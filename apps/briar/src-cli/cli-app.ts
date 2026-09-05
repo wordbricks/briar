@@ -76,6 +76,7 @@ import {
   sandboxStatusCommand,
   sandboxStopCommand,
   sandboxSuperviseCommand,
+  sandboxUnregisterCommand,
   sandboxUpCommand,
 } from "./sandbox-commands";
 import {
@@ -851,9 +852,9 @@ const sandboxCommand = Command.make("sandbox").pipe(
     ),
     leaf(
       "rm",
-      { ...sandboxTargetFlags, ...switches("purge") },
+      { ...sandboxTargetFlags, ...switches("purge", "keep-workers") },
       sandboxRemoveCommand,
-      "Remove the sandbox container (and its home volume with --purge)",
+      "Unregister the sandbox's workers and remove its container; --purge also drops its volume, image, and Docker context",
     ),
     leaf(
       "logs",
@@ -878,6 +879,8 @@ const sandboxCommand = Command.make("sandbox").pipe(
     leaf("report", {}, sandboxReportCommand, "Report sandbox readiness as JSON")
       .pipe(Command.unlisted),
     leaf("supervise", {}, sandboxSuperviseCommand, "Supervise sandbox workers")
+      .pipe(Command.unlisted),
+    leaf("unregister", {}, sandboxUnregisterCommand, "Unbind this sandbox's workers")
       .pipe(Command.unlisted),
   ]),
 );

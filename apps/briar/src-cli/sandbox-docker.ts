@@ -440,25 +440,135 @@ export async function restartSandbox(docker: DockerRunner, name: string) {
   }
 }
 
+const SandboxUnregisterReport = Schema.Struct({
+  teams: Schema.Array(Schema.Struct({
+    id: Schema.String,
+    workerId: Schema.NullOr(Schema.String),
+    state: Schema.Literals(["unbound", "not_registered", "failed"]),
+    detail: Schema.optional(Schema.String),
+  })),
+});
+export type SandboxUnregisterReport = typeof SandboxUnregisterReport.Type;
+const decodeSandboxUnregisterReport = Schema.decodeUnknownSync(SandboxUnregisterReport);
+
+/**
+ * Ask the container to unbind its workers. A stopped container is started
+ * first so the teardown can still reach the server with the sandbox's own
+ * session. Returns null when the container does not exist or cannot answer.
+ */
+async function unregisterSandboxWorkers(
+  docker: DockerRunner,
+  name: string,
+  inspected: SandboxInspection,
+): Promise<{ report: SandboxUnregisterReport | null; detail: string | null }> {
+  if (!inspected.exists) return { report: null, detail: null };
+  const containerName = sandboxContainerName(name);
+  if (!inspected.running) {
+    const started = await docker(["start", containerName]);
+    if (!started.ok) {
+      return { report: null, detail: `Could not start the sandbox to unregister its workers: ${started.output}` };
+    }
+  }
+  const result = await docker([
+    "exec",
+    containerName,
+    SANDBOX_CLI_PATH,
+    "sandbox",
+    "unregister",
+  ]);
+  if (!result.ok) {
+    return { report: null, detail: `Sandbox worker unregistration failed: ${result.output}` };
+  }
+  try {
+    return { report: decodeSandboxUnregisterReport(JSON.parse(result.output)), detail: null };
+  } catch {
+    return { report: null, detail: "Sandbox worker unregistration returned malformed output" };
+  }
+}
+
+export interface RemoveSandboxOptions {
+  readonly purge: boolean;
+  /** Unbind the sandbox's workers on the server before deleting it. */
+  readonly unregisterWorkers: boolean;
+  /** Image tag recorded for this sandbox; removed with `purge`. */
+  readonly imageTag?: string;
+  /** Docker context Briar created for this sandbox; removed with `purge`. */
+  readonly dockerContext?: string;
+  /** Runner without a context, used for `docker context rm`. */
+  readonly contextRunner?: DockerRunner;
+}
+
+export interface RemoveSandboxResult {
+  readonly existed: boolean;
+  readonly unregistered: SandboxUnregisterReport | null;
+  readonly unregisterDetail: string | null;
+  readonly volumeRemoved: boolean;
+  readonly imageRemoved: boolean;
+  readonly contextRemoved: boolean;
+}
+
+/**
+ * Tear a sandbox down completely: unbind its workers, delete the container,
+ * and with `purge` also the home volume, the built image, and the Docker
+ * context Briar created. Ownership is checked before anything is touched.
+ */
 export async function removeSandbox(
   docker: DockerRunner,
   name: string,
-  options: { readonly purge: boolean },
-) {
+  options: RemoveSandboxOptions,
+): Promise<RemoveSandboxResult> {
   const inspected = await requireOwned(docker, name);
+  const unregistered = options.unregisterWorkers
+    ? await unregisterSandboxWorkers(docker, name, inspected)
+    : { report: null, detail: null };
   if (inspected.exists) {
     const removed = await docker(["rm", "--force", sandboxContainerName(name)]);
     if (!removed.ok && !/no such container/iu.test(removed.output)) {
       throw new Error(`Could not remove the sandbox: ${removed.output}`);
     }
   }
+  let volumeRemoved = false;
+  let imageRemoved = false;
+  let contextRemoved = false;
   if (options.purge) {
     const volume = await docker(["volume", "rm", sandboxHomeVolume(name)]);
     if (!volume.ok && !/no such volume/iu.test(volume.output)) {
       throw new Error(`Could not remove the sandbox volume: ${volume.output}`);
     }
+    volumeRemoved = volume.ok;
+    if (options.imageTag) {
+      const image = await docker(["image", "rm", options.imageTag]);
+      if (!image.ok && !/no such image/iu.test(image.output)) {
+        throw new Error(`Could not remove the sandbox image: ${image.output}`);
+      }
+      imageRemoved = image.ok;
+    }
+    if (options.dockerContext && options.contextRunner) {
+      if (!options.dockerContext.startsWith("briar-sandbox-")) {
+        throw new Error(
+          `Refusing to remove Docker context ${options.dockerContext}: Briar did not create it.`,
+        );
+      }
+      const context = await options.contextRunner([
+        "context",
+        "rm",
+        "--force",
+        options.dockerContext,
+      ]);
+      if (!context.ok && !/not found|does not exist/iu.test(context.output)) {
+        throw new Error(`Could not remove the Docker context: ${context.output}`);
+      }
+      contextRemoved = context.ok;
+    }
   }
-  return inspected.exists;
+  return {
+    existed: inspected.exists,
+    unregistered: unregistered.report,
+    unregisterDetail: unregistered.detail,
+    volumeRemoved,
+    imageRemoved,
+    contextRemoved,
+  };
 }
 
 /** Ensure a Docker context exists for an SSH host and return its name. */

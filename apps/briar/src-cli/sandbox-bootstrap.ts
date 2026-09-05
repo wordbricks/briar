@@ -24,7 +24,10 @@ import {
   runSimpleCommand,
 } from "./project-repository-bootstrap";
 import { SANDBOX_SCHEMA_VERSION } from "./sandbox-image";
-import { registerProjectExecutionWorker } from "./worker-commands";
+import {
+  registerProjectExecutionWorker,
+  unregisterTeamExecutionWorker,
+} from "./worker-commands";
 
 /**
  * In-container half of the Docker sandbox.
@@ -344,6 +347,66 @@ async function readSupervisorPid(directory = configDirectory) {
   } catch {
     return null;
   }
+}
+
+export type SandboxUnregisterResult = {
+  readonly teams: ReadonlyArray<{
+    readonly id: string;
+    readonly workerId: string | null;
+    readonly state: "unbound" | "not_registered" | "failed";
+    readonly detail?: string;
+  }>;
+};
+
+/**
+ * Unbind every worker this sandbox registered so `briar sandbox rm` leaves
+ * nothing behind on the server. Failures are reported per team rather than
+ * thrown: the container is going away either way, and the caller decides how
+ * loudly to warn.
+ */
+export async function runSandboxUnregister(overrides: {
+  readonly loadConfig?: () => Promise<Config>;
+  readonly readState?: () => Promise<SandboxState | null>;
+  readonly unregister?: typeof unregisterTeamExecutionWorker;
+} = {}): Promise<SandboxUnregisterResult> {
+  const config = await (overrides.loadConfig ?? loadConfig)();
+  const state = await (overrides.readState ?? readSandboxState)();
+  const unregister = overrides.unregister ?? unregisterTeamExecutionWorker;
+  const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
+  const teams: SandboxUnregisterResult["teams"][number][] = [];
+  for (const id of state?.teamIds ?? []) {
+    const team = config.teams.find((candidate) => candidate.id === id);
+    if (!team?.executionWorker) {
+      teams.push({ id, workerId: null, state: "not_registered" });
+      continue;
+    }
+    if (!userToken) {
+      teams.push({
+        id,
+        workerId: team.executionWorker.workerId,
+        state: "failed",
+        detail: "No Briar session token in the sandbox",
+      });
+      continue;
+    }
+    try {
+      const result = await unregister({
+        config,
+        team,
+        userToken,
+        reason: "explicit_user_unlink",
+      });
+      teams.push({ id, workerId: result.workerId, state: "unbound" });
+    } catch (error) {
+      teams.push({
+        id,
+        workerId: team.executionWorker.workerId,
+        state: "failed",
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { teams };
 }
 
 export function sandboxWorkerTeamIds(config: Config, state: SandboxState | null) {
