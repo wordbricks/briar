@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.202",
+        date: "2026년 9월 5일",
+        title: "Docker sandbox에 데스크톱과 Computer Use를 더합니다",
+        summary:
+          "briar sandbox로 만든 컨테이너가 관리형 컴퓨터와 같은 화면 환경을 갖습니다. 에이전트마다 가상 디스플레이를 받아 브라우저와 데스크톱 앱을 직접 조작하고, 소유자는 같은 화면을 브라우저에서 실시간으로 볼 수 있습니다.",
+        items: [
+          "컨테이너 안에 VNC 디스플레이, XFCE 데스크톱, Chromium, Computer Use 실행기가 들어가고 systemd 없이도 디스플레이를 관리합니다.",
+          "briar sandbox view가 에이전트가 쓰는 화면을 noVNC로 열고, 원격 Docker 호스트는 SSH 포트 포워딩으로 연결합니다. briar sandbox verify가 디스플레이 할당과 스크린샷을 검증합니다.",
+          "briar sandbox rm이 워커 등록 해제, 볼륨, 이미지, Docker context까지 정리하고, 다시 up 하면 같은 호스트에 재생성됩니다.",
+          "느린 Debian 미러를 --debian-mirror로 바꿀 수 있고, 데스크톱 앱이 Computer Use MCP 서버 번들을 함께 설치해 설치된 CLI로도 sandbox를 만들 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.201",
         date: "2026년 9월 5일",
         title: "설정의 컴퓨터 목록이 비어 보이던 문제를 고칩니다",
@@ -1705,6 +1718,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.202",
+        date: "September 5, 2026",
+        title: "Give the Docker sandbox a desktop and Computer Use",
+        summary:
+          "Containers created with briar sandbox now carry the same display stack as a managed computer. Every agent gets its own virtual display to drive browsers and desktop apps, and the owner can watch that same screen live in a browser.",
+        items: [
+          "The container ships VNC displays, an XFCE desktop, Chromium, and the Computer Use executor, and manages displays without systemd.",
+          "briar sandbox view opens the display an agent is using through noVNC, tunnelling over SSH for remote Docker hosts; briar sandbox verify checks display assignment and screenshots.",
+          "briar sandbox rm now unregisters workers and removes the volume, image, and Docker context, and a later up recreates the sandbox on the same host.",
+          "A slow Debian mirror can be swapped with --debian-mirror, and the desktop app installs the Computer Use MCP bundle so an installed CLI can build the sandbox.",
+        ],
+      },
       {
         version: "1.2.201",
         date: "September 5, 2026",
