@@ -244,3 +244,38 @@ describe("managed computer remote session agent", () => {
     agent.stop();
   });
 });
+
+describe("managedComputerRemoteDisplayResolver", () => {
+  it("routes an assigned agent to its display and everyone else to the primary desktop", async () => {
+    const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { managedComputerRemoteDisplayResolver } = await import(
+      "./managed-computer-remote-session-agent"
+    );
+    const directory = await mkdtemp(join(tmpdir(), "briar-display-resolver-"));
+    try {
+      const assignments = join(directory, "window-assignments.json");
+      await writeFile(assignments, JSON.stringify({
+        version: 1,
+        assignments: [{
+          agentId: "agent-with-display",
+          displayIndex: 3,
+          ownerToken: "owner-token",
+          updatedAt: "2026-09-05T00:00:00.000Z",
+        }],
+      }), { mode: 0o600 });
+      const resolver = managedComputerRemoteDisplayResolver({
+        BRIAR_COMPUTER_USE_ASSIGNMENTS_FILE: assignments,
+        BRIAR_REMOTE_DISPLAY_HOST: "127.0.0.1",
+        BRIAR_REMOTE_DISPLAY_PORT: "5901",
+      });
+      expect(await resolver.resolve("agent-with-display")).toEqual({ host: "127.0.0.1", port: 5903 });
+      // An agent that is not using the computer shows the owner desktop.
+      expect(await resolver.resolve("idle-agent")).toEqual({ host: "127.0.0.1", port: 5901 });
+      expect(await resolver.resolve(undefined)).toEqual({ host: "127.0.0.1", port: 5901 });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
