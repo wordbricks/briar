@@ -163,7 +163,7 @@ describe("navigation actions", () => {
 
     const withoutTeam = harness({ activeTeamId: null });
     withoutTeam.actions.navigateToIssue("run-1");
-    expect(withoutTeam.registry.get(navigationLocationAtom)).toBe("lobby");
+    expect(withoutTeam.registry.get(navigationLocationAtom)).toBe("dms");
   });
 
   it("opens a channel, selects it and marks it read", () => {
@@ -191,7 +191,7 @@ describe("navigation actions", () => {
 
     actions.navigateToChannel("channel-a", "channels");
 
-    expect(registry.get(navigationLocationAtom)).toBe("lobby");
+    expect(registry.get(navigationLocationAtom)).toBe("dms");
     expect(registry.get(activeChannelIdAtom)).toBeNull();
   });
 
@@ -286,7 +286,7 @@ describe("navigation actions", () => {
     expect(registry.get(activePageAtom)).toBe("agents");
 
     actions.goToNavigationHistory(0);
-    expect(registry.get(activePageAtom)).toBe("lobby");
+    expect(registry.get(activePageAtom)).toBe("dms");
 
     actions.resetNavigation("lobby");
     expect(registry.get(navigationHistoryEntriesAtom)).toEqual(["lobby"]);

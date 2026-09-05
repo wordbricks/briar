@@ -12,7 +12,7 @@ import { EmptyState, MainContent, PageHeader } from "../layout";
 import { AppSettingsSidebar } from "./AppSettingsSidebar";
 import {
   ChannelsWithCatalog,
-  DirectMessagesWithCatalog,
+  DirectMessageConversationPaneWithCatalog,
 } from "./ChannelViews";
 import { HuntDashboardWithTeam } from "./HuntDashboardWithTeam";
 import { InboxDetailContent } from "./InboxDetailContent";
@@ -448,19 +448,13 @@ export function DesktopPages({
         );
       case "dms":
         return (
-          <DirectMessagesWithCatalog
+          <DirectMessageConversationPaneWithCatalog
             activeChannelId={desktopActiveChannelId}
             isSidebarOpen={isSidebarOpen}
             onChannelFallback={(channelId) =>
               handleDesktopChannelFallback(channelId, "dms")
             }
-            onChannelSelect={(channelId) => {
-              if (channelId) navigateToChannel(channelId, "dms");
-              else {
-                selectChannel(null);
-                navigateToPage("dms");
-              }
-            }}
+            onChannelSelect={(channelId) => navigateToChannel(channelId, "dms")}
             onCreateAgent={() => {
               setSettingsTarget({
                 scope: "organization",

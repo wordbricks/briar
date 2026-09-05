@@ -22,6 +22,7 @@ import { applySyncEvent } from "../sync/apply";
 import { resolveChannelApi } from "./api";
 import {
   activeChannelIdAtom,
+  directMessageComposeAtom,
   initialChannelInviteIdAtom,
   requestedChannelMessageAtom,
   requestedChannelSettingsIdAtom,
@@ -80,8 +81,13 @@ export interface ChannelActions {
   readonly openOrganizationChannelSettings: (channelId: string) => void;
   /** Deletes a channel and leaves it if it was the one on screen. */
   readonly deleteOrganizationChannel: (channelId: string) => Promise<void>;
-  /** Records the channel the app considers open. */
+  /** Records the channel the app considers open. Selecting one ends a compose. */
   readonly selectChannel: (channelId: string | null) => void;
+  /**
+   * Opens the desktop DM composer: no conversation is selected and the DM page
+   * shows the recipient picker until one is started or another is opened.
+   */
+  readonly startDirectMessageCompose: () => void;
   /** Records what the user is looking at, for notification suppression. */
   readonly setViewingChannel: (
     channelId: string | null,
@@ -218,7 +224,19 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
     },
 
     selectChannel(channelId) {
-      registry.set(activeChannelIdAtom, channelId);
+      Atom.batch(() => {
+        registry.set(activeChannelIdAtom, channelId);
+        if (channelId) registry.set(directMessageComposeAtom, false);
+      });
+    },
+
+    startDirectMessageCompose() {
+      if (registry.get(lockedTeamIdAtom)) return;
+      Atom.batch(() => {
+        registry.set(activeChannelIdAtom, null);
+        registry.set(directMessageComposeAtom, true);
+      });
+      channelNavigation(registry).navigateToPage?.("dms");
     },
 
     setViewingChannel(channelId, threadRootMessageId = null) {

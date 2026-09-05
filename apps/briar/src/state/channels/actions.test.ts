@@ -15,6 +15,7 @@ import {
 import {
   activeChannelIdAtom,
   activeOrganizationChannelsAtom,
+  directMessageComposeAtom,
   initialChannelInviteIdAtom,
   requestedChannelMessageAtom,
   requestedChannelSettingsIdAtom,
@@ -169,6 +170,37 @@ describe("channel actions", () => {
       "channels",
       "dms",
     ]);
+  });
+
+  it("composes a new direct message on the DM page until one is selected", () => {
+    const { actions, navigations, registry } = harness([
+      channel("dm-1", { kind: "dm" }),
+    ]);
+    actions.selectChannel("dm-1");
+
+    actions.startDirectMessageCompose();
+
+    expect(registry.get(directMessageComposeAtom)).toBe(true);
+    expect(registry.get(activeChannelIdAtom)).toBeNull();
+    expect(navigations.pages).toEqual(["dms"]);
+
+    // Selecting any conversation ends the compose; clearing does not.
+    actions.selectChannel(null);
+    expect(registry.get(directMessageComposeAtom)).toBe(true);
+    actions.selectChannel("dm-1");
+    expect(registry.get(directMessageComposeAtom)).toBe(false);
+    expect(registry.get(activeChannelIdAtom)).toBe("dm-1");
+  });
+
+  it("does not compose a direct message in a project window", () => {
+    const { actions, navigations, registry } = harness([], {
+      lockedTeamId: "team-1",
+    });
+
+    actions.startDirectMessageCompose();
+
+    expect(registry.get(directMessageComposeAtom)).toBe(false);
+    expect(navigations.pages).toEqual([]);
   });
 
   it("refuses to open a channel outside a project window's team", () => {

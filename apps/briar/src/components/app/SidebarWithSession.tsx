@@ -8,6 +8,7 @@ import {
 } from "../../state/dialogs/atoms";
 import {
   channelsLoadingAtom,
+  directMessageComposeAtom,
   organizationDirectMessagesAtom,
   visibleOrganizationChannelsAtom,
 } from "../../state/channels/atoms";
@@ -90,6 +91,8 @@ export function SidebarWithSession(
     | "channels"
     | "channelsLoading"
     | "connectedTeamIds"
+    | "directMessages"
+    | "isComposingDirectMessage"
     | "isOpen"
     | "projectReadiness"
     | "projectReadinessError"
@@ -106,6 +109,7 @@ export function SidebarWithSession(
   const channelsLoading = useAtomValue(channelsLoadingAtom);
   const connectedTeamIds = useAtomValue(connectedTeamIdsAtom);
   const directMessages = useAtomValue(organizationDirectMessagesAtom);
+  const isComposingDirectMessage = useAtomValue(directMessageComposeAtom);
   const isOpen = useAtomValue(isSidebarOpenAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const projectReadiness = useAtomValue(teamReadinessRecordAtom);
@@ -128,6 +132,8 @@ export function SidebarWithSession(
             channels={channels}
             channelsLoading={channelsLoading}
             connectedTeamIds={connectedTeamIds}
+            directMessages={directMessages}
+            isComposingDirectMessage={isComposingDirectMessage}
             isOpen={isOpen}
             projectReadiness={projectReadiness}
             projectReadinessError={projectReadinessError}

@@ -15,7 +15,11 @@ import {
 import { organizationChannelsAtom } from "../entities/channels";
 import { applySyncEvent } from "../sync/apply";
 import { channelApiAtom } from "../channels/api";
-import { activeChannelIdAtom } from "../channels/atoms";
+import {
+  activeChannelIdAtom,
+  channelCatalogCursorAtom,
+  directMessageComposeAtom,
+} from "../channels/atoms";
 import {
   activePageAtom,
   activeRunIdAtom,
@@ -247,7 +251,7 @@ describe("navigation reconciliation", () => {
       registry.set(userAtom, { ...user, id: "user-2" });
     });
     await flush();
-    expect(registry.get(activePageAtom)).toBe("lobby");
+    expect(registry.get(activePageAtom)).toBe("dms");
     await view.cleanup();
   });
 
@@ -617,6 +621,85 @@ describe("navigation reconciliation", () => {
     await flush();
     expect(registry.get(canGoBackAtom)).toBe(false);
     expect(registry.get(canGoForwardAtom)).toBe(false);
+    await view.cleanup();
+  });
+});
+
+describe("the DM page's latest conversation", () => {
+  const directMessageOf = (id: string, lastMessageAt: string): ChannelSummary => ({
+    ...channelOf(id),
+    kind: "dm",
+    visibility: "private",
+    lastMessageAt,
+    dmParticipants: [
+      { type: "user", id: user.id, name: user.name, image: null },
+      { type: "user", id: `${id}-peer`, name: id, image: null },
+    ],
+  });
+  const older = directMessageOf("dm-older", "2026-09-01T09:00:00.000Z");
+  const latest = directMessageOf("dm-latest", "2026-09-02T09:00:00.000Z");
+
+  it("opens the latest conversation when the window lands on the DM page", async () => {
+    const registry = harness();
+    seedChannels(registry, [older, latest]);
+    registry.set(channelCatalogCursorAtom, 1);
+    const view = await mount(registry);
+
+    expect(registry.get(navigationLocationAtom)).toBe(
+      channelNavigationLocation("dms", organization.id, latest.id, teamA.id),
+    );
+    expect(registry.get(activeChannelIdAtom)).toBe(latest.id);
+    // Swapped in, not visited: Back has nowhere to go.
+    expect(registry.get(navigationHistoryEntriesAtom)).toHaveLength(1);
+    expect(registry.get(canGoBackAtom)).toBe(false);
+    await view.cleanup();
+  });
+
+  it("waits for the catalog before choosing a conversation", async () => {
+    const registry = harness();
+    seedChannels(registry, [older, latest]);
+    const view = await mount(registry);
+
+    expect(registry.get(navigationLocationAtom)).toBe("dms");
+    expect(registry.get(activeChannelIdAtom)).toBeNull();
+
+    await act(async () => {
+      registry.set(channelCatalogCursorAtom, 1);
+    });
+    await flush();
+    expect(registry.get(activeChannelIdAtom)).toBe(latest.id);
+    await view.cleanup();
+  });
+
+  it("leaves the page on nothing while a new conversation is composed", async () => {
+    const registry = harness();
+    seedChannels(registry, [older, latest]);
+    registry.set(channelCatalogCursorAtom, 1);
+    registry.set(directMessageComposeAtom, true);
+    const view = await mount(registry);
+
+    expect(registry.get(navigationLocationAtom)).toBe("dms");
+    expect(registry.get(activeChannelIdAtom)).toBeNull();
+
+    // Opening a conversation ends the compose and shows it.
+    await act(async () => {
+      actions.navigateToChannel(older.id, "dms");
+    });
+    await flush();
+    expect(registry.get(directMessageComposeAtom)).toBe(false);
+    expect(registry.get(activeChannelIdAtom)).toBe(older.id);
+    await view.cleanup();
+  });
+
+  it("does nothing off the DM page", async () => {
+    const registry = harness();
+    seedChannels(registry, [older, latest]);
+    registry.set(channelCatalogCursorAtom, 1);
+    createNavigationActions(registry).resetNavigation("issues");
+    const view = await mount(registry);
+
+    expect(registry.get(activePageAtom)).toBe("issues");
+    expect(registry.get(activeChannelIdAtom)).toBeNull();
     await view.cleanup();
   });
 });

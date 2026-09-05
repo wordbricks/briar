@@ -10,6 +10,7 @@ import {
   settingsNavigationLocation,
 } from "../../lib/app-navigation";
 import { activeChannelIdAtom } from "../channels/atoms";
+import type { ChannelSummary } from "../../lib/channels-contract";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { userAtom } from "../session/atoms";
@@ -22,6 +23,8 @@ import {
   canGoBackAtom,
   canGoForwardAtom,
   desktopActiveChannelIdAtom,
+  lastDirectMessageChannelIdAtom,
+  lastWorkLocationAtom,
   navigationChannelIdAtom,
   navigationHistoryAtom,
   navigationHistoryEntriesAtom,
@@ -33,6 +36,7 @@ import {
   navigationSettingsTargetAtom,
   navigationTeamIdAtom,
   navigationUserBoundaryChangedAtom,
+  sidebarModeAtom,
 } from "./atoms";
 import {
   createNavigationHistory,
@@ -83,11 +87,11 @@ describe("navigation location atoms", () => {
   it("starts on the lobby with nowhere to go", () => {
     const registry = createTestRegistry();
 
-    expect(registry.get(navigationLocationAtom)).toBe("lobby");
-    expect(registry.get(activePageAtom)).toBe("lobby");
+    expect(registry.get(navigationLocationAtom)).toBe("dms");
+    expect(registry.get(activePageAtom)).toBe("dms");
     expect(registry.get(canGoBackAtom)).toBe(false);
     expect(registry.get(canGoForwardAtom)).toBe(false);
-    expect(registry.get(navigationHistoryEntriesAtom)).toEqual(["lobby"]);
+    expect(registry.get(navigationHistoryEntriesAtom)).toEqual(["dms"]);
     expect(registry.get(navigationHistoryIndexAtom)).toBe(0);
   });
 
@@ -212,7 +216,7 @@ describe("navigation location atoms", () => {
     unsubscribePage();
     unsubscribeLocation();
 
-    expect(pages).toEqual(["lobby", "issues", "agents"]);
+    expect(pages).toEqual(["dms", "issues", "agents"]);
     expect(locations).toHaveLength(4);
   });
 
@@ -350,5 +354,136 @@ describe("navigationHistoryRunLabelsAtom", () => {
     expect(seen).toHaveLength(1);
     expect(registry.get(navigationHistoryRunLabelsAtom).get(target.id)?.title)
       .toBe("고친 이슈");
+  });
+});
+
+describe("sidebar halves", () => {
+  const organizationId = teamA.organizationId;
+  const otherOrganizationId = "organization-other";
+  const otherTeam = teamOf("team-other", { organizationId: otherOrganizationId });
+  const directMessageOf = (id: string): ChannelSummary => ({
+    id,
+    organizationId,
+    kind: "dm",
+    slug: id,
+    name: id,
+    topic: null,
+    visibility: "private",
+    defaultProjectId: null,
+    archivedAt: null,
+    memberCount: 2,
+    agentCount: 0,
+    createdByUserId: user.id,
+    createdAt: "2026-09-01T00:00:00.000Z",
+    updatedAt: "2026-09-01T00:00:00.000Z",
+    lastMessageAt: null,
+    lastMessagePreview: null,
+    lastReadAt: null,
+    hasUnread: false,
+    dmParticipants: [
+      { type: "user", id: user.id, name: user.name, image: null },
+      { type: "user", id: "user-2", name: "Sam", image: null },
+    ],
+  });
+  const withOrganization = () =>
+    createTestRegistry([
+      [teamsAtom, [teamA, teamB, otherTeam]],
+      [activeTeamIdAtom, teamA.id],
+      [activeOrganizationIdAtom, organizationId],
+    ]);
+
+  it("is the DMs half on the DM page and the Work half everywhere else", () => {
+    const registry = withOrganization();
+    expect(registry.get(sidebarModeAtom)).toBe("dms");
+
+    navigate(registry, projectNavigationLocation("issues", teamA.id));
+    expect(registry.get(sidebarModeAtom)).toBe("work");
+
+    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    expect(registry.get(sidebarModeAtom)).toBe("dms");
+
+    navigate(registry, settingsNavigationLocation({
+      scope: "application",
+      section: "account",
+    }));
+    expect(registry.get(sidebarModeAtom)).toBe("work");
+  });
+
+  it("has no work location to return to before a work page was visited", () => {
+    const registry = withOrganization();
+    expect(registry.get(lastWorkLocationAtom)).toBeNull();
+
+    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    expect(registry.get(lastWorkLocationAtom)).toBeNull();
+  });
+
+  it("returns to the most recent work page, skipping DM visits", () => {
+    const registry = withOrganization();
+    navigate(registry, projectNavigationLocation("issues", teamA.id));
+    navigate(registry, organizationNavigationLocation(organizationId, "inbox"));
+    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    navigate(registry, channelPageNavigationLocation("dms", organizationId));
+
+    expect(registry.get(lastWorkLocationAtom)).toBe(
+      organizationNavigationLocation(organizationId, "inbox"),
+    );
+
+    // Going back past the inbox makes the board the most recent work page.
+    dispatch(registry, { type: "goTo", index: 1 });
+    expect(registry.get(lastWorkLocationAtom)).toBe(
+      projectNavigationLocation("issues", teamA.id),
+    );
+  });
+
+  it("skips work pages that belong to another organization", () => {
+    const registry = withOrganization();
+    navigate(registry, projectNavigationLocation("issues", teamA.id));
+    navigate(registry, organizationNavigationLocation(otherOrganizationId, "inbox"));
+    navigate(registry, projectNavigationLocation("agents", otherTeam.id));
+    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+
+    // Neither the other organization's inbox nor its team's page qualifies;
+    // following them would switch the organization back.
+    expect(registry.get(lastWorkLocationAtom)).toBe(
+      projectNavigationLocation("issues", teamA.id),
+    );
+
+    // A location naming no organization or team belongs to every one.
+    navigate(registry, settingsNavigationLocation({
+      scope: "application",
+      section: "account",
+    }));
+    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    expect(registry.get(lastWorkLocationAtom)).toBe(
+      settingsNavigationLocation({ scope: "application", section: "account" }),
+    );
+  });
+
+  it("returns to the most recent conversation still in the catalog", () => {
+    const registry = withOrganization();
+    applySyncEvent(registry, {
+      kind: "channel-catalog-snapshot",
+      organizationId,
+      channels: [directMessageOf("dm-1"), directMessageOf("dm-2")],
+    });
+    expect(registry.get(lastDirectMessageChannelIdAtom)).toBeNull();
+
+    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-2"));
+    navigate(registry, projectNavigationLocation("issues", teamA.id));
+    expect(registry.get(lastDirectMessageChannelIdAtom)).toBe("dm-2");
+
+    // A conversation that left the catalog is not somewhere to return to.
+    applySyncEvent(registry, {
+      kind: "channel-removed",
+      organizationId,
+      channelId: "dm-2",
+    });
+    expect(registry.get(lastDirectMessageChannelIdAtom)).toBe("dm-1");
+
+    // Nor is a conversation visited under another organization.
+    navigate(registry, channelNavigationLocation("dms", otherOrganizationId, "dm-9"));
+    navigate(registry, projectNavigationLocation("issues", teamA.id));
+    expect(registry.get(lastDirectMessageChannelIdAtom)).toBe("dm-1");
   });
 });

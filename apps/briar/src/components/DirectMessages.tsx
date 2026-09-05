@@ -37,6 +37,17 @@ import { Channels } from "./Channels";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 
+/*
+  Direct messages, in two arrangements.
+
+  The desktop puts the conversation list in the sidebar (`SidebarDirectMessages`)
+  and gives the whole page to one conversation — `DirectMessageConversationPane`
+  below, which shows either the timeline or the recipient picker for a new
+  conversation. The companion has no sidebar, so `DirectMessages` keeps the
+  list and the conversation side by side in one view. Both share the picker and
+  the row pieces exported from here.
+*/
+
 type Candidate =
   | {
       type: "user";
@@ -80,10 +91,10 @@ type DirectMessagesProps = {
 const candidateKey = (candidate: Pick<Candidate, "type" | "id">) =>
   `${candidate.type}:${candidate.id}`;
 
-const participantInitial = (name: string) =>
+export const participantInitial = (name: string) =>
   name.trim().charAt(0).toUpperCase() || "?";
 
-function DirectMessageAvatar({
+export function DirectMessageAvatar({
   participants,
   label,
   size = "default",
@@ -134,7 +145,7 @@ function DirectMessageAvatar({
   );
 }
 
-const formatConversationTime = (value: string, localeTag: string) => {
+export const formatConversationTime = (value: string, localeTag: string) => {
   const date = new Date(value);
   const today = new Date();
   const sameDay = date.toDateString() === today.toDateString();
@@ -146,31 +157,32 @@ const formatConversationTime = (value: string, localeTag: string) => {
   ).format(date);
 };
 
-export function DirectMessages({
-  isSidebarOpen,
+/**
+ * The recipient picker for a new conversation. It loads the organization's
+ * members and agents once on mount, and reports the conversation it created
+ * (or found — a DM with the same participants is reused by the server).
+ */
+export function DirectMessageCompose({
   organizationId,
-  organizationName,
   token,
   currentUserId,
-  channels,
-  projects = [],
-  activeChannelId,
-  channelCatalogCursor,
-  onChannelSelect,
-  onChannelFallback,
+  isSidebarOpen = true,
   onChannelsChange,
-  onIssueCreated,
-  onSkillSessionAccepted,
-  onViewingChannelChange,
-  onCreateAgent,
-}: DirectMessagesProps) {
-  const { localeTag, t } = useI18n();
+  onCreated,
+}: {
+  organizationId: string;
+  token: string;
+  currentUserId: string | null;
+  /** When false the recipient row leaves room for the window controls. */
+  isSidebarOpen?: boolean;
+  onChannelsChange: Dispatch<SetStateAction<ChannelSummary[]>>;
+  onCreated: (channelId: string) => void;
+}) {
+  const { t } = useI18n();
   const candidateLabel = (candidate: Candidate) =>
     candidate.type === "user" && candidate.isSelf
       ? t("dm.self")
       : candidate.name;
-  const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState(channels.length === 0);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [candidateSearch, setCandidateSearch] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -179,7 +191,6 @@ export function DirectMessages({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!creating) return;
     let cancelled = false;
     setLoadingCandidates(true);
     setError(null);
@@ -221,21 +232,8 @@ export function DirectMessages({
     return () => {
       cancelled = true;
     };
-  }, [creating, currentUserId, organizationId, t, token]);
+  }, [currentUserId, organizationId, t, token]);
 
-  const directMessages = useMemo(
-    () => sortDirectMessages(channels.filter((channel) => channel.kind === "dm")),
-    [channels],
-  );
-  const visibleDirectMessages = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    if (!query) return directMessages;
-    return directMessages.filter((channel) =>
-      directMessageDisplayName(channel, currentUserId)
-        .toLocaleLowerCase()
-        .includes(query)
-    );
-  }, [currentUserId, directMessages, search]);
   const filteredCandidates = useMemo(() => {
     const query = candidateSearch.trim().toLocaleLowerCase();
     return candidates.filter((candidate) =>
@@ -254,19 +252,7 @@ export function DirectMessages({
   );
   const isSelfMessage = selected.length === 1 && selected[0]?.type === "user" &&
     selected[0].isSelf;
-  const showMainOnMobile =
-    creating || visibleDirectMessages.some((channel) => channel.id === activeChannelId);
 
-  const startCreate = () => {
-    setCreating(true);
-    setCandidateSearch("");
-    setSelectedKeys(new Set());
-    setError(null);
-  };
-  const openConversation = (channelId: string) => {
-    setCreating(false);
-    onChannelSelect(channelId);
-  };
   const toggleCandidate = (candidate: Candidate) => {
     const key = candidateKey(candidate);
     setSelectedKeys((current) => {
@@ -296,15 +282,285 @@ export function DirectMessages({
             )
           : [...current, result.channel],
       );
-      onChannelSelect(result.channel.id);
-      setCreating(false);
       setSelectedKeys(new Set());
       setCandidateSearch("");
+      onCreated(result.channel.id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSubmitting(false);
     }
+  };
+
+  return (
+    <div className="dm-compose-view relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <div
+        className={cn(
+          "dm-recipient-composer flex min-h-[52px] shrink-0 items-start gap-[9px] border-b border-border px-3.5 py-2",
+          !isSidebarOpen && "pl-[var(--window-navigation-content-inset)]",
+        )}
+        data-tauri-drag-region
+      >
+        <span className="pt-2 text-sm font-semibold text-muted-foreground">
+          {t("dm.to")}
+        </span>
+        <div className="dm-recipient-field flex min-h-[35px] min-w-0 flex-1 flex-wrap items-center gap-[5px]">
+          {selected.map((candidate) => (
+            <button
+              aria-label={t("dm.removeRecipient", {
+                name: candidateLabel(candidate),
+              })}
+              className="dm-recipient-chip flex h-7 items-center gap-[5px] rounded-full border border-primary/25 bg-primary/10 px-2 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              key={candidateKey(candidate)}
+              onClick={() => toggleCandidate(candidate)}
+              type="button"
+            >
+              {candidateLabel(candidate)}
+              <X aria-hidden="true" size={12} />
+            </button>
+          ))}
+          <input
+            autoFocus
+            className="h-[34px] min-w-[170px] flex-1 border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-0"
+            onChange={(event) => setCandidateSearch(event.target.value)}
+            placeholder={selected.length ? t("dm.addMore") : t("dm.recipientPlaceholder")}
+            value={candidateSearch}
+          />
+        </div>
+        <Button
+          className="dm-start-button h-[34px] min-h-[34px] shrink-0 rounded-lg px-3 text-xs font-[650] shadow-none disabled:opacity-40"
+          disabled={selected.length === 0 || submitting}
+          onClick={() => void submit()}
+          size="sm"
+          type="button"
+          variant="default"
+        >
+          {submitting ? <Spinner aria-hidden="true" className="size-[14px]" /> : <MessageCircle aria-hidden="true" size={15} />}
+          {isSelfMessage
+            ? t("dm.self")
+            : selected.length > 1
+            ? t("dm.startGroup")
+            : t("dm.start")}
+        </Button>
+      </div>
+      <div className="dm-candidate-popover scrollbar-subtle absolute left-5 top-[57px] z-20 max-h-[360px] w-[min(600px,calc(100%_-_40px))] overflow-auto rounded-xl border border-border bg-popover p-[7px] shadow-[0_16px_42px_rgba(20,20,18,.14),0_2px_7px_rgba(20,20,18,.08)]">
+        {loadingCandidates ? (
+          <div className="dm-candidate-status m-0 flex items-center justify-center gap-2 p-[18px] text-sm text-muted-foreground">
+            <Spinner aria-hidden="true" className="size-[16px]" />
+            {t("dm.loadingPeople")}
+          </div>
+        ) : filteredCandidates.length ? (
+          filteredCandidates.map((candidate) => {
+            const checked = selectedKeys.has(candidateKey(candidate));
+            return (
+              <button
+                aria-pressed={checked}
+                className={cn(
+                  "grid min-h-12 w-full grid-cols-[32px_minmax(0,1fr)_auto_20px] items-center gap-[9px] rounded-lg border-0 px-[9px] py-1.5 text-left text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                  checked
+                    ? "selected bg-accent hover:bg-accent"
+                    : "bg-transparent hover:bg-accent",
+                )}
+                key={candidateKey(candidate)}
+                onClick={() => toggleCandidate(candidate)}
+                type="button"
+              >
+                <span className="dm-candidate-avatar grid size-[30px] place-items-center overflow-hidden rounded-full bg-[#8f6cef] text-xs font-bold text-white [&>img]:size-full [&>img]:object-cover">
+                  {candidate.image ? <img alt="" src={candidate.image} /> : candidate.type === "agent" ? <Bot aria-hidden="true" size={17} /> : participantInitial(candidate.name)}
+                </span>
+                <span className="grid min-w-0 gap-0.5">
+                  <strong className="truncate text-sm">
+                    {candidate.type === "user" && candidate.isSelf
+                      ? t("dm.self")
+                      : candidate.name}
+                  </strong>
+                  <small className="truncate text-xs text-muted-foreground">
+                    {candidate.detail}
+                  </small>
+                </span>
+                {candidate.type === "agent" ? (
+                  <span className="dm-candidate-badges flex min-w-0 items-center justify-end gap-[5px]">
+                    {candidate.projectName ? (
+                      <span
+                        className="dm-candidate-project flex min-w-0 max-w-[150px] items-center gap-1 overflow-hidden rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-[650] whitespace-nowrap text-secondary-foreground"
+                        title={candidate.projectName}
+                      >
+                        <FolderKanban aria-hidden="true" className="shrink-0" size={11} />
+                        <span className="min-w-0 truncate">{candidate.projectName}</span>
+                      </span>
+                    ) : null}
+                    <em className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold not-italic text-primary">
+                      {t("dm.agent")}
+                    </em>
+                  </span>
+                ) : null}
+                {checked ? <Check aria-hidden="true" size={16} /> : null}
+              </button>
+            );
+          })
+        ) : (
+          <p className="m-0 flex items-center justify-center p-[18px] text-sm text-muted-foreground">
+            {t("dm.noResults")}
+          </p>
+        )}
+      </div>
+      {error ? (
+        <p
+          className="dm-error absolute left-5 top-[430px] z-[21] m-0 text-sm text-destructive"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+      <div className="dm-compose-empty m-auto grid max-w-[440px] justify-items-center gap-2.5 px-8 pb-8 pt-[120px] text-center text-muted-foreground">
+        <Users aria-hidden="true" size={42} strokeWidth={1.3} />
+        <h2 className="mt-[3px] text-xl font-semibold text-foreground">
+          {t("dm.composeTitle")}
+        </h2>
+        <p className="m-0 text-sm leading-relaxed">{t("dm.composeDescription")}</p>
+      </div>
+    </div>
+  );
+}
+
+type DirectMessageConversationPaneProps = Omit<
+  DirectMessagesProps,
+  "onChannelSelect"
+> & {
+  /** The user asked for a new conversation; the picker shows instead of a timeline. */
+  composing: boolean;
+  onChannelSelect: (channelId: string) => void;
+};
+
+/**
+ * The desktop DM page: one conversation, full width. The list lives in the
+ * sidebar, so with nothing open this shows the recipient picker — either
+ * because the user asked for a new conversation, or because the organization
+ * has none yet. While the catalog is still loading it shows neither, since the
+ * navigation is about to open the latest conversation.
+ */
+export function DirectMessageConversationPane({
+  isSidebarOpen,
+  organizationId,
+  organizationName,
+  token,
+  currentUserId,
+  channels,
+  projects = [],
+  activeChannelId,
+  channelCatalogCursor,
+  composing,
+  onChannelSelect,
+  onChannelFallback,
+  onChannelsChange,
+  onIssueCreated,
+  onSkillSessionAccepted,
+  onViewingChannelChange,
+  onCreateAgent,
+}: DirectMessageConversationPaneProps) {
+  const { t } = useI18n();
+  const directMessages = useMemo(
+    () => sortDirectMessages(channels.filter((channel) => channel.kind === "dm")),
+    [channels],
+  );
+  const catalogLoaded = channelCatalogCursor !== null;
+  const showCompose =
+    composing || (catalogLoaded && directMessages.length === 0);
+  return (
+    <div
+      className={cn(
+        "dm-conversation-pane flex min-h-0 min-w-0 flex-1 bg-card [&>.channels]:flex-1",
+        !isSidebarOpen && "sidebar-closed",
+      )}
+      data-composing={showCompose ? "true" : undefined}
+    >
+      {showCompose ? (
+        <DirectMessageCompose
+          currentUserId={currentUserId}
+          isSidebarOpen={isSidebarOpen}
+          onChannelsChange={onChannelsChange}
+          onCreated={onChannelSelect}
+          organizationId={organizationId}
+          token={token}
+        />
+      ) : !catalogLoaded && directMessages.length === 0 ? (
+        <div
+          aria-busy="true"
+          aria-label={t("dm.conversations")}
+          className="dm-conversation-loading m-auto flex items-center justify-center text-muted-foreground"
+          role="status"
+        >
+          <Spinner aria-hidden="true" className="size-5" />
+        </div>
+      ) : (
+        <Channels
+          activeChannelId={activeChannelId}
+          channelCatalogCursor={channelCatalogCursor}
+          channels={directMessages}
+          currentUserId={currentUserId}
+          onChannelFallback={onChannelFallback}
+          onChannelSelect={(channelId) => {
+            if (channelId) onChannelSelect(channelId);
+          }}
+          onChannelsChange={onChannelsChange}
+          onCreateAgent={onCreateAgent}
+          onIssueCreated={onIssueCreated}
+          onSkillSessionAccepted={onSkillSessionAccepted}
+          onViewingChannelChange={onViewingChannelChange}
+          organizationId={organizationId}
+          organizationName={organizationName}
+          projects={projects}
+          surface="dm"
+          token={token}
+        />
+      )}
+    </div>
+  );
+}
+
+/** The companion DM view: the conversation list beside the open conversation. */
+export function DirectMessages({
+  isSidebarOpen,
+  organizationId,
+  organizationName,
+  token,
+  currentUserId,
+  channels,
+  projects = [],
+  activeChannelId,
+  channelCatalogCursor,
+  onChannelSelect,
+  onChannelFallback,
+  onChannelsChange,
+  onIssueCreated,
+  onSkillSessionAccepted,
+  onViewingChannelChange,
+  onCreateAgent,
+}: DirectMessagesProps) {
+  const { localeTag, t } = useI18n();
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(channels.length === 0);
+
+  const directMessages = useMemo(
+    () => sortDirectMessages(channels.filter((channel) => channel.kind === "dm")),
+    [channels],
+  );
+  const visibleDirectMessages = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!query) return directMessages;
+    return directMessages.filter((channel) =>
+      directMessageDisplayName(channel, currentUserId)
+        .toLocaleLowerCase()
+        .includes(query)
+    );
+  }, [currentUserId, directMessages, search]);
+  const showMainOnMobile =
+    creating || visibleDirectMessages.some((channel) => channel.id === activeChannelId);
+
+  const startCreate = () => setCreating(true);
+  const openConversation = (channelId: string) => {
+    setCreating(false);
+    onChannelSelect(channelId);
   };
 
   return (
@@ -418,127 +674,16 @@ export function DirectMessages({
         )}
       >
         {creating ? (
-          <div className="dm-compose-view relative flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="dm-recipient-composer flex min-h-[52px] shrink-0 items-start gap-[9px] border-b border-border px-3.5 py-2">
-              <span className="pt-2 text-sm font-semibold text-muted-foreground">
-                {t("dm.to")}
-              </span>
-              <div className="dm-recipient-field flex min-h-[35px] min-w-0 flex-1 flex-wrap items-center gap-[5px]">
-                {selected.map((candidate) => (
-                  <button
-                    aria-label={t("dm.removeRecipient", {
-                      name: candidateLabel(candidate),
-                    })}
-                    className="dm-recipient-chip flex h-7 items-center gap-[5px] rounded-full border border-primary/25 bg-primary/10 px-2 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    key={candidateKey(candidate)}
-                    onClick={() => toggleCandidate(candidate)}
-                    type="button"
-                  >
-                    {candidateLabel(candidate)}
-                    <X aria-hidden="true" size={12} />
-                  </button>
-                ))}
-                <input
-                  autoFocus
-                  className="h-[34px] min-w-[170px] flex-1 border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-0"
-                  onChange={(event) => setCandidateSearch(event.target.value)}
-                  placeholder={selected.length ? t("dm.addMore") : t("dm.recipientPlaceholder")}
-                  value={candidateSearch}
-                />
-              </div>
-              <Button
-                className="dm-start-button h-[34px] min-h-[34px] shrink-0 rounded-lg px-3 text-xs font-[650] shadow-none disabled:opacity-40"
-                disabled={selected.length === 0 || submitting}
-                onClick={() => void submit()}
-                size="sm"
-                type="button"
-                variant="default"
-              >
-                {submitting ? <Spinner aria-hidden="true" className="size-[14px]" /> : <MessageCircle aria-hidden="true" size={15} />}
-                {isSelfMessage
-                  ? t("dm.self")
-                  : selected.length > 1
-                  ? t("dm.startGroup")
-                  : t("dm.start")}
-              </Button>
-            </div>
-            <div className="dm-candidate-popover scrollbar-subtle absolute left-5 top-[57px] z-20 max-h-[360px] w-[min(600px,calc(100%_-_40px))] overflow-auto rounded-xl border border-border bg-popover p-[7px] shadow-[0_16px_42px_rgba(20,20,18,.14),0_2px_7px_rgba(20,20,18,.08)]">
-              {loadingCandidates ? (
-                <div className="dm-candidate-status m-0 flex items-center justify-center gap-2 p-[18px] text-sm text-muted-foreground">
-                  <Spinner aria-hidden="true" className="size-[16px]" />
-                  {t("dm.loadingPeople")}
-                </div>
-              ) : filteredCandidates.length ? (
-                filteredCandidates.map((candidate) => {
-                  const checked = selectedKeys.has(candidateKey(candidate));
-                  return (
-                    <button
-                      aria-pressed={checked}
-                      className={cn(
-                        "grid min-h-12 w-full grid-cols-[32px_minmax(0,1fr)_auto_20px] items-center gap-[9px] rounded-lg border-0 px-[9px] py-1.5 text-left text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                        checked
-                          ? "selected bg-accent hover:bg-accent"
-                          : "bg-transparent hover:bg-accent",
-                      )}
-                      key={candidateKey(candidate)}
-                      onClick={() => toggleCandidate(candidate)}
-                      type="button"
-                    >
-                      <span className="dm-candidate-avatar grid size-[30px] place-items-center overflow-hidden rounded-full bg-[#8f6cef] text-xs font-bold text-white [&>img]:size-full [&>img]:object-cover">
-                        {candidate.image ? <img alt="" src={candidate.image} /> : candidate.type === "agent" ? <Bot aria-hidden="true" size={17} /> : participantInitial(candidate.name)}
-                      </span>
-                      <span className="grid min-w-0 gap-0.5">
-                        <strong className="truncate text-sm">
-                          {candidate.type === "user" && candidate.isSelf
-                            ? t("dm.self")
-                            : candidate.name}
-                        </strong>
-                        <small className="truncate text-xs text-muted-foreground">
-                          {candidate.detail}
-                        </small>
-                      </span>
-                      {candidate.type === "agent" ? (
-                        <span className="dm-candidate-badges flex min-w-0 items-center justify-end gap-[5px]">
-                          {candidate.projectName ? (
-                            <span
-                              className="dm-candidate-project flex min-w-0 max-w-[150px] items-center gap-1 overflow-hidden rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-[650] whitespace-nowrap text-secondary-foreground"
-                              title={candidate.projectName}
-                            >
-                              <FolderKanban aria-hidden="true" className="shrink-0" size={11} />
-                              <span className="min-w-0 truncate">{candidate.projectName}</span>
-                            </span>
-                          ) : null}
-                          <em className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold not-italic text-primary">
-                            {t("dm.agent")}
-                          </em>
-                        </span>
-                      ) : null}
-                      {checked ? <Check aria-hidden="true" size={16} /> : null}
-                    </button>
-                  );
-                })
-              ) : (
-                <p className="m-0 flex items-center justify-center p-[18px] text-sm text-muted-foreground">
-                  {t("dm.noResults")}
-                </p>
-              )}
-            </div>
-            {error ? (
-              <p
-                className="dm-error absolute left-5 top-[430px] z-[21] m-0 text-sm text-destructive"
-                role="alert"
-              >
-                {error}
-              </p>
-            ) : null}
-            <div className="dm-compose-empty m-auto grid max-w-[440px] justify-items-center gap-2.5 px-8 pb-8 pt-[120px] text-center text-muted-foreground">
-              <Users aria-hidden="true" size={42} strokeWidth={1.3} />
-              <h2 className="mt-[3px] text-xl font-semibold text-foreground">
-                {t("dm.composeTitle")}
-              </h2>
-              <p className="m-0 text-sm leading-relaxed">{t("dm.composeDescription")}</p>
-            </div>
-          </div>
+          <DirectMessageCompose
+            currentUserId={currentUserId}
+            onChannelsChange={onChannelsChange}
+            onCreated={(channelId) => {
+              setCreating(false);
+              onChannelSelect(channelId);
+            }}
+            organizationId={organizationId}
+            token={token}
+          />
         ) : (
           <Channels
             activeChannelId={activeChannelId}

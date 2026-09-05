@@ -18,6 +18,7 @@ import {
 } from "../state/dialogs/atoms";
 import { useNavigationActions } from "../state/navigation/actions";
 import {
+  homeNavigationPage,
   requestedRunIdAtom,
   requestedSessionIdAtom,
 } from "../state/navigation/atoms";
@@ -122,7 +123,7 @@ export function useInvitationFlow({
       setRequestedSessionId(null);
       setCreateIssueTeamId(null);
       setIsIssueDialogOpen(false);
-      resetNavigation("lobby");
+      resetNavigation(homeNavigationPage);
     } finally {
       setAcceptingInvitation(false);
     }

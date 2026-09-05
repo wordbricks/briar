@@ -29,6 +29,7 @@ import {
 } from "./state/dialogs/atoms";
 import { useNavigationActions } from "./state/navigation/actions";
 import {
+  homeNavigationPage,
   requestedRunIdAtom,
   requestedSessionIdAtom,
 } from "./state/navigation/atoms";
@@ -273,7 +274,7 @@ export function App({
         onOrganizationCreated={(userId) => {
           markFirstRunTutorialPending(userId);
           setPendingFirstRunTutorialUserId(userId);
-          resetNavigation("lobby");
+          resetNavigation(homeNavigationPage);
         }}
         showsFirstOrganizationSetup={shouldShowFirstOrganizationSetup}
         showsInitialOnboarding={shouldShowInitialOnboarding}
@@ -288,13 +289,13 @@ export function App({
           onCollaboratorComplete: () => {
             if (invitation.showsCollaboratorTutorial) {
               invitation.clearInvitationProgress();
-              resetNavigation("lobby");
+              resetNavigation(homeNavigationPage);
               return;
             }
             if (!user) return;
             clearFirstRunTutorialPending(user.id);
             setPendingFirstRunTutorialUserId(null);
-            resetNavigation("lobby");
+            resetNavigation(homeNavigationPage);
           },
           onDeveloperSelect: () => {
             if (!user) return;
