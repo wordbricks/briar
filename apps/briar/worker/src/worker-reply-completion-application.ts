@@ -52,7 +52,6 @@ import type {
   IssueReplyCompletionInput,
   PreparedReplyAttachmentUploadsInput,
 } from "./worker-reply-completion-mappers";
-import { dmLearningPolicy } from "./dm-memory-learning-policy";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
 import {
   channelReplyWorkerAvailability,
@@ -736,10 +735,7 @@ export async function completeChannelReplyApplication(
         const capabilities = binding
           ? executionWorkerRuntime(binding).proto.capabilities
           : undefined;
-        if (
-          capabilities?.dmMemoryLearningRequests !== 1 ||
-          dmLearningPolicy(input.env, scope.organizationId) === null
-        ) {
+        if (capabilities?.dmMemoryLearningRequests !== 1) {
           throw new ReplyCompletionApplicationError(
             "claim_conflict",
             "Memory learning is unavailable",

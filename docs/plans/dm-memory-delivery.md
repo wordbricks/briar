@@ -12,8 +12,8 @@ runtime are enabled only after their separate measured gates pass.
 | 4 | Durable learning claims, proposals, independent verification, consolidation, release gates | [#1501](https://github.com/wordbricks/briar/pull/1501), merged |
 
 Use synthetic fixtures; never commit the user archive, profiles or conversation
-text. Per-DM recall and automatic learning remain owner opt-ins even when the
-server flags and an organization policy are active.
+text. Per-DM recall and automatic learning remain owner opt-ins even though the
+recall flags are active and learning is built in with no flag or policy.
 
 The final audit must bind M01–M28 to actual test evidence and record the four PR
 numbers, verified heads, required signoffs and merge commits. Retrieval and
@@ -219,6 +219,93 @@ commit row counts were all zero, so no private DM was imported or backfilled.
 - The checked-in rollout sets `DM_MEMORY_LEARNING_ENABLED=true` for the limited
   organization policy. Every DM remains owner opt-in and starts learning only
   from the point of opt-in; no existing conversation is imported or backfilled.
+
+## Derived learning provider
+
+- Automatic learning has no configuration left. `DM_MEMORY_LEARNING_ENABLED` and
+  `DM_MEMORY_LEARNING_POLICIES` are removed from `wrangler.jsonc` and the
+  generated Worker types, and the server reads neither. Learning is built in;
+  `learningAvailable` and the `automaticLearning` capability are always true.
+- `dmMemoryLearningVerifiedProviders` in
+  `apps/briar/src/lib/dm-memory-learning-contract.ts` is the entire allowlist and
+  holds `codex` and `claude`. `dmLearningAgentPolicy(provider)` builds the policy
+  from code constants and canonicalizes to exactly the JSON already stored in
+  pending production jobs, so those jobs stay claimable across the deploy.
+- The queue derives each job's policy from the DM's own Agent provider
+  (`dmLearningPreferredProvider`): that provider when verified, otherwise the
+  first verified one. The derived policy is written to `policy_json` at enqueue.
+- The claim UPDATE resolves the provider in place. It keeps `policy_json` when
+  the claiming Worker advertises both stage providers and otherwise substitutes
+  the first verified provider that Worker advertises, matching
+  `resolveDmLearningProvider`. Resolving inside the UPDATE rather than after it
+  keeps the write atomic: a SQLite UPDATE guard reads pre-update values, so a
+  later write would have been checked against the provider the Worker cannot run.
+  `RETURNING` then hands back the resolved row, the snapshot is captured with
+  that policy, and `snapshot.policy` equals the stored `policy_json`.
+- `dmLearningWorkerCurrentSql` now requires protocol 2, the `agent` transport and
+  the provider named in `policy_json` for both stages, so lease renewal, model
+  reservations and commit all fail closed if the Worker stops advertising it. The
+  OpenRouter claim branches are gone; `invokeOpenRouterDmLearningModel` stays as
+  dormant client code and is not reachable from a job.
+- Every server path that used to read the policy from the environment now reads
+  it from the job row (`requireDmLearningClaim` returns it, decoded with
+  `DmLearningPolicy` and compared to the snapshot). The remaining
+  `job.policy_json = ?` guards bind the snapshot's own policy; the redundant ones
+  were dropped and the input-hash and lease guards are unchanged.
+- Retry rewrites `policy_json` to the preferred derived policy and lets claim
+  time resolve any fallback. Its daily micro-USD guards became `<=` because a
+  subscription Agent policy has a zero micro-USD ceiling, which the previous
+  strict comparison could never satisfy.
+- `DmMemoryLearningConfiguration` gains `agent_provider`,
+  `agent_provider_verified` and `worker_available`. `readDmLearningStatus` always
+  returns a configuration for an existing space and probes for an eligible online
+  Worker with the same rules as a claim, minus the job binding. Desktop/Android
+  and iOS present provider identity as information: the same provider as the DM
+  Agent, an unverified Agent falling back to the connected verified provider, or
+  a warning that no Worker can run learning right now.
+- The eval runner takes `--provider <id>` and writes `report-<provider>.json` for
+  anything other than Codex. Adding a provider to the constant requires that run
+  and the existing gate in the same pull request. The evaluation was not re-run
+  for this change; it consumes the user's provider subscription.
+- Tests run for this change: `bun run typecheck` (clean), `bun run lint` and
+  `bun run lint:type-aware` (clean), `bunx vitest run
+  src/components/DmMemoryDialog.test.tsx src/lib` (120 files, 675 tests passed),
+  `bunx vitest run --config vitest.worker.config.ts` (61 files, 241 tests
+  passed), `bunx vitest run --config vitest.worker-d1.config.ts` (56 files, 529
+  tests passed, including 21 in `dm-memory-learning-storage.test.ts`), `bunx
+  vitest run src-cli/dm-memory` (2 files, 11 tests passed) and
+  `bash scripts/check-contracts.sh` (clean).
+
+- Independent review reran `bun run typecheck`, both lint passes, the full
+  Worker projects (117 files, 770 tests) and the full unit project (393 files,
+  2,523 tests); all passed. `dmMemoryCanonicalJson(dmLearningAgentPolicy("codex"))`
+  was confirmed byte-identical to the removed production policy JSON. The iOS
+  change in `DmMemory.swift` type-checked cleanly in a simulator build run with
+  `-continue-building-after-errors`; the app build itself currently fails on
+  `main` because `CompanionStore`/`CompanionViews`/`ChannelsStore` still use
+  `projectID` after the Project → Team contract rename (#1565). That breakage
+  predates this change and is tracked separately.
+
+- Running the eval against Claude exposed a bug in the read-only Agent
+  environment: it copied `~/.claude/.credentials.json` whenever the file
+  existed and consulted the macOS Keychain only when it was absent, so a stale
+  file left from an earlier login shadowed the live Keychain credential and every
+  Claude stage failed with "Not logged in". The isolated home now prefers the
+  Keychain credential and falls back to the file, matching
+  `readClaudeCredentials`; a regression test covers the stale-file case.
+
+- With that fix, `bun evals/dm-memory-learning-v1/run.ts --provider claude` ran
+  the full 20 store / 20 reject set through the isolated connected Claude
+  transport on 2026-09-05: precision 1.00, recall 1.00, zero committed reject
+  cases, median latency 11.2 s and maximum 27.3 s per case. `report-claude.json`
+  stores IDs, decisions and verdicts only. Claude therefore joins the verified
+  list after Codex; a DM whose Agent runs on Claude now learns through Claude,
+  and Codex remains the fallback order's first entry.
+
+Validated head `15e79dfcfa70f7c3ff8a35c7bcac14323d5efb2e` passed all four
+required `ci:signoff` contexts (app-worker 161 s, d1-migrations 179 s, rust 218 s,
+security 5 s) on 2026-09-06; this docs-only note was signed off again before the
+squash merge of [#1703](https://github.com/wordbricks/briar/pull/1703).
 
 Rollback sets retrieval and indexing flags to false while leaving owner edit,
 forget, exclusion, and vector cleanup paths available. A rollback does not

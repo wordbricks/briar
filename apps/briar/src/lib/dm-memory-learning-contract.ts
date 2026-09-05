@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 import { ModelEffort } from "./agent-provider-contract";
-import { agentProviders } from "./agent-provider";
+import { agentProviders, type AgentProvider } from "./agent-provider";
 import { IsoDateTimeWithOffset } from "./date-time-schema";
 
 export const dmMemoryLearningPolicyVersion = "dm-learning-verified-v1";
@@ -83,6 +83,47 @@ export const DmLearningPolicy = strict(Schema.Struct({
   spaceDailyMicroUsd: nonnegative, organizationDailyMicroUsd: nonnegative,
 }));
 export type DmLearningPolicy = typeof DmLearningPolicy.Type;
+
+/**
+ * Providers automatic learning may run on, in preference order. A provider is
+ * added here only after `apps/briar/evals/dm-memory-learning-v1` passes for it
+ * (precision at least 95%, recall at least 80%, zero committed reject cases).
+ * Only `agent` transport providers belong here, never `openrouter`: that
+ * transport is metered and would turn learning into a silent paid path.
+ */
+export const dmMemoryLearningVerifiedProviders = ["codex", "claude"] as const;
+export const dmMemoryLearningMaxInputBytes = 131_072;
+export const dmMemoryLearningSpaceDailyCalls = 24;
+export const dmMemoryLearningOrganizationDailyCalls = 240;
+export const dmMemoryLearningProposerMaxOutputTokens = 4096;
+export const dmMemoryLearningVerifierMaxOutputTokens = 2048;
+
+/** Learning is built in, so the policy is derived from the provider, never configured. */
+export function dmLearningAgentPolicy(provider: AgentProvider): DmLearningPolicy {
+  const model = { transport: "agent" as const, provider, model: null, effort: null,
+    maxInputMicroUsdPerMillionTokens: 0, maxOutputMicroUsdPerMillionTokens: 0 };
+  return { version: dmMemoryLearningPolicyVersion,
+    proposer: { ...model, maxOutputTokens: dmMemoryLearningProposerMaxOutputTokens },
+    verifier: { ...model, maxOutputTokens: dmMemoryLearningVerifierMaxOutputTokens },
+    maxInputBytes: dmMemoryLearningMaxInputBytes,
+    spaceDailyCalls: dmMemoryLearningSpaceDailyCalls,
+    organizationDailyCalls: dmMemoryLearningOrganizationDailyCalls,
+    spaceDailyMicroUsd: 0, organizationDailyMicroUsd: 0 };
+}
+
+/** The DM's own Agent provider when it is verified, otherwise the first verified one. */
+export function dmLearningPreferredProvider(agentProvider: AgentProvider): AgentProvider {
+  return dmMemoryLearningVerifiedProviders.some((provider) => provider === agentProvider)
+    ? agentProvider : dmMemoryLearningVerifiedProviders[0];
+}
+
+/** Claim-time fallback stays inside the verified list and never leaves the Worker's providers. */
+export function resolveDmLearningProvider(
+  preferred: AgentProvider, advertisedProviders: readonly AgentProvider[],
+): AgentProvider | null {
+  if (advertisedProviders.includes(preferred)) return preferred;
+  return dmMemoryLearningVerifiedProviders.find((provider) => advertisedProviders.includes(provider)) ?? null;
+}
 
 export const DmLearningSnapshot = strict(Schema.Struct({
   memorySpaceId: id, memoryRevision: nonnegative, revocationEpoch: nonnegative,

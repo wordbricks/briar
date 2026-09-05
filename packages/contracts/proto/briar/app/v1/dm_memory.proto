@@ -50,6 +50,9 @@ message DmMemoryLearningConfiguration {
   uint32 space_daily_calls = 3;
   uint64 space_daily_micro_usd = 4;
   bool cost_tracked = 5;
+  string agent_provider = 6;
+  bool agent_provider_verified = 7;
+  bool worker_available = 8;
 }
 
 message DmMemoryLearningModel {

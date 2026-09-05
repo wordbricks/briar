@@ -11,6 +11,19 @@ Run from `apps/briar` with a healthy local Codex connection:
 bun evals/dm-memory-learning-v1/run.ts
 ```
 
+Learning has no configuration: the code constant `dmMemoryLearningVerifiedProviders` (currently `codex` and `claude`, each with a committed report) in
+`src/lib/dm-memory-learning-contract.ts` is the whole allowlist, and the server never falls back outside it.
+Adding a provider therefore means running this evaluation against that provider and meeting the gate below in
+the same pull request that extends the constant:
+
+```sh
+bun evals/dm-memory-learning-v1/run.ts --provider grok
+```
+
+A non-Codex run writes `report-<provider>.json` (and `probe-report-<provider>.json` for a single-case probe), so
+each provider keeps its own committed evidence. Only `agent` transport providers are eligible; OpenRouter is
+metered and stays out of the list.
+
 `report.json` contains no real DM content. The rollout gate is final precision at least 95%, store-case recall at
 least 80%, and zero committed reject cases. A rejected proposal counts as safe because the production server applies
 changes only after the independent verifier and server validation both pass.

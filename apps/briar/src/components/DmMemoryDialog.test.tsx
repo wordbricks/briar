@@ -132,24 +132,45 @@ describe("DM memory management", () => {
     expect(button("Export Markdown").disabled).toBe(false);
     expect(dialog().querySelector('[aria-label="Forget memory"]')).not.toBeNull();
   });
+  const learningConfiguration = { proposer: { transport: "agent" as const, model: "default", provider: "codex" },
+    verifier: { transport: "agent" as const, model: "default", provider: "codex" }, costTracked: false,
+    spaceDailyCalls: 24, spaceDailyMicroUsd: 0,
+    agentProvider: "codex", agentProviderVerified: true, workerAvailable: true };
+  const learningPage = (configuration: Partial<typeof learningConfiguration> = {}) => ({
+    ...page, capabilities: { recall: true, automaticLearning: true },
+    spaces: page.spaces.map((space) => ({ ...space, useEnabled: true, autoEnabled: false })),
+    learning: { configuration: { ...learningConfiguration, ...configuration },
+      callsToday: 2, reservedMicroUsdToday: 50_000, pendingJobs: 0, failedJobs: 1,
+      lastJob: { id: crypto.randomUUID(), kind: "extract" as const, status: "failed" as const, stage: "verifying" as const,
+        errorCode: "verification_rejected" as const, updatedAt: "2026-09-01T00:00:00.000Z" },
+      retryableJob: { id: crypto.randomUUID(), callsUsed: 2 } },
+  });
+  it("reports the derived learning provider, an unverified Agent and a missing Worker", async () => {
+    client.load.mockResolvedValue(learningPage());
+    await render();
+    expect(dialog().textContent).toContain("Learning model · Codex (same as this DM's Agent)");
+    expect(dialog().textContent).toContain("Calls today / daily limit · 2 / 24");
+    expect(dialog().textContent).not.toContain("Reserved cost today");
+    expect(dialog().textContent).not.toContain("No Worker can run learning right now");
+    await root.cleanup();
+    root = createReactTestRoot({ attachToDocument: true });
+    client.load.mockResolvedValue(learningPage({ agentProvider: "grok", agentProviderVerified: false }));
+    await render();
+    expect(dialog().textContent).toContain(
+      "This DM's Agent (Grok) is not verified for automatic learning yet. Learning runs on the connected Codex.");
+    await root.cleanup();
+    root = createReactTestRoot({ attachToDocument: true });
+    client.load.mockResolvedValue(learningPage({ workerAvailable: false }));
+    await render();
+    expect(dialog().textContent).toContain("No Worker can run learning right now. A Worker with Codex connected is required.");
+  });
   it("keeps learning opt-in separate, shows verification failure, and disables learning when memory use stops", async () => {
-    const enabled = { ...page, capabilities: { recall: true, automaticLearning: true },
-      spaces: page.spaces.map((space) => ({ ...space, useEnabled: true, autoEnabled: false })),
-      learning: { configuration: { proposer: { transport: "agent" as const, model: "default", provider: "codex" },
-        verifier: { transport: "agent" as const, model: "default", provider: "codex" }, costTracked: false,
-        spaceDailyCalls: 24, spaceDailyMicroUsd: 0 },
-        callsToday: 2, reservedMicroUsdToday: 50_000, pendingJobs: 0, failedJobs: 1,
-        lastJob: { id: crypto.randomUUID(), kind: "extract" as const, status: "failed" as const, stage: "verifying" as const,
-          errorCode: "verification_rejected" as const, updatedAt: "2026-09-01T00:00:00.000Z" },
-        retryableJob: { id: crypto.randomUUID(), callsUsed: 2 } } };
+    const enabled = learningPage();
     client.load.mockResolvedValue(enabled);
     client.settings.mockResolvedValue({ ...enabled.spaces[0]!, autoEnabled: true });
     client.retryLearning.mockResolvedValue({ accepted: true, replayed: false });
     await render();
     expect(dialog().textContent).toContain("Independent verification rejected the proposal");
-    expect(dialog().textContent).toContain("default / default");
-    expect(dialog().textContent).toContain("Agent · codex / Agent · codex");
-    expect(dialog().textContent).not.toContain("Reserved cost today");
     await act(async () => button("Retry failed learning").click());
     expect(client.retryLearning).toHaveBeenCalledWith(scope, enabled.learning.retryableJob.id, 0);
     const automatic = [...dialog().querySelectorAll("label")].find((label) => label.textContent === "Learn memories from this conversation")!

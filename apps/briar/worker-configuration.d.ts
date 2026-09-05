@@ -13,8 +13,6 @@ interface __BaseEnv_Env {
 	DM_MEMORY_INDEX_ENABLED: "true";
 	DM_MEMORY_RETRIEVAL_ENABLED: "true";
 	DM_MEMORY_MINIMUM_SCORE: "0.5";
-	DM_MEMORY_LEARNING_ENABLED: "true";
-	DM_MEMORY_LEARNING_POLICIES: "{\"4fdee229-9de3-4e03-a1fd-380f46321533\":{\"version\":\"dm-learning-verified-v1\",\"proposer\":{\"transport\":\"agent\",\"provider\":\"codex\",\"model\":null,\"effort\":null,\"maxOutputTokens\":4096,\"maxInputMicroUsdPerMillionTokens\":0,\"maxOutputMicroUsdPerMillionTokens\":0},\"verifier\":{\"transport\":\"agent\",\"provider\":\"codex\",\"model\":null,\"effort\":null,\"maxOutputTokens\":2048,\"maxInputMicroUsdPerMillionTokens\":0,\"maxOutputMicroUsdPerMillionTokens\":0},\"maxInputBytes\":131072,\"spaceDailyCalls\":24,\"organizationDailyCalls\":240,\"spaceDailyMicroUsd\":0,\"organizationDailyMicroUsd\":0}}";
 	APNS_TEAM_ID: "QFJZ2V3829";
 	MANAGED_COMPUTER_AWS_REGION: "us-east-1";
 	MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID: "lt-0bf7a358da7b03e93";
@@ -48,7 +46,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "DM_MEMORY_INDEX_ENABLED" | "DM_MEMORY_RETRIEVAL_ENABLED" | "DM_MEMORY_MINIMUM_SCORE" | "DM_MEMORY_LEARNING_ENABLED" | "DM_MEMORY_LEARNING_POLICIES" | "APNS_TEAM_ID" | "MANAGED_COMPUTER_AWS_REGION" | "MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID" | "MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_VERSION" | "MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED" | "BETTER_AUTH_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "SLACK_CLIENT_ID" | "SLACK_CLIENT_SECRET" | "SLACK_SIGNING_SECRET" | "SLACK_TOKEN_ENCRYPTION_KEY" | "MANAGED_COMPUTER_PROMOTION_CODE" | "MANAGED_COMPUTER_ENROLLMENT_SECRET" | "MANAGED_COMPUTER_AWS_ACCESS_KEY_ID" | "MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "DM_MEMORY_INDEX_ENABLED" | "DM_MEMORY_RETRIEVAL_ENABLED" | "DM_MEMORY_MINIMUM_SCORE" | "APNS_TEAM_ID" | "MANAGED_COMPUTER_AWS_REGION" | "MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID" | "MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_VERSION" | "MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED" | "BETTER_AUTH_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "SLACK_CLIENT_ID" | "SLACK_CLIENT_SECRET" | "SLACK_SIGNING_SECRET" | "SLACK_TOKEN_ENCRYPTION_KEY" | "MANAGED_COMPUTER_PROMOTION_CODE" | "MANAGED_COMPUTER_ENROLLMENT_SECRET" | "MANAGED_COMPUTER_AWS_ACCESS_KEY_ID" | "MANAGED_COMPUTER_AWS_SECRET_ACCESS_KEY">> {}
 }
 declare module "*.svg" {
 	const value: string;

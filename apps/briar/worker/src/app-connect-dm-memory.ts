@@ -54,7 +54,6 @@ import {
   updateDmMemorySettings,
   type DmMemoryOwner,
 } from "./dm-memory-repository";
-import { dmLearningPolicy } from "./dm-memory-learning-policy";
 import { retryDmLearningJob } from "./dm-memory-learning-retry";
 import { readDmLearningStatus } from "./dm-memory-learning-status";
 import { HttpError } from "./http-response";
@@ -200,6 +199,9 @@ const protoLearningStatus = (status: DmMemoryLearningStatus | null) => status ==
           spaceDailyCalls: status.configuration.spaceDailyCalls,
           spaceDailyMicroUsd: BigInt(status.configuration.spaceDailyMicroUsd),
           costTracked: status.configuration.costTracked,
+          agentProvider: status.configuration.agentProvider,
+          agentProviderVerified: status.configuration.agentProviderVerified,
+          workerAvailable: status.configuration.workerAvailable,
         }),
     callsToday: status.callsToday,
     reservedMicroUsdToday: BigInt(status.reservedMicroUsdToday),
@@ -311,7 +313,6 @@ const createAppDmMemoryService = (
 ): ServiceImpl<typeof DmMemoryService> => ({
   listDmMemories: async (request) => {
     const owner = await ownerFor(input, request.organizationId, request.channelId);
-    const policy = dmLearningPolicy(input.env, owner.organizationId);
     const page = await listDmMemories(
       input.db,
       owner,
@@ -320,18 +321,13 @@ const createAppDmMemoryService = (
         : canonicalUuid(request.memorySpaceId),
       request.cursor === undefined ? undefined : canonicalUuid(request.cursor),
     );
-    const learning = await readDmLearningStatus(
-      input.db,
-      owner,
-      page.selectedSpaceId,
-      policy,
-    );
+    const learning = await readDmLearningStatus(input.db, owner, page.selectedSpaceId);
     return create(DmMemoryService.method.listDmMemories.output, {
       eligible: page.eligible,
       capabilities: {
         ...page.capabilities,
         recall: String(input.env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
-        automaticLearning: learning?.configuration !== null && learning?.configuration !== undefined,
+        automaticLearning: true,
       },
       spaces: page.spaces.map(protoSpace),
       selectedSpaceId: page.selectedSpaceId ?? undefined,
@@ -446,9 +442,7 @@ const createAppDmMemoryService = (
       ),
       useEnabled: request.useEnabled,
       autoEnabled: request.autoEnabled,
-    }), {
-      learningAvailable: dmLearningPolicy(input.env, owner.organizationId) !== null,
-    });
+    }), { learningAvailable: true });
     return create(DmMemoryService.method.updateDmMemorySettings.output, {
       space: protoSpace(space),
     });
@@ -464,7 +458,6 @@ const createAppDmMemoryService = (
         requestId: canonicalUuid(request.requestId),
         revocationEpoch: checkedNumber(request.revocationEpoch, "revocation_epoch"),
       }),
-      dmLearningPolicy(input.env, owner.organizationId),
     );
     return create(DmMemoryService.method.retryDmMemoryLearning.output, result);
   },

@@ -206,6 +206,41 @@ describe("read-only Agent environment", () => {
     }
   });
 
+  it("prefers the Claude Keychain login over a stale credential file", async () => {
+    const sourceClaudeHome = await mkdtemp(
+      join(tmpdir(), "briar-claude-stale-source-"),
+    );
+    await writeFile(
+      join(sourceClaudeHome, ".credentials.json"),
+      JSON.stringify({ claudeAiOauth: { accessToken: "expired-file-token" } }),
+    );
+    const keychainCredential = vi.fn(() =>
+      JSON.stringify({ claudeAiOauth: { accessToken: "keychain-token" } })
+    );
+    const prepared = await prepareReadOnlyAgentEnvironment("claude", {
+      workspaceRoot: "/repo",
+      environment: {
+        HOME: "/Users/worker",
+        USER: "worker",
+        CLAUDE_CONFIG_DIR: sourceClaudeHome,
+      },
+      claudeKeychainCredential: keychainCredential,
+    });
+    try {
+      expect(
+        JSON.parse(
+          await readFile(
+            join(prepared.environment.CLAUDE_CONFIG_DIR!, ".credentials.json"),
+            "utf8",
+          ),
+        ),
+      ).toEqual({ claudeAiOauth: { accessToken: "keychain-token" } });
+    } finally {
+      await prepared.cleanup();
+      await rm(sourceClaudeHome, { recursive: true, force: true });
+    }
+  });
+
   it("builds a fail-closed Grok sandbox from authentication only", async () => {
     const root = await mkdtemp(join(tmpdir(), "briar-grok-source-"));
     const sourceGrokHome = join(root, "home");

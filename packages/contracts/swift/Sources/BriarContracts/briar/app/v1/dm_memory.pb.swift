@@ -774,6 +774,12 @@ public nonisolated struct BriarAPI_DmMemoryLearningConfiguration: Sendable {
 
   public var costTracked: Bool = false
 
+  public var agentProvider: String = String()
+
+  public var agentProviderVerified: Bool = false
+
+  public var workerAvailable: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1818,7 +1824,7 @@ nonisolated extension BriarAPI_DmMemoryLearningStatus: SwiftProtobuf.Message, Sw
 
 nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DmMemoryLearningConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}proposer\0\u{1}verifier\0\u{3}space_daily_calls\0\u{3}space_daily_micro_usd\0\u{3}cost_tracked\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}proposer\0\u{1}verifier\0\u{3}space_daily_calls\0\u{3}space_daily_micro_usd\0\u{3}cost_tracked\0\u{3}agent_provider\0\u{3}agent_provider_verified\0\u{3}worker_available\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1831,6 +1837,9 @@ nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Mess
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self.spaceDailyCalls) }()
       case 4: try { try decoder.decodeSingularUInt64Field(value: &self.spaceDailyMicroUsd) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.costTracked) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.agentProvider) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.agentProviderVerified) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.workerAvailable) }()
       default: break
       }
     }
@@ -1856,6 +1865,15 @@ nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Mess
     if self.costTracked != false {
       try visitor.visitSingularBoolField(value: self.costTracked, fieldNumber: 5)
     }
+    if !self.agentProvider.isEmpty {
+      try visitor.visitSingularStringField(value: self.agentProvider, fieldNumber: 6)
+    }
+    if self.agentProviderVerified != false {
+      try visitor.visitSingularBoolField(value: self.agentProviderVerified, fieldNumber: 7)
+    }
+    if self.workerAvailable != false {
+      try visitor.visitSingularBoolField(value: self.workerAvailable, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1865,6 +1883,9 @@ nonisolated extension BriarAPI_DmMemoryLearningConfiguration: SwiftProtobuf.Mess
     if lhs.spaceDailyCalls != rhs.spaceDailyCalls {return false}
     if lhs.spaceDailyMicroUsd != rhs.spaceDailyMicroUsd {return false}
     if lhs.costTracked != rhs.costTracked {return false}
+    if lhs.agentProvider != rhs.agentProvider {return false}
+    if lhs.agentProviderVerified != rhs.agentProviderVerified {return false}
+    if lhs.workerAvailable != rhs.workerAvailable {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

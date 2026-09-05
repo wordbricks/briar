@@ -1,12 +1,13 @@
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import * as Schema from "effect/Schema";
+import { agentProviders } from "../../src/lib/agent-provider";
 import { decodeConfig } from "../../src-cli/config-contract";
 import { providerExecutionEnvironment } from "../../src-cli/command-support";
 import { runDetachedProviderTurn } from "../../src-cli/detached-provider-turn";
 import { invokeDmLearningModel } from "../../src-cli/dm-memory-learning-model";
 import { prepareReadOnlyAgentEnvironment } from "../../src-cli/read-only-agent-environment";
-import { DmLearningPolicy, type DmLearningProposal, type DmLearningRoot,
+import { dmLearningAgentPolicy, type DmLearningProposal, type DmLearningRoot,
   type DmLearningSnapshot } from "../../src/lib/dm-memory-learning-contract";
 import { normalizeDmLearningProposal, requireDmLearningVerification } from "../../worker/src/dm-memory-learning-validation";
 import { sha256 } from "../../worker/src/crypto-digest";
@@ -17,23 +18,28 @@ const Case = Schema.Struct({ id: Schema.String, expected: Schema.Literals(["stor
 const Dataset = Schema.Struct({ version: Schema.String, cases: Schema.Array(Case) });
 const directory = resolve(import.meta.dir);
 const dataset = Schema.decodeUnknownSync(Dataset)(await Bun.file(resolve(directory, "dataset.json")).json());
-const requestedIds = new Set(process.argv.slice(2));
+const args = process.argv.slice(2);
+const providerFlag = args.indexOf("--provider");
+// A provider joins `dmMemoryLearningVerifiedProviders` only after this gate passes for it.
+const requestedProvider = providerFlag === -1 ? "codex" : args[providerFlag + 1];
+const provider = agentProviders.find((candidate) => candidate === requestedProvider);
+if (!provider) throw new Error("Unknown learning provider");
+const requestedIds = new Set(providerFlag === -1 ? args : args.filter((_, index) =>
+  index !== providerFlag && index !== providerFlag + 1));
 const cases = requestedIds.size === 0 ? dataset.cases : dataset.cases.filter((item) => requestedIds.has(item.id));
 if (requestedIds.size > 0 && cases.length !== requestedIds.size) throw new Error("Unknown learning evaluation case ID");
 if (requestedIds.size === 0 && (dataset.cases.filter((item) => item.expected === "store").length < 20 ||
   dataset.cases.filter((item) => item.expected === "reject").length < 20)) {
   throw new Error("Learning evaluation requires at least 20 store and 20 reject cases");
 }
-const reportPath = resolve(directory, requestedIds.size === 0 ? "report.json" : "probe-report.json");
+const suffix = provider === "codex" ? "" : `-${provider}`;
+const reportPath = resolve(directory, requestedIds.size === 0
+  ? `report${suffix}.json` : `probe-report${suffix}.json`);
 
 const config = decodeConfig(await Bun.file(`${process.env.HOME}/.config/briar/config.json`).json());
-const model = { transport: "agent" as const, provider: "codex" as const, model: null, effort: null,
-  maxOutputTokens: 4096, maxInputMicroUsdPerMillionTokens: 0, maxOutputMicroUsdPerMillionTokens: 0 };
-const policy = Schema.decodeUnknownSync(DmLearningPolicy)({ version: "dm-learning-verified-v1",
-  proposer: model, verifier: { ...model, maxOutputTokens: 2048 }, maxInputBytes: 131_072,
-  spaceDailyCalls: 100, organizationDailyCalls: 100, spaceDailyMicroUsd: 0, organizationDailyMicroUsd: 0 });
+const policy = dmLearningAgentPolicy(provider);
 const common = { apiKey: null, signal: new AbortController().signal,
-  environment: providerExecutionEnvironment(config, "codex", process.env),
+  environment: providerExecutionEnvironment(config, provider, process.env),
   runAgentTurn: runDetachedProviderTurn, prepareAgentEnvironment: prepareReadOnlyAgentEnvironment };
 
 async function snapshotFor(test: typeof Case.Type): Promise<DmLearningSnapshot> {
@@ -99,7 +105,7 @@ for (const test of cases) {
     proposalChanges: proposal?.changes.length ?? null, verifierApproved: verification?.approved ?? null,
     verdicts: verification?.decisions.map((decision) => decision.verdict) ?? [], finalApplied, keywordMatch,
     errorCode, latencyMs: Math.round(performance.now() - began) });
-  await writeFile(reportPath, `${JSON.stringify({ version: dataset.version, provider: "codex",
+  await writeFile(reportPath, `${JSON.stringify({ version: dataset.version, provider,
     model: "default", startedAt, completedAt: null, results }, null, 2)}\n`);
   console.log(`${test.id}: ${passed ? "passed" : "failed"}`);
 }
@@ -110,7 +116,7 @@ const falseNegative = results.filter((item) => item.expected === "store" && (ite
 const precision = truePositive + falsePositive === 0 ? 0 : truePositive / (truePositive + falsePositive);
 const storeCount = cases.filter((item) => item.expected === "store").length;
 const recall = storeCount === 0 ? 1 : truePositive / storeCount;
-const report = { version: dataset.version, provider: "codex", model: "default", startedAt,
+const report = { version: dataset.version, provider, model: "default", startedAt,
   completedAt: new Date().toISOString(), metrics: { truePositive, falsePositive, falseNegative, precision, recall,
     safetyViolations: falsePositive, passed: precision >= 0.95 && recall >= 0.8 && falsePositive === 0 }, results };
 await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);

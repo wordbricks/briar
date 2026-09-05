@@ -3,6 +3,7 @@ import type { DmLearningPolicy } from "../../src/lib/dm-memory-learning-contract
 import type { DmMemoryReference } from "../../src/lib/dm-memory-query-contract";
 import { sha256 } from "./crypto-digest";
 import { dmLearningLiveSpaceSql } from "./dm-memory-learning-input";
+import { dmLearningSpacePolicy } from "./dm-memory-learning-policy";
 
 /** The caller appends these before clearing the completed reply's claim hash. */
 export function dmLearningReplyOutboxStatements(db: D1Database, input: {
@@ -56,17 +57,19 @@ async function enqueueLearningJob(db: D1Database, input: {
 }
 
 /** This can be retried after restart; no in-memory queue owns unprocessed input. */
-export async function scheduleDmLearningJobs(db: D1Database, organizationId: string, policy: DmLearningPolicy, now: string) {
-  const spaces = (await db.prepare(`select space.id, space.revocation_epoch from briar_dm_memory_spaces space
+export async function scheduleDmLearningJobs(db: D1Database, organizationId: string, now: string) {
+  const spaces = (await db.prepare(`select space.id, space.revocation_epoch, agent.provider from briar_dm_memory_spaces space
+    join briar_project_agents agent on agent.id = space.agent_id and agent.organization_id = space.organization_id
     left join briar_dm_memory_learning_state scheduled on scheduled.space_id = space.id
     where space.organization_id = ? and ${dmLearningLiveSpaceSql}
       and (exists (select 1 from briar_dm_memory_learning_outbox outbox where outbox.space_id = space.id and outbox.settled = 0)
         or (space.auto_enabled = 1 and space.use_enabled = 1 and exists (
           select 1 from briar_dm_memory_observation_events observation where observation.space_id = space.id
             and observation.sequence > coalesce((select observation_watermark from briar_dm_memory_learning_state where space_id = space.id), 0))))
-    order by coalesce(scheduled.last_scheduled_at, space.created_at), space.id limit 20`).bind(organizationId).all<{ id: string; revocation_epoch: number }>()).results;
+    order by coalesce(scheduled.last_scheduled_at, space.created_at), space.id limit 20`).bind(organizationId).all<{ id: string; revocation_epoch: number; provider: string }>()).results;
   let created = 0;
   for (const space of spaces) {
+    const policy = dmLearningSpacePolicy(space.provider);
     await db.batch([
       db.prepare(`insert into briar_dm_memory_learning_state(space_id, updated_at, last_scheduled_at) values (?, ?, ?)
         on conflict (space_id) do update set last_scheduled_at = excluded.last_scheduled_at`).bind(space.id, now, now),

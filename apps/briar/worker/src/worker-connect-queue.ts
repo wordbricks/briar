@@ -106,7 +106,6 @@ import {
   submitDmLearningProposal,
   submitDmLearningVerification,
 } from "./dm-memory-learning-model-calls";
-import { dmLearningPolicy } from "./dm-memory-learning-policy";
 import { DmLearningError } from "./dm-memory-learning-validation";
 import {
   DmLearningProposal,
@@ -323,12 +322,6 @@ const rethrowDmLearningError = (error: unknown): never => {
   );
 };
 
-const dmLearningPolicyFor = (input: WorkerConnectQueueInput, organizationId: string) => {
-  const policy = dmLearningPolicy(input.env, organizationId);
-  if (!policy) throw new DmLearningError("model_configuration");
-  return policy;
-};
-
 /**
  * The claim mutation commits before the protobuf mapping runs, so a mapping
  * failure leaves the job `running` behind a fifteen-minute lease that no Worker
@@ -460,21 +453,14 @@ async function claimWork(
     });
     if (issue) return { work: workerClaimMessage(issue) };
 
-    const policy = dmLearningPolicy(
-      input.env,
-      worker.principal.organizationId,
-    );
-    if (policy) {
-      const learning = await services.claimDmLearningJob(input.db, {
-        organizationId: worker.principal.organizationId,
-        deviceId: worker.principal.deviceId,
-        workerId: claimInput.workerId,
-        projectId: claimInput.projectId,
-        policy,
-        now: new Date().toISOString(),
-      });
-      if (learning) return { work: workerClaimMessage(learning) };
-    }
+    const learning = await services.claimDmLearningJob(input.db, {
+      organizationId: worker.principal.organizationId,
+      deviceId: worker.principal.deviceId,
+      workerId: claimInput.workerId,
+      projectId: claimInput.projectId,
+      now: new Date().toISOString(),
+    });
+    if (learning) return { work: workerClaimMessage(learning) };
   }
 
   return { retryAfterMs: 15_000 };
@@ -648,10 +634,6 @@ async function renewWorkLease(
             jobId: identity.workId,
             claimTokenHash,
           },
-          policy: dmLearningPolicyFor(
-            input,
-            worker.principal.organizationId,
-          ),
           inputHash: identity.work.value.inputHash,
           now: observedAt,
         });
@@ -1424,7 +1406,6 @@ async function reserveDmMemoryLearningCallRpc(
     const scope = await dmLearningScope(input, request.claim, services);
     const result = await services.reserveDmLearningModelCall(input.db, {
       ...scope,
-      policy: dmLearningPolicyFor(input, scope.organizationId),
       callId: request.callId,
       stage: learningStage(request.stage),
       now: new Date().toISOString(),
@@ -1446,7 +1427,6 @@ async function submitDmMemoryLearningProposalRpc(
     const scope = await dmLearningScope(input, request.claim, services);
     const result = await services.submitDmLearningProposal(input.db, {
       ...scope,
-      policy: dmLearningPolicyFor(input, scope.organizationId),
       callId: request.callId,
       proposal: learningJson(DmLearningProposal, request.proposalJson),
       usage: learningUsage(request.usage),
@@ -1469,7 +1449,6 @@ async function submitDmMemoryLearningVerificationRpc(
     const scope = await dmLearningScope(input, request.claim, services);
     const result = await services.submitDmLearningVerification(input.db, {
       ...scope,
-      policy: dmLearningPolicyFor(input, scope.organizationId),
       callId: request.callId,
       proposalId: request.proposalId,
       proposalHash: request.proposalHash,

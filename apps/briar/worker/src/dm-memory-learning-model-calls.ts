@@ -1,6 +1,6 @@
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
 import * as Schema from "effect/Schema";
-import { DmLearningChange, DmLearningProposal, type DmLearningInvocation, type DmLearningPolicy,
+import { DmLearningChange, DmLearningProposal, type DmLearningInvocation,
   type DmLearningUsage, type DmLearningVerification } from "../../src/lib/dm-memory-learning-contract";
 import { sha256 } from "./crypto-digest";
 import { dmLearningClaimCurrentSql, failDmLearningClaim, requireDmLearningClaim, type DmLearningClaimIdentity } from "./dm-memory-learning-claims";
@@ -42,11 +42,11 @@ async function readProposal(db: D1Database, jobId: string, inputHash: string) {
 }
 
 export async function reserveDmLearningModelCall(db: D1Database, input: {
-  identity: DmLearningClaimIdentity; policy: DmLearningPolicy; callId: string;
+  identity: DmLearningClaimIdentity; callId: string;
   stage: "proposing" | "verifying"; inputHash: string; now: string;
 }): Promise<DmLearningInvocation> {
-  const { identity, policy, now } = input;
-  const { job, snapshot } = await requireDmLearningClaim(db, identity, policy, now);
+  const { identity, now } = input;
+  const { job, snapshot, policy } = await requireDmLearningClaim(db, identity, now);
   if (job.input_hash !== input.inputHash || job.stage !== input.stage) throw new DmLearningError("stale");
   const current = input.stage === "verifying" ? await readProposal(db, job.id, input.inputHash) : null;
   const model = input.stage === "proposing" ? policy.proposer : policy.verifier;
@@ -71,7 +71,7 @@ export async function reserveDmLearningModelCall(db: D1Database, input: {
       on conflict (id) do nothing`)
       .bind(input.callId, identity.claimTokenHash, input.stage, input.inputHash, current?.row.proposal_hash ?? null,
         JSON.stringify(model), reserved.reservedMicroUsd, now, identity.jobId, identity.claimTokenHash, identity.workerId,
-        identity.deviceId, identity.organizationId, now, now, input.inputHash, dmMemoryCanonicalJson(policy), input.stage,
+        identity.deviceId, identity.organizationId, now, now, input.inputHash, dmMemoryCanonicalJson(snapshot.policy), input.stage,
         input.stage, current?.row.id ?? null, current?.row.proposal_hash ?? null,
         day, policy.spaceDailyCalls, day, policy.organizationDailyCalls,
         day, reserved.reservedMicroUsd, policy.spaceDailyMicroUsd, day, reserved.reservedMicroUsd, policy.organizationDailyMicroUsd),
@@ -82,7 +82,7 @@ export async function reserveDmLearningModelCall(db: D1Database, input: {
     db.prepare(`update briar_dm_memory_model_calls set budget_applied = 1 where id = ? and job_id = ? and claim_token_hash = ?`)
       .bind(input.callId, identity.jobId, identity.claimTokenHash),
   ]);
-  await requireDmLearningClaim(db, identity, policy, now);
+  await requireDmLearningClaim(db, identity, now);
   const call = await db.prepare(`select * from briar_dm_memory_model_calls where id = ? and job_id = ? and claim_token_hash = ?`)
     .bind(input.callId, identity.jobId, identity.claimTokenHash).first<CallRow>();
   if (!call) throw new DmLearningError("budget_exhausted");
@@ -99,13 +99,13 @@ const usageStatement = (db: D1Database, callId: string, usage: DmLearningUsage, 
     .bind(usage.inputTokens, usage.outputTokens, usage.costMicroUsd, now, callId, commitId);
 
 export async function submitDmLearningProposal(db: D1Database, input: {
-  identity: DmLearningClaimIdentity; policy: DmLearningPolicy; callId: string; inputHash: string;
+  identity: DmLearningClaimIdentity; callId: string; inputHash: string;
   proposal: DmLearningProposal; usage: DmLearningUsage; now: string;
 }) {
-  const { identity, policy, now } = input;
+  const { identity, now } = input;
   const replayed = await replayDmLearningCommit(db, input);
   if (replayed) return replayed;
-  const { job, snapshot } = await requireDmLearningClaim(db, identity, policy, now);
+  const { job, snapshot } = await requireDmLearningClaim(db, identity, now);
   if (job.input_hash !== input.inputHash) throw new DmLearningError("stale");
   const existing = await db.prepare("select * from briar_dm_memory_proposals where id = ? and job_id = ?")
     .bind(input.callId, job.id).first<ProposalRow>();
@@ -150,7 +150,7 @@ export async function submitDmLearningProposal(db: D1Database, input: {
           and call.claim_token_hash = ? and call.stage = 'proposing' and call.input_hash = job.input_hash and call.status = 'reserved')
       on conflict (id) do nothing returning id`)
       .bind(input.callId, input.inputHash, proposalHash, JSON.stringify(input.proposal), JSON.stringify(normalized), now,
-        job.id, identity.claimTokenHash, now, now, input.inputHash, dmMemoryCanonicalJson(policy), input.callId, identity.claimTokenHash),
+        job.id, identity.claimTokenHash, now, now, input.inputHash, dmMemoryCanonicalJson(snapshot.policy), input.callId, identity.claimTokenHash),
     db.prepare(`update briar_dm_memory_model_calls set status = 'completed', input_tokens = ?, output_tokens = ?, cost_micro_usd = ?, completed_at = ?
       where id = ? and claim_token_hash = ? and exists (select 1 from briar_dm_memory_proposals where id = ? and proposal_hash = ?)`)
       .bind(input.usage.inputTokens, input.usage.outputTokens, input.usage.costMicroUsd, now, input.callId, identity.claimTokenHash, input.callId, proposalHash),
@@ -163,12 +163,12 @@ export async function submitDmLearningProposal(db: D1Database, input: {
 }
 
 export async function submitDmLearningVerification(db: D1Database, input: {
-  identity: DmLearningClaimIdentity; policy: DmLearningPolicy; callId: string; inputHash: string;
+  identity: DmLearningClaimIdentity; callId: string; inputHash: string;
   proposalId: string; proposalHash: string; verification: DmLearningVerification; usage: DmLearningUsage; now: string;
 }) {
   const replayed = await replayDmLearningCommit(db, input);
   if (replayed) return replayed;
-  const { job, snapshot } = await requireDmLearningClaim(db, input.identity, input.policy, input.now);
+  const { job, snapshot } = await requireDmLearningClaim(db, input.identity, input.now);
   const current = await readProposal(db, job.id, input.inputHash);
   if (job.input_hash !== input.inputHash || current.row.id !== input.proposalId || current.row.proposal_hash !== input.proposalHash) {
     throw new DmLearningError("stale");

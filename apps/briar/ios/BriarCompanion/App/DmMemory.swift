@@ -444,14 +444,40 @@ struct DmMemoryView: View {
         }
     }
 
+    /// Display-only provider identity; an id this build does not know shows as sent.
+    private func providerLabel(_ provider: String) -> String {
+        switch provider {
+        case "codex": "Codex"
+        case "claude": "Claude"
+        case "cursor": "Cursor"
+        case "grok": "Grok"
+        case "agy": "Antigravity"
+        case "opencode": "OpenCode"
+        case "openrouter": "OpenRouter"
+        case "vertex": "Vertex AI"
+        case "pi": "Pi"
+        default: provider
+        }
+    }
+
     @ViewBuilder
     private func learningStatus(_ learning: BriarAPI_DmMemoryLearningStatus) -> some View {
         if learning.hasConfiguration {
             let configuration = learning.configuration
-            Text("\(text("제안 / 검증 모델", "Proposer / verifier model")) · \(configuration.proposer.model) / \(configuration.verifier.model)")
-                .font(.caption)
-            Text("\(configuration.proposer.transport == "agent" ? "Agent" : "OpenRouter") · \(configuration.proposer.provider) / \(configuration.verifier.transport == "agent" ? "Agent" : "OpenRouter") · \(configuration.verifier.provider)")
-                .font(.caption)
+            let preferred = providerLabel(configuration.proposer.provider)
+            if configuration.agentProviderVerified {
+                Text("\(text("학습 모델", "Learning model")) · \(preferred) \(text("(이 DM의 Agent와 동일)", "(same as this DM's Agent)"))")
+                    .font(.caption)
+            } else {
+                Text(text("이 DM의 Agent(\(providerLabel(configuration.agentProvider)))는 아직 자동 학습 검증 전입니다. 연결된 \(preferred)로 학습합니다.",
+                          "This DM's Agent (\(providerLabel(configuration.agentProvider))) is not verified for automatic learning yet. Learning runs on the connected \(preferred)."))
+                    .font(.caption)
+            }
+            if !configuration.workerAvailable {
+                Text(text("지금 학습을 처리할 수 있는 Worker가 없습니다. \(preferred)가 연결된 Worker가 필요합니다.",
+                          "No Worker can run learning right now. A Worker with \(preferred) connected is required."))
+                    .font(.caption).foregroundStyle(.orange)
+            }
             Text("\(text("오늘 호출 / 하루 한도", "Calls today / daily limit")) · \(learning.callsToday) / \(configuration.spaceDailyCalls)")
                 .font(.caption)
             if configuration.costTracked {

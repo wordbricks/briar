@@ -1,38 +1,31 @@
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
 import * as Schema from "effect/Schema";
-import { DmLearningSnapshot, type ClaimedDmMemory, type DmLearningPolicy, type DmLearningUsage } from "../../src/lib/dm-memory-learning-contract";
+import { DmLearningPolicy, DmLearningSnapshot, dmLearningAgentPolicy, dmMemoryLearningVerifiedProviders,
+  resolveDmLearningProvider, type ClaimedDmMemory, type DmLearningUsage } from "../../src/lib/dm-memory-learning-contract";
 import { sha256 } from "./crypto-digest";
 import { expireDmMemories } from "./dm-memory-access";
 import { captureDmLearningInput, dmLearningInputsCurrentSql, dmLearningLiveSpaceSql,
   type DmLearningJobRow, type DmLearningSpaceRow } from "./dm-memory-learning-input";
 import { scheduleDmLearningJobs } from "./dm-memory-learning-queue";
 import { reapDmLearningClaims } from "./dm-memory-learning-maintenance";
-import { supportsDmMemoryLearning } from "./dm-memory-learning-policy";
+import { advertisedDmLearningProviders } from "./dm-memory-learning-policy";
 import { DmLearningError } from "./dm-memory-learning-validation";
 import { executionWorkerBindingById, executionWorkerDeviceSessionBindings, executionWorkerRuntime,
   executionWorkerDeviceSessionsQuery, workerStateAt } from "./workers";
 
 export type DmLearningClaimIdentity = { organizationId: string; workerId: string; deviceId: string; claimTokenHash: string; jobId: string };
-const dmLearningWorkerModelSql = (stage: "proposer" | "verifier") => `(
-  (json_extract(job.policy_json, '$.${stage}.transport') = 'openrouter' and (
-    (json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 1
-      and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transport') = 'openrouter')
-    or (json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 2 and exists (
-      select 1 from json_each(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transports') transport
-      where transport.value = 'openrouter'))))
-  or (json_extract(job.policy_json, '$.${stage}.transport') = 'agent'
-    and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 2
-    and exists (select 1 from json_each(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transports') transport
-      where transport.value = 'agent')
-    and exists (select 1 from json_each(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.providers') provider
-      where provider.value = 'AGENT_PROVIDER_' || upper(json_extract(job.policy_json, '$.${stage}.provider'))))
-)`;
+const decodePolicy = Schema.decodeUnknownSync(DmLearningPolicy);
+/** Only the code-listed verified Agent providers are learnable; OpenRouter never is. */
+export const dmLearningVerifiedProviderSql = dmMemoryLearningVerifiedProviders
+  .map((provider) => `'AGENT_PROVIDER_${provider.toUpperCase()}'`).join(", ");
+const dmLearningJobProviderSql = (stage: "proposer" | "verifier") =>
+  `json_extract(job.policy_json, '$.${stage}.transport') = 'agent' and exists (
+    select 1 from json_each(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.providers') provider
+    where provider.value = 'AGENT_PROVIDER_' || upper(json_extract(job.policy_json, '$.${stage}.provider')))`;
 
-export const dmLearningWorkerCurrentSql = `exists (
-  select 1 from briar_execution_workers worker join briar_execution_worker_devices device on device.id = worker.device_id
-  join briar_project_agents agent on agent.id = space.agent_id and agent.organization_id = space.organization_id
-  where worker.id = job.claimed_worker_id and worker.device_id = job.claimed_device_id
-    and device.organization_id = space.organization_id and device.state <> 'disabled' and worker.state <> 'disabled'
+/** Worker eligibility shared by the claim guards and the status probe; `space` and `agent` must be in scope. */
+export const dmLearningWorkerEligibleSql = `device.organization_id = space.organization_id
+    and device.state <> 'disabled' and worker.state <> 'disabled'
     and worker.accepting_work = 1 and worker.readiness_state <> 'needs_attention'
     and julianday(worker.last_heartbeat_at) >= julianday(?) - (3.0 / 1440)
     and (agent.project_id is null or agent.project_id = worker.project_id)
@@ -43,11 +36,18 @@ export const dmLearningWorkerCurrentSql = `exists (
     and json_valid(worker.runtime_proto_json)
     and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 1
     and json_type(worker.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 'integer'
-    and (json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 1
-      or json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 2)
+    and json_extract(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 2
     and json_type(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.protocol') = 'integer'
-    and ${dmLearningWorkerModelSql("proposer")}
-    and ${dmLearningWorkerModelSql("verifier")})`;
+    and exists (select 1 from json_each(worker.runtime_proto_json, '$.capabilities.dmMemoryLearning.transports') transport
+      where transport.value = 'agent')`;
+
+export const dmLearningWorkerCurrentSql = `exists (
+  select 1 from briar_execution_workers worker join briar_execution_worker_devices device on device.id = worker.device_id
+  join briar_project_agents agent on agent.id = space.agent_id and agent.organization_id = space.organization_id
+  where worker.id = job.claimed_worker_id and worker.device_id = job.claimed_device_id
+    and ${dmLearningWorkerEligibleSql}
+    and ${dmLearningJobProviderSql("proposer")}
+    and ${dmLearningJobProviderSql("verifier")})`;
 
 export const dmLearningClaimCurrentSql = `job.status = 'running' and job.lease_expires_at > ?
   and job.kind in ('extract', 'explicit_request', 'consolidate')
@@ -55,16 +55,17 @@ export const dmLearningClaimCurrentSql = `job.status = 'running' and job.lease_e
   and (job.kind = 'explicit_request' or (space.use_enabled = 1 and space.auto_enabled = 1))
   and ${dmLearningWorkerCurrentSql}`;
 
-export async function requireDmLearningClaim(db: D1Database, identity: DmLearningClaimIdentity, policy: DmLearningPolicy, now: string) {
+/** The job row owns its policy; the claiming Worker is re-checked against it on every stage. */
+export async function requireDmLearningClaim(db: D1Database, identity: DmLearningClaimIdentity, now: string) {
   await expireDmMemories(db, now);
   const row = await db.prepare(`select job.* from briar_dm_memory_jobs job
     join briar_dm_memory_spaces space on space.id = job.space_id
     where job.id = ? and job.claimed_worker_id = ? and job.claimed_device_id = ? and job.lease_token_hash = ?
       and space.organization_id = ? and ${dmLearningClaimCurrentSql}
-      and job.expected_memory_revision = space.memory_revision and job.policy_json = ?
+      and job.expected_memory_revision = space.memory_revision
       and job.input_json is not null and job.input_hash is not null and ${dmLearningInputsCurrentSql}`)
     .bind(identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.organizationId,
-      now, now, dmMemoryCanonicalJson(policy)).first<DmLearningJobRow>();
+      now, now).first<DmLearningJobRow>();
   if (!row) {
     const stillAuthorized = await db.prepare(`select 1 from briar_dm_memory_jobs job
       join briar_dm_memory_spaces space on space.id = job.space_id
@@ -75,7 +76,8 @@ export async function requireDmLearningClaim(db: D1Database, identity: DmLearnin
   }
   const snapshot = Schema.decodeUnknownSync(DmLearningSnapshot)(JSON.parse(row.input_json!));
   if (await sha256(dmMemoryCanonicalJson(snapshot)) !== row.input_hash) throw new DmLearningError("stale");
-  return { job: row, snapshot };
+  if (dmMemoryCanonicalJson(snapshot.policy) !== row.policy_json) throw new DmLearningError("stale");
+  return { job: row, snapshot, policy: snapshot.policy };
 }
 
 export async function failDmLearningClaim(db: D1Database, identity: DmLearningClaimIdentity,
@@ -116,21 +118,15 @@ export async function renewDmLearningClaim(
   db: D1Database,
   input: {
     identity: DmLearningClaimIdentity;
-    policy: DmLearningPolicy;
     inputHash: string;
     now: string;
   },
 ) {
-  const { job } = await requireDmLearningClaim(
-    db,
-    input.identity,
-    input.policy,
-    input.now,
-  );
+  const { job } = await requireDmLearningClaim(db, input.identity, input.now);
   if (job.input_hash !== input.inputHash) throw new DmLearningError("stale");
   const leaseExpiresAt = new Date(Date.parse(input.now) + 5 * 60_000).toISOString();
   const renewed = await db.prepare(`update briar_dm_memory_jobs as job set lease_expires_at = ?, updated_at = ?
-    where job.id = ? and job.lease_token_hash = ? and job.input_hash = ? and job.policy_json = ?
+    where job.id = ? and job.lease_token_hash = ? and job.input_hash = ?
       and exists (select 1 from briar_dm_memory_spaces space where space.id = job.space_id
         and job.expected_memory_revision = space.memory_revision and ${dmLearningClaimCurrentSql}
         and ${dmLearningInputsCurrentSql}) returning id`)
@@ -140,7 +136,6 @@ export async function renewDmLearningClaim(
       input.identity.jobId,
       input.identity.claimTokenHash,
       input.inputHash,
-      dmMemoryCanonicalJson(input.policy),
       input.now,
       input.now,
     ).first();
@@ -149,28 +144,37 @@ export async function renewDmLearningClaim(
 }
 
 export async function claimDmLearningJob(db: D1Database, input: {
-  organizationId: string; deviceId: string; workerId: string; projectId: string; policy: DmLearningPolicy; now: string;
+  organizationId: string; deviceId: string; workerId: string; projectId: string; now: string;
 }): Promise<ClaimedDmMemory | null> {
   const worker = await executionWorkerBindingById(db, input.deviceId, input.workerId);
   const capabilities = worker === null ? undefined : executionWorkerRuntime(worker).proto.capabilities;
-  if (!worker || worker.project_id !== input.projectId || !supportsDmMemoryLearning(capabilities, input.policy) ||
+  const providers = advertisedDmLearningProviders(capabilities);
+  if (!worker || worker.project_id !== input.projectId || providers.length === 0 ||
     workerStateAt(worker.last_heartbeat_at, input.now, worker.state) !== "online" || worker.accepting_work !== 1 ||
     worker.readiness_state === "needs_attention") return null;
-  await scheduleDmLearningJobs(db, input.organizationId, input.policy, input.now);
+  await scheduleDmLearningJobs(db, input.organizationId, input.now);
   await reapDmLearningClaims(db, input.now, input.organizationId);
   const claimToken = `briar_memory_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
   const claimTokenHash = await sha256(claimToken);
   const leaseExpiresAt = new Date(Date.parse(input.now) + 5 * 60_000).toISOString();
+  // The claim resolves the provider in place: the job keeps its preferred policy
+  // when this Worker advertises it, and otherwise falls back inside the verified
+  // list, so every later guard reads the policy this Worker can actually run.
+  const advertised = providers.map(() => "?").join(", ");
   const result = await db.prepare(`update briar_dm_memory_jobs as job set status = 'running', stage = 'proposing',
     attempt = attempt + 1, lease_token_hash = ?, lease_expires_at = ?, claimed_worker_id = ?, claimed_device_id = ?,
     expected_memory_revision = (select memory_revision from briar_dm_memory_spaces where id = job.space_id),
+    policy_json = case when json_extract(job.policy_json, '$.proposer.provider') in (${advertised})
+      and json_extract(job.policy_json, '$.verifier.provider') in (${advertised}) then job.policy_json else ? end,
     updated_at = ?, error_code = null
     where job.id = (select candidate.id from briar_dm_memory_jobs candidate
       join briar_dm_memory_spaces space on space.id = candidate.space_id
       join briar_project_agents agent on agent.id = space.agent_id
       where candidate.kind in ('extract', 'explicit_request', 'consolidate')
         and candidate.status in ('pending', 'retry_wait') and candidate.available_at <= ?
-        and candidate.attempt < 3 and candidate.calls_used < 6 and candidate.policy_json = ?
+        and candidate.attempt < 3 and candidate.calls_used < 6
+        and json_extract(candidate.policy_json, '$.proposer.transport') = 'agent'
+        and json_extract(candidate.policy_json, '$.verifier.transport') = 'agent'
         and space.organization_id = ? and candidate.revocation_epoch = space.revocation_epoch
         and ${dmLearningLiveSpaceSql} and (agent.project_id is null or agent.project_id = ?)
         and (candidate.kind = 'explicit_request' or (space.use_enabled = 1 and space.auto_enabled = 1))
@@ -182,7 +186,8 @@ export async function claimDmLearningJob(db: D1Database, input: {
           and device.organization_id = ? and worker.accepting_work = 1 and worker.readiness_state = 'ready'
           and (select count(*) from (${executionWorkerDeviceSessionsQuery()}) active_work) < device.max_concurrent_sessions)
     returning *`)
-    .bind(claimTokenHash, leaseExpiresAt, input.workerId, input.deviceId, input.now, input.now, dmMemoryCanonicalJson(input.policy),
+    .bind(claimTokenHash, leaseExpiresAt, input.workerId, input.deviceId, ...providers, ...providers,
+      dmMemoryCanonicalJson(dmLearningAgentPolicy(providers[0]!)), input.now, input.now,
       input.organizationId, input.projectId, input.workerId, input.deviceId, input.organizationId,
       ...executionWorkerDeviceSessionBindings(input.deviceId, input.now)).all<DmLearningJobRow>();
   const claimed = result.results[0];
@@ -192,7 +197,13 @@ export async function claimDmLearningJob(db: D1Database, input: {
   try {
     const space = (await db.prepare("select * from briar_dm_memory_spaces where id = ?")
       .bind(claimed.space_id).first<DmLearningSpaceRow>())!;
-    const snapshot = await captureDmLearningInput(db, claimed, space, input.policy, input.now);
+    const policy = decodePolicy(JSON.parse(claimed.policy_json!));
+    if (policy.proposer.transport !== "agent" || policy.verifier.transport !== "agent" ||
+      resolveDmLearningProvider(policy.proposer.provider, providers) !== policy.proposer.provider ||
+      resolveDmLearningProvider(policy.verifier.provider, providers) !== policy.verifier.provider) {
+      throw new DmLearningError("model_configuration");
+    }
+    const snapshot = await captureDmLearningInput(db, claimed, space, policy, input.now);
     const inputHash = await sha256(dmMemoryCanonicalJson(snapshot));
     const [prepared] = await db.batch([
       db.prepare(`update briar_dm_memory_jobs as job set input_json = ?, input_hash = ?, source_end = ?,
@@ -215,7 +226,7 @@ export async function claimDmLearningJob(db: D1Database, input: {
         .bind(input.now, input.now, claimed.space_id, claimed.id, inputHash, claimTokenHash),
     ]);
     if (prepared.results.length !== 1) throw new DmLearningError("stale");
-    await requireDmLearningClaim(db, identity, input.policy, input.now);
+    await requireDmLearningClaim(db, identity, input.now);
     return { workType: "dmMemory", workId: claimed.id, runId: claimed.id, organizationId: input.organizationId,
       workerId: input.workerId, sourceKey: "dm-memory", title: "DM memory learning", claimToken,
       claimedAt: input.now, leaseExpiresAt, inputHash, snapshot };
