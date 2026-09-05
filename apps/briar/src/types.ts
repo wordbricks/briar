@@ -626,11 +626,16 @@ export type ManagedComputerState =
   | "stopped"
   | "terminated";
 
+export type ManagedComputerProvider = "aws" | "sandbox";
+
 export type ManagedComputer = {
   id: string;
   organizationId: string;
   requesterUserId: string;
   state: ManagedComputerState;
+  provider: ManagedComputerProvider;
+  /** Sandbox computers carry the label their worker registered with. */
+  label: string | null;
   region: string;
   instanceId: string | null;
   volumeId: string | null;

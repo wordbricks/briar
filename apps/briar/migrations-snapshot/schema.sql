@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 8fc839ceba67e2c3d1db8614cdf3092c115dc9ba841b0fcfba6128a6bc241db1
--- snapshot-digest: f68dbd149402dd21c7302f94b5532c385e90d81b5044c6d60be286d6968fb082
+-- migrations-digest: e5f6538286c2dc63af599139f3b800c3687fb84f431986e8c55d12f1bf47a9a3
+-- snapshot-digest: 3e9b2002371b03462ffcf19e527fc42baf4c8f0c61f4f4bf8259cbb2425e3119
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1116,7 +1116,8 @@ CREATE TABLE IF NOT EXISTS "briar_managed_computers" (
   stopped_at text,
   terminated_at text,
   updated_at text not null
-);
+, provider text not null default 'aws'
+    check (provider in ('aws', 'sandbox')));
 -- @statement
 CREATE TABLE IF NOT EXISTS "briar_managed_computer_provisioning_jobs" (
   id text primary key not null,
@@ -4802,6 +4803,9 @@ CREATE INDEX briar_channel_message_attachments_message_idx
 -- @statement
 CREATE INDEX briar_channel_message_attachments_channel_idx
   on briar_channel_message_attachments (organization_id, channel_id, message_id);
+-- @statement
+CREATE INDEX briar_managed_computers_provider_idx
+  on briar_managed_computers (provider, state);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN

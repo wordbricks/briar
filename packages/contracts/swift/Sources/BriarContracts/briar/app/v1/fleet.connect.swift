@@ -60,6 +60,12 @@ public protocol BriarAPI_FleetServiceClientInterface: Sendable {
     func `terminateManagedComputer`(request: BriarAPI_TerminateManagedComputerRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_TerminateManagedComputerResponse>
 
     @available(iOS 13, *)
+    func `registerSandboxComputer`(request: BriarAPI_RegisterSandboxComputerRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RegisterSandboxComputerResponse>
+
+    @available(iOS 13, *)
+    func `unregisterSandboxComputer`(request: BriarAPI_UnregisterSandboxComputerRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UnregisterSandboxComputerResponse>
+
+    @available(iOS 13, *)
     func `createManagedComputerRemoteSession`(request: BriarAPI_CreateManagedComputerRemoteSessionRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateManagedComputerRemoteSessionResponse>
 
     @available(iOS 13, *)
@@ -156,6 +162,16 @@ public final class BriarAPI_FleetServiceClient: BriarAPI_FleetServiceClientInter
     }
 
     @available(iOS 13, *)
+    public func `registerSandboxComputer`(request: BriarAPI_RegisterSandboxComputerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RegisterSandboxComputerResponse> {
+        return await self.client.unary(path: "/briar.app.v1.FleetService/RegisterSandboxComputer", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `unregisterSandboxComputer`(request: BriarAPI_UnregisterSandboxComputerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UnregisterSandboxComputerResponse> {
+        return await self.client.unary(path: "/briar.app.v1.FleetService/UnregisterSandboxComputer", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `createManagedComputerRemoteSession`(request: BriarAPI_CreateManagedComputerRemoteSessionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateManagedComputerRemoteSessionResponse> {
         return await self.client.unary(path: "/briar.app.v1.FleetService/CreateManagedComputerRemoteSession", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -192,6 +208,8 @@ public final class BriarAPI_FleetServiceClient: BriarAPI_FleetServiceClientInter
             public static let retryManagedComputer = Connect.MethodSpec(name: "RetryManagedComputer", service: "briar.app.v1.FleetService", type: .unary)
             public static let retireManagedComputer = Connect.MethodSpec(name: "RetireManagedComputer", service: "briar.app.v1.FleetService", type: .unary)
             public static let terminateManagedComputer = Connect.MethodSpec(name: "TerminateManagedComputer", service: "briar.app.v1.FleetService", type: .unary)
+            public static let registerSandboxComputer = Connect.MethodSpec(name: "RegisterSandboxComputer", service: "briar.app.v1.FleetService", type: .unary)
+            public static let unregisterSandboxComputer = Connect.MethodSpec(name: "UnregisterSandboxComputer", service: "briar.app.v1.FleetService", type: .unary)
             public static let createManagedComputerRemoteSession = Connect.MethodSpec(name: "CreateManagedComputerRemoteSession", service: "briar.app.v1.FleetService", type: .unary)
             public static let endManagedComputerRemoteSession = Connect.MethodSpec(name: "EndManagedComputerRemoteSession", service: "briar.app.v1.FleetService", type: .unary)
             public static let createManagedComputerSetupSession = Connect.MethodSpec(name: "CreateManagedComputerSetupSession", service: "briar.app.v1.FleetService", type: .unary)

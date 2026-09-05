@@ -4,6 +4,7 @@ import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import * as Schema from "effect/Schema";
+import { FleetService } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import {
   ProjectGitHubService,
 } from "@briar/contracts/gen/briar/app/v1/github_pb";
@@ -84,8 +85,60 @@ const SandboxState = Schema.Struct({
   label: Schema.String,
   teamIds: Schema.Array(Schema.String.check(Schema.isUUID())),
   bootstrappedAt: Schema.String,
+  /** Managed computer record that lets the app open this sandbox's desktop. */
+  managedComputerId: Schema.optional(Schema.String.check(Schema.isUUID())),
 }).annotate({ parseOptions: strictParseOptions });
 export type SandboxState = typeof SandboxState.Type;
+
+/**
+ * Credential file for the remote-desktop relay agent. It mirrors the managed
+ * computer's `worker-credential.json`: the worker credential doubles as the
+ * relay credential because the relay authenticates the agent as a worker
+ * device and matches it against the managed computer's device id.
+ */
+export const SandboxRemoteAgentConfig = Schema.Struct({
+  credential: Schema.String.check(Schema.isStartsWith("briar_worker_")),
+  deviceId: Schema.String.check(Schema.isMinLength(1)),
+  organizationId: Schema.String.check(Schema.isUUID()),
+  managedComputerId: Schema.String.check(Schema.isUUID()),
+  apiOrigin: HttpsUrl,
+}).annotate({ parseOptions: strictParseOptions });
+export type SandboxRemoteAgentConfig = typeof SandboxRemoteAgentConfig.Type;
+const decodeSandboxRemoteAgentConfig = Schema.decodeUnknownSync(
+  Schema.fromJsonString(SandboxRemoteAgentConfig),
+  strictParseOptions,
+);
+
+export const sandboxRemoteAgentConfigPath = (directory = configDirectory) =>
+  join(directory, "remote-agent.json");
+
+export async function readSandboxRemoteAgentConfig(
+  directory = configDirectory,
+): Promise<SandboxRemoteAgentConfig | null> {
+  try {
+    return decodeSandboxRemoteAgentConfig(
+      await readFile(sandboxRemoteAgentConfigPath(directory), "utf8"),
+    );
+  } catch (error) {
+    if (
+      error && typeof error === "object" && "code" in error &&
+      error.code === "ENOENT"
+    ) return null;
+    throw new Error("Sandbox remote agent config is unreadable; rerun `briar sandbox up`");
+  }
+}
+
+async function writeSandboxRemoteAgentConfig(
+  config: SandboxRemoteAgentConfig,
+  directory = configDirectory,
+) {
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await writeFile(
+    sandboxRemoteAgentConfigPath(directory),
+    `${JSON.stringify(config, null, 2)}\n`,
+    { mode: 0o600 },
+  );
+}
 const decodeSandboxState = Schema.decodeUnknownSync(
   Schema.fromJsonString(SandboxState),
   strictParseOptions,
@@ -157,6 +210,14 @@ export type SandboxBootstrapDependencies = {
     identity: { readonly name: string; readonly email: string },
   ) => Promise<void>;
   readonly writeState: (state: SandboxState) => Promise<void>;
+  readonly registerComputer: (input: {
+    apiUrl: string;
+    userToken: string;
+    organizationId: string;
+    deviceId: string;
+    label: string;
+  }) => Promise<{ managedComputerId: string }>;
+  readonly writeRemoteAgentConfig: (config: SandboxRemoteAgentConfig) => Promise<void>;
   readonly computerUseHealthy: () => Promise<boolean>;
   readonly sleep: (milliseconds: number) => Promise<void>;
   readonly now: () => Date;
@@ -201,6 +262,22 @@ const defaultDependencies: SandboxBootstrapDependencies = {
   writeCodexAuth,
   writeGitIdentity,
   writeState: writeSandboxState,
+  registerComputer: async (input) => {
+    const client = createAuthenticatedConnectClient(
+      FleetService,
+      input.apiUrl,
+      input.userToken,
+      { binary: true },
+    );
+    const response = await client.registerSandboxComputer({
+      organizationId: input.organizationId,
+      deviceId: input.deviceId,
+      label: input.label,
+    });
+    const computer = requiredMessage(response.computer, "registerSandboxComputer.computer");
+    return { managedComputerId: computer.id };
+  },
+  writeRemoteAgentConfig: writeSandboxRemoteAgentConfig,
   computerUseHealthy: () => computerUseServiceHealthy(),
   sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
   now: () => new Date(),
@@ -297,11 +374,46 @@ export async function runSandboxBootstrap(
       `Registered worker ${registration.workerId} for team ${project.id}`,
     );
   }
+  // Join the remote-desktop relay: register this sandbox's worker device as a
+  // managed computer so the app can open its desktop, and hand the relay
+  // agent the same worker credential the relay authenticates with.
+  let managedComputerId: string | undefined;
+  const relayWorker = config.teams
+    .filter((team) => payload.teams.some((project) => project.id === team.id))
+    .map((team) => team.executionWorker)
+    .find((worker) => worker?.token);
+  if (relayWorker?.token) {
+    try {
+      const registered = await dependencies.registerComputer({
+        apiUrl: payload.apiUrl,
+        userToken: payload.userToken,
+        organizationId: relayWorker.organizationId,
+        deviceId: relayWorker.deviceId,
+        label: payload.label,
+      });
+      managedComputerId = registered.managedComputerId;
+      await dependencies.writeRemoteAgentConfig({
+        credential: relayWorker.token,
+        deviceId: relayWorker.deviceId,
+        organizationId: relayWorker.organizationId,
+        managedComputerId,
+        apiOrigin: payload.apiUrl,
+      });
+      dependencies.log(`Registered sandbox desktop as managed computer ${managedComputerId}`);
+    } catch (error) {
+      dependencies.log(
+        `Sandbox desktop was not registered for remote viewing: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
   await dependencies.writeState({
     schemaVersion: SANDBOX_SCHEMA_VERSION,
     label: payload.label,
     teamIds: payload.teams.map((project) => project.id),
     bootstrappedAt: dependencies.now().toISOString(),
+    ...(managedComputerId ? { managedComputerId } : {}),
   });
 }
 
@@ -389,6 +501,7 @@ export async function sandboxReport(input: {
     ready: state !== null && missing.length === 0 && supervisorRunning && serviceHealthy,
     supervisorRunning,
     computerUse: { serviceHealthy, displays, primaryDisplay },
+    managedComputerId: state?.managedComputerId ?? null,
     detail,
     teams,
     providers,
@@ -431,6 +544,8 @@ export type SandboxUnregisterResult = {
     readonly state: "unbound" | "not_registered" | "failed";
     readonly detail?: string;
   }>;
+  /** Whether the sandbox's managed computer record was removed from the relay. */
+  readonly computerRemoved: boolean;
 };
 
 /**
@@ -439,16 +554,58 @@ export type SandboxUnregisterResult = {
  * thrown: the container is going away either way, and the caller decides how
  * loudly to warn.
  */
+async function unregisterSandboxComputer(input: {
+  apiUrl: string;
+  userToken: string;
+  organizationId: string;
+  deviceId: string;
+}) {
+  const client = createAuthenticatedConnectClient(
+    FleetService,
+    input.apiUrl,
+    input.userToken,
+    { binary: true },
+  );
+  const response = await client.unregisterSandboxComputer({
+    organizationId: input.organizationId,
+    deviceId: input.deviceId,
+  });
+  return response.removed;
+}
+
 export async function runSandboxUnregister(overrides: {
   readonly loadConfig?: () => Promise<Config>;
   readonly readState?: () => Promise<SandboxState | null>;
   readonly unregister?: typeof unregisterTeamExecutionWorker;
+  readonly readRemoteAgentConfig?: () => Promise<SandboxRemoteAgentConfig | null>;
+  readonly unregisterComputer?: typeof unregisterSandboxComputer;
 } = {}): Promise<SandboxUnregisterResult> {
   const config = await (overrides.loadConfig ?? loadConfig)();
   const state = await (overrides.readState ?? readSandboxState)();
   const unregister = overrides.unregister ?? unregisterTeamExecutionWorker;
   const userToken = process.env.BRIAR_USER_TOKEN ?? config.userToken;
   const teams: SandboxUnregisterResult["teams"][number][] = [];
+  const remoteAgent = await (overrides.readRemoteAgentConfig ?? readSandboxRemoteAgentConfig)()
+    .catch(() => null);
+  let computerRemoved = false;
+  if (remoteAgent && userToken) {
+    const worker = config.teams
+      .map((team) => team.executionWorker)
+      .find((candidate) => candidate?.deviceId === remoteAgent.deviceId);
+    if (worker) {
+      try {
+        computerRemoved = await (overrides.unregisterComputer ?? unregisterSandboxComputer)({
+          apiUrl: remoteAgent.apiOrigin,
+          userToken,
+          organizationId: worker.organizationId,
+          deviceId: remoteAgent.deviceId,
+        });
+      } catch {
+        computerRemoved = false;
+      }
+    }
+    await rm(sandboxRemoteAgentConfigPath(), { force: true });
+  }
   for (const id of state?.teamIds ?? []) {
     const team = config.teams.find((candidate) => candidate.id === id);
     if (!team?.executionWorker) {
@@ -481,7 +638,7 @@ export async function runSandboxUnregister(overrides: {
       });
     }
   }
-  return { teams };
+  return { teams, computerRemoved };
 }
 
 export function sandboxWorkerTeamIds(config: Config, state: SandboxState | null) {
@@ -581,14 +738,18 @@ export function primaryDisplayListening(
   });
 }
 
-export function boxServiceCommand(environment: NodeJS.ProcessEnv = process.env) {
-  const configured = environment.BRIAR_CLI?.trim();
-  if (configured && isAbsolute(configured)) return [configured, "sandbox", "box-exec"];
+export function cliCommand(...args: string[]) {
+  const configured = process.env.BRIAR_CLI?.trim();
+  if (configured && isAbsolute(configured)) return [configured, ...args];
   const entry = process.argv[1];
   if (!entry || !isAbsolute(entry)) {
     throw new Error("Unable to resolve the Briar CLI entry point");
   }
-  return [process.execPath, entry, "sandbox", "box-exec"];
+  return [process.execPath, entry, ...args];
+}
+
+export function boxServiceCommand() {
+  return cliCommand("sandbox", "box-exec");
 }
 
 /**
@@ -610,6 +771,7 @@ export async function runSandboxSupervisor(directory = configDirectory) {
     // default display and the managed computer's remote desktop; agents use
     // :2 and above through the box service.
     keepChildAlive("primary_display", primaryDisplayCommand(), stop.signal),
+    keepChildAlive("remote_agent", cliCommand("sandbox", "remote-agent"), stop.signal),
   ]);
   try {
     await runWorkerSupervisor({

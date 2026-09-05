@@ -28,6 +28,8 @@ service FleetService {
   rpc RetryManagedComputer(RetryManagedComputerRequest) returns (RetryManagedComputerResponse);
   rpc RetireManagedComputer(RetireManagedComputerRequest) returns (RetireManagedComputerResponse);
   rpc TerminateManagedComputer(TerminateManagedComputerRequest) returns (TerminateManagedComputerResponse);
+  rpc RegisterSandboxComputer(RegisterSandboxComputerRequest) returns (RegisterSandboxComputerResponse);
+  rpc UnregisterSandboxComputer(UnregisterSandboxComputerRequest) returns (UnregisterSandboxComputerResponse);
   rpc CreateManagedComputerRemoteSession(CreateManagedComputerRemoteSessionRequest) returns (CreateManagedComputerRemoteSessionResponse);
   rpc EndManagedComputerRemoteSession(EndManagedComputerRemoteSessionRequest) returns (EndManagedComputerRemoteSessionResponse);
   rpc CreateManagedComputerSetupSession(CreateManagedComputerSetupSessionRequest) returns (CreateManagedComputerSetupSessionResponse);
@@ -205,6 +207,15 @@ message ManagedComputerError {
   string message = 2;
 }
 
+// Who provisions and owns the computer's lifecycle. AWS computers are
+// provisioned by Briar; sandbox computers are Docker containers a member
+// runs on their own hardware and registers through the CLI.
+enum ManagedComputerProvider {
+  MANAGED_COMPUTER_PROVIDER_UNSPECIFIED = 0;
+  MANAGED_COMPUTER_PROVIDER_AWS = 1;
+  MANAGED_COMPUTER_PROVIDER_SANDBOX = 2;
+}
+
 message ManagedComputer {
   string id = 1;
   string organization_id = 2;
@@ -220,6 +231,9 @@ message ManagedComputer {
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp expires_at = 13;
   google.protobuf.Timestamp updated_at = 14;
+  ManagedComputerProvider provider = 15;
+  // Present for sandbox computers: the label the sandbox registered with.
+  optional string label = 16;
 }
 
 enum ManagedComputerCurrency {
@@ -265,6 +279,28 @@ message ListManagedComputersRequest {
 message ListManagedComputersResponse {
   repeated ManagedComputer computers = 1;
   google.protobuf.Timestamp generated_at = 2;
+}
+
+// Register a Docker sandbox's execution worker device as a managed computer
+// so its desktop can be reached through the remote-desktop relay. The caller
+// must own the device. Re-registering the same device replaces the record.
+message RegisterSandboxComputerRequest {
+  string organization_id = 1;
+  string device_id = 2;
+  string label = 3;
+}
+
+message RegisterSandboxComputerResponse {
+  ManagedComputer computer = 1;
+}
+
+message UnregisterSandboxComputerRequest {
+  string organization_id = 1;
+  string device_id = 2;
+}
+
+message UnregisterSandboxComputerResponse {
+  bool removed = 1;
 }
 
 message GetManagedComputerRequest {

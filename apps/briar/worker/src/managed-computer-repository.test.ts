@@ -5,6 +5,11 @@ import {
   beginManagedComputerRetirement,
   createManagedComputerRetry,
   createPromotionalManagedComputer,
+  createSandboxManagedComputer,
+  deleteSandboxManagedComputer,
+  listManagedComputersForReconciliation,
+  listOrganizationManagedComputers,
+  sandboxManagedComputerByDevice,
   enrollManagedComputerDevice,
   failManagedComputerProvisioning,
   managedComputerById,
@@ -451,5 +456,72 @@ describe("managed computer repository", () => {
       organizationId: secondOrganizationId,
       observedAt: "2026-08-22T00:22:00.000Z",
     })).toBeUndefined();
+  });
+
+  it("registers a sandbox worker device as a ready computer outside the AWS lifecycle", async () => {
+    const deviceId = "briar_device_sandbox_1";
+    await db.prepare(
+      `insert into briar_execution_worker_devices (
+         id, organization_id, owner_user_id, label, device_identity_hash,
+         state, max_concurrent_sessions, last_heartbeat_at, created_at, updated_at
+       ) values (?, ?, ?, 'sandbox-gx10', ?, 'online', 1, ?, ?, ?)`,
+    ).bind(
+      deviceId,
+      organizationId,
+      userId,
+      await sha256Hex("sandbox-device"),
+      observedAt,
+      observedAt,
+      observedAt,
+    ).run();
+    const register = async (suffix: string) =>
+      createSandboxManagedComputer(db, {
+        managedComputerId: `aaaaaaaa-aaaa-4aaa-8aaa-${suffix}`,
+        entitlementId: `bbbbbbbb-bbbb-4bbb-8bbb-${suffix}`,
+        organizationId,
+        userId,
+        deviceId,
+        apiOrigin: "https://briar.example",
+        enrollmentNonceHash: await sha256Hex(`sandbox:${suffix}`),
+        observedAt,
+      });
+    const first = await register("000000000001");
+    expect(first).toMatchObject({
+      provider: "sandbox",
+      state: "ready",
+      briar_device_id: deviceId,
+      device_label: "sandbox-gx10",
+      aws_region: "sandbox",
+    });
+    // AWS lifecycle and pilot capacity never see sandbox rows.
+    expect(
+      (await listManagedComputersForReconciliation(db)).some((row) => row.provider === "sandbox"),
+    ).toBe(false);
+    expect(
+      (await listOrganizationManagedComputers(db, organizationId))
+        .find((row) => row.id === first!.id)?.device_label,
+    ).toBe("sandbox-gx10");
+    // Re-registering the same device replaces the record instead of failing.
+    const second = await register("000000000002");
+    expect(second?.id).toBe("aaaaaaaa-aaaa-4aaa-8aaa-000000000002");
+    expect(await managedComputerById(db, first!.id)).toBeNull();
+    // A device another user owns cannot be registered, and the existing
+    // record survives the attempt.
+    expect(await createSandboxManagedComputer(db, {
+      managedComputerId: "aaaaaaaa-aaaa-4aaa-8aaa-000000000003",
+      entitlementId: "bbbbbbbb-bbbb-4bbb-8bbb-000000000003",
+      organizationId,
+      userId: "pilot-owner-2",
+      deviceId,
+      apiOrigin: "https://briar.example",
+      enrollmentNonceHash: await sha256Hex("sandbox:3"),
+      observedAt,
+    })).toBeNull();
+    expect(await sandboxManagedComputerByDevice(db, organizationId, deviceId))
+      .toMatchObject({ id: second!.id });
+    expect(await deleteSandboxManagedComputer(db, organizationId, deviceId)).toMatchObject({
+      id: second!.id,
+    });
+    expect(await sandboxManagedComputerByDevice(db, organizationId, deviceId)).toBeNull();
   });
 });

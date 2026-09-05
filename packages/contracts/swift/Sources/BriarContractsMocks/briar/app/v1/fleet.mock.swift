@@ -51,6 +51,10 @@ open class BriarAPI_FleetServiceClientMock: BriarAPI_FleetServiceClientInterface
     public var mockAsyncRetireManagedComputer = { (_: BriarAPI_RetireManagedComputerRequest) -> ResponseMessage<BriarAPI_RetireManagedComputerResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `terminateManagedComputer()`.
     public var mockAsyncTerminateManagedComputer = { (_: BriarAPI_TerminateManagedComputerRequest) -> ResponseMessage<BriarAPI_TerminateManagedComputerResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `registerSandboxComputer()`.
+    public var mockAsyncRegisterSandboxComputer = { (_: BriarAPI_RegisterSandboxComputerRequest) -> ResponseMessage<BriarAPI_RegisterSandboxComputerResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `unregisterSandboxComputer()`.
+    public var mockAsyncUnregisterSandboxComputer = { (_: BriarAPI_UnregisterSandboxComputerRequest) -> ResponseMessage<BriarAPI_UnregisterSandboxComputerResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createManagedComputerRemoteSession()`.
     public var mockAsyncCreateManagedComputerRemoteSession = { (_: BriarAPI_CreateManagedComputerRemoteSessionRequest) -> ResponseMessage<BriarAPI_CreateManagedComputerRemoteSessionResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `endManagedComputerRemoteSession()`.
@@ -120,6 +124,14 @@ open class BriarAPI_FleetServiceClientMock: BriarAPI_FleetServiceClientInterface
 
     open func `terminateManagedComputer`(request: BriarAPI_TerminateManagedComputerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_TerminateManagedComputerResponse> {
         return self.mockAsyncTerminateManagedComputer(request)
+    }
+
+    open func `registerSandboxComputer`(request: BriarAPI_RegisterSandboxComputerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RegisterSandboxComputerResponse> {
+        return self.mockAsyncRegisterSandboxComputer(request)
+    }
+
+    open func `unregisterSandboxComputer`(request: BriarAPI_UnregisterSandboxComputerRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UnregisterSandboxComputerResponse> {
+        return self.mockAsyncUnregisterSandboxComputer(request)
     }
 
     open func `createManagedComputerRemoteSession`(request: BriarAPI_CreateManagedComputerRemoteSessionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateManagedComputerRemoteSessionResponse> {

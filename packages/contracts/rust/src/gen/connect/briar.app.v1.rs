@@ -23145,6 +23145,30 @@ pub type OwnedTerminateManagedComputerResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<RegisterSandboxComputerRequestView<'static>>`.
+pub type OwnedRegisterSandboxComputerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterSandboxComputerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RegisterSandboxComputerResponseView<'static>>`.
+pub type OwnedRegisterSandboxComputerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterSandboxComputerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UnregisterSandboxComputerRequestView<'static>>`.
+pub type OwnedUnregisterSandboxComputerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnregisterSandboxComputerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UnregisterSandboxComputerResponseView<'static>>`.
+pub type OwnedUnregisterSandboxComputerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnregisterSandboxComputerResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<CreateManagedComputerRemoteSessionRequestView<'static>>`.
 pub type OwnedCreateManagedComputerRemoteSessionRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionRequestView<
@@ -23780,6 +23804,90 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RegisterSandboxComputerResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::RegisterSandboxComputerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::RegisterSandboxComputerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::RegisterSandboxComputerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UnregisterSandboxComputerResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::UnregisterSandboxComputerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::UnregisterSandboxComputerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UnregisterSandboxComputerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
     crate::proto::briar::app::v1::CreateManagedComputerRemoteSessionResponse,
 >
 for crate::proto::briar::app::v1::__buffa::view::CreateManagedComputerRemoteSessionResponseView<
@@ -24036,6 +24144,18 @@ pub const FLEET_SERVICE_RETIRE_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::con
 /// Static [`Spec`](::connectrpc::Spec) for the `TerminateManagedComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const FLEET_SERVICE_TERMINATE_MANAGED_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.FleetService/TerminateManagedComputer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RegisterSandboxComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_REGISTER_SANDBOX_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/RegisterSandboxComputer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `UnregisterSandboxComputer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const FLEET_SERVICE_UNREGISTER_SANDBOX_COMPUTER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.FleetService/UnregisterSandboxComputer",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -24458,6 +24578,52 @@ pub trait FleetService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::TerminateManagedComputerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RegisterSandboxComputer RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn register_sandbox_computer<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::RegisterSandboxComputerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::RegisterSandboxComputerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UnregisterSandboxComputer RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn unregister_sandbox_computer<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::UnregisterSandboxComputerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::UnregisterSandboxComputerResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -25022,6 +25188,64 @@ impl<S: FleetService> FleetServiceExt for S {
             .with_spec(FLEET_SERVICE_TERMINATE_MANAGED_COMPUTER_SPEC)
             .route_view(
                 FLEET_SERVICE_SERVICE_NAME,
+                "RegisterSandboxComputer",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::RegisterSandboxComputerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::RegisterSandboxComputerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.register_sandbox_computer(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::RegisterSandboxComputerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_REGISTER_SANDBOX_COMPUTER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
+                "UnregisterSandboxComputer",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::UnregisterSandboxComputerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::UnregisterSandboxComputerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.unregister_sandbox_computer(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::UnregisterSandboxComputerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(FLEET_SERVICE_UNREGISTER_SANDBOX_COMPUTER_SPEC)
+            .route_view(
+                FLEET_SERVICE_SERVICE_NAME,
                 "CreateManagedComputerRemoteSession",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -25280,6 +25504,18 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(FLEET_SERVICE_TERMINATE_MANAGED_COMPUTER_SPEC),
+                )
+            }
+            "RegisterSandboxComputer" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_REGISTER_SANDBOX_COMPUTER_SPEC),
+                )
+            }
+            "UnregisterSandboxComputer" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(FLEET_SERVICE_UNREGISTER_SANDBOX_COMPUTER_SPEC),
                 )
             }
             "CreateManagedComputerRemoteSession" => {
@@ -25654,6 +25890,50 @@ impl<T: FleetService> ::connectrpc::Dispatcher for FleetServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::TerminateManagedComputerResponse,
+                        >(format)
+                })
+            }
+            "RegisterSandboxComputer" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::RegisterSandboxComputerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::RegisterSandboxComputerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::RegisterSandboxComputerRequest,
+                    >::from_parts(&req, &body);
+                    svc.register_sandbox_computer(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::RegisterSandboxComputerResponse,
+                        >(format)
+                })
+            }
+            "UnregisterSandboxComputer" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::UnregisterSandboxComputerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::UnregisterSandboxComputerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::UnregisterSandboxComputerRequest,
+                    >::from_parts(&req, &body);
+                    svc.unregister_sandbox_computer(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::UnregisterSandboxComputerResponse,
                         >(format)
                 })
             }
@@ -26544,6 +26824,96 @@ where
                 &self.transport,
                 &self.config,
                 FLEET_SERVICE_TERMINATE_MANAGED_COMPUTER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RegisterSandboxComputer RPC. Sends a request to /briar.app.v1.FleetService/RegisterSandboxComputer.
+    pub async fn register_sandbox_computer(
+        &self,
+        request: crate::proto::briar::app::v1::RegisterSandboxComputerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RegisterSandboxComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.register_sandbox_computer_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RegisterSandboxComputer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn register_sandbox_computer_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::RegisterSandboxComputerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::RegisterSandboxComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_REGISTER_SANDBOX_COMPUTER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UnregisterSandboxComputer RPC. Sends a request to /briar.app.v1.FleetService/UnregisterSandboxComputer.
+    pub async fn unregister_sandbox_computer(
+        &self,
+        request: crate::proto::briar::app::v1::UnregisterSandboxComputerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UnregisterSandboxComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.unregister_sandbox_computer_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UnregisterSandboxComputer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn unregister_sandbox_computer_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::UnregisterSandboxComputerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::UnregisterSandboxComputerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                FLEET_SERVICE_UNREGISTER_SANDBOX_COMPUTER_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

@@ -19,6 +19,7 @@ import {
   ManagedComputerPromotionLimitReason,
   ManagedComputerRemoteSessionSchema,
   ManagedComputerRemoteSessionState,
+  ManagedComputerProvider,
   ManagedComputerSchema,
   ManagedComputerSetupSessionSchema,
   ManagedComputerSetupSessionStatus,
@@ -143,12 +144,19 @@ const managedState = {
   terminated: ManagedComputerState.TERMINATED,
 } as const satisfies Record<ManagedComputerRow["state"], ManagedComputerState>;
 
+const managedProvider = {
+  aws: ManagedComputerProvider.AWS,
+  sandbox: ManagedComputerProvider.SANDBOX,
+} as const satisfies Record<ManagedComputerRow["provider"], ManagedComputerProvider>;
+
 export const appManagedComputer = (row: ManagedComputerRow) =>
   create(ManagedComputerSchema, {
     id: row.id,
     organizationId: row.organization_id,
     requesterUserId: row.requester_user_id,
     state: managedState[row.state],
+    provider: managedProvider[row.provider],
+    label: row.provider === "sandbox" ? row.device_label ?? undefined : undefined,
     region: row.aws_region,
     instanceId: row.aws_instance_id ?? undefined,
     volumeId: row.aws_volume_id ?? undefined,

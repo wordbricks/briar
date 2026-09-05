@@ -31,6 +31,8 @@ const computer: ManagedComputer = {
   organizationId,
   requesterUserId: ownerUserId,
   state: "ready",
+  provider: "aws",
+  label: null,
   region: "us-east-1",
   instanceId: "i-managed",
   volumeId: "vol-managed",

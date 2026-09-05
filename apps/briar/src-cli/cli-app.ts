@@ -72,6 +72,7 @@ import {
   sandboxLoginCommand,
   sandboxLogsCommand,
   sandboxRecreateCommand,
+  sandboxRemoteAgentCommand,
   sandboxRemoveCommand,
   sandboxReportCommand,
   sandboxShellCommand,
@@ -893,6 +894,8 @@ const sandboxCommand = Command.make("sandbox").pipe(
     leaf("bootstrap", {}, sandboxBootstrapCommand, "Apply a bootstrap payload from stdin")
       .pipe(Command.unlisted),
     leaf("box-exec", {}, sandboxBoxExecCommand, "Run the Computer Use box service")
+      .pipe(Command.unlisted),
+    leaf("remote-agent", {}, sandboxRemoteAgentCommand, "Run the remote-desktop relay agent")
       .pipe(Command.unlisted),
     leaf("computer-use-check", {}, sandboxComputerUseCheckCommand, "Probe a Computer Use display")
       .pipe(Command.unlisted),

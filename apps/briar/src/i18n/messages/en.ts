@@ -1459,7 +1459,7 @@ export const en = {
   "managedComputer.apiCosts": "Model and API usage costs are separate.",
   "managedComputer.applicationsPaused": "New applications paused",
   "managedComputer.adminOnly": "Owners, co-owners, and developers only",
-  "managedComputer.computerName": "Managed computer {id}",
+  "managedComputer.computerName": "Managed computer {id}", "managedComputer.sandboxName": "Sandbox {label}",
   "managedComputer.checkoutTitle": "Buy a computer",
   "managedComputer.checkoutDescription": "Apply the promotion to request one pilot computer without a payment method.",
   "managedComputer.oneRun": "1 concurrent run",

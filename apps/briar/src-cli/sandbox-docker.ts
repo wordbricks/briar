@@ -164,6 +164,7 @@ export const SandboxReport = Schema.Struct({
   schemaVersion: Schema.String,
   ready: Schema.Boolean,
   supervisorRunning: Schema.Boolean,
+  managedComputerId: Schema.optional(Schema.NullOr(Schema.String)),
   computerUse: Schema.optional(Schema.Struct({
     serviceHealthy: Schema.Boolean,
     displays: Schema.Array(Schema.Struct({

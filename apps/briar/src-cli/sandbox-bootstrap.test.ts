@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Config } from "./config-contract";
 import {
   assignedDisplays,
+  type SandboxRemoteAgentConfig,
   primaryDisplayCommand,
   primaryDisplayListening,
   decodeSandboxBootstrapPayload,
@@ -453,5 +454,165 @@ describe("primary display", () => {
   it("keeps the owner desktop :1 through the managed remote-desktop script", async () => {
     expect(primaryDisplayCommand()).toEqual(["/opt/briar/bin/briar-remote-desktop"]);
     expect(await primaryDisplayListening(1)).toBe(false);
+  });
+});
+
+describe("remote-desktop relay registration", () => {
+  const registeredWorker = {
+    deviceId: "briar_device_x",
+    workerId: "worker-1",
+    organizationId,
+    token: `briar_worker_${"c".repeat(43)}`,
+    label: "sandbox-gx10",
+    maxConcurrentSessions: 1,
+  };
+
+  it("registers the worker device as a managed computer and writes the relay config", async () => {
+    const config = baseConfig();
+    const registrations: unknown[] = [];
+    const relayConfigs: SandboxRemoteAgentConfig[] = [];
+    const states: SandboxState[] = [];
+    await runSandboxBootstrap(payload(), {
+      loadConfig: async () => config,
+      saveConfig: async () => undefined,
+      fetchRepositoryCredential: async (_apiUrl, project) => credential(project.id),
+      ensureRepository: async () => "/repo",
+      registerWorker: async (input) => {
+        input.config.teams = input.config.teams.map((team) =>
+          team.id === input.project.id ? { ...team, executionWorker: registeredWorker } : team
+        );
+        return {
+          projectId: input.project.id,
+          organizationId,
+          deviceId: registeredWorker.deviceId,
+          workerId: registeredWorker.workerId,
+          label: input.label,
+          maxConcurrentSessions: 1,
+          state: "online",
+        };
+      },
+      registerComputer: async (input) => {
+        registrations.push(input);
+        return { managedComputerId: "44444444-4444-4444-8444-444444444444" };
+      },
+      writeRemoteAgentConfig: async (value) => {
+        relayConfigs.push(value);
+      },
+      writeCodexAuth: async () => undefined,
+      writeGitIdentity: async () => undefined,
+      writeState: async (state) => {
+        states.push(state);
+      },
+      computerUseHealthy: async () => true,
+      sleep: async () => undefined,
+      log: () => undefined,
+    });
+    expect(registrations).toEqual([{
+      apiUrl: "https://briar.example",
+      userToken,
+      organizationId,
+      deviceId: "briar_device_x",
+      label: "sandbox-gx10",
+    }]);
+    expect(relayConfigs).toEqual([{
+      credential: registeredWorker.token,
+      deviceId: "briar_device_x",
+      organizationId,
+      managedComputerId: "44444444-4444-4444-8444-444444444444",
+      apiOrigin: "https://briar.example",
+    }]);
+    expect(states[0]?.managedComputerId).toBe("44444444-4444-4444-8444-444444444444");
+  });
+
+  it("keeps the sandbox usable when relay registration fails", async () => {
+    const config = baseConfig();
+    const states: SandboxState[] = [];
+    const logs: string[] = [];
+    await runSandboxBootstrap(payload(), {
+      loadConfig: async () => config,
+      saveConfig: async () => undefined,
+      fetchRepositoryCredential: async (_apiUrl, project) => credential(project.id),
+      ensureRepository: async () => "/repo",
+      registerWorker: async (input) => {
+        input.config.teams = input.config.teams.map((team) =>
+          team.id === input.project.id ? { ...team, executionWorker: registeredWorker } : team
+        );
+        return {
+          projectId: input.project.id,
+          organizationId,
+          deviceId: registeredWorker.deviceId,
+          workerId: registeredWorker.workerId,
+          label: input.label,
+          maxConcurrentSessions: 1,
+          state: "online",
+        };
+      },
+      registerComputer: async () => {
+        throw new Error("relay down");
+      },
+      writeRemoteAgentConfig: async () => {
+        throw new Error("must not be written");
+      },
+      writeCodexAuth: async () => undefined,
+      writeGitIdentity: async () => undefined,
+      writeState: async (state) => {
+        states.push(state);
+      },
+      computerUseHealthy: async () => true,
+      sleep: async () => undefined,
+      log: (message) => {
+        logs.push(message);
+      },
+    });
+    expect(states[0]?.managedComputerId).toBeUndefined();
+    expect(logs.some((line) => line.includes("relay down"))).toBe(true);
+  });
+
+  it("removes the managed computer before unbinding workers on teardown", async () => {
+    const config = baseConfig();
+    config.userToken = userToken;
+    config.teams = [{
+      id: projectId,
+      repositoryPath: "/repo",
+      apiUrl: "https://briar.example",
+      agentToken,
+      executionWorker: registeredWorker,
+    }];
+    const removed: unknown[] = [];
+    const result = await runSandboxUnregister({
+      loadConfig: async () => config,
+      readState: async () => ({
+        schemaVersion: SANDBOX_SCHEMA_VERSION,
+        label: "sandbox-gx10",
+        teamIds: [projectId],
+        bootstrappedAt: "2026-09-05T00:00:00.000Z",
+        managedComputerId: "44444444-4444-4444-8444-444444444444",
+      }),
+      readRemoteAgentConfig: async () => ({
+        credential: registeredWorker.token,
+        deviceId: registeredWorker.deviceId,
+        organizationId,
+        managedComputerId: "44444444-4444-4444-8444-444444444444",
+        apiOrigin: "https://briar.example",
+      }),
+      unregisterComputer: async (input) => {
+        removed.push(input);
+        return true;
+      },
+      unregister: async () => ({
+        deviceId: registeredWorker.deviceId,
+        projectId,
+        workerId: registeredWorker.workerId,
+        state: "unbound" as const,
+      }),
+    });
+    expect(removed).toEqual([{
+      apiUrl: "https://briar.example",
+      userToken,
+      organizationId,
+      deviceId: "briar_device_x",
+    }]);
+    expect(result.computerRemoved).toBe(true);
+    expect(result.teams).toEqual([{ id: projectId, workerId: "worker-1", state: "unbound" }]);
   });
 });

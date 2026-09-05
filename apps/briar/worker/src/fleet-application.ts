@@ -4,6 +4,8 @@ import { managedComputerConfig } from "./managed-computer-model";
 import { reconcileDrainingManagedComputer } from "./managed-computer-reconciliation";
 import {
   beginManagedComputerRetirement,
+  createSandboxManagedComputer,
+  deleteSandboxManagedComputer,
   listOrganizationManagedComputers,
   managedComputerByDeviceId,
   managedComputerById,
@@ -11,6 +13,7 @@ import {
   organizationManagedComputer,
   recordManagedComputerAuditEvent,
   refreshManagedComputerReadiness,
+  sandboxManagedComputerByDevice,
 } from "./managed-computer-repository";
 import {
   applyForPromotionalManagedComputer,
@@ -50,6 +53,7 @@ import {
   unbindExecutionWorker,
   updateExecutionWorkerConcurrency,
   updateExecutionWorkerIcon,
+  userOwnsExecutionWorkerDevice,
 } from "./workers";
 
 export type FleetApplicationErrorReason =
@@ -610,6 +614,7 @@ export async function retireManagedComputerApplication(input: {
       "Managed computer not found",
     );
   }
+  rejectSandboxLifecycle(existing, "managed_computer_retire_unavailable");
   if (["requested", "provisioning", "bootstrapping"].includes(existing.state)) {
     return applicationError(
       "managed_computer_retire_unavailable",
@@ -671,6 +676,105 @@ export async function retireManagedComputerApplication(input: {
   return { computer, duplicate: !transitioned, reconciliation };
 }
 
+export async function registerSandboxComputerApplication(input: {
+  db: D1Database;
+  organizationId: string;
+  deviceId: string;
+  label: string;
+  userId: string;
+  apiOrigin: string;
+  observedAt: string;
+}) {
+  await organizationRole(input.db, input.organizationId, input.userId);
+  if (
+    !await userOwnsExecutionWorkerDevice(input.db, {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      deviceId: input.deviceId,
+    })
+  ) {
+    return applicationError(
+      "worker_not_found",
+      "Sandbox worker device not found",
+    );
+  }
+  const computer = await createSandboxManagedComputer(input.db, {
+    managedComputerId: crypto.randomUUID(),
+    entitlementId: crypto.randomUUID(),
+    organizationId: input.organizationId,
+    userId: input.userId,
+    deviceId: input.deviceId,
+    apiOrigin: input.apiOrigin,
+    enrollmentNonceHash: await sha256(`sandbox:${input.deviceId}:${crypto.randomUUID()}`),
+    observedAt: input.observedAt,
+  });
+  if (!computer) {
+    return applicationError(
+      "worker_not_found",
+      "Sandbox worker device not found",
+    );
+  }
+  await recordManagedComputerAuditEvent(input.db, {
+    organizationId: input.organizationId,
+    managedComputerId: computer.id,
+    actorUserId: input.userId,
+    action: "ready",
+    detail: { provider: "sandbox", deviceId: input.deviceId, label: input.label },
+    occurredAt: input.observedAt,
+  });
+  return { computer };
+}
+
+export async function unregisterSandboxComputerApplication(input: {
+  db: D1Database;
+  env: Env;
+  organizationId: string;
+  deviceId: string;
+  userId: string;
+  observedAt: string;
+}) {
+  await organizationRole(input.db, input.organizationId, input.userId);
+  if (
+    !await userOwnsExecutionWorkerDevice(input.db, {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      deviceId: input.deviceId,
+    })
+  ) {
+    return { removed: false };
+  }
+  const existing = await sandboxManagedComputerByDevice(
+    input.db,
+    input.organizationId,
+    input.deviceId,
+  );
+  if (!existing) return { removed: false };
+  await endManagedComputerRemoteSessionsAndDisconnect(input.db, input.env, {
+    managedComputerId: existing.id,
+    reason: "computer_retired",
+    observedAt: input.observedAt,
+  });
+  await recordManagedComputerAuditEvent(input.db, {
+    organizationId: input.organizationId,
+    managedComputerId: existing.id,
+    actorUserId: input.userId,
+    action: "terminated",
+    detail: { provider: "sandbox", deviceId: input.deviceId },
+    occurredAt: input.observedAt,
+  });
+  await deleteSandboxManagedComputer(input.db, input.organizationId, input.deviceId);
+  return { removed: true };
+}
+
+const rejectSandboxLifecycle = (
+  row: { provider: string },
+  reason: "managed_computer_retire_unavailable" | "managed_computer_terminate_unavailable",
+) => {
+  if (row.provider === "sandbox") {
+    applicationError(reason, "Remove a sandbox computer with `briar sandbox rm`");
+  }
+};
+
 export async function terminateManagedComputerApplication(input: {
   db: D1Database;
   env: Env;
@@ -689,6 +793,7 @@ export async function terminateManagedComputerApplication(input: {
   if (!existing) {
     return applicationError("managed_computer_not_found", "Managed computer not found");
   }
+  rejectSandboxLifecycle(existing, "managed_computer_terminate_unavailable");
   if (existing.state !== "stopped" && existing.state !== "terminated") {
     return applicationError(
       "managed_computer_terminate_unavailable",
