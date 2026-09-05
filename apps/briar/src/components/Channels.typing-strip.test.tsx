@@ -149,3 +149,4 @@ describe("ChannelMessageTypingStrip", () => {
     await view.cleanup();
   });
 });
+

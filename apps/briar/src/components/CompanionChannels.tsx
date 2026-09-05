@@ -120,6 +120,7 @@ import { useChannelConversationActions } from "../state/channel-conversation/act
 import { useChannelConversationLoader } from "../state/channel-conversation/loader";
 import { useChannelConversationSync } from "../state/channel-conversation/useChannelConversationSync";
 import { ChannelActivityPublisher } from "../state/channel-conversation/activity";
+import { ChannelMessageTypingPlaceholder } from "./ChannelTypingPlaceholder";
 import {
   ChannelMessageTypingStrip,
   ChannelThreadTypingStrip,
@@ -1113,6 +1114,7 @@ function MessageRow({
       )?.name ?? message.executionProposal.projectId
     : null;
   return (
+    <>
     <article
       aria-current={highlighted ? "true" : undefined}
       className={`companion-channel-message${reacting ? " is-reacting" : ""}${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`}
@@ -1333,7 +1335,7 @@ function MessageRow({
             />
           )
           : null}
-        {showTypingState ? (
+        {showTypingState && channel.kind !== "dm" ? (
           <ChannelMessageTypingStrip
             channelId={message.channelId}
             className="companion-channel-typing"
@@ -1435,6 +1437,15 @@ function MessageRow({
         </div>
       ) : null}
     </article>
+    {showTypingState && channel.kind === "dm" ? (
+      <ChannelMessageTypingPlaceholder
+        channelId={message.channelId}
+        className="companion-channel-typing-placeholder"
+        localeTag={localeTag}
+        messageId={message.id}
+      />
+    ) : null}
+    </>
   );
 }
 

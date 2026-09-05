@@ -179,6 +179,7 @@ import {
 } from "../state/channel-conversation/loader";
 import { useChannelConversationSync } from "../state/channel-conversation/useChannelConversationSync";
 import { ChannelActivityPublisher } from "../state/channel-conversation/activity";
+import { ChannelMessageTypingPlaceholder } from "./ChannelTypingPlaceholder";
 import {
   ChannelMessageTypingStrip,
   ChannelThreadTypingStrip,
@@ -2903,38 +2904,48 @@ export const ChannelMessageRow = memo(function ChannelMessageRow({
   const message = useAtomValue(
     channelMessageAtom(channelMessageKey(channelId, messageId)),
   );
+  const showTyping = message ? message.id !== context.threadParentId : false;
   if (!message) return null;
   return (
-    <MessageRow
-      acceptingProposal={
-        context.acceptingProposalId === message.proposal?.id
-      }
-      agents={context.agents}
-      busy={context.busy}
-      canOpenThread={context.canOpenThread}
-      channel={context.channel}
-      currentUserId={context.currentUserId}
-      decliningProposal={
-        context.decliningProposalId === message.proposal?.id
-      }
-      handlers={context.handlers}
-      highlighted={message.id === context.highlightedMessageId}
-      loadCreateExecutionProposalContext={
-        context.loadCreateExecutionProposalContext
-      }
-      localeTag={context.localeTag}
-      members={context.members}
-      message={message}
-      onIssueOpen={context.onIssueOpen}
-      projects={context.projects}
-      selectedProjectId={
-        message.proposal
-          ? context.proposalProjects[message.proposal.id] ?? null
-          : null
-      }
-      showTypingState={message.id !== context.threadParentId}
-      token={context.token}
-    />
+    <>
+      <MessageRow
+        acceptingProposal={
+          context.acceptingProposalId === message.proposal?.id
+        }
+        agents={context.agents}
+        busy={context.busy}
+        canOpenThread={context.canOpenThread}
+        channel={context.channel}
+        currentUserId={context.currentUserId}
+        decliningProposal={
+          context.decliningProposalId === message.proposal?.id
+        }
+        handlers={context.handlers}
+        highlighted={message.id === context.highlightedMessageId}
+        loadCreateExecutionProposalContext={
+          context.loadCreateExecutionProposalContext
+        }
+        localeTag={context.localeTag}
+        members={context.members}
+        message={message}
+        onIssueOpen={context.onIssueOpen}
+        projects={context.projects}
+        selectedProjectId={
+          message.proposal
+            ? context.proposalProjects[message.proposal.id] ?? null
+            : null
+        }
+        showTypingState={showTyping}
+        token={context.token}
+      />
+      {showTyping && context.channel.kind === "dm" ? (
+        <ChannelMessageTypingPlaceholder
+          channelId={channelId}
+          localeTag={context.localeTag}
+          messageId={messageId}
+        />
+      ) : null}
+    </>
   );
 });
 
@@ -3342,7 +3353,7 @@ export const MessageRow = memo(function MessageRow({
             participants={channelReplyParticipants(message)}
           />
         ) : null}
-        {showTypingState ? (
+        {showTypingState && channel.kind !== "dm" ? (
           <ChannelMessageTypingStrip
             channelId={channel.id}
             messageId={message.id}
