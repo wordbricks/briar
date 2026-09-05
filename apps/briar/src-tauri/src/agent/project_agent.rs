@@ -296,6 +296,13 @@ impl AutoHuntCliEnvironment {
         let briar_binary = briar_binary.to_string_lossy().into_owned();
         let briar_config_directory = sandbox_config.join("briar").to_string_lossy().into_owned();
         let worktree_home = home.to_string_lossy().into_owned();
+        // The wrapper swaps HOME, so a `~`-derived default would land in the
+        // throwaway sandbox home. Pass the real path instead, so the agent
+        // shell's `agent-browser` calls and the `briar` wrapper share one file.
+        let agent_browser_state_file = home
+            .join(".local/share/briar/agent-browser/shared-state.json")
+            .to_string_lossy()
+            .into_owned();
         Ok(Self {
             _directory: Some(directory),
             briar_binary: briar_binary.clone(),
@@ -308,6 +315,10 @@ impl AutoHuntCliEnvironment {
                 ("BRIAR_CLI".to_string(), briar_binary),
                 ("BRIAR_CONFIG_HOME".to_string(), briar_config_directory),
                 ("BRIAR_WORKTREE_HOME".to_string(), worktree_home),
+                (
+                    "BRIAR_AGENT_BROWSER_STATE_FILE".to_string(),
+                    agent_browser_state_file,
+                ),
             ],
         })
     }
@@ -1439,6 +1450,15 @@ mod tests {
         assert_eq!(
             environment.get("BRIAR_WORKTREE_HOME"),
             Some(&home.to_string_lossy().into_owned())
+        );
+        assert_eq!(
+            environment.get("BRIAR_AGENT_BROWSER_STATE_FILE"),
+            Some(
+                &home
+                    .join(".local/share/briar/agent-browser/shared-state.json")
+                    .to_string_lossy()
+                    .into_owned()
+            )
         );
         let output = Command::new(wrapper)
             .envs(&environment)

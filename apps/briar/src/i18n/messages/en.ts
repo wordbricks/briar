@@ -991,7 +991,7 @@ export const en = {
   "browser.egoProjectLink": "Explore ego (lite)",
   "browser.toolSelection": "Browser automation tool",
   "browser.egoChoiceDescription": "Uses a dedicated Space that can share signed-in state.",
-  "browser.agentChoiceDescription": "Uses its separately installed Chrome runtime.",
+  "browser.agentChoiceDescription": "Uses its separate Chrome runtime and keeps logins in a shared Briar state file.",
   "browser.asideChoiceDescription": "Controls your signed-in Aside browser through MCP.",
   "browser.selectEgo": "Select ego (lite) for browser automation",
   "browser.selectAgent": "Select agent-browser for browser automation",

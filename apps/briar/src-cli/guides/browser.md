@@ -85,18 +85,44 @@ handoff rules: if the user takes control, stop and wait for explicit confirmatio
 
 ## Verification with agent-browser
 
-Use a run-specific session, read a fresh snapshot before interacting, verify the final visible
-state, capture a useful screenshot, and close the session when finished:
+Every Briar Agent on this machine shares one `agent-browser` login state file, so a site signed in
+during any earlier run starts signed in here. Use a run-specific session so concurrent runs never
+share tabs, start it from the shared state, read a fresh snapshot before interacting, verify the
+final visible state, capture a useful screenshot, and merge the state back before closing:
 
 ```sh
+state="$($BRIAR_CLI browser-state ensure)"
 session="briar-<run-id>"
-agent-browser --session "$session" open 'http://127.0.0.1:<port>'
+agent-browser --session "$session" --state "$state" open 'http://127.0.0.1:<port>'
 agent-browser --session "$session" snapshot -i
 agent-browser --session "$session" click '@e1'
 agent-browser --session "$session" snapshot
 agent-browser --session "$session" screenshot '<absolute-screenshot-path>.png'
+tmp="$(mktemp)"
+agent-browser --session "$session" state save "$tmp" && $BRIAR_CLI browser-state merge "$tmp"
+rm -f "$tmp"
 agent-browser --session "$session" close
 ```
+
+Always run `state save` and `browser-state merge` before `close`. Closing without merging throws
+away every login this run performed, and the next run and every other Agent is asked to sign in
+again.
+
+Never type credentials into a page. When a site requires a sign-in, close the session, reopen it
+headed on the same shared state so the user can sign in themselves, and hand the browser over:
+
+```sh
+agent-browser --session "$session" close
+agent-browser --session "$session" --headed --state "$state" open '<login url>'
+```
+
+Then say in your answer that a browser window is open on this machine, ask the user to sign in
+there and to reply when they are done, and end the turn without closing the session. When the user
+confirms, run `state save` and `browser-state merge` on the next turn so the login is kept, and
+continue the task.
+
+The shared state belongs to every Briar Agent this user runs. Use the authenticated state only
+where the task requires it, and stay out of unrelated accounts and sites.
 
 Never copy an element reference from an old snapshot after the page has materially changed. With
 any tool, use a deterministic local fixture only when necessary, disclose it in the evidence
@@ -141,5 +167,8 @@ and the checks that still ran in the evidence detail. Never fabricate an image.
   requires it and the operator has authorized that context.
 - Aside uses the user's browser profiles and signed-in accounts. Treat that state as sensitive and
   use only the account and pages required by the task.
+- The shared `agent-browser` state file holds plaintext cookies. Pass its path to `--state` and to
+  `browser-state merge` only; never print, copy, screenshot, or attach its contents to logs,
+  evidence, or an answer.
 - Do not perform destructive or externally visible actions merely to obtain a screenshot.
 - Keep each Auto Hunt run isolated and always close its task space or session.
