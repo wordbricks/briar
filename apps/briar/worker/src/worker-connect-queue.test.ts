@@ -109,6 +109,62 @@ const mergeBatchIdentity = () => create(WorkClaimIdentitySchema, {
   },
 });
 
+const claimedAt = "2026-08-31T00:00:00.000Z";
+const leaseExpiresAt = "2026-08-31T00:15:00.000Z";
+
+/**
+ * A claim that is valid apart from a session reason the generated enum does not
+ * carry, which is exactly how `designated_worker_claimed` stranded replies in
+ * production.
+ */
+const unserializableChannelReplyClaim = {
+  workType: "channelReply",
+  workId,
+  runId: channelId,
+  channelId,
+  organizationId,
+  projectId,
+  scope: { kind: "project", organizationId, projectId },
+  sourceKey: `briar-channel:${channelId}:reply:${workId}`,
+  title: "Channel",
+  triggerMessageId: "77777777-7777-4777-8777-777777777777",
+  parentMessageId: "88888888-8888-4888-8888-888888888888",
+  provider: "codex",
+  model: null,
+  effort: null,
+  agent: {
+    id: "99999999-9999-4999-8999-999999999999",
+    name: "Agent",
+    provider: "codex",
+    model: null,
+    effort: null,
+    computerUsePolicy: "disabled",
+    responsibility: "Handle the work",
+    skills: [],
+  },
+  activeSkill: null,
+  skillExecutionTarget: null,
+  claimToken,
+  claimedAt,
+  leaseExpiresAt,
+  activity: { token: "activity", expiresAt: leaseExpiresAt },
+  organizationContext: null,
+  delegation: null,
+  delegationTargets: [],
+  handoffContext: null,
+  session: {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    threadId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    conversationId: null,
+    retainedUntil: "2026-09-01T00:00:00.000Z",
+    claimReason: "reason_the_enum_does_not_carry",
+  },
+  triggerAttachments: [],
+  memory: null,
+  memoryLearningEnabled: false,
+  snapshot: { channel: { id: channelId } },
+};
+
 describe("WorkerQueueService lifecycle semantics", () => {
   it("requires the Worker bearer binding before claiming", async () => {
     const authenticate = vi.fn<WorkerQueueServices["requireWorkerProjectBinding"]>();
@@ -227,6 +283,48 @@ describe("WorkerQueueService lifecycle semantics", () => {
     expect(error).toBeInstanceOf(HttpError);
     expect((error as HttpError).status).toBe(409);
     expect(checkpoint).toHaveBeenCalledTimes(1);
+  });
+
+  // A claim commits to D1 before the protobuf mapping runs. When the mapping
+  // throws, nothing else releases the job, so it would sit `running` behind its
+  // fifteen-minute lease with no Worker executing it.
+  it("releases a channel reply claim the protobuf mapping cannot serialize", async () => {
+    const claim = vi.fn<WorkerQueueServices["claimNextChannelReplyWork"]>();
+    claim.mockResolvedValue({
+      ...unserializableChannelReplyClaim,
+    } as unknown as Awaited<ReturnType<
+      WorkerQueueServices["claimNextChannelReplyWork"]
+    >>);
+    const issueReply = vi.fn<WorkerQueueServices["claimNextIssueReplyWork"]>();
+    issueReply.mockResolvedValue(null);
+    const fail = vi.fn<WorkerQueueServices["failChannelReply"]>();
+    fail.mockResolvedValue(null);
+    const service = createWorkerQueueService(input, {
+      requireWorkerProjectBinding: authentication(),
+      sha256: async () => "e".repeat(64),
+      claimNextIssueReplyWork: issueReply,
+      claimNextChannelReplyWork: claim,
+      failChannelReply: fail,
+    });
+
+    const request = create(ClaimWorkRequestSchema, {
+      projectId,
+      workerId,
+      claimedBy: "worker",
+      repliesOnly: true,
+    });
+    const error = await Promise.resolve(service.claimWork(request, context))
+      .catch((cause: unknown) => cause);
+
+    expect((error as Error).message).toContain("unknown session reason");
+    expect(fail).toHaveBeenCalledWith(input.db, {
+      jobId: workId,
+      deviceId,
+      workerId,
+      claimTokenHash: "e".repeat(64),
+      error: expect.stringContaining("unknown session reason"),
+      updatedAt: expect.any(String),
+    });
   });
 
   it("preserves handoff correlation and reports an idempotent replay", async () => {

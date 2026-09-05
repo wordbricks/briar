@@ -510,7 +510,7 @@ const sessionClaimReason = (
 ): "session_created" | "worker_reused" | "worker_reused_runtime_changed" |
   "worker_failover_lease_expired" |
   "worker_failover_unavailable_or_incompatible" |
-  "ttl_expired_reactivated" => {
+  "ttl_expired_reactivated" | "designated_worker_claimed" => {
   switch (value) {
     case ChannelReplySessionClaimReason.SESSION_CREATED:
       return "session_created";
@@ -524,6 +524,8 @@ const sessionClaimReason = (
       return "worker_failover_unavailable_or_incompatible";
     case ChannelReplySessionClaimReason.TTL_EXPIRED_REACTIVATED:
       return "ttl_expired_reactivated";
+    case ChannelReplySessionClaimReason.DESIGNATED_WORKER_CLAIMED:
+      return "designated_worker_claimed";
     default:
       throw new Error("Worker channel reply omitted session claim reason");
   }
