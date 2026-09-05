@@ -30,6 +30,17 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.198",
+        date: "2026년 9월 5일",
+        title: "삭제된 실행이 남긴 고아 행을 정리해 프로바이더 스키마 마이그레이션을 적용합니다",
+        summary:
+          "8월 초에 삭제된 이슈 실행이 남긴 자식 행 7건이 프로바이더 스키마 마이그레이션의 커밋 시점 외래 키 검사를 막았습니다. 마이그레이션이 시작될 때 이 고아 행을 정리해 Vertex AI·Pi 프로바이더 스키마가 프로덕션 데이터베이스에 적용됩니다.",
+        items: [
+          "삭제된 이슈 실행이 남긴 자식 행 7건(실행 이벤트 5건, 이슈 첨부 1건, 구독 1건)을 프로바이더 스키마 마이그레이션이 시작할 때 정리합니다. 이 자식 테이블의 제약은 모두 삭제(cascade) 규칙으로 정의되므로 부모가 사라진 행은 존재해선 안 됩니다.",
+          "고아 행 정리 덕분에 Google Vertex AI와 Pi를 모든 저장 프로바이더 제약에 더하는 마이그레이션이 프로덕션 D1에서 실패 없이 적용되고, 워커 배포가 같은 커밋에서 진행됩니다.",
+        ],
+      },
+      {
         version: "1.2.197",
         date: "2026년 9월 5일",
         title: "Google Vertex AI와 Pi 코딩 에이전트를 더하고 프로바이더 추가 방식을 정리합니다",
@@ -1669,6 +1680,17 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.198",
+        date: "September 5, 2026",
+        title: "Clear orphan rows left by deleted runs so the provider schema migration applies",
+        summary:
+          "Seven child rows left behind by runs deleted in early August failed the provider schema migration's deferred foreign key check at commit. The migration now removes those orphans first, so the Vertex AI and Pi provider schema reaches the production database.",
+        items: [
+          "The provider schema migration deletes seven child rows whose parent run is already gone (five run events, one issue attachment, one subscription) before rebuilding. Every constraint on these child tables is on-delete-cascade, so rows without a parent should not exist.",
+          "With the orphans gone, the migration that adds Google Vertex AI and Pi to every persisted provider constraint applies cleanly on the production D1 database, and the Worker deployment proceeds from the same commit.",
+        ],
+      },
       {
         version: "1.2.197",
         date: "September 5, 2026",
