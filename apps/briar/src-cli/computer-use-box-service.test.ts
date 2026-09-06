@@ -114,8 +114,18 @@ describe("ComputerUseBoxService", () => {
     }))).rejects.toThrow(/ownership/u);
 
     await assigned.release();
+    // The window outlives the turn; only the lease ends, so the old token no
+    // longer routes to the executor.
     expect(supervisor.started).toEqual([2]);
-    expect(supervisor.stopped).toEqual([2]);
+    expect(supervisor.stopped).toEqual([]);
+    await expect(desktopManager.snapshot()).resolves.toEqual([
+      expect.objectContaining({ agentId: "agent-a", displayIndex: 2, ownerToken: null }),
+    ]);
+    await expect(assigned.executor.execute(create(ComputerUseArgsSchema, {
+      actions: [create(ComputerUseActionSchema, {
+        action: { case: "screenshot", value: create(ScreenshotActionSchema) },
+      })],
+    }))).rejects.toThrow(/ownership/u);
   });
 
   it("runs the owner display login watcher for as long as it serves", async () => {

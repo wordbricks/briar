@@ -146,6 +146,49 @@ it("seeds a process window only when it is not already running", async () => {
   expect(children.size).toBe(1);
 });
 
+it("captures a systemd window's logins in place without stopping it", async () => {
+  const run = vi.fn().mockResolvedValue(undefined);
+  const remove = vi.fn().mockResolvedValue(undefined);
+  const captureLiveDisplay = vi.fn().mockResolvedValue(emptyReport());
+  const supervisor = new SystemdComputerUseWindowSupervisor({
+    commandRunner: { run },
+    portProbe: { isListening: async () => true },
+    browserProfileCleaner: { remove },
+    browserLoginStore: {
+      seed: async () => emptyReport(),
+      capture: async () => emptyReport(),
+      captureLiveDisplay,
+    },
+  });
+
+  await supervisor.captureWindowLogins(assignment);
+
+  expect(captureLiveDisplay).toHaveBeenCalledWith(2);
+  expect(run).not.toHaveBeenCalled();
+  expect(remove).not.toHaveBeenCalled();
+});
+
+it("captures a process window's logins in place and keeps it running", async () => {
+  const captureLiveDisplay = vi.fn().mockResolvedValue(emptyReport());
+  const child = fakeWindowProcess();
+  const supervisor = new ProcessComputerUseWindowSupervisor({
+    portProbe: { isListening: async () => true },
+    browserProfileCleaner: { remove: async () => undefined },
+    browserLoginStore: {
+      seed: async () => emptyReport(),
+      capture: async () => emptyReport(),
+      captureLiveDisplay,
+    },
+    spawnWindow: () => child as never,
+  });
+  await supervisor.ensureWindow(assignment);
+
+  await supervisor.captureWindowLogins(assignment);
+
+  expect(captureLiveDisplay).toHaveBeenCalledWith(2);
+  expect(child.exitCode).toBeNull();
+});
+
 it("keeps display 1 outside the Agent window supervisor", () => {
   expect(() => computerUseWindowUnit(1)).toThrow();
   expect(computerUseRfbPort(2)).toBe(5_902);

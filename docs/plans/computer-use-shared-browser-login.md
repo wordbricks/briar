@@ -14,8 +14,9 @@
 - display는 `ComputerUseDesktopManager`가 agentId 단위로 배정하므로 Agent A와 B는 서로 다른
   프로필을 쓴다. 프로필 사이에 쿠키나 로그인 데이터를 옮기는 단계가 없다.
 - `runDetachedProviderTurn`은 turn 시작 시 display를 assign하고 `finally`에서 release한다.
-  release는 `stopWindow`를 부르고, 그 안에서 `browserProfileCleaner.remove`가 display 프로필을
-  삭제한다. 같은 Agent라도 다음 turn은 로그인이 없는 새 프로필로 시작한다.
+  이 문서를 쓸 당시 release는 `stopWindow`를 부르고, 그 안에서 `browserProfileCleaner.remove`가
+  display 프로필을 삭제했다. 같은 Agent라도 다음 turn은 로그인이 없는 새 프로필로 시작했다.
+  (2026-09-06 이후 release는 lease만 끝내고 display와 프로필을 유지한다. 아래 3.2의 후기 참고.)
 
 그 결과 사용자가 takeover로 한 사이트에 로그인해도 그 turn이 끝나면 사라지고, 다른 Agent는
 처음부터 다시 로그인을 요청한다. Grok Bot은 한 box 안에서 `/home/box/chrome-profile` 하나를
@@ -75,6 +76,10 @@ GPUCache, Service Worker, Session Storage, Sessions, Preferences, History, Exten
 - `stopWindow`: window를 내려 Chrome이 종료된 뒤, 프로필을 지우기 전에 capture한다. display
   프로필의 화이트리스트 항목을 공유 저장소에 반영하고 나서 기존대로 display 프로필을 삭제한다.
   capture 실패는 release를 막지 않는다. 결과는 stderr 로그로 남긴다.
+- 후기(2026-09-06): display가 turn 사이에도 살아 있게 되면서 `stopWindow`는 유휴 TTL 만료,
+  eviction, canary에서만 불린다. 일반 release는 `captureWindowLogins`로 살아 있는 display
+  프로필을 `captureLive`(전체 항목)로 capture한다. display `:1`과 같은 경로이며, turn이 끝난
+  display는 Chrome이 놀고 있어 디렉터리 항목까지 안전하게 가져온다.
 
 seed와 capture는 모두 desktop manager의 `runExclusive` 안에서 실행되므로 한 box 서비스 안에서
 직렬화된다. 저장소 구현도 자체 promise mutex를 가져 다른 호출 경로에서도 안전하다.

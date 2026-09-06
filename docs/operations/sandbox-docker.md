@@ -41,9 +41,15 @@ sandbox는 Grok Bot의 로컬 VM처럼 에이전트가 볼 수 있는 데스크�
   box 서비스가 뜰 때까지 최대 90초 기다린다.
 - **브라우저**: Linux ARM64용 Google Chrome이 없어 Chromium을 설치하고
   `/usr/bin/google-chrome-stable` 래퍼(`--no-sandbox`)로 감싼다. `briar-open-browser`와
-  데스크톱 파일은 AMI와 동일하다. 디스플레이 프로필은 release마다 지워지므로 로그인 상태는
-  `/var/lib/briar-computer-use/profiles/shared` 공유 저장소에 capture했다가 다음 디스플레이에
-  seed한다. 프로필 사이에서 복호화되도록 `--password-store=basic`으로 Chrome 기본 키를 쓴다.
+  데스크톱 파일은 AMI와 동일하다. 로그인 상태는 turn이 끝날 때마다 살아 있는 프로필에서
+  `/var/lib/briar-computer-use/profiles/shared` 공유 저장소에 capture하고, 새 디스플레이를 만들
+  때 seed한다. 프로필 사이에서 복호화되도록 `--password-store=basic`으로 Chrome 기본 키를 쓴다.
+- **디스플레이 수명**: 에이전트 디스플레이는 turn이 끝나도 파기하지 않는다. release는 그 turn의
+  소유권 토큰만 지우고 창과 브라우저는 그대로 두므로, 다음 turn은 같은 화면을 이어받고 소유자는
+  turn 사이에도 그 화면을 보거나 조작할 수 있다. 유휴 상태가 72시간(`BRIAR_COMPUTER_USE_IDLE_DISPLAY_TTL_HOURS`)을
+  넘긴 디스플레이는 box 서비스가 15분마다 도는 sweep과 재시작 시 `restoreAssignments`에서
+  내리고, 빈 디스플레이가 없으면 가장 오래 놀던 디스플레이를 비워 새 에이전트에게 준다.
+  워커 canary(`briar-capability-canary`)는 예외로 스크린샷 뒤 바로 내린다.
 - **소유자 디스플레이 `:1`**: supervisor가 `briar-remote-desktop`으로 `:1`(loopback 5901)을
   항상 띄운다. 에이전트가 없어도 볼 수 있는 데스크톱이며, 에이전트는 `:2` 이상을 쓴다.
   supervisor가 이 프로세스에 `BRIAR_BROWSER_PROFILE_DIRECTORY=/var/lib/briar-computer-use/profiles/display-1`을
@@ -54,8 +60,9 @@ sandbox는 Grok Bot의 로컬 VM처럼 에이전트가 볼 수 있는 데스크�
 - **사용자가 보는 화면**: 컨테이너 안 websockify + noVNC가 6080에서 모든 디스플레이를
   `?token=displayN`으로 라우팅하고, Docker 호스트의 loopback(`--view-port`, 기본 6080)에만
   publish된다. `briar sandbox view --name <name> [--display N]`이 원격 호스트면 SSH 포트
-  포워딩을 열고 브라우저에 noVNC 페이지를 띄운다. 디스플레이를 지정하지 않으면 현재
-  에이전트에 할당된 첫 디스플레이를, 없으면 소유자 디스플레이 `:1`을 연다.
+  포워딩을 열고 브라우저에 noVNC 페이지를 띄운다. 디스플레이를 지정하지 않으면 에이전트에
+  배정된 첫 디스플레이(유휴 중이어도)를, 없으면 소유자 디스플레이 `:1`을 연다. `status`의
+  `report.computerUse.displays[].leased`가 지금 turn이 쓰는 중인지 알려 준다.
 - **검증**: `briar sandbox verify --name <name>`이 컨테이너 안에서 디스플레이를 하나
   할당해 스크린샷을 찍고 해제한다. `status`의 `report.computerUse`에 box 서비스 health와
   현재 할당된 디스플레이 목록이 나온다.

@@ -39,6 +39,7 @@ import { FileComputerUseBrowserLoginStore } from "./computer-use-browser-login-s
 import {
   ComputerUseDesktopManager,
   ComputerUseDesktopOwnershipError,
+  configuredComputerUseIdleDisplayTtlMs,
   FileComputerUseAssignmentStore,
 } from "./computer-use-desktop-manager";
 import { NativeComputerUseExecutor } from "./computer-use-native-executor";
@@ -199,7 +200,11 @@ export interface ComputerUseBoxServiceOptions {
   readonly desktopManager?: ComputerUseDesktopManager;
   readonly controlledExecManager?: SimpleControlledExecManager;
   readonly primaryLoginWatcher?: ComputerUsePrimaryLoginSource;
+  /** How often idle Agent displays are checked against their TTL. */
+  readonly idleDisplaySweepIntervalMs?: number;
 }
+
+const DEFAULT_IDLE_DISPLAY_SWEEP_INTERVAL_MS = 15 * 60_000;
 
 export class ComputerUseBoxService {
   private readonly host: string;
@@ -210,6 +215,7 @@ export class ComputerUseBoxService {
   private readonly primaryLoginWatcher: ComputerUsePrimaryLoginSource;
   private primaryServer: Server | undefined;
   private forkServer: Server | undefined;
+  private idleDisplaySweep: ReturnType<typeof setInterval> | undefined;
 
   constructor(private readonly options: ComputerUseBoxServiceOptions = {}) {
     this.host = options.host ?? "127.0.0.1";
@@ -221,6 +227,13 @@ export class ComputerUseBoxService {
     this.desktopManager = options.desktopManager ?? new ComputerUseDesktopManager(
       new FileComputerUseAssignmentStore(),
       computerUseWindowSupervisorFromEnvironment(process.env, { browserLoginStore }),
+      {
+        idleTtlMs: configuredComputerUseIdleDisplayTtlMs(process.env),
+        log: (message) => console.log(JSON.stringify({
+          event: "computer_use_display",
+          message,
+        })),
+      },
     );
     this.primaryLoginWatcher = options.primaryLoginWatcher
       ?? new ComputerUsePrimaryLoginWatcher({ store: browserLoginStore });
@@ -254,6 +267,16 @@ export class ComputerUseBoxService {
       throw new BoxExecAuthTokenError("Box auth token is malformed");
     }
     await this.desktopManager.restoreAssignments();
+    // Agent displays outlive their turns so the owner can keep watching them;
+    // the sweep tears down the ones nobody has used within the idle TTL.
+    this.idleDisplaySweep = setInterval(() => {
+      this.desktopManager.reapIdleAssignments().catch((error: unknown) => {
+        console.error(
+          `Computer Use idle display sweep failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    }, this.options.idleDisplaySweepIntervalMs ?? DEFAULT_IDLE_DISPLAY_SWEEP_INTERVAL_MS);
+    this.idleDisplaySweep.unref();
     // The owner may sign in on display :1 at any time; the watcher folds those
     // logins into the shared store for every Agent display.
     this.primaryLoginWatcher.start();
@@ -355,12 +378,19 @@ export class ComputerUseBoxService {
       await Promise.allSettled([close(primaryServer), close(forkServer)]);
       this.primaryServer = undefined;
       this.forkServer = undefined;
+      this.stopIdleDisplaySweep();
       this.primaryLoginWatcher.stop();
       throw error;
     }
   }
 
+  private stopIdleDisplaySweep(): void {
+    if (this.idleDisplaySweep !== undefined) clearInterval(this.idleDisplaySweep);
+    this.idleDisplaySweep = undefined;
+  }
+
   async stop(): Promise<void> {
+    this.stopIdleDisplaySweep();
     this.primaryLoginWatcher.stop();
     const servers = [this.primaryServer, this.forkServer].filter(
       (server): server is Server => server !== undefined,

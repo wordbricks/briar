@@ -99,6 +99,11 @@ export interface ComputerUseLiveBrowserLoginCapture {
   ): Promise<ComputerUseBrowserLoginStoreReport>;
 }
 
+/** Capture an Agent display's profile while its Chrome keeps running. */
+export interface ComputerUseLiveDisplayLoginCapture {
+  captureLiveDisplay(displayIndex: number): Promise<ComputerUseBrowserLoginStoreReport>;
+}
+
 export interface FileComputerUseBrowserLoginStoreOptions {
   readonly sharedDirectory?: string;
   readonly profilesDirectory?: string;
@@ -644,6 +649,15 @@ implements ComputerUseBrowserLoginStore, ComputerUseLiveBrowserLoginCapture {
       this.logReport(`capture ${sourceDirectory}`, report);
       return report;
     });
+  }
+
+  /**
+   * Fold an Agent display into the shared store at the end of a turn, while
+   * its Chrome stays open for the next one. The full cycle is safe here
+   * because the display is idle, unlike the owner's busy display `:1`.
+   */
+  captureLiveDisplay(displayIndex: number): Promise<ComputerUseBrowserLoginStoreReport> {
+    return this.captureLive(this.displayDirectory(displayIndex), { sqliteOnly: false });
   }
 
   private logReport(label: string, report: ComputerUseBrowserLoginStoreReport): void {
