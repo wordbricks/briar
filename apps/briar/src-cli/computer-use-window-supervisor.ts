@@ -1,12 +1,21 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { rm } from "node:fs/promises";
 import { createConnection } from "node:net";
-import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import {
+  type ComputerUseBrowserLoginStore,
+  computerUseBrowserProfileDirectory,
+  FileComputerUseBrowserLoginStore,
+} from "./computer-use-browser-login-store";
 import type {
   ComputerUseDesktopAssignment,
   ComputerUseWindowSupervisor,
 } from "./computer-use-desktop-manager";
+
+export {
+  computerUseBrowserProfileDirectory,
+  defaultComputerUseBrowserProfilesDirectory,
+} from "./computer-use-browser-login-store";
 
 export const computerUseWindowUnit = (displayIndex: number): string => {
   if (!Number.isInteger(displayIndex) || displayIndex < 2 || displayIndex > 100) {
@@ -18,17 +27,6 @@ export const computerUseWindowUnit = (displayIndex: number): string => {
 export const computerUseRfbPort = (displayIndex: number): number => {
   computerUseWindowUnit(displayIndex);
   return 5_900 + displayIndex;
-};
-
-export const defaultComputerUseBrowserProfilesDirectory =
-  "/var/lib/briar-computer-use/profiles";
-
-export const computerUseBrowserProfileDirectory = (
-  displayIndex: number,
-  profilesDirectory = defaultComputerUseBrowserProfilesDirectory,
-): string => {
-  computerUseWindowUnit(displayIndex);
-  return join(profilesDirectory, `display-${displayIndex}`);
 };
 
 export interface ComputerUseSystemCommandRunner {
@@ -94,6 +92,7 @@ export interface SystemdComputerUseWindowSupervisorOptions {
   readonly startupTimeoutMs?: number;
   readonly pollIntervalMs?: number;
   readonly browserProfileCleaner?: ComputerUseBrowserProfileCleaner;
+  readonly browserLoginStore?: ComputerUseBrowserLoginStore;
 }
 
 export class SystemdComputerUseWindowSupervisor implements ComputerUseWindowSupervisor {
@@ -103,6 +102,7 @@ export class SystemdComputerUseWindowSupervisor implements ComputerUseWindowSupe
   private readonly startupTimeoutMs: number;
   private readonly pollIntervalMs: number;
   private readonly browserProfileCleaner: ComputerUseBrowserProfileCleaner;
+  private readonly browserLoginStore: ComputerUseBrowserLoginStore;
 
   constructor(options: SystemdComputerUseWindowSupervisorOptions = {}) {
     this.commandRunner = options.commandRunner ?? defaultCommandRunner;
@@ -112,6 +112,8 @@ export class SystemdComputerUseWindowSupervisor implements ComputerUseWindowSupe
     this.pollIntervalMs = options.pollIntervalMs ?? 200;
     this.browserProfileCleaner = options.browserProfileCleaner
       ?? defaultBrowserProfileCleaner;
+    this.browserLoginStore = options.browserLoginStore
+      ?? new FileComputerUseBrowserLoginStore();
   }
 
   private systemctl(action: "start" | "stop", displayIndex: number): Promise<void> {
@@ -124,6 +126,9 @@ export class SystemdComputerUseWindowSupervisor implements ComputerUseWindowSupe
   }
 
   async ensureWindow(assignment: ComputerUseDesktopAssignment): Promise<void> {
+    // A no-op once the display profile exists, so a reconnect or a restored
+    // assignment keeps the profile the running Chrome already holds open.
+    await this.browserLoginStore.seed(assignment.displayIndex);
     await this.systemctl("start", assignment.displayIndex);
     const port = computerUseRfbPort(assignment.displayIndex);
     const deadline = performance.now() + this.startupTimeoutMs;
@@ -138,6 +143,7 @@ export class SystemdComputerUseWindowSupervisor implements ComputerUseWindowSupe
 
   async stopWindow(assignment: ComputerUseDesktopAssignment): Promise<void> {
     await this.systemctl("stop", assignment.displayIndex);
+    await this.browserLoginStore.capture(assignment.displayIndex);
     await this.browserProfileCleaner.remove(assignment.displayIndex);
   }
 }
@@ -152,6 +158,7 @@ export interface ProcessComputerUseWindowSupervisorOptions {
   readonly startupTimeoutMs?: number;
   readonly pollIntervalMs?: number;
   readonly browserProfileCleaner?: ComputerUseBrowserProfileCleaner;
+  readonly browserLoginStore?: ComputerUseBrowserLoginStore;
   readonly spawnWindow?: (launcher: string, displayIndex: number) => ChildProcess;
 }
 
@@ -167,6 +174,7 @@ export class ProcessComputerUseWindowSupervisor implements ComputerUseWindowSupe
   private readonly startupTimeoutMs: number;
   private readonly pollIntervalMs: number;
   private readonly browserProfileCleaner: ComputerUseBrowserProfileCleaner;
+  private readonly browserLoginStore: ComputerUseBrowserLoginStore;
   private readonly spawnWindow: (launcher: string, displayIndex: number) => ChildProcess;
   private readonly windows = new Map<number, ChildProcess>();
 
@@ -178,6 +186,8 @@ export class ProcessComputerUseWindowSupervisor implements ComputerUseWindowSupe
     this.pollIntervalMs = options.pollIntervalMs ?? 200;
     this.browserProfileCleaner = options.browserProfileCleaner
       ?? defaultBrowserProfileCleaner;
+    this.browserLoginStore = options.browserLoginStore
+      ?? new FileComputerUseBrowserLoginStore();
     this.spawnWindow = options.spawnWindow ?? ((launcher, displayIndex) =>
       spawn(launcher, [String(displayIndex)], {
         env: process.env,
@@ -196,6 +206,7 @@ export class ProcessComputerUseWindowSupervisor implements ComputerUseWindowSupe
   async ensureWindow(assignment: ComputerUseDesktopAssignment): Promise<void> {
     const port = computerUseRfbPort(assignment.displayIndex);
     if (!this.running(assignment.displayIndex)) {
+      await this.browserLoginStore.seed(assignment.displayIndex);
       const child = this.spawnWindow(this.launcher, assignment.displayIndex);
       child.once("exit", () => {
         if (this.windows.get(assignment.displayIndex) === child) {
@@ -236,6 +247,7 @@ export class ProcessComputerUseWindowSupervisor implements ComputerUseWindowSupe
       }
       this.windows.delete(assignment.displayIndex);
     }
+    await this.browserLoginStore.capture(assignment.displayIndex);
     await this.browserProfileCleaner.remove(assignment.displayIndex);
   }
 }

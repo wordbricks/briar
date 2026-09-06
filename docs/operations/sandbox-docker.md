@@ -38,7 +38,9 @@ sandbox는 Grok Bot의 로컬 VM처럼 에이전트가 볼 수 있는 데스크�
   box 서비스가 뜰 때까지 최대 90초 기다린다.
 - **브라우저**: Linux ARM64용 Google Chrome이 없어 Chromium을 설치하고
   `/usr/bin/google-chrome-stable` 래퍼(`--no-sandbox`)로 감싼다. `briar-open-browser`와
-  데스크톱 파일은 AMI와 동일하다.
+  데스크톱 파일은 AMI와 동일하다. 디스플레이 프로필은 release마다 지워지므로 로그인 상태는
+  `/var/lib/briar-computer-use/profiles/shared` 공유 저장소에 capture했다가 다음 디스플레이에
+  seed한다. 프로필 사이에서 복호화되도록 `--password-store=basic`으로 Chrome 기본 키를 쓴다.
 - **소유자 디스플레이 `:1`**: supervisor가 `briar-remote-desktop`으로 `:1`(loopback 5901)을
   항상 띄운다. 에이전트가 없어도 볼 수 있는 데스크톱이며, 에이전트는 `:2` 이상을 쓴다.
 - **사용자가 보는 화면**: 컨테이너 안 websockify + noVNC가 6080에서 모든 디스플레이를
