@@ -1,7 +1,7 @@
 # 에이전트 간 메시지 (Agent-to-Agent Messaging)
 
-Status: implemented (0~4단계, 데스크탑). §8의 결정 10건을 2026-09-06에 확정했고 같은
-날 구현했다. 모바일(5단계)은 후속 PR. 작성일 2026-09-06.
+Status: implemented (0~5단계). §8의 결정 10건을 2026-09-06에 확정했고 같은 날
+데스크탑(PR #1721)과 모바일(후속 PR)을 구현했다. 작성일 2026-09-06.
 
 ## 구현 현황
 
@@ -15,7 +15,8 @@ Status: implemented (0~4단계, 데스크탑). §8의 결정 10건을 2026-09-06
 | 러너 프롬프트와 출력 | done | `apps/briar/src-cli/agent-runner.ts`, `apps/briar/src-cli/reply-execution.ts`, `apps/briar/src-cli/worker-queue-contract.ts` |
 | 데스크탑: relay 행, 읽기 전용 에이전트 DM, 에이전트 상세 "대화" | done | `apps/briar/src/components/ChannelRelayRow.tsx`, `Channels.tsx`, `DirectMessages.tsx`, `AgentConversationsSection.tsx`, `src/hooks/useAgentConversationChannel.ts` |
 | 서버 왕복 테스트 | done | `apps/briar/worker/src/channel-agent-message.test.ts` |
-| 모바일 iOS·Android | 후속 PR | relay 메시지는 일반 에이전트 메시지로 보이고, 읽기 전용 에이전트 DM은 열 수 없다 |
+| 모바일 iOS: relay 행, 읽기 전용 대화, 에이전트 상세 "대화", 딥링크 | done | `apps/briar/ios/BriarCompanion/App/ChannelsViews.swift`, `ChannelsStore.swift`, `ChannelConnect.swift`, `AgentsViews.swift`, `Tests/ChannelRelayTests.swift` |
+| 모바일 Android(웹 셸): companion DM 배치의 relay·읽기 전용·id로 열기, 딥링크 | done | `apps/briar/src/hooks/useAgentConversationChannel.ts` (`useAgentConversationSurface`), `DirectMessages.tsx`, `useDeepLinks.ts` |
 
 구현하면서 설계와 달라진 것:
 
@@ -31,6 +32,11 @@ Status: implemented (0~4단계, 데스크탑). §8의 결정 10건을 2026-09-06
 - **읽기 전용 에이전트 DM의 실시간 갱신은 3초 폴링이다.** 카탈로그에 없는 채널을
   델타 병합이 삭제로 취급하는 문제는 `retainWhenAbsentFromCatalog`로 우회했다.
 - **에이전트 상세의 "대화"는 접힌 disclosure다.** 펼칠 때 목록을 불러온다.
+- **iOS의 relay 행 이동은 전용 `AgentConversationRoute`로 push한다.** 메시지 화면에서 DM
+  스택 바인딩에 접근할 수 없고 카탈로그가 읽기 전용 id를 모르기 때문이다. 에이전트
+  상세와 딥링크 진입은 기존 `ChannelSummary` 경로를 쓴다.
+- **companion 웹 셸의 에이전트 상세 "대화"는 아직 도달 경로가 없다.** `TeamAgentDetail`은
+  데스크탑 페이지에서만 렌더되므로 companion 분기는 구현·테스트만 돼 있다.
 
 ## 1. 목표 시나리오
 
