@@ -41,6 +41,7 @@ async function inboundChannelMessageId(connectionId: string, wamid: string) {
 async function processWhatsAppMessage(
   env: Env,
   message: WhatsAppInboundMessage,
+  context?: ExecutionContext,
 ) {
   const connection = await getWhatsAppConnectionByPhoneNumberId(
     env.DB,
@@ -95,6 +96,8 @@ async function processWhatsAppMessage(
     });
     await createOrganizationChannelMessage({
       db: env.DB,
+      env,
+      context,
       organizationId: connection.organization_id,
       channelId: directMessage.channel.id,
       userId: link.user_id,
@@ -124,8 +127,11 @@ async function processWhatsAppMessage(
 async function processWhatsAppMessages(
   env: Env,
   messages: WhatsAppInboundMessage[],
+  context?: ExecutionContext,
 ) {
-  await Promise.all(messages.map((message) => processWhatsAppMessage(env, message)));
+  await Promise.all(
+    messages.map((message) => processWhatsAppMessage(env, message, context)),
+  );
   await Promise.all([
     flushOrganizationInboxRealtimeOutbox(env, env.DB),
     flushWhatsAppOutbox(env, env.DB),
@@ -174,7 +180,7 @@ async function handleWebhookEvent(
     throw new HttpError(400, "Invalid WhatsApp webhook payload");
   }
   const messages = decodeWhatsAppWebhookMessages(payload);
-  const processing = processWhatsAppMessages(env, messages);
+  const processing = processWhatsAppMessages(env, messages, context);
   if (context) context.waitUntil(processing);
   else await processing;
   return json({ ok: true });

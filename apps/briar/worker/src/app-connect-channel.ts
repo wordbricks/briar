@@ -815,6 +815,8 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.createMessage({
       db: input.db,
+      env: input.env,
+      context: input.context,
       organizationId: canonicalUuid(request.organizationId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,

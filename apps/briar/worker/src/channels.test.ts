@@ -235,6 +235,19 @@ describe("organization channels", () => {
     request,
   });
 
+  // Organization ids the mutation poked the wake hub with. The binding is
+  // resolved synchronously inside the fire-and-forget publish, so the record is
+  // complete by the time the mutation resolves.
+  const workerWakes: string[] = [];
+  const wakeEnv = {
+    WORKER_WAKE: {
+      getByName: (name: string) => {
+        workerWakes.push(name);
+        return { fetch: async () => new Response(null, { status: 204 }) };
+      },
+    },
+  } as unknown as Env;
+
   const createMessageThroughApplication = (
     channelId: string,
     request: Parameters<typeof decodeChannelMessageApplicationInput>[0],
@@ -243,6 +256,7 @@ describe("organization channels", () => {
     const decoded = decodeChannelMessageApplicationInput(request);
     return createOrganizationChannelMessage({
       db,
+      env: wakeEnv,
       organizationId,
       channelId,
       userId,
@@ -3613,6 +3627,7 @@ describe("organization channels", () => {
         parentMessageId: earlierDmMessageId,
       }),
     ]));
+    workerWakes.length = 0;
     const messageBody = await createMessageThroughApplication(
       createdBody.channel.id,
       {
@@ -3627,6 +3642,9 @@ describe("organization channels", () => {
       status: "queued",
       error: null,
     });
+    // Queued reply work is claimable now, so the mutation pushes the
+    // organization's Workers instead of leaving them on their idle poll.
+    expect(workerWakes).toEqual([organizationId]);
     const dmReplyJob = await getChannelAgentReplyJob(
       db,
       organizationId,
@@ -4288,6 +4306,7 @@ describe("organization channels", () => {
       createdAt: observedAt,
     });
 
+    workerWakes.length = 0;
     const body = await createMessageThroughApplication(channelId, {
       body: "@Pinned-Agent stay pinned",
       mentionedAgentIds: [agentId],
@@ -4298,6 +4317,8 @@ describe("organization channels", () => {
         error: expect.stringContaining('Worker "Pinned Mac"'),
       }),
     ]);
+    // Nothing became claimable, so no Worker is woken.
+    expect(workerWakes).toEqual([]);
     await db.prepare(
       `update briar_execution_workers
        set label = 'Worker', state = 'online' where id = ?`,

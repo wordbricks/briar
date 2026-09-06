@@ -36,12 +36,13 @@ interface __BaseEnv_Env {
 	CHANNEL_REALTIME: DurableObjectNamespace<import("./worker/src/index").ChannelRealtimeHub>;
 	CHANNEL_ACTIVITY_REALTIME: DurableObjectNamespace<import("./worker/src/index").ChannelActivityHub>;
 	MANAGED_COMPUTER_REMOTE: DurableObjectNamespace<import("./worker/src/index").ManagedComputerRemoteSessionHub>;
+	WORKER_WAKE: DurableObjectNamespace<import("./worker/src/index").WorkerWakeHub>;
 	MANAGED_COMPUTER_PROVISIONING: Workflow<Parameters<import("./worker/src/index").ManagedComputerProvisioningWorkflow['run']>[0]['payload']>;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./worker/src/index");
-		durableNamespaces: "ChannelRealtimeHub" | "ChannelActivityHub" | "ManagedComputerRemoteSessionHub";
+		durableNamespaces: "ChannelRealtimeHub" | "ChannelActivityHub" | "ManagedComputerRemoteSessionHub" | "WorkerWakeHub";
 	}
 	interface Env extends __BaseEnv_Env {}
 }

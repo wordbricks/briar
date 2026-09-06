@@ -67,6 +67,7 @@ import {
   executionWorkerRuntime,
 } from "./workers";
 import { scheduleWhatsAppOutboxFlush } from "./whatsapp-outbox";
+import { wakeOrganizationWorkers } from "./worker-wake-hub";
 
 export class ReplyCompletionApplicationError extends Error {
   constructor(
@@ -118,6 +119,7 @@ export type ReplyCompletionApplicationServices = {
   readonly requireDmMemoryReplyFence: typeof requireDmMemoryReplyFence;
   readonly channelReplyWorkerAvailability: typeof channelReplyWorkerAvailability;
   readonly scheduleWhatsAppOutboxFlush: typeof scheduleWhatsAppOutboxFlush;
+  readonly wakeOrganizationWorkers: typeof wakeOrganizationWorkers;
 };
 
 const applicationServices: ReplyCompletionApplicationServices = {
@@ -148,6 +150,7 @@ const applicationServices: ReplyCompletionApplicationServices = {
   requireDmMemoryReplyFence,
   channelReplyWorkerAvailability,
   scheduleWhatsAppOutboxFlush,
+  wakeOrganizationWorkers,
 };
 
 /**
@@ -774,6 +777,14 @@ export async function completeIssueReplyApplication(
       completed,
       input.context,
     );
+    // A reply queued behind this one on the same issue only becomes claimable
+    // now, so wake instead of leaving it to the next idle poll.
+    services.wakeOrganizationWorkers(
+      input.env,
+      scope.organizationId,
+      "issue_reply_completed",
+      input.context,
+    );
     return { replayed: false, disposition, retainedUntil: null };
   } catch (cause) {
     if (cause instanceof ReplyCompletionApplicationError) throw cause;
@@ -1082,6 +1093,14 @@ export async function completeChannelReplyApplication(
     );
     services.scheduleChannelActivityClear(input.env, completed, input.context);
     services.scheduleWhatsAppOutboxFlush(input.env, input.db, input.context);
+    // A reply queued behind this one in the same session only becomes
+    // claimable now, so wake instead of leaving it to the next idle poll.
+    services.wakeOrganizationWorkers(
+      input.env,
+      scope.organizationId,
+      "channel_reply_completed",
+      input.context,
+    );
     return { replayed: false, disposition, retainedUntil };
   } catch (cause) {
     if (cause instanceof ReplyCompletionApplicationError) throw cause;
