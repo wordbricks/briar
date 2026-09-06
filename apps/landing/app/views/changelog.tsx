@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.209",
+        date: "2026년 9월 6일",
+        title: "에이전트 컴퓨터 화면이 작업 사이에도 유지됩니다",
+        summary:
+          "이전에는 에이전트가 답장을 마치자마자 Computer Use 화면이 사라져 DM 패널에 빈 데스크톱만 보였습니다. 이제 화면은 계속 떠 있고 72시간 동안 쓰이지 않을 때만 회수됩니다. codex 기반 에이전트가 화면 제어 도구를 못 찾던 문제와 Ctrl+L이 주소창 대신 검색 팝업을 열던 문제도 함께 고쳤습니다.",
+        items: [
+          "디스플레이가 에이전트별로 유지되어 작업이 끝나도 DM 패널에서 마지막 화면을 계속 볼 수 있고, 72시간 동안 쓰이지 않은 화면만 회수됩니다(BRIAR_COMPUTER_USE_IDLE_DISPLAY_TTL_HOURS).",
+          "codex 기반 에이전트(예: \"Briar Developer\")가 briar-computer MCP 도구를 실제로 찾아 화면 제어를 시작할 수 있고, 설치된 MCP 서버도 실행기 번들을 올바르게 찾습니다.",
+          "Ctrl+L, Ctrl+A 같은 키 조합이 대문자로 눌려 Chromium의 탭 검색 팝업을 열던 문제를 고쳐 주소창 이동이 다시 정상 동작합니다.",
+          "WhatsApp Business 번호를 대표 조직 에이전트에 연결하면 그 번호로 온 문자가 Briar DM으로 들어와 기존 답장·위임·DM 기억 파이프라인을 그대로 사용합니다(Phase 1).",
+          "iOS와 컴패니언 셸의 DM에서도 에이전트 간 메시지 전달 알림과 읽기 전용 대화 보기를 지원합니다.",
+        ],
+      },
+      {
         version: "1.2.208",
         date: "2026년 9월 6일",
         title: "에이전트들이 브라우저 로그인을 공유합니다",
@@ -1794,6 +1808,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.209",
+        date: "September 6, 2026",
+        title: "Agent computer screens now stay up between tasks",
+        summary:
+          "An Agent's Computer Use screen used to vanish the instant it finished replying, leaving the DM panel showing an empty desktop. The screen now stays up and is only reclaimed after 72 hours of no use. This release also fixes codex-based Agents failing to find the screen-control tools and Ctrl+L opening a search popup instead of the address bar.",
+        items: [
+          "Displays now persist per Agent, so the DM panel keeps showing an Agent's last screen after a task ends. A display is only reclaimed after 72 hours of no use (BRIAR_COMPUTER_USE_IDLE_DISPLAY_TTL_HOURS).",
+          "codex-based Agents (like \"Briar Developer\") can now actually find and call the briar-computer MCP tools, and the installed MCP server correctly locates its runner bundles.",
+          "Key combos such as Ctrl+L and Ctrl+A no longer get sent as shifted uppercase letters, so they stop opening Chromium's Search Tabs popup and reach the address bar again.",
+          "Linking a WhatsApp Business phone number to your representative Organization Agent now routes incoming texts into Briar as DMs, reusing the existing reply, delegation, and DM-memory pipeline (Phase 1).",
+          "iOS and the companion shell's DMs now show Agent-to-Agent relay notices and support opening the agent-only conversation read-only.",
+        ],
+      },
       {
         version: "1.2.208",
         date: "September 6, 2026",
