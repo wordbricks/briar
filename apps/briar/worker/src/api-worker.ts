@@ -39,6 +39,8 @@ import {
 import { handleScheduledTask } from "./scheduled-task";
 import { handleSlackAppPublicRoute } from "./slack-app-routes";
 import { handleSlackEventPublicRoute } from "./slack-event-routes";
+import { handleWhatsAppEventPublicRoute } from "./whatsapp-event-routes";
+import { handleWhatsAppSettingsRoute } from "./whatsapp-settings-routes";
 import {
   corsHeaders,
   credentialedAuthCorsHeaders,
@@ -129,6 +131,15 @@ async function route(
     env,
   });
   if (accountResponse) return accountResponse;
+
+  const whatsappSettingsResponse = await handleWhatsAppSettingsRoute({
+    request,
+    url,
+    auth,
+    db,
+    env,
+  });
+  if (whatsappSettingsResponse !== undefined) return whatsappSettingsResponse;
 
   const legacyUpdateBootstrapResponse =
     await handleLegacyUpdateBootstrapRoute({ request, auth, db });
@@ -272,6 +283,14 @@ export default {
       context: ctx,
     });
     if (slackEventResponse !== undefined) return slackEventResponse;
+
+    const whatsappEventResponse = await handleWhatsAppEventPublicRoute({
+      request,
+      url,
+      env,
+      context: ctx,
+    });
+    if (whatsappEventResponse !== undefined) return whatsappEventResponse;
 
     try {
       const authOrigin = url.protocol === "wss:"

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { verifyEncryptedEnv } from "./verify-encrypted-env";
+import {
+  encryptedEnvPolicies,
+  verifyEncryptedEnv,
+} from "./verify-encrypted-env";
 
 const policy = {
   publicKey: "DOTENV_PUBLIC_KEY_TEST",
@@ -20,6 +23,34 @@ function fixture(overrides: Partial<Record<string, string>> = {}) {
 }
 
 describe("encrypted environment verification", () => {
+  it("allows encrypted WhatsApp secrets only through the production policy", () => {
+    const productionPolicy = encryptedEnvPolicies[".env.production"];
+    expect(productionPolicy.optionalSecrets).toContain("WHATSAPP_APP_SECRET");
+    expect(productionPolicy.optionalSecrets).toContain(
+      "WHATSAPP_TOKEN_ENCRYPTION_KEY",
+    );
+    expect(() =>
+      verifyEncryptedEnv(
+        ".env.production",
+        fixture(),
+        {
+          ...policy,
+          optionalSecrets: productionPolicy.optionalSecrets,
+        },
+      )
+    ).not.toThrow();
+    expect(() =>
+      verifyEncryptedEnv(
+        ".env.production",
+        `${fixture()}\nWHATSAPP_APP_SECRET="plaintext"`,
+        {
+          ...policy,
+          optionalSecrets: productionPolicy.optionalSecrets,
+        },
+      )
+    ).toThrow("requires encrypted ciphertext for WHATSAPP_APP_SECRET");
+  });
+
   it("allows an encrypted optional secret and rejects plaintext", () => {
     const optionalPolicy = {
       ...policy,

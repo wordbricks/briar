@@ -43,6 +43,12 @@ import {
 import { slackCreateIssueShortcutCallbackId } from "./slack";
 
 const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
+  flushWhatsAppOutbox: vi.fn(async () => ({
+    sent: 0,
+    retried: 0,
+    deadLettered: 0,
+    deferred: 0,
+  })),
   runDmMemoryMaintenance: vi.fn(async () => ({ expired: 0, indexing: null, cleanup: null })),
   cleanupExpiredChannelReplySessions: vi.fn(async () => []),
   maintainUploadCleanup: vi.fn(async () => ({
@@ -303,6 +309,7 @@ describe("Worker HTTP contract", () => {
     await Promise.all(minute.pending);
     expect(minuteDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
     expect(minuteDependencies.runDmMemoryMaintenance).toHaveBeenCalledOnce();
+    expect(minuteDependencies.flushWhatsAppOutbox).toHaveBeenCalledOnce();
     expect(
       minuteDependencies.reconcileEnabledMergeQueueRuns,
     ).toHaveBeenCalledOnce();
@@ -327,6 +334,7 @@ describe("Worker HTTP contract", () => {
       sweepDependencies.pruneExpiredDashboardChanges,
     ).toHaveBeenCalledOnce();
     expect(sweepDependencies.archiveCompletedLogs).toHaveBeenCalledOnce();
+    expect(sweepDependencies.flushWhatsAppOutbox).not.toHaveBeenCalled();
     expect(sweepDependencies.expireArchives).toHaveBeenCalledOnce();
     expect(sweepDependencies.processArchiveCleanupQueue).toHaveBeenCalledOnce();
     expect(sweepDependencies.processSlackRevocationQueue).toHaveBeenCalledOnce();

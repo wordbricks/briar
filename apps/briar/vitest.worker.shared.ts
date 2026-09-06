@@ -17,6 +17,11 @@ export const workerTestBindings = {
   // Base64 for 32 zero bytes. Production secrets are never loaded into tests.
   SLACK_TOKEN_ENCRYPTION_KEY:
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  WHATSAPP_APP_SECRET: "whatsapp-app-secret-test",
+  WHATSAPP_TOKEN_ENCRYPTION_KEY:
+    "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+  WHATSAPP_GRAPH_API_VERSION: "v25.0",
+  WHATSAPP_APP_ORIGIN: "https://briar-api.example",
   MANAGED_COMPUTER_PROMOTION_CODE: "BRIAR-TEST-PROMOTION",
   MANAGED_COMPUTER_ENROLLMENT_SECRET:
     "briar-test-managed-enrollment-secret-0001",

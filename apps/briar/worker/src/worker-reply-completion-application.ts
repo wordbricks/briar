@@ -66,6 +66,7 @@ import {
   executionWorkerBindingById,
   executionWorkerRuntime,
 } from "./workers";
+import { scheduleWhatsAppOutboxFlush } from "./whatsapp-outbox";
 
 export class ReplyCompletionApplicationError extends Error {
   constructor(
@@ -116,6 +117,7 @@ export type ReplyCompletionApplicationServices = {
   readonly executionWorkerBindingById: typeof executionWorkerBindingById;
   readonly requireDmMemoryReplyFence: typeof requireDmMemoryReplyFence;
   readonly channelReplyWorkerAvailability: typeof channelReplyWorkerAvailability;
+  readonly scheduleWhatsAppOutboxFlush: typeof scheduleWhatsAppOutboxFlush;
 };
 
 const applicationServices: ReplyCompletionApplicationServices = {
@@ -145,6 +147,7 @@ const applicationServices: ReplyCompletionApplicationServices = {
   executionWorkerBindingById,
   requireDmMemoryReplyFence,
   channelReplyWorkerAvailability,
+  scheduleWhatsAppOutboxFlush,
 };
 
 /**
@@ -810,6 +813,7 @@ export async function completeChannelReplyApplication(
       scope.organizationId,
       input.context,
     );
+    services.scheduleWhatsAppOutboxFlush(input.env, input.db, input.context);
     return completionResult(replay, true);
   }
   const claimed = await activeClaim(input.db, scope, observedAt, services);
@@ -1054,6 +1058,8 @@ export async function completeChannelReplyApplication(
         agentProvider: claimed.agent_provider ?? agent.provider,
         completedAt: observedAt,
         conversationId: input.request.conversationId,
+        whatsappAppOrigin: input.env.WHATSAPP_APP_ORIGIN?.trim() ||
+          "https://briar.wordbricks.ai",
         attachments: attachments.map((attachment) => ({
           id: attachment.upload_id,
           organization_id: scope.organizationId,
@@ -1075,6 +1081,7 @@ export async function completeChannelReplyApplication(
       input.context,
     );
     services.scheduleChannelActivityClear(input.env, completed, input.context);
+    services.scheduleWhatsAppOutboxFlush(input.env, input.db, input.context);
     return { replayed: false, disposition, retainedUntil };
   } catch (cause) {
     if (cause instanceof ReplyCompletionApplicationError) throw cause;
