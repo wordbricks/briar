@@ -13,6 +13,7 @@ import {
   SANDBOX_RUNTIME_LABEL,
   SANDBOX_SCHEMA_LABEL,
   SANDBOX_VIEW_PORT_LABEL,
+  sandboxComputerUseVolume,
   sandboxContainerName,
   sandboxHomeVolume,
   sandboxName,
@@ -193,7 +194,7 @@ describe("sandbox names", () => {
 });
 
 describe("sandbox run arguments", () => {
-  it("labels the container, mounts only the home volume, and publishes only the loopback view", () => {
+  it("labels the container, mounts the two state volumes, and publishes only the loopback view", () => {
     const args = sandboxRunArguments({
       name,
       runtimeSha256,
@@ -204,6 +205,10 @@ describe("sandbox run arguments", () => {
     expect(args).toContain(`${SANDBOX_RUNTIME_LABEL}=${runtimeSha256}`);
     expect(args).toContain(`${SANDBOX_SCHEMA_LABEL}=${SANDBOX_SCHEMA_VERSION}`);
     expect(args).toContain(`${sandboxHomeVolume(name)}:/home/briar`);
+    expect(args).toContain(
+      `${sandboxComputerUseVolume(name)}:/var/lib/briar-computer-use`,
+    );
+    expect(args.filter((argument) => argument === "--volume")).toHaveLength(2);
     expect(args.filter((argument) => argument === "--publish")).toHaveLength(1);
     expect(args).toContain("127.0.0.1:6080:6080");
     expect(args).not.toContain("--gpus");
@@ -321,6 +326,23 @@ describe("ensureSandbox", () => {
     const commands = fake.calls.map((call) => call[0]);
     expect(commands.indexOf("rm")).toBeLessThan(commands.indexOf("run"));
     expect(fake.state.containers[container]?.labels[SANDBOX_RUNTIME_LABEL]).toBe(runtimeSha256);
+  });
+
+  it("replaces a container built before the current schema version", async () => {
+    const { input, fake } = ensureInput(fakeDocker({
+      containers: {
+        [container]: {
+          running: true,
+          image: "briar-sandbox:x",
+          labels: { ...ownedLabels(), [SANDBOX_SCHEMA_LABEL]: "1" },
+        },
+      },
+    }));
+    await ensureSandbox(fake.docker, input);
+    const commands = fake.calls.map((call) => call[0]);
+    expect(commands.indexOf("rm")).toBeLessThan(commands.indexOf("run"));
+    expect(fake.state.containers[container]?.labels[SANDBOX_SCHEMA_LABEL])
+      .toBe(SANDBOX_SCHEMA_VERSION);
   });
 
   it("replaces a container when the GPU request changes", async () => {
@@ -455,7 +477,7 @@ describe("stop and remove", () => {
     expect(fake.calls.map((call) => call[0])).not.toContain("exec");
   });
 
-  it("purges the volume, image, and Briar-created context", async () => {
+  it("purges both volumes, the image, and the Briar-created context", async () => {
     const imageTag = sandboxImageTag(runtimeSha256);
     const fake = fakeDocker({
       images: [imageTag],
@@ -479,6 +501,9 @@ describe("stop and remove", () => {
     });
     expect(fake.state.images.has(imageTag)).toBe(false);
     expect(fake.state.contexts["briar-sandbox-gx10"]).toBeUndefined();
+    expect(
+      fake.calls.filter((call) => call[0] === "volume").map((call) => call.at(-1)),
+    ).toEqual([sandboxHomeVolume(name), sandboxComputerUseVolume(name)]);
     const again = await removeSandbox(fake.docker, name, { purge: false, unregisterWorkers: true });
     expect(again.existed).toBe(false);
     expect(again.unregistered).toBeNull();
