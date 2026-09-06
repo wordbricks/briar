@@ -11,6 +11,7 @@ import {
   createWorkerDeviceIdentity,
   createWorkerLoopHeartbeat,
   defaultWorkerLabel,
+  emptyClaimDelayMs,
   errorDelayMs,
   heartbeatDelayMs,
   heartbeatErrorDelayMs,
@@ -33,6 +34,7 @@ import {
   type ClaimedIssue,
   type WorkerLoopDependencies,
 } from "./worker";
+import type { WorkerWakeReason } from "../src/lib/worker-wake-protocol";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 
@@ -184,6 +186,103 @@ describe("briar worker loop", () => {
 
     expect(result.processed).toBe(1);
     expect(test.sleeps).toEqual([20_000, 40_000, 60_000, 60_000]);
+  });
+
+  /*
+    The server shortens `retryAfterMs` while a DM reply is inside its settle
+    window. Stretching that hint up to the poll interval would strand work the
+    server already knows is about to be claimable.
+  */
+  it("re-claims on a short server retry hint instead of the idle interval", async () => {
+    let polls = 0;
+    const test = harness([], {
+      claim: async () => {
+        polls += 1;
+        return polls > 2
+          ? { work: issue("issue-settled") }
+          : { work: null, retryAfterMs: 2_000 };
+      },
+    });
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 1,
+      idleDelayMs: 15_000,
+      maxIdleDelayMs: 60_000,
+      heartbeatIntervalMs: 10 * 60_000,
+    });
+
+    expect(result.processed).toBe(1);
+    // No backoff and no jitter: the hint is obeyed exactly, twice over.
+    expect(test.sleeps).toEqual([2_000, 2_000]);
+  });
+
+  it("claims at once when the server pushes a wake, and restarts the backoff", async () => {
+    const idleWaits: number[] = [];
+    let polls = 0;
+    let notify: ((reason: WorkerWakeReason) => void) | null = null;
+    let unsubscribed = false;
+    const test = harness([], {
+      claim: async () => {
+        polls += 1;
+        return polls > 4 ? issue("issue-pushed") : null;
+      },
+      sleep: async (milliseconds, signal) => {
+        // Only lease renewal asks for a wait this long; it blocks until the
+        // loop aborts it, exactly as the real timer does.
+        if (milliseconds >= 100_000) {
+          if (signal?.aborted) return;
+          await new Promise<void>((resolve) => {
+            signal?.addEventListener("abort", () => resolve(), { once: true });
+          });
+          return;
+        }
+        idleWaits.push(milliseconds);
+        // The third wait is the one the server interrupts.
+        if (idleWaits.length === 3) notify?.("channel_reply_enqueued");
+        if (signal?.aborted) return;
+      },
+      wake: {
+        subscribe: (listener) => {
+          notify = listener;
+          return () => {
+            unsubscribed = true;
+          };
+        },
+      },
+    });
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 1,
+      idleDelayMs: 15_000,
+      maxIdleDelayMs: 60_000,
+      heartbeatIntervalMs: 10 * 60_000,
+      leaseRenewIntervalMs: 10 * 60_000,
+    });
+
+    expect(result.processed).toBe(1);
+    // The wake ends the 60s wait and drops the fleet back to its base delay
+    // instead of leaving it at the backoff ceiling.
+    expect(idleWaits).toEqual([15_000, 30_000, 60_000, 15_000]);
+    expect(test.logs).toContain(
+      "worker woken by server (channel_reply_enqueued)",
+    );
+    expect(unsubscribed).toBe(true);
+  });
+
+  it("polls exactly as before when no wake source is attached", async () => {
+    let polls = 0;
+    const test = harness([], {
+      claim: async () => {
+        polls += 1;
+        return polls > 2 ? issue("issue-polled") : null;
+      },
+    });
+    const result = await runWorkerLoop(test.dependencies, {
+      maxIssues: 1,
+      idleDelayMs: 15_000,
+      heartbeatIntervalMs: 10 * 60_000,
+    });
+
+    expect(result.processed).toBe(1);
+    expect(test.sleeps).toEqual([15_000, 30_000]);
   });
 
   it("holds exactly one issue in flight and renews its lease while it runs", async () => {
@@ -622,6 +721,30 @@ describe("briar worker loop", () => {
     expect(idleDelayWithBackoffMs(50, 15_000, 60_000, () => 1)).toBe(
       DEFAULT_MAX_IDLE_DELAY_MS,
     );
+  });
+
+  it("obeys a short server retry hint but floors a long one with backoff", () => {
+    expect(emptyClaimDelayMs({
+      serverDelayMs: 2_000,
+      consecutiveEmptyClaims: 5,
+      idleDelayMs: 15_000,
+      maxIdleDelayMs: 60_000,
+      random: () => 0.5,
+    })).toBe(2_000);
+    expect(emptyClaimDelayMs({
+      serverDelayMs: null,
+      consecutiveEmptyClaims: 1,
+      idleDelayMs: 15_000,
+      maxIdleDelayMs: 60_000,
+      random: () => 0.5,
+    })).toBe(15_000);
+    expect(emptyClaimDelayMs({
+      serverDelayMs: 20_000,
+      consecutiveEmptyClaims: 2,
+      idleDelayMs: 15_000,
+      maxIdleDelayMs: 60_000,
+      random: () => 0.5,
+    })).toBe(40_000);
   });
 
   it("jitters five-minute lease renewal without approaching expiry", () => {

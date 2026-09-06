@@ -726,6 +726,8 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.createMessage({
         db: input.db,
+        env: input.env,
+        context: input.context,
         projectId: canonicalUuid(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,

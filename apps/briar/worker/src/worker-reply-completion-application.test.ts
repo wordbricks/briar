@@ -784,6 +784,78 @@ describe("reply completion application", () => {
     });
   });
 
+  /*
+    A reply queued behind this one in the same session only becomes claimable
+    when this one completes, so the completion pushes a wake instead of leaving
+    the next turn to the Worker's idle poll.
+  */
+  it("wakes the organization's Workers when a channel reply completes", async () => {
+    const claim = await seedChannelClaim();
+    const wakes: Array<{ organizationId: string; reason: string }> = [];
+    const completion = completeChannelReplyInputFromProto(create(
+      CompleteChannelReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
+        projectId,
+        workerId,
+        work: channelIdentity(claim),
+        outcome: {
+          case: "success",
+          value: {
+            body: "Done.",
+            conversationId: "channel-conversation-wake",
+          },
+        },
+      },
+    ));
+
+    await expect(completeChannelReplyApplication({
+      db,
+      env: env(),
+      worker,
+      request: completion,
+      observedAt: at(250 + sequence),
+    }, {
+      wakeOrganizationWorkers: (_env, organizationId, reason) => {
+        wakes.push({ organizationId, reason });
+      },
+    })).resolves.toMatchObject({ replayed: false, disposition: "completed" });
+    expect(wakes).toEqual([
+      { organizationId, reason: "channel_reply_completed" },
+    ]);
+  });
+
+  // The issue queue drains the same way, so its completion wakes too.
+  it("wakes the organization's Workers when an issue reply completes", async () => {
+    const claim = await seedClaim();
+    const wakes: Array<{ organizationId: string; reason: string }> = [];
+    const completion = completeIssueReplyInputFromProto(create(
+      CompleteIssueReplyRequestSchema,
+      {
+        requestId: crypto.randomUUID(),
+        projectId,
+        workerId,
+        work: identity(claim),
+        outcome: { case: "success", value: { body: "Done." } },
+      },
+    ));
+
+    await expect(completeIssueReplyApplication({
+      db,
+      env: env(),
+      worker,
+      request: completion,
+      observedAt: at(250 + sequence),
+    }, {
+      wakeOrganizationWorkers: (_env, organizationId, reason) => {
+        wakes.push({ organizationId, reason });
+      },
+    })).resolves.toMatchObject({ replayed: false, disposition: "completed" });
+    expect(wakes).toEqual([
+      { organizationId, reason: "issue_reply_completed" },
+    ]);
+  });
+
   it("fails a blocked channel reply at once and tells the channel why", async () => {
     const claim = await seedChannelClaim();
     const completion = completeChannelReplyInputFromProto(create(

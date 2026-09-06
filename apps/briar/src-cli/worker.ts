@@ -14,6 +14,7 @@ import { homedir, hostname, platform } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
+import type { WorkerWakeSource } from "./worker-wake-client";
 
 export type ClaimedIssue = {
   workType?:
@@ -146,6 +147,11 @@ export type WorkerLoopDependencies<Issue extends ClaimedIssue = ClaimedIssue> = 
   /** Injectable jitter source; production defaults to Math.random. */
   random?: () => number;
   log: (line: string) => void;
+  /**
+   * Server push that cuts an idle wait short. Optional: without it the loop
+   * behaves exactly as it did when polling was the only signal.
+   */
+  wake?: WorkerWakeSource;
 };
 
 export type WorkerLoopOptions = {
@@ -271,6 +277,40 @@ export function idleDelayWithBackoffMs(
   return Math.max(1, Math.min(maxDelayMs, Math.round(exponential * jitter)));
 }
 
+/**
+ * How long to wait after an empty claim.
+ *
+ * A server delay shorter than the base idle delay is a deliberate "come back
+ * soon" hint - a DM reply inside its settle window, say - and is honored
+ * exactly: stretching it to the poll interval would strand work the server
+ * knows is about to be claimable. Anything else keeps the historical
+ * behaviour, where the server delay is only ever a floor under the backoff.
+ */
+export function emptyClaimDelayMs(input: {
+  serverDelayMs: number | null;
+  consecutiveEmptyClaims: number;
+  idleDelayMs?: number;
+  maxIdleDelayMs?: number;
+  random?: () => number;
+}): number {
+  const idleDelayMs = input.idleDelayMs ?? DEFAULT_IDLE_DELAY_MS;
+  const maxIdleDelayMs = input.maxIdleDelayMs ?? DEFAULT_MAX_IDLE_DELAY_MS;
+  const serverDelayMs = input.serverDelayMs;
+  if (serverDelayMs !== null && serverDelayMs < idleDelayMs) {
+    return serverDelayMs;
+  }
+  const floor = serverDelayMs ?? idleDelayMs;
+  return Math.max(
+    floor,
+    idleDelayWithBackoffMs(
+      input.consecutiveEmptyClaims,
+      Math.max(idleDelayMs, floor),
+      Math.max(maxIdleDelayMs, floor),
+      input.random,
+    ),
+  );
+}
+
 export function leaseRenewDelayMs(
   intervalMs = DEFAULT_LEASE_RENEW_INTERVAL_MS,
   random = Math.random,
@@ -374,6 +414,47 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
   const beat = async () => {
     if (dependencies.now() < nextHeartbeatAt) return;
     await reportState();
+  };
+
+  // Server pushes abort whichever idle wait is in flight. A wake that lands
+  // while the loop is between waits sets `wakePending` so the next wait is
+  // skipped instead of lost.
+  const idleWaits = new Set<AbortController>();
+  let wakePending = false;
+  const unsubscribeWake = dependencies.wake?.subscribe((reason) => {
+    wakePending = true;
+    // Work exists now, so the empty-queue backoff must start over rather than
+    // keep the fleet at its 60s ceiling.
+    consecutiveEmptyClaims = 0;
+    dependencies.log(`worker woken by server (${reason})`);
+    for (const controller of idleWaits) controller.abort();
+    idleWaits.clear();
+  });
+  const finish = (result: WorkerLoopResult) => {
+    unsubscribeWake?.();
+    return result;
+  };
+  const idleSleep = async (milliseconds: number, controller?: AbortController) => {
+    if (!dependencies.wake) {
+      if (controller) {
+        await dependencies.sleep(milliseconds, controller.signal);
+        return;
+      }
+      await dependencies.sleep(milliseconds);
+      return;
+    }
+    if (wakePending) {
+      wakePending = false;
+      return;
+    }
+    const wait = controller ?? new AbortController();
+    idleWaits.add(wait);
+    try {
+      await dependencies.sleep(milliseconds, wait.signal);
+    } finally {
+      idleWaits.delete(wait);
+      wakePending = false;
+    }
   };
 
   const execute = async (issue: Issue, waitForTurn: Promise<void>) => {
@@ -516,16 +597,14 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
               Number.isFinite(claim.retryAfterMs) &&
               (claim.retryAfterMs ?? 0) > 0
             ? claim.retryAfterMs!
-            : idleDelayMs;
-          emptyQueueDelayMs = Math.max(
+            : null;
+          emptyQueueDelayMs = emptyClaimDelayMs({
             serverDelayMs,
-            idleDelayWithBackoffMs(
-              consecutiveEmptyClaims,
-              Math.max(idleDelayMs, serverDelayMs),
-              Math.max(maxIdleDelayMs, serverDelayMs),
-              dependencies.random,
-            ),
-          );
+            consecutiveEmptyClaims,
+            idleDelayMs,
+            maxIdleDelayMs,
+            random: dependencies.random,
+          });
           break;
         }
         if (repliesOnly && !isReplyWork(issue)) {
@@ -555,7 +634,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       if (!heartbeatFailed) consecutiveFailures += 1;
       dependencies.log(`worker iteration failed: ${describe(error)}`);
       if (options.once && active.size === 0) {
-        return { processed, failures, stoppedBecause: "once" };
+        return finish({ processed, failures, stoppedBecause: "once" });
       }
       await dependencies.sleep(
         heartbeatFailed
@@ -570,14 +649,14 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
 
     if (active.size === 0) {
       if (options.once) {
-        return { processed, failures, stoppedBecause: "emptyQueue" };
+        return finish({ processed, failures, stoppedBecause: "emptyQueue" });
       }
       if (queueWasEmpty) {
         const heartbeatDelayMs = Math.max(
           0,
           nextHeartbeatAt - dependencies.now(),
         );
-        await dependencies.sleep(Math.min(emptyQueueDelayMs, heartbeatDelayMs));
+        await idleSleep(Math.min(emptyQueueDelayMs, heartbeatDelayMs));
       }
       continue;
     }
@@ -593,13 +672,14 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         : heartbeatDelayMs;
     // Wake for the next heartbeat even when every execution slot is occupied.
     // Otherwise a long-running issue makes the server report the live worker
-    // as stale until that issue finishes.
-    const wake = new AbortController();
+    // as stale until that issue finishes. A server wake ends this wait too, so
+    // a reply that arrives mid-execution is claimed without a poll.
+    const waitController = new AbortController();
     const outcome = await Promise.race([
       executionFinished,
-      dependencies.sleep(waitDelayMs, wake.signal).then(() => null),
+      idleSleep(waitDelayMs, waitController).then(() => null),
     ]);
-    wake.abort();
+    waitController.abort();
     if (!outcome) continue;
 
     active.delete(executionKey(outcome.issue));
@@ -621,7 +701,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       dependencies.log(`worker iteration failed: ${describe(outcome.error)}`);
       if (options.once) {
         await reportState();
-        return { processed, failures, stoppedBecause: "once" };
+        return finish({ processed, failures, stoppedBecause: "once" });
       }
       await dependencies.sleep(
         errorDelayMs(consecutiveFailures, options.maxErrorDelayMs),
@@ -630,11 +710,11 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     await reportState();
   }
 
-  return {
+  return finish({
     processed,
     failures,
     stoppedBecause: options.once ? "once" : "maxIssues",
-  };
+  });
 }
 
 const normalizeConcurrency = (value: number) =>

@@ -17,6 +17,7 @@ import { handleTeamAgentRoute } from "./team-agent-routes";
 import { handlePublicRoute } from "./public-routes";
 import { handleIncomingChannelWebhookRoute } from "./incoming-channel-webhook";
 import { handleRealtimeRoute } from "./realtime-routes";
+import { handleWorkerWakeRoute } from "./worker-wake-routes";
 import { handleUploadRoute } from "./upload-route";
 import {
   requireAgentProject,
@@ -158,6 +159,13 @@ async function route(
     env,
   });
   if (realtimeResponse !== undefined) return realtimeResponse;
+
+  const workerWakeResponse = await handleWorkerWakeRoute({
+    request,
+    db,
+    env,
+  });
+  if (workerWakeResponse !== undefined) return workerWakeResponse;
 
   const uploadResponse = await handleUploadRoute({
     request,

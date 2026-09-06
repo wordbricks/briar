@@ -119,6 +119,10 @@
       {
         "name": "MANAGED_COMPUTER_REMOTE",
         "class_name": "ManagedComputerRemoteSessionHub"
+      },
+      {
+        "name": "WORKER_WAKE",
+        "class_name": "WorkerWakeHub"
       }
     ]
   },
@@ -142,6 +146,10 @@
       "storage": "sqlite"
     },
     "ManagedComputerRemoteSessionHub": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "WorkerWakeHub": {
       "type": "durable-object",
       "storage": "sqlite"
     }

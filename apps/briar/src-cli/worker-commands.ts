@@ -51,6 +51,7 @@ import {
   createWorkerQueueClient,
   createWorkerQueueOperations,
 } from "./worker-queue-client";
+import { WorkerWakeClient } from "./worker-wake-client";
 import type { ClaimedWork } from "./worker-queue-contract";
 import {
   configDirectory,
@@ -679,6 +680,17 @@ async function workerCommand() {
   const maxIssues = Number.parseInt(value("--max-issues") ?? "", 10);
   const workerQueueClient = createWorkerQueueClient(config.apiUrl, workerToken);
   const workerQueue = createWorkerQueueOperations(workerQueueClient);
+  // Push replaces most of the idle poll. It is best effort: the loop keeps its
+  // polling cadence whenever the socket is down.
+  const wakeClient = new WorkerWakeClient(
+    {
+      apiUrl: config.apiUrl,
+      organizationId: registered.organizationId,
+      credential: workerToken,
+    },
+    (line) => console.log(line),
+  );
+  wakeClient.start();
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
@@ -1080,13 +1092,14 @@ async function workerCommand() {
       sleep: interruptibleSleep,
       now: () => Date.now(),
       log: (line) => console.log(line),
+      wake: wakeClient,
     },
     {
       once: has("--once"),
       maxConcurrentSessions: registered.maxConcurrentSessions,
       ...(Number.isInteger(maxIssues) && maxIssues > 0 ? { maxIssues } : {}),
     },
-  );
+  ).finally(() => wakeClient.stop());
   console.log(JSON.stringify(result));
 }
 
