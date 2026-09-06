@@ -489,6 +489,14 @@ const agentMessagePrompt = (input: {
   ];
 };
 
+const detachedReplyProgressInstructions = [
+  "If you can answer promptly without tools, do not send a commentary or progress message. Return the final answer immediately.",
+  "If the request needs a search, repository inspection, test, Computer Use, or another tool that will make the user wait, send one brief commentary message immediately before the first tool call. Name the concrete work you are about to do in natural language.",
+  "Send another commentary message only when the meaningful stage of the work changes or the user has otherwise waited a long time. Never use generic status text such as 'Checking on it', 'Working on it', or 'Processing'.",
+  "Commentary is only an ephemeral progress update. Never preview a final answer, attachment, document, issue proposal, execution proposal, Skill approval, or other structured result in commentary. Return those once, in the final structured response.",
+  "If work cannot continue because of an error, login, 2FA, CAPTCHA, approval, or another human-only step, stop using ordinary progress updates and tell the user exactly what action is required.",
+].join(" ");
+
 export function detachedIssueReplyPrompt(input: {
   agent: DetachedAgent;
   snapshot: Record<string, unknown>;
@@ -499,6 +507,7 @@ export function detachedIssueReplyPrompt(input: {
 }) {
   return [
     `You are ${input.agent.name}. A user mentioned you in an issue conversation. Answer that user directly and concisely.`,
+    detachedReplyProgressInstructions,
     input.workspaceAvailable && input.workspaceShared
       ? "The existing issue-processing worktree is available and is shared with the Worker currently handling this issue. It has the same shell, network, browser, and filesystem permissions as the project Worker. Inspect its live, including uncommitted, files and use the commands or tools needed to complete the user's request accurately. Changes affect the live issue worktree."
       : input.workspaceAvailable
@@ -563,6 +572,7 @@ export function detachedChannelReplyPrompt(input: {
     agentMessageHop === 0 && eligibleAgentMessageTargets.length > 0;
   return [
     `You are ${input.agent.name}, an Agent taking part in a team chat channel. Someone mentioned you. Answer them directly and concisely, in the language they used.`,
+    detachedReplyProgressInstructions,
     input.workspaceAvailable
       ? "A disposable project worktree is available with the same shell, network, browser, and filesystem permissions as a project Worker. Inspect it and run the commands or tools needed to answer accurately. Local worktree changes are discarded after this reply."
       : input.organizationContextAvailable

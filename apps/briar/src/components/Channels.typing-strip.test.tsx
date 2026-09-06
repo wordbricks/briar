@@ -14,6 +14,7 @@ import {
 } from "../test/channel-conversation";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { channelRootMessageSummariesAtom } from "../state/channel-conversation/atoms";
+import { channelAgentActivityAtom } from "../state/channel-conversation/activity";
 import { applySyncEvent } from "../state/sync/apply";
 import {
   writeChannelParticipants,
@@ -92,7 +93,7 @@ beforeEach(() => {
 });
 
 describe("ChannelMessageTypingStrip", () => {
-  it("re-renders only the strip of the message being answered", async () => {
+  it("waits for concrete activity, then re-renders only the matching strip", async () => {
     const registry = seededRegistry();
     const view = await renderConversation(registry);
     renderCounter.reset();
@@ -111,13 +112,59 @@ describe("ChannelMessageTypingStrip", () => {
       });
     });
 
-    expect(view.container.textContent).toContain("Scout");
+    expect(view.container.textContent).not.toContain("Scout");
+
+    renderCounter.reset();
+    await act(async () => {
+      registry.set(channelAgentActivityAtom(channelId), new Map([
+        ["reply-1", {
+          replyJobId: "reply-1",
+          attempt: 1,
+          sequence: 1,
+          organizationId: "organization-1",
+          channelId,
+          agentId: "agent-1",
+          triggerMessageId: "message-1",
+          parentMessageId: "message-1",
+          activity: {
+            id: "commentary-1",
+            kind: "message",
+            headline: "Checking the repository tests",
+          },
+          sentAt: "2026-08-01T01:00:00.000Z",
+          expiresAt: "2099-08-01T01:00:00.000Z",
+        }],
+      ]));
+    });
+
+    expect(view.container.textContent).toContain(
+      "Scout · Checking the repository tests",
+    );
     /*
       The claim is which boundaries woke. Neither message body, neither other
       strip, and not the list around them — only the strip under the message an
       agent is answering.
     */
     expect(Object.keys(renderCounter.counts())).toEqual(["typing:message-1"]);
+
+    await act(async () => {
+      registry.set(channelAgentActivityAtom(channelId), new Map([
+        ["reply-1", {
+          replyJobId: "reply-1",
+          attempt: 1,
+          sequence: 2,
+          organizationId: "organization-1",
+          channelId,
+          agentId: "agent-1",
+          triggerMessageId: "message-1",
+          parentMessageId: "message-1",
+          activity: null,
+          sentAt: "2026-08-01T01:00:01.000Z",
+          expiresAt: "2099-08-01T01:00:01.000Z",
+        }],
+      ]));
+    });
+    expect(view.container.textContent).not.toContain("Scout");
     await view.cleanup();
   });
 
@@ -149,4 +196,3 @@ describe("ChannelMessageTypingStrip", () => {
     await view.cleanup();
   });
 });
-

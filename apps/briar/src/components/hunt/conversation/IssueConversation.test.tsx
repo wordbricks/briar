@@ -127,20 +127,6 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
   };
 }
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-function pendingAgentReplyState(scope: ParentNode | null | undefined) {
-  return scope?.querySelector<HTMLElement>(":scope > .issue-agent-reply-state");
-}
-function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
-  const pending = pendingAgentReplyState(scope);
-  const loader = pending?.querySelector<HTMLElement>("[data-testid='loading-state']");
-  expect(loader).not.toBeNull();
-  expect(loader?.dataset.variant).toBe("Drive");
-  expect(loader?.dataset.size).toBe("compact");
-  expect(pending?.textContent).toContain("에이전트가 답변을 작성하고 있습니다");
-  expect(pending?.textContent).toContain("0.0s");
-  expect(pending?.querySelector(".animate-spin")).toBeNull();
-  return pending;
-}
 describe("IssueConversation", () => {
   it("highlights and focuses the reply selected from Inbox", async () => {
     const run = demoDashboard.runs[0];
@@ -363,7 +349,7 @@ describe("IssueConversation", () => {
     expect(loadDelta).toHaveBeenCalledOnce();
     expect(container.textContent).toContain("Developer · 원인을 확인하고 있습니다.");
     expect(container.textContent).not.toContain("Briar · 원인을 확인하고 있습니다.");
-    expect(container.textContent).toContain("Reviewer님이 답변을 작성하고 있습니다…");
+    expect(container.textContent).not.toContain("Reviewer님이 답변을 작성하고 있습니다…");
     expect(container.textContent).toContain(staleMessage.body);
     await act(async () => {
       root.render(renderPage("conversation:message-reply"));
@@ -1079,7 +1065,7 @@ describe("IssueConversation", () => {
       await Promise.resolve();
     });
     const userMessageGroup = Array.from(container.querySelectorAll<HTMLElement>(".issue-message-group")).find(group => group.textContent?.includes(userMessage.body));
-    expectPendingAgentReplyLoader(userMessageGroup);
+    expect(userMessageGroup?.querySelector(":scope > .issue-agent-reply-state")).toBeNull();
     await act(async () => {
       rejectAgentReply(new Error("worker unavailable"));
       await pendingAgentReply.catch(() => undefined);

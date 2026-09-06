@@ -510,6 +510,43 @@ describe("detached Agent runner", () => {
     }
   });
 
+  it("gives issue and channel replies the same situational progress rules", () => {
+    const prompts = [
+      detachedChannelReplyPrompt({
+        agent,
+        snapshot: { messages: [] },
+        workspaceAvailable: true,
+      }),
+      detachedIssueReplyPrompt({
+        agent,
+        snapshot: { messages: [] },
+        userMessage: "Answer this question.",
+        workspaceAvailable: true,
+      }),
+    ];
+
+    for (const prompt of prompts) {
+      expect(prompt).toContain(
+        "If you can answer promptly without tools, do not send a commentary or progress message.",
+      );
+      expect(prompt).toContain(
+        "immediately before the first tool call",
+      );
+      expect(prompt).toContain(
+        "only when the meaningful stage of the work changes",
+      );
+      expect(prompt).toContain(
+        "Never use generic status text",
+      );
+      expect(prompt).toContain(
+        "Never preview a final answer, attachment, document, issue proposal",
+      );
+      expect(prompt).toContain(
+        "login, 2FA, CAPTCHA, approval, or another human-only step",
+      );
+    }
+  });
+
   it("excludes display-only channel data from provider context", () => {
     const avatar = `data:image/png;base64,${"a".repeat(62_554)}`;
     const prompt = detachedChannelReplyPrompt({

@@ -1,8 +1,5 @@
 import type { RunnerToParent } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
-import {
-  AgentActivityKind,
-  type NormalizedAgentEvent,
-} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+import type { NormalizedAgentEvent } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { naturalLanguageFromAgentMessage } from "../src/lib/auto-hunt-agent";
 import {
   CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH,
@@ -69,21 +66,13 @@ function normalizedEventFromPayload(
     : null;
 }
 
-function channelActivityKind(
-  kind: AgentActivityKind,
-): ChannelAgentActivityDescriptor["kind"] | null {
-  switch (kind) {
-    case AgentActivityKind.COMMAND:
-      return "command";
-    case AgentActivityKind.FILE_CHANGE:
-      return "fileChange";
-    case AgentActivityKind.WEB_SEARCH:
-      return "webSearch";
-    case AgentActivityKind.TOOL:
-      return "tool";
-    default:
-      return null;
-  }
+const structuredReplyPrefix = /^\s*(?:```(?:json)?\s*)?\{/iu;
+
+function sameVisibleActivity(
+  left: ChannelAgentActivityDescriptor | null,
+  right: ChannelAgentActivityDescriptor | null,
+) {
+  return left?.kind === right?.kind && left?.headline === right?.headline;
 }
 
 /**
@@ -92,7 +81,6 @@ function channelActivityKind(
  * state replaces older pending state.
  */
 export class ChannelActivityPublisher {
-  private readonly active = new Map<string, ChannelAgentActivityDescriptor>();
   private commentary: ChannelAgentActivityDescriptor | null = null;
   private readonly now: () => number;
   private readonly minIntervalMs: number;
@@ -132,34 +120,26 @@ export class ChannelActivityPublisher {
     ) {
       if (
         normalized.value.phase !== "commentary" ||
-        !normalized.value.text.trim()
+        !normalized.value.text.trim() ||
+        structuredReplyPrefix.test(normalized.value.text)
       ) return;
-      this.commentary = {
+      const commentary = {
         id: normalized.value.id,
-        kind: "message",
+        kind: "message" as const,
         headline: safeChannelActivityHeadline(
           "message",
           naturalLanguageFromAgentMessage(normalized.value.text),
         ),
       };
-    } else if (normalized.case === "activityStarted") {
-      const kind = channelActivityKind(normalized.value.kind);
-      if (!kind) return;
-      this.active.delete(normalized.value.id);
-      this.active.set(normalized.value.id, {
-        id: normalized.value.id,
-        kind,
-        headline: safeChannelActivityHeadline(kind, normalized.value.title),
-      });
-    } else if (normalized.case === "activityCompleted") {
-      this.active.delete(normalized.value.id);
+      if (sameVisibleActivity(this.commentary, commentary)) return;
+      this.commentary = commentary;
     } else if (normalized.case === "turnCompleted") {
-      this.active.clear();
+      if (this.commentary === null) return;
       this.commentary = null;
     } else {
       return;
     }
-    this.queue(this.latest());
+    this.queue(this.commentary);
   }
 
   stop() {
@@ -169,12 +149,11 @@ export class ChannelActivityPublisher {
     this.timer = null;
     this.heartbeat = null;
     this.pending = undefined;
-    this.active.clear();
     this.commentary = null;
   }
 
   private latest() {
-    return [...this.active.values()].at(-1) ?? this.commentary;
+    return this.commentary;
   }
 
   private queue(activity: ChannelAgentActivityDescriptor | null) {

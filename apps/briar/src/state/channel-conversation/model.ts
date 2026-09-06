@@ -133,24 +133,6 @@ export const removeReplySummary = (
     : {}),
 });
 
-/** The distinct agent names replying under any of `messageIds`. */
-export const typingAgentNamesForReplies = (
-  replies: readonly ChannelAgentReply[],
-  agents: readonly ChannelAgentSummary[],
-  messageIds: ReadonlySet<string>,
-  fallbackName: string,
-): string[] => [
-  ...new Set(
-    replies
-      .filter((reply) => messageIds.has(reply.parentMessageId))
-      .map(
-        (reply) =>
-          agents.find((agent) => agent.agentId === reply.agentId)?.name ??
-          fallbackName,
-      ),
-  ),
-];
-
 /**
  * What this module reads of a live activity frame. Narrower than
  * `ChannelAgentActivityFrame` on purpose: the typing strip needs the headline
@@ -185,8 +167,8 @@ export const activityForReplies = (
 };
 
 /**
- * The distinct agents replying under any of `messageIds`, with avatar, provider,
- * and the reply's `createdAt` for placeholder-row timestamps.
+ * The distinct agents with current concrete activity under any of `messageIds`,
+ * with avatar, provider, and the reply's `createdAt` for placeholder timestamps.
  */
 export interface TypingAgentDescriptor {
   readonly name: string;
@@ -198,6 +180,7 @@ export interface TypingAgentDescriptor {
 export const typingAgentsForReplies = (
   replies: readonly ChannelAgentReply[],
   agents: readonly ChannelAgentSummary[],
+  activity: ReadonlyMap<string, ChannelAgentActivityAttempt>,
   messageIds: ReadonlySet<string>,
   fallbackName: string,
 ): TypingAgentDescriptor[] => {
@@ -205,6 +188,8 @@ export const typingAgentsForReplies = (
   const result: TypingAgentDescriptor[] = [];
   for (const reply of replies) {
     if (!messageIds.has(reply.parentMessageId)) continue;
+    const frame = activity.get(reply.id);
+    if (!frame?.activity || frame.attempt !== reply.attempts) continue;
     const key = reply.agentId;
     if (seen.has(key)) continue;
     seen.add(key);

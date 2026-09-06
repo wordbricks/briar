@@ -274,6 +274,8 @@ final class CompanionReadTests: XCTestCase {
             attempts: 1,
             error: nil
         ))
+        XCTAssertTrue(store.typingStatuses(parentMessageID: parentMessageID).isEmpty)
+
         store.applyActivityFrame(IssueAgentActivityFrame(
             replyJobId: replyID,
             attempt: 1,
@@ -292,8 +294,22 @@ final class CompanionReadTests: XCTestCase {
         ))
 
         let status = try XCTUnwrap(store.typingStatuses(parentMessageID: parentMessageID).first)
-        XCTAssertEqual(status.activity?.headline, "원인을 확인하고 있습니다.")
-        XCTAssertEqual(status.activity?.displayHeadline, "원인을 확인하고 있습니다.")
+        XCTAssertEqual(status.activity.headline, "원인을 확인하고 있습니다.")
+        XCTAssertEqual(status.activity.displayHeadline, "원인을 확인하고 있습니다.")
+
+        store.applyActivityFrame(IssueAgentActivityFrame(
+            replyJobId: replyID,
+            attempt: 1,
+            sequence: 2,
+            projectId: projectID,
+            runId: runID,
+            triggerMessageId: parentMessageID,
+            parentMessageId: parentMessageID,
+            activity: nil,
+            sentAt: Date(),
+            expiresAt: Date().addingTimeInterval(30)
+        ))
+        XCTAssertTrue(store.typingStatuses(parentMessageID: parentMessageID).isEmpty)
     }
 
     func testChannelActivityDisplayHeadlineExtractsReplyBody() {

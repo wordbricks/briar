@@ -1,13 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { AgentActivityKind } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import {
-  AgentActivityKind,
-  AgentActivityStatus,
-} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
-import {
-  normalizedActivityCompleted,
-  normalizedActivityDelta,
   normalizedActivityStarted,
   normalizedMessageCompleted,
+  normalizedMessageStarted,
+  normalizedTurnCompleted,
 } from "../src-agent/normalized-agent-event";
 import { sidecarProviderEvent } from "../src-agent/sidecar-protocol";
 import {
@@ -22,7 +19,7 @@ const credential = {
 };
 
 describe("ChannelActivityPublisher", () => {
-  it("publishes commentary and restores it after a tool completes", async () => {
+  it("publishes commentary, ignores tool noise, and clears when the turn ends", async () => {
     const send = vi.fn(async (
       _credential: typeof credential,
       _input: ChannelAgentActivityPublishInput,
@@ -59,25 +56,19 @@ describe("ChannelActivityPublisher", () => {
         text: "",
       }),
     }));
-    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(send).toHaveBeenCalledTimes(1);
+
     publisher.observePayload(sidecarProviderEvent({
       raw: {},
-      event: normalizedActivityCompleted({
-        id: "command-1",
-        kind: AgentActivityKind.COMMAND,
-        title: "Running tests",
-        text: "",
-        status: AgentActivityStatus.COMPLETED,
-      }),
+      event: normalizedTurnCompleted("completed"),
     }));
-    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(3));
-    expect(send.mock.calls[2]?.[1]).toMatchObject({
-      activity: { id: "commentary-1", kind: "message" },
-    });
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(send.mock.calls[1]?.[1]).toMatchObject({ activity: null });
     publisher.stop();
   });
 
-  it("publishes only normalized semantic activity without blocking observation", async () => {
+  it("does not turn provider tool events into user-visible progress", async () => {
     const send = vi.fn(async () => undefined);
     const publisher = new ChannelActivityPublisher({
       credential,
@@ -94,24 +85,8 @@ describe("ChannelActivityPublisher", () => {
         text: "private output",
       }),
     }));
-    publisher.observePayload(sidecarProviderEvent({
-      raw: {},
-      event: normalizedActivityDelta({
-        id: "command-1",
-        delta: "secret stdout",
-      }),
-    }));
-    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
-    expect(send).toHaveBeenCalledWith(credential, {
-      sequence: 1,
-      activity: {
-        id: "command-1",
-        kind: "command",
-        headline: "Running tests",
-      },
-    });
-    expect(JSON.stringify(send.mock.calls)).not.toContain("private output");
-    expect(JSON.stringify(send.mock.calls)).not.toContain("secret stdout");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(send).not.toHaveBeenCalled();
     publisher.stop();
   });
 
@@ -124,7 +99,7 @@ describe("ChannelActivityPublisher", () => {
     ).toBe("TOKEN=[redacted] [redacted]");
   });
 
-  it("publishes only the reply body when commentary is a JSON envelope", async () => {
+  it("does not expose a structured reply envelope as progress", async () => {
     const send = vi.fn(async (
       _credential: typeof credential,
       _input: ChannelAgentActivityPublishInput,
@@ -143,15 +118,46 @@ describe("ChannelActivityPublisher", () => {
         text: '{"body":"Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.","attachments":[],"document":null,"issueProposal"',
       }),
     }));
-    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
-    expect(send.mock.calls[0]?.[1]).toMatchObject({
-      activity: {
-        id: "commentary-json",
-        kind: "message",
-        headline:
-          "Approve 동시성 처리와 staging 배포 흐름을 코드 기준으로 확인하겠습니다.",
-      },
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(send).not.toHaveBeenCalled();
+
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedMessageCompleted({
+        id: "commentary-fenced-json",
+        phase: "commentary",
+        text: '```json\n{"reply":"final","attachments":[]}',
+      }),
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(send).not.toHaveBeenCalled();
+    publisher.stop();
+  });
+
+  it("does not republish an unchanged commentary headline", async () => {
+    const send = vi.fn(async () => undefined);
+    const publisher = new ChannelActivityPublisher({
+      credential,
+      send,
+      minIntervalMs: 1,
     });
+    const commentary = {
+      id: "commentary-1",
+      phase: "commentary",
+      text: "관련 파일과 테스트 범위를 확인하겠습니다.",
+    };
+
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedMessageStarted(commentary),
+    }));
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    publisher.observePayload(sidecarProviderEvent({
+      raw: {},
+      event: normalizedMessageCompleted(commentary),
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(send).toHaveBeenCalledTimes(1);
     publisher.stop();
   });
 
@@ -172,28 +178,26 @@ describe("ChannelActivityPublisher", () => {
     });
     publisher.observePayload(sidecarProviderEvent({
       raw: {},
-      event: normalizedActivityStarted({
+      event: normalizedMessageCompleted({
         id: "one",
-        kind: AgentActivityKind.TOOL,
-        title: "First tool",
-        text: "",
+        phase: "commentary",
+        text: "First step",
       }),
     }));
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
     publisher.observePayload(sidecarProviderEvent({
       raw: {},
-      event: normalizedActivityStarted({
+      event: normalizedMessageCompleted({
         id: "two",
-        kind: AgentActivityKind.WEB_SEARCH,
-        title: "Latest search",
-        text: "",
+        phase: "commentary",
+        text: "Latest step",
       }),
     }));
     expect(send).toHaveBeenCalledTimes(1);
     resolveFirst?.();
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
     expect(send.mock.calls[1]?.[1]).toMatchObject({
-      activity: { id: "two", headline: "Latest search" },
+      activity: { id: "two", headline: "Latest step" },
     });
     publisher.stop();
   });

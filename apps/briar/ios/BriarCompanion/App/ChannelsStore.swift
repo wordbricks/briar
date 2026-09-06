@@ -160,7 +160,7 @@ final class ChannelsStore: ObservableObject {
     struct AgentTypingStatus: Identifiable, Equatable, Sendable {
         let id: UUID
         let agentName: String
-        let activity: ChannelAgentActivity?
+        let activity: ChannelAgentActivity
     }
 
     @Published private(set) var channels: [ChannelSummary] = []
@@ -2751,11 +2751,11 @@ final class ChannelsStore: ObservableObject {
             (reply.status == .queued || reply.status == .running) &&
             messageIDs.contains(reply.parentMessageId) {
             let name = agents.first(where: { $0.agentId == reply.agentId })?.name ?? "Agent"
-            let frame = activityFrames[reply.id]
-            let liveActivity = frame?.attempt == reply.attempts &&
-                    (frame?.expiresAt ?? .distantPast) > now
-                ? frame?.activity
-                : nil
+            guard let frame = activityFrames[reply.id],
+                  frame.attempt == reply.attempts,
+                  frame.expiresAt > now,
+                  let liveActivity = frame.activity
+            else { continue }
             byAgentID[reply.agentId] = AgentTypingStatus(
                 id: reply.id,
                 agentName: name,
@@ -2870,8 +2870,9 @@ final class ChannelsStore: ObservableObject {
                 } catch is CancellationError {
                     return
                 } catch {
-                    // Durable reply state keeps the generic typing fallback while
-                    // this best-effort activity socket reconnects.
+                    // The socket is best-effort. Avoid inventing a generic
+                    // status while it reconnects; the next frame restores the
+                    // latest concrete progress message.
                 }
                 reconnectAttempt = min(reconnectAttempt + 1, 5)
                 do {
@@ -2883,7 +2884,7 @@ final class ChannelsStore: ObservableObject {
         }
     }
 
-    private func applyActivityFrame(_ frame: ChannelAgentActivityFrame) {
+    func applyActivityFrame(_ frame: ChannelAgentActivityFrame) {
         if let previous = activityFrames[frame.replyJobId],
            previous.attempt > frame.attempt ||
             (previous.attempt == frame.attempt && previous.sequence >= frame.sequence) {
