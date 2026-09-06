@@ -389,6 +389,68 @@ describe("detached execution workers", () => {
       observedAt: atMinute(minute),
     });
 
+  const replySessionAgentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+  /**
+   * Seed one owned channel thread so hard deletes have to detach both owner
+   * columns; the channel and root message survive `beforeEach`.
+   */
+  const seedReplySession = async (
+    seed: string,
+    input: {
+      deviceId: string;
+      workerId: string;
+      workerLabel: string;
+      retainedUntil: string;
+    },
+  ) => {
+    await executeD1Sql(
+      db,
+      `insert or ignore into briar_channels (
+         id, organization_id, slug, name, default_project_id,
+         created_by_user_id, created_at, updated_at
+       ) values (
+         'channel-${seed}', '${projectId}', '${seed}', 'Channel ${seed}',
+         '${projectId}', 'owner', '${atMinute(0)}', '${atMinute(0)}'
+       );
+       insert or ignore into briar_channel_messages (
+         id, channel_id, author_user_id, body, created_at, updated_at
+       ) values (
+         'message-${seed}', 'channel-${seed}', 'owner', 'Thread root',
+         '${atMinute(0)}', '${atMinute(0)}'
+       );`,
+    );
+    await db.prepare(
+      `insert into briar_channel_reply_sessions (
+         id, organization_id, channel_id, thread_root_message_id, project_id,
+         agent_id, provider, owner_device_id, owner_worker_id,
+         owner_worker_label, last_activity_at, retained_until,
+         created_at, updated_at
+       ) values (?, ?, ?, ?, ?, ?, 'codex', ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      `session-${seed}`,
+      projectId,
+      `channel-${seed}`,
+      `message-${seed}`,
+      projectId,
+      replySessionAgentId,
+      input.deviceId,
+      input.workerId,
+      input.workerLabel,
+      atMinute(1),
+      input.retainedUntil,
+      atMinute(1),
+      atMinute(1),
+    ).run();
+    return `session-${seed}`;
+  };
+
+  const replySessionOwnership = (sessionId: string) =>
+    db.prepare(
+      `select owner_device_id, owner_worker_id, owner_worker_label
+       from briar_channel_reply_sessions where id = ?`,
+    ).bind(sessionId).first();
+
   it("detects only persisted Worker readiness transitions", () => {
     const ready = {
       accepting_work: 1,
@@ -2114,6 +2176,110 @@ describe("detached execution workers", () => {
         reason: "explicit_user_deprovision",
       }),
     ).resolves.toBe(true);
+  });
+
+  it("deletes a device that still owns an expired channel thread", async () => {
+    const registered = await register("expired-thread-delete");
+    const sessionId = await seedReplySession("expired-thread-delete", {
+      deviceId: registered.device.id,
+      workerId: registered.worker.id,
+      workerLabel: registered.worker.label,
+      retainedUntil: atMinute(2),
+    });
+
+    await expect(
+      deleteExecutionWorker(db, registered.device.id, atMinute(5), {
+        requestId: "worker-deprovision:expired-thread-delete",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
+    ).resolves.toBe(true);
+    await expect(db.prepare(
+      `select id from briar_execution_worker_devices where id = ?`,
+    ).bind(registered.device.id).first()).resolves.toBeNull();
+    await expect(replySessionOwnership(sessionId)).resolves.toEqual({
+      owner_device_id: null,
+      owner_worker_id: null,
+      owner_worker_label: registered.worker.label,
+    });
+    await expect(db.prepare(
+      `select outcome, detail_json from briar_execution_worker_lifecycle_events
+       where request_id = ?`,
+    ).bind("worker-deprovision:expired-thread-delete").first())
+      .resolves.toMatchObject({
+        outcome: "deleted",
+        detail_json: expect.stringContaining('"detachedReplySessions":1'),
+      });
+  });
+
+  it("still blocks deleting a device that owns a retained channel thread", async () => {
+    const registered = await register("retained-thread-delete");
+    const sessionId = await seedReplySession("retained-thread-delete", {
+      deviceId: registered.device.id,
+      workerId: registered.worker.id,
+      workerLabel: registered.worker.label,
+      retainedUntil: atMinute(90),
+    });
+
+    await expect(
+      deleteExecutionWorker(db, registered.device.id, atMinute(5), {
+        requestId: "worker-deprovision:retained-thread-delete",
+        organizationId: projectId,
+        projectId: null,
+        workerId: null,
+        reason: "explicit_user_deprovision",
+      }),
+    ).rejects.toThrow("owns a retained channel thread");
+    await expect(replySessionOwnership(sessionId)).resolves.toEqual({
+      owner_device_id: registered.device.id,
+      owner_worker_id: registered.worker.id,
+      owner_worker_label: registered.worker.label,
+    });
+    await expect(db.prepare(
+      `select outcome, detail_json from
+         briar_execution_worker_lifecycle_events where request_id = ?`,
+    ).bind("worker-deprovision:retained-thread-delete").first())
+      .resolves.toEqual({
+        outcome: "blocked",
+        detail_json: '{"reasonCode":"active_sessions"}',
+      });
+  });
+
+  it("unbinds a project whose Worker still owns an expired channel thread", async () => {
+    const registered = await register("expired-thread-unbind");
+    const sessionId = await seedReplySession("expired-thread-unbind", {
+      deviceId: registered.device.id,
+      workerId: registered.worker.id,
+      workerLabel: registered.worker.label,
+      retainedUntil: atMinute(2),
+    });
+
+    await expect(
+      unbindExecutionWorker(db, registered.device.id, projectId, atMinute(5), {
+        requestId: "worker-unlink:expired-thread-unbind",
+        organizationId: projectId,
+        workerId: registered.worker.id,
+        reason: "explicit_user_unlink",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      executionWorkerBindingForProject(db, registered.device.id, projectId),
+    ).resolves.toBeNull();
+    await expect(replySessionOwnership(sessionId)).resolves.toEqual({
+      owner_device_id: null,
+      owner_worker_id: null,
+      owner_worker_label: registered.worker.label,
+    });
+    await expect(db.prepare(
+      `select outcome, detail_json from briar_execution_worker_lifecycle_events
+       where request_id = ?`,
+    ).bind("worker-unlink:expired-thread-unbind").first())
+      .resolves.toMatchObject({
+        outcome: "deleted",
+        detail_json: expect.stringContaining('"detachedReplySessions":1'),
+      });
   });
 
   it("disables but does not delete a Worker with an active session", async () => {

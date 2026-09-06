@@ -34,12 +34,14 @@ type WorkerHardDeleteDetail =
       disableRowsWritten: number;
       deviceDeleteRowsWritten: number;
       releasedSpecificDispatches: number;
+      detachedReplySessions: number;
     }
   | {
       bindingDeleteRowsWritten: number;
       remainingBindings: number;
       deviceStateRowsWritten: number;
       releasedSpecificDispatches: number;
+      detachedReplySessions: number;
     };
 
 type WorkerPreservedDetail =
