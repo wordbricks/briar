@@ -160,12 +160,18 @@ authentication_args=(
   -authenticationKeyID "$APPLE_API_KEY"
   -authenticationKeyIssuerID "$APPLE_API_ISSUER"
 )
+# Command-line settings apply to every target in the archive, including the
+# BriarContracts framework and the Swift package products, which reject a
+# provisioning profile and must keep their own bundle identifiers. The profile
+# therefore travels through BRIAR_IOS_PROVISIONING_PROFILE, which only the
+# application's Production configuration reads (see project.yml), and the
+# application bundle identifier stays the project's own value; the archive
+# verification below still asserts it matches the release configuration.
 common_build_settings=(
   CODE_SIGN_STYLE=Manual
   CODE_SIGN_IDENTITY="Apple Distribution"
-  PROVISIONING_PROFILE_SPECIFIER="$IOS_PROVISIONING_PROFILE_UUID"
+  BRIAR_IOS_PROVISIONING_PROFILE="$IOS_PROVISIONING_PROFILE_UUID"
   DEVELOPMENT_TEAM=QFJZ2V3829
-  PRODUCT_BUNDLE_IDENTIFIER="$bundle_id"
   MARKETING_VERSION="$marketing_version"
   CURRENT_PROJECT_VERSION="$build_number"
   INFOPLIST_KEY_CFBundleShortVersionString="$marketing_version"

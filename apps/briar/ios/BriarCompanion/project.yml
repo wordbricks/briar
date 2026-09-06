@@ -88,6 +88,11 @@ targets:
           BRIAR_APNS_ENVIRONMENT: production
           DEVELOPMENT_TEAM: QFJZ2V3829
           PRODUCT_BUNDLE_IDENTIFIER: app.briar.companion
+          # The release script passes the App Store profile through this
+          # variable instead of overriding PROVISIONING_PROFILE_SPECIFIER for
+          # the whole build: only the application may carry a profile, and the
+          # BriarContracts framework and Swift package targets reject one.
+          PROVISIONING_PROFILE_SPECIFIER: $(BRIAR_IOS_PROVISIONING_PROFILE)
     entitlements:
       path: App/BriarCompanion.entitlements
       properties:
