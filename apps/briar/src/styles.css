@@ -4616,6 +4616,32 @@ button.issue-message-state { width:100%; cursor:pointer; }
 @media (max-width: 760px) {
   .channel-header-back { display: grid; }
 }
+/*
+  The same header on a phone.
+
+  Back is the only way out of a conversation there — a read-only Agent-to-Agent
+  one has no row in the list to return to — so it is always drawn and always a
+  finger wide, whatever the device's width says. The read-only badge keeps its
+  lock and drops its words, which would otherwise squeeze the name to nothing.
+*/
+.companion-shell .channel-header-back { display: grid; width: 44px; height: 44px; flex-basis: 44px; }
+.companion-shell .channel-readonly-badge-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/*
+  The two ends of a relay, as a thumb reaches them. Both are links into the
+  read-only conversation, and both are small: the notice is a line of grey text
+  and the label above an answer is smaller still. They grow to a finger rather
+  than borrowing the space around them, which on the answer's label belongs to
+  the answer itself.
+*/
+.companion-shell .channel-relay-open,
+.companion-shell .channel-relay-from { min-height: 44px; }
 .channel-header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; }
 .channel-header-icon {
   display: inline-flex;
