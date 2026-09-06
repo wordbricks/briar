@@ -55,6 +55,7 @@ import { decodeIssueMessageMutationReceiptResponse } from "./issue-mutation-rece
 import { resolveIssueAttachmentUploads } from "./issue-attachment-upload-repository";
 import { getOrganizationRole } from "./organization-repository";
 import { issueProcessingAgentSkillRow } from "./agent-skills";
+import { wakeOrganizationWorkers } from "./worker-wake-hub";
 
 type RequireRunExecutionProject = (
   db: D1Database,
@@ -160,6 +161,9 @@ export async function createProjectIssueMessage(
   input: IssueConversationApplicationInput & {
     request: ReturnType<typeof decodeIssueMessageInput>;
     attachmentIds: readonly string[];
+    /** Optional so tests and callers without a Worker env can skip the wake. */
+    env?: Env;
+    context?: ExecutionContext;
   },
 ) {
   const project = await requireIssueConversationProject(input);
@@ -467,6 +471,16 @@ export async function createProjectIssueMessage(
       );
     }
     throw error;
+  }
+  // The reply jobs are claimable as soon as this commit lands, so push beats
+  // the Worker's idle poll by up to a full backoff interval.
+  if (input.env && replies.length > 0) {
+    wakeOrganizationWorkers(
+      input.env,
+      project.organization_id,
+      "issue_reply_enqueued",
+      input.context,
+    );
   }
   return result;
 }

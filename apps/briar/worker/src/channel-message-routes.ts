@@ -52,6 +52,7 @@ import {
   decodeChannelMessageApplicationInput,
 } from "./app-mutation-request-mappers";
 import { sha256 } from "./crypto-digest";
+import { wakeOrganizationWorkers } from "./worker-wake-hub";
 import {
   findChannelMessageMutationReceipt,
   resolveChannelMessageUploads,
@@ -162,6 +163,9 @@ export async function createOrganizationChannelMessage(
   input: ChannelMessageApplicationInput & {
     request: ReturnType<typeof decodeChannelMessageApplicationInput>;
     attachmentIds: readonly string[];
+    /** Optional so tests and callers without a Worker env can skip the wake. */
+    env?: Env;
+    context?: ExecutionContext;
   },
 ) {
   const channel = await requireChannelWriteAccess(
@@ -441,6 +445,16 @@ export async function createOrganizationChannelMessage(
     channel.id,
     message.id,
   );
+  // Push beats the Worker's 15-60s idle poll: a queued reply is claimable the
+  // moment this mutation commits, so tell the organization's Workers now.
+  if (input.env && agentReplies.some((reply) => reply.status === "queued")) {
+    wakeOrganizationWorkers(
+      input.env,
+      input.organizationId,
+      "channel_reply_enqueued",
+      input.context,
+    );
+  }
   return {
     message,
     agentReplies: agentReplies.map(channelReplyJson),

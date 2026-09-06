@@ -57,6 +57,7 @@ export const workerD1TestFiles = [
   "worker/src/slack-db.test.ts",
   "worker/src/worker-connect-execution.test.ts",
   "worker/src/worker-reply-completion-application.test.ts",
+  "worker/src/worker-wake-routes.test.ts",
   "worker/src/workers.test.ts",
   "worker/src/workflow-policy.test.ts",
   "worker/src/workflow-v2.test.ts",

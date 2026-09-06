@@ -95,6 +95,7 @@ async function processWhatsAppMessage(
     });
     await createOrganizationChannelMessage({
       db: env.DB,
+      env,
       organizationId: connection.organization_id,
       channelId: directMessage.channel.id,
       userId: link.user_id,
