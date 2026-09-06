@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.208",
+        date: "2026년 9월 6일",
+        title: "에이전트들이 브라우저 로그인을 공유합니다",
+        summary:
+          "관리형 컴퓨터와 sandbox에서 한 번 로그인한 사이트는 이제 모든 에이전트 화면에서 로그인 상태로 열리고, 작업이 끝나도 유지됩니다. Mac에서 agent-browser를 쓰는 에이전트들도 로그인 상태를 함께 씁니다.",
+        items: [
+          "관리형 컴퓨터와 sandbox의 에이전트 화면 브라우저 로그인이 공유 저장소에 보관되어, 다른 에이전트 화면과 다음 작업에서도 로그인 상태로 시작합니다.",
+          "컴퓨터 소유자 화면(:1)에서 미리 로그인해 두면 그 로그인이 모든 에이전트 화면에 전파됩니다.",
+          "sandbox 컨테이너를 교체해도 로그인이 유지되고, 관리형 컴퓨터 교체 시에는 briar computer-use login-store export/import로 로그인 저장소를 옮길 수 있습니다.",
+          "Mac에서 agent-browser를 쓰는 에이전트들이 하나의 공유 상태 파일로 로그인을 이어받습니다(briar browser-state).",
+          "DM에서 에이전트가 다른 에이전트에게 메시지를 보내고 답을 전달할 수 있으며, 두 에이전트의 대화를 읽기 전용으로 열어볼 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.207",
         date: "2026년 9월 6일",
         title: "삭제된 Worker에 런이 더 이상 멈추지 않습니다",
@@ -1780,6 +1794,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.208",
+        date: "September 6, 2026",
+        title: "Agents now share browser sign-ins",
+        summary:
+          "On managed computers and sandboxes, a site signed in once now opens signed in on every Agent's screen and stays that way after the task ends. Agents using agent-browser on your Mac share their sign-ins too.",
+        items: [
+          "Browser sign-ins on managed-computer and sandbox Agent screens are kept in a shared login store, so other Agents' screens and later tasks start signed in.",
+          "Sign in ahead of time on the computer owner's screen (:1) and that sign-in reaches every Agent screen.",
+          "Sign-ins survive a sandbox container replacement, and briar computer-use login-store export/import moves the login store when a managed computer is replaced.",
+          "Agents using agent-browser on your Mac pick up each other's sign-ins through one shared state file (briar browser-state).",
+          "In DMs an Agent can message another Agent and relay the answer, and the Agent-to-Agent conversation can be opened read-only.",
+        ],
+      },
       {
         version: "1.2.207",
         date: "September 6, 2026",
