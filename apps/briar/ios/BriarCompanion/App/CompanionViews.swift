@@ -2665,14 +2665,7 @@ struct RunDetailView: View {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
-                            Text(
-                                status.activity.map {
-                                    "Agent · \($0.displayHeadline)"
-                                } ?? L10n.text(
-                                    "Agent가 답변을 작성하고 있습니다…",
-                                    locale: locale
-                                )
-                            )
+                            Text("Agent · \(status.activity.displayHeadline)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)

@@ -366,26 +366,23 @@ export function IssueConversation({
   const agentReplyIndicatorsByThreadId = useMemo(() => {
     const byThread = new Map<string, Map<string, {
       agentName: string | null;
-      activity?: ChannelAgentActivityDescriptor;
-      sentAt?: string;
+      activity: ChannelAgentActivityDescriptor;
+      sentAt: string;
     }>>();
     for (const [jobId, tracked] of trackedAgentRepliesRef.current) {
       const job = agentRepliesByIdRef.current.get(jobId);
       if (!job) continue;
       const agentName = job.agentName?.trim() || mentionAgents.find(agent => agent.id === job.agentId)?.name.trim() || null;
       const frame = issueActivity.get(jobId);
+      if (!frame?.activity || frame.attempt !== job.attempts) continue;
       const key = job.agentId ? `agent:${job.agentId}` : agentName ? `name:${agentName}` : `job:${job.id}`;
       const indicators = byThread.get(tracked.replyThreadId) ?? new Map();
       const current = indicators.get(key);
-      const hasCurrentActivity = Boolean(current?.activity && current.sentAt);
-      const hasNextActivity = Boolean(frame?.activity && frame.attempt === job.attempts);
-      if (!current || hasNextActivity && (!hasCurrentActivity || current.sentAt! < frame!.sentAt)) {
+      if (!current || current.sentAt < frame.sentAt) {
         indicators.set(key, {
           agentName,
-          ...(hasNextActivity ? {
-            activity: frame!.activity,
-            sentAt: frame!.sentAt
-          } : {})
+          activity: frame.activity,
+          sentAt: frame.sentAt
         });
       }
       byThread.set(tracked.replyThreadId, indicators);

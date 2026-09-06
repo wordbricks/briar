@@ -206,7 +206,86 @@ final class ChannelsStoreTests: XCTestCase {
         store.applicationDidEnterBackground()
     }
 
-    private func summary() -> ChannelSummary {
+    func testDirectMessageProgressRequiresConcreteActivityAndClearsWithTombstone() async throws {
+        let rootID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
+        let replyID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
+        let channel = summary(kind: .directMessage)
+        let running = agentReply(
+            id: replyID,
+            rootID: rootID,
+            status: .running,
+            attempts: 1
+        )
+        let api = ChannelHTTPRecorder(channel: channel)
+        let scenario = ChannelConnectScenario(
+            channel: channel,
+            initialMessages: [message(id: rootID, body: "빠리 답할 수 있어?")],
+            syncResponses: [ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                reset: true,
+                channels: [channel],
+                removedChannelIds: [],
+                messages: [message(id: rootID, body: "빠리 답할 수 있어?")],
+                removedMessageIds: [],
+                agentReplies: [running]
+            )]
+        )
+        let store = ChannelsStore(
+            api: api,
+            preparedUploadClient: api,
+            channelService: scenario.service(),
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            dmMemoryService: BriarAPI_DmMemoryServiceClientMock(),
+            managesRealtime: false,
+            pollInterval: .seconds(3_600)
+        )
+
+        store.applicationDidEnterBackground()
+        store.select(organizationID: organizationID, token: "token")
+        await store.refresh()
+        XCTAssertFalse(store.channels.isEmpty)
+        await store.openChannel(channelID)
+        await store.refreshChanges()
+        XCTAssertTrue(store.typingStatuses(messageIDs: [rootID]).isEmpty)
+
+        store.applyActivityFrame(ChannelAgentActivityFrame(
+            replyJobId: replyID,
+            attempt: 1,
+            sequence: 1,
+            agentId: agentID,
+            channelId: channelID,
+            triggerMessageId: rootID,
+            parentMessageId: rootID,
+            activity: ChannelAgentActivity(
+                id: "commentary-1",
+                kind: .message,
+                headline: "관련 테스트 범위를 확인하겠습니다."
+            ),
+            sentAt: Date(),
+            expiresAt: Date().addingTimeInterval(30)
+        ))
+        XCTAssertEqual(
+            store.typingStatuses(messageIDs: [rootID]).first?.activity.headline,
+            "관련 테스트 범위를 확인하겠습니다."
+        )
+
+        store.applyActivityFrame(ChannelAgentActivityFrame(
+            replyJobId: replyID,
+            attempt: 1,
+            sequence: 2,
+            agentId: agentID,
+            channelId: channelID,
+            triggerMessageId: rootID,
+            parentMessageId: rootID,
+            activity: nil,
+            sentAt: Date(),
+            expiresAt: Date().addingTimeInterval(30)
+        ))
+        XCTAssertTrue(store.typingStatuses(messageIDs: [rootID]).isEmpty)
+    }
+
+    private func summary(kind: ChannelSummary.Kind = .channel) -> ChannelSummary {
         ChannelSummary(
             id: channelID,
             organizationId: organizationID,
@@ -220,7 +299,7 @@ final class ChannelsStoreTests: XCTestCase {
             agentCount: 1,
             createdAt: Date(timeIntervalSince1970: 1_775_260_800),
             updatedAt: Date(timeIntervalSince1970: 1_775_260_800),
-            kind: .channel,
+            kind: kind,
             hasUnread: false,
             dmParticipants: []
         )

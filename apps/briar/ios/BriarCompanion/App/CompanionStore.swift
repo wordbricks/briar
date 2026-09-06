@@ -523,7 +523,7 @@ final class DashboardStore: ObservableObject {
 final class RunDetailStore: ObservableObject {
     struct AgentTypingStatus: Identifiable, Equatable, Sendable {
         let id: UUID
-        let activity: ChannelAgentActivity?
+        let activity: ChannelAgentActivity
     }
 
     struct ExecutionProposalContext: Equatable, Sendable {
@@ -821,11 +821,11 @@ final class RunDetailStore: ObservableObject {
             guard reply.parentMessageId == parentMessageID,
                   reply.status == .queued || reply.status == .running
             else { return nil }
-            let frame = activityFrames[reply.id]
-            let activity = frame?.attempt == reply.attempts &&
-                    (frame?.expiresAt ?? .distantPast) > now
-                ? frame?.activity
-                : nil
+            guard let frame = activityFrames[reply.id],
+                  frame.attempt == reply.attempts,
+                  frame.expiresAt > now,
+                  let activity = frame.activity
+            else { return nil }
             return AgentTypingStatus(id: reply.id, activity: activity)
         }
     }

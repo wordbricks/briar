@@ -10,7 +10,7 @@ export function AgentReplyState({
   indicators?: Array<{
     key: string;
     agentName: string | null;
-    activity?: ChannelAgentActivityDescriptor;
+    activity: ChannelAgentActivityDescriptor;
   }>;
   state?: {
     pending: number;
@@ -22,14 +22,10 @@ export function AgentReplyState({
   } = useI18n();
   if (!state) return null;
   if (state.pending > 0) {
+    if (indicators.length === 0) return null;
     return <>
-        {(indicators.length > 0 ? indicators : [{
-        key: "generic",
-        agentName: null
-      }]).map(indicator => <div className="issue-agent-reply-state" key={indicator.key}>
-            <LoadingState label={indicator.activity ? indicator.agentName ? `${indicator.agentName} · ${displayChannelActivityHeadline(indicator.activity)}` : displayChannelActivityHeadline(indicator.activity) : indicator.agentName ? t("channel.namedAgentTyping", {
-          name: indicator.agentName
-        }) : t("channel.agentTyping")} size="compact" />
+        {indicators.map(indicator => <div className="issue-agent-reply-state" key={indicator.key}>
+            <LoadingState label={indicator.agentName ? `${indicator.agentName} · ${displayChannelActivityHeadline(indicator.activity)}` : displayChannelActivityHeadline(indicator.activity)} size="compact" />
           </div>)}
       </>;
   }

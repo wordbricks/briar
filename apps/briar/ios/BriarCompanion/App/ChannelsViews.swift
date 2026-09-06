@@ -1426,14 +1426,7 @@ private struct ChannelConversationView: View {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
-                            Text(
-                                status.activity.map {
-                                    "\(status.agentName) · \($0.displayHeadline)"
-                                } ?? String(
-                                    format: L10n.text(.channelAgentTyping, locale: locale),
-                                    status.agentName
-                                )
-                            )
+                            Text("\(status.agentName) · \(status.activity.displayHeadline)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)

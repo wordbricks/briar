@@ -23,9 +23,10 @@ import { LoadingState } from "./ui/loading-state";
  * DM placeholder row(s) for agents writing a reply.
  *
  * Instead of a one-line typing indicator inside the user's message body, each
- * pending-reply agent gets its own message-like row with avatar, provider badge,
- * agent name, time, and a status bubble with the loading animation. The row
- * disappears when the real agent message arrives.
+ * agent with concrete commentary gets its own message-like row with avatar,
+ * provider badge, agent name, time, and a status bubble with the loading
+ * animation. The row disappears when activity is cleared or the real agent
+ * message arrives.
  */
 export function ChannelMessageTypingPlaceholder({
   channelId,
@@ -47,6 +48,7 @@ export function ChannelMessageTypingPlaceholder({
   const descriptors = typingAgentsForReplies(
     own,
     agents,
+    activity,
     new Set([messageId]),
     fallbackAgentName,
   );
@@ -57,16 +59,18 @@ export function ChannelMessageTypingPlaceholder({
     fallbackAgentName,
   );
   if (descriptors.length === 0) return null;
-  return descriptors.map((agent) => (
-    <TypingPlaceholderRow
-      key={agent.name}
-      agent={agent}
-      activityDescriptor={activityByName[agent.name]}
-      className={className}
-      localeTag={localeTag}
-      t={t}
-    />
-  ));
+  return descriptors.map((agent) => {
+    const activityDescriptor = activityByName[agent.name];
+    return activityDescriptor ? (
+      <TypingPlaceholderRow
+        key={agent.name}
+        agent={agent}
+        activityDescriptor={activityDescriptor}
+        className={className}
+        localeTag={localeTag}
+      />
+    ) : null;
+  });
 }
 
 function TypingPlaceholderRow({
@@ -74,17 +78,13 @@ function TypingPlaceholderRow({
   activityDescriptor,
   className,
   localeTag,
-  t,
 }: {
   agent: TypingAgentDescriptor;
-  activityDescriptor?: ChannelAgentActivityDescriptor;
+  activityDescriptor: ChannelAgentActivityDescriptor;
   className?: string;
   localeTag: string;
-  t: ReturnType<typeof useI18n>["t"];
 }) {
-  const label = activityDescriptor
-    ? `${agent.name} · ${displayChannelActivityHeadline(activityDescriptor)}`
-    : t("channel.namedAgentTyping", { name: agent.name });
+  const label = `${agent.name} · ${displayChannelActivityHeadline(activityDescriptor)}`;
 
   return (
     <article

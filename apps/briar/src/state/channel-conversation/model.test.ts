@@ -16,7 +16,6 @@ import {
   removeReplySummary,
   summarizeChannelMessages,
   threadMessageIdSet,
-  typingAgentNamesForReplies,
   typingAgentsForReplies,
 } from "./model";
 
@@ -186,22 +185,6 @@ describe("removeReplySummary", () => {
 describe("typing state", () => {
   const agents = [testChannelAgent("agent-1", { name: "Builder" })];
 
-  it("names the replying agents once each and falls back for unknown ids", () => {
-    const replies = [
-      testChannelAgentReply("reply-1", { parentMessageId: "root" }),
-      testChannelAgentReply("reply-2", { parentMessageId: "root" }),
-      testChannelAgentReply("reply-3", {
-        parentMessageId: "root",
-        agentId: "agent-missing",
-      }),
-      testChannelAgentReply("reply-4", { parentMessageId: "elsewhere" }),
-    ];
-
-    expect(
-      typingAgentNamesForReplies(replies, agents, new Set(["root"]), "Agent"),
-    ).toEqual(["Builder", "Agent"]);
-  });
-
   const descriptor = {
     id: "activity-1",
     kind: "command",
@@ -238,7 +221,7 @@ describe("typing state", () => {
     ).toHaveLength(2);
   });
 
-  it("returns agent descriptors with avatar, provider, and createdAt", () => {
+  it("returns descriptors only for replies with current concrete activity", () => {
     const replies = [
       testChannelAgentReply("reply-1", {
         parentMessageId: "root",
@@ -255,9 +238,21 @@ describe("typing state", () => {
       }),
     ];
 
+    expect(typingAgentsForReplies(
+      replies,
+      agents,
+      new Map(),
+      new Set(["root"]),
+      "Agent",
+    )).toEqual([]);
+
     const result = typingAgentsForReplies(
       replies,
       agents,
+      new Map([
+        ["reply-1", { attempt: 1, activity: descriptor }],
+        ["reply-2", { attempt: 1, activity: descriptor }],
+      ]),
       new Set(["root"]),
       "Agent",
     );
@@ -283,6 +278,10 @@ describe("typing state", () => {
     const result = typingAgentsForReplies(
       replies,
       agents,
+      new Map([
+        ["reply-1", { attempt: 1, activity: descriptor }],
+        ["reply-2", { attempt: 1, activity: descriptor }],
+      ]),
       new Set(["root"]),
       "Agent",
     );
