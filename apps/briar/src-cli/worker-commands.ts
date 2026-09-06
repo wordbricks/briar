@@ -94,6 +94,7 @@ import { runClaimedDmMemory } from "./dm-memory-learning";
 import { runDetachedProviderTurn } from "./detached-provider-turn";
 import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 import { ComputerUseBoxClient } from "./computer-use-box-client";
+import { COMPUTER_USE_CANARY_AGENT_ID } from "./computer-use-desktop-manager";
 import { agentBundleCandidates } from "./agent-bundle-path";
 import { defaultComputerUseScreenshotDirectory } from "./computer-use-native-executor";
 import { supportsComputerUseProvider } from
@@ -149,7 +150,7 @@ const dmMemoryLearningCapability = (
 
 const runComputerUseCanary = async (): Promise<boolean> => {
   const client = await ComputerUseBoxClient.connect();
-  const assigned = await client.assign("briar-capability-canary");
+  const assigned = await client.assign(COMPUTER_USE_CANARY_AGENT_ID);
   let screenshotPath: string | undefined;
   try {
     const result = await assigned.executor.execute(buildComputerUseArgs({

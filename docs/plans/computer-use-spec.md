@@ -196,7 +196,9 @@ desktop을 할당한다.
 - 각 assignment에는 Agent ID, display index, owner token이 있다.
 - 새 assignment의 owner token은 UUID다.
 - 이미 다른 Agent가 가진 display는 재사용하지 않는다.
-- release하면 fork desktop을 중지하고 assignment를 지운다.
+- release는 turn의 owner token만 지우고 fork desktop과 assignment는 유지한다(2026-09-06부터).
+  유휴 TTL(기본 72시간)을 넘기거나 빈 display가 없어 evict될 때, 그리고 capability canary처럼
+  transient한 Agent가 release할 때만 desktop을 중지하고 assignment를 지운다.
 
 production composition은 primary의 computer use를 gate한다. 정상 Agent는 fork
 display를 받아야 하며, primary는 관리와 bootstrap 경로로 남는다.
@@ -519,8 +521,9 @@ assignment record:
 - 다른 Agent가 가진 display는 빼앗지 않는다.
 - owner token이 다르면 router가 거절한다.
 - process crash 후 stale process와 lock을 확인하고 안전하게 복구한다.
-- 명시적 release에서만 desktop과 profile을 정리하며, 정리 전에 display profile의 로그인
-  상태를 공유 저장소에 capture한다([computer-use-shared-browser-login.md](computer-use-shared-browser-login.md)).
+- release는 display profile의 로그인 상태를 살아 있는 Chrome에서 공유 저장소에 capture하고
+  desktop과 profile은 다음 turn과 소유자의 화면을 위해 남긴다. 정리는 유휴 TTL 만료, eviction,
+  transient Agent에서만 일어나며 그때도 정리 전에 capture한다([computer-use-shared-browser-login.md](computer-use-shared-browser-login.md)).
 - display 1은 Agent가 쓰지 않지만 로그인 원본이다. `display-1` 프로필로 고정해 두고 box
   서비스가 소유자의 새 로그인을 공유 저장소로 capture한다.
 - managed computer 재부팅 후 persisted assignments에 필요한 windows를 재생성한다.

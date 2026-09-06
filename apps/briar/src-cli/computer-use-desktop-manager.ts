@@ -19,6 +19,10 @@ export const COMPUTER_USE_DEFAULT_MAX_DISPLAY_INDEX = 100;
 export const defaultComputerUseAssignmentPath =
   "/var/lib/briar-computer-use/window-assignments.json";
 export const computerUseOwnerTokenPattern = /^[A-Za-z0-9_-]+$/u;
+/** Worker capability canaries borrow a display for one screenshot; their windows never persist. */
+export const COMPUTER_USE_CANARY_AGENT_ID = "briar-capability-canary";
+/** An Agent display that idles this long between turns is torn down. */
+export const COMPUTER_USE_DEFAULT_IDLE_DISPLAY_TTL_MS = 72 * 60 * 60 * 1000;
 
 const rejectExcessProperties = { onExcessProperty: "error" } as const;
 const strict = <S extends Schema.Top>(schema: S) =>
@@ -29,10 +33,10 @@ const PersistedDesktopAssignment = strict(Schema.Struct({
   displayIndex: Schema.Int.check(
     Schema.isGreaterThanOrEqualTo(COMPUTER_USE_FIRST_AGENT_DISPLAY_INDEX),
   ),
-  ownerToken: Schema.String.check(
+  ownerToken: Schema.NullOr(Schema.String.check(
     Schema.isPattern(computerUseOwnerTokenPattern),
     Schema.isMaxLength(128),
-  ),
+  )),
   updatedAt: IsoDateTimeUtc,
 }));
 
@@ -64,12 +68,23 @@ const PersistedDesktopAssignments = strict(Schema.Struct({
 
 const decodePersistedAssignments = Schema.decodeUnknownSync(PersistedDesktopAssignments);
 
+/**
+ * A display stays assigned to its Agent across turns. `ownerToken` is the
+ * lease of the turn currently driving it and is null while the display idles
+ * with its windows still open; `updatedAt` is the last lease change, which
+ * the idle TTL counts from.
+ */
 export interface ComputerUseDesktopAssignment {
   readonly agentId: string;
   readonly displayIndex: number;
-  readonly ownerToken: string;
+  readonly ownerToken: string | null;
   readonly updatedAt: string;
 }
+
+/** An assignment whose display is leased to a running turn. */
+export type ComputerUseDesktopLease = ComputerUseDesktopAssignment & {
+  readonly ownerToken: string;
+};
 
 export interface ComputerUseAssignmentStore {
   load(): Promise<readonly ComputerUseDesktopAssignment[]>;
@@ -79,6 +94,8 @@ export interface ComputerUseAssignmentStore {
 export interface ComputerUseWindowSupervisor {
   ensureWindow(assignment: ComputerUseDesktopAssignment): Promise<void>;
   stopWindow(assignment: ComputerUseDesktopAssignment): Promise<void>;
+  /** Fold the display's browser logins into the shared store while its window keeps running. */
+  captureWindowLogins?(assignment: ComputerUseDesktopAssignment): Promise<void>;
 }
 
 export class ComputerUseAssignmentStoreError extends Error {
@@ -101,6 +118,24 @@ export class ComputerUseDesktopOwnershipError extends Error {
     this.name = "ComputerUseDesktopOwnershipError";
   }
 }
+
+/** `BRIAR_COMPUTER_USE_IDLE_DISPLAY_TTL_HOURS` overrides how long idle displays are kept. */
+export const configuredComputerUseIdleDisplayTtlMs = (
+  environment: NodeJS.ProcessEnv = process.env,
+): number => {
+  const raw = environment.BRIAR_COMPUTER_USE_IDLE_DISPLAY_TTL_HOURS?.trim();
+  if (!raw) return COMPUTER_USE_DEFAULT_IDLE_DISPLAY_TTL_MS;
+  const hours = Number(raw);
+  if (!Number.isFinite(hours) || hours <= 0) {
+    throw new ComputerUseAssignmentStoreError(
+      "BRIAR_COMPUTER_USE_IDLE_DISPLAY_TTL_HOURS must be a positive number of hours",
+    );
+  }
+  return hours * 60 * 60 * 1000;
+};
+
+const describeError = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 export const configuredComputerUseAssignmentPath = (
   environment: NodeJS.ProcessEnv = process.env,
@@ -177,6 +212,11 @@ export interface ComputerUseDesktopManagerOptions {
   readonly maxDisplayIndex?: number;
   readonly now?: () => string;
   readonly mintOwnerToken?: () => string;
+  /** How long a display may idle between turns before it is torn down. */
+  readonly idleTtlMs?: number;
+  /** Agents whose displays are torn down on release instead of kept idle. */
+  readonly transientAgentIds?: ReadonlySet<string>;
+  readonly log?: (message: string) => void;
 }
 
 export class ComputerUseDesktopManager {
@@ -187,6 +227,9 @@ export class ComputerUseDesktopManager {
   private readonly maxDisplayIndex: number;
   private readonly now: () => string;
   private readonly mintOwnerToken: () => string;
+  private readonly idleTtlMs: number;
+  private readonly transientAgentIds: ReadonlySet<string>;
+  private readonly log: (message: string) => void;
 
   constructor(
     private readonly store: ComputerUseAssignmentStore,
@@ -203,6 +246,13 @@ export class ComputerUseDesktopManager {
     }
     this.now = options.now ?? (() => DateTime.formatIso(DateTime.nowUnsafe()));
     this.mintOwnerToken = options.mintOwnerToken ?? randomUUID;
+    this.idleTtlMs = options.idleTtlMs ?? COMPUTER_USE_DEFAULT_IDLE_DISPLAY_TTL_MS;
+    if (!Number.isFinite(this.idleTtlMs) || this.idleTtlMs <= 0) {
+      throw new ComputerUseAssignmentStoreError("Computer Use idle display TTL must be positive");
+    }
+    this.transientAgentIds = options.transientAgentIds
+      ?? new Set([COMPUTER_USE_CANARY_AGENT_ID]);
+    this.log = options.log ?? (() => undefined);
   }
 
   private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
@@ -248,7 +298,13 @@ export class ComputerUseDesktopManager {
     return undefined;
   }
 
-  ensureAssignment(agentId: string): Promise<ComputerUseDesktopAssignment> {
+  /**
+   * Lease the Agent's display for a turn. A display the Agent already holds
+   * is reused: a running lease is shared as is, an idle one gets a fresh
+   * token. A new Agent takes a free display, or the longest-idle one when
+   * every display is taken.
+   */
+  ensureAssignment(agentId: string): Promise<ComputerUseDesktopLease> {
     return this.runExclusive(async () => {
       await this.load();
       const normalizedAgentId = agentId.trim();
@@ -257,20 +313,37 @@ export class ComputerUseDesktopManager {
       }
       const existing = this.assignments.get(normalizedAgentId);
       if (existing !== undefined) {
-        await this.supervisor.ensureWindow(existing);
-        return existing;
+        if (existing.ownerToken !== null) {
+          await this.supervisor.ensureWindow(existing);
+          return { ...existing, ownerToken: existing.ownerToken };
+        }
+        const renewed = this.lease(existing);
+        this.assignments.set(normalizedAgentId, renewed);
+        await this.save();
+        try {
+          await this.supervisor.ensureWindow(renewed);
+          return renewed;
+        } catch (error) {
+          this.assignments.set(normalizedAgentId, existing);
+          await this.save();
+          throw error;
+        }
       }
-      const displayIndex = this.freeDisplayIndex();
-      if (displayIndex === undefined) throw new ComputerUseDesktopUnavailableError();
-      const assignment: ComputerUseDesktopAssignment = {
+      let displayIndex = this.freeDisplayIndex();
+      if (displayIndex === undefined) {
+        const evictable = this.longestIdle();
+        if (evictable === undefined) throw new ComputerUseDesktopUnavailableError();
+        await this.teardown(evictable);
+        this.log(`display :${evictable.displayIndex} of ${evictable.agentId} was evicted for ${normalizedAgentId}`);
+        displayIndex = this.freeDisplayIndex();
+        if (displayIndex === undefined) throw new ComputerUseDesktopUnavailableError();
+      }
+      const assignment = this.lease({
         agentId: normalizedAgentId,
         displayIndex,
-        ownerToken: this.mintOwnerToken(),
+        ownerToken: null,
         updatedAt: this.now(),
-      };
-      if (!computerUseOwnerTokenPattern.test(assignment.ownerToken)) {
-        throw new ComputerUseAssignmentStoreError("Computer Use owner token is invalid");
-      }
+      });
       this.assignments.set(normalizedAgentId, assignment);
       await this.save();
       try {
@@ -284,9 +357,11 @@ export class ComputerUseDesktopManager {
     });
   }
 
+  /** Recreate the windows of every kept assignment; expired idle ones are dropped instead. */
   restoreAssignments(): Promise<readonly ComputerUseDesktopAssignment[]> {
     return this.runExclusive(async () => {
       await this.load();
+      await this.reapExpired();
       const assignments = [...this.assignments.values()];
       for (const assignment of assignments) {
         await this.supervisor.ensureWindow(assignment);
@@ -295,6 +370,77 @@ export class ComputerUseDesktopManager {
     });
   }
 
+  /** Tear down displays that idled past the TTL. Returns what was torn down. */
+  reapIdleAssignments(): Promise<readonly ComputerUseDesktopAssignment[]> {
+    return this.runExclusive(async () => {
+      await this.load();
+      return this.reapExpired();
+    });
+  }
+
+  private nowMs(): number {
+    const parsed = Date.parse(this.now());
+    return Number.isNaN(parsed) ? Date.now() : parsed;
+  }
+
+  private isExpired(assignment: ComputerUseDesktopAssignment, nowMs: number): boolean {
+    return assignment.ownerToken === null
+      && nowMs - Date.parse(assignment.updatedAt) >= this.idleTtlMs;
+  }
+
+  private longestIdle(): ComputerUseDesktopAssignment | undefined {
+    let candidate: ComputerUseDesktopAssignment | undefined;
+    for (const assignment of this.assignments.values()) {
+      if (assignment.ownerToken !== null) continue;
+      if (candidate === undefined || assignment.updatedAt < candidate.updatedAt) {
+        candidate = assignment;
+      }
+    }
+    return candidate;
+  }
+
+  private lease(assignment: ComputerUseDesktopAssignment): ComputerUseDesktopLease {
+    const ownerToken = this.mintOwnerToken();
+    if (!computerUseOwnerTokenPattern.test(ownerToken)) {
+      throw new ComputerUseAssignmentStoreError("Computer Use owner token is invalid");
+    }
+    return { ...assignment, ownerToken, updatedAt: this.now() };
+  }
+
+  private async teardown(assignment: ComputerUseDesktopAssignment): Promise<void> {
+    this.displaysTearingDown.add(assignment.displayIndex);
+    try {
+      await this.supervisor.stopWindow(assignment);
+      this.assignments.delete(assignment.agentId);
+      await this.save();
+    } finally {
+      this.displaysTearingDown.delete(assignment.displayIndex);
+    }
+  }
+
+  /** A failed teardown keeps the assignment so the next sweep retries it. */
+  private async reapExpired(): Promise<ComputerUseDesktopAssignment[]> {
+    const nowMs = this.nowMs();
+    const reaped: ComputerUseDesktopAssignment[] = [];
+    for (const assignment of [...this.assignments.values()]) {
+      if (!this.isExpired(assignment, nowMs)) continue;
+      try {
+        await this.teardown(assignment);
+        reaped.push(assignment);
+        this.log(`display :${assignment.displayIndex} of ${assignment.agentId} idled past the TTL and was torn down`);
+      } catch (error) {
+        this.log(`display :${assignment.displayIndex} teardown failed: ${describeError(error)}`);
+      }
+    }
+    return reaped;
+  }
+
+  /**
+   * End a turn's lease. The window and the browser on it stay up for the next
+   * turn and for the owner's screen; only transient agents (the capability
+   * canary) give the display back. A display that is already idle has
+   * nothing to release, whatever token the late caller still holds.
+   */
   private release(
     agentId: string,
     ownerToken?: string,
@@ -302,18 +448,25 @@ export class ComputerUseDesktopManager {
     return this.runExclusive(async () => {
       await this.load();
       const assignment = this.assignments.get(agentId);
-      if (assignment === undefined) return;
+      if (assignment === undefined || assignment.ownerToken === null) return;
       if (ownerToken !== undefined && assignment.ownerToken !== ownerToken) {
         throw new ComputerUseDesktopOwnershipError();
       }
-      this.displaysTearingDown.add(assignment.displayIndex);
-      try {
-        await this.supervisor.stopWindow(assignment);
-        this.assignments.delete(agentId);
-        await this.save();
-      } finally {
-        this.displaysTearingDown.delete(assignment.displayIndex);
+      if (this.transientAgentIds.has(agentId)) {
+        await this.teardown(assignment);
+        return;
       }
+      try {
+        await this.supervisor.captureWindowLogins?.(assignment);
+      } catch (error) {
+        this.log(`display :${assignment.displayIndex} login capture failed: ${describeError(error)}`);
+      }
+      this.assignments.set(agentId, {
+        ...assignment,
+        ownerToken: null,
+        updatedAt: this.now(),
+      });
+      await this.save();
     });
   }
 

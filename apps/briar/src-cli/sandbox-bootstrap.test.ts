@@ -378,13 +378,13 @@ describe("sandboxReport", () => {
       repositoryPresent: () => true,
       providerSignedIn: async (provider) => provider === "codex",
       computerUseHealthy: async () => true,
-      displays: async () => [{ agentId: "agent-a", displayIndex: 2 }],
+      displays: async () => [{ agentId: "agent-a", displayIndex: 2, leased: true }],
       primaryDisplay: async () => true,
     });
     expect(report.ready).toBe(true);
     expect(report.computerUse).toEqual({
       serviceHealthy: true,
-      displays: [{ agentId: "agent-a", displayIndex: 2 }],
+      displays: [{ agentId: "agent-a", displayIndex: 2, leased: true }],
       primaryDisplay: true,
     });
     expect(report.teams).toEqual([{
@@ -557,15 +557,21 @@ describe("noVNC bridge", () => {
     expect(command.at(-1)).toBe("0.0.0.0:6080");
   });
 
-  it("lists assigned displays without exposing owner tokens", async () => {
+  it("lists assigned displays with their lease state and without owner tokens", async () => {
     const directory = await mkdtemp(join(tmpdir(), "briar-sandbox-displays-"));
     directories.push(directory);
     const path = join(directory, "window-assignments.json");
     await writeFile(path, JSON.stringify({
       version: 1,
-      assignments: [{ agentId: "agent-a", displayIndex: 2, ownerToken: "secret", assignedAt: "x" }],
+      assignments: [
+        { agentId: "agent-a", displayIndex: 2, ownerToken: "secret", assignedAt: "x" },
+        { agentId: "agent-b", displayIndex: 3, ownerToken: null, assignedAt: "x" },
+      ],
     }));
-    expect(await assignedDisplays(path)).toEqual([{ agentId: "agent-a", displayIndex: 2 }]);
+    expect(await assignedDisplays(path)).toEqual([
+      { agentId: "agent-a", displayIndex: 2, leased: true },
+      { agentId: "agent-b", displayIndex: 3, leased: false },
+    ]);
     expect(await assignedDisplays(join(directory, "missing.json"))).toEqual([]);
   });
 });

@@ -586,19 +586,28 @@ export async function sandboxReport(input: {
   };
 }
 
-export type SandboxDisplay = { readonly agentId: string; readonly displayIndex: number };
+export type SandboxDisplay = {
+  readonly agentId: string;
+  readonly displayIndex: number;
+  /** True while a turn drives the display; idle displays keep their windows for the next turn. */
+  readonly leased: boolean;
+};
 
-/** Displays the box service currently holds for agents, without their owner tokens. */
+/** Displays the box service holds for agents, without their owner tokens. */
 export async function assignedDisplays(
   path = configuredComputerUseAssignmentPath(),
 ): Promise<SandboxDisplay[]> {
   try {
     const parsed = JSON.parse(await readFile(path, "utf8")) as {
-      assignments?: { agentId?: unknown; displayIndex?: unknown }[];
+      assignments?: { agentId?: unknown; displayIndex?: unknown; ownerToken?: unknown }[];
     };
     return (parsed.assignments ?? []).flatMap((assignment) =>
       typeof assignment.agentId === "string" && typeof assignment.displayIndex === "number"
-        ? [{ agentId: assignment.agentId, displayIndex: assignment.displayIndex }]
+        ? [{
+            agentId: assignment.agentId,
+            displayIndex: assignment.displayIndex,
+            leased: typeof assignment.ownerToken === "string",
+          }]
         : []
     );
   } catch {

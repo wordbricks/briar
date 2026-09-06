@@ -4,6 +4,7 @@ import { createConnection } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import {
   type ComputerUseBrowserLoginStore,
+  type ComputerUseLiveDisplayLoginCapture,
   computerUseBrowserProfileDirectory,
   FileComputerUseBrowserLoginStore,
 } from "./computer-use-browser-login-store";
@@ -85,6 +86,11 @@ const defaultBrowserProfileCleaner: ComputerUseBrowserProfileCleaner = {
   ),
 };
 
+/** Seeds and captures around window lifecycle; live capture keeps an idle window's logins current. */
+export type ComputerUseWindowLoginStore =
+  & ComputerUseBrowserLoginStore
+  & Partial<ComputerUseLiveDisplayLoginCapture>;
+
 export interface SystemdComputerUseWindowSupervisorOptions {
   readonly commandRunner?: ComputerUseSystemCommandRunner;
   readonly portProbe?: ComputerUsePortProbe;
@@ -92,7 +98,7 @@ export interface SystemdComputerUseWindowSupervisorOptions {
   readonly startupTimeoutMs?: number;
   readonly pollIntervalMs?: number;
   readonly browserProfileCleaner?: ComputerUseBrowserProfileCleaner;
-  readonly browserLoginStore?: ComputerUseBrowserLoginStore;
+  readonly browserLoginStore?: ComputerUseWindowLoginStore;
 }
 
 export class SystemdComputerUseWindowSupervisor implements ComputerUseWindowSupervisor {
@@ -102,7 +108,7 @@ export class SystemdComputerUseWindowSupervisor implements ComputerUseWindowSupe
   private readonly startupTimeoutMs: number;
   private readonly pollIntervalMs: number;
   private readonly browserProfileCleaner: ComputerUseBrowserProfileCleaner;
-  private readonly browserLoginStore: ComputerUseBrowserLoginStore;
+  private readonly browserLoginStore: ComputerUseWindowLoginStore;
 
   constructor(options: SystemdComputerUseWindowSupervisorOptions = {}) {
     this.commandRunner = options.commandRunner ?? defaultCommandRunner;
@@ -146,6 +152,10 @@ export class SystemdComputerUseWindowSupervisor implements ComputerUseWindowSupe
     await this.browserLoginStore.capture(assignment.displayIndex);
     await this.browserProfileCleaner.remove(assignment.displayIndex);
   }
+
+  async captureWindowLogins(assignment: ComputerUseDesktopAssignment): Promise<void> {
+    await this.browserLoginStore.captureLiveDisplay?.(assignment.displayIndex);
+  }
 }
 
 export const defaultComputerUseWindowLauncher =
@@ -158,7 +168,7 @@ export interface ProcessComputerUseWindowSupervisorOptions {
   readonly startupTimeoutMs?: number;
   readonly pollIntervalMs?: number;
   readonly browserProfileCleaner?: ComputerUseBrowserProfileCleaner;
-  readonly browserLoginStore?: ComputerUseBrowserLoginStore;
+  readonly browserLoginStore?: ComputerUseWindowLoginStore;
   readonly spawnWindow?: (launcher: string, displayIndex: number) => ChildProcess;
 }
 
@@ -174,7 +184,7 @@ export class ProcessComputerUseWindowSupervisor implements ComputerUseWindowSupe
   private readonly startupTimeoutMs: number;
   private readonly pollIntervalMs: number;
   private readonly browserProfileCleaner: ComputerUseBrowserProfileCleaner;
-  private readonly browserLoginStore: ComputerUseBrowserLoginStore;
+  private readonly browserLoginStore: ComputerUseWindowLoginStore;
   private readonly spawnWindow: (launcher: string, displayIndex: number) => ChildProcess;
   private readonly windows = new Map<number, ChildProcess>();
 
@@ -249,6 +259,10 @@ export class ProcessComputerUseWindowSupervisor implements ComputerUseWindowSupe
     }
     await this.browserLoginStore.capture(assignment.displayIndex);
     await this.browserProfileCleaner.remove(assignment.displayIndex);
+  }
+
+  async captureWindowLogins(assignment: ComputerUseDesktopAssignment): Promise<void> {
+    await this.browserLoginStore.captureLiveDisplay?.(assignment.displayIndex);
   }
 }
 

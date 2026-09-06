@@ -14,12 +14,12 @@ import {
   type ComputerUseExecutor,
 } from "@briar/agent-exec";
 import { readBoxExecAuthToken } from "./computer-use-box-service";
-import type { ComputerUseDesktopAssignment } from "./computer-use-desktop-manager";
+import type { ComputerUseDesktopLease } from "./computer-use-desktop-manager";
 
 type WindowServiceClient = Client<typeof ComputerUseWindowService>;
 
 export interface AssignedComputerUseResource {
-  readonly assignment: ComputerUseDesktopAssignment;
+  readonly assignment: ComputerUseDesktopLease;
   readonly executor: ComputerUseExecutor;
   release(): Promise<void>;
 }
@@ -59,7 +59,7 @@ export class ComputerUseBoxClient {
     if (window === undefined) {
       throw new Error("Box executor returned no Computer Use window");
     }
-    const assignment: ComputerUseDesktopAssignment = {
+    const assignment: ComputerUseDesktopLease = {
       agentId: window.agentId,
       displayIndex: window.displayIndex,
       ownerToken: window.ownerToken,
@@ -81,7 +81,7 @@ export class ComputerUseBoxClient {
 
   executorFor(
     assignment: Pick<
-      ComputerUseDesktopAssignment,
+      ComputerUseDesktopLease,
       "displayIndex" | "ownerToken"
     >,
     forkPort?: number,
