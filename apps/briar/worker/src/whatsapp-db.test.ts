@@ -244,6 +244,86 @@ describe("WhatsApp DM bridge D1 integration", () => {
     ).bind(channel!.id, organizationAgentId).first()).resolves.toEqual({ count: 1 });
   });
 
+  /*
+    The webhook answers Meta before the message is stored, so the wake the
+    inbound DM enqueues has to be registered on the request's ExecutionContext.
+    Left off it, the poke would run as a dangling promise the runtime is free to
+    cancel once the response is sent.
+  */
+  it("wakes the organization's Workers under waitUntil for an inbound DM", async () => {
+    // A reply is only claimable — and so only worth a wake — while some live
+    // Worker can run the representative Agent.
+    const wakeDeviceId = "99999999-9999-4999-8999-999999999999";
+    const wakeWorkerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const live = new Date().toISOString();
+    await db.batch([
+      db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Wake Device', ?, 'online', ?, ?, ?)`,
+      ).bind(wakeDeviceId, organizationId, ownerId, "e".repeat(64), live, live, live),
+      db.prepare(
+        `insert into briar_execution_worker_credentials (
+           device_id, token_hash, created_at
+         ) values (?, ?, ?)`,
+      ).bind(wakeDeviceId, "f".repeat(64), live),
+      db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint,
+           runtime_proto_json, state, accepting_work, readiness_state,
+           last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, 'Wake Worker', ?, ?, 'online', 1, 'ready', ?, ?, ?)`,
+      ).bind(
+        wakeWorkerId,
+        projectId,
+        wakeDeviceId,
+        "0".repeat(64),
+        workerRuntimeProtoJsonFixture({
+          agentProvider: "codex",
+          providers: ["codex"],
+        }),
+        live,
+        live,
+        live,
+      ),
+    ]);
+
+    const wakes: string[] = [];
+    const pending: Promise<unknown>[] = [];
+    const wakeEnv = {
+      ...env,
+      WORKER_WAKE: {
+        getByName: (name: string) => {
+          wakes.push(name);
+          return { fetch: async () => new Response(null, { status: 204 }) };
+        },
+      },
+    } as unknown as typeof env;
+    const context = {
+      waitUntil(promise: Promise<unknown>) {
+        pending.push(promise);
+      },
+    } as unknown as ExecutionContext;
+
+    const response = await worker.fetch(signedRequest({
+      wamid: "wamid.wake",
+      from: linkedPhone,
+      body: "웨이크 확인",
+    }), wakeEnv, context);
+    // The webhook answers before it stores anything: all of it is deferred.
+    expect(response.status).toBe(200);
+    expect(pending.length).toBe(1);
+    expect(wakes).toEqual([]);
+
+    await Promise.all(pending.splice(0));
+    expect(wakes).toEqual([organizationId]);
+    // The message path registers nothing else on the context, so this lone
+    // remaining task is the wake itself rather than a dangling promise.
+    expect(pending.length).toBe(1);
+    await Promise.all(pending.splice(0));
+  });
+
   it("does not create a DM for an unlinked number and sends connection guidance", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
       messaging_product: "whatsapp",

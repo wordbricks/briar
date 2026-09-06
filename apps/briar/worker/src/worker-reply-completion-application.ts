@@ -777,6 +777,14 @@ export async function completeIssueReplyApplication(
       completed,
       input.context,
     );
+    // A reply queued behind this one on the same issue only becomes claimable
+    // now, so wake instead of leaving it to the next idle poll.
+    services.wakeOrganizationWorkers(
+      input.env,
+      scope.organizationId,
+      "issue_reply_completed",
+      input.context,
+    );
     return { replayed: false, disposition, retainedUntil: null };
   } catch (cause) {
     if (cause instanceof ReplyCompletionApplicationError) throw cause;

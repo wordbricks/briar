@@ -22,6 +22,7 @@ export const WorkerWakeReason = Schema.Literals([
   "channel_reply_enqueued",
   "issue_reply_enqueued",
   "channel_reply_completed",
+  "issue_reply_completed",
 ]);
 export type WorkerWakeReason = typeof WorkerWakeReason.Type;
 
