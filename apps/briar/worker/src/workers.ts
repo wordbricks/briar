@@ -1555,6 +1555,48 @@ async function releaseSpecificDispatchesForDevice(
 }
 
 /**
+ * `briar_channel_reply_sessions` points at both the owning device and the
+ * owning binding with separate `on delete set null` foreign keys, and a table
+ * CHECK demands the two columns stay null together. Deleting a device fires
+ * those set-null actions independently — one for `owner_device_id`, one for
+ * `owner_worker_id` via the cascaded binding delete — so whichever lands first
+ * leaves the row half-null and SQLite rejects the whole delete. Null both
+ * columns in a single statement before the delete; `owner_worker_label` is the
+ * display label kept for history and stays as it is.
+ *
+ * Pass `projectId` for a binding-level unlink so only that binding's threads
+ * are detached; omit it to detach every thread the device owns.
+ */
+async function detachReplySessionOwnership(
+  db: D1Database,
+  input: { deviceId: string; projectId?: string },
+) {
+  const scoped = input.projectId !== undefined;
+  const result = await db
+    .prepare(
+      scoped
+        ? `update briar_channel_reply_sessions
+           set owner_device_id = null, owner_worker_id = null
+           where owner_worker_id in (
+             select id from briar_execution_workers
+             where device_id = ? and project_id = ?
+           )
+           returning id`
+        : `update briar_channel_reply_sessions
+           set owner_device_id = null, owner_worker_id = null
+           where owner_device_id = ?
+             or owner_worker_id in (
+               select id from briar_execution_workers where device_id = ?
+             )
+           returning id`,
+    )
+    .bind(input.deviceId, scoped ? input.projectId : input.deviceId)
+    .all<{ id: string }>();
+  // `meta.changes` also counts trigger writes, so count the returned rows.
+  return { result, detachedSessionIds: result.results.map((row) => row.id) };
+}
+
+/**
  * Permanently remove an idle organization Worker and its project bindings.
  *
  * Disable first so a concurrent request cannot claim new work while deletion
@@ -1631,6 +1673,8 @@ export async function deleteExecutionWorker(
     }
     const released = await releaseSpecificDispatchesForDevice(db, { deviceId });
     metrics = addD1MutationMetrics(metrics, d1MutationMetrics([released.result]));
+    const detached = await detachReplySessionOwnership(db, { deviceId });
+    metrics = addD1MutationMetrics(metrics, d1MutationMetrics([detached.result]));
     const deleted = await db
       .prepare(
         `delete from briar_execution_worker_devices
@@ -1653,6 +1697,7 @@ export async function deleteExecutionWorker(
           disableRowsWritten: disabled.metrics.rowsWritten,
           deviceDeleteRowsWritten: deletionMetrics.rowsWritten,
           releasedSpecificDispatches: released.releasedRunIds.length,
+          detachedReplySessions: detached.detachedSessionIds.length,
         },
       });
       return true;
@@ -1737,6 +1782,11 @@ export async function unbindExecutionWorker(
       projectId,
     });
     metrics = addD1MutationMetrics(metrics, d1MutationMetrics([released.result]));
+    const detached = await detachReplySessionOwnership(db, {
+      deviceId,
+      projectId,
+    });
+    metrics = addD1MutationMetrics(metrics, d1MutationMetrics([detached.result]));
     const deleted = await db
       .prepare(
         `delete from briar_execution_workers
@@ -1791,6 +1841,7 @@ export async function unbindExecutionWorker(
         remainingBindings,
         deviceStateRowsWritten: followupMetrics.rowsWritten,
         releasedSpecificDispatches: released.releasedRunIds.length,
+        detachedReplySessions: detached.detachedSessionIds.length,
       },
     });
     return true;
