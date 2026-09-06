@@ -12,6 +12,10 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
     let snapshot: DashboardSnapshot?
     let issueConversationView: IssueConversationViewTracker?
     let refreshDashboard: () async -> Void
+    /// The Agent-to-Agent conversations one Agent takes part in. They are read
+    /// on demand because most visits to an Agent are about something else.
+    let loadAgentConversations: (UUID) async throws -> [ChannelSummary]
+    let onOpenAgentConversation: @MainActor (ChannelSummary) -> Void
     @ToolbarContentBuilder let toolbarContent: () -> ToolbarContentType
 
     var body: some View {
@@ -100,7 +104,9 @@ struct AgentsHomeView<ToolbarContentType: ToolbarContent>: View {
                                 workerID: workerID
                             )
                         },
-                        onOpenSession: { path.append(AgentRoute.session($0)) }
+                        onOpenSession: { path.append(AgentRoute.session($0)) },
+                        loadConversations: loadAgentConversations,
+                        onOpenConversation: onOpenAgentConversation
                     )
                 } else {
                     ContentUnavailableView(L10n.text("Agent를 찾을 수 없음"), systemImage: "cpu")
@@ -271,8 +277,15 @@ struct AgentDetailView: View {
     let workers: [DashboardWorker]
     let onRun: (ProjectAgent.Skill, String, String) async throws -> Void
     let onOpenSession: (String) -> Void
+    var loadConversations: ((UUID) async throws -> [ChannelSummary])? = nil
+    var onOpenConversation: (@MainActor (ChannelSummary) -> Void)? = nil
 
+    @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
     @State private var showingRun = false
+
+    private var locale: CompanionLocale {
+        CompanionLocale(rawValue: localeRaw) ?? .ko
+    }
 
     private var readyWorkers: [DashboardWorker] {
         workers.filter { $0.readiness == "available" && $0.acceptingWork }
@@ -363,6 +376,14 @@ struct AgentDetailView: View {
                     }
                 }
             }
+            if let loadConversations, let onOpenConversation {
+                AgentConversationsSection(
+                    agentID: agent.id,
+                    locale: locale,
+                    loadConversations: loadConversations,
+                    onOpenConversation: onOpenConversation
+                )
+            }
             Section(L10n.text("세션")) {
                 if sessions.isEmpty {
                     Text(L10n.text("이 Agent의 세션이 아직 없습니다."))
@@ -398,6 +419,168 @@ struct AgentDetailView: View {
                 onRun: onRun
             )
         }
+    }
+}
+
+/*
+  The conversations one Agent had with other Agents.
+
+  These conversations are deliberately missing from the direct message list —
+  nobody is a participant — so an Agent's own screen is where they are listed,
+  next to the relay rows that link to the same place. The list is fetched when
+  the section is opened rather than with the screen, since most visits are
+  about something else.
+*/
+private struct AgentConversationsSection: View {
+    let agentID: UUID
+    let locale: CompanionLocale
+    let loadConversations: (UUID) async throws -> [ChannelSummary]
+    let onOpenConversation: @MainActor (ChannelSummary) -> Void
+
+    @State private var isExpanded = false
+    @State private var conversations: [ChannelSummary]?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    /// Which Agent the held list belongs to. A failed load clears it so
+    /// reopening the section asks again.
+    @State private var loadedAgentID: UUID?
+
+    var body: some View {
+        Section {
+            DisclosureGroup(isExpanded: $isExpanded) {
+                content
+            } label: {
+                Label(
+                    L10n.text(.agentConversations, locale: locale),
+                    systemImage: "bubble.left.and.bubble.right"
+                )
+            }
+            .accessibilityIdentifier("agent-conversations-disclosure")
+        }
+        .task(id: isExpanded) { await loadIfNeeded() }
+        .task(id: agentID) { await loadIfNeeded() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        Text(L10n.text(.agentConversationsDescription, locale: locale))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        if let errorMessage {
+            Text(errorMessage)
+                .font(.subheadline)
+                .foregroundStyle(.orange)
+                .accessibilityIdentifier("agent-conversations-error")
+        } else if isLoading || conversations == nil {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(L10n.text(.agentConversationsLoading, locale: locale))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityIdentifier("agent-conversations-loading")
+        } else if let conversations, conversations.isEmpty {
+            Text(L10n.text(.agentConversationsEmpty, locale: locale))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("agent-conversations-empty")
+        } else if let conversations {
+            ForEach(conversations) { conversation in
+                Button {
+                    onOpenConversation(conversation)
+                } label: {
+                    AgentConversationRow(
+                        counterparts: counterparts(of: conversation),
+                        conversation: conversation,
+                        locale: locale,
+                        name: displayName(of: conversation)
+                    )
+                }
+                .accessibilityLabel(
+                    String(
+                        format: L10n.text(.agentConversationsOpen, locale: locale),
+                        displayName(of: conversation)
+                    )
+                )
+                .accessibilityIdentifier(
+                    "agent-conversation-\(conversation.id.uuidString.lowercased())"
+                )
+            }
+        }
+    }
+
+    /// The other side of an Agent-to-Agent conversation, from this Agent's view.
+    private func counterparts(
+        of conversation: ChannelSummary
+    ) -> [DirectMessageParticipant] {
+        let ownID = agentID.uuidString.lowercased()
+        return conversation.dmParticipants.filter {
+            !($0.type == .agent && $0.id.lowercased() == ownID)
+        }
+    }
+
+    private func displayName(of conversation: ChannelSummary) -> String {
+        let names = counterparts(of: conversation).map(\.name)
+        return names.isEmpty ? conversation.name : names.joined(separator: ", ")
+    }
+
+    private func loadIfNeeded() async {
+        guard isExpanded, loadedAgentID != agentID else { return }
+        loadedAgentID = agentID
+        conversations = nil
+        errorMessage = nil
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            conversations = DirectMessageOrdering.byMostRecent(
+                try await loadConversations(agentID)
+            )
+        } catch {
+            loadedAgentID = nil
+            errorMessage = CompanionStore.message(for: error)
+        }
+    }
+}
+
+private struct AgentConversationRow: View {
+    let counterparts: [DirectMessageParticipant]
+    let conversation: ChannelSummary
+    let locale: CompanionLocale
+    let name: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ProfileImageView(
+                image: counterparts.first?.image,
+                name: name,
+                systemImage: "cpu",
+                size: 38,
+                cornerRadius: 10
+            )
+            VStack(alignment: .leading, spacing: 3) {
+                Text(name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(
+                    conversation.lastMessagePreview
+                        ?? L10n.text("아직 메시지가 없습니다.", locale: locale)
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(
+                L10n.relativeDate(
+                    conversation.lastMessageAt ?? conversation.createdAt,
+                    locale: locale
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
     }
 }
 

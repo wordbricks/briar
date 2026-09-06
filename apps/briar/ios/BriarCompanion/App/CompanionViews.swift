@@ -139,6 +139,10 @@ struct CompanionShellView: View {
                             snapshot: snapshot,
                             issueConversationView: issueConversationView,
                             refreshDashboard: refresh,
+                            loadAgentConversations: { agentID in
+                                try await channels.listAgentDirectMessages(agentID: agentID)
+                            },
+                            onOpenAgentConversation: openAgentConversation,
                             toolbarContent: { companionToolbar(showsProjectMenu: true) }
                         )
                     }
@@ -403,6 +407,15 @@ struct CompanionShellView: View {
         taskPath.append(route)
     }
 
+    /// An Agent-to-Agent conversation lives on the direct message stack even
+    /// though the direct message list never shows it.
+    @MainActor
+    private func openAgentConversation(_ channel: ChannelSummary) {
+        navigation.selectedTab = .directMessages
+        directMessagesPath = NavigationPath()
+        directMessagesPath.append(channel)
+    }
+
     @MainActor
     private func openPendingChannel() async {
         guard let target = navigation.consumePendingChannel() else { return }
@@ -412,6 +425,16 @@ struct CompanionShellView: View {
             await channels.refresh()
         }
         guard let channel = channels.channels.first(where: { $0.id == target.channelID }) else {
+            /*
+              A read-only Agent conversation is absent from every catalog
+              refresh by design, so an id the list still does not hold is asked
+              for directly before the link is given up on.
+            */
+            if let conversation = await channels.loadAgentConversation(target.channelID) {
+                guard navigation.pathChannelToken == expectedToken else { return }
+                openAgentConversation(conversation)
+                await channels.openChannel(conversation.id)
+            }
             return
         }
         if channel.isDirectMessage {

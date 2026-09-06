@@ -104,6 +104,11 @@ final class ChannelsStore: ObservableObject {
     static let cachedConversationLimit = 5
     static let cachedThreadLimit = 5
     static let cachedMessageLimit = 40
+    /// The organization delta loop only carries channels the catalog holds, and
+    /// an Agent-to-Agent conversation is deliberately outside it, so while one
+    /// is open its page is asked for on this timer instead.
+    static let agentConversationPollInterval: Duration = .seconds(3)
+    static let agentConversationMessageLimit = 50
 
     func makeMemoryStore(channelID: UUID) -> DmMemoryStore? {
         guard let organizationID, let token, let dmMemoryService else { return nil }
@@ -159,6 +164,11 @@ final class ChannelsStore: ObservableObject {
     }
 
     @Published private(set) var channels: [ChannelSummary] = []
+    /// The one conversation the catalog deliberately does not hold. An
+    /// Agent-to-Agent conversation is reachable from a relay row and from an
+    /// Agent's detail screen, never from the direct message list, so it is
+    /// fetched when it is asked for and dropped when it is closed.
+    @Published private(set) var openAgentConversation: ChannelSummary?
     @Published private(set) var messages: [ChannelMessage] = []
     @Published private(set) var thread: [ChannelMessage] = []
     @Published private(set) var members: [ChannelMember] = []
@@ -217,6 +227,7 @@ final class ChannelsStore: ObservableObject {
     private var isForeground = true
     private var changesRefreshRequested = false
     private var pollingTask: Task<Void, Never>?
+    private var agentConversationPollingTask: Task<Void, Never>?
     private var realtimeTask: Task<Void, Never>?
     private var activityTask: Task<Void, Never>?
     private var activityExpiryTask: Task<Void, Never>?
@@ -288,6 +299,8 @@ final class ChannelsStore: ObservableObject {
         acceptanceRevision &+= 1
         pollingTask?.cancel()
         pollingTask = nil
+        agentConversationPollingTask?.cancel()
+        agentConversationPollingTask = nil
         realtimeTask?.cancel()
         realtimeTask = nil
         activityTask?.cancel()
@@ -317,6 +330,7 @@ final class ChannelsStore: ObservableObject {
         cachedThreads = [:]
         cachedThreadOrder = []
         channels = []
+        openAgentConversation = nil
         messages = []
         thread = []
         optimisticMessageIDs = []
@@ -429,6 +443,50 @@ final class ChannelsStore: ObservableObject {
         return channel
     }
 
+    /// The Agent-to-Agent conversations one Agent takes part in, for the
+    /// conversations section of an Agent's detail screen. They are read-only
+    /// for people and never join the catalog.
+    func listAgentDirectMessages(agentID: UUID) async throws -> [ChannelSummary] {
+        guard let organizationID, token != nil, let channelService else {
+            throw MobileAPIError.invalidRequest
+        }
+        var request = BriarAPI_ListAgentDirectMessagesRequest()
+        request.organizationID = coreUUIDString(organizationID)
+        request.agentID = coreUUIDString(agentID)
+        let response = try await channelService.listAgentDirectMessages(
+            request: request,
+            headers: [:]
+        ).briarValue()
+        return try response.channels.map(ChannelSummary.init(connectMessage:))
+    }
+
+    /// Fetches a conversation by id so a relay row or an Agent's detail screen
+    /// can push it. Only a read-only channel is adopted this way; any other id
+    /// belongs to the catalog and is left to it.
+    func loadAgentConversation(_ channelID: UUID) async -> ChannelSummary? {
+        guard let organizationID, token != nil, let channelService else { return nil }
+        do {
+            var request = BriarAPI_GetChannelRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.messageLimit = 1
+            let response = try await channelService.getChannel(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            guard response.hasChannel else { throw MobileAPIError.invalidResponse }
+            let channel = try ChannelSummary(connectMessage: response.channel)
+            guard channel.readOnly else { return nil }
+            openAgentConversation = channel
+            return channel
+        } catch {
+            // Whatever the id was, this surface cannot show it. The caller keeps
+            // the conversation it is already on.
+            errorMessage = CompanionStore.message(for: error)
+            return nil
+        }
+    }
+
     func openChannel(_ channelID: UUID) async {
         guard let organizationID, token != nil else { return }
         cacheFocusedThread()
@@ -507,8 +565,20 @@ final class ChannelsStore: ObservableObject {
                 expectedLoadRevision == authoritativeLoadRevision,
                 focusedChannelID == channelID
             else { return }
-            upsertChannel(channel)
-            await markChannelRead(channelID)
+            /*
+              An Agent-to-Agent conversation is held by whoever opened it, not
+              by the catalog: adding it there would put it in the direct message
+              list and its unread badge, which is exactly what opening it by id
+              is meant to avoid. It is nobody's inbox either, so it never counts
+              as unread and no read mark is written for it.
+            */
+            if channel.readOnly {
+                openAgentConversation = channel
+                startAgentConversationPolling()
+            } else {
+                upsertChannel(channel)
+                await markChannelRead(channelID)
+            }
             invalidateExecutionProposals(
                 forMessageIDs: previousMessageIDs.subtracting(Set(incomingMessages.map(\.id)))
             )
@@ -549,6 +619,11 @@ final class ChannelsStore: ObservableObject {
         authoritativeLoadRevision &+= 1
         invalidateProposalAcceptancePresentation()
         focusedChannelID = nil
+        if openAgentConversation?.id == channelID {
+            openAgentConversation = nil
+        }
+        agentConversationPollingTask?.cancel()
+        agentConversationPollingTask = nil
         activityTask?.cancel()
         activityTask = nil
         activityExpiryTask?.cancel()
@@ -864,6 +939,7 @@ final class ChannelsStore: ObservableObject {
         guard organizationID != nil, token != nil else { return }
         startSynchronization()
         startActivitySynchronization()
+        startAgentConversationPolling()
     }
 
     func applicationDidEnterBackground() {
@@ -871,6 +947,8 @@ final class ChannelsStore: ObservableObject {
         changesRefreshRequested = false
         pollingTask?.cancel()
         pollingTask = nil
+        agentConversationPollingTask?.cancel()
+        agentConversationPollingTask = nil
         realtimeTask?.cancel()
         realtimeTask = nil
         activityTask?.cancel()
@@ -2225,7 +2303,12 @@ final class ChannelsStore: ObservableObject {
     }
 
     private func isDirectMessage(channelID: UUID) -> Bool {
-        channels.first(where: { $0.id == channelID })?.isDirectMessage == true
+        if let channel = channels.first(where: { $0.id == channelID }) {
+            return channel.isDirectMessage
+        }
+        return openAgentConversation.map {
+            $0.id == channelID && $0.isDirectMessage
+        } ?? false
     }
 
     private func apply(_ delta: ChannelDeltaResponse) {
@@ -2349,8 +2432,11 @@ final class ChannelsStore: ObservableObject {
 
         let removedChannelIDs = Set(delta.removedChannelIds)
         channels = delta.channels.filter { !removedChannelIDs.contains($0.id) }
+        // A read-only Agent conversation is absent from every catalog snapshot
+        // by design, so a reset must not read that absence as a removal.
         guard let focusedChannelID,
-              channels.contains(where: { $0.id == focusedChannelID })
+              channels.contains(where: { $0.id == focusedChannelID }) ||
+              openAgentConversation?.id == focusedChannelID
         else {
             authoritativeLoadRevision &+= 1
             self.focusedChannelID = nil
@@ -2546,6 +2632,9 @@ final class ChannelsStore: ObservableObject {
 
     private func markChannelRead(_ channelID: UUID) async {
         guard let organizationID, token != nil, let channelService else { return }
+        // An Agent-to-Agent conversation is nobody's inbox: it never counts as
+        // unread, so opening one must not write a read mark for it either.
+        guard openAgentConversation?.id != channelID else { return }
         if let index = channels.firstIndex(where: { $0.id == channelID }) {
             var updated = channels[index]
             updated.hasUnread = false
@@ -2674,6 +2763,73 @@ final class ChannelsStore: ObservableObject {
             )
         }
         return Array(byAgentID.values).sorted { $0.agentName < $1.agentName }
+    }
+
+    /// Keeps the open Agent-to-Agent conversation current without the catalog.
+    /// It stops with the view and while the app is in the background, so a
+    /// conversation left behind costs nothing.
+    private func startAgentConversationPolling() {
+        agentConversationPollingTask?.cancel()
+        agentConversationPollingTask = nil
+        guard isForeground,
+              organizationID != nil,
+              token != nil,
+              let channelID = openAgentConversation?.id,
+              focusedChannelID == channelID
+        else { return }
+        let expectedGeneration = generation
+        let interval = Self.agentConversationPollInterval
+        agentConversationPollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: interval)
+                } catch {
+                    return
+                }
+                guard
+                    !Task.isCancelled,
+                    let self,
+                    expectedGeneration == self.generation,
+                    self.isForeground,
+                    self.focusedChannelID == channelID,
+                    self.openAgentConversation?.id == channelID
+                else { return }
+                await self.refreshAgentConversationMessages(channelID: channelID)
+            }
+        }
+    }
+
+    private func refreshAgentConversationMessages(channelID: UUID) async {
+        guard let organizationID, token != nil, let channelService else { return }
+        let expectedGeneration = generation
+        let expectedLoadRevision = authoritativeLoadRevision
+        do {
+            var request = BriarAPI_ListChannelMessagesRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.channelID = coreUUIDString(channelID)
+            request.limit = UInt32(Self.agentConversationMessageLimit)
+            let response = try await channelService.listChannelMessages(
+                request: request,
+                headers: [:]
+            ).briarValue()
+            let incomingMessages = try response.messages.map(
+                ChannelMessage.init(connectMessage:)
+            )
+            guard
+                !Task.isCancelled,
+                expectedGeneration == generation,
+                expectedLoadRevision == authoritativeLoadRevision,
+                focusedChannelID == channelID,
+                focusedThreadParentID == nil,
+                openAgentConversation?.id == channelID
+            else { return }
+            recordProposalMessages(incomingMessages)
+            messages = Self.mergeMessages(messages, updates: incomingMessages, removing: [])
+            cacheFocusedConversation()
+        } catch {
+            // A failed tick is not worth reporting: the next one retries and the
+            // conversation on screen is still the last good page.
+        }
     }
 
     private func startActivitySynchronization() {

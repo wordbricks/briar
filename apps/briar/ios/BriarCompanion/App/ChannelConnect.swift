@@ -101,7 +101,8 @@ extension ChannelSummary {
             hasUnread: message.hasUnread_p,
             dmParticipants: try message.directMessageParticipants.map {
                 try DirectMessageParticipant(connectMessage: $0)
-            }
+            },
+            readOnly: message.readOnly
         )
     }
 }
@@ -238,8 +239,39 @@ extension ChannelMessage {
                 ? try AgentSkillExecutionProposal(connectMessage: message.skillExecutionProposal)
                 : nil,
             subscribers: try message.subscribers.map { try IssueSubscriber(connectMessage: $0) },
+            relay: message.hasRelay ? try Relay(connectMessage: message.relay) : nil,
             createdAt: try channelDate(message.createdAt),
             deletedAt: try channelOptionalDate(message.deletedAt, present: message.hasDeletedAt)
+        )
+    }
+}
+
+extension ChannelMessage.Relay {
+    init(connectMessage message: BriarAPI_ChannelMessageRelay) throws {
+        let direction: Direction
+        switch message.direction {
+        case .outbound: direction = .outbound
+        case .inbound: direction = .inbound
+        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+        }
+        let status: Status
+        switch message.status {
+        case .pending: status = .pending
+        case .completed: status = .completed
+        case .failed: status = .failed
+        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+        }
+        guard !message.peerAgentID.isEmpty, !message.peerAgentName.isEmpty else {
+            throw MobileAPIError.invalidResponse
+        }
+        self.init(
+            direction: direction,
+            status: status,
+            peerChannelId: try channelUUID(message.peerChannelID),
+            peerMessageId: try channelUUID(message.peerMessageID),
+            peerAgentId: message.peerAgentID,
+            peerAgentName: message.peerAgentName,
+            peerAgentImage: message.hasPeerAgentImage ? message.peerAgentImage : nil
         )
     }
 }
