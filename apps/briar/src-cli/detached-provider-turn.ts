@@ -1,7 +1,6 @@
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
 import { create, toBinary } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
@@ -42,6 +41,7 @@ import {
   type DetachedAgentSkillCatalog,
 } from "./agent-skill-discovery";
 import { ComputerUseBoxClient } from "./computer-use-box-client";
+import { findAgentBundle } from "./agent-bundle-path";
 
 export type DetachedProviderTurnResult = {
   exitCode: number | null;
@@ -189,11 +189,6 @@ export function logDetachedProviderTurnDiagnostic(
   console.error(`[briar-agent-runner] ${JSON.stringify(diagnostic)}`);
 }
 
-const existingBundle = async (paths: readonly string[]): Promise<string | null> =>
-  (await Promise.all(
-    paths.map(async (path) => ((await Bun.file(path).exists()) ? path : null)),
-  )).find((path): path is string => Boolean(path)) ?? null;
-
 const prepareComputerUseTurn = async (
   input: DetachedProviderTurnInput,
 ): Promise<{
@@ -214,10 +209,10 @@ const prepareComputerUseTurn = async (
     }
     return { input, release: async () => undefined };
   }
-  const mcpServerPath = await existingBundle([
-    resolve(import.meta.dir, "agent/computer-use-mcp-server.js"),
-    resolve(import.meta.dir, "../dist-agent/computer-use-mcp-server.js"),
-  ]);
+  const mcpServerPath = await findAgentBundle(
+    import.meta.dir,
+    "computer-use-mcp-server.js",
+  );
   if (!mcpServerPath) {
     throw new Error(
       "Computer Use MCP bundle is missing; run `bun run agent:build`",
@@ -292,10 +287,10 @@ async function runPreparedDetachedProviderTurn(
     diagnose("turn.binary_missing", { binaryName });
     throw new Error(`${binaryName} coding agent is not installed on this Worker`);
   }
-  const runnerPath = await existingBundle([
-    resolve(import.meta.dir, `agent/${runnerProvider}-runner.js`),
-    resolve(import.meta.dir, `../dist-agent/${runnerProvider}-runner.js`),
-  ]);
+  const runnerPath = await findAgentBundle(
+    import.meta.dir,
+    `${runnerProvider}-runner.js`,
+  );
   if (!runnerPath) {
     diagnose("turn.runner_missing", { provider, runnerProvider });
     throw new Error(

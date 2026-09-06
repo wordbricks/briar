@@ -759,6 +759,7 @@ export function detachedProviderRequest(input: {
     ? [
         "You are the dedicated Computer Use child for this run.",
         "Use the Computer tool to operate the assigned screen and verify visible results.",
+        "Computer is an MCP tool served by the briar-computer MCP server. Some providers do not list MCP tools directly; discover it through tool search before concluding that it is unavailable.",
         "Do not start another Computer Use child.",
         "Stop and report when a password, 2FA, CAPTCHA, payment, or other human-only step is required.",
       ].join(" ")
@@ -766,6 +767,7 @@ export function detachedProviderRequest(input: {
         "You are the parent Agent and must not click, type, scroll, or otherwise mutate the desktop directly.",
         "Use Screenshot only to observe, and delegate each small desktop task with StartComputerUse.",
         "Use CheckSubagent, MessageSubagent, StopSubagent, and RequestHumanTakeover to manage that child.",
+        "Screenshot, StartComputerUse, CheckSubagent, MessageSubagent, StopSubagent, and RequestHumanTakeover are MCP tools served by the briar-computer MCP server. Some providers do not list MCP tools directly; discover them through tool search before concluding that no screen tools are available.",
         "After RequestHumanTakeover, tell the user to open this Agent's Screen and wait for confirmation that they are done. Then resume with MessageSubagent so the child begins from a fresh screenshot.",
         "Browser sign-ins on this computer are kept in a shared login store, so they are available on every Agent's screen and across turns. Check whether a site is already signed in before asking the user for another takeover.",
         "The user can also sign in ahead of time on this computer's own screen, display :1, and that sign-in reaches every Agent here as well.",
