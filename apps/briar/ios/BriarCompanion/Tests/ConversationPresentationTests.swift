@@ -104,6 +104,39 @@ final class ConversationPresentationTests: XCTestCase {
         )
     }
 
+    func testInitialPositionWaitsForLastRowLayoutAndRunsOnce() {
+        XCTAssertFalse(ConversationScrollPresentation.shouldPositionInitially(
+            hasMessages: false,
+            lastRowLaidOut: true,
+            positioning: false,
+            positioned: false
+        ))
+        XCTAssertFalse(ConversationScrollPresentation.shouldPositionInitially(
+            hasMessages: true,
+            lastRowLaidOut: false,
+            positioning: false,
+            positioned: false
+        ))
+        XCTAssertTrue(ConversationScrollPresentation.shouldPositionInitially(
+            hasMessages: true,
+            lastRowLaidOut: true,
+            positioning: false,
+            positioned: false
+        ))
+        XCTAssertFalse(ConversationScrollPresentation.shouldPositionInitially(
+            hasMessages: true,
+            lastRowLaidOut: true,
+            positioning: true,
+            positioned: false
+        ))
+        XCTAssertFalse(ConversationScrollPresentation.shouldPositionInitially(
+            hasMessages: true,
+            lastRowLaidOut: true,
+            positioning: false,
+            positioned: true
+        ))
+    }
+
     @MainActor
     func testComposerClearsImmediatelyAndRestoresDraftAfterFailedSend() async throws {
         let draft = ConversationComposerDraftBox()

@@ -58,6 +58,15 @@ enum ConversationScrollPresentation {
     ) -> Bool {
         !programmaticScrollActive
     }
+
+    static func shouldPositionInitially(
+        hasMessages: Bool,
+        lastRowLaidOut: Bool,
+        positioning: Bool,
+        positioned: Bool
+    ) -> Bool {
+        hasMessages && lastRowLaidOut && !positioning && !positioned
+    }
 }
 
 private struct ConversationBottomMaxYPreferenceKey: PreferenceKey {
@@ -65,6 +74,14 @@ private struct ConversationBottomMaxYPreferenceKey: PreferenceKey {
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+private struct ConversationLastRowLayoutPreferenceKey: PreferenceKey {
+    static let defaultValue = false
+
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        value = value || nextValue()
     }
 }
 
@@ -136,30 +153,12 @@ where Message.ID: Hashable {
                         viewportHeight: viewport.size.height
                     )
                 }
+                .onPreferenceChange(ConversationLastRowLayoutPreferenceKey.self) { laidOut in
+                    positionInitiallyIfReady(proxy, lastRowLaidOut: laidOut)
+                }
                 .onChange(of: messages.last?.id, initial: true) { previous, current in
                     guard let current else { return }
                     if !positionedInitially {
-                        if !positioningInitially {
-                            positioningInitially = true
-                            let scrollToFocused = ConversationScrollPresentation
-                                .shouldScrollToFocusedMessage(
-                                    focusedMessageID: focusedMessageID,
-                                    messageIDs: messages.map(\.id)
-                                )
-                            performProgrammaticScroll {
-                                if scrollToFocused, let focusedMessageID {
-                                    proxy.scrollTo(focusedMessageID, anchor: .center)
-                                } else {
-                                    proxy.scrollTo(
-                                        conversationBottomAnchorID,
-                                        anchor: .bottom
-                                    )
-                                }
-                            } afterLayout: {
-                                positionedInitially = true
-                                positioningInitially = false
-                            }
-                        }
                         return
                     }
                     guard previous != current else { return }
@@ -183,7 +182,7 @@ where Message.ID: Hashable {
                     }
                 }
                 .onChange(of: messages.first?.id) { previous, current in
-                    guard let previous, previous != current else { return }
+                    guard positionedInitially, let previous, previous != current else { return }
                     performProgrammaticScroll {
                         proxy.scrollTo(previous, anchor: .top)
                     }
@@ -294,6 +293,16 @@ where Message.ID: Hashable {
             }
             row(messages[index])
                 .id(messages[index].id)
+                .background {
+                    if index == messages.indices.last {
+                        GeometryReader { _ in
+                            Color.clear.preference(
+                                key: ConversationLastRowLayoutPreferenceKey.self,
+                                value: true
+                            )
+                        }
+                    }
+                }
         }
     }
 
@@ -309,6 +318,34 @@ where Message.ID: Hashable {
         Task { @MainActor in
             await onLoadEarlier?()
             requestedEarlierMessages = false
+        }
+    }
+
+    private func positionInitiallyIfReady(
+        _ proxy: ScrollViewProxy,
+        lastRowLaidOut: Bool
+    ) {
+        guard ConversationScrollPresentation.shouldPositionInitially(
+            hasMessages: messages.last != nil,
+            lastRowLaidOut: lastRowLaidOut,
+            positioning: positioningInitially,
+            positioned: positionedInitially
+        ) else { return }
+
+        positioningInitially = true
+        let scrollToFocused = ConversationScrollPresentation.shouldScrollToFocusedMessage(
+            focusedMessageID: focusedMessageID,
+            messageIDs: messages.map(\.id)
+        )
+        performProgrammaticScroll {
+            if scrollToFocused, let focusedMessageID {
+                proxy.scrollTo(focusedMessageID, anchor: .center)
+            } else {
+                proxy.scrollTo(conversationBottomAnchorID, anchor: .bottom)
+            }
+        } afterLayout: {
+            positionedInitially = true
+            positioningInitially = false
         }
     }
 
