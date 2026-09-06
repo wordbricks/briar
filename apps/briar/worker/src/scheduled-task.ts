@@ -20,6 +20,7 @@ import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
 import { maintainUploadCleanup } from "./upload-repository";
 import { runDmMemoryMaintenance } from "./dm-memory-indexing";
+import { flushWhatsAppOutbox } from "./whatsapp-outbox";
 
 export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
@@ -34,6 +35,7 @@ export type ScheduledTaskDependencies = {
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
   maintainUploadCleanup: typeof maintainUploadCleanup;
   runDmMemoryMaintenance: typeof runDmMemoryMaintenance;
+  flushWhatsAppOutbox: typeof flushWhatsAppOutbox;
 };
 
 interface DashboardChangePruneFailure {
@@ -53,6 +55,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   cleanupExpiredChannelReplySessions,
   maintainUploadCleanup,
   runDmMemoryMaintenance,
+  flushWhatsAppOutbox,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
 const LOG_MAINTENANCE_CRON = "17 */6 * * *";
@@ -67,7 +70,7 @@ export async function handleScheduledTask(
   if (controller.cron === GITHUB_RECONCILIATION_CRON) {
     ctx.waitUntil((async () => {
       try {
-        const [github, mergeQueue, managedComputerRetirements, dmMemory] =
+        const [github, mergeQueue, managedComputerRetirements, dmMemory, whatsapp] =
           await Promise.all([
           dependencies.reconcileGithubMergedRuns(env.DB),
           dependencies.reconcileEnabledMergeQueueRuns(env.DB, observedAt),
@@ -77,6 +80,7 @@ export async function handleScheduledTask(
             observedAt,
           ),
           dependencies.runDmMemoryMaintenance(env, observedAt),
+          dependencies.flushWhatsAppOutbox(env, env.DB, observedAt),
         ]);
         await Promise.all([
           flushOrganizationInboxRealtimeOutbox(env, env.DB),
@@ -89,6 +93,7 @@ export async function handleScheduledTask(
           mergeQueue,
           managedComputerRetirements,
           dmMemory,
+          whatsapp,
         }));
       } catch (error) {
         console.error(JSON.stringify({

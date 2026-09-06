@@ -1,4 +1,8 @@
 interface Env {
+  WHATSAPP_APP_SECRET?: string;
+  WHATSAPP_TOKEN_ENCRYPTION_KEY?: string;
+  WHATSAPP_GRAPH_API_VERSION?: string;
+  WHATSAPP_APP_ORIGIN?: string;
   /** HMAC key accepted only by the monotonic R2 release promotion endpoint. */
   RELEASE_PROMOTION_SECRET?: string;
   /** Apple Developer team that owns the Companion bundle identifier. */

@@ -38,6 +38,8 @@ export const encryptedEnvPolicies = {
       "FIREBASE_PROJECT_ID",
       "FIREBASE_CLIENT_EMAIL",
       "FIREBASE_PRIVATE_KEY",
+      "WHATSAPP_APP_SECRET",
+      "WHATSAPP_TOKEN_ENCRYPTION_KEY",
     ],
   },
   ".env.release": {

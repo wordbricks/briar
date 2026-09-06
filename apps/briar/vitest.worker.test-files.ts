@@ -60,5 +60,6 @@ export const workerD1TestFiles = [
   "worker/src/workers.test.ts",
   "worker/src/workflow-policy.test.ts",
   "worker/src/workflow-v2.test.ts",
+  "worker/src/whatsapp-db.test.ts",
   "worker/src/zz-probe.test.ts",
 ] as const;

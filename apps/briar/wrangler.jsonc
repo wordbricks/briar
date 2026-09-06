@@ -41,6 +41,8 @@
     // Agent-to-Agent turns (the recipient's run plus the sender's relay run)
     // one organization may spend per hour.
     "AGENT_MESSAGE_HOURLY_LIMIT": "30",
+    "WHATSAPP_GRAPH_API_VERSION": "v25.0",
+    "WHATSAPP_APP_ORIGIN": "https://briar.wordbricks.ai",
     "APNS_TEAM_ID": "QFJZ2V3829",
     "MANAGED_COMPUTER_AWS_REGION": "us-east-1",
     "MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID": "lt-0bf7a358da7b03e93",
@@ -76,6 +78,7 @@
       "/html-artifact-preview",
       "/github/*",
       "/slack/*",
+      "/whatsapp/*",
       "/hooks/*",
       "/.well-known/*",
       "/open/*",

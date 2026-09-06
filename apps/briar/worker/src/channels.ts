@@ -62,6 +62,7 @@ import {
   channelMessageUploadConsumeStatements,
   type ChannelMessageUploadScope,
 } from "./channel-message-upload-repository";
+import { enqueueWhatsAppReplyStatements } from "./whatsapp-repository";
 
 const strictStoredChannelMessageBlockOptions = {
   errors: "all",
@@ -4357,6 +4358,7 @@ export type ChannelReplyCompletionInput = {
   agentProvider: AgentProvider;
   completedAt: string;
   conversationId?: string | null;
+  whatsappAppOrigin?: string;
   attachments?: ChannelMessageAttachmentInput[];
   commit?: ReplyCompletionCommit;
 };
@@ -5777,6 +5779,28 @@ export async function completeChannelReply(
       ),
     );
   }
+  const whatsappApprovalSummary = input.issueProposal
+    ? "이슈 생성 제안이 도착했습니다."
+    : input.issueBatchProposal
+    ? "여러 이슈 생성 제안이 도착했습니다."
+    : input.executionProposal
+    ? "이슈 실행 제안이 도착했습니다."
+    : input.skillExecutionProposal
+    ? "에이전트 스킬 실행 제안이 도착했습니다."
+    : null;
+  statements.push(...enqueueWhatsAppReplyStatements(db, {
+    jobId: input.jobId,
+    deviceId: input.deviceId,
+    workerId: input.workerId,
+    claimTokenHash: input.claimTokenHash,
+    completedAt: input.completedAt,
+    organizationId: job.organization_id,
+    channelId: job.channel_id,
+    channelMessageId: job.reply_message_id,
+    body: input.body,
+    approvalSummary: whatsappApprovalSummary,
+    appOrigin: input.whatsappAppOrigin ?? "https://briar.wordbricks.ai",
+  }));
   statements.push(
     db.prepare(
       `update briar_channel_reply_sessions
