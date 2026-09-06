@@ -1623,6 +1623,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = app.briar.companion;
+				PROVISIONING_PROFILE_SPECIFIER = "$(BRIAR_IOS_PROVISIONING_PROFILE)";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
