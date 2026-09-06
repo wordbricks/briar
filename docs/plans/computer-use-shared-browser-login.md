@@ -157,9 +157,142 @@ Linux Chrome은 쿠키 값과 저장된 비밀번호를 OS 키링 키 또는 기
 - Bun 1.4에서 `node:sqlite` 병합이 동작하는지 스크립트로 한 번 확인한다.
 - `sandbox:check`, `typecheck`, `lint`, `lint:type-aware`, `agent:build`가 통과한다.
 
-## 6. 후속
+## 6. primary display `:1`을 로그인 원본으로
 
-- primary display `:1` 기본 프로필을 로그인 원본으로 추가하고 사용자가 `:1`에서 로그인하는
-  경로를 열기.
-- 관리형 컴퓨터 교체·재생성 시 공유 저장소를 함께 옮기기(현재는 `/home/briar`만 유지).
-- Mac DM Agent의 agent-browser에 지속 프로필을 주는 것은 별도 설계.
+### 6.1 문제
+
+`:1`은 컴퓨터 소유자의 데스크톱이다. 관리형 컴퓨터는 `briar-remote-desktop.service`가 항상
+띄우고 앱의 원격 화면으로 들어가며, sandbox는 supervisor가 `primaryDisplayCommand`로 항상
+띄우고 `briar sandbox view`로 본다. 여기서 Chrome을 열면 `briar-open-browser`가 프로필 환경변수
+없이 실행되어 Chrome 기본 프로필(관리형 `~/.config/google-chrome`, sandbox Chromium
+`~/.config/chromium`)을 쓴다. 이 프로필은 유지되지만 Agent는 보지 못한다. Agent는 `:1` 사용이
+거절되고, 이 프로필을 공유 저장소로 옮기는 코드가 없다.
+
+사용자가 Agent를 기다리지 않고 "내 컴퓨터 화면"에서 미리 로그인해 두면 모든 Agent가 그 로그인을
+쓰게 하는 것이 목표다. `:1`은 원본(source)이고, 공유 저장소에서 `:1`로 seed하지는 않는다.
+
+### 6.2 `:1` 프로필 고정
+
+`:1`의 Chrome도 `/var/lib/briar-computer-use/profiles/display-1`을 `--user-data-dir`로 쓴다.
+그래야 감시할 경로가 환경(Chrome/Chromium, HOME)에 따라 달라지지 않고, `--password-store=basic`이
+프로필 분기에서 함께 적용된다.
+
+- 관리형: `briar-remote-desktop.service`에
+  `Environment=BRIAR_BROWSER_PROFILE_DIRECTORY=/var/lib/briar-computer-use/profiles/display-1`을
+  추가한다. `verify-managed-image`가 `systemctl cat`으로 이 줄을 확인한다.
+- sandbox: `runSandboxSupervisor`가 `primaryDisplayCommand`를 띄울 때 같은 환경변수를 넘긴다.
+  `keepChildAlive`에 env 옵션을 추가한다.
+- `briar-open-browser`의 경로 검증 case에 `display-1`을 허용한다. `briar-computer-use-window`는
+  그대로 2..100만 받는다.
+- 저장소 모듈에 `COMPUTER_USE_PRIMARY_DISPLAY_INDEX = 1`과
+  `computerUsePrimaryBrowserProfileDirectory(profilesDirectory)`를 추가한다. Agent display용
+  `computerUseBrowserProfileDirectory`의 2..100 guard는 유지한다.
+- 기존 `:1` 기본 프로필의 로그인은 이전하지 않는다. 운영 문서에 "이미지 갱신 후 `:1`에서 한 번
+  다시 로그인"을 적는다.
+
+### 6.3 살아 있는 프로필 capture
+
+`:1`의 Chrome은 사용자가 계속 쓰는 프로세스이고 종료 hook이 없다. Chrome은 SQLite 파일을 배타
+잠금으로 열기 때문에 `ATTACH` 행 병합을 바로 걸 수 없다. 그래서 먼저 스냅샷을 만들고 그 스냅샷을
+기존 capture 경로의 소스로 쓴다.
+
+저장소에 `captureLive(sourceDirectory, { sqliteOnly })`를 추가한다. 각 SQLite 화이트리스트 항목에
+대해:
+
+1. 소스를 `DatabaseSync(path, { readOnly: true })`로 열고 `PRAGMA busy_timeout = 100` 뒤
+   `VACUUM INTO '<tmp>'`를 시도한다.
+2. 잠김이나 다른 오류로 실패하면 main 파일과 `-journal`, `-wal`, `-shm` sidecar를 `<tmp>`로
+   raw copy한다. Chrome이 쓰는 중이어도 journal이 함께 있으면 SQLite가 열 때 복구한다.
+3. `<tmp>`를 열어 `PRAGMA quick_check`가 `ok`인지 확인한다. 아니면 그 항목은 skip하고 사유를
+   report에 남긴다.
+4. 스냅샷을 소스로 기존 로직을 태운다. Cookies는 행 병합, 나머지는 파일 교체다.
+5. 임시 스냅샷을 지운다.
+
+디렉터리 항목(Local Storage, IndexedDB)은 live copy가 불안정하므로 `sqliteOnly: false`일 때만
+best-effort로 교체한다. 변경 감지 트리거는 `sqliteOnly: true`로, 주기 사이클과 시작 시에는
+`sqliteOnly: false`로 부른다. 모든 실패는 report와 로그에만 남고 예외로 나가지 않는다.
+
+### 6.4 감시자
+
+새 모듈 `computer-use-primary-login-watcher.ts`의 `ComputerUsePrimaryLoginWatcher`가 box 서비스
+안에서 돈다. `ComputerUseBoxService.start()`가 `restoreAssignments()` 뒤에 시작하고 `stop()`이
+정지한다. 관리형과 sandbox 모두 box 서비스가 같은 코드를 돌린다.
+
+- `display-1/Default/Network`와 `display-1/Default`를 `fs.watch`(`persistent: false`)로 본다.
+  파일명이 화이트리스트 basename으로 시작하면 5초 debounce 뒤 `captureLive({ sqliteOnly: true })`.
+- 디렉터리가 아직 없으면(첫 Chrome 실행 전) 30초마다 다시 arm을 시도한다.
+- 시작 직후 1회, 이후 10분마다 `captureLive({ sqliteOnly: false })`를 돈다. fs.watch가 놓친
+  변경의 backstop이기도 하다.
+- clock, timer, watch 함수는 주입 가능해야 테스트할 수 있다.
+- 동시성은 저장소의 내부 mutex가 처리한다. Agent display의 seed/capture와 같은 큐를 탄다.
+
+### 6.5 안내와 문서
+
+- parent Computer Use 안내에 사용자가 이 컴퓨터의 소유자 화면(`:1`)에서 미리 로그인해 둘 수도
+  있다는 한 문장을 더한다.
+- `computer-use-spec.md` §5.8의 display 1 설명에 "로그인 원본"을 추가한다.
+- `managed-computer-pilot.md`와 `sandbox-docker.md`의 소유자 디스플레이 항목에 `:1` 로그인이 모든
+  Agent에 전파된다는 것과 프로필 경로 변경을 적는다.
+
+### 6.6 검증
+
+- `captureLive`: 잠기지 않은 DB는 `VACUUM INTO` 경로로 병합된다. 주입한 vacuum이 throw하면 raw
+  copy로 폴백한다. `quick_check` 실패는 skip으로 보고된다. `sqliteOnly: true`면 디렉터리를 건드리지
+  않는다. 임시 스냅샷이 남지 않는다.
+- 감시자: 가짜 fs 이벤트가 debounce 뒤 한 번만 capture를 부른다. 관련 없는 파일명은 무시한다.
+  디렉터리가 없으면 재시도 후 arm된다. 주기 사이클이 `sqliteOnly: false`로 돈다. `stop()` 뒤에는
+  아무 것도 부르지 않는다.
+- `briar-open-browser`가 `display-1`을 받고 `display-0`이나 `shared`는 거절한다.
+- sandbox bootstrap이 `:1` 프로세스에 프로필 환경변수를 넘긴다.
+
+## 7. 저장소 이전
+
+### 7.1 sandbox: 두 번째 볼륨
+
+sandbox 볼륨은 `/home/briar` 하나뿐이어서 `/var/lib/briar-computer-use`는 컨테이너 쓰기 레이어에
+남고, `sandbox recreate`나 이미지가 바뀌는 `sandbox up`에서 컨테이너가 교체되면 저장소와 `:1`
+프로필이 사라진다.
+
+- `sandboxComputerUseVolume(name)` = `briar-sandbox-<name>-computer-use`를 추가하고
+  `docker run`에 `--volume <그 이름>:/var/lib/briar-computer-use`를 넘긴다. 빈 named volume은
+  첫 마운트에서 이미지의 디렉터리 내용과 소유권(briar, 0700)을 복사한다.
+- `SANDBOX_SCHEMA_VERSION`을 올려 기존 컨테이너가 다음 `up`에서 교체되게 한다.
+- `sandbox rm --purge`가 홈 볼륨과 함께 이 볼륨도 지운다. `volumeRemoved`는 둘 다 지워졌을 때
+  true다.
+- `sandbox-docker.md`의 "볼륨 하나"를 두 볼륨으로 고친다.
+
+### 7.2 관리형: 인플레이스 유지와 교체 시 export/import
+
+같은 인스턴스를 재시작하는 업그레이드 경로는 root EBS를 그대로 쓰므로
+`/var/lib/briar-computer-use`도 `/home/briar`와 함께 남는다. 이를 운영 문서에 명시한다.
+
+새 AMI로 인스턴스를 교체할 때는 운영자가 로그인 저장소만 옮길 수 있는 CLI를 둔다. Worker
+credential, 저장소 clone, provider 인증은 옮기지 않는다.
+
+- `briar computer-use login-store export --out <file.tar.gz> [--force] [--json]`:
+  `shared`와 `display-1`의 화이트리스트 항목을 임시 디렉터리에 모은다. `display-1`은 Chrome이
+  살아 있을 수 있으므로 6.3의 스냅샷 로직을 쓴다. 레이아웃은 `shared/Default/...`,
+  `display-1/Default/...`다. `/usr/bin/tar -C <tmp> -czf <out> .`로 묶고 0600으로 남긴다. 기존
+  파일은 `--force` 없이는 덮어쓰지 않는다.
+- `briar computer-use login-store import <file.tar.gz> [--json]`: 임시 디렉터리에 풀고 항목이
+  화이트리스트 경로 안인지 검증한다(`..`, 절대 경로, 화이트리스트 밖 경로는 거절). `shared/*`와
+  `display-1/*`를 모두 공유 저장소에 capture 경로로 반영한다. Cookies는 행 병합, 나머지는 교체다.
+  살아 있는 `:1` 프로필에는 쓰지 않는다. 다음 Agent display seed와 `:1`의 새 로그인이 합쳐진다.
+- 둘 다 `briar` 계정으로 실행하며 `--profiles-directory` 옵션으로 경로를 바꿀 수 있다(테스트용).
+- `managed-computer-pilot.md` "기존 컴퓨터 업그레이드" 절에 교체 절차를 추가한다. 중지 전 export,
+  SSM으로 파일 이동, 새 컴퓨터 enrollment 뒤 import, 아카이브 삭제. "다른 컴퓨터의 홈이나 credential을
+  복사하지 않는다"는 문장은 소유자가 동의한 브라우저 로그인 저장소 이전만 예외로 둔다고 고친다.
+
+### 7.3 검증
+
+- export → import 왕복이 임시 디렉터리에서 동작한다. import 후 Cookies 행이 병합되고 Local Storage가
+  교체된다.
+- `..`나 화이트리스트 밖 경로가 든 아카이브는 거절되고 저장소가 바뀌지 않는다.
+- `--force` 없이 기존 출력 파일을 덮어쓰지 않는다.
+- sandbox `docker run` 인자에 두 볼륨이 들어가고 `rm --purge`가 둘을 지운다.
+
+## 8. 후속
+
+- Mac DM Agent의 agent-browser 로그인 공유는 상태 파일 방식으로 별도 설계한다:
+  [agent-browser-shared-login-state.md](agent-browser-shared-login-state.md).
+- 컴퓨터 사이 자동 동기화(Grok Bot box-store-sync)는 export/import로 운영 요구가 확인된 뒤 검토한다.

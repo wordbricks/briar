@@ -117,4 +117,30 @@ describe("ComputerUseBoxService", () => {
     expect(supervisor.started).toEqual([2]);
     expect(supervisor.stopped).toEqual([2]);
   });
+
+  it("runs the owner display login watcher for as long as it serves", async () => {
+    const events: string[] = [];
+    const desktopManager = new ComputerUseDesktopManager(
+      new MemoryStore(),
+      new MemorySupervisor(),
+    );
+    service = new ComputerUseBoxService({
+      authToken: "box_token_abcdefghijklmnopqrstuvwxyz1234567890",
+      host: "127.0.0.1",
+      primaryPort: 0,
+      forkPort: 0,
+      desktopManager,
+      primaryLoginWatcher: {
+        start: () => events.push("start"),
+        stop: () => events.push("stop"),
+      },
+    });
+
+    await service.start();
+    expect(events).toEqual(["start"]);
+
+    await service.stop();
+    service = undefined;
+    expect(events).toEqual(["start", "stop"]);
+  });
 });

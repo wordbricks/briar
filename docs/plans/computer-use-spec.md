@@ -491,7 +491,7 @@ semantics를 바꾸지 않는다. 변경한 port는 capability에서 명시한�
 기존 단일 `briar-remote-desktop.service`를 supervisor 구조로 확장한다.
 
 ```text
-display 1  → primary/bootstrap, Agent computer use 금지
+display 1  → primary/bootstrap, Agent computer use 금지, 공유 로그인 저장소의 로그인 원본
 display 2  → Agent A
 display 3  → Agent B
 display 4  → Agent C
@@ -521,6 +521,8 @@ assignment record:
 - process crash 후 stale process와 lock을 확인하고 안전하게 복구한다.
 - 명시적 release에서만 desktop과 profile을 정리하며, 정리 전에 display profile의 로그인
   상태를 공유 저장소에 capture한다([computer-use-shared-browser-login.md](computer-use-shared-browser-login.md)).
+- display 1은 Agent가 쓰지 않지만 로그인 원본이다. `display-1` 프로필로 고정해 두고 box
+  서비스가 소유자의 새 로그인을 공유 저장소로 capture한다.
 - managed computer 재부팅 후 persisted assignments에 필요한 windows를 재생성한다.
 
 browser process와 session data의 시작 방식도 Grok fixture와 비교한다. 재구성 소스에서

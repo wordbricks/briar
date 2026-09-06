@@ -27,6 +27,7 @@ import {
 } from "./config-contract";
 import { createAuthenticatedConnectClient } from "./connect-client";
 import { providerAuthenticated } from "./managed-computer-setup-agent";
+import { computerUsePrimaryBrowserProfileDirectory } from "./computer-use-browser-login-store";
 import { configuredComputerUseAssignmentPath } from "./computer-use-desktop-manager";
 import { runWorkerSupervisor } from "./managed-computer-supervisor";
 import {
@@ -736,14 +737,16 @@ export function keepChildAlive(
   name: string,
   command: readonly string[],
   stop: AbortSignal,
+  options: { readonly env?: NodeJS.ProcessEnv } = {},
 ): Promise<void> {
   return new Promise((resolve) => {
     let child: ChildProcess | undefined;
     let attempt = 0;
+    const environment = options.env ?? process.env;
     const launch = () => {
       if (stop.aborted) return resolve();
       const startedAt = Date.now();
-      child = spawn(command[0]!, command.slice(1), { stdio: "inherit", env: process.env });
+      child = spawn(command[0]!, command.slice(1), { stdio: "inherit", env: environment });
       console.log(JSON.stringify({ event: `sandbox_${name}_started`, pid: child.pid ?? null }));
       child.once("exit", (code, signal) => {
         child = undefined;
@@ -798,6 +801,20 @@ export function primaryDisplayCommand() {
   return ["/opt/briar/bin/briar-remote-desktop"];
 }
 
+/**
+ * Pin the owner desktop's Chrome to `display-1` so its sign-ins land where the
+ * box service watches for them, the way the managed image pins the same
+ * profile through `briar-remote-desktop.service`.
+ */
+export function primaryDisplayEnvironment(
+  environment: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  return {
+    ...environment,
+    BRIAR_BROWSER_PROFILE_DIRECTORY: computerUsePrimaryBrowserProfileDirectory(),
+  };
+}
+
 /** True when the owner's display :1 accepts VNC connections on loopback. */
 export function primaryDisplayListening(
   port = SANDBOX_PRIMARY_DISPLAY_PORT,
@@ -847,7 +864,9 @@ export async function runSandboxSupervisor(directory = configDirectory) {
     // Display :1 is the owner's desktop, always available like Grok Bot's
     // default display and the managed computer's remote desktop; agents use
     // :2 and above through the box service.
-    keepChildAlive("primary_display", primaryDisplayCommand(), stop.signal),
+    keepChildAlive("primary_display", primaryDisplayCommand(), stop.signal, {
+      env: primaryDisplayEnvironment(),
+    }),
     keepChildAlive("remote_agent", cliCommand("sandbox", "remote-agent"), stop.signal),
   ]);
   try {
