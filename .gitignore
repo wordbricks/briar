@@ -25,3 +25,4 @@ apps/briar/src-tauri/binaries/bun-*
 *.cpuprofile
 src-tauri/target
 apps/briar/src-tauri/target
+__pycache__/

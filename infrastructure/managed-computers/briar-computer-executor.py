@@ -53,6 +53,24 @@ class RequestError(Exception):
     pass
 
 
+def combo_key_names(expression: str) -> list[str]:
+    """Split a key expression such as ``ctrl+l`` into its key names.
+
+    Inside a combo, a single letter is lowercased. Uppercase letter keysyms sit
+    on the Shift level of the keyboard map, so pressing them as written would
+    hold Shift as an implicit modifier and turn ``ctrl+A`` into Chromium's
+    Ctrl+Shift+A. Shift is only held when the combo names it. A lone key such
+    as ``A`` keeps its case so it still produces the uppercase letter.
+    """
+    names = [part.strip() for part in expression.split("+") if part.strip()]
+    if len(names) <= 1:
+        return names
+    return [
+        name.lower() if len(name) == 1 and name.isalpha() else name
+        for name in names
+    ]
+
+
 def require_dict(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise RequestError(f"{label} must be an object")
@@ -175,7 +193,7 @@ class XComputer:
             self.display.sync()
 
     def press_combo(self, expression: str, hold_ms: int = 0) -> None:
-        names = [part.strip() for part in expression.split("+") if part.strip()]
+        names = combo_key_names(expression)
         if not names:
             raise RequestError("key must not be empty")
         pressed: list[int] = []

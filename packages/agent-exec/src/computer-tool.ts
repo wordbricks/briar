@@ -50,7 +50,9 @@ export const computerActionFields = {
   y2: z.number().int().optional(),
   path: z.array(CoordinateInput).optional(),
   text: z.string().optional(),
-  key: z.string().optional(),
+  key: z.string().optional().describe(
+    "A key name or a combo joined with +, such as Return, Tab, ctrl+l, or ctrl+shift+t. Letters in a combo are pressed unshifted; name shift when it is wanted.",
+  ),
   button: z.enum(["left", "right", "middle"]).optional(),
   count: z.number().int().min(1).max(3).optional(),
   direction: z.enum(["up", "down", "left", "right"]).optional(),
