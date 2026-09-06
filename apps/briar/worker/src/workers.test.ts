@@ -2713,7 +2713,7 @@ describe("detached execution workers", () => {
     });
   });
 
-  it("does not claim unattended Computer Use work without provider capability", async () => {
+  it("claims unattended Computer Use work on a Worker without a desktop", async () => {
     const registered = await register("computer-use-gate");
     const agent = await db
       .prepare(
@@ -2741,6 +2741,8 @@ describe("detached execution workers", () => {
       occurredAt: atMinute(2),
     });
 
+    // The policy grants the Agent a desktop where one exists; it does not
+    // hold the run back from a Worker that has none.
     await expect(claimNextQueuedHuntRun(db, projectId, {
       claimTokenHash: fingerprint("computer-use-missing-capability"),
       claimedBy: registered.worker.label,
@@ -2748,17 +2750,6 @@ describe("detached execution workers", () => {
       leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
       workerId: registered.worker.id,
       detachedOnly: true,
-      computerUseProvidersJson: "[]",
-    })).resolves.toBeNull();
-
-    await expect(claimNextQueuedHuntRun(db, projectId, {
-      claimTokenHash: fingerprint("computer-use-capable"),
-      claimedBy: registered.worker.label,
-      claimedAt: atMinute(3),
-      leaseExpiresAt: leaseExpiryFrom(atMinute(3)),
-      workerId: registered.worker.id,
-      detachedOnly: true,
-      computerUseProvidersJson: '["codex"]',
     })).resolves.toMatchObject({ id: runId, agent_id: agent!.id });
   });
 

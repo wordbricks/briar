@@ -25,7 +25,6 @@ import {
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import {
   executionWorkerProviders,
-  executionWorkerRuntime,
   isExecutionWorkerAllowedForProject,
   leaseExpiryFrom,
   workerStateAt,
@@ -52,10 +51,6 @@ export async function claimNextTeamAgentTaskWork(input: {
       throw new HttpError(409, "Worker is not ready to claim agent tasks");
     }
     const providers = executionWorkerProviders(authenticatedWorker.binding);
-    const computerUseProvidersJson = JSON.stringify(
-      executionWorkerRuntime(authenticatedWorker.binding).computerUse
-        ?.providers ?? [],
-    );
     if (providers.length === 0) {
       throw new HttpError(409, "Worker has no available agent provider");
     }
@@ -129,7 +124,6 @@ export async function claimNextTeamAgentTaskWork(input: {
       claimTokenHash: await sha256(claimToken),
       claimedAt: observedAt,
       leaseExpiresAt: leaseExpiryFrom(observedAt),
-      computerUseProvidersJson,
     });
     if (!job) return null;
     const activeSkill = job.agent_skills.find(

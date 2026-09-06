@@ -189,37 +189,55 @@ export function logDetachedProviderTurnDiagnostic(
   console.error(`[briar-agent-runner] ${JSON.stringify(diagnostic)}`);
 }
 
-const prepareComputerUseTurn = async (
+/**
+ * `unattended` grants an Agent the use of a computer; it does not demand one of
+ * every host that runs the Agent. A host without a Computer Use box runs the
+ * turn without the desktop tools and says so, so a task that never needed a
+ * screen still runs where it can.
+ */
+export const prepareComputerUseTurn = async (
   input: DetachedProviderTurnInput,
 ): Promise<{
   readonly input: DetachedProviderTurnInput;
   release(): Promise<void>;
 }> => {
+  const diagnose = createDiagnosticEmitter(input);
+  const withoutComputerUse = (reason: string, detail?: string) => {
+    diagnose("computer_use.unavailable", {
+      reason,
+      ...(detail ? { detail: redactDiagnosticText(detail) } : {}),
+      provider: input.agent.provider,
+    });
+    return { input, release: async () => undefined };
+  };
   if (input.agent.computerUsePolicy !== "unattended") {
     return { input, release: async () => undefined };
   }
-  if (!supportsComputerUseProvider(input.agent.provider)) {
-    throw new Error(
-      `Computer Use is not available for the ${input.agent.provider} provider`,
-    );
-  }
   if (input.runKind === "computerUse") {
+    // A child launched for the desktop is a different case: it was spawned to
+    // drive one, so a missing binding is a defect rather than a plain host.
     if (!input.computerUseBinding || !input.computerUseMcpServerPath) {
       throw new Error("Computer Use child is missing its display binding");
     }
     return { input, release: async () => undefined };
   }
+  if (!supportsComputerUseProvider(input.agent.provider)) {
+    return withoutComputerUse("provider_unsupported");
+  }
   const mcpServerPath = await findAgentBundle(
     import.meta.dir,
     "computer-use-mcp-server.js",
-  );
+  ).catch(() => null);
   if (!mcpServerPath) {
-    throw new Error(
-      "Computer Use MCP bundle is missing; run `bun run agent:build`",
-    );
+    return withoutComputerUse("mcp_bundle_missing");
   }
-  const client = await ComputerUseBoxClient.connect();
-  const assigned = await client.assign(input.agent.id);
+  let assigned;
+  try {
+    const client = await ComputerUseBoxClient.connect();
+    assigned = await client.assign(input.agent.id);
+  } catch (error) {
+    return withoutComputerUse("box_unavailable", describeDiagnosticError(error));
+  }
   try {
     const parentRunId = input.diagnosticContext?.runId
       ?? input.diagnosticContext?.workId

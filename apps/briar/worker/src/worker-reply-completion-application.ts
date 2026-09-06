@@ -628,7 +628,6 @@ async function resolveAgentMessage(
     provider: target.provider,
     model: target.model,
     effort: target.effort,
-    computerUsePolicy: target.computer_use_policy,
     observedAt: input.observedAt,
   });
   return {

@@ -4,6 +4,8 @@ import {
   detachedProviderBlockOf,
   DetachedProviderBlockedError,
   detachedProviderTurnFailure,
+  prepareComputerUseTurn,
+  type DetachedProviderTurnInput,
   type DetachedProviderTurnResult,
 } from "./detached-provider-turn";
 import {
@@ -180,5 +182,72 @@ describe("assertDetachedProviderTurnSucceeded", () => {
     expect(() => assertDetachedProviderTurnSucceeded(result)).toThrow(
       DetachedProviderBlockedError,
     );
+  });
+});
+
+describe("prepareComputerUseTurn", () => {
+  function computerUseInput(
+    overrides: Partial<DetachedProviderTurnInput> = {},
+  ): DetachedProviderTurnInput {
+    return {
+      agent: {
+        id: "8b0f2e1c-58bd-4a2e-9b41-5f8f1a2c9d33",
+        name: "Briar Developer",
+        provider: "opencode",
+        model: null,
+        computerUsePolicy: "unattended",
+        responsibility: "Ship the release.",
+        skills: [],
+      },
+      prompt: "Release the desktop app.",
+      workspacePath: "/tmp/workspace",
+      fullAccess: false,
+      environment: {
+        // An absolute path that cannot exist, so the box is unreachable here
+        // no matter what the machine running the suite has installed.
+        BRIAR_BOX_EXEC_AUTH_TOKEN_FILE: "/nonexistent/briar/box-exec-token",
+      },
+      signal: new AbortController().signal,
+      ...overrides,
+    };
+  }
+
+  it("runs an unattended Agent on a host that has no Computer Use box", async () => {
+    // The incident this guards: `/Release Desktop app` needs no desktop, but
+    // its Agent carries the unattended policy, so every box-less Worker
+    // refused the work and the task sat queued forever.
+    const diagnostics: string[] = [];
+    const input = computerUseInput({
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic.phase),
+    });
+
+    const prepared = await prepareComputerUseTurn(input);
+
+    expect(prepared.input).toBe(input);
+    expect(prepared.input.computerUseBinding).toBeUndefined();
+    expect(diagnostics).toContain("computer_use.unavailable");
+    await expect(prepared.release()).resolves.toBeUndefined();
+  });
+
+  it("leaves a turn alone when the Agent has no Computer Use policy", async () => {
+    const diagnostics: string[] = [];
+    const input = computerUseInput({
+      agent: {
+        ...computerUseInput().agent,
+        computerUsePolicy: "disabled",
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic.phase),
+    });
+
+    const prepared = await prepareComputerUseTurn(input);
+
+    expect(prepared.input).toBe(input);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("still rejects a Computer Use child that lost its display binding", async () => {
+    await expect(
+      prepareComputerUseTurn(computerUseInput({ runKind: "computerUse" })),
+    ).rejects.toThrow("Computer Use child is missing its display binding");
   });
 });

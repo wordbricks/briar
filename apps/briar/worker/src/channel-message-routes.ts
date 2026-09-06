@@ -361,7 +361,6 @@ export async function createOrganizationChannelMessage(
         provider: replyRuntime.provider,
         model: replyRuntime.model,
         effort: replyRuntime.effort,
-        computerUsePolicy: agent.computer_use_policy,
         observedAt: createdAt,
       });
       const unavailableReason: ChannelReplyUnavailableReason | null =
