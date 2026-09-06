@@ -188,9 +188,14 @@ enum InboxMessageBuilder {
             let finalEvent = (session.events ?? []).reversed().first {
                 $0.type.rawValue == session.status.rawValue
             }
-            let fallbackTimestamp = session.completedAt ?? session.startedAt
-            let version = finalEvent?.id ??
-                "\(session.status.rawValue):\(ISO8601DateFormatter.mobileContract.string(from: fallbackTimestamp))"
+            let completionTimestamp = session.completedAt ?? session.startedAt
+            // This is the canonical version emitted by the worker feed and
+            // desktop/web clients. Event UUIDs are transport details and can
+            // differ depending on which endpoint populated the session.
+            let completedAt = ISO8601DateFormatter.mobileContract.string(
+                from: completionTimestamp
+            )
+            let version = "session:v1:\(session.status.rawValue):\(completedAt)"
             messages.append(InboxMessage(
                 id: "session:\(session.id)",
                 kind: .session,

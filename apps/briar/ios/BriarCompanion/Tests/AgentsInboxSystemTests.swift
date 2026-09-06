@@ -1080,6 +1080,10 @@ final class AgentsInboxSystemTests: XCTestCase {
             )
         )
         let failedSession = try XCTUnwrap(messages.first { $0.kind == .session })
+        XCTAssertEqual(
+            failedSession.version,
+            "session:v1:failed:2023-11-14T22:14:40.000Z"
+        )
         XCTAssertEqual(InboxMessageBuilder.classify(failedSession), .actionRequired)
         XCTAssertEqual(
             InboxNotificationPresentationBuilder.content(for: failedSession),

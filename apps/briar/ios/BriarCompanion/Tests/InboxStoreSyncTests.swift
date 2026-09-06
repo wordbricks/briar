@@ -146,6 +146,53 @@ final class InboxStoreSyncTests: XCTestCase {
         XCTAssertEqual(lastPut, [message.id: message.version])
     }
 
+    func testLegacySessionReadVersionMigratesAndSurvivesRefreshAndRelaunch() throws {
+        let (defaults, suiteName) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let messageID = "session:session-1"
+        let legacyVersion = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        let storage = try JSONSerialization.data(withJSONObject: [
+            "messages": [["id": messageID, "version": legacyVersion]],
+            "readVersions": [messageID: legacyVersion],
+        ])
+        defaults.set(storage, forKey: "briar.inbox.v1.user.user-1")
+        let project = makeProject()
+        let original = makeTerminalSession(eventID: legacyVersion)
+
+        let store = InboxStore(defaults: defaults)
+        store.configure(token: nil, userID: "user-1")
+        store.update(snapshot: nil, sessions: [original], project: project)
+
+        let canonical = "session:v1:failed:2023-11-14T22:14:40.000Z"
+        XCTAssertEqual(store.messages.first?.version, canonical)
+        XCTAssertEqual(store.messages.first?.isUnread, false)
+
+        // A later poll can return another terminal event UUID without
+        // changing the logical completion represented by the Inbox row.
+        let refreshed = makeTerminalSession(
+            eventID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        )
+        store.update(snapshot: nil, sessions: [refreshed], project: project)
+        XCTAssertEqual(store.messages.first?.version, canonical)
+        XCTAssertEqual(store.messages.first?.isUnread, false)
+
+        let relaunched = InboxStore(defaults: defaults)
+        relaunched.configure(token: nil, userID: "user-1")
+        relaunched.update(snapshot: nil, sessions: [refreshed], project: project)
+        XCTAssertEqual(relaunched.messages.first?.isUnread, false)
+
+        let newFailure = makeTerminalSession(
+            id: "session-2",
+            eventID: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            completedAt: Date(timeIntervalSince1970: 1_700_000_180)
+        )
+        relaunched.update(snapshot: nil, sessions: [newFailure], project: project)
+        XCTAssertEqual(
+            relaunched.messages.first { $0.id == "session:session-2" }?.isUnread,
+            true
+        )
+    }
+
     private func wireMessage(id: String, occurredAt: Date) -> BriarAPI_InboxFeedMessage {
         var identity = BriarAPI_InboxMessageIdentity()
         identity.id = id
@@ -200,6 +247,37 @@ final class InboxStoreSyncTests: XCTestCase {
             )],
             cursor: 1,
             generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+    }
+
+    private func makeTerminalSession(
+        id: String = "session-1",
+        eventID: String,
+        completedAt: Date = Date(timeIntervalSince1970: 1_700_000_080)
+    ) -> ProjectAgentSession {
+        ProjectAgentSession(
+            id: id,
+            projectId: projectID,
+            dispatchGroupId: id,
+            agentId: nil,
+            agentName: "Review Agent",
+            sessionType: .task,
+            trigger: .manual,
+            scheduleId: nil,
+            scheduleRunId: nil,
+            parentSessionId: nil,
+            request: "Review",
+            status: .failed,
+            issues: [],
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            completedAt: completedAt,
+            conversationId: nil,
+            workspaceRoot: nil,
+            summary: nil,
+            error: "Failed",
+            events: [.init(id: eventID, type: .failed, occurredAt: completedAt)],
+            updatedAt: completedAt,
+            requestedByUserId: "user-1"
         )
     }
 
