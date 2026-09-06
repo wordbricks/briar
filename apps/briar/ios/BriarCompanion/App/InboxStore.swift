@@ -18,6 +18,7 @@ final class InboxStore: ObservableObject {
 
     private var sourceMessages: [InboxMessage] = []
     private var readVersions: [String: String] = [:]
+    private var storedMessageVersions: [String: String] = [:]
     private var remoteReadVersions: [String: String] = [:]
     private var pendingPush: [String: String] = [:]
     private var inFlightPush: [String: String] = [:]
@@ -102,6 +103,7 @@ final class InboxStore: ObservableObject {
             remoteReadVersions = [:]
             // Never let a previous account's in-memory cache seed the new account.
             readVersions = [:]
+            storedMessageVersions = [:]
             if let userID = self.userID {
                 loadReadVersions(storageKey: storageKey(for: userID))
                 startReadStateSync()
@@ -329,6 +331,7 @@ final class InboxStore: ObservableObject {
     }
 
     private func mergeMessages(_ incoming: [InboxMessage]) {
+        migrateLegacySessionReadVersions(for: incoming)
         var merged = Dictionary(uniqueKeysWithValues: sourceMessages.map { ($0.id, $0) })
         for message in incoming {
             merged[message.id] = message
@@ -343,6 +346,7 @@ final class InboxStore: ObservableObject {
     }
 
     private func replaceMessages(_ incoming: [InboxMessage]) {
+        migrateLegacySessionReadVersions(for: incoming)
         sourceMessages = incoming.sorted {
             $0.occurredAt == $1.occurredAt
                 ? $0.id < $1.id
@@ -395,6 +399,29 @@ final class InboxStore: ObservableObject {
             let decoded = try? JSONDecoder().decode(Storage.self, from: data)
         else { return }
         readVersions = decoded.readVersions
+        storedMessageVersions = Dictionary(
+            uniqueKeysWithValues: decoded.messages.map { ($0.id, $0.version) }
+        )
+    }
+
+    /// An older iOS build stored a terminal event UUID (or a status/timestamp
+    /// fallback) for sessions. Promote only entries proven to have been read:
+    /// the saved read version must equal the version of the saved Inbox row.
+    private func migrateLegacySessionReadVersions(for messages: [InboxMessage]) {
+        var migrated: [String: String] = [:]
+        for message in messages where
+            message.kind == .session && message.version.hasPrefix("session:v1:") {
+            guard let storedVersion = storedMessageVersions[message.id],
+                  !storedVersion.hasPrefix("session:v1:"),
+                  readVersions[message.id] == storedVersion
+            else { continue }
+            readVersions[message.id] = message.version
+            storedMessageVersions[message.id] = message.version
+            migrated[message.id] = message.version
+        }
+        if !migrated.isEmpty {
+            queuePush(migrated)
+        }
     }
 
     private func persistIfPossible() {
