@@ -25,6 +25,7 @@ import {
   getChannelMessage,
   getChannelMessageAttachment,
   getChannelReplySessionForThread,
+  getLiveDmChannelReplySession,
   isChannelReactionEmoji,
   listChannelAgents,
   listChannelAgentReplies,
@@ -313,11 +314,29 @@ export async function createOrganizationChannelMessage(
       const selectedSkill = selectedSkillTarget?.agent.id === agent.id
         ? selectedSkillTarget.skill
         : null;
-      const retainedSession = await getChannelReplySessionForThread(input.db, {
-        channelId: channel.id,
-        threadRootMessageId: request.parentMessageId ?? messageId,
-        agentId: agent.id,
-      });
+      /*
+        A channel thread anchors its reply session on the thread root. A direct
+        message has no root to anchor on, so anchoring on the message being sent
+        gave every message in a burst its own session, its own provider
+        conversation and its own parallel reply. The Agent's live session in
+        this direct message is the conversation the person is already in; only
+        when none is retained does this message become the new anchor.
+      */
+      const anchoredSession = channel.kind === "dm" && !request.parentMessageId
+        ? await getLiveDmChannelReplySession(input.db, {
+            channelId: channel.id,
+            agentId: agent.id,
+            observedAt: createdAt,
+          })
+        : null;
+      const sessionRootMessageId = anchoredSession?.thread_root_message_id ??
+        request.parentMessageId ?? messageId;
+      const retainedSession = anchoredSession ??
+        await getChannelReplySessionForThread(input.db, {
+          channelId: channel.id,
+          threadRootMessageId: sessionRootMessageId,
+          agentId: agent.id,
+        });
       const liveSession = retainedSession && retainedSession.retained_until > createdAt
         ? retainedSession
         : null;
@@ -351,7 +370,13 @@ export async function createOrganizationChannelMessage(
           : workerAvailability === "usage_exhausted"
           ? channelReplyProviderUsageExhaustedError
           : channelReplyNoAvailableWorkerError;
-      return { agent, selectedSkill, replyRuntime, unavailableReason };
+      return {
+        agent,
+        selectedSkill,
+        replyRuntime,
+        unavailableReason,
+        sessionRootMessageId,
+      };
     }),
   );
   let message = null;
@@ -396,12 +421,14 @@ export async function createOrganizationChannelMessage(
           selectedSkill,
           replyRuntime,
           unavailableReason,
+          sessionRootMessageId,
         }) => ({
           id: agent.id,
           projectId: agent.project_id,
           skillId: selectedSkill?.id ?? null,
           provider: replyRuntime.provider,
           unavailableReason,
+          sessionRootMessageId,
         })),
         preferredDeviceId: request.preferredDeviceId,
         createdAt,

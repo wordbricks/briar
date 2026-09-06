@@ -279,6 +279,14 @@ export type ChannelAgentReplyEnqueueInput = {
     skillId?: string | null;
     provider: AgentProvider;
     unavailableReason?: ChannelReplyUnavailableReason | null;
+    /**
+     * The message the Agent's reply session is anchored to. A channel thread
+     * always anchors on its root, so this is `parentMessageId` there. A direct
+     * message anchors on the Agent's live session instead, which is how a burst
+     * of short messages stays one conversation with one provider session rather
+     * than one isolated session per message.
+     */
+    sessionRootMessageId?: string | null;
   }>;
   preferredDeviceId?: string | null;
   createdAt: string;
@@ -294,6 +302,12 @@ export type ChannelReplyJobRow = {
   trigger_message_id: string;
   parent_message_id: string;
   reply_message_id: string;
+  /**
+   * Set on a queued direct-message turn that a later message in the same
+   * session took over. Such a job settles as `completed` and never produces a
+   * message of its own.
+   */
+  superseded_by_reply_job_id: string | null;
   status: ChannelReplyStatus;
   agent_provider: AgentProvider | null;
   preferred_device_id: string | null;
@@ -2863,6 +2877,95 @@ export async function getClaimedChannelReplyAttachment(
 }
 
 /**
+ * An ordinary conversation turn: the Agent simply answers what the person
+ * wrote. A Skill command, a delegated turn, an Agent-to-Agent hop and an
+ * approved Skill execution each carry their own contract with the runner, so
+ * none of them may be absorbed into a later message or held back by the DM
+ * settle window.
+ */
+const channelReplyPlainConversationTurn = (job: string) =>
+  `${job}.skill_id is null
+     and ${job}.delegated_by_reply_job_id is null
+     and ${job}.agent_message_hop = 0
+     and ${job}.approved_skill_execution_proposal_id is null`;
+
+/**
+ * A person who sends three short direct messages in a row is asking one
+ * question, not three. The newest job in the session takes over every older
+ * conversation turn that has not started running, so exactly one reply arrives
+ * and it answers all of them.
+ *
+ * There is no `superseded` status to move those jobs into: the column check,
+ * the client status enum and the shared protobuf enum all stop at
+ * queued/running/completed/failed, and `failed` would raise a toast the person
+ * has no reason to see. An absorbed turn is therefore `completed` with no
+ * message of its own plus `superseded_by_reply_job_id` naming its successor.
+ * Re-pointing an older chain at the new job keeps that chain one level deep, so
+ * the claim route can collect every unanswered trigger with one join.
+ */
+function channelDmSupersededTurnStatements(
+  db: D1Database,
+  input: {
+    jobId: string;
+    agentId: string;
+    channelId: string;
+    sessionRootMessageId: string;
+    completedAt: string;
+  },
+) {
+  const absorbedTurns = `select older.id
+       from briar_channel_agent_reply_jobs older
+       join briar_channel_reply_sessions session
+         on session.id = older.session_id
+       join briar_channels channel on channel.id = session.channel_id
+       where session.channel_id = ? and session.thread_root_message_id = ?
+         and session.agent_id = ? and channel.kind = 'dm'
+         and older.id <> ? and older.status = 'queued'
+         and older.created_at <= ?
+         and ${channelReplyPlainConversationTurn("older")}`;
+  // A job that could not be enqueued, or that was recorded as unavailable, has
+  // nothing to hand the conversation to, so the queued turns keep their turn.
+  const successorIsLive = `exists (
+         select 1 from briar_channel_agent_reply_jobs newer
+         where newer.id = ? and newer.status = 'queued'
+           and ${channelReplyPlainConversationTurn("newer")}
+       )`;
+  const absorbedBindings = [
+    input.channelId,
+    input.sessionRootMessageId,
+    input.agentId,
+    input.jobId,
+    input.completedAt,
+  ];
+  return [
+    db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set superseded_by_reply_job_id = ?, updated_at = ?
+       where superseded_by_reply_job_id in (${absorbedTurns})
+         and ${successorIsLive}`,
+    ).bind(
+      input.jobId,
+      input.completedAt,
+      ...absorbedBindings,
+      input.jobId,
+    ),
+    db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set status = 'completed', superseded_by_reply_job_id = ?,
+           completed_at = ?, updated_at = ?
+       where id in (${absorbedTurns})
+         and ${successorIsLive}`,
+    ).bind(
+      input.jobId,
+      input.completedAt,
+      input.completedAt,
+      ...absorbedBindings,
+      input.jobId,
+    ),
+  ];
+}
+
+/**
  * One job per mentioned agent, so a message that names two agents gets two
  * independent replies. Organization agents leave project_id null, which is what
  * makes them claimable by any device in the organization.
@@ -2890,6 +2993,9 @@ async function channelAgentReplyEnqueueStatements(
        case when current_skill.id is null then null else trigger_message.body end`;
   return input.agents.flatMap((agent) => {
       const sessionId = crypto.randomUUID();
+      const jobId = crypto.randomUUID();
+      const sessionRootMessageId = agent.sessionRootMessageId ??
+        input.parentMessageId;
       return [
         db.prepare(
           `insert into briar_channel_reply_sessions (
@@ -2985,7 +3091,7 @@ async function channelAgentReplyEnqueueStatements(
           sessionId,
           input.organizationId,
           input.channelId,
-          input.parentMessageId,
+          sessionRootMessageId,
           agent.projectId,
           agent.id,
           input.createdAt,
@@ -2997,7 +3103,7 @@ async function channelAgentReplyEnqueueStatements(
           input.createdAt,
           agent.skillId ?? null,
           input.channelId,
-          input.parentMessageId,
+          sessionRootMessageId,
           input.channelId,
           agent.id,
           input.organizationId,
@@ -3051,7 +3157,7 @@ async function channelAgentReplyEnqueueStatements(
              )
            on conflict (channel_id, trigger_message_id, agent_id) do nothing`,
         ).bind(
-          crypto.randomUUID(),
+          jobId,
           input.organizationId,
           input.channelId,
           agent.projectId,
@@ -3069,7 +3175,7 @@ async function channelAgentReplyEnqueueStatements(
           input.createdAt,
           agent.skillId ?? null,
           input.triggerMessageId,
-          input.parentMessageId,
+          sessionRootMessageId,
           input.channelId,
           agent.id,
           input.organizationId,
@@ -3079,6 +3185,15 @@ async function channelAgentReplyEnqueueStatements(
           agent.skillId ?? null,
           agent.provider,
         ),
+        ...(agent.skillId
+          ? []
+          : channelDmSupersededTurnStatements(db, {
+            jobId,
+            agentId: agent.id,
+            channelId: input.channelId,
+            sessionRootMessageId,
+            completedAt: input.createdAt,
+          })),
         db.prepare(
           `insert into briar_channel_reply_session_events (
              id, session_id, reply_job_id, event_type, reason,
@@ -3097,7 +3212,7 @@ async function channelAgentReplyEnqueueStatements(
           input.createdAt,
           input.triggerMessageId,
           input.channelId,
-          input.parentMessageId,
+          sessionRootMessageId,
           agent.id,
         ),
       ];
@@ -3165,6 +3280,28 @@ export async function getChannelReplySession(
   return db.prepare(
     `select * from briar_channel_reply_sessions where id = ?`,
   ).bind(sessionId).first<ChannelReplySessionRow>();
+}
+
+/**
+ * The session a new direct message joins. A DM has no thread roots to key on,
+ * so anchoring on the message being sent gave every message its own session,
+ * its own provider conversation and its own parallel reply. The Agent's live
+ * session in this channel is the conversation the person is actually in; only
+ * when none is retained does the new message become a fresh anchor.
+ */
+export async function getLiveDmChannelReplySession(
+  db: D1Database,
+  input: { channelId: string; agentId: string; observedAt: string },
+) {
+  return db.prepare(
+    `select * from briar_channel_reply_sessions
+     where channel_id = ? and agent_id = ? and retained_until > ?
+     order by last_activity_at desc, id desc limit 1`,
+  ).bind(
+    input.channelId,
+    input.agentId,
+    input.observedAt,
+  ).first<ChannelReplySessionRow>();
 }
 
 export async function getChannelReplySessionForThread(
@@ -3318,6 +3455,99 @@ export async function cleanupExpiredChannelReplySessions(
 }
 
 /**
+ * How long a queued direct-message conversation turn waits before a Worker may
+ * claim it. Someone typing "hi", "quick question", "about the deploy" wants one
+ * answer, and the supersede path can only fold those together while they are
+ * all still queued — which means the first one must not be claimed the instant
+ * it lands.
+ */
+export const DM_REPLY_SETTLE_MS = 2_000;
+
+/** The largest and smallest wait a settle-blocked claim asks the Worker for. */
+export const DM_REPLY_SETTLE_MIN_RETRY_MS = 250;
+export const DM_REPLY_SETTLE_MAX_RETRY_MS = 2_000;
+
+/** The configured window, or the default whenever it is absent or nonsense. */
+export const dmReplySettleMs = (configured: unknown) => {
+  const raw = typeof configured === "string" ? configured.trim() : configured;
+  if (raw === "" || raw === null || raw === undefined) {
+    return DM_REPLY_SETTLE_MS;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 60_000
+    ? parsed
+    : DM_REPLY_SETTLE_MS;
+};
+
+const dmReplySettleThreshold = (claimedAt: string, settleMs?: number) =>
+  new Date(Date.parse(claimedAt) - (settleMs ?? DM_REPLY_SETTLE_MS))
+    .toISOString();
+
+/**
+ * A direct-message conversation turn is claimable only once the settle window
+ * has passed. Everything else — Skill commands, delegated turns, Agent-to-Agent
+ * hops, approved Skill executions and every channel thread — is claimable the
+ * moment it is queued, exactly as before.
+ */
+const channelReplySettled = (job: string) => `(
+       ${job}.created_at <= ?
+       or not exists (
+         select 1 from briar_channels settle_channel
+         where settle_channel.id = ${job}.channel_id
+           and settle_channel.kind = 'dm'
+           and ${channelReplyPlainConversationTurn(job)}
+       )
+     )`;
+
+/**
+ * How long the caller should wait before asking again, when the only work it
+ * could have taken is a direct-message turn still inside its settle window.
+ * Null means nothing is waiting and the caller keeps its ordinary idle delay.
+ */
+export async function nextChannelReplySettleWaitMs(
+  db: D1Database,
+  organizationId: string,
+  input: { observedAt: string; settleMs?: number },
+) {
+  const settleMs = input.settleMs ?? DM_REPLY_SETTLE_MS;
+  if (settleMs <= 0) return null;
+  const settleThreshold = dmReplySettleThreshold(input.observedAt, settleMs);
+  const next = await db.prepare(
+    `select min(job.created_at) as earliest
+     from briar_channel_agent_reply_jobs job
+     join briar_channels channel on channel.id = job.channel_id
+     where job.organization_id = ? and job.status = 'queued'
+       and channel.kind = 'dm'
+       and ${channelReplyPlainConversationTurn("job")}
+       and job.created_at > ?
+       and job.attempts < (? + job.memory_restart_count)
+       and exists (
+         select 1 from briar_channel_agents current_roster
+         where current_roster.channel_id = job.channel_id
+           and current_roster.agent_id = job.agent_id
+       )
+       and not exists (
+         select 1 from briar_channel_agent_reply_jobs active_job
+         where active_job.session_id = job.session_id
+           and active_job.id <> job.id and active_job.status = 'running'
+           and active_job.lease_expires_at > ?
+       )`,
+  ).bind(
+    organizationId,
+    settleThreshold,
+    MAX_REPLY_ATTEMPTS,
+    input.observedAt,
+  ).first<{ earliest: string | null }>();
+  if (!next?.earliest) return null;
+  const remaining = Date.parse(next.earliest) + settleMs -
+    Date.parse(input.observedAt);
+  return Math.min(
+    DM_REPLY_SETTLE_MAX_RETRY_MS,
+    Math.max(DM_REPLY_SETTLE_MIN_RETRY_MS, Math.ceil(remaining)),
+  );
+}
+
+/**
  * Any enabled binding may host an organization job. A Project Agent job may
  * only be claimed by the exact binding for that project; device identity alone
  * is insufficient because one device can run several project loops.
@@ -3332,8 +3562,13 @@ export async function claimNextChannelAgentReply(
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
+    settleMs?: number;
   },
 ) {
+  const settleThreshold = dmReplySettleThreshold(
+    input.claimedAt,
+    input.settleMs,
+  );
   // Migration 0092 is a deployment prerequisite, so every claim enforces the
   // saved-Skill snapshot without a runtime compatibility branch.
   const liveSkillSnapshot = (job: string) => `(
@@ -3547,6 +3782,7 @@ export async function claimNextChannelAgentReply(
      where job.organization_id = ? and job.attempts < (? + job.memory_restart_count)
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))
+       and ${channelReplySettled("job")}
        and not exists (
          select 1 from briar_channel_agent_reply_jobs active_job
          where active_job.session_id = job.session_id
@@ -3590,6 +3826,7 @@ export async function claimNextChannelAgentReply(
     organizationId,
     MAX_REPLY_ATTEMPTS,
     input.claimedAt,
+    settleThreshold,
     input.claimedAt,
     input.workerId,
     input.workerId,
@@ -3687,6 +3924,7 @@ export async function claimNextChannelAgentReply(
          and session_id = ?
          and (status = 'queued'
            or (status = 'running' and lease_expires_at <= ?))
+         and ${channelReplySettled("briar_channel_agent_reply_jobs")}
          and not exists (
            select 1 from briar_channel_agent_reply_jobs active_job
            where active_job.session_id = briar_channel_agent_reply_jobs.session_id
@@ -3747,6 +3985,7 @@ export async function claimNextChannelAgentReply(
         MAX_REPLY_ATTEMPTS,
         candidate.session_id,
         input.claimedAt,
+        settleThreshold,
         input.claimedAt,
         candidate.session_updated_at,
         candidate.session_owner_worker_id,
@@ -5646,7 +5885,6 @@ export async function completeChannelReply(
   }
   if (job.agent_message_hop === 1 && originJob) {
     const inboundMessageId = crypto.randomUUID();
-    const relaySessionId = crypto.randomUUID();
     const relayJobId = crypto.randomUUID();
     statements.push(
       /*
@@ -5696,40 +5934,26 @@ export async function completeChannelReply(
         ...claimedCompletionBindings(),
       ),
       /*
-        The sending Agent picks its own thread back up: the conflict path keeps
-        the live session row, and with it the provider conversation, so the
-        relay turn continues the person's conversation instead of restarting it.
+        The sending Agent picks its own thread back up: the relay turn joins the
+        origin job's own session, and with it the provider conversation, so the
+        answer continues the person's conversation instead of restarting it.
+        The session is addressed by id rather than by thread root because a
+        direct-message session is anchored on the Agent's live conversation,
+        which is not always the origin job's parent message.
       */
       db.prepare(
-        `insert into briar_channel_reply_sessions (
-           id, organization_id, channel_id, thread_root_message_id,
-           project_id, agent_id, provider, model, effort,
-           owner_device_id, owner_worker_id, owner_worker_label,
-           last_activity_at, retained_until, created_at, updated_at
-         )
-         select ?, origin.organization_id, origin.channel_id,
-                origin.parent_message_id, origin.project_id, origin.agent_id,
-                origin_agent.provider, origin_agent.model, origin_agent.effort,
-                designated_worker.device_id, designated_worker.id,
-                origin_agent.designated_worker_label, ?, ?, ?, ?
-         from briar_channel_agent_reply_jobs claim
-         join briar_channel_agent_reply_jobs origin
-           on origin.id = claim.origin_reply_job_id
-         join briar_project_agents origin_agent on origin_agent.id = origin.agent_id
-         left join briar_execution_workers designated_worker
-           on designated_worker.id = origin_agent.designated_worker_id
-          and designated_worker.project_id = origin_agent.project_id
-         where ${claimedCompletion} and claim.agent_message_hop = 1
-         on conflict (channel_id, thread_root_message_id, agent_id)
-         do update set
-           last_activity_at = excluded.last_activity_at,
-           retained_until = excluded.retained_until,
-           updated_at = excluded.updated_at`,
+        `update briar_channel_reply_sessions
+         set last_activity_at = ?, retained_until = ?, updated_at = ?
+         where id = (
+           select origin.session_id
+           from briar_channel_agent_reply_jobs claim
+           join briar_channel_agent_reply_jobs origin
+             on origin.id = claim.origin_reply_job_id
+           where ${claimedCompletion} and claim.agent_message_hop = 1
+         )`,
       ).bind(
-        relaySessionId,
         input.completedAt,
         retainedUntil,
-        input.completedAt,
         input.completedAt,
         ...claimedCompletionBindings(),
       ),
@@ -5748,8 +5972,8 @@ export async function completeChannelReply(
          join briar_channel_agent_reply_jobs origin
            on origin.id = claim.origin_reply_job_id
          join briar_channel_reply_sessions session
-           on session.channel_id = origin.channel_id
-          and session.thread_root_message_id = origin.parent_message_id
+           on session.id = origin.session_id
+          and session.channel_id = origin.channel_id
           and session.agent_id = origin.agent_id
          where ${claimedCompletion} and claim.agent_message_hop = 1
          on conflict (channel_id, trigger_message_id, agent_id) do nothing`,

@@ -36707,6 +36707,20 @@ pub struct ClaimedChannelReply {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub agent_message_hop: u32,
+    /// The trigger messages this one reply still has to answer, oldest first: this
+    /// job's own trigger plus the triggers of the queued turns it took over when a
+    /// person sent several short messages in a row. Always at least one element.
+    ///
+    /// Field 31: `pending_trigger_message_ids`
+    #[serde(
+        rename = "pendingTriggerMessageIds",
+        alias = "pending_trigger_message_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub pending_trigger_message_ids: ::buffa::alloc::vec::Vec<
+        ::buffa::alloc::string::String,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -36747,6 +36761,7 @@ impl ::core::fmt::Debug for ClaimedChannelReply {
             .field("agent_message_targets", &self.agent_message_targets)
             .field("inbound_agent_message", &self.inbound_agent_message)
             .field("agent_message_hop", &self.agent_message_hop)
+            .field("pending_trigger_message_ids", &self.pending_trigger_message_ids)
             .finish()
     }
 }
@@ -36984,6 +36999,9 @@ impl ::buffa::Message for ClaimedChannelReply {
                 += 2u64
                     + ::buffa::types::uint32_encoded_len(self.agent_message_hop) as u64;
         }
+        for v in &self.pending_trigger_message_ids {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -37171,6 +37189,9 @@ impl ::buffa::Message for ClaimedChannelReply {
         }
         if self.agent_message_hop != 0u32 {
             ::buffa::types::put_uint32_field(30u32, self.agent_message_hop, buf);
+        }
+        for v in &self.pending_trigger_message_ids {
+            ::buffa::types::put_string_field(31u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -37474,6 +37495,17 @@ impl ::buffa::Message for ClaimedChannelReply {
                 )?;
                 self.agent_message_hop = ::buffa::types::decode_uint32(buf)?;
             }
+            31u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.pending_trigger_message_ids.push(__elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -37512,6 +37544,7 @@ impl ::buffa::Message for ClaimedChannelReply {
         self.agent_message_targets.clear();
         self.inbound_agent_message = ::buffa::MessageField::none();
         self.agent_message_hop = 0u32;
+        self.pending_trigger_message_ids.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -104936,6 +104969,12 @@ pub mod __buffa {
             ///
             /// Field 30: `agent_message_hop`
             pub agent_message_hop: u32,
+            /// The trigger messages this one reply still has to answer, oldest first: this
+            /// job's own trigger plus the triggers of the queued turns it took over when a
+            /// person sent several short messages in a row. Always at least one element.
+            ///
+            /// Field 31: `pending_trigger_message_ids`
+            pub pending_trigger_message_ids: ::buffa::RepeatedView<'a, &'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ClaimedChannelReplyView<'a> {
@@ -105477,6 +105516,17 @@ pub mod __buffa {
                                 )?,
                             );
                     }
+                    31u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.pending_trigger_message_ids.push(__elem);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -105668,6 +105718,11 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     agent_message_hop: self.agent_message_hop,
+                    pending_trigger_message_ids: self
+                        .pending_trigger_message_ids
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -105886,6 +105941,9 @@ pub mod __buffa {
                             + ::buffa::types::uint32_encoded_len(self.agent_message_hop)
                                 as u64;
                 }
+                for v in &self.pending_trigger_message_ids {
+                    size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -106083,6 +106141,9 @@ pub mod __buffa {
                 if self.agent_message_hop != 0u32 {
                     ::buffa::types::put_uint32_field(30u32, self.agent_message_hop, buf);
                 }
+                for v in &self.pending_trigger_message_ids {
+                    ::buffa::types::put_string_field(31u32, v, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -106274,6 +106335,13 @@ pub mod __buffa {
                         .serialize_entry(
                             "agentMessageHop",
                             &::buffa::json_helpers::ProtoJson(&self.agent_message_hop),
+                        )?;
+                }
+                if !self.pending_trigger_message_ids.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "pendingTriggerMessageIds",
+                            &*self.pending_trigger_message_ids,
                         )?;
                 }
                 __map.end()
@@ -106607,6 +106675,17 @@ pub mod __buffa {
             #[must_use]
             pub fn agent_message_hop(&self) -> u32 {
                 self.0.reborrow().agent_message_hop
+            }
+            /// The trigger messages this one reply still has to answer, oldest first: this
+            /// job's own trigger plus the triggers of the queued turns it took over when a
+            /// person sent several short messages in a row. Always at least one element.
+            ///
+            /// Field 31: `pending_trigger_message_ids`
+            #[must_use]
+            pub fn pending_trigger_message_ids(
+                &self,
+            ) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().pending_trigger_message_ids
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ClaimedChannelReplyView<'static>>>

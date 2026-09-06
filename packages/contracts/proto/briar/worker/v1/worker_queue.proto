@@ -1247,6 +1247,10 @@ message ClaimedChannelReply {
   // 0 human-started, 1 the answering Agent, 2 the sender relaying the answer
   // back to the person. Hop 2 may not send again.
   uint32 agent_message_hop = 30;
+  // The trigger messages this one reply still has to answer, oldest first: this
+  // job's own trigger plus the triggers of the queued turns it took over when a
+  // person sent several short messages in a row. Always at least one element.
+  repeated string pending_trigger_message_ids = 31;
 }
 
 enum MergeBatchPhase {

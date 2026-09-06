@@ -285,7 +285,11 @@ describe("Agent-to-Agent messaging", () => {
   };
 
   const startTurn = async (channelId: string, userId: string, body: string) => {
-    const now = new Date().toISOString();
+    // Direct-message conversation turns wait out a short settle window before a
+    // Worker may claim them, so that several short messages sent in a row
+    // become one reply. These turns are claimed immediately, so they are
+    // written as if the person had sent them a moment ago.
+    const now = new Date(Date.now() - 10_000).toISOString();
     const messageId = crypto.randomUUID();
     await createChannelMessage(db, {
       id: messageId,

@@ -544,6 +544,11 @@ const channelReplyFromProto = (
     scope,
     triggerMessageId: value.triggerMessageId,
     parentMessageId: value.parentMessageId,
+    // An older server sends nothing here; the job's own trigger is then the
+    // only message this reply owes an answer to.
+    pendingTriggerMessageIds: value.pendingTriggerMessageIds.length > 0
+      ? value.pendingTriggerMessageIds
+      : [value.triggerMessageId],
     provider: agentProvider(value.provider),
     model: value.model ?? null,
     effort: value.effort ?? null,

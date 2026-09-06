@@ -867,6 +867,7 @@ async function runClaimedChannelReply(
         : null,
       agentMessageHop: agentMessageHop(reply.agentMessageHop),
       skillExecutionTarget: reply.skillExecutionTarget,
+      pendingTriggerMessageIds: reply.pendingTriggerMessageIds,
     });
     let conversationId: string | null =
       reply.session?.conversationId ?? reply.handoffContext?.conversationId ?? null;
