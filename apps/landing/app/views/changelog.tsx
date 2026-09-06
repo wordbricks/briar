@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.210",
+        date: "2026년 9월 7일",
+        title: "DM 진행 메시지가 작업 상황을 그대로 보여줍니다",
+        summary:
+          "에이전트가 일하는 동안 검색·코드 조사·테스트·Computer Use 단계에 맞는 진행 메시지가 표시되고, 도구 없이 즉답할 수 있는 요청은 중간 상태 없이 바로 답합니다. Computer Use 작업은 이제 완료 후 최종 화면 스크린샷을 답변에 첨부합니다. 데스크톱 로그인이 CLI 자격 증명과 어긋나던 문제와 iOS DM 초기 빈 화면·읽음 상태 문제도 함께 고쳤습니다.",
+        items: [
+          "도구 없이 즉답할 수 있는 요청은 중간 상태 없이 최종 답변을 보내고, 검색·코드 조사·테스트·Computer Use는 첫 도구 호출 전에 구체적인 진행 메시지를 보내며 의미 있는 단계가 바뀔 때만 갱신합니다.",
+          "웹·Android 공용 UI와 iOS는 현재 시도의 실제 활동이 있을 때만 진행 상태를 보여주고, 만료되거나 완료된 상태는 자동으로 지웁니다.",
+          "Computer Use 부모 에이전트는 자식 에이전트가 작업 완료를 보고하면 새 스크린샷을 찍어 최종 화면 상태를 확인하고, 구조화된 답변에 첨부합니다.",
+          "데스크톱 앱에서 로그인하면 선택한 세션과 API 주소가 로컬 CLI 설정에도 기록되어 CLI가 이전 사용자로 남아 있던 문제를 고쳤고, 로그아웃 시에는 나중에 따로 한 CLI 로그인을 보존합니다.",
+          "iOS DM에서 마지막 메시지 행의 실제 레이아웃이 끝난 뒤에 초기 위치를 확정해 첫 화면이 빈 상태로 나오던 문제를 고쳤습니다.",
+          "iOS에서 전체 읽음 처리가 세션 버전을 서버·웹 표준 형식에 맞추도록 고쳐 읽음 상태가 새로고침과 재시작 후에도 유지됩니다.",
+        ],
+      },
+      {
         version: "1.2.209",
         date: "2026년 9월 6일",
         title: "에이전트 컴퓨터 화면이 작업 사이에도 유지됩니다",
@@ -1808,6 +1823,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.210",
+        date: "September 7, 2026",
+        title: "DM progress messages now reflect what the Agent is doing",
+        summary:
+          "While an Agent works, progress messages now match the actual search, code research, test, or Computer Use step, and requests that need no tools answer immediately with no intermediate state. Computer Use tasks now attach a final screenshot of the finished screen to the reply. This release also fixes desktop login drifting out of sync with local CLI credentials, plus two iOS fixes for a blank DM on first scroll and inbox read state.",
+        items: [
+          "Requests answerable without tools send the final answer with no intermediate state; search, code research, tests, and Computer Use now send a specific progress message before the first tool call and only update it when the step meaningfully changes.",
+          "The web/Android shared UI and iOS show progress state only while the current attempt has a real activity, and clear stale states when they expire or complete.",
+          "The parent Computer Use Agent takes a fresh screenshot once the Computer Use child reports the task finished, confirms the final on-screen result, and attaches it to the structured reply.",
+          "Signing in on desktop now writes the selected session and API origin to the local CLI config, fixing the CLI staying authenticated as the previous user; signing out preserves an independent later CLI login.",
+          "iOS DMs confirm the initial scroll position after the last message row's real layout finishes, fixing the blank first screen.",
+          "iOS mark-all-read now aligns terminal Agent session versions with the server/web canonical format, so read state survives polling refreshes and relaunches.",
+        ],
+      },
       {
         version: "1.2.209",
         date: "September 6, 2026",
