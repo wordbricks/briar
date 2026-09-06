@@ -66,3 +66,128 @@ fn persists_and_clears_session_without_a_keychain() {
     );
     fs::remove_dir_all(directory).expect("test session directory should be removed");
 }
+
+#[cfg(desktop)]
+#[test]
+fn desktop_login_switches_cli_account_and_api_without_changing_worker_settings() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let session_path = directory.path().join("session.json");
+    let config_path = directory.path().join("cli/config.json");
+    let mut config = default_local_config("https://old.briar.example.com");
+    config.user_token = Some("old-cli-session".to_string());
+    config.worker_device_identity = Some(format!("briar_device_{}", "a".repeat(64)));
+    config.teams.push(LocalTeamConfig {
+        id: "11111111-1111-4111-8111-111111111111".to_string(),
+        repository_path: "/repo".to_string(),
+        api_url: "https://old.briar.example.com".to_string(),
+        agent_token: Some("briar_agent_existing".to_string()),
+        execution_worker: LocalExecutionWorkerConfig {
+            worker_id: "22222222-2222-4222-8222-222222222222".to_string(),
+            device_id: "33333333-3333-4333-8333-333333333333".to_string(),
+            organization_id: "44444444-4444-4444-8444-444444444444".to_string(),
+            label: "Existing Worker".to_string(),
+            max_concurrent_sessions: 2,
+            token: Some("briar_worker_existing".to_string()),
+            ..Default::default()
+        }
+        .into(),
+        ..Default::default()
+    });
+    write_cli_config(&config_path, &config).expect("old CLI config");
+    write_session_token_to(&session_path, "old-app-session".to_string()).expect("old app session");
+
+    write_desktop_session_at(
+        &session_path,
+        &config_path,
+        "https://briar.example.com",
+        "new-session".to_string(),
+    )
+    .expect("login");
+
+    let saved = read_cli_config(&config_path).expect("updated CLI config");
+    assert_eq!(saved.user_token.as_deref(), Some("new-session"));
+    assert_eq!(saved.api_url, "https://briar.example.com");
+    assert_eq!(saved.teams, config.teams);
+    assert_eq!(saved.worker_device_identity, config.worker_device_identity);
+    assert_eq!(saved.agent_providers, config.agent_providers);
+    assert_eq!(
+        read_session_token_from(&session_path).expect("app session"),
+        saved.user_token
+    );
+
+    clear_desktop_session_at(&session_path, &config_path).expect("logout");
+    let cleared = read_cli_config(&config_path).expect("CLI config after logout");
+    assert!(cleared.user_token.is_none());
+    assert_eq!(cleared.teams, config.teams);
+    assert!(read_session_token_from(&session_path)
+        .expect("app logout")
+        .is_none());
+}
+
+#[cfg(desktop)]
+#[test]
+fn desktop_login_initializes_cli_without_a_local_worker() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let session_path = directory.path().join("session.json");
+    let config_path = directory.path().join("cli/config.json");
+    write_desktop_session_at(
+        &session_path,
+        &config_path,
+        "https://briar.example.com",
+        "new-session".to_string(),
+    )
+    .expect("login");
+    let saved = read_cli_config(&config_path).expect("CLI config");
+    assert_eq!(saved.user_token.as_deref(), Some("new-session"));
+    assert_eq!(saved.api_url, "https://briar.example.com");
+    assert!(saved.teams.is_empty());
+}
+
+#[cfg(desktop)]
+#[test]
+fn desktop_logout_preserves_an_independent_cli_login() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let session_path = directory.path().join("session.json");
+    let config_path = directory.path().join("config.json");
+    write_session_token_to(&session_path, "app-session".to_string()).expect("app session");
+    let mut config = default_local_config("https://briar.example.com");
+    config.user_token = Some("separate-cli-session".to_string());
+    write_cli_config(&config_path, &config).expect("CLI config");
+    clear_desktop_session_at(&session_path, &config_path).expect("logout");
+    assert_eq!(
+        read_cli_config(&config_path)
+            .expect("CLI config")
+            .user_token,
+        config.user_token
+    );
+    assert!(read_session_token_from(&session_path)
+        .expect("app session")
+        .is_none());
+}
+
+#[cfg(desktop)]
+#[test]
+fn desktop_login_restores_the_previous_session_if_cli_sync_fails() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let session_path = directory.path().join("session.json");
+    let config_path = directory.path().join("config.json");
+    for previous in [None, Some("previous-session")] {
+        if let Some(token) = previous {
+            write_session_token_to(&session_path, token.to_string()).expect("previous session");
+        }
+        assert!(write_desktop_session_at(
+            &session_path,
+            &config_path,
+            "invalid API URL",
+            "new-session".to_string()
+        )
+        .is_err());
+        assert_eq!(
+            read_session_token_from(&session_path)
+                .expect("session after failure")
+                .as_deref(),
+            previous
+        );
+        assert!(!config_path.exists());
+    }
+}
