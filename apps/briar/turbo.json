@@ -226,7 +226,8 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/package.json"],
       "outputs": [
         "dist-agent/**",
-        "dist-cli/briar-remote-session-agent.js"
+        "dist-cli/briar-remote-session-agent.js",
+        "dist-cli/briar-box-exec.js"
       ],
       "cache": true
     },
