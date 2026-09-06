@@ -876,6 +876,47 @@ pub(super) fn clear_session_token_at(path: &Path) -> Result<(), String> {
     }
 }
 
+/// Desktop and CLI authentication share the account selected in the app.
+#[cfg(desktop)]
+fn write_desktop_session_at(
+    session_path: &Path,
+    config_path: &Path,
+    api_url: &str,
+    token: String,
+) -> Result<(), String> {
+    let mut config = read_cli_config(config_path)?;
+    config.api_url = api_url.to_string();
+    config.user_token = Some(token.clone());
+    let previous_session = read_session_token_from(session_path)?;
+    write_session_token_to(session_path, token)?;
+    if let Err(error) = write_cli_config(config_path, &config) {
+        let rollback = match previous_session {
+            Some(previous) => write_session_token_to(session_path, previous),
+            None => clear_session_token_at(session_path),
+        };
+        return match rollback {
+            Ok(()) => Err(error),
+            Err(rollback_error) => Err(format!("{error}; {rollback_error}")),
+        };
+    }
+    Ok(())
+}
+
+#[cfg(desktop)]
+fn clear_desktop_session_at(session_path: &Path, config_path: &Path) -> Result<(), String> {
+    let session = read_session_token_from(session_path)?;
+    if config_path.exists() {
+        let mut config = read_cli_config(config_path)?;
+        // A separate CLI login made after the desktop login belongs to that
+        // CLI session and must not be signed out by an older app session.
+        if session.is_some() && config.user_token == session {
+            config.user_token = None;
+            write_cli_config(config_path, &config)?;
+        }
+    }
+    clear_session_token_at(session_path)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub(super) fn read_session_token(app: tauri::AppHandle) -> Result<Option<String>, String> {
@@ -884,14 +925,38 @@ pub(super) fn read_session_token(app: tauri::AppHandle) -> Result<Option<String>
 
 #[tauri::command]
 #[specta::specta]
-pub(super) fn write_session_token(app: tauri::AppHandle, token: String) -> Result<(), String> {
-    write_session_token_to(&session_file_path(&app)?, token)
+pub(super) fn write_session_token(
+    app: tauri::AppHandle,
+    token: String,
+    api_url: String,
+) -> Result<(), String> {
+    #[cfg(desktop)]
+    {
+        write_desktop_session_at(
+            &session_file_path(&app)?,
+            &cli_config_path(&app)?,
+            &api_url,
+            token,
+        )
+    }
+    #[cfg(mobile)]
+    {
+        let _ = api_url;
+        write_session_token_to(&session_file_path(&app)?, token)
+    }
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(super) fn clear_session_token(app: tauri::AppHandle) -> Result<(), String> {
-    clear_session_token_at(&session_file_path(&app)?)
+    #[cfg(desktop)]
+    {
+        clear_desktop_session_at(&session_file_path(&app)?, &cli_config_path(&app)?)
+    }
+    #[cfg(mobile)]
+    {
+        clear_session_token_at(&session_file_path(&app)?)
+    }
 }
 
 #[tauri::command]

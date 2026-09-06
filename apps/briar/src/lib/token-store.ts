@@ -1,5 +1,7 @@
 import { commands } from "../generated/tauri";
 
+import { briarApiUrl } from "./api-config";
+
 const TOKEN_KEY = "briar.session-token";
 
 const isTauri = () => "__TAURI_INTERNALS__" in window;
@@ -14,7 +16,7 @@ export async function writeSessionToken(token: string) {
     window.localStorage.setItem(TOKEN_KEY, token);
     return;
   }
-  await commands.writeSessionToken(token);
+  await commands.writeSessionToken(token, briarApiUrl);
 }
 
 export async function clearSessionToken() {
