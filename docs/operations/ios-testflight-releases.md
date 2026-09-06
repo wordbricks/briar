@@ -92,6 +92,47 @@ finds a release blocker, fix the SwiftUI implementation, increment the build
 number, repeat the full gate, and submit the corrected native build. There is no
 Tauri iOS rollback binary or source-retention policy.
 
+## 2026-09-06 — 1.2.208 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.208`
+- App Store Connect build: `1`
+- App Store Connect build ID: `b128322b-edcd-4d13-8c78-1a40a87c742d`
+- Latest main commit: `8e072fe2656dc655bd930d89fcd3ae5e4ebb2e71`
+- Release source commit: `f61e8f97d7d7f585ee53e59671f6692edc87b0b3`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: `bfd7f08da1316b9a76aca969f0fbb447efd58f53d6309ac180a2ab460fad902d`
+
+First TestFlight build since 1.2.172. It carries everything merged in between,
+including the generated Connect contract framework (#1427) and the
+Agent-to-Agent relay rows and read-only Agent conversations (#1723). The
+release passed the shared API contract check, the Swift unit tests, 20 iPhone
+UI tests, the iPad accessibility and largest Dynamic Type checks, the
+Production analyze/build, the keychain and bounded download-memory invariant
+checks, and the retained Tauri Android arm64 debug regression build. The
+archive identity, App Store provisioning profile, distribution signature, and
+production entitlements were verified before the exact exported IPA was
+uploaded.
+
+The release path itself needed two fixes on the way: the mobile gate's
+platform-support probe raced on package resolution when steps ran in parallel
+(#1726), and the archive failed with "BriarContracts does not support
+provisioning profiles" because the release script overrode the provisioning
+profile and bundle identifier for every target, not only the application; the
+profile now travels through `BRIAR_IOS_PROVISIONING_PROFILE`, which only the
+application's Production configuration reads. On the release host the JDK for
+the Android gate had to be selected explicitly (`JAVA_HOME` pointing at the
+Homebrew OpenJDK 17) because the system `java` stub satisfies the `which`
+check without providing a runtime. The manual physical-device checklist items
+(VoiceOver pass, device performance traces, terminated-app push delivery) were
+not part of this upload.
+
 ## 2026-08-30 — 1.2.172 (1)
 
 - App: Briar Companion (`app.briar.companion`)
