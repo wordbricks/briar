@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { unlink } from "node:fs/promises";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import { buildComputerUseArgs } from "@briar/agent-exec";
@@ -94,6 +94,7 @@ import { runClaimedDmMemory } from "./dm-memory-learning";
 import { runDetachedProviderTurn } from "./detached-provider-turn";
 import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 import { ComputerUseBoxClient } from "./computer-use-box-client";
+import { agentBundleCandidates } from "./agent-bundle-path";
 import { defaultComputerUseScreenshotDirectory } from "./computer-use-native-executor";
 import { supportsComputerUseProvider } from
   "../src/lib/computer-use-contract";
@@ -219,10 +220,10 @@ const inspectComputerUseCapability = async (
   if (!computerUseHost || computerUseProviders.length === 0) {
     return undefined;
   }
-  const mcpServerPath = [
-    resolve(import.meta.dir, "agent/computer-use-mcp-server.js"),
-    resolve(import.meta.dir, "../dist-agent/computer-use-mcp-server.js"),
-  ].find((path) => Bun.file(path).size > 0);
+  const mcpServerPath = agentBundleCandidates(
+    import.meta.dir,
+    "computer-use-mcp-server.js",
+  ).find((path) => Bun.file(path).size > 0);
   if (!mcpServerPath) return undefined;
   try {
     const response = await fetch("http://127.0.0.1:1337/healthz", {
