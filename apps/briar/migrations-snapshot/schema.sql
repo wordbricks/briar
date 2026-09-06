@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 61551eb07a9c049e26319dacdca5ec39f0a5aa6884800bef43aa471b9c463f4c
--- snapshot-digest: 5304ab5121f0cb8e88891c00e2d7fa4c33ea6ba394420fe89eab81b431da0101
+-- migrations-digest: a9100bcea659ec704bc5df4e33309ecc5f3ed906616460c51a7dd9116d2f3771
+-- snapshot-digest: c6bc5d878c25c983be1d8391dcd32a14314111290e56741dba3362fe566b5d60
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1868,6 +1868,34 @@ CREATE TABLE briar_production_operation_leases (
     check (expires_at > acquired_at)
 ) strict;
 -- @statement
+CREATE TABLE briar_channel_sidebar_sections (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  user_id text not null references "user" (id) on delete cascade,
+  name text not null check (length(trim(name)) between 1 and 60),
+  position integer not null,
+  created_at text not null,
+  updated_at text not null
+);
+-- @statement
+CREATE TABLE briar_channel_sidebar_preferences (
+  user_id text not null references "user" (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  pinned_at text,
+  section_id text
+    references briar_channel_sidebar_sections (id) on delete set null,
+  hidden_at text,
+  updated_at text not null,
+  primary key (user_id, channel_id)
+);
+-- @statement
+CREATE TABLE briar_agent_providers (
+  provider text primary key not null,
+  proto_name text not null unique
+    check (proto_name = 'AGENT_PROVIDER_' || upper(provider))
+) strict;
+-- @statement
 CREATE TABLE briar_agent_skill_execution_approval_audit (
   id text primary key not null,
   proposal_id text not null unique,
@@ -1888,8 +1916,7 @@ CREATE TABLE briar_agent_skill_execution_approval_audit (
   skill_name text not null,
   skill_instructions text not null,
   skill_kind text not null check (skill_kind in ('issue_processing', 'custom')),
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
+  provider text not null,
   model text,
   effort text check (
     effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
@@ -1905,7 +1932,8 @@ CREATE TABLE briar_agent_skill_execution_approval_audit (
   created_at text not null
 , execution_mode text not null default 'task'
   check (execution_mode in ('conversation', 'task')), approval_policy text not null default 'explicit'
-  check (approval_policy in ('invoke_is_consent', 'explicit')), thread_root_message_id text, result_reply_job_id text, result_message_id text);
+  check (approval_policy in ('invoke_is_consent', 'explicit')), thread_root_message_id text, result_reply_job_id text, result_message_id text,
+  foreign key ("provider") references briar_agent_providers (provider));
 -- @statement
 CREATE TABLE briar_agent_skill_execution_proposals (
   id text primary key not null,
@@ -1932,8 +1960,7 @@ CREATE TABLE briar_agent_skill_execution_proposals (
   ),
   skill_instructions text not null check (length(skill_instructions) <= 20000),
   skill_kind text not null check (skill_kind in ('issue_processing', 'custom')),
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
+  provider text not null,
   model text check (
     model is null or length(trim(model)) between 1 and 100
   ),
@@ -1974,7 +2001,8 @@ CREATE TABLE briar_agent_skill_execution_proposals (
       and requested_worker_label is not null and result_session_id is not null
       and accepted_at is not null)
     or status = 'invalidated'
-  )
+  ),
+  foreign key ("provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE IF NOT EXISTS "briar_project_agents" (
@@ -1992,8 +2020,7 @@ CREATE TABLE IF NOT EXISTS "briar_project_agents" (
     )
   ),
   name text not null check (length(trim(name)) between 1 and 100),
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
+  provider text not null,
   model text check (
     model is null or (model = trim(model) and length(model) between 1 and 100)
   ),
@@ -2038,7 +2065,8 @@ CREATE TABLE IF NOT EXISTS "briar_project_agents" (
     designated_worker_label is null
     or length(trim(designated_worker_label)) between 1 and 100
   ), computer_use_policy text not null default 'disabled'
-check (computer_use_policy in ('disabled', 'unattended')));
+check (computer_use_policy in ('disabled', 'unattended')),
+  foreign key ("provider") references briar_agent_providers (provider));
 -- @statement
 CREATE TABLE briar_agent_skills (
   id text primary key not null,
@@ -2048,8 +2076,7 @@ CREATE TABLE briar_agent_skills (
     name = trim(name) and length(name) between 1 and 100
   ),
   body text not null default '' check (length(body) <= 20000),
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
+  provider text not null,
   model text check (
     model is null or (model = trim(model) and length(model) between 1 and 100)
   ),
@@ -2065,7 +2092,8 @@ CREATE TABLE briar_agent_skills (
 , description text not null default ''
   check (length(description) <= 1000), execution_mode text not null
   default 'task' check (execution_mode in ('conversation', 'task')), approval_policy text not null
-  default 'explicit' check (approval_policy in ('invoke_is_consent', 'explicit')));
+  default 'explicit' check (approval_policy in ('invoke_is_consent', 'explicit')),
+  foreign key ("provider") references briar_agent_providers (provider));
 -- @statement
 CREATE TABLE IF NOT EXISTS "briar_hunt_runs" (
   run_number integer primary key autoincrement,
@@ -2163,14 +2191,8 @@ CREATE TABLE IF NOT EXISTS "briar_hunt_runs" (
   dispatch_mode text check (dispatch_mode in ('any', 'specific')),
   dispatch_request_id text,
   dispatched_at text,
-  requested_agent_provider text check (
-    requested_agent_provider is null
-    or requested_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
-  ),
-  preferred_agent_provider text check (
-    preferred_agent_provider is null
-    or preferred_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
-  ),
+  requested_agent_provider text,
+  preferred_agent_provider text,
   preferred_agent_model text check (
     preferred_agent_model is null
     or length(trim(preferred_agent_model)) between 1 and 100
@@ -2205,7 +2227,9 @@ CREATE TABLE IF NOT EXISTS "briar_hunt_runs" (
   check (
     (stage in ('completed', 'cancelled') and completed_at is not null)
     or (stage not in ('completed', 'cancelled') and completed_at is null)
-  )
+  ),
+  foreign key ("requested_agent_provider") references briar_agent_providers (provider),
+  foreign key ("preferred_agent_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE IF NOT EXISTS "briar_agent_transcript_sessions" (
@@ -2215,12 +2239,12 @@ CREATE TABLE IF NOT EXISTS "briar_agent_transcript_sessions" (
   project_id text not null references briar_projects (id) on delete cascade,
   run_id text references briar_hunt_runs (id) on delete cascade,
   worker_id text references briar_execution_workers (id) on delete set null,
-  agent_provider text not null
-    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
+  agent_provider text not null,
   started_at text not null,
   last_event_at text not null,
   event_count integer not null default 0 check (event_count >= 0),
-  byte_count integer not null default 0 check (byte_count >= 0)
+  byte_count integer not null default 0 check (byte_count >= 0),
+  foreign key ("agent_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_agent_transcript_segments (
@@ -2312,10 +2336,7 @@ CREATE TABLE IF NOT EXISTS "briar_channel_messages" (
     author_agent_name is null
     or length(trim(author_agent_name)) between 1 and 100
   ),
-  author_agent_provider text check (
-    author_agent_provider is null
-    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
-  ),
+  author_agent_provider text,
   author_webhook_id text
     references briar_channel_webhooks (id) on delete set null,
   author_webhook_name text check (
@@ -2349,7 +2370,8 @@ CREATE TABLE IF NOT EXISTS "briar_channel_messages" (
   check (
     (author_webhook_name is null and webhook_event_id is null)
     or author_webhook_name is not null
-  )
+  ),
+  foreign key ("author_agent_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_channel_reply_sessions (
@@ -2362,11 +2384,7 @@ CREATE TABLE briar_channel_reply_sessions (
   project_id text references briar_projects (id) on delete set null,
   agent_id text not null
     references briar_project_agents (id) on delete cascade,
-  provider text not null check (
-    provider in (
-      'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter', 'vertex', 'pi'
-    )
-  ),
+  provider text not null,
   model text,
   effort text,
   owner_device_id text
@@ -2389,7 +2407,8 @@ CREATE TABLE briar_channel_reply_sessions (
   check (
     (owner_device_id is null and owner_worker_id is null)
     or (owner_device_id is not null and owner_worker_id is not null)
-  )
+  ),
+  foreign key ("provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_channel_agent_reply_jobs (
@@ -2407,10 +2426,7 @@ CREATE TABLE briar_channel_agent_reply_jobs (
   reply_message_id text not null unique,
   status text not null default 'queued'
     check (status in ('queued', 'running', 'completed', 'failed')),
-  agent_provider text check (
-    agent_provider is null
-    or agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
-  ),
+  agent_provider text,
   claimed_device_id text
     references briar_execution_worker_devices (id) on delete set null,
   claim_token_hash text,
@@ -2443,7 +2459,8 @@ CREATE TABLE briar_channel_agent_reply_jobs (
   references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0, agent_message_hop integer not null default 0
     check (agent_message_hop between 0 and 2), origin_reply_job_id text
     references briar_channel_agent_reply_jobs (id) on delete cascade, superseded_by_reply_job_id text,
-  unique (channel_id, trigger_message_id, agent_id)
+  unique (channel_id, trigger_message_id, agent_id),
+  foreign key ("agent_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_channel_agents (
@@ -2533,6 +2550,18 @@ CREATE TABLE briar_channel_message_reactions (
   ),
   created_at text not null,
   primary key (message_id, user_id, emoji)
+);
+-- @statement
+CREATE TABLE briar_channel_message_relays (
+  message_id text primary key not null
+    references briar_channel_messages (id) on delete cascade,
+  direction text not null check (direction in ('outbound', 'inbound')),
+  peer_channel_id text not null references briar_channels (id) on delete cascade,
+  peer_message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  origin_reply_job_id text not null
+    references briar_channel_agent_reply_jobs (id) on delete cascade,
+  created_at text not null
 );
 -- @statement
 CREATE TABLE IF NOT EXISTS "briar_channel_notification_inbox" (
@@ -2717,17 +2746,15 @@ CREATE TABLE IF NOT EXISTS "briar_issue_messages" (
   run_id text not null references briar_hunt_runs (id) on delete cascade,
   parent_message_id text,
   author_user_id text references "user" (id) on delete set null,
-  author_agent_provider text check (
-    author_agent_provider is null
-    or author_agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
-  ),
+  author_agent_provider text,
   body text not null check (
     body = trim(body) and length(body) between 1 and 10000
   ),
   created_at text not null,
   updated_at text not null, author_agent_id text
   references briar_project_agents (id) on delete set null, author_agent_name text,
-  check (parent_message_id is null or parent_message_id <> id)
+  check (parent_message_id is null or parent_message_id <> id),
+  foreign key ("author_agent_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_issue_agent_reply_jobs (
@@ -2750,10 +2777,8 @@ CREATE TABLE briar_issue_agent_reply_jobs (
     references briar_execution_workers (id) on delete set null,
   claimed_worker_id text
     references briar_execution_workers (id) on delete set null,
-  preferred_provider text
-    check (preferred_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
-  agent_provider text
-    check (agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
+  preferred_provider text,
+  agent_provider text,
   claim_token_hash text,
   claimed_at text,
   lease_expires_at text,
@@ -2774,7 +2799,9 @@ CREATE TABLE briar_issue_agent_reply_jobs (
   selected_skill_effort_snapshot text,
   skill_execution_request_snapshot text, planned_update_resume integer not null
   default 0 check (planned_update_resume in (0, 1)),
-  unique (project_id, trigger_message_id, agent_id)
+  unique (project_id, trigger_message_id, agent_id),
+  foreign key ("preferred_provider") references briar_agent_providers (provider),
+  foreign key ("agent_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_issue_attachments (
@@ -2849,8 +2876,7 @@ CREATE TABLE briar_issue_execution_approval_audit (
   generation integer not null,
   approved_by_user_id text references "user" (id) on delete set null,
   approved_at text not null,
-  provider text not null
-    check (provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')),
+  provider text not null,
   model text,
   effort text check (
     effort is null or effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
@@ -2859,7 +2885,8 @@ CREATE TABLE briar_issue_execution_approval_audit (
   dispatch_request_id text not null unique,
   proposed_by_agent_id text,
   delegated_by_agent_id text,
-  created_at text not null
+  created_at text not null,
+  foreign key ("provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_issue_execution_proposals (
@@ -2891,10 +2918,7 @@ CREATE TABLE briar_issue_execution_proposals (
   approval_reserved_by_user_id text
     references "user" (id) on delete set null,
   approval_reserved_at text,
-  requested_provider text check (
-    requested_provider is null
-    or requested_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
-  ),
+  requested_provider text,
   requested_model text check (
     requested_model is null
     or length(trim(requested_model)) between 1 and 100
@@ -2932,7 +2956,8 @@ CREATE TABLE briar_issue_execution_proposals (
     (approval_reserved_at is not null
       and requested_provider is not null
       and dispatch_request_id is not null)
-  )
+  ),
+  foreign key ("requested_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_issue_key_aliases (
@@ -3337,9 +3362,7 @@ CREATE TABLE briar_run_cost_records (
   scope_id text check (
     scope_id is null or length(trim(scope_id)) between 1 and 512
   ),
-  agent_provider text not null check (
-    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
-  ),
+  agent_provider text not null,
   model_provider text check (
     model_provider is null or length(trim(model_provider)) between 1 and 256
   ),
@@ -3362,7 +3385,8 @@ CREATE TABLE briar_run_cost_records (
   ),
   observed_at text not null,
   recorded_at text not null,
-  primary key (execution_id, cost_key)
+  primary key (execution_id, cost_key),
+  foreign key ("agent_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_run_evidence (
@@ -3530,9 +3554,7 @@ CREATE TABLE briar_run_usage_records (
   session_id text,
   turn_id text,
   scope_id text,
-  agent_provider text not null check (
-    agent_provider in ('codex', 'claude', 'grok', 'opencode', 'agy', 'cursor', 'openrouter', 'vertex', 'pi')
-  ),
+  agent_provider text not null,
   model_provider text,
   model text,
   canonical_model text,
@@ -3574,41 +3596,8 @@ CREATE TABLE briar_run_usage_records (
     )
   ),
 
-  primary key (execution_id, usage_key)
-);
--- @statement
-CREATE TABLE briar_channel_sidebar_sections (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  user_id text not null references "user" (id) on delete cascade,
-  name text not null check (length(trim(name)) between 1 and 60),
-  position integer not null,
-  created_at text not null,
-  updated_at text not null
-);
--- @statement
-CREATE TABLE briar_channel_sidebar_preferences (
-  user_id text not null references "user" (id) on delete cascade,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  pinned_at text,
-  section_id text
-    references briar_channel_sidebar_sections (id) on delete set null,
-  hidden_at text,
-  updated_at text not null,
-  primary key (user_id, channel_id)
-);
--- @statement
-CREATE TABLE briar_channel_message_relays (
-  message_id text primary key not null
-    references briar_channel_messages (id) on delete cascade,
-  direction text not null check (direction in ('outbound', 'inbound')),
-  peer_channel_id text not null references briar_channels (id) on delete cascade,
-  peer_message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  origin_reply_job_id text not null
-    references briar_channel_agent_reply_jobs (id) on delete cascade,
-  created_at text not null
+  primary key (execution_id, usage_key),
+  foreign key ("agent_provider") references briar_agent_providers (provider)
 );
 -- @statement
 CREATE TABLE briar_whatsapp_connections (
@@ -3642,25 +3631,6 @@ CREATE TABLE briar_whatsapp_connections (
     (status = 'connected' and disconnected_at is null)
     or (status = 'disconnected' and disconnected_at is not null)
   )
-);
--- @statement
-CREATE TABLE briar_whatsapp_user_links (
-  id text primary key not null,
-  connection_id text not null
-    references briar_whatsapp_connections (id) on delete cascade,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  user_id text not null references "user" (id) on delete cascade,
-  phone_number text not null check (
-    length(phone_number) between 8 and 20
-    and phone_number not glob '*[^0-9]*'
-  ),
-  created_by_user_id text references "user" (id) on delete set null,
-  last_inbound_at text,
-  created_at text not null,
-  updated_at text not null,
-  unique (connection_id, user_id),
-  unique (connection_id, phone_number)
 );
 -- @statement
 CREATE TABLE briar_whatsapp_events (
@@ -3727,6 +3697,25 @@ CREATE TABLE briar_whatsapp_outbox (
   )
 );
 -- @statement
+CREATE TABLE briar_whatsapp_user_links (
+  id text primary key not null,
+  connection_id text not null
+    references briar_whatsapp_connections (id) on delete cascade,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  user_id text not null references "user" (id) on delete cascade,
+  phone_number text not null check (
+    length(phone_number) between 8 and 20
+    and phone_number not glob '*[^0-9]*'
+  ),
+  created_by_user_id text references "user" (id) on delete set null,
+  last_inbound_at text,
+  created_at text not null,
+  updated_at text not null,
+  unique (connection_id, user_id),
+  unique (connection_id, phone_number)
+);
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -3748,6 +3737,24 @@ INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active",
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-9','getbriar-jay-9','Managed computer pilot Jay slot 9',1,'2026-09-03T00:00:00.000Z','2026-09-03T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-10','getbriar-jay-10','Managed computer pilot Jay slot 10',1,'2026-09-03T00:00:00.000Z','2026-09-03T00:00:00.000Z');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('codex','AGENT_PROVIDER_CODEX');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('claude','AGENT_PROVIDER_CLAUDE');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('cursor','AGENT_PROVIDER_CURSOR');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('grok','AGENT_PROVIDER_GROK');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('agy','AGENT_PROVIDER_AGY');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('opencode','AGENT_PROVIDER_OPENCODE');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('openrouter','AGENT_PROVIDER_OPENROUTER');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('vertex','AGENT_PROVIDER_VERTEX');
+-- @statement
+INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('pi','AGENT_PROVIDER_PI');
 -- @statement
 CREATE VIEW briar_run_child_storage_a_project_mismatches as
 select child.project_id as stale_project_id,
@@ -3957,36 +3964,16 @@ end;
 -- @statement
 CREATE VIEW briar_execution_worker_healthy_providers as
 select worker.id as worker_id,
-       case json_extract(health.value, '$.provider')
-         when 'AGENT_PROVIDER_CODEX' then 'codex'
-         when 'AGENT_PROVIDER_CLAUDE' then 'claude'
-         when 'AGENT_PROVIDER_CURSOR' then 'cursor'
-         when 'AGENT_PROVIDER_GROK' then 'grok'
-         when 'AGENT_PROVIDER_AGY' then 'agy'
-         when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
-         when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
-         when 'AGENT_PROVIDER_VERTEX' then 'vertex'
-         when 'AGENT_PROVIDER_PI' then 'pi'
-       end as provider,
-       case json_extract(worker.runtime_proto_json, '$.agentProvider')
-         when 'AGENT_PROVIDER_CODEX' then 'codex'
-         when 'AGENT_PROVIDER_CLAUDE' then 'claude'
-         when 'AGENT_PROVIDER_CURSOR' then 'cursor'
-         when 'AGENT_PROVIDER_GROK' then 'grok'
-         when 'AGENT_PROVIDER_AGY' then 'agy'
-         when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
-         when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
-         when 'AGENT_PROVIDER_VERTEX' then 'vertex'
-         when 'AGENT_PROVIDER_PI' then 'pi'
-       end as agent_provider
+       health_provider.provider as provider,
+       runtime_provider.provider as agent_provider
 from briar_execution_workers worker,
      json_each(worker.runtime_proto_json, '$.providerHealth') health
-where json_extract(health.value, '$.healthy') = 1
-  and json_extract(health.value, '$.provider') in (
-    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX', 'AGENT_PROVIDER_PI'
-  );
+join briar_agent_providers health_provider
+  on health_provider.proto_name = json_extract(health.value, '$.provider')
+left join briar_agent_providers runtime_provider
+  on runtime_provider.proto_name
+     = json_extract(worker.runtime_proto_json, '$.agentProvider')
+where json_extract(health.value, '$.healthy') = 1;
 -- @statement
 CREATE VIEW briar_invalid_execution_worker_runtime as
 select worker.id
@@ -3996,29 +3983,26 @@ where not (
   and json_type(worker.runtime_proto_json) = 'object'
   and length(cast(worker.runtime_proto_json as blob)) <= 1048576
   and json_extract(worker.runtime_proto_json, '$.agentProvider') in (
-    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX', 'AGENT_PROVIDER_PI'
+    select proto_name from briar_agent_providers
   )
   and json_type(worker.runtime_proto_json, '$.providerHealth') = 'array'
-  and json_array_length(worker.runtime_proto_json, '$.providerHealth') = 9
+  and json_array_length(worker.runtime_proto_json, '$.providerHealth')
+    = (select count(*) from briar_agent_providers)
   and (
     select count(distinct json_extract(health.value, '$.provider'))
     from json_each(worker.runtime_proto_json, '$.providerHealth') health
     where health.type = 'object'
       and json_extract(health.value, '$.provider') in (
-        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX', 'AGENT_PROVIDER_PI'
+        select proto_name from briar_agent_providers
       )
-  ) = 9
+  ) = (select count(*) from briar_agent_providers)
   and json_type(worker.runtime_proto_json, '$.capabilities') = 'object'
   and json_type(
     worker.runtime_proto_json, '$.capabilities.providerCapabilities'
   ) = 'array'
   and json_array_length(
     worker.runtime_proto_json, '$.capabilities.providerCapabilities'
-  ) = 9
+  ) = (select count(*) from briar_agent_providers)
   and (
     select count(distinct json_extract(capability.value, '$.provider'))
     from json_each(
@@ -4026,11 +4010,9 @@ where not (
     ) capability
     where capability.type = 'object'
       and json_extract(capability.value, '$.provider') in (
-        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER', 'AGENT_PROVIDER_VERTEX', 'AGENT_PROVIDER_PI'
+        select proto_name from briar_agent_providers
       )
-  ) = 9
+  ) = (select count(*) from briar_agent_providers)
   and (
     json_type(worker.runtime_proto_json, '$.versions') is null
     or json_type(worker.runtime_proto_json, '$.versions') = 'object'
@@ -4453,6 +4435,18 @@ CREATE UNIQUE INDEX "deviceCode_deviceCode_uidx"
 -- @statement
 CREATE UNIQUE INDEX "deviceCode_userCode_uidx"
   on "deviceCode" ("userCode");
+-- @statement
+CREATE INDEX briar_managed_computers_provider_idx
+  on briar_managed_computers (provider, state);
+-- @statement
+CREATE INDEX briar_channel_sidebar_sections_user_idx
+  on briar_channel_sidebar_sections (user_id, organization_id, position);
+-- @statement
+CREATE INDEX briar_channel_sidebar_preferences_channel_idx
+  on briar_channel_sidebar_preferences (channel_id);
+-- @statement
+CREATE INDEX briar_channel_sidebar_preferences_section_idx
+  on briar_channel_sidebar_preferences (section_id);
 -- @statement
 CREATE INDEX briar_hunt_events_run_idx
   on briar_hunt_events (run_id, occurred_at desc, id desc);
@@ -4955,18 +4949,6 @@ CREATE INDEX briar_channel_message_attachments_message_idx
 -- @statement
 CREATE INDEX briar_channel_message_attachments_channel_idx
   on briar_channel_message_attachments (organization_id, channel_id, message_id);
--- @statement
-CREATE INDEX briar_managed_computers_provider_idx
-  on briar_managed_computers (provider, state);
--- @statement
-CREATE INDEX briar_channel_sidebar_sections_user_idx
-  on briar_channel_sidebar_sections (user_id, organization_id, position);
--- @statement
-CREATE INDEX briar_channel_sidebar_preferences_channel_idx
-  on briar_channel_sidebar_preferences (channel_id);
--- @statement
-CREATE INDEX briar_channel_sidebar_preferences_section_idx
-  on briar_channel_sidebar_preferences (section_id);
 -- @statement
 CREATE INDEX briar_channel_agent_reply_jobs_agent_message_origin_idx
   on briar_channel_agent_reply_jobs (
