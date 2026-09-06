@@ -68,6 +68,45 @@ enum ChannelReplySummaryPresentation {
     }
 }
 
+/*
+  The two ends of an Agent-to-Agent round trip, as they appear in the person's
+  own conversation.
+
+  The Agent that was asked to reach another one leaves a short notice behind
+  ("메시지 보냄 → B") rather than a bubble, because the text it sent belongs to
+  the Agent-to-Agent conversation and is only summarised here; the answer that
+  comes back *is* a bubble, authored by the other Agent, so it carries a label
+  saying where it came from. Both link through to the read-only conversation.
+*/
+enum ChannelRelayPresentation {
+    static func sentTo(_ name: String, locale: CompanionLocale) -> String {
+        String(format: L10n.text(.dmRelaySentTo, locale: locale), name)
+    }
+
+    static func pending(_ name: String, locale: CompanionLocale) -> String {
+        String(format: L10n.text(.dmRelayPending, locale: locale), name)
+    }
+
+    static func failed(_ name: String, locale: CompanionLocale) -> String {
+        String(format: L10n.text(.dmRelayFailed, locale: locale), name)
+    }
+
+    static func from(_ name: String, locale: CompanionLocale) -> String {
+        String(format: L10n.text(.dmRelayFrom, locale: locale), name)
+    }
+
+    static func open(_ name: String, locale: CompanionLocale) -> String {
+        String(format: L10n.text(.dmRelayOpen, locale: locale), name)
+    }
+
+    static func identifier(
+        direction: ChannelMessage.Relay.Direction,
+        messageID: UUID
+    ) -> String {
+        "dm-relay-\(direction.rawValue)-\(messageID.uuidString.lowercased())"
+    }
+}
+
 /// Home: the organization's channels, grouped by project with section dividers.
 struct ChannelsHomeView: View {
     @ObservedObject var channels: ChannelsStore
@@ -421,8 +460,21 @@ private struct ChannelRow: View {
     }
 }
 
+/// Pushes a read-only Agent-to-Agent conversation. It carries the channel it
+/// already fetched, because the catalog does not hold one and the destination
+/// would have nothing to look the id up in.
+struct AgentConversationRoute: Hashable, Identifiable {
+    let channel: ChannelSummary
+    /// The counterpart of the relay row that opened it, when the page it lands
+    /// on happens to contain that message.
+    let focusedMessageID: UUID?
+
+    var id: UUID { channel.id }
+}
+
 /// A channel's root messages. Tapping one opens its thread.
 struct ChannelMessagesView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var channels: ChannelsStore
     @ObservedObject var navigation: CompanionNavigationModel
     @AppStorage("companion-locale") private var localeRaw = CompanionLocale.ko.rawValue
@@ -431,6 +483,8 @@ struct ChannelMessagesView: View {
     @State private var selectedThread: ChannelThreadRoute?
     @State private var selectedProfile: ConversationProfileTarget?
     @State private var memoryStore: DmMemoryStore?
+    @State private var agentConversation: AgentConversationRoute?
+    @State private var openingAgentConversation = false
 
     let channel: ChannelSummary
     let currentUserID: String?
@@ -440,14 +494,27 @@ struct ChannelMessagesView: View {
     let onIssueOpen: ChannelIssueOpenHandler
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     let onSkillSessionOpen: SkillSessionOpenHandler
+    /// Opens on this message when the first page holds it. Only a relay row
+    /// asks for one today.
+    var focusedMessageID: UUID? = nil
 
     private var locale: CompanionLocale {
         CompanionLocale(rawValue: localeRaw) ?? .ko
     }
 
+    /*
+      An Agent-to-Agent conversation is held by whoever opened it rather than by
+      the catalog, so the live copy of a read-only channel comes from the store's
+      own property instead of the list every other conversation is found in.
+    */
     private var currentChannel: ChannelSummary {
-        channels.channels.first(where: { $0.id == channel.id }) ?? channel
+        if let held = channels.openAgentConversation, held.id == channel.id {
+            return held
+        }
+        return channels.channels.first(where: { $0.id == channel.id }) ?? channel
     }
+
+    private var isReadOnly: Bool { currentChannel.readOnly }
 
     private var displayTitle: String {
         currentChannel.isDirectMessage
@@ -481,13 +548,31 @@ struct ChannelMessagesView: View {
             onOpenThread: currentChannel.isDirectMessage
                 ? nil
                 : { openThread(from: $0) },
-            showsThreadSummary: !currentChannel.isDirectMessage
+            showsThreadSummary: !currentChannel.isDirectMessage,
+            focusedMessageID: focusedMessageID,
+            onOpenRelay: { openRelay($0) }
         )
         .navigationTitle(currentChannel.isDirectMessage ? "" : displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .channelNavigationSubtitle(currentChannel.isDirectMessage ? nil : navigationSubtitle)
+        .navigationBarBackButtonHidden(isReadOnly)
         .toolbar {
-            if currentChannel.isDirectMessage {
+            if isReadOnly {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Label(
+                            L10n.text(.dmAgentConversationBack, locale: locale),
+                            systemImage: "chevron.left"
+                        )
+                    }
+                    .accessibilityIdentifier("dm-agent-conversation-back")
+                }
+            }
+            // The memory sheet belongs to a person's own conversation. An
+            // Agent-to-Agent one is outside DM memory entirely.
+            if currentChannel.isDirectMessage, !isReadOnly {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(locale == .ko ? "기억" : "Memory", systemImage: "brain") {
                         memoryStore = channels.makeMemoryStore(channelID: channel.id)
@@ -503,7 +588,8 @@ struct ChannelMessagesView: View {
                         members: channels.members,
                         agents: channels.agents,
                         locale: locale,
-                        onSelect: { selectedProfile = $0 }
+                        onSelect: { selectedProfile = $0 },
+                        allowsProfileSelection: !isReadOnly
                     )
                 }
             } else {
@@ -543,6 +629,21 @@ struct ChannelMessagesView: View {
                 onSkillSessionOpen: onSkillSessionOpen
             )
         }
+        .navigationDestination(item: $agentConversation) { route in
+            ChannelMessagesView(
+                channels: channels,
+                navigation: navigation,
+                channel: route.channel,
+                currentUserID: currentUserID,
+                projects: projects,
+                providers: providers,
+                workers: workers,
+                onIssueOpen: onIssueOpen,
+                onSkillSessionMaterialized: onSkillSessionMaterialized,
+                onSkillSessionOpen: onSkillSessionOpen,
+                focusedMessageID: route.focusedMessageID
+            )
+        }
         .onChange(of: navigation.pendingChannelThread) { _, _ in
             applyPendingInboxThread()
         }
@@ -568,6 +669,30 @@ struct ChannelMessagesView: View {
                     )
                 }
             }
+        }
+        .overlay {
+            if openingAgentConversation {
+                ChannelLoadingIndicator(
+                    accessibilityID: "dm-agent-conversation-loading",
+                    label: L10n.text(.dmAgentConversationLoading, locale: locale)
+                )
+            }
+        }
+    }
+
+    /// A relay row names a conversation the catalog does not hold, so it is
+    /// fetched here before the push rather than looked up in the list.
+    private func openRelay(_ relay: ChannelMessage.Relay) {
+        guard !openingAgentConversation, agentConversation == nil else { return }
+        openingAgentConversation = true
+        Task { @MainActor in
+            let peer = await channels.loadAgentConversation(relay.peerChannelId)
+            openingAgentConversation = false
+            guard let peer else { return }
+            agentConversation = AgentConversationRoute(
+                channel: peer,
+                focusedMessageID: relay.peerMessageId
+            )
         }
     }
 
@@ -694,6 +819,9 @@ private struct DirectMessageNavigationTitle: View {
     let agents: [ChannelAgentSummary]
     let locale: CompanionLocale
     let onSelect: (ConversationProfileTarget) -> Void
+    /// A read-only Agent conversation names its two Agents but offers no
+    /// profile actions, so the pill is plain there.
+    var allowsProfileSelection = true
 
     private var participants: [DirectMessageParticipant] {
         channel.directMessageParticipants(excluding: currentUserID)
@@ -705,7 +833,11 @@ private struct DirectMessageNavigationTitle: View {
 
     var body: some View {
         Group {
-            if participants.count > 1 {
+            if !allowsProfileSelection {
+                identityPill
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("channel-header-identity")
+            } else if participants.count > 1 {
                 Menu {
                     ForEach(participants, id: \.profileKey) { participant in
                         Button {
@@ -1105,6 +1237,8 @@ private struct ChannelConversationView: View {
     let onOpenThread: ((ChannelMessage) -> Void)?
     let showsThreadSummary: Bool
     var focusedMessageID: UUID? = nil
+    /// A relay row can link into the Agent-to-Agent conversation it names.
+    var onOpenRelay: ((ChannelMessage.Relay) -> Void)? = nil
     @State private var skillResultMessageID: UUID?
     @State private var showingErrorToast = false
     @State private var errorToastMessage = ""
@@ -1131,6 +1265,9 @@ private struct ChannelConversationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if channel.readOnly {
+                ChannelReadOnlyBadge(locale: locale)
+            }
             ConversationTimeline(
                 messages: messages,
                 locale: locale,
@@ -1274,7 +1411,8 @@ private struct ChannelConversationView: View {
                             projects: projects,
                             providers: providers,
                             workers: workers,
-                            showsThreadSummary: showsThreadSummary
+                            showsThreadSummary: showsThreadSummary,
+                            onOpenRelay: onOpenRelay
                 )
             }
             .sheet(item: $citedMemory) { route in
@@ -1307,26 +1445,30 @@ private struct ChannelConversationView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
             }
-            ChannelComposer(
-                draft: $draft,
-                sending: channels.sending,
-                candidates: mentionCandidates,
-                placeholder: String(
-                    format: L10n.text(.channelMessagePlaceholder, locale: locale),
-                    channel.name
-                ),
-                locale: locale,
-                send: { body, mentions, attachments in
-                    await channels.send(
-                        channelID: channel.id,
-                        parentMessageID: parentMessageID,
-                        body: body,
-                        currentUserID: currentUserID,
-                        mentions: mentions,
-                        attachments: attachments
-                    )
-                }
-            )
+            // Nobody writes into an Agent-to-Agent conversation, so it has no
+            // composer at all rather than a disabled one.
+            if !channel.readOnly {
+                ChannelComposer(
+                    draft: $draft,
+                    sending: channels.sending,
+                    candidates: mentionCandidates,
+                    placeholder: String(
+                        format: L10n.text(.channelMessagePlaceholder, locale: locale),
+                        channel.name
+                    ),
+                    locale: locale,
+                    send: { body, mentions, attachments in
+                        await channels.send(
+                            channelID: channel.id,
+                            parentMessageID: parentMessageID,
+                            body: body,
+                            currentUserID: currentUserID,
+                            mentions: mentions,
+                            attachments: attachments
+                        )
+                    }
+                )
+            }
         }
         .companionToast(
             isPresented: $showingErrorToast,
@@ -1406,6 +1548,8 @@ private struct ChannelMessageRow: View {
     let providers: [AgentProvider]
     let workers: [DashboardWorker]
     var showsThreadSummary = false
+    /// Opens the Agent-to-Agent conversation a relay row points at.
+    var onOpenRelay: ((ChannelMessage.Relay) -> Void)? = nil
     @State private var showingThreadActions = false
     @State private var linkCopied = false
     @State private var messageCopied = false
@@ -1436,12 +1580,41 @@ private struct ChannelMessageRow: View {
         }
     }
 
+    /// An Agent-to-Agent conversation is read: nothing in it can be changed
+    /// from here, so every mutating affordance is left out of the row.
+    private var isReadOnly: Bool { channel.readOnly }
+
     private var canDelete: Bool {
-        !isOptimistic && message.deletedAt == nil &&
+        !isOptimistic && !isReadOnly && message.deletedAt == nil &&
             message.author.type == .user && message.author.id == currentUserID
     }
 
+    private func openRelay(_ relay: ChannelMessage.Relay) -> (() -> Void)? {
+        guard let onOpenRelay else { return nil }
+        return { onOpenRelay(relay) }
+    }
+
     var body: some View {
+        /*
+          The Agent said it would pass the request on. What it sent lives in the
+          Agent-to-Agent conversation, so the thread keeps a notice rather than a
+          bubble; the answer coming back is a bubble of its own, below.
+        */
+        if let relay = message.relay, relay.direction == .outbound {
+            ChannelRelayOutboundNotice(
+                locale: locale,
+                messageID: message.id,
+                onOpen: openRelay(relay),
+                relay: relay,
+                sentBody: messageBodyWithoutAttachments,
+                timestamp: message.createdAt
+            )
+        } else {
+            conversationRow
+        }
+    }
+
+    private var conversationRow: some View {
         VStack(alignment: .leading, spacing: 0) {
         ConversationMessageLayout(
             authorImage: (message.author.type == .user || message.author.type == .agent)
@@ -1458,6 +1631,14 @@ private struct ChannelMessageRow: View {
             timestamp: message.createdAt,
             accessibilityIdentifier: "channel-message-\(message.id.uuidString.lowercased())"
         ) {
+            if let relay = message.relay, relay.direction == .inbound {
+                ChannelRelayFromLabel(
+                    locale: locale,
+                    messageID: message.id,
+                    onOpen: openRelay(relay),
+                    relay: relay
+                )
+            }
             ChannelAlertMessageBody(
                 locale: locale,
                 mentionHandles: mentionHandles,
@@ -1499,7 +1680,7 @@ private struct ChannelMessageRow: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 3)
                 }
-                if let proposal = message.proposal {
+                if let proposal = message.proposal, !isReadOnly {
                     ChannelProposalCard(
                         accepting: acceptingProposalID == proposal.id,
                         declining: decliningProposalID == proposal.id,
@@ -1529,7 +1710,7 @@ private struct ChannelMessageRow: View {
                     )
                     .padding(.top, 5)
                 }
-                if let proposal = message.executionProposal,
+                if let proposal = message.executionProposal, !isReadOnly,
                    message.proposal?.payload.executeAfterCreate != true {
                     ChannelExecutionProposalCard(
                         acceptanceInFlight: acceptingProposalID != nil ||
@@ -1554,7 +1735,7 @@ private struct ChannelMessageRow: View {
                     )
                     .padding(.top, 5)
                 }
-                if let proposal = message.skillExecutionProposal {
+                if let proposal = message.skillExecutionProposal, !isReadOnly {
                     ChannelSkillExecutionProposalCard(
                         acceptanceInFlight: acceptingProposalID != nil ||
                             approvingExecutionProposalID != nil ||
@@ -1578,7 +1759,7 @@ private struct ChannelMessageRow: View {
                     )
                     .padding(.top, 5)
                 }
-                if !isOptimistic, !message.reactions.isEmpty {
+                if !isOptimistic, !isReadOnly, !message.reactions.isEmpty {
                     ChannelReactionBar(
                         currentUserID: currentUserID,
                         locale: locale,
@@ -1627,7 +1808,9 @@ private struct ChannelMessageRow: View {
         .sheet(isPresented: $showingThreadActions) {
             ChannelMessageActionsSheet(
                 locale: locale,
-                quickEmojis: message.deletedAt == nil ? Self.quickReactionEmojis : [],
+                quickEmojis: message.deletedAt == nil && !isReadOnly
+                    ? Self.quickReactionEmojis
+                    : [],
                 onToggleReaction: { emoji in
                     showingThreadActions = false
                     Task { await onToggleReaction(emoji) }
@@ -1667,7 +1850,9 @@ private struct ChannelMessageRow: View {
                     }
                 }
             )
-            .presentationDetents([.height(onOpenThread == nil ? 290 : 370)])
+            .presentationDetents([
+                .height(isReadOnly ? 210 : (onOpenThread == nil ? 290 : 370)),
+            ])
             .presentationDragIndicator(.visible)
             .presentationBackground(.regularMaterial)
         }
@@ -1744,6 +1929,155 @@ private struct ChannelReplySummary: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(identifier)
         .accessibilityLabel(countLabel)
+    }
+}
+
+/// States, once, that this conversation belongs to two Agents and is only read
+/// here. It sits above the timeline so it stays visible while scrolling back.
+private struct ChannelReadOnlyBadge: View {
+    let locale: CompanionLocale
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "lock.fill")
+                .font(.caption2)
+            Text(L10n.text(.dmAgentConversationReadOnly, locale: locale))
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 5)
+        .background(Color.secondary.opacity(0.12), in: Capsule())
+        .padding(.top, 6)
+        .padding(.bottom, 2)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.text(.dmAgentConversationReadOnly, locale: locale))
+        .accessibilityIdentifier("dm-agent-conversation-badge")
+    }
+}
+
+/// The outbound notice: a compact system row rather than a message bubble. The
+/// text the Agent sent hangs off the row as a secondary line, since the row
+/// itself links into the conversation where that text actually lives.
+private struct ChannelRelayOutboundNotice: View {
+    let locale: CompanionLocale
+    let messageID: UUID
+    let onOpen: (() -> Void)?
+    let relay: ChannelMessage.Relay
+    /// The notice message's own body: the text the Agent sent.
+    let sentBody: String
+    let timestamp: Date
+
+    private var name: String { relay.peerAgentName }
+
+    var body: some View {
+        Button {
+            onOpen?()
+        } label: {
+            HStack(alignment: .top, spacing: 9) {
+                ProfileImageView(
+                    image: relay.peerAgentImage,
+                    name: name,
+                    systemImage: "cpu",
+                    size: 20
+                )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ChannelRelayPresentation.sentTo(name, locale: locale))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if !sentBody.isEmpty {
+                        Text(sentBody)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    if relay.status == .pending {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.mini)
+                            Text(ChannelRelayPresentation.pending(name, locale: locale))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if relay.status == .failed {
+                        Label(
+                            ChannelRelayPresentation.failed(name, locale: locale),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    }
+                }
+                Spacer(minLength: 8)
+                Text(timestamp, style: .time)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(onOpen == nil)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(ChannelRelayPresentation.sentTo(name, locale: locale))
+        .accessibilityValue(sentBody)
+        .accessibilityHint(ChannelRelayPresentation.open(name, locale: locale))
+        .accessibilityIdentifier(
+            ChannelRelayPresentation.identifier(
+                direction: .outbound,
+                messageID: messageID
+            )
+        )
+    }
+}
+
+/// The "from B" label above an answer copied back from the other Agent.
+private struct ChannelRelayFromLabel: View {
+    let locale: CompanionLocale
+    let messageID: UUID
+    let onOpen: (() -> Void)?
+    let relay: ChannelMessage.Relay
+
+    private var name: String { relay.peerAgentName }
+
+    var body: some View {
+        Button {
+            onOpen?()
+        } label: {
+            HStack(spacing: 5) {
+                ProfileImageView(
+                    image: relay.peerAgentImage,
+                    name: name,
+                    systemImage: "cpu",
+                    size: 16
+                )
+                Text(ChannelRelayPresentation.from(name, locale: locale))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Color.secondary.opacity(0.12), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(onOpen == nil)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(ChannelRelayPresentation.from(name, locale: locale))
+        .accessibilityHint(ChannelRelayPresentation.open(name, locale: locale))
+        .accessibilityIdentifier(
+            ChannelRelayPresentation.identifier(
+                direction: .inbound,
+                messageID: messageID
+            )
+        )
     }
 }
 

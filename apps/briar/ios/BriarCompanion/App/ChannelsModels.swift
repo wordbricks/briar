@@ -21,6 +21,9 @@ struct ChannelSummary: Hashable, Identifiable, Sendable {
     var lastReadAt: Date? = nil
     var hasUnread: Bool
     var dmParticipants: [DirectMessageParticipant]
+    /// An Agent-to-Agent conversation. People read it and never write to it, and
+    /// the catalog deliberately does not list it, so whoever opened it holds it.
+    var readOnly: Bool = false
 
     enum Kind: String, Hashable, Sendable {
         case channel
@@ -341,6 +344,9 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
     /// immutable snapshot and monotonic merge lifecycle are tracked separately.
     var skillExecutionProposal: AgentSkillExecutionProposal?
     var subscribers: [IssueSubscriber]
+    /// Present only on the two ends of an Agent-to-Agent round trip, as they
+    /// appear inside the person's own conversation.
+    let relay: Relay?
     let createdAt: Date
     let deletedAt: Date?
 
@@ -364,6 +370,7 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
         executionProposal: IssueExecutionProposal? = nil,
         skillExecutionProposal: AgentSkillExecutionProposal? = nil,
         subscribers: [IssueSubscriber] = [],
+        relay: Relay? = nil,
         createdAt: Date,
         deletedAt: Date? = nil
     ) {
@@ -386,8 +393,35 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
         self.executionProposal = executionProposal
         self.skillExecutionProposal = skillExecutionProposal
         self.subscribers = subscribers
+        self.relay = relay
         self.createdAt = createdAt
         self.deletedAt = deletedAt
+    }
+
+    /// Links this message to its counterpart inside an Agent-to-Agent
+    /// conversation. An outbound row is the short "sent to B" notice the Agent
+    /// left behind; an inbound row is B's answer copied back to be read here.
+    struct Relay: Hashable, Sendable {
+        let direction: Direction
+        let status: Status
+        let peerChannelId: UUID
+        let peerMessageId: UUID
+        let peerAgentId: String
+        let peerAgentName: String
+        let peerAgentImage: String?
+
+        enum Direction: String, Hashable, Sendable {
+            case outbound
+            case inbound
+        }
+
+        /// Outbound rows carry the state of the round trip; inbound rows are
+        /// always completed because the answer they copy has already arrived.
+        enum Status: String, Hashable, Sendable {
+            case pending
+            case completed
+            case failed
+        }
     }
 
     struct Author: Hashable, Sendable {

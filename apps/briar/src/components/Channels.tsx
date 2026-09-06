@@ -1360,7 +1360,15 @@ export function Channels({
                     variant="secondary"
                   >
                     <Lock aria-hidden="true" size={11} />
-                    {t("dm.agentConversation.readOnly")}
+                    {/*
+                      The words are their own element so the companion header,
+                      which has no room for them beside the name, can leave the
+                      lock alone and hide only the label — from the eye, not
+                      from a reader.
+                    */}
+                    <span className="channel-readonly-badge-label">
+                      {t("dm.agentConversation.readOnly")}
+                    </span>
                   </Badge>
                 ) : null}
                 {surface === "dm" && !readOnly && <button type="button" className="channel-header-icon"

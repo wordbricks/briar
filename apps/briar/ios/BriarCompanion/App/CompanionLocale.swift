@@ -862,6 +862,19 @@ enum L10n {
         case channelRetryExecution
         case channelSelectProposalProject
         case channelViewIssue
+        case dmRelaySentTo
+        case dmRelayPending
+        case dmRelayFailed
+        case dmRelayFrom
+        case dmRelayOpen
+        case dmAgentConversationReadOnly
+        case dmAgentConversationBack
+        case dmAgentConversationLoading
+        case agentConversations
+        case agentConversationsDescription
+        case agentConversationsEmpty
+        case agentConversationsLoading
+        case agentConversationsOpen
 
         var ko: String {
             switch self {
@@ -946,6 +959,19 @@ enum L10n {
             case .channelSelectProposalProject: "프로젝트 선택"
             case .channelViewIssue: "이슈 보기"
             case .notificationHint: "선택한 분류의 새 항목이 도착하면 로컬 알림을 보냅니다."
+            case .dmRelaySentTo: "메시지 보냄 → %@"
+            case .dmRelayPending: "%@가 확인 중"
+            case .dmRelayFailed: "%@에게 메시지를 전달하지 못했습니다."
+            case .dmRelayFrom: "보낸 사람 %@"
+            case .dmRelayOpen: "%@와의 에이전트 간 대화 열기"
+            case .dmAgentConversationReadOnly: "에이전트 간 대화 · 읽기 전용"
+            case .dmAgentConversationBack: "돌아가기"
+            case .dmAgentConversationLoading: "에이전트 간 대화를 여는 중…"
+            case .agentConversations: "대화"
+            case .agentConversationsDescription: "이 에이전트가 다른 에이전트와 주고받은 대화입니다."
+            case .agentConversationsEmpty: "아직 다른 에이전트와 나눈 대화가 없습니다."
+            case .agentConversationsLoading: "대화를 불러오는 중…"
+            case .agentConversationsOpen: "%@와의 대화 열기"
             }
         }
 
@@ -1032,6 +1058,19 @@ enum L10n {
             case .channelSelectProposalProject: "Select project"
             case .channelViewIssue: "View issue"
             case .notificationHint: "Local notifications fire for newly arrived items in the selected categories."
+            case .dmRelaySentTo: "Message sent → %@"
+            case .dmRelayPending: "%@ is checking"
+            case .dmRelayFailed: "The message to %@ could not be delivered."
+            case .dmRelayFrom: "From %@"
+            case .dmRelayOpen: "Open the agent conversation with %@"
+            case .dmAgentConversationReadOnly: "Agent conversation · Read only"
+            case .dmAgentConversationBack: "Back"
+            case .dmAgentConversationLoading: "Opening the agent conversation…"
+            case .agentConversations: "Conversations"
+            case .agentConversationsDescription: "Conversations this agent had with other agents."
+            case .agentConversationsEmpty: "No conversations with other agents yet."
+            case .agentConversationsLoading: "Loading conversations…"
+            case .agentConversationsOpen: "Open the conversation with %@"
             }
         }
 
@@ -1118,6 +1157,19 @@ enum L10n {
             case .channelSelectProposalProject: "选择项目"
             case .channelViewIssue: "查看问题"
             case .notificationHint: "所选分类有新项目时会发送本地通知。"
+            case .dmRelaySentTo: "已发送消息 → %@"
+            case .dmRelayPending: "%@ 正在确认"
+            case .dmRelayFailed: "未能将消息送达 %@。"
+            case .dmRelayFrom: "发送者 %@"
+            case .dmRelayOpen: "打开与 %@ 的智能体对话"
+            case .dmAgentConversationReadOnly: "智能体之间的对话 · 只读"
+            case .dmAgentConversationBack: "返回"
+            case .dmAgentConversationLoading: "正在打开智能体对话…"
+            case .agentConversations: "对话"
+            case .agentConversationsDescription: "该智能体与其他智能体之间的对话。"
+            case .agentConversationsEmpty: "还没有与其他智能体的对话。"
+            case .agentConversationsLoading: "正在加载对话…"
+            case .agentConversationsOpen: "打开与 %@ 的对话"
             }
         }
     }

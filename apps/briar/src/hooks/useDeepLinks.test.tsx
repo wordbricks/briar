@@ -45,7 +45,11 @@ import {
   deepLinkListenerApiAtom,
   type DeepLinkListenerApi,
 } from "../state/deep-links/atoms";
-import { useDeepLinks, type UseDeepLinksInput } from "./useDeepLinks";
+import {
+  companionChannelPage,
+  useDeepLinks,
+  type UseDeepLinksInput,
+} from "./useDeepLinks";
 
 /*
   The resolver's branches, driven through the atoms it waits on.
@@ -465,6 +469,30 @@ describe("useDeepLinks", () => {
     expect(registry.get(pendingInboxNotificationTargetAtom)).not.toBeNull();
 
     await view.cleanup();
+  });
+
+  /*
+    Where the phone sends a channel link. `companionMode` is decided once at
+    module load, so the branch itself cannot be driven from a case here; what
+    the branch decides is this function, and it is the whole decision.
+  */
+  describe("companionChannelPage", () => {
+    it("sends a channel to the channel list and a direct message to the DM page", () => {
+      const catalog = [channel(), channel({ id: "channel-2", kind: "dm" })];
+
+      expect(companionChannelPage(catalog, "channel-1")).toBe("home");
+      expect(companionChannelPage(catalog, "channel-2")).toBe("dms");
+    });
+
+    it("sends an id the catalog does not hold to the DM page", () => {
+      /*
+        An Agent-to-Agent conversation is never in the catalog, and the DM page
+        is the surface that fetches one by id. The channel list has no row for
+        it, so "home" would be a dead end.
+      */
+      expect(companionChannelPage([channel()], "agent-dm-1")).toBe("dms");
+      expect(companionChannelPage([], "agent-dm-1")).toBe("dms");
+    });
   });
 
   it("leaves an issue page whose run is gone", async () => {

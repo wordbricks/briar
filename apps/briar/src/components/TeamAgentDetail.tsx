@@ -3,7 +3,7 @@ import {
   isProviderBlockedError,
   requestAgentUsageRefresh,
 } from "../lib/provider-block-error";
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { ArrowLeft, MonitorUp, Play } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { useEffect, useState } from "react";
@@ -35,7 +35,9 @@ import type {
   ProjectAgent,
   TeamAgentBoard,
 } from "../types";
+import { useChannelActions } from "../state/channels/actions";
 import { useNavigationActions } from "../state/navigation/actions";
+import { companionPageAtom } from "../state/navigation/atoms";
 import { AgentConversationsSection } from "./AgentConversationsSection";
 import { ManagedComputerRemoteDesktop } from
   "./ManagedComputerRemoteDesktop";
@@ -105,6 +107,8 @@ export function TeamAgentDetail({
   const { t } = useI18n();
   const { toast } = useToast();
   const { navigateToChannel } = useNavigationActions();
+  const { selectChannel } = useChannelActions();
+  const setCompanionPage = useAtomSet(companionPageAtom);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [remoteComputer, setRemoteComputer] = useState<ManagedComputer | null>(
@@ -210,6 +214,22 @@ export function TeamAgentDetail({
   // Agent-to-Agent conversations are an organization's, so the section only
   // shows once the board has told this page which organization it belongs to.
   const agentOrganizationId = board?.team.organizationId ?? null;
+  /*
+    Both shells open the conversation on their direct message surface, where the
+    read-only fetch takes over. The desktop records the visit; the phone has no
+    visit stack to record it in, so it selects the channel and switches the page
+    the same way every other companion destination does.
+  */
+  const openAgentConversation = (channelId: string) => {
+    if (companionMode) {
+      selectChannel(channelId);
+      setCompanionPage("dms");
+      return;
+    }
+    if (agentOrganizationId) {
+      navigateToChannel(channelId, "dms", agentOrganizationId);
+    }
+  };
 
   const submit = async (input: TeamAgentTaskDialogSubmit) => {
     if (isTaskStarting || !board) return;
@@ -386,12 +406,16 @@ export function TeamAgentDetail({
         />
       </div>
 
-      {!companionMode && token && agentOrganizationId ? (
+      {token && agentOrganizationId ? (
         <AgentConversationsSection
           agentId={agent.id}
-          className="shrink-0 border-t border-border bg-card px-5 py-2.5"
-          onOpenConversation={(channelId) =>
-            navigateToChannel(channelId, "dms", agentOrganizationId)}
+          className={cn(
+            "shrink-0 border-t border-border bg-card px-5 py-2.5",
+            // Clear of the phone's bottom bar, which floats over the page.
+            companionMode &&
+              "px-4 pb-[calc(96px_+_env(safe-area-inset-bottom))]",
+          )}
+          onOpenConversation={openAgentConversation}
           organizationId={agentOrganizationId}
           token={token}
         />

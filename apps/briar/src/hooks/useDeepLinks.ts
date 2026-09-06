@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n";
 import { useToast } from "../components/ui/toast";
 import { resolveIssueHierarchyLocation } from "../lib/api";
+import type { ChannelSummary } from "../lib/channels-contract";
 import { projectNavigationLocation } from "../lib/app-navigation";
 import { navigateToIssueLink } from "../lib/issue-link-navigation";
 import { useChannelActions } from "../state/channels/actions";
@@ -71,6 +72,23 @@ import {
   through the navigation actions, the team and organization actions and the
   inbox's own read marker — nothing is handed in at all.
 */
+
+/*
+  Which page of the phone a channel belongs to.
+
+  The catalog answers for every channel it holds. The one it does not hold is an
+  Agent-to-Agent conversation — deliberately outside the catalog, because nobody
+  is a participant — and the direct message page is the surface that fetches one
+  by id, so an unknown id goes there rather than to a channel list with no row
+  for it.
+*/
+export const companionChannelPage = (
+  channels: readonly ChannelSummary[],
+  channelId: string,
+): "dms" | "home" => {
+  const known = channels.find((channel) => channel.id === channelId);
+  return !known || known.kind === "dm" ? "dms" : "home";
+};
 
 /** What the resolver reaches outside the store, so a test can replace it. */
 export interface DeepLinkResolvers {
@@ -198,11 +216,7 @@ export function useDeepLinks({
       markOrganizationChannelRead(pendingBriarLink.channelId);
       if (companionMode) {
         setCompanionPage(
-          organizationChannels.find(
-              (channel) => channel.id === pendingBriarLink.channelId,
-            )?.kind === "dm"
-            ? "dms"
-            : "home",
+          companionChannelPage(organizationChannels, pendingBriarLink.channelId),
         );
       } else {
         navigateToChannel(
@@ -428,11 +442,10 @@ export function useDeepLinks({
       markOrganizationChannelRead(pendingInboxNotificationTarget.targetId);
       if (companionMode) {
         setCompanionPage(
-          organizationChannels.find(
-              (channel) => channel.id === pendingInboxNotificationTarget.targetId,
-            )?.kind === "dm"
-            ? "dms"
-            : "home",
+          companionChannelPage(
+            organizationChannels,
+            pendingInboxNotificationTarget.targetId,
+          ),
         );
       } else {
         navigateToChannel(
