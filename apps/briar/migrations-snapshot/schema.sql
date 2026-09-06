@@ -1,11 +1,10 @@
 -- GENERATED FILE - DO NOT EDIT BY HAND.
 -- Produced by scripts/generate-d1-schema-snapshot.ts from apps/briar/migrations
--- (excluding 0142_restore_cvs_slack_history.sql).
 -- Loaded by the worker-d1 Vitest project in place of replaying migrations.
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: a9100bcea659ec704bc5df4e33309ecc5f3ed906616460c51a7dd9116d2f3771
+-- migrations-digest: 02634678e9f02f965a5a0aa516bbc2d7f6154d9f49b69596cd364dea0b1c7dad
 -- snapshot-digest: c6bc5d878c25c983be1d8391dcd32a14314111290e56741dba3362fe566b5d60
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(

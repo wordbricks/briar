@@ -100,6 +100,43 @@ export function buildMigrationImport(
   return `${migrationSql.trimEnd()}\n\nINSERT INTO d1_migrations (name) VALUES ('${escapedName}');\n`;
 }
 
+/**
+ * Header line a squashed baseline carries, naming the last migration it stands
+ * in for. Written by `scripts/generate-d1-baseline-migration.ts` on every part.
+ */
+export const BASELINE_MARKER = "-- baseline-through: ";
+
+function baselineCutoff(migrationSql: string): string | null {
+  const line = migrationSql
+    .split("\n", 40)
+    .find((entry) => entry.startsWith(BASELINE_MARKER));
+  return line?.slice(BASELINE_MARKER.length).trim() || null;
+}
+
+/**
+ * Whether a pending baseline is already in the database, in the shape of the
+ * history it replaced.
+ *
+ * A baseline creates the tables, views, indexes and triggers of a database
+ * migrated up to its cut-off. On a database that has already run that history
+ * it must never execute: the tables exist, and its triggers and views are the
+ * ones the cut-off had, which later migrations have since replaced. So a
+ * database whose history reaches the cut-off records the baseline as applied
+ * instead of running it. A fresh database has no such history, and runs it.
+ */
+export function baselineAlreadyApplied(
+  migrationSql: string,
+  appliedMigrations: ReadonlySet<string>,
+): boolean {
+  const cutoff = baselineCutoff(migrationSql);
+  // The cut-off migration itself, not merely something below it: a database
+  // that stopped partway through the squashed history has neither the schema
+  // the baseline describes nor the files to reach it, and running the baseline
+  // there fails loudly on the tables it already has. That is the right
+  // outcome, so it is not recorded away.
+  return cutoff !== null && appliedMigrations.has(cutoff);
+}
+
 const runRequiredMigrationPreflight = (
   migrationName: string,
   signal?: AbortSignal,
@@ -189,13 +226,22 @@ export async function applyRemoteD1Migrations({
       const migrationPath = join(migrationsDirectory, migrationName);
       const migrationSql = await readFile(migrationPath, "utf8");
       const importPath = join(temporaryDirectory, basename(migrationName));
+      // A baseline squashes history this database may already hold, in which
+      // case running it would recreate the cut-off's triggers and views over
+      // the current ones. Record it instead, so the squash needs no manual
+      // step against an existing database.
+      const recordOnly = baselineAlreadyApplied(migrationSql, appliedMigrations);
       await writeFile(
         importPath,
-        buildMigrationImport(migrationSql, migrationName),
+        buildMigrationImport(recordOnly ? "" : migrationSql, migrationName),
         { mode: 0o600 },
       );
 
-      console.log(`Applying remote D1 migration ${migrationName}...`);
+      console.log(
+        recordOnly
+          ? `Recording baseline ${migrationName} as applied; this database already holds the history it replaces.`
+          : `Applying remote D1 migration ${migrationName}...`,
+      );
       // The import endpoint can both lose its final poll after D1 has already
       // committed the file and return success while the server-side job never
       // commits. Only the history INSERT, the last statement of the atomic

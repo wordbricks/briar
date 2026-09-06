@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { applyD1SchemaSnapshot } from "./test-helpers/d1-sql";
 
-// Every file in this project gets its own isolated D1, so replaying the ~190
-// migrations here cost about 2s per file (plus shipping the parsed migration
+// Every file in this project gets its own isolated D1, so replaying every
+// migration here cost about 2s per file (plus shipping the parsed migration
 // list into every worker). Loading the generated snapshot of the fully migrated
 // schema costs ~0.2s instead. The snapshot lives at
 // apps/briar/migrations-snapshot/schema.sql, is produced by `bun run d1:snapshot`

@@ -1,36 +1,142 @@
--- Channel message metadata stays in ChannelService while opaque bytes use the
--- shared upload capability transport. Migration 0150 already creates the
--- final shared upload shape; this migration adds only Channel-owned state and
--- extends the shared authorization guards.
-pragma foreign_keys = on;
+-- GENERATED FILE - DO NOT EDIT BY HAND.
+-- baseline-through: 0159_allow_duplicate_evidence_image_digests.sql
+-- Continuation 3 of 0000_baseline_schema.sql.
 
-drop trigger if exists briar_upload_batch_insert_guard;
-drop trigger if exists briar_upload_batch_immutable;
-drop trigger if exists briar_upload_metadata_immutable;
-drop trigger if exists briar_upload_state_guard;
-drop trigger if exists briar_upload_delete_cleanup;
-
-create table briar_channel_message_mutation_receipts (
-  message_id text primary key not null
-    references briar_channel_messages (id) on delete cascade,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  user_id text not null references "user" (id) on delete cascade,
-  request_hash text not null check (
-    length(request_hash) = 64
-    and request_hash not glob '*[^0-9a-f]*'
-  ),
-  created_at text not null
-);
-
-create index briar_channel_message_mutation_receipts_scope_idx
-  on briar_channel_message_mutation_receipts (
-    organization_id, channel_id, user_id, message_id
-  );
-
---> statement-breakpoint
-create trigger briar_upload_batch_insert_guard
+-- @statement
+CREATE TRIGGER briar_dm_memory_forget_learning_payload after insert on briar_dm_memory_exclusions begin
+  insert into briar_dm_memory_purge_documents(space_id, root_document_id, document_id)
+  select new.space_id, new.document_id, source.document_id from briar_dm_memory_sources source
+  where source.space_id = new.space_id and source.source_type = new.source_type and source.source_id = new.source_id
+  on conflict (root_document_id, document_id) do nothing;
+  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
+  values (new.space_id, new.source_type, new.source_id);
+  update briar_dm_memory_jobs set request_targets_json = '[]' where space_id = new.space_id
+    and exists (select 1 from json_each(request_targets_json) target
+      where json_extract(target.value, '$.documentId') in (
+        select document_id from briar_dm_memory_purge_documents where space_id = new.space_id));
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_edit_learning_source after update of body, deleted_at on briar_channel_messages
+when old.body <> new.body or old.deleted_at is not new.deleted_at begin
+  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
+  select distinct space_id, 'message', new.id from briar_dm_memory_learning_inputs
+  where source_type = 'message' and source_id = new.id;
+  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
+  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = new.id);
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_delete_learning_source before delete on briar_channel_messages begin
+  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
+  select distinct space_id, 'message', old.id from briar_dm_memory_learning_inputs
+  where source_type = 'message' and source_id = old.id;
+  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
+  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = old.id);
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_forget_derived_content after update of revocation_epoch on briar_dm_memory_spaces
+when old.revocation_epoch <> new.revocation_epoch begin
+  update briar_dm_memory_documents set status = 'deleted', title = '[deleted]'
+  where space_id = new.id and id in (select source.document_id from briar_dm_memory_sources source
+    join briar_dm_memory_exclusions excluded on excluded.space_id = source.space_id
+      and excluded.source_type = source.source_type and excluded.source_id = source.source_id
+    where source.space_id = new.id);
+  update briar_dm_memory_commits set payload_hash = null where document_id in (
+    select id from briar_dm_memory_documents where space_id = new.id and status = 'deleted');
+  delete from briar_dm_memory_revisions where document_id in (
+    select id from briar_dm_memory_documents where space_id = new.id and status = 'deleted');
+end;
+-- @statement
+CREATE TRIGGER briar_reply_completion_receipt_insert_guard
+before insert on briar_reply_completion_receipts
+when not (
+  (
+    new.reply_kind = 'issue'
+    and exists (
+      select 1
+      from briar_issue_agent_reply_jobs job
+      join briar_projects project on project.id = job.project_id
+      join briar_execution_workers worker
+        on worker.id = job.claimed_worker_id
+       and worker.project_id = job.project_id
+      where job.id = new.work_id and job.project_id = new.project_id
+        and job.run_id = new.run_id
+        and project.organization_id = new.organization_id
+        and worker.id = new.worker_id and worker.device_id = new.device_id
+        and job.claim_token_hash = new.claim_token_hash
+        and (
+          (new.outcome_kind = 'success'
+            and new.disposition = 'completed'
+            and job.status = 'completed'
+            and job.completed_at = new.created_at)
+          or
+          (new.outcome_kind = 'failure'
+            and job.updated_at = new.created_at
+            and (
+              (job.attempts < 3 and new.disposition = 'requeued'
+                and job.status = 'queued')
+              or
+              (job.attempts >= 3 and new.disposition = 'failed'
+                and job.status = 'failed')
+            ))
+        )
+    )
+  )
+  or
+  (
+    new.reply_kind = 'channel'
+    and exists (
+      select 1
+      from briar_channel_agent_reply_jobs job
+      join briar_execution_workers worker
+        on worker.id = job.claimed_worker_id
+       and worker.device_id = job.claimed_device_id
+      join briar_projects project on project.id = worker.project_id
+      where job.id = new.work_id and job.channel_id = new.run_id
+        and job.organization_id = new.organization_id
+        and project.id = new.project_id
+        and project.organization_id = new.organization_id
+        and worker.id = new.worker_id and worker.device_id = new.device_id
+        and job.claim_token_hash = new.claim_token_hash
+        and (
+          (new.outcome_kind = 'success'
+            and new.disposition = 'completed'
+            and job.status = 'completed'
+            and job.completed_at = new.created_at)
+          or
+          (new.outcome_kind = 'failure'
+            and job.updated_at = new.created_at
+            and (
+              (job.attempts < 3 and new.disposition = 'requeued'
+                and job.status = 'queued')
+              or
+              (job.attempts >= 3 and new.disposition = 'failed'
+                and job.status = 'failed')
+            ))
+        )
+    )
+  )
+)
+begin
+  select raise(abort, 'invalid reply completion receipt');
+end;
+-- @statement
+CREATE TRIGGER briar_reply_completion_receipt_immutable_update
+before update on briar_reply_completion_receipts
+begin
+  select raise(abort, 'reply completion receipt is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_reply_completion_receipt_immutable_delete
+before delete on briar_reply_completion_receipts
+when exists (
+  select 1 from briar_organizations organization
+  where organization.id = old.organization_id
+)
+begin
+  select raise(abort, 'reply completion receipt is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_upload_batch_insert_guard
 before insert on briar_upload_batches
 when not (
   (
@@ -124,16 +230,14 @@ when not (
 begin
   select raise(abort, 'invalid upload authorization');
 end;
-
---> statement-breakpoint
-create trigger briar_upload_batch_immutable
+-- @statement
+CREATE TRIGGER briar_upload_batch_immutable
 before update on briar_upload_batches
 begin
   select raise(abort, 'upload batch is immutable');
 end;
-
---> statement-breakpoint
-create trigger briar_upload_metadata_immutable
+-- @statement
+CREATE TRIGGER briar_upload_metadata_immutable
 before update on briar_uploads
 when new.upload_id is not old.upload_id
   or new.batch_request_id is not old.batch_request_id
@@ -149,9 +253,8 @@ when new.upload_id is not old.upload_id
 begin
   select raise(abort, 'upload metadata is immutable');
 end;
-
---> statement-breakpoint
-create trigger briar_channel_message_mutation_receipt_insert_guard
+-- @statement
+CREATE TRIGGER briar_channel_message_mutation_receipt_insert_guard
 before insert on briar_channel_message_mutation_receipts
 when not exists (
   select 1 from briar_channel_messages message
@@ -163,16 +266,14 @@ when not exists (
 begin
   select raise(abort, 'invalid channel message receipt');
 end;
-
---> statement-breakpoint
-create trigger briar_channel_message_mutation_receipt_immutable
+-- @statement
+CREATE TRIGGER briar_channel_message_mutation_receipt_immutable
 before update on briar_channel_message_mutation_receipts
 begin
   select raise(abort, 'channel message receipt is immutable');
 end;
-
---> statement-breakpoint
-create trigger briar_upload_state_guard
+-- @statement
+CREATE TRIGGER briar_upload_state_guard
 before update on briar_uploads
 when not (
   (
@@ -261,9 +362,8 @@ when not (
 begin
   select raise(abort, 'invalid upload state transition');
 end;
-
---> statement-breakpoint
-create trigger briar_upload_delete_cleanup
+-- @statement
+CREATE TRIGGER briar_upload_delete_cleanup
 before delete on briar_uploads
 when old.consumed_at is null
 begin
