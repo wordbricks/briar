@@ -552,6 +552,7 @@ const channelReply = (
       title: value.title,
       triggerMessageId: value.triggerMessageId,
       parentMessageId: value.parentMessageId,
+      pendingTriggerMessageIds: value.pendingTriggerMessageIds,
       provider: provider(value.provider),
       model: value.model ?? undefined,
       effort: value.effort ?? undefined,

@@ -5,8 +5,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 9b50780281a86d8fe5c4b36921b6c002353c420b60b5233dbc962f1a170e684f
--- snapshot-digest: 55c466f4d9a641af533b4572cf12a2ae1e25e59b73009c8fc65268d15c084813
+-- migrations-digest: 61551eb07a9c049e26319dacdca5ec39f0a5aa6884800bef43aa471b9c463f4c
+-- snapshot-digest: 5304ab5121f0cb8e88891c00e2d7fa4c33ea6ba394420fe89eab81b431da0101
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2442,7 +2442,7 @@ CREATE TABLE briar_channel_agent_reply_jobs (
   default 0 check (planned_update_resume in (0, 1)), session_id text
   references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0, agent_message_hop integer not null default 0
     check (agent_message_hop between 0 and 2), origin_reply_job_id text
-    references briar_channel_agent_reply_jobs (id) on delete cascade,
+    references briar_channel_agent_reply_jobs (id) on delete cascade, superseded_by_reply_job_id text,
   unique (channel_id, trigger_message_id, agent_id)
 );
 -- @statement
@@ -5011,6 +5011,12 @@ CREATE UNIQUE INDEX briar_whatsapp_outbox_event_part_idx
 -- @statement
 CREATE INDEX briar_whatsapp_outbox_due_idx
   on briar_whatsapp_outbox (status, next_attempt_at, created_at, id);
+-- @statement
+CREATE INDEX briar_channel_agent_reply_jobs_superseded_by_idx
+  on briar_channel_agent_reply_jobs (superseded_by_reply_job_id);
+-- @statement
+CREATE INDEX briar_channel_reply_sessions_channel_agent_activity_idx
+  on briar_channel_reply_sessions (channel_id, agent_id, last_activity_at desc);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN

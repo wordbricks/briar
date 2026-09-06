@@ -22,6 +22,7 @@ export const workerD1TestFiles = [
   "worker/src/cascade-erasure.test.ts",
   "worker/src/channel-agent-delegation.test.ts",
   "worker/src/channel-agent-message.test.ts",
+  "worker/src/channel-dm-reply-burst.test.ts",
   "worker/src/channel-message-pdf.test.ts",
   "worker/src/channel-proposal-routes.test.ts",
   "worker/src/channel-sidebar-preferences.test.ts",

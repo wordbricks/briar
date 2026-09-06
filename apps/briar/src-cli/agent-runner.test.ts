@@ -15,6 +15,7 @@ import {
 import { IssueAgentReplyProviderOutputSchema } from "../src/lib/agent-reply-contract";
 import { ChannelAgentReplyProviderOutputSchema } from "../src/lib/channel-agent-reply-contract";
 import {
+  channelReplyPromptSnapshot,
   createDetachedTranscriptSequencer,
   detachedAgentContext,
   detachedAgentPrompt,
@@ -617,6 +618,62 @@ describe("detached Agent runner", () => {
     expect(prompt).not.toContain('"reactions"');
     expect(prompt).not.toContain('"blocks"');
     expect(prompt.length).toBeLessThan(20_000);
+  });
+
+  it("names every message a burst left unanswered and marks them in the snapshot", () => {
+    // Three short messages in a row are one question. Only the newest reply job
+    // survives to answer them, so the prompt has to say which messages that one
+    // answer still owes something to.
+    const messageIds = [
+      "33333333-3333-4333-8333-333333333331",
+      "33333333-3333-4333-8333-333333333332",
+      "33333333-3333-4333-8333-333333333333",
+    ];
+    const snapshot = {
+      messages: messageIds.map((id, index) => ({
+        id,
+        parentMessageId: null,
+        author: { type: "user", id: "member", name: "Member" },
+        body: `Burst message ${index + 1}`,
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+        attachments: [],
+        createdAt: `2026-09-06T00:00:0${index}.000Z`,
+      })),
+    };
+    const burstPrompt = detachedChannelReplyPrompt({
+      agent,
+      workspaceAvailable: false,
+      snapshot,
+      pendingTriggerMessageIds: messageIds,
+    });
+    expect(burstPrompt).toContain(
+      "The user sent these messages since your last reply and none of them has been answered yet",
+    );
+    expect(burstPrompt).toContain(
+      "Answer all of them together in one reply; do not answer them one by one",
+    );
+    for (const id of messageIds) expect(burstPrompt).toContain(id);
+    expect(
+      channelReplyPromptSnapshot(snapshot, messageIds).messages,
+    ).toEqual(messageIds.map((id) => expect.objectContaining({
+      id,
+      unanswered: true,
+    })));
+
+    // One trigger is the ordinary case and must not gain a section that tells
+    // the Agent to answer several messages at once.
+    const singlePrompt = detachedChannelReplyPrompt({
+      agent,
+      workspaceAvailable: false,
+      snapshot,
+      pendingTriggerMessageIds: [messageIds[2]!],
+    });
+    expect(singlePrompt).not.toContain("none of them has been answered yet");
+    expect(singlePrompt).not.toContain('"unanswered"');
+    expect(
+      detachedChannelReplyPrompt({ agent, workspaceAvailable: false, snapshot }),
+    ).not.toContain("none of them has been answered yet");
   });
 
   it("keeps webhook block text that the message body does not repeat", () => {

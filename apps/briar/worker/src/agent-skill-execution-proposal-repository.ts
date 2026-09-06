@@ -350,7 +350,7 @@ export async function acceptConversationAgentSkillExecutionProposal(
        join briar_channel_reply_sessions session
          on session.id = source.session_id
         and session.channel_id = proposal.channel_id
-        and session.thread_root_message_id = proposal.thread_root_message_id
+        and source.parent_message_id = proposal.thread_root_message_id
         and session.agent_id = proposal.agent_id
        join briar_execution_workers worker
          on worker.id = proposal.requested_worker_id

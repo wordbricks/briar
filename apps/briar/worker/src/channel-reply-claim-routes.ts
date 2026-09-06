@@ -16,6 +16,7 @@ import {
 } from "./agent-message-targets";
 import {
   claimNextChannelAgentReply,
+  dmReplySettleMs,
   failChannelReply,
   getChannelAgentReplyJob,
   getChannelById,
@@ -103,6 +104,7 @@ export async function claimNextChannelReplyWork(
     claimTokenHash,
     claimedAt: observedAt,
     leaseExpiresAt: leaseExpiryFrom(observedAt),
+    settleMs: dmReplySettleMs(env.DM_REPLY_SETTLE_MS),
   });
   if (!job) return null;
   scheduleChannelRealtimePublish(env, db, input.organizationId, context);
@@ -149,6 +151,25 @@ export async function claimNextChannelReplyWork(
     const triggerMessage = messages.find(
       (message) => message.id === job.trigger_message_id,
     ) ?? null;
+    /*
+      Every message this one reply owes an answer to: its own trigger plus the
+      triggers of the queued turns it took over. Ordered by the messages'
+      creation so the runner can read them as the person wrote them.
+    */
+    const pendingTriggers = await db.prepare(
+      `select message.id
+       from briar_channel_agent_reply_jobs pending
+       join briar_channel_messages message
+         on message.id = pending.trigger_message_id
+        and message.channel_id = pending.channel_id
+       where pending.channel_id = ? and pending.agent_id = ?
+         and (pending.id = ? or pending.superseded_by_reply_job_id = ?)
+       order by message.created_at, message.id`,
+    ).bind(job.channel_id, job.agent_id, job.id, job.id)
+      .all<{ id: string }>();
+    const pendingTriggerMessageIds = pendingTriggers.results.length > 0
+      ? pendingTriggers.results.map((row) => row.id)
+      : [job.trigger_message_id];
     const liveActiveSkill = job.skill_id
       ? liveAgent.skills.find((skill) => skill.id === job.skill_id) ?? null
       : null;
@@ -461,6 +482,7 @@ export async function claimNextChannelReplyWork(
         title: channel.name,
         triggerMessageId: job.trigger_message_id,
         parentMessageId: job.parent_message_id,
+        pendingTriggerMessageIds,
         provider: job.agent_provider,
         model: replyModel,
         effort: replyEffort,

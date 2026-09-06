@@ -136,12 +136,19 @@ export async function approveAgentSkillExecutionProposal(
     }
     if (current.execution_mode === "conversation") {
       const conversation = await db.prepare(
+        /*
+          The proposal's thread root is the reply job's parent message, which is
+          what the approved turn is threaded under. A reply session is anchored
+          separately — a direct message anchors on the Agent's live conversation
+          rather than on each message — so the invariant is checked against the
+          job that carries the proposal, not against the session's anchor.
+        */
         `select session.id, reply.status as reply_status
          from briar_channel_reply_sessions session
          join briar_channel_agent_reply_jobs reply
            on reply.id = ? and reply.session_id = session.id
          where session.id = ? and session.channel_id = ?
-           and session.thread_root_message_id = ? and session.agent_id = ?`,
+           and reply.parent_message_id = ? and session.agent_id = ?`,
       ).bind(
         current.result_reply_job_id,
         current.result_session_id,
@@ -245,7 +252,7 @@ export async function approveAgentSkillExecutionProposal(
        from briar_channel_agent_reply_jobs source
        join briar_channel_reply_sessions session on session.id = source.session_id
        where source.id = ? and source.status = 'completed'
-         and session.channel_id = ? and session.thread_root_message_id = ?
+         and session.channel_id = ? and source.parent_message_id = ?
          and session.agent_id = ?`,
     ).bind(
       proposal.source_reply_job_id,
