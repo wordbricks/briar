@@ -107,6 +107,11 @@ runtime_is_available() {
   [[ "$runtimes" == *"$ios_runtime_identifier"* ]]
 }
 
+# Resolves the package graph as a side effect, so it must use the same derived
+# data path as the build it precedes: mobile CI runs the iPhone, iPad and
+# Production steps concurrently on one freshly generated project, and two
+# resolutions racing inside the shared default DerivedData fail one of them
+# with a misleading "no compatible iOS Platform Support".
 platform_support_is_available() {
   (
     cd "$workspace_root"
@@ -115,6 +120,7 @@ platform_support_is_available() {
       -scheme "$swift_dev_scheme" \
       -configuration 'Dev Debug' \
       -destination "$generic_simulator_destination" \
+      ${derived_data_args[@]+"${derived_data_args[@]}"} \
       CODE_SIGNING_ALLOWED=NO \
       -showBuildSettings >/dev/null 2>&1
   )
