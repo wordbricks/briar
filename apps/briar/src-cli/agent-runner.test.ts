@@ -920,6 +920,34 @@ describe("detached Agent runner", () => {
     });
   });
 
+  it("tells the Computer Use parent to reconfirm and attach the final screenshot", () => {
+    const launch = detachedProviderRequest({
+      agent,
+      prompt: "Book the flight",
+      workspacePath: "/worktree",
+      fullAccess: true,
+      agentBinary: "/bin/codex",
+      runKind: "parent",
+      computerUseBinding: {} as never,
+    });
+
+    expect(launch.request.instructions).toContain(
+      "take a fresh Screenshot yourself to confirm the final on-screen result before you reply",
+    );
+    expect(launch.request.instructions).toContain(
+      "copy it to a path inside this workspace so it can be attached",
+    );
+    expect(launch.request.instructions).toContain(
+      "put that workspace-relative path in the final structured response's attachments",
+    );
+    expect(launch.request.instructions).toContain(
+      "Do not treat a screen that is waiting on human login, 2FA, CAPTCHA, or other takeover as the completed result",
+    );
+    expect(launch.request.instructions).not.toContain(
+      "You are the dedicated Computer Use child for this run.",
+    );
+  });
+
   it("uses the same noninteractive contract for standalone providers", () => {
     const launch = detachedProviderRequest({
       agent: { ...agent, provider: "claude", model: null },

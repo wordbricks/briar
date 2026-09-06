@@ -773,6 +773,10 @@ export function detachedProviderRequest(input: {
         "After RequestHumanTakeover, tell the user to open this Agent's Screen and wait for confirmation that they are done. Then resume with MessageSubagent so the child begins from a fresh screenshot.",
         "Browser sign-ins on this computer are kept in a shared login store, so they are available on every Agent's screen and across turns. Check whether a site is already signed in before asking the user for another takeover.",
         "The user can also sign in ahead of time on this computer's own screen, display :1, and that sign-in reaches every Agent here as well.",
+        "Once a Computer Use child reports the requested task finished, take a fresh Screenshot yourself to confirm the final on-screen result before you reply.",
+        "If that screenshot file is saved outside this workspace, copy it to a path inside this workspace so it can be attached, then put that workspace-relative path in the final structured response's attachments.",
+        "Do not treat a screen that is waiting on human login, 2FA, CAPTCHA, or other takeover as the completed result, and never attach it as the finished screenshot.",
+        "Pick a final screenshot that shows the completed state of the task the user actually asked for, free of unrelated windows or sensitive information.",
       ].join(" ");
   const outputSchema = input.outputSchema === null || input.outputSchema === undefined
     ? undefined
