@@ -79,7 +79,8 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
         if (output[field] !== null) {
           issues.push({
             path: [field],
-            issue: "A context lookup cannot include a proposal or delegation",
+            issue:
+              "A context lookup cannot include a proposal, delegation or Agent message",
           });
         }
       }
@@ -105,7 +106,8 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
         if (output[field] !== null) {
           issues.push({
             path: [field],
-            issue: "A memory lookup cannot include a proposal or delegation",
+            issue:
+              "A memory lookup cannot include a proposal, delegation or Agent message",
           });
         }
       }
@@ -177,6 +179,7 @@ export const ChannelAgentReplyProviderOutputSchema =
                 executionProposal: null,
                 skillExecutionProposal: null,
                 delegation: null,
+                agentMessage: null,
                 contextRequests: turn.requests.contextRequests,
                 memoryRequests: null,
                 memoryCitations: null,
@@ -192,6 +195,7 @@ export const ChannelAgentReplyProviderOutputSchema =
                 executionProposal: null,
                 skillExecutionProposal: null,
                 delegation: null,
+                agentMessage: null,
                 contextRequests: null,
                 memoryRequests: [turn.request],
                 memoryCitations: null,
@@ -207,6 +211,7 @@ export const ChannelAgentReplyProviderOutputSchema =
                 executionProposal: turn.result.executionProposal,
                 skillExecutionProposal: turn.result.skillExecutionProposal,
                 delegation: turn.result.delegation,
+                agentMessage: turn.result.agentMessage,
                 contextRequests: null,
                 memoryRequests: null,
                 memoryCitations: turn.result.memoryCitations

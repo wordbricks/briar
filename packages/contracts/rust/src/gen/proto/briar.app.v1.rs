@@ -66481,6 +66481,301 @@ pub const __CREATE_DIRECT_MESSAGE_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
     from_json: ::buffa::type_registry::any_from_json::<CreateDirectMessageResponse>,
     is_wkt: false,
 };
+/// The Agent-to-Agent conversations one Agent takes part in, for the
+/// conversations tab on an Agent detail page. They are read-only for people.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListAgentDirectMessagesRequest {
+    /// Field 1: `organization_id`
+    #[serde(
+        rename = "organizationId",
+        alias = "organization_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub organization_id: ::buffa::alloc::string::String,
+    /// Field 2: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListAgentDirectMessagesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListAgentDirectMessagesRequest")
+            .field("organization_id", &self.organization_id)
+            .field("agent_id", &self.agent_id)
+            .finish()
+    }
+}
+impl ListAgentDirectMessagesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListAgentDirectMessagesRequest";
+}
+::buffa::impl_default_instance!(ListAgentDirectMessagesRequest);
+impl ::buffa::MessageName for ListAgentDirectMessagesRequest {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListAgentDirectMessagesRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.ListAgentDirectMessagesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListAgentDirectMessagesRequest";
+}
+impl ::buffa::Message for ListAgentDirectMessagesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.organization_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        }
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.organization_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        }
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.organization_id.clear();
+        self.agent_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListAgentDirectMessagesRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListAgentDirectMessagesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListAgentDirectMessagesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_AGENT_DIRECT_MESSAGES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListAgentDirectMessagesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListAgentDirectMessagesRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListAgentDirectMessagesRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListAgentDirectMessagesResponse {
+    /// Field 1: `channels`
+    #[serde(
+        rename = "channels",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub channels: ::buffa::alloc::vec::Vec<ChannelSummary>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListAgentDirectMessagesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListAgentDirectMessagesResponse")
+            .field("channels", &self.channels)
+            .finish()
+    }
+}
+impl ListAgentDirectMessagesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListAgentDirectMessagesResponse";
+}
+::buffa::impl_default_instance!(ListAgentDirectMessagesResponse);
+impl ::buffa::MessageName for ListAgentDirectMessagesResponse {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ListAgentDirectMessagesResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.ListAgentDirectMessagesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListAgentDirectMessagesResponse";
+}
+impl ::buffa::Message for ListAgentDirectMessagesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.channels {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.channels {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.channels.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.channels.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListAgentDirectMessagesResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListAgentDirectMessagesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListAgentDirectMessagesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_AGENT_DIRECT_MESSAGES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListAgentDirectMessagesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListAgentDirectMessagesResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListAgentDirectMessagesResponse>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -79628,6 +79923,17 @@ pub struct ChannelSummary {
         ::buffa_types::google::protobuf::Timestamp,
         ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
     >,
+    /// True for an Agent-to-Agent direct message: members may read it but never
+    /// post, add participants, archive or delete it.
+    ///
+    /// Field 23: `read_only`
+    #[serde(
+        rename = "readOnly",
+        alias = "read_only",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub read_only: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -79657,6 +79963,7 @@ impl ::core::fmt::Debug for ChannelSummary {
             .field("pinned_at", &self.pinned_at)
             .field("sidebar_section_id", &self.sidebar_section_id)
             .field("hidden_at", &self.hidden_at)
+            .field("read_only", &self.read_only)
             .finish()
     }
 }
@@ -79853,6 +80160,9 @@ impl ::buffa::Message for ChannelSummary {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.read_only {
+            size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -79974,6 +80284,9 @@ impl ::buffa::Message for ChannelSummary {
                 buf,
             );
             self.hidden_at.write_to(__cache, buf);
+        }
+        if self.read_only {
+            ::buffa::types::put_bool_field(23u32, self.read_only, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -80200,6 +80513,13 @@ impl ::buffa::Message for ChannelSummary {
                     ctx,
                 )?;
             }
+            23u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.read_only = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -80230,6 +80550,7 @@ impl ::buffa::Message for ChannelSummary {
         self.pinned_at = ::buffa::MessageField::none();
         self.sidebar_section_id = ::core::option::Option::None;
         self.hidden_at = ::buffa::MessageField::none();
+        self.read_only = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -83563,6 +83884,624 @@ pub const __GET_CHANNEL_LINK_PREVIEW_RESPONSE_JSON_ANY: ::buffa::type_registry::
     from_json: ::buffa::type_registry::any_from_json::<GetChannelLinkPreviewResponse>,
     is_wkt: false,
 };
+/// Links a message in the originating thread to its counterpart inside an
+/// Agent-to-Agent direct message. An outbound row marks the "sent to B" notice;
+/// an inbound row is B's answer copied back for the person to read.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ChannelMessageRelay {
+    /// Field 1: `direction`
+    #[serde(
+        rename = "direction",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub direction: ::buffa::EnumValue<channel_message_relay::Direction>,
+    /// Field 2: `peer_channel_id`
+    #[serde(
+        rename = "peerChannelId",
+        alias = "peer_channel_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub peer_channel_id: ::buffa::alloc::string::String,
+    /// Field 3: `peer_message_id`
+    #[serde(
+        rename = "peerMessageId",
+        alias = "peer_message_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub peer_message_id: ::buffa::alloc::string::String,
+    /// Field 4: `peer_agent_id`
+    #[serde(
+        rename = "peerAgentId",
+        alias = "peer_agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub peer_agent_id: ::buffa::alloc::string::String,
+    /// Field 5: `peer_agent_name`
+    #[serde(
+        rename = "peerAgentName",
+        alias = "peer_agent_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub peer_agent_name: ::buffa::alloc::string::String,
+    /// Field 6: `peer_agent_image`
+    #[serde(
+        rename = "peerAgentImage",
+        alias = "peer_agent_image",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub peer_agent_image: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Outbound rows carry the state of the round trip; inbound rows are always
+    /// completed because the answer they copy has already arrived.
+    ///
+    /// Field 7: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<channel_message_relay::Status>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ChannelMessageRelay {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ChannelMessageRelay")
+            .field("direction", &self.direction)
+            .field("peer_channel_id", &self.peer_channel_id)
+            .field("peer_message_id", &self.peer_message_id)
+            .field("peer_agent_id", &self.peer_agent_id)
+            .field("peer_agent_name", &self.peer_agent_name)
+            .field("peer_agent_image", &self.peer_agent_image)
+            .field("status", &self.status)
+            .finish()
+    }
+}
+impl ChannelMessageRelay {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageRelay";
+}
+impl ChannelMessageRelay {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::peer_agent_image`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_peer_agent_image(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.peer_agent_image = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(ChannelMessageRelay);
+impl ::buffa::MessageName for ChannelMessageRelay {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "ChannelMessageRelay";
+    const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageRelay";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageRelay";
+}
+impl ::buffa::Message for ChannelMessageRelay {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.direction.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if !self.peer_channel_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.peer_channel_id) as u64;
+        }
+        if !self.peer_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.peer_message_id) as u64;
+        }
+        if !self.peer_agent_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.peer_agent_id) as u64;
+        }
+        if !self.peer_agent_name.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.peer_agent_name) as u64;
+        }
+        if let Some(ref v) = self.peer_agent_image {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.direction.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.peer_channel_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.peer_channel_id, buf);
+        }
+        if !self.peer_message_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.peer_message_id, buf);
+        }
+        if !self.peer_agent_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.peer_agent_id, buf);
+        }
+        if !self.peer_agent_name.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.peer_agent_name, buf);
+        }
+        if let Some(ref v) = self.peer_agent_image {
+            ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.direction = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.peer_channel_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.peer_message_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.peer_agent_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.peer_agent_name, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .peer_agent_image
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.direction = ::buffa::EnumValue::from(0);
+        self.peer_channel_id.clear();
+        self.peer_message_id.clear();
+        self.peer_agent_id.clear();
+        self.peer_agent_name.clear();
+        self.peer_agent_image = ::core::option::Option::None;
+        self.status = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ChannelMessageRelay {
+    const PROTO_FQN: &'static str = "briar.app.v1.ChannelMessageRelay";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ChannelMessageRelay {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHANNEL_MESSAGE_RELAY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ChannelMessageRelay",
+    to_json: ::buffa::type_registry::any_to_json::<ChannelMessageRelay>,
+    from_json: ::buffa::type_registry::any_from_json::<ChannelMessageRelay>,
+    is_wkt: false,
+};
+pub mod channel_message_relay {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Direction {
+        DIRECTION_UNSPECIFIED = 0i32,
+        DIRECTION_OUTBOUND = 1i32,
+        DIRECTION_INBOUND = 2i32,
+    }
+    impl Direction {
+        ///Idiomatic alias for [`Self::DIRECTION_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Unspecified: Self = Self::DIRECTION_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::DIRECTION_OUTBOUND`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Outbound: Self = Self::DIRECTION_OUTBOUND;
+        ///Idiomatic alias for [`Self::DIRECTION_INBOUND`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Inbound: Self = Self::DIRECTION_INBOUND;
+    }
+    impl ::core::default::Default for Direction {
+        fn default() -> Self {
+            Self::DIRECTION_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Direction {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Direction {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Direction;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Direction)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Direction, E> {
+                    <Direction as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Direction, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Direction as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Direction, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Direction as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Direction, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Direction {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Direction {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::DIRECTION_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::DIRECTION_OUTBOUND),
+                2i32 => ::core::option::Option::Some(Self::DIRECTION_INBOUND),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::DIRECTION_UNSPECIFIED => "DIRECTION_UNSPECIFIED",
+                Self::DIRECTION_OUTBOUND => "DIRECTION_OUTBOUND",
+                Self::DIRECTION_INBOUND => "DIRECTION_INBOUND",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "DIRECTION_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::DIRECTION_UNSPECIFIED)
+                }
+                "DIRECTION_OUTBOUND" => {
+                    ::core::option::Option::Some(Self::DIRECTION_OUTBOUND)
+                }
+                "DIRECTION_INBOUND" => {
+                    ::core::option::Option::Some(Self::DIRECTION_INBOUND)
+                }
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[
+                Self::DIRECTION_UNSPECIFIED,
+                Self::DIRECTION_OUTBOUND,
+                Self::DIRECTION_INBOUND,
+            ]
+        }
+    }
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Status {
+        STATUS_UNSPECIFIED = 0i32,
+        STATUS_PENDING = 1i32,
+        STATUS_COMPLETED = 2i32,
+        STATUS_FAILED = 3i32,
+    }
+    impl Status {
+        ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Unspecified: Self = Self::STATUS_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::STATUS_PENDING`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Pending: Self = Self::STATUS_PENDING;
+        ///Idiomatic alias for [`Self::STATUS_COMPLETED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Completed: Self = Self::STATUS_COMPLETED;
+        ///Idiomatic alias for [`Self::STATUS_FAILED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Failed: Self = Self::STATUS_FAILED;
+    }
+    impl ::core::default::Default for Status {
+        fn default() -> Self {
+            Self::STATUS_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Status {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Status {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Status;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Status)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Status, E> {
+                    <Status as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Status, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Status {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Status {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::STATUS_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::STATUS_PENDING),
+                2i32 => ::core::option::Option::Some(Self::STATUS_COMPLETED),
+                3i32 => ::core::option::Option::Some(Self::STATUS_FAILED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::STATUS_UNSPECIFIED => "STATUS_UNSPECIFIED",
+                Self::STATUS_PENDING => "STATUS_PENDING",
+                Self::STATUS_COMPLETED => "STATUS_COMPLETED",
+                Self::STATUS_FAILED => "STATUS_FAILED",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "STATUS_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::STATUS_UNSPECIFIED)
+                }
+                "STATUS_PENDING" => ::core::option::Option::Some(Self::STATUS_PENDING),
+                "STATUS_COMPLETED" => {
+                    ::core::option::Option::Some(Self::STATUS_COMPLETED)
+                }
+                "STATUS_FAILED" => ::core::option::Option::Some(Self::STATUS_FAILED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[
+                Self::STATUS_UNSPECIFIED,
+                Self::STATUS_PENDING,
+                Self::STATUS_COMPLETED,
+                Self::STATUS_FAILED,
+            ]
+        }
+    }
+}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -83741,6 +84680,15 @@ pub struct ChannelMessage {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub memory_citations: ::buffa::alloc::vec::Vec<DmMemoryReference>,
+    /// Field 22: `relay`
+    #[serde(
+        rename = "relay",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub relay: ::buffa::MessageField<
+        ChannelMessageRelay,
+        ::buffa::Inline<ChannelMessageRelay>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -83769,6 +84717,7 @@ impl ::core::fmt::Debug for ChannelMessage {
             .field("created_at", &self.created_at)
             .field("deleted_at", &self.deleted_at)
             .field("memory_citations", &self.memory_citations)
+            .field("relay", &self.relay)
             .finish()
     }
 }
@@ -83944,6 +84893,14 @@ impl ::buffa::Message for ChannelMessage {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.relay.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.relay.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -84086,6 +85043,14 @@ impl ::buffa::Message for ChannelMessage {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if self.relay.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                22u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.relay.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -84322,6 +85287,17 @@ impl ::buffa::Message for ChannelMessage {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.memory_citations.push(elem);
             }
+            22u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.relay.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -84351,6 +85327,7 @@ impl ::buffa::Message for ChannelMessage {
         self.created_at = ::buffa::MessageField::none();
         self.deleted_at = ::buffa::MessageField::none();
         self.memory_citations.clear();
+        self.relay = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -239977,6 +240954,618 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// The Agent-to-Agent conversations one Agent takes part in, for the
+        /// conversations tab on an Agent detail page. They are read-only for people.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListAgentDirectMessagesRequestView<'a> {
+            /// Field 1: `organization_id`
+            pub organization_id: &'a str,
+            /// Field 2: `agent_id`
+            pub agent_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListAgentDirectMessagesRequestView<'a> {
+            type Owned = super::super::ListAgentDirectMessagesRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.agent_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAgentDirectMessagesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListAgentDirectMessagesRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListAgentDirectMessagesRequest {
+                    organization_id: self.organization_id.to_string(),
+                    agent_id: self.agent_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListAgentDirectMessagesRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.organization_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                                as u64;
+                }
+                if !self.agent_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.organization_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                }
+                if !self.agent_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListAgentDirectMessagesRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
+                    __map.serialize_entry("organizationId", self.organization_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_id) {
+                    __map.serialize_entry("agentId", self.agent_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListAgentDirectMessagesRequestView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListAgentDirectMessagesRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.ListAgentDirectMessagesRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListAgentDirectMessagesRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListAgentDirectMessagesRequestView);
+        ::buffa::impl_view_reborrow!(ListAgentDirectMessagesRequestView);
+        /** Self-contained, `'static` owned view of a `ListAgentDirectMessagesRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListAgentDirectMessagesRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListAgentDirectMessagesRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListAgentDirectMessagesRequestOwnedView(
+            ::buffa::OwnedView<ListAgentDirectMessagesRequestView<'static>>,
+        );
+        impl ListAgentDirectMessagesRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAgentDirectMessagesRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAgentDirectMessagesRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListAgentDirectMessagesRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAgentDirectMessagesRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListAgentDirectMessagesRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListAgentDirectMessagesRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListAgentDirectMessagesRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `organization_id`
+            #[must_use]
+            pub fn organization_id(&self) -> &'_ str {
+                self.0.reborrow().organization_id
+            }
+            /// Field 2: `agent_id`
+            #[must_use]
+            pub fn agent_id(&self) -> &'_ str {
+                self.0.reborrow().agent_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListAgentDirectMessagesRequestView<'static>>,
+        > for ListAgentDirectMessagesRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListAgentDirectMessagesRequestView<'static>>,
+            ) -> Self {
+                ListAgentDirectMessagesRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListAgentDirectMessagesRequestOwnedView>
+        for ::buffa::OwnedView<ListAgentDirectMessagesRequestView<'static>> {
+            fn from(wrapper: ListAgentDirectMessagesRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListAgentDirectMessagesRequestView<'static>>,
+        > for ListAgentDirectMessagesRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListAgentDirectMessagesRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListAgentDirectMessagesRequest {
+            type View<'a> = ListAgentDirectMessagesRequestView<'a>;
+            type ViewHandle = ListAgentDirectMessagesRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListAgentDirectMessagesRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListAgentDirectMessagesResponseView<'a> {
+            /// Field 1: `channels`
+            pub channels: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ChannelSummaryView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListAgentDirectMessagesResponseView<'a> {
+            type Owned = super::super::ListAgentDirectMessagesResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::ChannelSummaryView,
+                            >(),
+                        )?;
+                        view.channels
+                            .push(
+                                <super::super::__buffa::view::ChannelSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAgentDirectMessagesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListAgentDirectMessagesResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListAgentDirectMessagesResponse {
+                    channels: self
+                        .channels
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListAgentDirectMessagesResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.channels {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.channels {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListAgentDirectMessagesResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.channels.is_empty() {
+                    __map.serialize_entry("channels", &*self.channels)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListAgentDirectMessagesResponseView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ListAgentDirectMessagesResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.ListAgentDirectMessagesResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListAgentDirectMessagesResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListAgentDirectMessagesResponseView);
+        ::buffa::impl_view_reborrow!(ListAgentDirectMessagesResponseView);
+        /** Self-contained, `'static` owned view of a `ListAgentDirectMessagesResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListAgentDirectMessagesResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListAgentDirectMessagesResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListAgentDirectMessagesResponseOwnedView(
+            ::buffa::OwnedView<ListAgentDirectMessagesResponseView<'static>>,
+        );
+        impl ListAgentDirectMessagesResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAgentDirectMessagesResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAgentDirectMessagesResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListAgentDirectMessagesResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAgentDirectMessagesResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListAgentDirectMessagesResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListAgentDirectMessagesResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListAgentDirectMessagesResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `channels`
+            #[must_use]
+            pub fn channels(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ChannelSummaryView<'_>,
+            > {
+                &self.0.reborrow().channels
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListAgentDirectMessagesResponseView<'static>>,
+        > for ListAgentDirectMessagesResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListAgentDirectMessagesResponseView<'static>>,
+            ) -> Self {
+                ListAgentDirectMessagesResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListAgentDirectMessagesResponseOwnedView>
+        for ::buffa::OwnedView<ListAgentDirectMessagesResponseView<'static>> {
+            fn from(wrapper: ListAgentDirectMessagesResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListAgentDirectMessagesResponseView<'static>>,
+        > for ListAgentDirectMessagesResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListAgentDirectMessagesResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListAgentDirectMessagesResponse {
+            type View<'a> = ListAgentDirectMessagesResponseView<'a>;
+            type ViewHandle = ListAgentDirectMessagesResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListAgentDirectMessagesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         #[derive(Clone, Debug, Default)]
         pub struct CreateChannelRequestView<'a> {
             /// Field 1: `organization_id`
@@ -262908,6 +264497,11 @@ pub mod __buffa {
             pub hidden_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// True for an Agent-to-Agent direct message: members may read it but never
+            /// post, add participants, archive or delete it.
+            ///
+            /// Field 23: `read_only`
+            pub read_only: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ChannelSummaryView<'a> {
@@ -263227,6 +264821,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    23u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.read_only = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     18u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -263360,6 +264961,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    read_only: self.read_only,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -263495,6 +265097,9 @@ pub mod __buffa {
                         += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.read_only {
+                    size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -263617,6 +265222,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.hidden_at.write_to(__cache, buf);
+                }
+                if self.read_only {
+                    ::buffa::types::put_bool_field(23u32, self.read_only, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -263749,6 +265357,9 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("hiddenAt", __v)?;
                     }
+                }
+                if self.read_only {
+                    __map.serialize_entry("readOnly", &self.read_only)?;
                 }
                 __map.end()
             }
@@ -263991,6 +265602,14 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().hidden_at
+            }
+            /// True for an Agent-to-Agent direct message: members may read it but never
+            /// post, add participants, archive or delete it.
+            ///
+            /// Field 23: `read_only`
+            #[must_use]
+            pub fn read_only(&self) -> bool {
+                self.0.reborrow().read_only
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChannelSummaryView<'static>>>
@@ -269565,6 +271184,460 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// Links a message in the originating thread to its counterpart inside an
+        /// Agent-to-Agent direct message. An outbound row marks the "sent to B" notice;
+        /// an inbound row is B's answer copied back for the person to read.
+        #[derive(Clone, Debug, Default)]
+        pub struct ChannelMessageRelayView<'a> {
+            /// Field 1: `direction`
+            pub direction: ::buffa::EnumValue<
+                super::super::channel_message_relay::Direction,
+            >,
+            /// Field 2: `peer_channel_id`
+            pub peer_channel_id: &'a str,
+            /// Field 3: `peer_message_id`
+            pub peer_message_id: &'a str,
+            /// Field 4: `peer_agent_id`
+            pub peer_agent_id: &'a str,
+            /// Field 5: `peer_agent_name`
+            pub peer_agent_name: &'a str,
+            /// Field 6: `peer_agent_image`
+            pub peer_agent_image: ::core::option::Option<&'a str>,
+            /// Outbound rows carry the state of the round trip; inbound rows are always
+            /// completed because the answer they copy has already arrived.
+            ///
+            /// Field 7: `status`
+            pub status: ::buffa::EnumValue<super::super::channel_message_relay::Status>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ChannelMessageRelayView<'a> {
+            type Owned = super::super::ChannelMessageRelay;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.direction = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.peer_channel_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.peer_message_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.peer_agent_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.peer_agent_name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.peer_agent_image = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ChannelMessageRelay,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ChannelMessageRelay,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ChannelMessageRelay {
+                    direction: self.direction,
+                    peer_channel_id: self.peer_channel_id.to_string(),
+                    peer_message_id: self.peer_message_id.to_string(),
+                    peer_agent_id: self.peer_agent_id.to_string(),
+                    peer_agent_name: self.peer_agent_name.to_string(),
+                    peer_agent_image: self.peer_agent_image.map(|s| s.to_string()),
+                    status: self.status,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ChannelMessageRelayView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                {
+                    let val = self.direction.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if !self.peer_channel_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.peer_channel_id)
+                                as u64;
+                }
+                if !self.peer_message_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.peer_message_id)
+                                as u64;
+                }
+                if !self.peer_agent_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.peer_agent_id)
+                                as u64;
+                }
+                if !self.peer_agent_name.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.peer_agent_name)
+                                as u64;
+                }
+                if let Some(ref v) = self.peer_agent_image {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.direction.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.peer_channel_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.peer_channel_id, buf);
+                }
+                if !self.peer_message_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.peer_message_id, buf);
+                }
+                if !self.peer_agent_id.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.peer_agent_id, buf);
+                }
+                if !self.peer_agent_name.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.peer_agent_name, buf);
+                }
+                if let Some(ref v) = self.peer_agent_image {
+                    ::buffa::types::put_string_field(6u32, v, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ChannelMessageRelayView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.direction,
+                ) {
+                    __map.serialize_entry("direction", &self.direction)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.peer_channel_id) {
+                    __map.serialize_entry("peerChannelId", self.peer_channel_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.peer_message_id) {
+                    __map.serialize_entry("peerMessageId", self.peer_message_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.peer_agent_id) {
+                    __map.serialize_entry("peerAgentId", self.peer_agent_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.peer_agent_name) {
+                    __map.serialize_entry("peerAgentName", self.peer_agent_name)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.peer_agent_image {
+                    __map.serialize_entry("peerAgentImage", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ChannelMessageRelayView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "ChannelMessageRelay";
+            const FULL_NAME: &'static str = "briar.app.v1.ChannelMessageRelay";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ChannelMessageRelay";
+        }
+        ::buffa::impl_default_view_instance!(ChannelMessageRelayView);
+        ::buffa::impl_view_reborrow!(ChannelMessageRelayView);
+        /** Self-contained, `'static` owned view of a `ChannelMessageRelay` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ChannelMessageRelayView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ChannelMessageRelayView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ChannelMessageRelayOwnedView(
+            ::buffa::OwnedView<ChannelMessageRelayView<'static>>,
+        );
+        impl ChannelMessageRelayOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageRelayOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageRelayOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ChannelMessageRelay,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChannelMessageRelayOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ChannelMessageRelayView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ChannelMessageRelayView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::ChannelMessageRelay {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `direction`
+            #[must_use]
+            pub fn direction(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::channel_message_relay::Direction> {
+                self.0.reborrow().direction
+            }
+            /// Field 2: `peer_channel_id`
+            #[must_use]
+            pub fn peer_channel_id(&self) -> &'_ str {
+                self.0.reborrow().peer_channel_id
+            }
+            /// Field 3: `peer_message_id`
+            #[must_use]
+            pub fn peer_message_id(&self) -> &'_ str {
+                self.0.reborrow().peer_message_id
+            }
+            /// Field 4: `peer_agent_id`
+            #[must_use]
+            pub fn peer_agent_id(&self) -> &'_ str {
+                self.0.reborrow().peer_agent_id
+            }
+            /// Field 5: `peer_agent_name`
+            #[must_use]
+            pub fn peer_agent_name(&self) -> &'_ str {
+                self.0.reborrow().peer_agent_name
+            }
+            /// Field 6: `peer_agent_image`
+            #[must_use]
+            pub fn peer_agent_image(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().peer_agent_image
+            }
+            /// Outbound rows carry the state of the round trip; inbound rows are always
+            /// completed because the answer they copy has already arrived.
+            ///
+            /// Field 7: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::channel_message_relay::Status> {
+                self.0.reborrow().status
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ChannelMessageRelayView<'static>>>
+        for ChannelMessageRelayOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ChannelMessageRelayView<'static>>,
+            ) -> Self {
+                ChannelMessageRelayOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ChannelMessageRelayOwnedView>
+        for ::buffa::OwnedView<ChannelMessageRelayView<'static>> {
+            fn from(wrapper: ChannelMessageRelayOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ChannelMessageRelayView<'static>>>
+        for ChannelMessageRelayOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ChannelMessageRelayView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ChannelMessageRelay {
+            type View<'a> = ChannelMessageRelayView<'a>;
+            type ViewHandle = ChannelMessageRelayOwnedView;
+        }
+        impl ::serde::Serialize for ChannelMessageRelayOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         #[derive(Clone, Debug, Default)]
         pub struct ChannelMessageView<'a> {
             /// Field 1: `id`
@@ -269642,6 +271715,10 @@ pub mod __buffa {
             pub memory_citations: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::DmMemoryReferenceView<'a>,
+            >,
+            /// Field 22: `relay`
+            pub relay: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelMessageRelayView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -269907,6 +271984,31 @@ pub mod __buffa {
                             None => {
                                 view.deleted_at = ::buffa::MessageFieldView::set(
                                     <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    22u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.relay.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.relay = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ChannelMessageRelayView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -270205,6 +272307,15 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    relay: match self.relay.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ChannelMessageRelay,
+                                ::buffa::Inline<super::super::ChannelMessageRelay>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -270358,6 +272469,14 @@ pub mod __buffa {
                         += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.relay.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.relay.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -270502,6 +272621,14 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
+                if self.relay.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        22u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.relay.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -270627,6 +272754,11 @@ pub mod __buffa {
                 }
                 if !self.memory_citations.is_empty() {
                     __map.serialize_entry("memoryCitations", &*self.memory_citations)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.relay.as_option() {
+                        __map.serialize_entry("relay", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -270889,6 +273021,15 @@ pub mod __buffa {
                 super::super::__buffa::view::DmMemoryReferenceView<'_>,
             > {
                 &self.0.reborrow().memory_citations
+            }
+            /// Field 22: `relay`
+            #[must_use]
+            pub fn relay(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ChannelMessageRelayView<'_>,
+            > {
+                &self.0.reborrow().relay
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChannelMessageView<'static>>>
@@ -371794,6 +373935,8 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_DIRECT_MESSAGE_RECIPIENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_DIRECT_MESSAGE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_DIRECT_MESSAGE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_AGENT_DIRECT_MESSAGES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_AGENT_DIRECT_MESSAGES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_CHANNEL_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPDATE_CHANNEL_REQUEST_JSON_ANY);
         reg.register_json_any(super::update_channel_request::__CLEAR_TOPIC_JSON_ANY);
@@ -371896,6 +374039,7 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_CHANNEL_LINK_PREVIEW_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_LINK_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__GET_CHANNEL_LINK_PREVIEW_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CHANNEL_MESSAGE_RELAY_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_ISSUE_PROPOSAL_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_ISSUE_PROPOSAL_PAYLOAD_JSON_ANY);
@@ -373038,6 +375182,14 @@ pub use self::__buffa::view::CreateDirectMessageResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateDirectMessageResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::ListAgentDirectMessagesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentDirectMessagesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentDirectMessagesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentDirectMessagesResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::CreateChannelRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateChannelRequestOwnedView;
@@ -373333,6 +375485,10 @@ pub use self::__buffa::view::ChannelLinkPreviewOwnedView;
 pub use self::__buffa::view::GetChannelLinkPreviewResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetChannelLinkPreviewResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelMessageRelayView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelMessageRelayOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ChannelMessageView;
 #[doc(inline)]

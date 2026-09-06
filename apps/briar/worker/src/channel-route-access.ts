@@ -4,7 +4,15 @@ import { HttpError } from "./http-response";
 import {
   getChannel,
   getChannelById,
+  isAgentDirectMessage,
 } from "./channels";
+
+/**
+ * An Agent-to-Agent conversation has no human participants, so a person can
+ * read it under the plan's §3.5 rule but never write to it, rename it, or
+ * change who is in it. Deletion keeps the existing conversation rule.
+ */
+const AGENT_DIRECT_MESSAGE_READ_ONLY = "Agent conversations are read-only";
 
 export async function requireChannelAccess(
   db: D1Database,
@@ -36,6 +44,9 @@ export async function requireChannelWriteAccess(
   }
   const channel = await getChannel(db, organizationId, channelId, userId);
   if (!channel) throw new HttpError(404, "Channel not found");
+  if (isAgentDirectMessage(channel)) {
+    throw new HttpError(403, AGENT_DIRECT_MESSAGE_READ_ONLY);
+  }
   return channel;
 }
 
@@ -96,6 +107,9 @@ export async function requireChannelWebhookManagement(
     channelId,
     userId,
   );
+  if (isAgentDirectMessage(channel)) {
+    throw new HttpError(403, AGENT_DIRECT_MESSAGE_READ_ONLY);
+  }
   if (channel.kind === "dm") {
     throw new HttpError(400, "Webhooks are not available in direct messages");
   }

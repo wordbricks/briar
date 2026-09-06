@@ -291,6 +291,7 @@ describe("Organization Agent channel delegation", () => {
             executionProposal: result.executionProposal ?? null,
             skillExecutionProposal: result.skillExecutionProposal ?? null,
             delegation: result.delegation ?? null,
+            agentMessage: result.agentMessage ?? null,
           },
         }
       : { case: "failure", error: "Reply result is required", block: null };

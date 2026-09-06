@@ -166,6 +166,7 @@ describe("generated reply completion client", () => {
           executionProposal: null,
           skillExecutionProposal: null,
           delegation: null,
+          agentMessage: null,
         },
       },
     })).resolves.toEqual({
@@ -182,6 +183,74 @@ describe("generated reply completion client", () => {
         },
       },
     });
+  });
+
+  it("encodes an Agent message onto its own action arm", async () => {
+    const completeChannel = vi.fn().mockResolvedValue({
+      replayed: false,
+      disposition: ReplyCompletionDisposition.COMPLETED,
+      retainedUntil: timestampFromDate(new Date("2026-08-31T16:00:00.000Z")),
+    });
+    const queue = {
+      prepareReplyAttachmentUploads: vi.fn(),
+      completeIssueReply: vi.fn(),
+      completeChannelReply: completeChannel,
+    } as unknown as ReplyCompletionQueueClient;
+    const client = createReplyCompletionClient(
+      "http://127.0.0.1:8787",
+      "worker-token",
+      { queue },
+    );
+    const agentId = "88888888-8888-4888-8888-888888888888";
+    const result = {
+      body: "Sure, I'll ask them.",
+      document: null,
+      issueProposal: null,
+      issueBatchProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+      agentMessage: { agentId, body: "Please check the ticker." },
+    };
+
+    await expect(client.completeChannelReply({
+      projectId,
+      workerId,
+      work: channelWork,
+      outcome: {
+        case: "success",
+        conversationId: null,
+        attachments: [],
+        result,
+      },
+    })).resolves.toMatchObject({ disposition: "completed" });
+
+    expect(completeChannel.mock.calls[0]![0].outcome).toMatchObject({
+      case: "success",
+      value: {
+        action: {
+          case: "agentMessage",
+          value: { agentId, body: "Please check the ticker." },
+        },
+      },
+    });
+
+    // Delegation and an Agent message are exclusive arms of one oneof, so the
+    // client refuses the pair rather than silently dropping one.
+    await expect(client.completeChannelReply({
+      projectId,
+      workerId,
+      work: channelWork,
+      outcome: {
+        case: "success",
+        conversationId: null,
+        attachments: [],
+        result: {
+          ...result,
+          delegation: { projectId, agentId, request: "Inspect it." },
+        },
+      },
+    })).rejects.toThrow("Channel reply action variants are mutually exclusive");
   });
 
   it("uses the default crypto UUID function with its receiver intact", async () => {

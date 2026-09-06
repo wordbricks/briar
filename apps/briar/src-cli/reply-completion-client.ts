@@ -229,9 +229,24 @@ const channelSuccess = (
       (result.document || artifactProposalCount > 0 ||
         result.skillExecutionProposal)) ||
     (result.skillExecutionProposal &&
-      (result.document || artifactProposalCount > 0))
+      (result.document || artifactProposalCount > 0)) ||
+    (result.agentMessage &&
+      (result.delegation || result.document || artifactProposalCount > 0 ||
+        result.skillExecutionProposal))
   ) {
     throw new Error("Channel reply action variants are mutually exclusive");
+  }
+  if (result.agentMessage) {
+    return create(ChannelReplySuccessSchema, {
+      ...base,
+      action: {
+        case: "agentMessage",
+        value: {
+          agentId: result.agentMessage.agentId,
+          body: result.agentMessage.body,
+        },
+      },
+    });
   }
   if (result.delegation) {
     return create(ChannelReplySuccessSchema, {

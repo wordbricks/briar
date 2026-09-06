@@ -31,6 +31,7 @@ const message = (
   proposal: null,
   executionProposal: null,
   skillExecutionProposal: null,
+  relay: null,
   createdAt: "2026-08-24T00:00:00.000Z",
 });
 

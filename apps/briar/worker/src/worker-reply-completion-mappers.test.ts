@@ -78,6 +78,37 @@ describe("reply completion protobuf mapping", () => {
     });
   });
 
+  it("maps the Agent message action onto the completion input", () => {
+    const agentId = "60000000-0000-4000-8000-000000000001";
+    const mapped = completeChannelReplyInputFromProto(create(
+      CompleteChannelReplyRequestSchema,
+      {
+        requestId,
+        projectId,
+        workerId: "worker-1",
+        work: channelWork(),
+        outcome: {
+          case: "success",
+          value: {
+            body: "Sure, I'll ask them.",
+            action: {
+              case: "agentMessage",
+              value: { agentId, body: "  Please check the ticker.  " },
+            },
+          },
+        },
+      },
+    ));
+
+    expect(mapped.outcome).toMatchObject({
+      case: "success",
+      completion: {
+        agentMessage: { agentId, body: "Please check the ticker." },
+        delegation: null,
+      },
+    });
+  });
+
   it("retains semantic validation for generated success payloads", () => {
     expect(() => completeIssueReplyInputFromProto(create(
       CompleteIssueReplyRequestSchema,

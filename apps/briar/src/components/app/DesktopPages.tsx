@@ -469,6 +469,7 @@ export function DesktopPages({
               setRequestedRunId(runId);
               navigateToIssue(runId, projectId);
             }}
+            onNavigateBack={goBack}
             onSkillSessionAccepted={agentSessions.adoptRemoteSession}
           />
         );

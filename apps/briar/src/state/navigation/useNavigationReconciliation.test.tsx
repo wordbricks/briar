@@ -18,6 +18,7 @@ import { channelApiAtom } from "../channels/api";
 import {
   activeChannelIdAtom,
   channelCatalogCursorAtom,
+  claimOpenAgentConversation,
   directMessageComposeAtom,
 } from "../channels/atoms";
 import {
@@ -113,6 +114,7 @@ const channelOf = (id: string): ChannelSummary => ({
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 });
 
 const seedChannels = (registry: AtomRegistry, channels: ChannelSummary[]) => {
@@ -670,6 +672,42 @@ describe("the DM page's latest conversation", () => {
       registry.set(channelCatalogCursorAtom, 1);
     });
     await flush();
+    expect(registry.get(activeChannelIdAtom)).toBe(latest.id);
+    await view.cleanup();
+  });
+
+  /*
+    An Agent-to-Agent conversation is opened by id and this catalog never lists
+    it, so the swap above would throw the reader out of it on the way in. What
+    tells the two apart is the claim the view stakes before navigating.
+  */
+  it("stays on a claimed Agent conversation the catalog does not list", async () => {
+    const registry = harness();
+    seedChannels(registry, [older, latest]);
+    registry.set(channelCatalogCursorAtom, 1);
+    const view = await mount(registry);
+
+    await act(async () => {
+      claimOpenAgentConversation(registry, "agent-dm-1");
+      actions.navigateToChannel("agent-dm-1", "dms");
+    });
+    await flush();
+
+    expect(registry.get(activeChannelIdAtom)).toBe("agent-dm-1");
+    await view.cleanup();
+  });
+
+  it("swaps in the latest conversation for an unclaimed missing one", async () => {
+    const registry = harness();
+    seedChannels(registry, [older, latest]);
+    registry.set(channelCatalogCursorAtom, 1);
+    const view = await mount(registry);
+
+    await act(async () => {
+      actions.navigateToChannel("dm-gone", "dms");
+    });
+    await flush();
+
     expect(registry.get(activeChannelIdAtom)).toBe(latest.id);
     await view.cleanup();
   });

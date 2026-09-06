@@ -18,6 +18,7 @@ service ChannelService {
   rpc SyncChannels(SyncChannelsRequest) returns (SyncChannelsResponse);
   rpc ListDirectMessageRecipients(ListDirectMessageRecipientsRequest) returns (ListDirectMessageRecipientsResponse);
   rpc CreateDirectMessage(CreateDirectMessageRequest) returns (CreateDirectMessageResponse);
+  rpc ListAgentDirectMessages(ListAgentDirectMessagesRequest) returns (ListAgentDirectMessagesResponse);
   rpc CreateChannel(CreateChannelRequest) returns (CreateChannelResponse);
   rpc UpdateChannel(UpdateChannelRequest) returns (UpdateChannelResponse);
   rpc DeleteChannel(DeleteChannelRequest) returns (DeleteChannelResponse);
@@ -97,6 +98,17 @@ message CreateDirectMessageRequest {
 
 message CreateDirectMessageResponse {
   ChannelSummary channel = 1;
+}
+
+// The Agent-to-Agent conversations one Agent takes part in, for the
+// conversations tab on an Agent detail page. They are read-only for people.
+message ListAgentDirectMessagesRequest {
+  string organization_id = 1;
+  string agent_id = 2;
+}
+
+message ListAgentDirectMessagesResponse {
+  repeated ChannelSummary channels = 1;
 }
 
 message CreateChannelRequest {
@@ -551,6 +563,9 @@ message ChannelSummary {
   optional google.protobuf.Timestamp pinned_at = 20;
   optional string sidebar_section_id = 21;
   optional google.protobuf.Timestamp hidden_at = 22;
+  // True for an Agent-to-Agent direct message: members may read it but never
+  // post, add participants, archive or delete it.
+  bool read_only = 23;
 }
 
 message ChannelMember {
@@ -656,6 +671,34 @@ message GetChannelLinkPreviewResponse {
   optional ChannelLinkPreview preview = 1;
 }
 
+// Links a message in the originating thread to its counterpart inside an
+// Agent-to-Agent direct message. An outbound row marks the "sent to B" notice;
+// an inbound row is B's answer copied back for the person to read.
+message ChannelMessageRelay {
+  enum Direction {
+    DIRECTION_UNSPECIFIED = 0;
+    DIRECTION_OUTBOUND = 1;
+    DIRECTION_INBOUND = 2;
+  }
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_PENDING = 1;
+    STATUS_COMPLETED = 2;
+    STATUS_FAILED = 3;
+  }
+
+  Direction direction = 1;
+  string peer_channel_id = 2;
+  string peer_message_id = 3;
+  string peer_agent_id = 4;
+  string peer_agent_name = 5;
+  optional string peer_agent_image = 6;
+  // Outbound rows carry the state of the round trip; inbound rows are always
+  // completed because the answer they copy has already arrived.
+  Status status = 7;
+}
+
 message ChannelMessage {
   string id = 1;
   string channel_id = 2;
@@ -678,6 +721,7 @@ message ChannelMessage {
   google.protobuf.Timestamp created_at = 19;
   optional google.protobuf.Timestamp deleted_at = 20;
   repeated DmMemoryReference memory_citations = 21;
+  optional ChannelMessageRelay relay = 22;
 }
 
 message ChannelIssueProposal {

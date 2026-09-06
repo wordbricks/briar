@@ -9,6 +9,7 @@ import {
   createRouterTransport,
 } from "@connectrpc/connect";
 import {
+  ChannelKind,
   ChannelService,
   ChannelVisibility,
 } from "@briar/contracts/gen/briar/app/v1/channel_pb";
@@ -126,6 +127,7 @@ describe("app Channel Connect adapter", () => {
         },
         executionProposal: null,
         skillExecutionProposal: null,
+        relay: null,
         subscribers: [],
         createdAt: "2026-08-30T01:02:03.000Z",
         deletedAt: null,
@@ -236,6 +238,58 @@ describe("app Channel Connect adapter", () => {
       visibility: ChannelVisibility.UNSPECIFIED,
     })).rejects.toMatchObject({ code: Code.InvalidArgument });
     expect(createChannel).not.toHaveBeenCalled();
+  });
+
+  it("lists an Agent's read-only Agent-to-Agent conversations", async () => {
+    const listAgentDirectMessages = vi.fn<
+      AppConnectChannelServices["listAgentDirectMessages"]
+    >().mockResolvedValue({
+      channels: [{
+        id: channelId,
+        organizationId,
+        kind: "dm",
+        slug: "agent-dm",
+        name: "Agent A, Agent B",
+        topic: null,
+        visibility: "private",
+        defaultProjectId: null,
+        archivedAt: null,
+        memberCount: 0,
+        agentCount: 2,
+        createdByUserId: null,
+        createdAt: "2026-09-06T01:02:03.000Z",
+        updatedAt: "2026-09-06T01:02:03.000Z",
+        lastMessageAt: null,
+        lastMessagePreview: null,
+        lastReadAt: null,
+        hasUnread: false,
+        dmParticipants: [],
+        pinnedAt: null,
+        sidebarSectionId: null,
+        hiddenAt: null,
+        readOnly: true,
+      }],
+    });
+    const { client, flushBackgroundTasks } = createChannelClient({
+      listAgentDirectMessages,
+    });
+
+    const result = await client.listAgentDirectMessages({
+      organizationId,
+      agentId,
+    });
+    await flushBackgroundTasks();
+
+    expect(listAgentDirectMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId, userId, agentId }),
+    );
+    // Nobody may post in these conversations, and the flag is what every
+    // reader keys the read-only surface off.
+    expect(result.channels[0]).toMatchObject({
+      id: channelId,
+      readOnly: true,
+      kind: ChannelKind.DIRECT_MESSAGE,
+    });
   });
 
   it("requires and maps the membership oneof while preserving opaque user IDs", async () => {

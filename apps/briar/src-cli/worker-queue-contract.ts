@@ -593,13 +593,41 @@ const channelReplyFromProto = (
     triggerAttachments: value.triggerAttachments,
     memory: value.memory ? dmMemoryDescriptorFromProto(value.memory) : null,
     memoryLearningEnabled: value.memoryLearningEnabled,
+    agentMessageTargets: value.agentMessageTargets.map((target) => ({
+      agentId: target.agentId,
+      agentName: target.agentName,
+      projectId: target.projectId ?? null,
+      projectName: target.projectName ?? null,
+      responsibility: target.responsibility,
+      skills: target.skills.map((skill) => ({ id: skill.id, name: skill.name })),
+    })),
+    inboundAgentMessage: value.inboundAgentMessage
+      ? {
+          senderAgentId: value.inboundAgentMessage.senderAgentId,
+          senderAgentName: value.inboundAgentMessage.senderAgentName,
+          body: value.inboundAgentMessage.body,
+          originReplyJobId: value.inboundAgentMessage.originReplyJobId,
+        }
+      : null,
+    agentMessageHop: value.agentMessageHop,
   };
   if (scope.kind === "organization") {
     if (!mapped.organizationContext || mapped.delegation || mapped.skillExecutionTarget) {
       throw new Error("Worker organization reply has inconsistent scope data");
     }
   } else if (mapped.organizationContext || mapped.delegationTargets.length > 0) {
+    // Delegation stays an Organization Agent path inside a channel thread.
+    // Agent messages are a DM feature open to both scopes, so
+    // agentMessageTargets is deliberately absent from this rule.
     throw new Error("Worker project reply has inconsistent scope data");
+  }
+  // The two paths pick different completion actions and are never offered
+  // together (plan §3.7); a claim carrying both target lists cannot say which
+  // one this reply may use.
+  if (
+    mapped.delegationTargets.length > 0 && mapped.agentMessageTargets.length > 0
+  ) {
+    throw new Error("Worker channel reply has conflicting Agent target lists");
   }
   if (
     mapped.skillExecutionTarget &&

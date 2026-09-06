@@ -60,6 +60,7 @@ const message: ChannelMessage = {
   proposal: null,
   executionProposal: null,
   skillExecutionProposal: null,
+  relay: null,
   createdAt: "2026-08-01T01:00:00.000Z",
 };
 

@@ -109,6 +109,7 @@ export {
   deleteChannel,
   deleteChannelMessage,
   deleteChannelSidebarSection,
+  listAgentDirectMessages,
   listChannelMessages,
   listChannels,
   listChannelSidebarSections,

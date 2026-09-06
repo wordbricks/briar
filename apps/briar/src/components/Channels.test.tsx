@@ -45,6 +45,7 @@ const selectedChannel: ChannelSummary = {
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 };
 
 const secondChannel: ChannelSummary = {
@@ -79,6 +80,7 @@ const virtualMessage = (channelId: string, index: number): ChannelMessage => ({
   proposal: null,
   executionProposal: null,
   skillExecutionProposal: null,
+  relay: null,
   createdAt: `2026-08-01T00:${String(index).padStart(2, "0")}:00.000Z`,
 });
 
@@ -94,7 +96,8 @@ const channelSummaryWire = (channel: ChannelSummary) => ({
   agentCount: channel.agentCount,
   createdAt: channel.createdAt,
   updatedAt: channel.updatedAt,
-  kind: 1,
+  kind: channel.kind === "dm" ? 2 : 1,
+  readOnly: channel.readOnly,
   hasUnread: channel.hasUnread,
   directMessageParticipants: channel.dmParticipants.map((participant) => ({
     kind: participant.type === "user" ? 1 : 2,
@@ -362,6 +365,7 @@ describe("Channels", () => {
       proposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
+      relay: null,
       createdAt: "2026-08-15T00:00:00.000Z",
     };
     vi.stubGlobal("fetch", createChannelFetch((method) =>
@@ -450,6 +454,7 @@ describe("Channels", () => {
       proposal: null,
       executionProposal: null,
       skillExecutionProposal: null,
+      relay: null,
       createdAt: "2026-08-15T00:00:00.000Z",
     };
     const replyMessage: ChannelMessage = {
@@ -692,5 +697,82 @@ describe("Channels", () => {
     ).toBe(true);
 
     await view.cleanup();
+  });
+
+  it("opens an Agent-to-Agent conversation without a way to write to it", async () => {
+    /*
+      Nobody is a participant of an Agent-to-Agent conversation, so the whole
+      write surface goes: the composer, the memory dialog, the computer panel
+      and the roster button that adds people. What is left is the badge saying
+      why, and a way back to wherever the reader came from.
+    */
+    const agentConversation: ChannelSummary = {
+      ...selectedChannel,
+      id: "agent-dm-1",
+      slug: "agent-dm-1",
+      name: "Ava, Bay",
+      kind: "dm",
+      visibility: "private",
+      createdByUserId: null,
+      agentCount: 2,
+      memberCount: 0,
+      readOnly: true,
+      dmParticipants: [
+        { type: "agent", id: "agent-a", name: "Ava", image: null },
+        { type: "agent", id: "agent-b", name: "Bay", image: null },
+      ],
+    };
+    vi.stubGlobal("fetch", createChannelFetch((method) => method === "GetChannel"
+      ? {
+          channel: channelSummaryWire(agentConversation),
+          members: [],
+          agents: [],
+          messages: [],
+          agentReplies: [],
+        }
+      : {}));
+    let backCount = 0;
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
+      <RegistryContext.Provider value={createChannelTestRegistry()}>
+      <I18nProvider>
+        <Channels
+          activeChannelId={agentConversation.id}
+          channelCatalogCursor={0}
+          channels={[agentConversation]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          onReadOnlyBack={() => {
+            backCount += 1;
+          }}
+          organizationId="org-1"
+          surface="dm"
+          token="token"
+        />
+      </I18nProvider>
+      </RegistryContext.Provider>,
+    );
+    await act(async () => Promise.resolve());
+
+    expect(
+      container.querySelector(".channel-readonly-badge")?.textContent,
+    ).toContain("Agent conversation · Read only");
+    expect(container.querySelector(".channel-composer")).toBeNull();
+    expect(container.querySelector(".channel-header-members")).toBeNull();
+    expect(container.querySelector(".dm-computer-panel")).toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Memory"]'),
+    ).toBeNull();
+
+    const back = container.querySelector<HTMLButtonElement>(
+      ".channel-header-back",
+    );
+    expect(back?.getAttribute("aria-label")).toBe("Back");
+    await act(async () => back?.click());
+    expect(backCount).toBe(1);
+
+    await cleanup();
   });
 });

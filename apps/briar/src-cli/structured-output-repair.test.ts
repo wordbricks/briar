@@ -30,6 +30,7 @@ const proposalWithStatus = JSON.stringify({
   executionProposal: null,
   skillExecutionProposal: null,
   delegation: null,
+  agentMessage: null,
   contextRequests: null,
   memoryRequests: null,
   memoryCitations: null,

@@ -387,6 +387,7 @@ describe("sidebar halves", () => {
     pinnedAt: null,
     sidebarSectionId: null,
     hiddenAt: null,
+    readOnly: false,
   });
   const withOrganization = () =>
     createTestRegistry([

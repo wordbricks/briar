@@ -73,6 +73,9 @@ const channelReply = {
   }],
       memory: null,
       memoryLearningEnabled: false,
+  agentMessageTargets: [],
+  inboundAgentMessage: null,
+  agentMessageHop: 0,
   snapshot: {
     channel: {
       id: common.runId,
@@ -153,6 +156,57 @@ describe("Worker claim protobuf mapper", () => {
         session: { claimReason },
       });
     }
+  });
+
+  /*
+    Phase 0 always claims a hop-0 turn with no reachable Agents, so the round
+    trip proves the three fields survive the wire rather than any routing.
+  */
+  it("round-trips the Agent message claim fields", () => {
+    const message = workerClaimMessage({
+      ...channelReply,
+      agentMessageTargets: [{
+        agentId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        agentName: "Repository Guide",
+        // An Organization Agent has no repository, so both project fields
+        // must survive as absent rather than as an empty string.
+        projectId: null,
+        projectName: null,
+        responsibility: "Answer questions about the Briar repository.",
+        skills: [{ id: "ffffffff-ffff-4fff-8fff-ffffffffffff", name: "Search" }],
+      }],
+      inboundAgentMessage: {
+        senderAgentId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        senderAgentName: "Repository Guide",
+        body: "Checked, nothing new.",
+        originReplyJobId: common.workId,
+      },
+      agentMessageHop: 2,
+    } as unknown as WorkerQueueClaim);
+    expect(message.work.case).toBe("channelReply");
+    if (message.work.case !== "channelReply") return;
+    const target = message.work.value.agentMessageTargets[0]!;
+    expect(target).toMatchObject({
+      agentName: "Repository Guide",
+      skills: [{ name: "Search" }],
+    });
+    expect(target.projectId).toBeUndefined();
+    expect(target.projectName).toBeUndefined();
+
+    expect(claimedWorkFromProto(message)).toMatchObject({
+      agentMessageHop: 2,
+      agentMessageTargets: [{
+        agentId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        projectId: null,
+        projectName: null,
+        skills: [{ id: "ffffffff-ffff-4fff-8fff-ffffffffffff", name: "Search" }],
+      }],
+      inboundAgentMessage: {
+        senderAgentName: "Repository Guide",
+        body: "Checked, nothing new.",
+        originReplyJobId: common.workId,
+      },
+    });
   });
 
   it("carries the planned-update resume count on an Agent task claim", () => {

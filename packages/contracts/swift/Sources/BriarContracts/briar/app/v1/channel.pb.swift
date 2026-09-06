@@ -267,6 +267,34 @@ public nonisolated struct BriarAPI_CreateDirectMessageResponse: Sendable {
   fileprivate var _channel: BriarAPI_ChannelSummary? = nil
 }
 
+/// The Agent-to-Agent conversations one Agent takes part in, for the
+/// conversations tab on an Agent detail page. They are read-only for people.
+public nonisolated struct BriarAPI_ListAgentDirectMessagesRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var organizationID: String = String()
+
+  public var agentID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct BriarAPI_ListAgentDirectMessagesResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var channels: [BriarAPI_ChannelSummary] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public nonisolated struct BriarAPI_CreateChannelRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2036,6 +2064,13 @@ public nonisolated struct BriarAPI_ChannelSummary: @unchecked Sendable {
   /// Clears the value of `hiddenAt`. Subsequent reads from it will return its default value.
   public mutating func clearHiddenAt() {_uniqueStorage()._hiddenAt = nil}
 
+  /// True for an Agent-to-Agent direct message: members may read it but never
+  /// post, add participants, archive or delete it.
+  public var readOnly: Bool {
+    get {_storage._readOnly}
+    set {_uniqueStorage()._readOnly = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -2519,6 +2554,124 @@ public nonisolated struct BriarAPI_GetChannelLinkPreviewResponse: Sendable {
   fileprivate var _preview: BriarAPI_ChannelLinkPreview? = nil
 }
 
+/// Links a message in the originating thread to its counterpart inside an
+/// Agent-to-Agent direct message. An outbound row marks the "sent to B" notice;
+/// an inbound row is B's answer copied back for the person to read.
+public nonisolated struct BriarAPI_ChannelMessageRelay: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var direction: BriarAPI_ChannelMessageRelay.Direction = .unspecified
+
+  public var peerChannelID: String = String()
+
+  public var peerMessageID: String = String()
+
+  public var peerAgentID: String = String()
+
+  public var peerAgentName: String = String()
+
+  public var peerAgentImage: String {
+    get {_peerAgentImage ?? String()}
+    set {_peerAgentImage = newValue}
+  }
+  /// Returns true if `peerAgentImage` has been explicitly set.
+  public var hasPeerAgentImage: Bool {self._peerAgentImage != nil}
+  /// Clears the value of `peerAgentImage`. Subsequent reads from it will return its default value.
+  public mutating func clearPeerAgentImage() {self._peerAgentImage = nil}
+
+  /// Outbound rows carry the state of the round trip; inbound rows are always
+  /// completed because the answer they copy has already arrived.
+  public var status: BriarAPI_ChannelMessageRelay.Status = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum Direction: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case outbound // = 1
+    case inbound // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .outbound
+      case 2: self = .inbound
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .outbound: return 1
+      case .inbound: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [BriarAPI_ChannelMessageRelay.Direction] = [
+      .unspecified,
+      .outbound,
+      .inbound,
+    ]
+
+  }
+
+  public nonisolated enum Status: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case pending // = 1
+    case completed // = 2
+    case failed // = 3
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .pending
+      case 2: self = .completed
+      case 3: self = .failed
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .pending: return 1
+      case .completed: return 2
+      case .failed: return 3
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [BriarAPI_ChannelMessageRelay.Status] = [
+      .unspecified,
+      .pending,
+      .completed,
+      .failed,
+    ]
+
+  }
+
+  public init() {}
+
+  fileprivate var _peerAgentImage: String? = nil
+}
+
 public nonisolated struct BriarAPI_ChannelMessage: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2664,6 +2817,15 @@ public nonisolated struct BriarAPI_ChannelMessage: @unchecked Sendable {
     get {_storage._memoryCitations}
     set {_uniqueStorage()._memoryCitations = newValue}
   }
+
+  public var relay: BriarAPI_ChannelMessageRelay {
+    get {_storage._relay ?? BriarAPI_ChannelMessageRelay()}
+    set {_uniqueStorage()._relay = newValue}
+  }
+  /// Returns true if `relay` has been explicitly set.
+  public var hasRelay: Bool {_storage._relay != nil}
+  /// Clears the value of `relay`. Subsequent reads from it will return its default value.
+  public mutating func clearRelay() {_uniqueStorage()._relay = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -3231,6 +3393,71 @@ nonisolated extension BriarAPI_CreateDirectMessageResponse: SwiftProtobuf.Messag
 
   public static func ==(lhs: BriarAPI_CreateDirectMessageResponse, rhs: BriarAPI_CreateDirectMessageResponse) -> Bool {
     if lhs._channel != rhs._channel {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListAgentDirectMessagesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListAgentDirectMessagesRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}agent_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.organizationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    }
+    if !self.agentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListAgentDirectMessagesRequest, rhs: BriarAPI_ListAgentDirectMessagesRequest) -> Bool {
+    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.agentID != rhs.agentID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListAgentDirectMessagesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListAgentDirectMessagesResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}channels\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.channels) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.channels.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.channels, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListAgentDirectMessagesResponse, rhs: BriarAPI_ListAgentDirectMessagesResponse) -> Bool {
+    if lhs.channels != rhs.channels {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6037,7 +6264,7 @@ nonisolated extension BriarAPI_DirectMessageParticipant.Kind: SwiftProtobuf._Pro
 
 nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelSummary"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{1}slug\0\u{1}name\0\u{1}topic\0\u{1}visibility\0\u{3}default_project_id\0\u{3}archived_at\0\u{3}member_count\0\u{3}agent_count\0\u{3}created_at\0\u{3}updated_at\0\u{1}kind\0\u{3}last_message_at\0\u{3}last_message_preview\0\u{3}last_read_at\0\u{3}has_unread\0\u{3}direct_message_participants\0\u{3}created_by_user_id\0\u{3}pinned_at\0\u{3}sidebar_section_id\0\u{3}hidden_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{1}slug\0\u{1}name\0\u{1}topic\0\u{1}visibility\0\u{3}default_project_id\0\u{3}archived_at\0\u{3}member_count\0\u{3}agent_count\0\u{3}created_at\0\u{3}updated_at\0\u{1}kind\0\u{3}last_message_at\0\u{3}last_message_preview\0\u{3}last_read_at\0\u{3}has_unread\0\u{3}direct_message_participants\0\u{3}created_by_user_id\0\u{3}pinned_at\0\u{3}sidebar_section_id\0\u{3}hidden_at\0\u{3}read_only\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -6062,6 +6289,7 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
     var _pinnedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _sidebarSectionID: String? = nil
     var _hiddenAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _readOnly: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -6094,6 +6322,7 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
       _pinnedAt = source._pinnedAt
       _sidebarSectionID = source._sidebarSectionID
       _hiddenAt = source._hiddenAt
+      _readOnly = source._readOnly
     }
   }
 
@@ -6134,6 +6363,7 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._pinnedAt) }()
         case 21: try { try decoder.decodeSingularStringField(value: &_storage._sidebarSectionID) }()
         case 22: try { try decoder.decodeSingularMessageField(value: &_storage._hiddenAt) }()
+        case 23: try { try decoder.decodeSingularBoolField(value: &_storage._readOnly) }()
         default: break
         }
       }
@@ -6212,6 +6442,9 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
       try { if let v = _storage._hiddenAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
       } }()
+      if _storage._readOnly != false {
+        try visitor.visitSingularBoolField(value: _storage._readOnly, fieldNumber: 23)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -6243,6 +6476,7 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
         if _storage._pinnedAt != rhs_storage._pinnedAt {return false}
         if _storage._sidebarSectionID != rhs_storage._sidebarSectionID {return false}
         if _storage._hiddenAt != rhs_storage._hiddenAt {return false}
+        if _storage._readOnly != rhs_storage._readOnly {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -6995,9 +7229,81 @@ nonisolated extension BriarAPI_GetChannelLinkPreviewResponse: SwiftProtobuf.Mess
   }
 }
 
+nonisolated extension BriarAPI_ChannelMessageRelay: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelMessageRelay"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}direction\0\u{3}peer_channel_id\0\u{3}peer_message_id\0\u{3}peer_agent_id\0\u{3}peer_agent_name\0\u{3}peer_agent_image\0\u{1}status\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.direction) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.peerChannelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.peerMessageID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.peerAgentID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.peerAgentName) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._peerAgentImage) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self.status) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.direction != .unspecified {
+      try visitor.visitSingularEnumField(value: self.direction, fieldNumber: 1)
+    }
+    if !self.peerChannelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.peerChannelID, fieldNumber: 2)
+    }
+    if !self.peerMessageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.peerMessageID, fieldNumber: 3)
+    }
+    if !self.peerAgentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.peerAgentID, fieldNumber: 4)
+    }
+    if !self.peerAgentName.isEmpty {
+      try visitor.visitSingularStringField(value: self.peerAgentName, fieldNumber: 5)
+    }
+    try { if let v = self._peerAgentImage {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    if self.status != .unspecified {
+      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ChannelMessageRelay, rhs: BriarAPI_ChannelMessageRelay) -> Bool {
+    if lhs.direction != rhs.direction {return false}
+    if lhs.peerChannelID != rhs.peerChannelID {return false}
+    if lhs.peerMessageID != rhs.peerMessageID {return false}
+    if lhs.peerAgentID != rhs.peerAgentID {return false}
+    if lhs.peerAgentName != rhs.peerAgentName {return false}
+    if lhs._peerAgentImage != rhs._peerAgentImage {return false}
+    if lhs.status != rhs.status {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ChannelMessageRelay.Direction: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIRECTION_UNSPECIFIED\0\u{1}DIRECTION_OUTBOUND\0\u{1}DIRECTION_INBOUND\0")
+}
+
+nonisolated extension BriarAPI_ChannelMessageRelay.Status: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STATUS_UNSPECIFIED\0\u{1}STATUS_PENDING\0\u{1}STATUS_COMPLETED\0\u{1}STATUS_FAILED\0")
+}
+
 nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelMessage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}body\0\u{1}blocks\0\u{1}author\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{1}attachments\0\u{1}reactions\0\u{3}reply_count\0\u{3}last_reply_at\0\u{3}reply_authors\0\u{1}document\0\u{1}proposal\0\u{3}execution_proposal\0\u{3}skill_execution_proposal\0\u{1}subscribers\0\u{3}created_at\0\u{3}deleted_at\0\u{3}memory_citations\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}body\0\u{1}blocks\0\u{1}author\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{1}attachments\0\u{1}reactions\0\u{3}reply_count\0\u{3}last_reply_at\0\u{3}reply_authors\0\u{1}document\0\u{1}proposal\0\u{3}execution_proposal\0\u{3}skill_execution_proposal\0\u{1}subscribers\0\u{3}created_at\0\u{3}deleted_at\0\u{3}memory_citations\0\u{1}relay\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -7021,6 +7327,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
     var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _deletedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _memoryCitations: [BriarAPI_DmMemoryReference] = []
+    var _relay: BriarAPI_ChannelMessageRelay? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -7052,6 +7359,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
       _createdAt = source._createdAt
       _deletedAt = source._deletedAt
       _memoryCitations = source._memoryCitations
+      _relay = source._relay
     }
   }
 
@@ -7091,6 +7399,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
         case 19: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._deletedAt) }()
         case 21: try { try decoder.decodeRepeatedMessageField(value: &_storage._memoryCitations) }()
+        case 22: try { try decoder.decodeSingularMessageField(value: &_storage._relay) }()
         default: break
         }
       }
@@ -7166,6 +7475,9 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
       if !_storage._memoryCitations.isEmpty {
         try visitor.visitRepeatedMessageField(value: _storage._memoryCitations, fieldNumber: 21)
       }
+      try { if let v = _storage._relay {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -7196,6 +7508,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._deletedAt != rhs_storage._deletedAt {return false}
         if _storage._memoryCitations != rhs_storage._memoryCitations {return false}
+        if _storage._relay != rhs_storage._relay {return false}
         return true
       }
       if !storagesAreEqual {return false}

@@ -59,6 +59,7 @@ export function createOptimisticChannelMessage(input: {
     proposal: null,
     executionProposal: null,
     skillExecutionProposal: null,
+    relay: null,
     optimistic: true,
     createdAt,
   };

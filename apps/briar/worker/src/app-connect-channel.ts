@@ -61,6 +61,7 @@ import {
 import {
   createOrganizationDirectMessage,
   getOrganizationChannelDetail,
+  listOrganizationAgentDirectMessages,
   listOrganizationChannels,
   markOrganizationChannelRead,
   syncOrganizationChannels,
@@ -139,6 +140,7 @@ export type AppConnectChannelServices = {
   readonly acceptSkillExecutionProposal:
     typeof acceptOrganizationChannelSkillExecutionProposal;
   readonly createDirectMessage: typeof createOrganizationDirectMessage;
+  readonly listAgentDirectMessages: typeof listOrganizationAgentDirectMessages;
   readonly createChannel: typeof createChannelApplication;
   readonly updateChannel: typeof updateChannelApplication;
   readonly deleteChannel: typeof deleteChannelApplication;
@@ -179,6 +181,7 @@ export const appConnectChannelServices: AppConnectChannelServices = {
   acceptProposal: acceptOrganizationChannelProposal,
   acceptSkillExecutionProposal: acceptOrganizationChannelSkillExecutionProposal,
   createDirectMessage: createOrganizationDirectMessage,
+  listAgentDirectMessages: listOrganizationAgentDirectMessages,
   createChannel: createChannelApplication,
   updateChannel: updateChannelApplication,
   deleteChannel: deleteChannelApplication,
@@ -378,6 +381,19 @@ const createAppChannelService = (
     scheduleChannelMutation(input, request.organizationId);
     return create(ChannelService.method.createDirectMessage.output, {
       channel: appChannelSummaryJson(result.channel),
+    });
+  },
+
+  listAgentDirectMessages: async (request) => {
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.listAgentDirectMessages({
+      db: input.db,
+      organizationId: canonicalUuid(request.organizationId),
+      userId: session.user.id,
+      agentId: canonicalUuid(request.agentId),
+    });
+    return create(ChannelService.method.listAgentDirectMessages.output, {
+      channels: result.channels.map(appChannelSummaryJson),
     });
   },
 

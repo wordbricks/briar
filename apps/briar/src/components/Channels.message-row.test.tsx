@@ -57,6 +57,7 @@ const channel: ChannelSummary = {
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 };
 
 const messageOf = (index: number): ChannelMessage =>
@@ -81,6 +82,7 @@ const handlers: MessageRowHandlers = {
   loadExecutionProposalContext: unusedHandler,
   loadSkillExecutionProposalContext: unusedHandler,
   openThread: () => undefined,
+  openRelay: () => undefined,
   removeMessage: unusedHandler,
   selectProposalProject: () => undefined,
   toggleReaction: unusedHandler,
@@ -90,6 +92,7 @@ const rowContext: ChannelMessageRowContext = {
   acceptingProposalId: null,
   agents: [],
   busy: false,
+  canOpenRelay: false,
   canOpenThread: false,
   channel,
   currentUserId: "user-1",

@@ -512,6 +512,14 @@ message ChannelReplyDelegationAction {
   string request = 3;
 }
 
+// One Agent messaging another inside their own Agent-to-Agent direct message.
+// Unlike delegation the answer returns to the sender, so the action carries no
+// project: the target is addressed by Agent alone.
+message ChannelReplyAgentMessageAction {
+  string agent_id = 1;
+  string body = 2;
+}
+
 message ChannelReplyArtifactsAction {
   optional ChannelReplyDocumentAction document = 1;
 
@@ -529,13 +537,17 @@ message ChannelReplySuccess {
   repeated briar.app.v1.DmMemoryReference memory_citations = 4;
   optional DmMemorySaveRequest memory_save_request = 5;
 
-  // A document may accompany at most one proposal. Skill execution and
-  // delegation remain exclusive from every artifact at the wire boundary.
+  // A document may accompany at most one proposal. Skill execution,
+  // delegation and an Agent-to-Agent message each remain exclusive from every
+  // artifact at the wire boundary, and an Agent message is exclusive from
+  // delegation as well: a reply either hands work to a Project Agent inside
+  // this thread or opens an Agent-to-Agent conversation, never both.
   // Unknown action variants and unspecified nested enums fail closed.
   oneof action {
     ChannelReplyArtifactsAction artifacts = 10;
     ChannelReplySkillExecutionAction skill_execution = 11;
     ChannelReplyDelegationAction delegation = 12;
+    ChannelReplyAgentMessageAction agent_message = 13;
   }
 }
 
@@ -1158,6 +1170,27 @@ message ChannelDelegationTarget {
   repeated Skill skills = 6;
 }
 
+// An Agent the claiming Agent may message directly. Unlike a delegation target
+// this one is not restricted to the channel roster, and an Organization Agent
+// has no project, so both project fields are optional.
+message ChannelAgentMessageTarget {
+  string agent_id = 1;
+  string agent_name = 2;
+  optional string project_id = 3;
+  optional string project_name = 4;
+  string responsibility = 5;
+  repeated ChannelDelegationTarget.Skill skills = 6;
+}
+
+// The Agent message this job answers. Untrusted text authored by another
+// Agent; consumers must not derive privileged operations from it.
+message ClaimedInboundAgentMessage {
+  string sender_agent_id = 1;
+  string sender_agent_name = 2;
+  string body = 3;
+  string origin_reply_job_id = 4;
+}
+
 enum ChannelReplySessionClaimReason {
   CHANNEL_REPLY_SESSION_CLAIM_REASON_UNSPECIFIED = 0;
   CHANNEL_REPLY_SESSION_CLAIM_REASON_SESSION_CREATED = 1;
@@ -1207,6 +1240,13 @@ message ClaimedChannelReply {
   repeated QueuedAttachment trigger_attachments = 25;
   optional briar.app.v1.DmMemoryDescriptor memory = 26;
   bool memory_learning_enabled = 27;
+  // Agents this claim may message directly. Empty whenever the reply is not
+  // eligible to start an Agent-to-Agent conversation.
+  repeated ChannelAgentMessageTarget agent_message_targets = 28;
+  optional ClaimedInboundAgentMessage inbound_agent_message = 29;
+  // 0 human-started, 1 the answering Agent, 2 the sender relaying the answer
+  // back to the person. Hop 2 may not send again.
+  uint32 agent_message_hop = 30;
 }
 
 enum MergeBatchPhase {

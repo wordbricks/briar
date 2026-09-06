@@ -13609,6 +13609,18 @@ pub type OwnedCreateDirectMessageRequestView = ::buffa::view::OwnedView<
 pub type OwnedCreateDirectMessageResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateDirectMessageResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ListAgentDirectMessagesRequestView<'static>>`.
+pub type OwnedListAgentDirectMessagesRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListAgentDirectMessagesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListAgentDirectMessagesResponseView<'static>>`.
+pub type OwnedListAgentDirectMessagesResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListAgentDirectMessagesResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<CreateChannelRequestView<'static>>`.
 pub type OwnedCreateChannelRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateChannelRequestView<'static>,
@@ -14039,6 +14051,48 @@ for crate::proto::briar::app::v1::__buffa::view::CreateDirectMessageResponseView
 impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateDirectMessageResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::CreateDirectMessageResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListAgentDirectMessagesResponse,
+>
+for crate::proto::briar::app::v1::__buffa::view::ListAgentDirectMessagesResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::app::v1::ListAgentDirectMessagesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListAgentDirectMessagesResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -15217,6 +15271,12 @@ pub const CHANNEL_SERVICE_CREATE_DIRECT_MESSAGE_SPEC: ::connectrpc::Spec = ::con
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListAgentDirectMessages` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHANNEL_SERVICE_LIST_AGENT_DIRECT_MESSAGES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ChannelService/ListAgentDirectMessages",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `CreateChannel` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const CHANNEL_SERVICE_CREATE_CHANNEL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.app.v1.ChannelService/CreateChannel",
@@ -15537,6 +15597,29 @@ pub trait ChannelService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::app::v1::CreateDirectMessageResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListAgentDirectMessages RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_agent_direct_messages<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::app::v1::ListAgentDirectMessagesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::app::v1::ListAgentDirectMessagesResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -16378,6 +16461,35 @@ impl<S: ChannelService> ChannelServiceExt for S {
                 },
             )
             .with_spec(CHANNEL_SERVICE_CREATE_DIRECT_MESSAGE_SPEC)
+            .route_view(
+                CHANNEL_SERVICE_SERVICE_NAME,
+                "ListAgentDirectMessages",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::app::v1::__buffa::view::ListAgentDirectMessagesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::app::v1::ListAgentDirectMessagesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_agent_direct_messages(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::app::v1::ListAgentDirectMessagesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANNEL_SERVICE_LIST_AGENT_DIRECT_MESSAGES_SPEC)
             .route_view(
                 CHANNEL_SERVICE_SERVICE_NAME,
                 "CreateChannel",
@@ -17326,6 +17438,12 @@ impl<T: ChannelService> ::connectrpc::Dispatcher for ChannelServiceServer<T> {
                         .with_spec(CHANNEL_SERVICE_CREATE_DIRECT_MESSAGE_SPEC),
                 )
             }
+            "ListAgentDirectMessages" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHANNEL_SERVICE_LIST_AGENT_DIRECT_MESSAGES_SPEC),
+                )
+            }
             "CreateChannel" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -17614,6 +17732,28 @@ impl<T: ChannelService> ::connectrpc::Dispatcher for ChannelServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::briar::app::v1::CreateDirectMessageResponse,
+                        >(format)
+                })
+            }
+            "ListAgentDirectMessages" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::app::v1::ListAgentDirectMessagesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListAgentDirectMessagesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::app::v1::ListAgentDirectMessagesRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_agent_direct_messages(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::app::v1::ListAgentDirectMessagesResponse,
                         >(format)
                 })
             }
@@ -18581,6 +18721,51 @@ where
                 &self.transport,
                 &self.config,
                 CHANNEL_SERVICE_CREATE_DIRECT_MESSAGE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListAgentDirectMessages RPC. Sends a request to /briar.app.v1.ChannelService/ListAgentDirectMessages.
+    pub async fn list_agent_direct_messages(
+        &self,
+        request: crate::proto::briar::app::v1::ListAgentDirectMessagesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListAgentDirectMessagesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_agent_direct_messages_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListAgentDirectMessages RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_agent_direct_messages_with_options(
+        &self,
+        request: crate::proto::briar::app::v1::ListAgentDirectMessagesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::app::v1::__buffa::view::ListAgentDirectMessagesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANNEL_SERVICE_LIST_AGENT_DIRECT_MESSAGES_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

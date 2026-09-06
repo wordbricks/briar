@@ -111,6 +111,7 @@ describe("provider structured output contracts", () => {
         agentId: "22222222-2222-4222-8222-222222222222",
         request: "  Inspect authentication.  ",
       },
+      agentMessage: null,
       contextRequests: null,
       memoryRequests: null,
       memoryCitations: null,
@@ -125,6 +126,7 @@ describe("provider structured output contracts", () => {
       executionProposal: null,
       skillExecutionProposal: null,
       delegation: null,
+      agentMessage: null,
       memoryRequests: null,
       memoryCitations: null,
       memorySaveRequest: null,
@@ -163,11 +165,47 @@ describe("provider structured output contracts", () => {
             agentId: "22222222-2222-4222-8222-222222222222",
             request: "Inspect authentication.",
           },
+          agentMessage: null,
           memoryCitations: null,
           memorySaveRequest: null,
         },
         attachmentPaths: ["auth.html"],
       });
+      /*
+        The Agent message rides the same reply turn as delegation and is
+        exclusive from it, so the codec has to carry one without the other.
+      */
+      expect(contract.decode({
+        ...replyOutput,
+        delegation: null,
+        agentMessage: {
+          agentId: "22222222-2222-4222-8222-222222222222",
+          body: "  Please check the ticker now.  ",
+        },
+      })).toMatchObject({
+        case: "reply",
+        result: {
+          delegation: null,
+          agentMessage: {
+            agentId: "22222222-2222-4222-8222-222222222222",
+            body: "Please check the ticker now.",
+          },
+        },
+      });
+      expect(() => contract.decode({
+        ...replyOutput,
+        agentMessage: {
+          agentId: "22222222-2222-4222-8222-222222222222",
+          body: "Check the ticker.",
+        },
+      })).toThrow();
+      expect(() => contract.decode({
+        ...contextOutput,
+        agentMessage: {
+          agentId: "22222222-2222-4222-8222-222222222222",
+          body: "Check the ticker.",
+        },
+      })).toThrow();
       expect(contract.decode(contextOutput)).toEqual({
         case: "context",
         requests: { contextRequests: contextOutput.contextRequests },
@@ -188,6 +226,32 @@ describe("provider structured output contracts", () => {
       expect(() => contract.decode(missingAttachments)).toThrow();
     }
   });
+
+  it("encodes a lookup turn with no Agent message", () => {
+    /*
+      A lookup turn is replayed to the provider through the same codec. An
+      Agent message reappearing there would send a message the Agent never
+      chose, so both lookup cases must encode it as null.
+    */
+    const encode = Schema.encodeSync(ChannelAgentReplyProviderOutputSchema);
+
+    expect(encode({
+      case: "context",
+      requests: {
+        contextRequests: [{
+          resource: "issues",
+          projectId: "project-1",
+          detail: "summary",
+          limit: 25,
+          cursor: null,
+        }],
+      },
+    })).toMatchObject({ agentMessage: null, delegation: null, body: null });
+    expect(encode({
+      case: "memory",
+      request: { operation: "search", queries: ["metric units"] },
+    })).toMatchObject({ agentMessage: null, delegation: null, body: null });
+  });
 });
 
 describe("Claude Code provider schemas", () => {
@@ -204,6 +268,7 @@ describe("Claude Code provider schemas", () => {
       agentId: "22222222-2222-4222-8222-222222222222",
       request: "Inspect authentication.",
     },
+    agentMessage: null,
     contextRequests: null,
     memoryRequests: null,
     memoryCitations: null,

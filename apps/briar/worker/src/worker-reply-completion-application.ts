@@ -5,14 +5,22 @@ import {
   providerBlockReplyMessage,
   type ProviderBlock,
 } from "../../src/lib/provider-block";
+import {
+  channelReplyAssignedWorkerUnavailableError,
+  channelReplyNoAvailableWorkerError,
+  channelReplyProviderUsageExhaustedError,
+} from "../../src/lib/channels-contract";
 import { replyFailureDisposition } from "./reply-failure-disposition";
 import { hydrateAgentSkills } from "./agent-skills";
+import { listAgentMessageTargetAgents } from "./agent-message-targets";
 import {
   channelReplySessionRetentionUntil,
   completeChannelReply,
   failChannelReply,
+  getChannelById,
   getClaimedChannelReply,
   getOrganizationProject,
+  isAgentDirectMessage,
   listChannelAgents,
 } from "./channels";
 import { sha256 } from "./crypto-digest";
@@ -93,6 +101,8 @@ export type ReplyCompletionApplicationServices = {
   readonly failIssueAgentReply: typeof failIssueAgentReply;
   readonly completeChannelReply: typeof completeChannelReply;
   readonly failChannelReply: typeof failChannelReply;
+  readonly getChannelById: typeof getChannelById;
+  readonly listAgentMessageTargetAgents: typeof listAgentMessageTargetAgents;
   readonly getOrganizationAgent: typeof getOrganizationAgent;
   readonly listChannelAgents: typeof listChannelAgents;
   readonly hydrateAgentSkills: typeof hydrateAgentSkills;
@@ -120,6 +130,8 @@ const applicationServices: ReplyCompletionApplicationServices = {
   failIssueAgentReply,
   completeChannelReply,
   failChannelReply,
+  getChannelById,
+  listAgentMessageTargetAgents,
   getOrganizationAgent,
   listChannelAgents,
   hydrateAgentSkills,
@@ -488,6 +500,149 @@ const channelExecutionTargetInSnapshot = (
   }
 };
 
+const DEFAULT_AGENT_MESSAGE_HOURLY_LIMIT = 30;
+const AGENT_MESSAGE_WINDOW_MS = 60 * 60 * 1_000;
+
+/** Plan §3.6: one organization-wide ceiling on Agent-to-Agent turns per hour. */
+const agentMessageHourlyLimit = (env: Env) => {
+  const configured = env.AGENT_MESSAGE_HOURLY_LIMIT;
+  const parsed = configured === undefined || String(configured).trim() === ""
+    ? Number.NaN
+    : Number(configured);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : DEFAULT_AGENT_MESSAGE_HOURLY_LIMIT;
+};
+
+/**
+ * Turn the runner's `{ agentId, body }` into a checked send, or refuse it.
+ *
+ * The eligible Agents are recomputed here rather than trusted from the claim
+ * snapshot, so a project the requester lost access to in the meantime takes
+ * its Agents with it. The recipient's runtime is read live too: an Agent with
+ * no Worker to run it produces a failed answering job with a reason, which is
+ * what the person sees, instead of a queue nothing will drain.
+ */
+async function resolveAgentMessage(
+  input: {
+    db: D1Database;
+    env: Env;
+    scope: ReplyClaimScope;
+    claimed: {
+      agent_id: string;
+      channel_id: string;
+      trigger_message_id: string;
+      agent_message_hop: number;
+      delegated_by_reply_job_id: string | null;
+    };
+    request: { agentId: string; body: string } | null;
+    artifactRequested: boolean;
+    delegationRequested: boolean;
+    observedAt: string;
+  },
+  services: ReplyCompletionApplicationServices,
+): Promise<Parameters<typeof completeChannelReply>[2]["agentMessage"]> {
+  const { claimed, request, scope } = input;
+  if (claimed.agent_message_hop === 2 && request) {
+    throw new ReplyCompletionApplicationError(
+      "invalid_request",
+      "A relayed Agent answer cannot send another Agent message",
+    );
+  }
+  if (!request) return null;
+  if (input.artifactRequested || input.delegationRequested) {
+    throw new ReplyCompletionApplicationError(
+      "invalid_request",
+      "An Agent message cannot be combined with a delegation or an artifact proposal",
+    );
+  }
+  const channel = await services.getChannelById(
+    input.db,
+    scope.organizationId,
+    claimed.channel_id,
+  );
+  if (
+    !channel || channel.kind !== "dm" || isAgentDirectMessage(channel) ||
+    claimed.agent_message_hop !== 0 ||
+    claimed.delegated_by_reply_job_id !== null
+  ) {
+    throw new ReplyCompletionApplicationError(
+      "invalid_request",
+      "Only a direct message reply can message another Agent",
+    );
+  }
+  const trigger = await input.db.prepare(
+    `select author_user_id from briar_channel_messages
+     where id = ? and channel_id = ?`,
+  ).bind(claimed.trigger_message_id, claimed.channel_id)
+    .first<{ author_user_id: string | null }>();
+  const targets = await services.listAgentMessageTargetAgents(input.db, {
+    organizationId: scope.organizationId,
+    viewerUserId: trigger?.author_user_id ?? null,
+    excludeAgentId: claimed.agent_id,
+  });
+  const target = targets.find((candidate) => candidate.id === request.agentId);
+  if (!target) {
+    throw new ReplyCompletionApplicationError(
+      "invalid_request",
+      "Agent message target is not eligible",
+    );
+  }
+  const limit = agentMessageHourlyLimit(input.env);
+  const used = await input.db.prepare(
+    `select count(*) as count from briar_channel_agent_reply_jobs
+     where organization_id = ? and agent_message_hop > 0 and created_at > ?`,
+  ).bind(
+    scope.organizationId,
+    new Date(Date.parse(input.observedAt) - AGENT_MESSAGE_WINDOW_MS)
+      .toISOString(),
+  ).first<{ count: number }>();
+  if ((used?.count ?? 0) >= limit) {
+    /*
+      The turn itself is over: retrying cannot help while the window is full,
+      so the job ends failed with the reason on it and the person reads it
+      through the usual reply error, not just as a rejected worker request.
+    */
+    const message = `Agent message hourly limit (${limit}) reached`;
+    await services.failChannelReply(input.db, {
+      jobId: scope.workId,
+      deviceId: scope.deviceId,
+      workerId: scope.workerId,
+      claimTokenHash: scope.claimTokenHash,
+      error: message,
+      updatedAt: input.observedAt,
+      terminal: true,
+    });
+    throw new ReplyCompletionApplicationError("invalid_request", message);
+  }
+  const availability = await services.channelReplyWorkerAvailability(input.db, {
+    organizationId: scope.organizationId,
+    projectId: target.project_id,
+    preferredWorkerId: target.designated_worker_id ?? null,
+    provider: target.provider,
+    model: target.model,
+    effort: target.effort,
+    computerUsePolicy: target.computer_use_policy,
+    observedAt: input.observedAt,
+  });
+  return {
+    agentId: target.id,
+    agentName: target.name,
+    projectId: target.project_id,
+    provider: target.provider,
+    unavailableReason: availability === "available"
+      ? null
+      : target.designated_worker_id
+      ? channelReplyAssignedWorkerUnavailableError(
+        target.designated_worker_label ?? target.designated_worker_id,
+      )
+      : availability === "usage_exhausted"
+      ? channelReplyProviderUsageExhaustedError
+      : channelReplyNoAvailableWorkerError,
+    body: request.body,
+  };
+}
+
 export async function completeIssueReplyApplication(
   input: {
     db: D1Database;
@@ -746,6 +901,35 @@ export async function completeChannelReplyApplication(
           scope.workId,
         );
       }
+      const artifactRequested = Boolean(
+        result.document || result.issueProposal || result.issueBatchProposal ||
+          result.executionProposal || result.skillExecutionProposal,
+      );
+      /*
+        Nobody inside an Agent-to-Agent conversation can approve anything, and
+        the answering Agent runs read-only, so its turn produces prose and
+        attachments and nothing else (plan §3.6).
+      */
+      if (
+        claimed.agent_message_hop === 1 &&
+        (result.delegation || result.agentMessage || artifactRequested ||
+          result.memorySaveRequest)
+      ) {
+        throw new ReplyCompletionApplicationError(
+          "invalid_request",
+          "An Agent-to-Agent answer can only carry a body and attachments",
+        );
+      }
+      const agentMessage = await resolveAgentMessage({
+        db: input.db,
+        env: input.env,
+        scope,
+        claimed,
+        request: result.agentMessage ?? null,
+        artifactRequested,
+        delegationRequested: Boolean(result.delegation),
+        observedAt,
+      }, services);
       if (
         result.delegation &&
         (agent.project_id !== null || claimed.delegated_by_reply_job_id !== null)
@@ -865,6 +1049,7 @@ export async function completeChannelReplyApplication(
         executionProposal,
         skillExecutionProposal: Boolean(result.skillExecutionProposal),
         delegation,
+        agentMessage,
         agentName: agent.name,
         agentProvider: claimed.agent_provider ?? agent.provider,
         completedAt: observedAt,

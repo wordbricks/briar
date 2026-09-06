@@ -18,6 +18,9 @@ import {
   type ChannelLinkPreview as ChannelLinkPreviewMessage,
   type ChannelMember as ChannelMemberMessage,
   type ChannelMessage as ChannelMessageMessage,
+  ChannelMessageRelay_Direction as ProtoChannelMessageRelayDirection,
+  ChannelMessageRelay_Status as ProtoChannelMessageRelayStatus,
+  type ChannelMessageRelay as ChannelMessageRelayMessage,
   type ChannelSidebarSection as ChannelSidebarSectionMessage,
   type ChannelMessageAuthor as ChannelMessageAuthorMessage,
   type ChannelProposal as ChannelProposalMessage,
@@ -68,6 +71,7 @@ import type {
   ChannelMessageBlock,
   ChannelMessageDocumentContent,
   ChannelMessageProposal,
+  ChannelMessageRelay,
   ChannelReplyStatus,
   ChannelSidebarSection,
   ChannelSummary,
@@ -195,6 +199,7 @@ export const channelSummaryFromMessage = (
   pinnedAt: optionalTimestamp(value.pinnedAt),
   sidebarSectionId: value.sidebarSectionId ?? null,
   hiddenAt: optionalTimestamp(value.hiddenAt),
+  readOnly: value.readOnly,
 });
 
 export const channelSidebarSectionFromMessage = (
@@ -609,6 +614,42 @@ const channelMessageAuthorFromMessage = (
   }
 };
 
+const channelMessageRelayFromMessage = (
+  value: ChannelMessageRelayMessage,
+): ChannelMessageRelay => {
+  const direction = (() => {
+    switch (value.direction) {
+      case ProtoChannelMessageRelayDirection.OUTBOUND:
+        return "outbound" as const;
+      case ProtoChannelMessageRelayDirection.INBOUND:
+        return "inbound" as const;
+      default:
+        throw new Error(`Unknown channel message relay direction: ${value.direction}`);
+    }
+  })();
+  const status = (() => {
+    switch (value.status) {
+      case ProtoChannelMessageRelayStatus.PENDING:
+        return "pending" as const;
+      case ProtoChannelMessageRelayStatus.COMPLETED:
+        return "completed" as const;
+      case ProtoChannelMessageRelayStatus.FAILED:
+        return "failed" as const;
+      default:
+        throw new Error(`Unknown channel message relay status: ${value.status}`);
+    }
+  })();
+  return {
+    direction,
+    peerChannelId: value.peerChannelId,
+    peerMessageId: value.peerMessageId,
+    peerAgentId: value.peerAgentId,
+    peerAgentName: value.peerAgentName,
+    peerAgentImage: value.peerAgentImage ?? null,
+    status,
+  };
+};
+
 export const channelMessageFromMessage = (
   value: ChannelMessageMessage,
 ): ChannelMessage => ({
@@ -670,6 +711,7 @@ export const channelMessageFromMessage = (
     documentId: reference.documentId,
     version: reference.version,
   })),
+  relay: value.relay ? channelMessageRelayFromMessage(value.relay) : null,
   createdAt: requiredTimestamp(value.createdAt, "channelMessage.createdAt"),
   deletedAt: optionalTimestamp(value.deletedAt),
 });
@@ -821,6 +863,20 @@ export async function createDirectMessage(
       "createDirectMessage.channel",
     )),
   };
+}
+
+/** The Agent-to-Agent conversations one Agent takes part in, newest first. */
+export async function listAgentDirectMessages(
+  token: string,
+  organizationId: string,
+  agentId: string,
+): Promise<{ channels: ChannelSummary[] }> {
+  const client = requireChannelClient();
+  const response = await client.listAgentDirectMessages(
+    { organizationId, agentId },
+    appCallOptions(token),
+  );
+  return { channels: response.channels.map(channelSummaryFromMessage) };
 }
 
 export async function createChannel(

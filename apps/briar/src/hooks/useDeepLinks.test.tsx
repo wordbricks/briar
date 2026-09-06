@@ -102,6 +102,7 @@ const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
   ...overrides,
 });
 

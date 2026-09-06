@@ -138,6 +138,7 @@ const agentDirectMessage: ChannelSummary = {
   pinnedAt: null,
   sidebarSectionId: null,
   hiddenAt: null,
+  readOnly: false,
 };
 
 const renderCounter = createRenderCounter();

@@ -38,6 +38,7 @@ const baseMessage = (
   proposal: null,
   executionProposal: null,
   skillExecutionProposal: null,
+  relay: null,
   createdAt: "2026-08-30T01:02:03.000Z",
   deletedAt: null,
   ...overrides,

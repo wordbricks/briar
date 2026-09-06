@@ -122,6 +122,14 @@ import {
   detachedReplyAgent,
 } from "./issue-execution";
 
+/**
+ * The claim carries the hop as an unbounded proto integer. The server caps it
+ * at 2; anything else is treated as the human-started hop so an unknown value
+ * can never unlock the send or relay wording.
+ */
+const agentMessageHop = (hop: number): 0 | 1 | 2 =>
+  hop === 1 || hop === 2 ? hop : 0;
+
 async function runClaimedProjectAgentTask(
   config: Config,
   project: TeamConfig,
@@ -847,6 +855,17 @@ async function runClaimedChannelReply(
       memoryLearningAvailable: reply.memoryLearningEnabled,
       delegationTargets: reply.delegationTargets,
       delegation: reply.delegation,
+      // An Agent-to-Agent hop only changes what this turn may say. Hop 1 stays
+      // an ordinary channel reply here, so the claimed scope keeps deciding the
+      // worktree and organization context exactly as it does for hop 0.
+      agentMessageTargets: reply.agentMessageTargets,
+      inboundAgentMessage: reply.inboundAgentMessage
+        ? {
+            senderAgentName: reply.inboundAgentMessage.senderAgentName,
+            body: reply.inboundAgentMessage.body,
+          }
+        : null,
+      agentMessageHop: agentMessageHop(reply.agentMessageHop),
       skillExecutionTarget: reply.skillExecutionTarget,
     });
     let conversationId: string | null =

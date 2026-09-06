@@ -22,9 +22,13 @@ import {
 } from "../lib/api";
 import type {
   ChannelAgentSummary,
+  ChannelMessageRelay,
   ChannelSummary,
   DirectMessageParticipant,
 } from "../lib/channels-contract";
+import { useAgentConversationChannel } from "../hooks/useAgentConversationChannel";
+import { claimOpenAgentConversation } from "../state/channels/atoms";
+import { useRegistry } from "../state/registry";
 import {
   directMessageDisplayName,
   directMessageParticipants,
@@ -430,6 +434,11 @@ type DirectMessageConversationPaneProps = Omit<
   /** The user asked for a new conversation; the picker shows instead of a timeline. */
   composing: boolean;
   onChannelSelect: (channelId: string) => void;
+  /**
+   * Returns to wherever a read-only Agent conversation was opened from, when
+   * that was not a relay row in another conversation.
+   */
+  onNavigateBack?: () => void;
 };
 
 /**
@@ -454,18 +463,62 @@ export function DirectMessageConversationPane({
   onChannelFallback,
   onChannelsChange,
   onIssueCreated,
+  onNavigateBack,
   onSkillSessionAccepted,
   onViewingChannelChange,
   onCreateAgent,
 }: DirectMessageConversationPaneProps) {
   const { t } = useI18n();
+  const registry = useRegistry();
   const directMessages = useMemo(
     () => sortDirectMessages(channels.filter((channel) => channel.kind === "dm")),
     [channels],
   );
   const catalogLoaded = channelCatalogCursor !== null;
-  const showCompose =
-    composing || (catalogLoaded && directMessages.length === 0);
+  /*
+    An Agent-to-Agent conversation is opened by id and never joins the catalog,
+    so this pane holds the one that is open — and only while it is open — and
+    hands it to the timeline as if it had come from the sidebar.
+  */
+  const agentConversation = useAgentConversationChannel({
+    channelId: activeChannelId,
+    channels: directMessages,
+    enabled: catalogLoaded,
+    organizationId,
+    token,
+  });
+  /*
+    Where a relay row was activated, and which message inside the Agent
+    conversation it pointed at, so the view can scroll to it and the read-only
+    header can go back to the conversation the reader came from.
+  */
+  const [relayTarget, setRelayTarget] = useState<
+    {
+      channelId: string;
+      messageId: string | null;
+      originChannelId: string | null;
+    } | null
+  >(null);
+  const openRelay = (relay: ChannelMessageRelay) => {
+    setRelayTarget({
+      channelId: relay.peerChannelId,
+      messageId: relay.peerMessageId,
+      originChannelId: activeChannelId,
+    });
+    // Before navigating, so the shell does not reconcile the page back to the
+    // latest conversation on the way in.
+    claimOpenAgentConversation(registry, relay.peerChannelId);
+    onChannelSelect(relay.peerChannelId);
+  };
+  const relayHere = relayTarget?.channelId === activeChannelId
+    ? relayTarget
+    : null;
+  const conversationChannels = agentConversation.channel
+    ? [...directMessages, agentConversation.channel]
+    : directMessages;
+  const showCompose = composing ||
+    (catalogLoaded && directMessages.length === 0 &&
+      !agentConversation.channel && !agentConversation.loading);
   return (
     <div
       className={cn(
@@ -483,10 +536,13 @@ export function DirectMessageConversationPane({
           organizationId={organizationId}
           token={token}
         />
-      ) : !catalogLoaded && directMessages.length === 0 ? (
+      ) : agentConversation.loading ||
+          (!catalogLoaded && directMessages.length === 0) ? (
         <div
           aria-busy="true"
-          aria-label={t("dm.conversations")}
+          aria-label={agentConversation.loading
+            ? t("dm.agentConversation.loading")
+            : t("dm.conversations")}
           className="dm-conversation-loading m-auto flex items-center justify-center text-muted-foreground"
           role="status"
         >
@@ -496,7 +552,7 @@ export function DirectMessageConversationPane({
         <Channels
           activeChannelId={activeChannelId}
           channelCatalogCursor={channelCatalogCursor}
-          channels={directMessages}
+          channels={conversationChannels}
           currentUserId={currentUserId}
           onChannelFallback={onChannelFallback}
           onChannelSelect={(channelId) => {
@@ -505,11 +561,29 @@ export function DirectMessageConversationPane({
           onChannelsChange={onChannelsChange}
           onCreateAgent={onCreateAgent}
           onIssueCreated={onIssueCreated}
+          onReadOnlyBack={() => {
+            const origin = relayHere?.originChannelId;
+            setRelayTarget(null);
+            if (origin) onChannelSelect(origin);
+            else onNavigateBack?.();
+          }}
+          onRelayOpen={openRelay}
+          onRequestedMessageOpen={() =>
+            setRelayTarget((current) =>
+              current ? { ...current, messageId: null } : current
+            )}
           onSkillSessionAccepted={onSkillSessionAccepted}
           onViewingChannelChange={onViewingChannelChange}
           organizationId={organizationId}
           organizationName={organizationName}
           projects={projects}
+          requestedMessage={relayHere?.messageId
+            ? {
+                channelId: relayHere.channelId,
+                messageId: relayHere.messageId,
+                rootMessageId: relayHere.messageId,
+              }
+            : null}
           surface="dm"
           token={token}
         />
