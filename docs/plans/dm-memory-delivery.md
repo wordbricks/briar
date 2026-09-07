@@ -310,3 +310,41 @@ squash merge of [#1703](https://github.com/wordbricks/briar/pull/1703).
 Rollback sets retrieval and indexing flags to false while leaving owner edit,
 forget, exclusion, and vector cleanup paths available. A rollback does not
 delete owner-managed memory.
+
+## Restored execution coverage
+
+The protobuf/Connect migration in
+[#1427](https://github.com/wordbricks/briar/pull/1427) deleted
+`worker/src/dm-memory-execution.test.ts` (12 real-D1 tests) and
+`src-cli/dm-memory-reply-loop.test.ts` (5 runner tests) without replacing them.
+Between that commit and this note, the execution PR evidence above described
+coverage that no longer existed: nothing exercised claim binding, the brief and
+lookup RPCs, the lookup budget, citation validation at publication, or the
+activity revocation trigger. M27 in particular could not be shown on a real
+path, which section 14 of the SPEC requires.
+
+Both files are restored on the generated Connect surface rather than the removed
+HTTP routes.
+
+- The Worker suite drives `claimNextChannelReplyWork` with a real authenticated
+  Worker binding and calls `getDmMemoryClaimBrief` and `lookupDmMemoryClaim`
+  directly, matching how the original called its route handler. Its fixtures now
+  age the reply job, because DM replies are held by the settle window that keeps
+  a burst of messages on one job.
+- The runner suite serves a synthetic `WorkerQueueService` and
+  `OrganizationAgentContextService` through `connectNodeAdapter`, so the real
+  generated Worker Queue client is exercised end to end. Its claim is built as a
+  wire message and decoded with `claimedWorkFromProto`, so the test cannot drift
+  from what a Worker actually receives.
+
+Two assertions were adjusted to current behavior rather than preserved as
+written: the activity revocation frame is built through the proto frame helper,
+so its sequence is a bigint and a null activity is omitted; and the failing
+provider case now fails the turn outright, since a non-zero exit code alone no
+longer discards a parsed result. Both still assert the guarantee the original
+covered.
+
+Tests run for this restoration: `bunx vitest run --config
+vitest.worker-d1.config.ts dm-memory` (4 files, 70 tests) and `bunx vitest run
+src-cli/dm-memory-reply-loop.test.ts` (5 tests). No product code changed; the
+only non-test edit registers the Worker suite in `vitest.worker.test-files.ts`.

@@ -28,6 +28,7 @@ export const workerD1TestFiles = [
   "worker/src/channel-sidebar-preferences.test.ts",
   "worker/src/channels.test.ts",
   "worker/src/db.test.ts",
+  "worker/src/dm-memory-execution.test.ts",
   "worker/src/dm-memory-learning-storage.test.ts",
   "worker/src/dm-memory-repository.test.ts",
   "worker/src/dm-memory-retrieval.test.ts",
