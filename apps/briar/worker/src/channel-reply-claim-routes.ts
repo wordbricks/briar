@@ -452,6 +452,21 @@ export async function claimNextChannelReplyWork(
     const currentSession = memoryBinding
       ? await getChannelReplySession(db, job.channel_reply_session.id)
       : job.channel_reply_session;
+    /*
+      A direct message the person simply sent starts its own provider
+      conversation. What accumulates in a resumed one is the Agent's working
+      transcript — every command it ran, every screen it captured — and
+      carrying that into the next message puts a whole day of tool output
+      behind a "hi": one DM thread reached 105 MB and 81.8M input tokens on
+      2026-09-07 and then could not be resumed at all. The next message already
+      gets what it needs, the channel snapshot and DM memory. An explicit reply
+      is the one place the person points at earlier work, so that is where the
+      conversation continues; a channel or issue message always carries a
+      display parent, which leaves this a DM-only rule.
+    */
+    const resumedConversationId = contextParentMessageId
+      ? currentSession?.conversation_id ?? null
+      : null;
     await requireDmMemoryReplyFence(db, job.id);
     const activity = env.CHANNEL_ACTIVITY_REALTIME
       ? await channelActivityCredential(env, job, {
@@ -526,7 +541,7 @@ export async function claimNextChannelReplyWork(
         session: {
           id: job.channel_reply_session.id,
           threadId: job.channel_reply_session.thread_root_message_id,
-          conversationId: currentSession?.conversation_id ?? null,
+          conversationId: resumedConversationId,
           retainedUntil: job.channel_reply_session.retained_until,
           claimReason: job.session_claim_reason,
         },
