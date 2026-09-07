@@ -383,6 +383,7 @@ async function executeDetachedProviderTurn(
     cwd: input.workspacePath,
     env: input.environment,
     stdio: ["pipe", "pipe", "pipe"],
+    detached: process.platform !== "win32",
   });
   diagnose("runner.spawned", { runnerPid: child.pid ?? null });
   const exitPromise = new Promise<number | null>((resolveExit, rejectExit) => {
@@ -411,15 +412,26 @@ async function executeDetachedProviderTurn(
   let conversationId = input.conversationId ?? null;
   let outputCount = 0;
   let runnerStderrBuffer = "";
+  const signalRunnerTree = (signal: NodeJS.Signals) => {
+    if (process.platform !== "win32" && child.pid) {
+      try {
+        process.kill(-child.pid, signal);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+      }
+    } else {
+      child.kill(signal);
+    }
+  };
   const terminate = () => {
     if (child.exitCode !== null || child.killed) return;
     diagnose("runner.terminate_requested", {
       runnerPid: child.pid ?? null,
       reason: input.signal.aborted ? "aborted" : "cleanup",
     });
-    child.kill("SIGTERM");
+    signalRunnerTree("SIGTERM");
     setTimeout(() => {
-      if (child.exitCode === null) child.kill("SIGKILL");
+      if (child.exitCode === null) signalRunnerTree("SIGKILL");
     }, 5_000).unref();
   };
   input.signal.addEventListener("abort", terminate, { once: true });
@@ -471,6 +483,7 @@ async function executeDetachedProviderTurn(
       child.stdout,
       { readMaxBytes: maxSidecarFrameBytes },
     )) {
+      input.signal.throwIfAborted();
       if (terminalOutputSeen) {
         throw new Error("Agent runner emitted output after a terminal frame");
       }

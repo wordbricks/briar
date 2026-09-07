@@ -1,3 +1,4 @@
+import { dmReplyStopStatements, type DmReplyStop } from "./dm-reply-stop";
 import * as Schema from "effect/Schema";
 import {
   dmMemoryCitationsCurrent,
@@ -2607,6 +2608,7 @@ export async function createChannelMessage(
     attachments?: ChannelMessageAttachmentInput[];
     mutationCommit?: ChannelMessageMutationCommit;
     agentReplyEnqueue?: ChannelAgentReplyEnqueueInput;
+    dmReplyStop?: DmReplyStop;
     createdAt: string;
   },
 ) {
@@ -2724,6 +2726,7 @@ export async function createChannelMessage(
         ]
       : []),
     ...agentReplyStatements,
+    ...(input.dmReplyStop ? dmReplyStopStatements(db, input.dmReplyStop) : []),
   ];
   await db.batch(statements);
   return getChannelMessage(db, input.channelId, input.id);
@@ -2889,81 +2892,7 @@ const channelReplyPlainConversationTurn = (job: string) =>
      and ${job}.agent_message_hop = 0
      and ${job}.approved_skill_execution_proposal_id is null`;
 
-/**
- * A person who sends three short direct messages in a row is asking one
- * question, not three. The newest job in the session takes over every older
- * conversation turn that has not started running, so exactly one reply arrives
- * and it answers all of them.
- *
- * There is no `superseded` status to move those jobs into: the column check,
- * the client status enum and the shared protobuf enum all stop at
- * queued/running/completed/failed, and `failed` would raise a toast the person
- * has no reason to see. An absorbed turn is therefore `completed` with no
- * message of its own plus `superseded_by_reply_job_id` naming its successor.
- * Re-pointing an older chain at the new job keeps that chain one level deep, so
- * the claim route can collect every unanswered trigger with one join.
- */
-function channelDmSupersededTurnStatements(
-  db: D1Database,
-  input: {
-    jobId: string;
-    agentId: string;
-    channelId: string;
-    sessionRootMessageId: string;
-    completedAt: string;
-  },
-) {
-  const absorbedTurns = `select older.id
-       from briar_channel_agent_reply_jobs older
-       join briar_channel_reply_sessions session
-         on session.id = older.session_id
-       join briar_channels channel on channel.id = session.channel_id
-       where session.channel_id = ? and session.thread_root_message_id = ?
-         and session.agent_id = ? and channel.kind = 'dm'
-         and older.id <> ? and older.status = 'queued'
-         and older.created_at <= ?
-         and ${channelReplyPlainConversationTurn("older")}`;
-  // A job that could not be enqueued, or that was recorded as unavailable, has
-  // nothing to hand the conversation to, so the queued turns keep their turn.
-  const successorIsLive = `exists (
-         select 1 from briar_channel_agent_reply_jobs newer
-         where newer.id = ? and newer.status = 'queued'
-           and ${channelReplyPlainConversationTurn("newer")}
-       )`;
-  const absorbedBindings = [
-    input.channelId,
-    input.sessionRootMessageId,
-    input.agentId,
-    input.jobId,
-    input.completedAt,
-  ];
-  return [
-    db.prepare(
-      `update briar_channel_agent_reply_jobs
-       set superseded_by_reply_job_id = ?, updated_at = ?
-       where superseded_by_reply_job_id in (${absorbedTurns})
-         and ${successorIsLive}`,
-    ).bind(
-      input.jobId,
-      input.completedAt,
-      ...absorbedBindings,
-      input.jobId,
-    ),
-    db.prepare(
-      `update briar_channel_agent_reply_jobs
-       set status = 'completed', superseded_by_reply_job_id = ?,
-           completed_at = ?, updated_at = ?
-       where id in (${absorbedTurns})
-         and ${successorIsLive}`,
-    ).bind(
-      input.jobId,
-      input.completedAt,
-      input.completedAt,
-      ...absorbedBindings,
-      input.jobId,
-    ),
-  ];
-}
+
 
 /**
  * One job per mentioned agent, so a message that names two agents gets two
@@ -3185,15 +3114,8 @@ async function channelAgentReplyEnqueueStatements(
           agent.skillId ?? null,
           agent.provider,
         ),
-        ...(agent.skillId
-          ? []
-          : channelDmSupersededTurnStatements(db, {
-            jobId,
-            agentId: agent.id,
-            channelId: input.channelId,
-            sessionRootMessageId,
-            completedAt: input.createdAt,
-          })),
+        // Each message retains its job so a DM reply can stop that message
+        // without revoking another message's work in this shared session.
         db.prepare(
           `insert into briar_channel_reply_session_events (
              id, session_id, reply_job_id, event_type, reason,
@@ -4610,11 +4532,12 @@ export async function completeChannelReply(
     job.channel_id,
   );
   if (!channel) return null;
+  const triggerMessage = await getChannelMessage(db, job.channel_id, job.trigger_message_id);
   const replyParentMessageId = agentReplyDisplayParentMessageId(
     channel.kind,
     {
       id: job.trigger_message_id,
-      parentMessageId: job.parent_message_id,
+      parentMessageId: triggerMessage?.parentMessageId ?? null,
     },
   );
   const delegation = input.delegation ?? null;

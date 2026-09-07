@@ -1,3 +1,4 @@
+import { isDmReplyStop } from "./dm-reply-stop";
 import {
   isIssueAttachmentReference,
   issueAttachmentReferences,
@@ -298,6 +299,10 @@ export async function createOrganizationChannelMessage(
       throw new HttpError(400, "Mentioned member is not in this organization");
     }
   }
+  const stopReply = channel.kind === "dm" && request.parentMessageId !== null &&
+    request.skillId === null && input.attachmentIds.length === 0 &&
+    request.mentionedUserIds.length === 0 &&
+    isDmReplyStop(request.body, mentionedAgents.map((agent) => agent.name));
   const createdAt = new Date().toISOString();
   const uploads = await resolveChannelMessageUploads(input.db, {
     organizationId: input.organizationId,
@@ -314,7 +319,7 @@ export async function createOrganizationChannelMessage(
     );
   }
   const invokedAgents = await Promise.all(
-    mentionedAgents.map(async (agent) => {
+    (stopReply ? [] : mentionedAgents).map(async (agent) => {
       const selectedSkill = selectedSkillTarget?.agent.id === agent.id
         ? selectedSkillTarget.skill
         : null;
@@ -414,6 +419,15 @@ export async function createOrganizationChannelMessage(
         requestHash,
         committedAt: createdAt,
       },
+      dmReplyStop: stopReply && request.parentMessageId ? {
+        organizationId: input.organizationId,
+        channelId: channel.id,
+        userId: input.userId,
+        rootMessageId: request.parentMessageId,
+        requestMessageId: messageId,
+        mentionedAgentIds: request.mentionedAgentIds,
+        createdAt,
+      } : undefined,
       agentReplyEnqueue: {
         organizationId: input.organizationId,
         channelId: channel.id,
@@ -473,11 +487,11 @@ export async function createOrganizationChannelMessage(
   );
   // Push beats the Worker's 15-60s idle poll: a queued reply is claimable the
   // moment this mutation commits, so tell the organization's Workers now.
-  if (input.env && agentReplies.some((reply) => reply.status === "queued")) {
+  if (input.env && (stopReply || agentReplies.some((reply) => reply.status === "queued"))) {
     wakeOrganizationWorkers(
       input.env,
       input.organizationId,
-      "channel_reply_enqueued",
+      stopReply ? "channel_reply_completed" : "channel_reply_enqueued",
       input.context,
     );
   }

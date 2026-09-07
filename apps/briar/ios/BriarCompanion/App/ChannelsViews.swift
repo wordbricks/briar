@@ -542,13 +542,8 @@ struct ChannelMessagesView: View {
             workers: workers,
             onSkillSessionMaterialized: onSkillSessionMaterialized,
             onSkillSessionOpen: onSkillSessionOpen,
-            // Direct messages flow as one continuous conversation, so replies
-            // render inline instead of collapsing into a thread summary and
-            // long-press thread actions stay unavailable.
-            onOpenThread: currentChannel.isDirectMessage
-                ? nil
-                : { openThread(from: $0) },
-            showsThreadSummary: !currentChannel.isDirectMessage,
+            onOpenThread: { openThread(from: $0) },
+            showsThreadSummary: true,
             focusedMessageID: focusedMessageID,
             onOpenRelay: { openRelay($0) }
         )
@@ -699,7 +694,7 @@ struct ChannelMessagesView: View {
     private func openThread(from message: ChannelMessage) {
         selectedThread = ChannelThreadRoute(
             channelID: currentChannel.id,
-            parentMessageID: message.id,
+            parentMessageID: message.parentMessageId ?? message.id,
             highlightMessageID: nil
         )
     }
@@ -707,8 +702,7 @@ struct ChannelMessagesView: View {
     private func applyPendingInboxThread() {
         guard
             let route = navigation.pendingChannelThread,
-            route.channelID == channel.id,
-            !currentChannel.isDirectMessage
+            route.channelID == channel.id
         else { return }
         selectedThread = route
         navigation.pendingChannelThread = nil

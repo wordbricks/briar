@@ -20,6 +20,7 @@ import {
   failChannelReply,
   getChannelAgentReplyJob,
   getChannelById,
+  getChannelMessage,
   getChannelReplySession,
   getOrganizationProject,
   isAgentDirectMessage,
@@ -112,18 +113,21 @@ export async function claimNextChannelReplyWork(
     if (job.claimed_worker_id !== binding.id) {
       throw new HttpError(409, "Reply claim is bound to another Worker");
     }
-    const [channel, liveAgent] = await Promise.all([
+    const [channel, liveAgent, sourceMessage] = await Promise.all([
       getChannelById(db, job.organization_id, job.channel_id),
       getOrganizationAgent(db, job.organization_id, job.agent_id),
+      getChannelMessage(db, job.channel_id, job.trigger_message_id),
     ]);
     if (!channel || !liveAgent || !job.agent_provider) {
       throw new HttpError(409, "Reply job lost its channel context");
     }
+    // The job anchor also exists for timeline messages; only the actual
+    // message parent distinguishes an explicit DM thread reply.
     const contextParentMessageId = agentReplyDisplayParentMessageId(
       channel.kind,
       {
         id: job.trigger_message_id,
-        parentMessageId: job.parent_message_id,
+        parentMessageId: sourceMessage?.parentMessageId ?? null,
       },
     );
     const messages = contextParentMessageId
