@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.212",
+        date: "2026년 9월 7일",
+        title: "DM 답장으로 작업을 멈추고, 컴퓨터 화면은 켜야 조종합니다",
+        summary:
+          "DM에서 원본 메시지에 답장해 그 메시지가 시작한 작업만 중단할 수 있습니다. 컴퓨터 전체화면은 보기 전용으로 열리고 ‘컴퓨터 제어’를 켜야 입력이 전달됩니다. Agent 화면이 ‘이미 제어 중’으로 한 시간 잠기던 문제도 고쳤습니다.",
+        items: [
+          "DM에서 원본 메시지에 답장해 대화를 이어가거나 작업을 중단할 수 있습니다. 중단은 그 메시지와 선택한 Agent의 작업에만 적용하고, 대상이 모호하면 취소하지 않으며, 결과는 새 작업 없이 같은 스레드에 남습니다.",
+          "컴퓨터 전체화면이 보기 전용으로 시작합니다. ‘컴퓨터 제어’ 스위치를 켜야 마우스·스크롤·키보드·붙여넣기와 Ctrl Alt Del이 전달되고, 제어를 끄거나 화면을 닫으면 입력 권한과 캡처가 즉시 해제됩니다.",
+          "컨트롤러가 종료 신호 없이 사라져 남은 세션이 컴퓨터를 한 시간 잠그던 문제를 고쳤습니다. 티켓 발급이 주인 없는 세션을 회수하고, DM 패널은 같은 화면으로 다시 잡힌 타깃의 세션을 껐다 켜지 않습니다.",
+        ],
+      },
+      {
         version: "1.2.211",
         date: "2026년 9월 7일",
         title: "DM 답장이 빨라지고, 연달아 보낸 메시지에 한 번만 답합니다",
@@ -1835,6 +1847,30 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.212",
+        date: "September 7, 2026",
+        title: "Reply in a DM to stop a task, and take control of a computer explicitly",
+        summary:
+          "Replying to the original message in a DM now continues that thread or stops just the work it started. The computer full screen opens read-only and only forwards input once you turn on Computer control. This release also fixes an Agent screen staying locked as already being controlled for an hour.",
+        items: [
+          "Reply to the original message in a DM to continue the conversation or stop the work it started. A stop applies only to that message and the Agent you picked, cancels nothing when the target is ambiguous, and records its result in the same thread without creating a new task.",
+          "The computer full screen now starts read-only. Mouse, scroll, keyboard, paste, and Ctrl Alt Del only reach the computer after you turn on the Computer control switch, and turning control off, closing the screen, or reconnecting drops input authority and capture immediately.",
+          "Fixed an Agent screen staying locked as already being controlled for an hour after a controller vanished without a close frame. Issuing a ticket now reclaims the orphaned session, and the DM panel no longer tears down a live session when the same screen resolves again.",
+        ],
+      },
+      {
+        version: "1.2.211",
+        date: "September 7, 2026",
+        title: "DM replies start sooner, and a burst of messages gets one reply",
+        summary:
+          "Execution Workers now wake over a socket instead of polling, removing the median 14-second wait before a DM reply starts, and short messages sent back to back collapse into one conversation with a single reply. This release also fixes tasks that need no screen sitting in the queue forever because of a Computer Use setting.",
+        items: [
+          "Queuing a message now wakes an execution Worker over a socket. Workers used to sleep 15 seconds after an empty poll and back off to 60, leaving a median 14-second and up to roughly 32-second gap between queueing and the task starting.",
+          "Short messages sent back to back in a DM now collapse into one conversation and get a single reply, instead of a separate session and a near-identical reply per message. Channel threads behave as before.",
+          "Agents with the Computer Use permission now run on hosts with no screen. The permission was read as a host requirement, which left tasks that need no screen at all queued forever.",
+        ],
+      },
       {
         version: "1.2.210",
         date: "September 7, 2026",
