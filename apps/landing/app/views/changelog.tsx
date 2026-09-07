@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.213",
+        date: "2026년 9월 7일",
+        title: "DM은 답장일 때만 이어지고, 모바일 목록이 바로 뜹니다",
+        summary:
+          "그냥 보낸 DM 메시지는 이제 새 대화로 시작하고, 특정 메시지에 답장할 때만 그 작업의 대화를 이어받습니다. 모바일 이슈 목록과 상세 화면이 전체 응답을 기다리지 않고 먼저 표시되고, Project Agent 없는 이슈 실행이 빈 책임 범위로 거절되던 문제도 고쳤습니다.",
+        items: [
+          "DM에서 특정 메시지에 답장할 때만 직전 Agent 작업의 provider 대화를 이어받고, 그냥 보낸 메시지는 새 대화로 시작합니다. Agent의 작업 기록이 쌓인 대화를 그대로 이어받아 답장이 실패하던 문제를 막고, 채널과 이슈 답변 동작은 그대로입니다.",
+          "모바일 이슈 목록이 첫 페이지를 먼저 보여주고 스크롤로 이어 붙입니다. 상세 화면도 기본 정보와 메시지를 먼저 표시하고, 증빙과 실행 로그는 탭을 열 때 읽으며 실행 로그는 50개 단위로 이어서 조회합니다.",
+          "Project Agent가 없는 이슈 실행에 현재 프로젝트와 Run에 한정된 기본 개발 책임을 부여해, 빈 책임 범위로 거절되고 활성 Run을 반복 재개하던 문제를 고쳤습니다. 지정 Agent의 이름·책임·Skill은 유지하고 실행 Provider와 프로젝트 범위만 고정합니다.",
+          "DM 답장이 실패하면 Worker 로그에 오류 클래스, Connect 코드, 시스템 오류 코드와 스택 프레임 형태를 남겨 원인을 좁힐 수 있습니다. 메시지 본문은 남기지 않습니다.",
+        ],
+      },
+      {
         version: "1.2.212",
         date: "2026년 9월 7일",
         title: "DM 답장으로 작업을 멈추고, 컴퓨터 화면은 켜야 조종합니다",
@@ -1847,6 +1860,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.213",
+        date: "September 7, 2026",
+        title: "DMs continue only on reply, and mobile lists load first",
+        summary:
+          "A plain DM message now starts a new conversation, and only an explicit reply continues the work conversation it answered. Mobile issue lists and detail screens show content without waiting for the full response, and issue runs without a Project Agent no longer get rejected for an empty responsibility scope.",
+        items: [
+          "Only an explicit reply to a message continues the provider conversation of the Agent work behind it; a plain DM message starts a new conversation. This stops replies failing when they inherited a conversation grown from Agent work logs, and channel and issue replies behave as before.",
+          "The mobile issue list shows its first page immediately and appends more as you scroll. The detail screen shows basic info and messages first, evidence and run logs load when their tab opens, and run logs page 50 at a time.",
+          "Issue runs without a Project Agent now get a default development responsibility scoped to the current project and run, fixing runs being rejected for an empty responsibility scope and active runs resuming repeatedly. An assigned Agent keeps its name, responsibility, and Skills while only the execution provider and project scope are pinned.",
+          "When a DM reply fails, the Worker log records the error shape — error class, Connect code, system error code, and stack frames — so the cause can be narrowed down. Message bodies are never logged.",
+        ],
+      },
       {
         version: "1.2.212",
         date: "September 7, 2026",
