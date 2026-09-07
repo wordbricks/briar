@@ -213,6 +213,18 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
       };
     },
 
+    acknowledgeChannelReplySteer: async (input: {
+      projectId: string;
+      workerId: string;
+      work: ClaimedChannelReply;
+    }) => {
+      const response = await client.acknowledgeChannelReplySteer({
+        projectId: input.projectId,
+        workerId: input.workerId,
+        work: workClaimIdentityToProto(input.work),
+      });
+      return response.released;
+    },
     checkpointChannelReplySession: async (input: {
       projectId: string;
       workerId: string;

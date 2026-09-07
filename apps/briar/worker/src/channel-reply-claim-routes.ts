@@ -142,6 +142,7 @@ export async function claimNextChannelReplyWork(
           channel.kind === "dm"
             ? {
                 limit: DM_REPLY_CONTEXT_MESSAGE_LIMIT,
+                createdBefore: job.last_input_at ?? sourceMessage?.createdAt,
                 createdAfter: new Date(
                   Date.parse(job.claimed_at ?? observedAt) -
                     DM_REPLY_CONTEXT_MAX_AGE_MS,
@@ -174,6 +175,17 @@ export async function claimNextChannelReplyWork(
     const pendingTriggerMessageIds = pendingTriggers.results.length > 0
       ? pendingTriggers.results.map((row) => row.id)
       : [job.trigger_message_id];
+    // Pending inputs are not subject to the recent-history limit. A long burst
+    // must not lose its first messages or attachments when it resumes.
+    const pendingMessages = (await Promise.all(pendingTriggerMessageIds.map(
+      (id) => getChannelMessage(db, job.channel_id, id),
+    ))).filter((message) => message !== null);
+    const responseMessages = [...new Map([...messages, ...pendingMessages]
+      .map((message) => [message.id, message])).values()]
+      .filter((message) => channel.kind !== "dm" ||
+        message.createdAt <= (job.last_input_at ?? sourceMessage?.createdAt ?? observedAt) ||
+        pendingTriggerMessageIds.includes(message.id))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
     const liveActiveSkill = job.skill_id
       ? liveAgent.skills.find((skill) => skill.id === job.skill_id) ?? null
       : null;
@@ -447,8 +459,8 @@ export async function claimNextChannelReplyWork(
         })
       : null;
     const safeMessages = channel.kind === "dm" && !agentDirectMessage
-      ? await excludeForgottenDmSources(db, channel.id, messages)
-      : messages;
+      ? await excludeForgottenDmSources(db, channel.id, responseMessages)
+      : responseMessages;
     const currentSession = memoryBinding
       ? await getChannelReplySession(db, job.channel_reply_session.id)
       : job.channel_reply_session;
@@ -464,7 +476,7 @@ export async function claimNextChannelReplyWork(
       conversation continues; a channel or issue message always carries a
       display parent, which leaves this a DM-only rule.
     */
-    const resumedConversationId = contextParentMessageId
+    const resumedConversationId = contextParentMessageId || job.steer_revision > 0
       ? currentSession?.conversation_id ?? null
       : null;
     await requireDmMemoryReplyFence(db, job.id);
@@ -553,7 +565,8 @@ export async function claimNextChannelReplyWork(
         agentMessageTargets,
         inboundAgentMessage,
         agentMessageHop: job.agent_message_hop,
-        triggerAttachments: (triggerMessage?.attachments ?? []).map(
+        triggerAttachments: safeMessages.filter((message) => pendingTriggerMessageIds.includes(message.id))
+          .flatMap((message) => message.attachments ?? []).map(
           (attachment) => ({
             id: attachment.id,
             filename: attachment.filename,

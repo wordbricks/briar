@@ -131,7 +131,7 @@ export type WorkerLoopDependencies<Issue extends ClaimedIssue = ClaimedIssue> = 
     issue: Issue,
     signal: AbortSignal,
     checkpoint: (value: WorkerExecutionCheckpoint) => void,
-  ) => Promise<void>;
+  ) => Promise<void | { steered: true }>;
   /** Atomically release one claim to the next Worker after its provider stops. */
   handoff?: (
     issue: Issue,
@@ -353,13 +353,13 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
   let nextHeartbeatAt = Number.NEGATIVE_INFINITY;
   const active = new Map<
     string,
-    Promise<{ issue: Issue; error: unknown | null; handedOff: boolean }>
+    Promise<{ issue: Issue; error: unknown | null; handedOff: boolean; steered?: boolean }>
   >();
   const activeControllers = new Map<string, AbortController>();
   let activeSlotCount = 0;
   let updateDirective: WorkerLoopUpdateDirective | null = null;
   const serialTails = new Map<string, Promise<void>>();
-  const executionKey = (issue: Issue) => issue.workType === "mergeBatch"
+  const executionKey = (issue: Issue) => issue.workType === "mergeBatch" || issue.workType === "channelReply"
     ? `${issue.runId}:${issue.claimToken}`
     : issue.workId ?? issue.executionId ?? `${issue.runId}:${issue.claimToken}`;
   const serialKey = (issue: Issue) =>
@@ -436,7 +436,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     idleWaits.clear();
     // A settled reply can revoke a running claim. Wake only the authority
     // check; the server decides which execution (if any) must abort.
-    if (reason === "channel_reply_completed") {
+    if (reason === "channel_reply_completed" || reason === "channel_reply_enqueued") {
       leaseWakeVersion += 1;
       for (const controller of leaseWaits) controller.abort();
     }
@@ -542,9 +542,12 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       dependencies.log(
         `execution started for ${issue.sourceKey} (${issue.runId}) attempt ${issue.claimAttempts ?? "unknown"}`,
       );
-      await dependencies.runIssue(issue, execution.signal, (value) => {
+      const executionResult = await dependencies.runIssue(issue, execution.signal, (value) => {
         checkpoint = { ...checkpoint, ...value };
       });
+      if (executionResult?.steered) {
+        return { issue, error: null, handedOff: false, steered: true };
+      }
       dependencies.log(
         `execution returned for ${issue.sourceKey} (${issue.runId})`,
       );
@@ -709,7 +712,10 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     active.delete(executionKey(outcome.issue));
     if (!isReplyWork(outcome.issue)) activeSlotCount -= 1;
     if (outcome.error === null) {
-      if (outcome.handedOff) {
+      if (outcome.steered) {
+        consecutiveFailures = 0;
+        dependencies.log(`resuming ${outcome.issue.sourceKey} with followup input`);
+      } else if (outcome.handedOff) {
         consecutiveFailures = 0;
         dependencies.log(
           `handed off ${outcome.issue.sourceKey} for planned Worker update`,

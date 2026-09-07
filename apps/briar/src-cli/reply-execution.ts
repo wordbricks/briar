@@ -876,7 +876,11 @@ async function runClaimedChannelReply(
     let lookupRounds = 0;
     let repairRounds = 0;
     const decodeReplyJson = repairableDecoder(outputContract.decodeJson);
-    let turnPrompt = [prompt, memoryInvocation?.prompt()]
+    let turnPrompt = [
+      reply.session?.conversationId && reply.pendingTriggerMessageIds.length > 1
+        ? "Continue the interrupted response in this same conversation with the updated user inputs below. Preserve completed work and tool results from the transcript; do not repeat completed actions unless the new input requires it."
+        : null,
+      prompt, memoryInvocation?.prompt()]
       .filter(Boolean)
       .join("\n\n");
     let result: ParsedChannelReplyAgentResult["result"] | null = null;

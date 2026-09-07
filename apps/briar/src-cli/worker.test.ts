@@ -267,7 +267,7 @@ describe("briar worker loop", () => {
     expect(unsubscribed).toBe(true);
   });
 
-  it("a reply settlement push rechecks the active lease and aborts a revoked execution", async () => {
+  it.each(["channel_reply_completed", "channel_reply_enqueued"] as const)("%s rechecks the active lease and aborts a revoked execution", async (reason) => {
     let notify: ((reason: WorkerWakeReason) => void) | undefined;
     let aborted = false;
     let renewed = false;
@@ -283,13 +283,48 @@ describe("briar worker loop", () => {
           aborted = true;
           resolve();
         }, { once: true }));
-        notify?.("channel_reply_completed");
+        notify?.(reason);
         await stopped;
       },
     });
     await runWorkerLoop(test.dependencies, { once: true, leaseRenewIntervalMs: 600_000 });
     expect(renewed).toBe(true);
     expect(aborted).toBe(true);
+  });
+
+  it("reclaims a steered response without counting an execution failure or final response", async () => {
+    const original = { ...issue("steered"), workType: "channelReply" as const,
+      workId: "response", session: { id: "same-session" } };
+    const resumed = { ...original, claimToken: "new-claim" };
+    let notify: ((reason: WorkerWakeReason) => void) | undefined;
+    const order: string[] = [];
+    const test = harness([original, resumed], {
+      wake: { subscribe: (listener) => { notify = listener; return () => {}; } },
+      sleep: async (_milliseconds, signal) => {
+        if (!signal || signal.aborted) return;
+        await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+      },
+      renewLease: async (work) => {
+        if (work.claimToken === original.claimToken) throw new Error("pending steer");
+      },
+      runIssue: async (work, signal) => {
+        if (work.claimToken === resumed.claimToken) {
+          order.push("resumed");
+          return;
+        }
+        const stopped = new Promise<void>((resolve) => signal.addEventListener("abort", () => {
+          order.push("provider stopped");
+          resolve();
+        }, { once: true }));
+        notify?.("channel_reply_enqueued");
+        await stopped;
+        order.push("acknowledged");
+        return { steered: true };
+      },
+    });
+    const result = await runWorkerLoop(test.dependencies, { maxIssues: 1 });
+    expect(order).toEqual(["provider stopped", "acknowledged", "resumed"]);
+    expect(result).toMatchObject({ processed: 1, failures: 0 });
   });
 
   it("polls exactly as before when no wake source is attached", async () => {

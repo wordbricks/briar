@@ -1,3 +1,4 @@
+import { dmReplySteerStatements } from "./dm-reply-steer";
 import { dmReplyStopStatements, type DmReplyStop } from "./dm-reply-stop";
 import * as Schema from "effect/Schema";
 import {
@@ -313,6 +314,10 @@ export type ChannelReplyJobRow = {
    * message of its own.
    */
   superseded_by_reply_job_id: string | null;
+  steer_revision: number;
+  steer_restart_count: number;
+  applied_steer_revision: number;
+  last_input_at: string | null;
   status: ChannelReplyStatus;
   agent_provider: AgentProvider | null;
   preferred_device_id: string | null;
@@ -2104,6 +2109,7 @@ export async function listChannelRootMessages(
   options: {
     limit?: number;
     createdAfter?: string;
+    createdBefore?: string;
   } = {},
 ) {
   const limit = options.limit ?? 200;
@@ -2113,12 +2119,14 @@ export async function listChannelRootMessages(
       `${select}
        where message.channel_id = ? and message.parent_message_id is null
          ${options.createdAfter ? "and message.created_at > ?" : ""}
+         ${options.createdBefore ? "and message.created_at <= ?" : ""}
        order by message.created_at desc, message.id desc
        limit ?`,
     )
     .bind(
       channelId,
       ...(options.createdAfter ? [options.createdAfter] : []),
+      ...(options.createdBefore ? [options.createdBefore] : []),
       limit,
     )
     .all<ChannelMessageRow>();
@@ -2876,7 +2884,12 @@ export async function getClaimedChannelReplyAttachment(
        join briar_channel_message_attachments attachment
          on attachment.organization_id = job.organization_id
         and attachment.channel_id = job.channel_id
-        and attachment.message_id = job.trigger_message_id
+        and (attachment.message_id = job.trigger_message_id or exists (
+          select 1 from briar_channel_agent_reply_jobs absorbed
+          where absorbed.superseded_by_reply_job_id = job.id
+            and absorbed.channel_id = job.channel_id and absorbed.agent_id = job.agent_id
+            and absorbed.trigger_message_id = attachment.message_id
+        ))
        where job.id = ? and job.organization_id = ?
          and job.claimed_device_id = ? and job.claim_token_hash = ?
          and job.status = 'running' and job.lease_expires_at > ?
@@ -3172,8 +3185,7 @@ async function channelAgentReplyEnqueueStatements(
               ),
             ]
           : []),
-        // Each message retains its job so a DM reply can stop that message
-        // without revoking another message's work in this shared session.
+        ...dmReplySteerStatements(db, jobId),
         db.prepare(
           `insert into briar_channel_reply_session_events (
              id, session_id, reply_job_id, event_type, reason,
@@ -3500,7 +3512,7 @@ export async function nextChannelReplySettleWaitMs(
        and channel.kind = 'dm'
        and ${channelReplyPlainConversationTurn("job")}
        and job.created_at > ?
-       and job.attempts < (? + job.memory_restart_count)
+       and (job.attempts < (? + job.memory_restart_count + job.steer_restart_count) or job.steer_revision > job.applied_steer_revision)
        and exists (
          select 1 from briar_channel_agents current_roster
          where current_roster.channel_id = job.channel_id
@@ -3649,7 +3661,8 @@ export async function claimNextChannelAgentReply(
            error = coalesce(error, 'Channel reply lease expired repeatedly.'),
            claimed_device_id = null, claimed_worker_id = null,
            claim_token_hash = null, lease_expires_at = null, updated_at = ?
-       where organization_id = ? and status = 'running' and attempts >= (? + memory_restart_count)
+       where organization_id = ? and status = 'running' and attempts >= (? + memory_restart_count + steer_restart_count)
+         and steer_revision = applied_steer_revision
          and lease_expires_at <= ?`,
     )
     .bind(input.claimedAt, organizationId, MAX_REPLY_ATTEMPTS, input.claimedAt)
@@ -3758,7 +3771,7 @@ export async function claimNextChannelAgentReply(
      join briar_channel_reply_sessions session on session.id = job.session_id
      left join briar_agent_skills current_skill
        on current_skill.id = job.skill_id and current_skill.agent_id = job.agent_id
-     where job.organization_id = ? and job.attempts < (? + job.memory_restart_count)
+     where job.organization_id = ? and (job.attempts < (? + job.memory_restart_count + job.steer_restart_count) or job.steer_revision > job.applied_steer_revision)
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))
        and ${channelReplySettled("job")}
@@ -3892,8 +3905,11 @@ export async function claimNextChannelAgentReply(
        set status = 'running', claimed_device_id = ?, claimed_worker_id = ?,
            claim_token_hash = ?, claimed_at = ?, lease_expires_at = ?,
            attempts = attempts + case when planned_update_resume = 1 then 0 else 1 end,
+           steer_restart_count = steer_restart_count + case
+             when steer_revision > applied_steer_revision and planned_update_resume = 0 then 1 else 0 end,
+           applied_steer_revision = steer_revision,
            planned_update_resume = 0, error = null, updated_at = ?
-       where id = ? and organization_id = ? and attempts < (? + memory_restart_count)
+       where id = ? and organization_id = ? and (attempts < (? + memory_restart_count + steer_restart_count) or steer_revision > applied_steer_revision)
          and session_id = ?
          and (status = 'queued'
            or (status = 'running' and lease_expires_at <= ?))
@@ -4270,6 +4286,7 @@ export async function renewChannelReplyLease(
        set lease_expires_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?
          and claim_token_hash = ? and status = 'running'
+         and steer_revision = applied_steer_revision
          and lease_expires_at > ?
          and exists (
            select 1 from briar_channel_agents current_roster
@@ -4373,17 +4390,18 @@ export async function failChannelReply(
   const statements: D1PreparedStatement[] = [
     db.prepare(
       `update briar_channel_agent_reply_jobs
-       set status = case when ? = 1 or attempts >= (? + memory_restart_count) then 'failed' else 'queued' end,
+       set status = case when ? = 1 or attempts >= (? + memory_restart_count + steer_restart_count) then 'failed' else 'queued' end,
            error = ?,
            ${input.commit
              ? ""
              : `claimed_device_id = null, claimed_worker_id = null,
                 preferred_device_id = null,
                 claim_token_hash = null, lease_expires_at = null,`}
-           completed_at = case when ? = 1 or attempts >= (? + memory_restart_count) then ? else completed_at end,
+           completed_at = case when ? = 1 or attempts >= (? + memory_restart_count + steer_restart_count) then ? else completed_at end,
            updated_at = ?
        where id = ? and claimed_device_id = ? and claimed_worker_id = ?
          and claim_token_hash = ? and status = 'running'
+         and steer_revision = applied_steer_revision
          and lease_expires_at > ?
          and exists (
            select 1 from briar_channel_agents current_roster
@@ -4913,6 +4931,7 @@ export async function completeChannelReply(
          set status = 'completed', completed_at = ?, updated_at = ?
          where id = ? and claimed_device_id = ? and claimed_worker_id = ?
            and claim_token_hash = ? and status = 'running'
+           and steer_revision = applied_steer_revision
            and lease_expires_at > ?
            and exists (
              select 1 from briar_channel_agents current_roster

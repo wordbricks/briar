@@ -27,6 +27,7 @@ import "google/protobuf/timestamp.proto";
 // and provider-specific streams intentionally use their dedicated transports.
 service WorkerQueueService {
   rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
+  rpc AcknowledgeChannelReplySteer(AcknowledgeChannelReplySteerRequest) returns (AcknowledgeChannelReplySteerResponse);
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
   rpc CheckpointChannelReplySession(CheckpointChannelReplySessionRequest) returns (CheckpointChannelReplySessionResponse);
   rpc PrepareReplyAttachmentUploads(PrepareReplyAttachmentUploadsRequest) returns (PrepareReplyAttachmentUploadsResponse);
@@ -1364,4 +1365,14 @@ message ClaimedMergeBatch {
   MergeBatch batch = 15;
   repeated MergeBatchMember members = 16;
   repeated PendingMergeGroupHead pending_heads = 17;
+}
+
+message AcknowledgeChannelReplySteerRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+}
+
+message AcknowledgeChannelReplySteerResponse {
+  bool released = 1;
 }

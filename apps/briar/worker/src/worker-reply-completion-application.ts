@@ -845,7 +845,7 @@ export async function completeChannelReplyApplication(
       outcome,
       failure: await failureOutcome(input.db, {
       scope,
-      attempts: claimed.attempts,
+      attempts: claimed.attempts - (claimed.steer_restart_count ?? 0),
         error: outcome.error,
         block: outcome.block,
       provider: claimed.agent_provider,

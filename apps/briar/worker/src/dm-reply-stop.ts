@@ -44,7 +44,10 @@ export function dmReplyStopStatements(db: D1Database, input: DmReplyStop) {
     db.prepare(`update briar_channel_agent_reply_jobs
       set status = 'completed', error = ?, completed_at = ?, updated_at = ?,
           claim_token_hash = null, lease_expires_at = null
-      where organization_id = ? and channel_id = ? and trigger_message_id = ?
+      where organization_id = ? and channel_id = ? and (trigger_message_id = ? or id in (
+          select superseded_by_reply_job_id from briar_channel_agent_reply_jobs absorbed
+          where absorbed.channel_id = ? and absorbed.trigger_message_id = ?
+        ))
         and status in ('queued', 'running')
         and superseded_by_reply_job_id is null
         and exists (select 1 from briar_channel_agents roster
@@ -60,7 +63,7 @@ export function dmReplyStopStatements(db: D1Database, input: DmReplyStop) {
           ) = 1)
         ) and ${authorized}`)
       .bind(marker, input.createdAt, input.createdAt, input.organizationId,
-        input.channelId, input.rootMessageId, mentioned, mentioned, mentioned,
+        input.channelId, input.rootMessageId, input.channelId, input.rootMessageId, mentioned, mentioned, mentioned,
         input.organizationId, input.channelId, input.rootMessageId, ...authorization),
     // Drop only the interrupted provider conversation. Queued jobs keep their
     // session/Worker affinity and start a clean provider turn after the abort.

@@ -1046,6 +1046,11 @@ async function workerCommand() {
               reportCheckpoint,
             );
           } catch (error) {
+            // runClaimedChannelReply has stopped its provider and finished cleanup.
+            // Only now may the server make the response claimable again.
+            if (await workerQueue.acknowledgeChannelReplySteer({
+              projectId: project.id, workerId, work: reply,
+            })) return { steered: true };
             if (signal.aborted) throw error;
             await failClaimedChannelReply(
               config,

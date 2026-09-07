@@ -1,3 +1,4 @@
+import { acknowledgeDmReplySteer } from "./dm-reply-steer";
 import {
   providerBlockFromProto,
   providerBlockReplyMessage,
@@ -10,6 +11,8 @@ import {
   DmMemoryDescriptorSchema,
 } from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
+  AcknowledgeChannelReplySteerResponseSchema,
+  type AcknowledgeChannelReplySteerRequest,
   BlockMergeBatchResponseSchema,
   CheckpointChannelReplySessionResponseSchema,
   CompleteChannelReplyResponseSchema,
@@ -846,6 +849,32 @@ const channelReplyConversationId = (value: string | undefined) => {
   return conversationId;
 };
 
+async function acknowledgeChannelReplySteerRpc(
+  input: WorkerConnectQueueInput,
+  request: AcknowledgeChannelReplySteerRequest,
+  services: WorkerQueueServices,
+) {
+  const identity = requiredWork(request.work);
+  if (identity.work.case !== "channelReply") {
+    throw new HttpError(400, "Channel reply claim identity is required");
+  }
+  const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
+  const organizationId = identity.work.value.organizationId;
+  if (organizationId !== worker.principal.organizationId) {
+    throw new HttpError(403, "Worker is not enabled for this organization");
+  }
+  const released = await acknowledgeDmReplySteer(input.db, {
+    jobId: identity.workId,
+    organizationId,
+    channelId: identity.runId,
+    deviceId: worker.principal.deviceId,
+    workerId: worker.binding.id,
+    claimTokenHash: await services.sha256(identity.claimToken),
+    observedAt: new Date().toISOString(),
+  });
+  return create(AcknowledgeChannelReplySteerResponseSchema, { released });
+}
+
 async function checkpointChannelReplySessionRpc(
   input: WorkerConnectQueueInput,
   request: CheckpointChannelReplySessionRequest,
@@ -1521,6 +1550,7 @@ export function createWorkerQueueService(
   return {
     claimWork: (request) => claimWork(input, request, services),
     renewWorkLease: (request) => renewWorkLease(input, request, services),
+    acknowledgeChannelReplySteer: (request) => acknowledgeChannelReplySteerRpc(input, request, services),
     checkpointChannelReplySession: (request) => checkpointChannelReplySessionRpc(input, request, services),
     handoffWork: (request) => handoffWork(input, request, services),
     completeProjectAgentTask: (request) => completeTeamAgentTask(input, request, services),

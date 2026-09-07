@@ -8,6 +8,18 @@ pub type OwnedClaimWorkRequestView = ::buffa::view::OwnedView<
 pub type OwnedClaimWorkResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'static>,
 >;
+///Shorthand for `OwnedView<AcknowledgeChannelReplySteerRequestView<'static>>`.
+pub type OwnedAcknowledgeChannelReplySteerRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<AcknowledgeChannelReplySteerResponseView<'static>>`.
+pub type OwnedAcknowledgeChannelReplySteerResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<RenewWorkLeaseRequestView<'static>>`.
 pub type OwnedRenewWorkLeaseRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::RenewWorkLeaseRequestView<'static>,
@@ -420,6 +432,48 @@ for crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimWorkResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -1748,6 +1802,12 @@ pub const WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC: ::connectrpc::Spec = ::connectrp
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AcknowledgeChannelReplySteer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_ACKNOWLEDGE_CHANNEL_REPLY_STEER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AcknowledgeChannelReplySteer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `RenewWorkLease` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const WORKER_QUEUE_SERVICE_RENEW_WORK_LEASE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.worker.v1.WorkerQueueService/RenewWorkLease",
@@ -1935,6 +1995,29 @@ pub trait WorkerQueueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::ClaimWorkResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AcknowledgeChannelReplySteer RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn acknowledge_channel_reply_steer<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2436,6 +2519,35 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                 },
             )
             .with_spec(WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AcknowledgeChannelReplySteer",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.acknowledge_channel_reply_steer(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_ACKNOWLEDGE_CHANNEL_REPLY_STEER_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
                 "RenewWorkLease",
@@ -3049,6 +3161,14 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .with_spec(WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC),
                 )
             }
+            "AcknowledgeChannelReplySteer" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WORKER_QUEUE_SERVICE_ACKNOWLEDGE_CHANNEL_REPLY_STEER_SPEC,
+                        ),
+                )
+            }
             "RenewWorkLease" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -3215,6 +3335,28 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::ClaimWorkResponse,
+                        >(format)
+                })
+            }
+            "AcknowledgeChannelReplySteer" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerRequest,
+                    >::from_parts(&req, &body);
+                    svc.acknowledge_channel_reply_steer(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerResponse,
                         >(format)
                 })
             }
@@ -3805,6 +3947,51 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AcknowledgeChannelReplySteer RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AcknowledgeChannelReplySteer.
+    pub async fn acknowledge_channel_reply_steer(
+        &self,
+        request: crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.acknowledge_channel_reply_steer_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AcknowledgeChannelReplySteer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn acknowledge_channel_reply_steer_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_ACKNOWLEDGE_CHANNEL_REPLY_STEER_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
