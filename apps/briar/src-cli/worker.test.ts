@@ -267,6 +267,31 @@ describe("briar worker loop", () => {
     expect(unsubscribed).toBe(true);
   });
 
+  it("a reply settlement push rechecks the active lease and aborts a revoked execution", async () => {
+    let notify: ((reason: WorkerWakeReason) => void) | undefined;
+    let aborted = false;
+    let renewed = false;
+    const test = harness([issue("cancelled-reply")], {
+      sleep: async (_milliseconds, signal) => {
+        if (!signal || signal.aborted) return;
+        await new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve(), { once: true }));
+      },
+      wake: { subscribe: (listener) => { notify = listener; return () => {}; } },
+      renewLease: async () => { renewed = true; throw new Error("Claim revoked"); },
+      runIssue: async (_issue, signal) => {
+        const stopped = new Promise<void>((resolve) => signal.addEventListener("abort", () => {
+          aborted = true;
+          resolve();
+        }, { once: true }));
+        notify?.("channel_reply_completed");
+        await stopped;
+      },
+    });
+    await runWorkerLoop(test.dependencies, { once: true, leaseRenewIntervalMs: 600_000 });
+    expect(renewed).toBe(true);
+    expect(aborted).toBe(true);
+  });
+
   it("polls exactly as before when no wake source is attached", async () => {
     let polls = 0;
     const test = harness([], {

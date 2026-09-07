@@ -1252,7 +1252,7 @@ export function Channels({
       agents,
       busy,
       canOpenRelay: Boolean(onRelayOpen),
-      canOpenThread: surface === "channel",
+      canOpenThread: true,
       channel: activeChannel,
       currentUserId,
       decliningProposalId,
@@ -1530,7 +1530,7 @@ export function Channels({
               {...threadResizeProps}
             />
           )}
-          <aside className="channel-thread">
+          <aside aria-label={t("channel.thread")} className="channel-thread">
           <header data-tauri-drag-region="deep">
             <div className="channel-thread-heading">
               <span>
@@ -3138,9 +3138,9 @@ export const MessageRow = memo(function MessageRow({
   const onOpenThread = useMemo(
     () =>
       canOpenThread
-        ? () => void handlers.openThread(message.id)
+        ? () => void handlers.openThread(message.parentMessageId ?? message.id)
         : undefined,
-    [canOpenThread, handlers, message.id],
+    [canOpenThread, handlers, message.id, message.parentMessageId],
   );
   const relay = message.relay;
   const onOpenRelay = useMemo(

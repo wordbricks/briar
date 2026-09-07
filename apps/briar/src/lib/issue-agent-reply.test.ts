@@ -32,7 +32,7 @@ describe("issue agent replies", () => {
     };
 
     expect(agentReplyDisplayParentMessageId("dm", rootMessage)).toBeNull();
-    expect(agentReplyDisplayParentMessageId("dm", threadMessage)).toBeNull();
+    expect(agentReplyDisplayParentMessageId("dm", threadMessage)).toBe(threadMessage.parentMessageId);
     expect(agentReplyDisplayParentMessageId("channel", rootMessage)).toBe(
       "root-mention",
     );

@@ -1,3 +1,4 @@
+import { isDmReplyStop } from "./dm-reply-stop";
 import { createHash } from "node:crypto";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -14,6 +15,7 @@ import {
   getChannelMessage,
   getClaimedChannelReply,
   getLiveDmChannelReplySession,
+  listChannelThreadMessages,
   nextChannelReplySettleWaitMs,
 } from "./channels";
 import { createOrganizationAgent } from "./organization-agents";
@@ -325,45 +327,141 @@ describe("direct message reply bursts", () => {
     expect((await claim())?.workId).toBe(second.job.id);
   });
 
-  it("folds queued turns into the newest message and reports every unanswered trigger", async () => {
+  it("recognizes only explicit whole stop commands", () => {
+    for (const body of ["그만해", "중단해", "여기까지 해", "stop", " STOP! ", "@assistant 중단해 주세요"]) {
+      expect(isDmReplyStop(body, ["Assistant"])).toBe(true);
+    }
+    for (const body of ["중단이라는 단어", "중단하지 마", "stop the server after the build", "don't stop", "그만해?", "'stop'", "if it fails stop", "@someone stop"]) {
+      expect(isDmReplyStop(body, ["Assistant"])).toBe(false);
+    }
+  });
+
+  it("settles only the original queued job, without enqueuing a stop reply", async () => {
+    const channelId = await freshConversation("dm");
+    const original = await send(channelId, "Summarize", { mentionedAgentIds: [agentId], skillId });
+    const other = await send(channelId, "Another task", { mentionedAgentIds: [agentId], skillId });
+    const stop = await send(channelId, "그만해", { parentMessageId: original.messageId });
+    expect(stop.job).toBeUndefined();
+    expect(await getChannelAgentReplyJob(db, organizationId, original.job.id))
+      .toMatchObject({ status: "completed", claim_token_hash: null, lease_expires_at: null });
+    expect(await getChannelAgentReplyJob(db, organizationId, other.job.id))
+      .toMatchObject({ status: "queued" });
+    expect((await listChannelThreadMessages(db, channelId, original.messageId))
+      .some((message) => message.body === "요청한 Agent 작업을 중단했습니다.")).toBe(true);
+  });
+
+  it("revokes a running claim and fences stale completion while its session peer stays queued", async () => {
+    const channelId = await freshConversation("dm");
+    const original = await send(channelId, "First task");
+    await stopTyping(original.job.id);
+    const claimed = (await claim())!;
+    const claimTokenHash = sha256(claimed.claimToken);
+    const oldJob = (await getClaimedChannelReply(db, {
+      jobId: claimed.workId, deviceId, workerId, claimTokenHash,
+      observedAt: claimed.claimedAt!,
+    }))!;
+    const other = await send(channelId, "Next task");
+    await send(channelId, "stop", { parentMessageId: original.messageId });
+    await expect(getClaimedChannelReply(db, {
+      jobId: claimed.workId, deviceId, workerId, claimTokenHash,
+      observedAt: new Date().toISOString(),
+    })).rejects.toThrow();
+    await completeChannelReply(db, oldJob, {
+      jobId: oldJob.id, deviceId, workerId, claimTokenHash,
+      agentName: "Assistant", agentProvider: "claude", body: "Late answer",
+      document: null, issueProposal: null, executionProposal: null,
+      completedAt: new Date().toISOString(),
+    });
+    expect(await getChannelMessage(db, channelId, oldJob.reply_message_id)).toBeNull();
+    expect(await getChannelAgentReplyJob(db, organizationId, other.job.id))
+      .toMatchObject({ status: "queued" });
+  });
+
+  it("does not cancel on ambiguous prose and keeps explicit DM replies in the thread", async () => {
+    const channelId = await freshConversation("dm");
+    const original = await send(channelId, "First task");
+    await stopTyping(original.job.id);
+    const firstClaim = (await claim())!;
+    const followup = await send(channelId, "중단이라는 단어를 설명해 줘", { parentMessageId: original.messageId });
+    expect(followup.job).toBeDefined();
+    expect(await getChannelAgentReplyJob(db, organizationId, original.job.id))
+      .toMatchObject({ status: "running" });
+    await finish(firstClaim);
+    await stopTyping(followup.job.id);
+    const next = (await claim())!;
+    expect(next.workId).toBe(followup.job.id);
+    expect(next.snapshot.messages.map((message) => message.id)).toEqual([
+      original.messageId,
+      followup.messageId,
+    ]);
+    await finish(next);
+    const row = (await getChannelAgentReplyJob(db, organizationId, next.workId))!;
+    expect(await getChannelMessage(db, channelId, row.reply_message_id))
+      .toMatchObject({ parentMessageId: original.messageId });
+  });
+
+  it("requires one explicit Agent on a multi-Agent origin and leaves the other job alone", async () => {
+    const channelId = await freshConversation("dm");
+    const otherAgentId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await createOrganizationAgent(db, { id: otherAgentId, organizationId, name: "Other",
+      provider: "claude", model: null, responsibility: "Answer", effort: null, createdAt: now });
+    await db.prepare(`insert into briar_channel_agents (channel_id, agent_id, created_at)
+      values (?, ?, ?)`).bind(channelId, otherAgentId, now).run();
+    const original = await send(channelId, "Both answer", { mentionedAgentIds: [agentId, otherAgentId] });
+    const jobs = () => db.prepare(`select agent_id, status from briar_channel_agent_reply_jobs
+      where channel_id = ? and trigger_message_id = ? order by agent_id`)
+      .bind(channelId, original.messageId).all<{ agent_id: string; status: string }>();
+    await send(channelId, "stop", { parentMessageId: original.messageId });
+    expect((await jobs()).results.map((job) => job.status)).toEqual(["queued", "queued"]);
+    await send(channelId, "@assistant stop", { parentMessageId: original.messageId, mentionedAgentIds: [agentId] });
+    expect((await jobs()).results.find((job) => job.agent_id === agentId)?.status).toBe("completed");
+    expect((await jobs()).results.find((job) => job.agent_id === otherAgentId)?.status).toBe("queued");
+  });
+
+  it("replays a stop receipt without affecting later work or duplicating the notice", async () => {
+    const channelId = await freshConversation("dm");
+    const original = await send(channelId, "First task");
+    const request = { ...decodeChannelMessageApplicationInput({ body: "stop", parentMessageId: original.messageId }), clientMessageId: crypto.randomUUID() };
+    const input = { db, organizationId, channelId, userId: ownerId, request, attachmentIds: [] };
+    await createOrganizationChannelMessage(input);
+    const before = await listChannelThreadMessages(db, channelId, original.messageId);
+    const later = await send(channelId, "Continue", { parentMessageId: original.messageId });
+    await createOrganizationChannelMessage(input);
+    expect(await getChannelAgentReplyJob(db, organizationId, later.job.id))
+      .toMatchObject({ status: "queued" });
+    const after = await listChannelThreadMessages(db, channelId, original.messageId);
+    expect(after.filter((message) => message.body === "요청한 Agent 작업을 중단했습니다.")).toHaveLength(1);
+    expect(after).toHaveLength(before.length + 1);
+  });
+
+  it("rejects a nonparticipant and a root from another DM", async () => {
+    const channelId = await freshConversation("dm");
+    const original = await send(channelId, "First task");
+    const request = { ...decodeChannelMessageApplicationInput({ body: "stop", parentMessageId: original.messageId }), clientMessageId: crypto.randomUUID() };
+    await expect(createOrganizationChannelMessage({ db, organizationId, channelId,
+      userId: "not-a-participant", request, attachmentIds: [] })).rejects.toThrow();
+    const otherChannelId = crypto.randomUUID();
+    await expect(createOrganizationChannelMessage({ db, organizationId, channelId: otherChannelId,
+      userId: ownerId, request, attachmentIds: [] })).rejects.toThrow();
+    expect(await getChannelAgentReplyJob(db, organizationId, original.job.id))
+      .toMatchObject({ status: "queued" });
+  });
+
+  it("keeps queued DM messages independently cancellable in a shared session", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "hi");
     const second = await send(channelId, "one more thing");
-    expect(await getChannelAgentReplyJob(db, organizationId, first.job.id))
-      .toMatchObject({
-        status: "completed",
-        superseded_by_reply_job_id: second.job.id,
-      });
-
-    const third = await send(channelId, "actually, about the deploy");
-    // The chain stays one level deep: both older turns point at the survivor.
-    for (const superseded of [first, second]) {
-      const job = await getChannelAgentReplyJob(
-        db,
-        organizationId,
-        superseded.job.id,
-      );
-      expect(job).toMatchObject({
-        status: "completed",
-        superseded_by_reply_job_id: third.job.id,
-      });
-      expect(job!.completed_at).not.toBeNull();
-      // A superseded turn answers through its successor, so its own reply
-      // message is never written.
-      expect(await getChannelMessage(db, channelId, job!.reply_message_id))
-        .toBeNull();
+    for (const item of [first, second]) {
+      expect(await getChannelAgentReplyJob(db, organizationId, item.job.id))
+        .toMatchObject({ status: "queued", superseded_by_reply_job_id: null });
     }
-    expect(await getChannelAgentReplyJob(db, organizationId, third.job.id))
-      .toMatchObject({ status: "queued", superseded_by_reply_job_id: null });
-
-    await stopTyping(third.job.id);
-    const claimed = await claim();
-    expect(claimed?.workId).toBe(third.job.id);
-    expect(claimed?.pendingTriggerMessageIds).toEqual([
-      first.messageId,
-      second.messageId,
-      third.messageId,
-    ]);
+    expect(await sessionIdOf(first.job.id)).toBe(await sessionIdOf(second.job.id));
+    await send(channelId, "stop", { parentMessageId: first.messageId });
+    expect(await getChannelAgentReplyJob(db, organizationId, second.job.id))
+      .toMatchObject({ status: "queued" });
+    await stopTyping(second.job.id);
+    expect((await claim())?.workId).toBe(second.job.id);
   });
 
   it("never takes a turn away from a Worker that already started it", async () => {

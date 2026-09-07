@@ -426,12 +426,13 @@ describe("Channels", () => {
     await cleanup();
   });
 
-  it("keeps an Inbox thread reply centered and links its channel", async () => {
+  it.each(["channel", "dm"] as const)("keeps an Inbox %s thread reply centered and links its channel", async (kind) => {
+    const conversation = { ...selectedChannel, kind };
     const openChannel = vi.fn();
     const onRequestedMessageOpen = vi.fn();
     const rootMessage: ChannelMessage = {
       id: "channel-root-1",
-      channelId: selectedChannel.id,
+      channelId: conversation.id,
       parentMessageId: null,
       author: {
         type: "user",
@@ -476,7 +477,7 @@ describe("Channels", () => {
       }
       if (method === "GetChannel") {
         return {
-          channel: channelSummaryWire(selectedChannel),
+          channel: channelSummaryWire(conversation),
           members: [],
           agents: [],
           messages: [],
@@ -500,9 +501,10 @@ describe("Channels", () => {
       <RegistryContext.Provider value={createChannelTestRegistry()}>
       <I18nProvider>
         <Channels
-          activeChannelId={selectedChannel.id}
+          surface={kind}
+          activeChannelId={conversation.id}
           channelCatalogCursor={0}
-          channels={[selectedChannel]}
+          channels={[conversation]}
           currentUserId="user-1"
           inboxDetail
           onChannelSelect={() => undefined}
@@ -512,7 +514,7 @@ describe("Channels", () => {
           onRequestedMessageOpen={onRequestedMessageOpen}
           organizationId="org-1"
           requestedMessage={{
-            channelId: selectedChannel.id,
+            channelId: conversation.id,
             messageId: replyMessage.id,
             rootMessageId: rootMessage.id,
           }}
@@ -535,7 +537,7 @@ describe("Channels", () => {
     );
     expect(channelLink?.textContent).toContain("General");
     await act(async () => channelLink?.click());
-    expect(openChannel).toHaveBeenCalledWith(selectedChannel.id);
+    expect(openChannel).toHaveBeenCalledWith(conversation.id);
 
     requestAnimationFrame.mockRestore();
     await cleanup();

@@ -25,7 +25,7 @@ type ReplyTargetMessage = Pick<
 export function agentReplyDisplayParentMessageId(
   conversationKind: "dm",
   message: ReplyTargetMessage,
-): null;
+): string | null;
 export function agentReplyDisplayParentMessageId(
   conversationKind: "channel" | "issue",
   message: ReplyTargetMessage,
@@ -39,7 +39,7 @@ export function agentReplyDisplayParentMessageId(
   message: ReplyTargetMessage,
 ) {
   return conversationKind === "dm"
-    ? null
+    ? message.parentMessageId
     : agentReplyParentMessageId(message);
 }
 

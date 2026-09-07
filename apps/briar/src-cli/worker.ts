@@ -25,6 +25,7 @@ export type ClaimedIssue = {
     | "dmMemory"
     | "mergeBatch";
   workId?: string;
+  session?: { id: string } | null;
   /** Immutable identity of one run claim/execution attempt. */
   executionId?: string;
   runId: string;
@@ -365,7 +366,9 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     !issue.workType || issue.workType === "issue" ||
         issue.workType === "mergeBatch"
       ? issue.runId
-      : null;
+      : issue.workType === "channelReply" && issue.session
+        ? `channel-session:${issue.session.id}`
+        : null;
 
   const applyHeartbeat = (
     heartbeat:
@@ -420,6 +423,8 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
   // while the loop is between waits sets `wakePending` so the next wait is
   // skipped instead of lost.
   const idleWaits = new Set<AbortController>();
+  const leaseWaits = new Set<AbortController>();
+  let leaseWakeVersion = 0;
   let wakePending = false;
   const unsubscribeWake = dependencies.wake?.subscribe((reason) => {
     wakePending = true;
@@ -429,6 +434,12 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     dependencies.log(`worker woken by server (${reason})`);
     for (const controller of idleWaits) controller.abort();
     idleWaits.clear();
+    // A settled reply can revoke a running claim. Wake only the authority
+    // check; the server decides which execution (if any) must abort.
+    if (reason === "channel_reply_completed") {
+      leaseWakeVersion += 1;
+      for (const controller of leaseWaits) controller.abort();
+    }
   });
   const finish = (result: WorkerLoopResult) => {
     unsubscribeWake?.();
@@ -465,11 +476,24 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     let checkpoint: WorkerExecutionCheckpoint = {};
     const leaseRenewal: LeaseRenewalState = { failure: null };
     const renewalLoop = (async () => {
+      let observedWakeVersion = leaseWakeVersion;
       while (!renewal.signal.aborted) {
-        await dependencies.sleep(
-          leaseRenewDelayMs(leaseRenewIntervalMs, dependencies.random),
-          renewal.signal,
-        );
+        const leaseWait = new AbortController();
+        const stopWait = () => leaseWait.abort();
+        renewal.signal.addEventListener("abort", stopWait, { once: true });
+        leaseWaits.add(leaseWait);
+        try {
+          if (observedWakeVersion === leaseWakeVersion) {
+            await dependencies.sleep(
+              leaseRenewDelayMs(leaseRenewIntervalMs, dependencies.random),
+              leaseWait.signal,
+            );
+          }
+          observedWakeVersion = leaseWakeVersion;
+        } finally {
+          leaseWaits.delete(leaseWait);
+          renewal.signal.removeEventListener("abort", stopWait);
+        }
         if (renewal.signal.aborted) break;
         try {
           await dependencies.renewLease(issue);
