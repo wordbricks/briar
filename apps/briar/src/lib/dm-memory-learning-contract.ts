@@ -97,6 +97,13 @@ export const dmMemoryLearningSpaceDailyCalls = 24;
 export const dmMemoryLearningOrganizationDailyCalls = 240;
 export const dmMemoryLearningProposerMaxOutputTokens = 4096;
 export const dmMemoryLearningVerifierMaxOutputTokens = 2048;
+/**
+ * Source events an empty extraction carries into its next review. One question
+ * and one answer is rarely a durable fact on its own, so a window that produced
+ * nothing is kept rather than consumed; this bounds how far it may grow, well
+ * under the 32 events a single snapshot can hold.
+ */
+export const dmMemoryLearningRetainedSources = 16;
 
 /** Learning is built in, so the policy is derived from the provider, never configured. */
 export function dmLearningAgentPolicy(provider: AgentProvider): DmLearningPolicy {
