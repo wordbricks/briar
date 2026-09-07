@@ -19,6 +19,8 @@ import {
   createDetachedTranscriptSequencer,
   detachedAgentContext,
   detachedAgentPrompt,
+  detachedIssueExecutionAgent,
+  invalidIssueExecutionProfileRunEvent,
   detachedChannelReplyPrompt,
   detachedIssueReplyPrompt,
   detachedProjectAgentPrompt,
@@ -278,6 +280,101 @@ describe("detached Agent runner", () => {
 
     expect(prompt).toContain("BRIAR-7");
     expect(prompt).not.toContain("Briar Agent assigned");
+  });
+
+  it("builds a project- and run-bound executor when an issue has no Agent", () => {
+    const executor = detachedIssueExecutionAgent({
+      agent: null,
+      runId: "run-7",
+      organizationId: "organization-1",
+      projectId: "project-1",
+      provider: "codex",
+      model: "gpt-5",
+      effort: "high",
+    });
+
+    expect(executor).toMatchObject({
+      id: "run-7",
+      name: "Briar Developer",
+      provider: "codex",
+      model: "gpt-5",
+      effort: "high",
+      skills: [],
+      activeSkill: null,
+      scope: {
+        kind: "project",
+        organizationId: "organization-1",
+        projectId: "project-1",
+      },
+    });
+    const context = detachedAgentContext(executor);
+    expect(context).toContain("Execute only the issue and workflow bound to this run");
+    expect(context).toContain("Project scope (project-1)");
+    expect(context).not.toContain("No responsibility is configured");
+    expect(context).not.toContain(agent.responsibility);
+  });
+
+  it("keeps the selected Project Agent profile while binding its execution scope", () => {
+    const executor = detachedIssueExecutionAgent({
+      agent,
+      runId: "run-42",
+      organizationId: "organization-1",
+      projectId: "project-1",
+      provider: "claude",
+      model: "claude-sonnet",
+      effort: "medium",
+    });
+
+    expect(executor).toMatchObject({
+      id: agent.id,
+      name: agent.name,
+      responsibility: agent.responsibility,
+      skills: agent.skills,
+      provider: "claude",
+      model: "claude-sonnet",
+      effort: "medium",
+      scope: {
+        kind: "project",
+        organizationId: "organization-1",
+        projectId: "project-1",
+      },
+    });
+  });
+
+  it("rejects an invalid selected Agent profile before starting a provider turn", () => {
+    expect(() => detachedIssueExecutionAgent({
+      agent: { ...agent, responsibility: "  " },
+      runId: "run-42",
+      organizationId: "organization-1",
+      projectId: "project-1",
+      provider: "codex",
+      model: null,
+      effort: null,
+    })).toThrow("selected Project Agent has no responsibility");
+  });
+
+  it("turns an invalid execution profile into one terminal failed event", () => {
+    const event = invalidIssueExecutionProfileRunEvent({
+      attempt: 2,
+      revision: 3,
+      workflowStage: "analyzing",
+      actor: "briar-worker:worker-1",
+      repository: "briar",
+      detail: "missing project organization binding",
+      occurredAt: "2026-09-07T00:00:00.000Z",
+    });
+
+    expect(event).toMatchObject({
+      status: "failed",
+      workflowStage: "analyzing",
+      eventKey: "detached:2:3:invalid-execution-profile",
+      structuredResult: {
+        outcome: "failed",
+        humanActionRequired: false,
+        nextAction: null,
+      },
+    });
+    expect(event.structuredResult.summary).toContain("한 번의 실패 상태로 종료");
   });
 
   it("uses the logical Agent configuration independently of a Worker", () => {

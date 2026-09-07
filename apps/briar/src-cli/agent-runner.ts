@@ -142,6 +142,87 @@ export type DetachedAgent = {
   scope?: DetachedAgentScope;
 };
 
+export const defaultIssueExecutorResponsibility = [
+  "Execute only the issue and workflow bound to this run in the authenticated project.",
+  "You may investigate the issue, change code, run tests, record evidence, open or update a pull request, and perform only the completion stages configured in the run's workflow.",
+  "Do not access or act on another Briar project or organization, and do not assume any conversation Agent, delegation, messaging, or saved Skill authority.",
+].join(" ");
+
+export function detachedIssueExecutionAgent(input: {
+  agent: DetachedAgent | null;
+  runId: string;
+  organizationId: string;
+  projectId: string;
+  provider: DetachedAgentProvider;
+  model: string | null;
+  effort: DetachedAgentEffort | null;
+}): DetachedAgent {
+  const scope = {
+    kind: "project" as const,
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+  };
+  if (input.agent) {
+    if (!input.agent.responsibility.trim()) {
+      throw new Error("The selected Project Agent has no responsibility");
+    }
+    return {
+      ...input.agent,
+      provider: input.provider,
+      model: input.model,
+      effort: input.effort,
+      scope,
+    };
+  }
+  return {
+    id: input.runId,
+    name: "Briar Developer",
+    provider: input.provider,
+    model: input.model,
+    effort: input.effort,
+    computerUsePolicy: "disabled",
+    responsibility: defaultIssueExecutorResponsibility,
+    skills: [],
+    activeSkill: null,
+    scope,
+  };
+}
+
+export function invalidIssueExecutionProfileRunEvent(input: {
+  attempt: number;
+  revision: number;
+  workflowStage: string | null;
+  actor: string;
+  repository: string;
+  detail: string;
+  occurredAt: string;
+}) {
+  return {
+    status: "failed" as const,
+    workflowStage: input.workflowStage,
+    eventKey:
+      `detached:${input.attempt}:${input.revision}:invalid-execution-profile`,
+    occurredAt: input.occurredAt,
+    actor: input.actor,
+    repository: input.repository,
+    detail: input.detail,
+    resultSummary:
+      "실행 프로필이 유효하지 않아 Provider 호출 전에 Run을 종료했습니다.",
+    structuredResult: {
+      summary:
+        "이슈 실행에 필요한 프로젝트 범위, Provider 또는 Agent 책임 정보가 유효하지 않아 작업을 시작할 수 없었습니다. 같은 응답을 반복하지 않도록 Run을 한 번의 실패 상태로 종료했습니다.",
+      outcome: "failed" as const,
+      importance: "important" as const,
+      urgency: "normal" as const,
+      impact: "issue" as const,
+      humanActionRequired: false,
+      nextAction: null,
+      dueAt: null,
+    },
+    pullRequestUrls: [] as string[],
+  };
+}
+
 export type DetachedDelegationTarget = {
   agentId: string;
   agentName: string;
