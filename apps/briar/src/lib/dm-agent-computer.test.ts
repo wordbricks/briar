@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ManagedComputer } from "../types";
-import { resolveDmAgentComputerTarget } from "./dm-agent-computer";
+import {
+  resolveDmAgentComputerTarget,
+  sameDmAgentComputerTarget,
+} from "./dm-agent-computer";
 
 const computer = (overrides: Partial<ManagedComputer> = {}): ManagedComputer => ({
   id: "computer-1",
@@ -93,5 +96,23 @@ describe("resolveDmAgentComputerTarget", () => {
       computers: [computer({ state: "stopped" })],
       workers: [worker],
     })).toBeNull();
+  });
+
+  it("reads a re-resolved screen as the same one", () => {
+    const resolve = () => resolveDmAgentComputerTarget({
+      agents: [agent],
+      agentConfigurations: [configuration],
+      computers: [computer()],
+      workers: [worker],
+    });
+    const target = resolve();
+    expect(target).not.toBeNull();
+    expect(sameDmAgentComputerTarget(target, resolve())).toBe(true);
+    expect(sameDmAgentComputerTarget(target, null)).toBe(false);
+    expect(sameDmAgentComputerTarget(null, null)).toBe(true);
+    expect(sameDmAgentComputerTarget(
+      target,
+      target && { ...target, agentId: "agent-2" },
+    )).toBe(false);
   });
 });

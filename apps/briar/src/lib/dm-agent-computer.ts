@@ -74,3 +74,20 @@ export function resolveDmAgentComputerTarget(input: {
   }
   return null;
 }
+
+/**
+ * Whether two resolutions name the same screen. A re-resolve — a channel
+ * switch, a roster refresh — reads the same fleet through fresh objects; the
+ * panel keeps its live remote session when this holds, rather than tearing the
+ * session down and racing a new one against its own end request.
+ */
+export function sameDmAgentComputerTarget(
+  left: DmAgentComputerTarget | null,
+  right: DmAgentComputerTarget | null,
+) {
+  if (!left || !right) return left === right;
+  return left.agentId === right.agentId &&
+    left.agentName === right.agentName &&
+    left.computer.id === right.computer.id &&
+    left.workerLabel === right.workerLabel;
+}
