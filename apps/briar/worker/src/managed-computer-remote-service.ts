@@ -7,7 +7,10 @@ import {
   type ManagedComputerConfig,
   type ManagedComputerRow,
 } from "./managed-computer-model";
-import { managedComputerRemoteSessionJson } from "./managed-computer-remote-model";
+import {
+  managedComputerRemoteSessionJson,
+  type ManagedComputerRemoteSessionRow,
+} from "./managed-computer-remote-model";
 import {
   activeManagedComputerRemoteSession,
   consumeManagedComputerRemoteSessionToken,
@@ -189,6 +192,32 @@ export async function managedComputerRemoteAgentStatus(
   return response.json<{ agentConnected: boolean; controllerConnected: boolean }>();
 }
 
+/*
+  A controller that vanished without closing its socket — the app quit, the
+  machine slept, the network dropped — leaves the relay with nothing to close,
+  so the row stays `connected` and locks the computer until `max_expires_at`,
+  an hour later. The relay already tells the ticket endpoint whether a
+  controller is on the wire; when it says no one is, a session in a state that
+  claims a live socket is a leftover and the next request reclaims it. The
+  grace period keeps a connection that is still being accepted — the relay
+  writes `connected` before it accepts the socket — from being reclaimed by a
+  request that arrives in the same moment.
+*/
+const controllerAbsenceGraceMs = 15_000;
+
+function controllerAbandonedSession(
+  session: ManagedComputerRemoteSessionRow,
+  status: { readonly controllerConnected: boolean },
+  observedAtMs: number,
+) {
+  if (status.controllerConnected) return false;
+  if (session.state !== "connecting" && session.state !== "connected") {
+    return false;
+  }
+  return Date.parse(session.updated_at) <=
+    observedAtMs - controllerAbsenceGraceMs;
+}
+
 function assertRemoteComputerAvailable(computer: ManagedComputerRow | null) {
   if (!computer) {
     throw remoteError(
@@ -266,10 +295,24 @@ export async function createManagedComputerRemoteSessionTicket(
     controllerUserId: input.controllerUserId,
     requestId: input.requestId,
   });
-  const activeSession = await activeManagedComputerRemoteSession(
+  let activeSession = await activeManagedComputerRemoteSession(
     db,
     input.managedComputerId,
   );
+  if (
+    activeSession &&
+    controllerAbandonedSession(activeSession, status, observedAtMs)
+  ) {
+    await endManagedComputerRemoteSessionAndDisconnect(db, env, {
+      sessionId: activeSession.id,
+      organizationId: activeSession.organization_id,
+      managedComputerId: activeSession.managed_computer_id,
+      actorUserId: input.controllerUserId,
+      reason: "controller_absent",
+      observedAt: input.observedAt,
+    });
+    activeSession = null;
+  }
   const recoverableSessionId =
     activeSession?.state === "disconnected" &&
       activeSession.controller_user_id === input.controllerUserId &&

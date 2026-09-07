@@ -24,10 +24,12 @@ import {
   loadOrganizationExecutionWorkers,
   loadProjectAgents,
 } from "../lib/api";
+import { ApiError } from "../lib/api/errors";
 import type { ChannelAgentSummary } from "../lib/channels-contract";
 import {
   type DmAgentComputerTarget,
   resolveDmAgentComputerTarget,
+  sameDmAgentComputerTarget,
 } from "../lib/dm-agent-computer";
 import { supportsManagedComputerRemoteDesktop } from "../lib/platform";
 import { setRemoteDesktopKeyboardCapture } from
@@ -37,6 +39,7 @@ import {
   isRemoteDesktopPasteShortcut,
 } from "../lib/remote-desktop-paste";
 import { cn } from "../lib/utils";
+import type { ManagedComputerRemoteSessionTicket } from "../types";
 import { managedComputerRemoteErrorMessage } from
   "./ManagedComputerRemoteDesktop";
 import { RemoteDesktopClipboardButton } from "./RemoteDesktopClipboardButton";
@@ -44,6 +47,22 @@ import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
 
 type ConnectionState = "connecting" | "connected" | "reconnect" | "error";
+
+/*
+  Leaving a screen ends its session and opening the next one asks for a new
+  ticket, and the two requests are in flight together: whenever the new ticket
+  is read first, Briar still sees the old session holding the computer and
+  answers `MANAGED_COMPUTER_REMOTE_IN_USE`. The end lands a moment later, so
+  the panel waits it out instead of leaving the user on an error with a manual
+  reconnect button. A rejected ticket costs nothing against the rate limit —
+  only issued sessions count.
+*/
+const remoteSessionRetryDelaysMs = [400, 1_200, 2_500];
+
+function remoteSessionInUse(error: unknown) {
+  return error instanceof ApiError &&
+    error.code === "MANAGED_COMPUTER_REMOTE_IN_USE";
+}
 
 export type DmComputerRfbConstructor = new (
   target: HTMLElement,
@@ -86,11 +105,11 @@ function useDmAgentComputerTarget(input: {
   );
 
   useEffect(() => {
-    setTarget(null);
     if (
       !supportsManagedComputerRemoteDesktop() ||
       eligibleAgents.length === 0
     ) {
+      setTarget(null);
       return;
     }
 
@@ -106,12 +125,15 @@ function useDmAgentComputerTarget(input: {
       )),
     ]).then(([workerResponse, computerResponse, agentGroups]) => {
       if (cancelled) return;
-      setTarget(resolveDmAgentComputerTarget({
+      const resolved = resolveDmAgentComputerTarget({
         agents: eligibleAgents,
         agentConfigurations: agentGroups.flat(),
         computers: computerResponse.computers,
         workers: workerResponse.workers,
-      }));
+      });
+      setTarget((current) =>
+        sameDmAgentComputerTarget(current, resolved) ? current : resolved
+      );
     }).catch(() => {
       if (!cancelled) setTarget(null);
     });
@@ -178,16 +200,33 @@ function DmComputerScreen({
     try {
       const reconnectSessionId = remoteSessionIdRef.current ??
         window.sessionStorage.getItem(storageKey) ?? undefined;
-      const ticket = await services.createRemoteSession(
-        token,
-        organizationId,
-        target.computer.id,
-        {
-          requestId: crypto.randomUUID(),
-          agentId: target.agentId,
-          ...(reconnectSessionId ? { reconnectSessionId } : {}),
-        },
-      );
+      let ticket: ManagedComputerRemoteSessionTicket | null = null;
+      for (let attempt = 0; ticket === null; attempt += 1) {
+        try {
+          ticket = await services.createRemoteSession(
+            token,
+            organizationId,
+            target.computer.id,
+            {
+              requestId: crypto.randomUUID(),
+              agentId: target.agentId,
+              ...(reconnectSessionId ? { reconnectSessionId } : {}),
+            },
+          );
+        } catch (caught) {
+          if (generation !== generationRef.current) return;
+          if (
+            !remoteSessionInUse(caught) ||
+            attempt >= remoteSessionRetryDelaysMs.length
+          ) {
+            throw caught;
+          }
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, remoteSessionRetryDelaysMs[attempt])
+          );
+          if (generation !== generationRef.current) return;
+        }
+      }
       if (generation !== generationRef.current || !targetRef.current) {
         void services.endRemoteSession(
           token,

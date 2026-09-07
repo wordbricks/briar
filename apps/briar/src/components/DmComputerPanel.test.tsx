@@ -5,7 +5,8 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
-import { createReactTestRoot, renderReactTestRoot } from "../test/react";
+import { ApiError } from "../lib/api/errors";
+import { createReactTestRoot, flush, renderReactTestRoot } from "../test/react";
 import type {
   ManagedComputer,
   ManagedComputerRemoteSessionTicket,
@@ -150,6 +151,21 @@ const ticket: ManagedComputerRemoteSessionTicket = {
   reconnected: false,
 };
 
+const dmAgent = () => ({
+  agentId: "agent-1",
+  name: "QA Engineer",
+  avatar: null,
+  provider: "codex" as const,
+  model: null,
+  effort: null,
+  computerUsePolicy: "unattended" as const,
+  projectId: "project-1",
+  projectName: "Briar",
+  responsibility: "QA",
+  skills: [],
+  createdAt: "2026-09-02T00:00:00.000Z",
+});
+
 const createRemoteSession = vi.fn<
   DmComputerPanelServices["createRemoteSession"]
 >();
@@ -293,5 +309,60 @@ describe("DmComputerPanel", () => {
       "computer-1",
       "remote-session-1",
     );
+  });
+
+  it("keeps the live screen when the DM roster resolves again", async () => {
+    const { cleanup, root } = createReactTestRoot({ attachToDocument: true });
+    const panel = () => (
+      <I18nProvider>
+        <DmComputerPanel
+          agents={[dmAgent()]}
+          organizationId="organization-1"
+          services={services}
+          token="session-token"
+        />
+      </I18nProvider>
+    );
+    await renderReactTestRoot(root, panel());
+    await vi.waitFor(() => expect(noVncState.instances).toHaveLength(1));
+
+    await renderReactTestRoot(root, panel());
+    await flush();
+
+    expect(createRemoteSession).toHaveBeenCalledTimes(1);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+    expect(noVncState.instances).toHaveLength(1);
+    await cleanup();
+  });
+
+  it("waits for a computer the previous screen is still releasing", async () => {
+    createRemoteSession.mockRejectedValueOnce(
+      new ApiError(
+        409,
+        "Managed computer is already being controlled",
+        "MANAGED_COMPUTER_REMOTE_IN_USE",
+      ),
+    );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <DmComputerPanel
+          agents={[dmAgent()]}
+          organizationId="organization-1"
+          services={services}
+          token="session-token"
+        />
+      </I18nProvider>,
+    );
+
+    await vi.waitFor(() => expect(noVncState.instances).toHaveLength(1), {
+      timeout: 4_000,
+    });
+    expect(createRemoteSession).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain("already being controlled");
+    await cleanup();
   });
 });

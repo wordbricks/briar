@@ -252,6 +252,56 @@ describe("managed computer remote desktop routes", () => {
     });
   });
 
+  it("reclaims a session whose controller left without closing the socket", async () => {
+    await db.prepare(
+      `update briar_managed_computer_remote_sessions
+       set state = 'ended', ended_at = ?, end_reason = 'test_setup', updated_at = ?
+       where state in ('created', 'connecting', 'connected', 'disconnected')`,
+    ).bind(now, now).run();
+    const abandoned = await createRemoteSession(
+      ownerToken,
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "https://briar.example",
+      undefined,
+      agentId,
+    );
+    const abandonedId = abandoned.session?.id ?? "";
+    const markConnected = (updatedAt: string) => db.prepare(
+      `update briar_managed_computer_remote_sessions
+       set state = 'connected', connected_at = ?, updated_at = ? where id = ?`,
+    ).bind(updatedAt, updatedAt, abandonedId).run();
+
+    await markConnected(new Date().toISOString());
+    expect(await errorCode(createRemoteSession(
+      ownerToken,
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "https://briar.example",
+      undefined,
+      agentId,
+    ))).toBe(Code.FailedPrecondition);
+
+    await markConnected(new Date(Date.now() - 60_000).toISOString());
+    relayFetch.mockClear();
+    const replacement = await createRemoteSession(
+      ownerToken,
+      "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "https://briar.example",
+      undefined,
+      agentId,
+    );
+    expect(replacement.reconnected).toBe(false);
+    expect(replacement.session?.id).not.toBe(abandonedId);
+    expect(relayFetch).toHaveBeenCalledWith(
+      "https://managed-computer-remote.internal/disconnect-controller",
+      { method: "POST", headers: { "X-Briar-Remote-Session": abandonedId } },
+    );
+    expect(await db.prepare(
+      `select state, end_reason from briar_managed_computer_remote_sessions
+       where id = ?`,
+    ).bind(abandonedId).first<{ state: string; end_reason: string }>())
+      .toMatchObject({ state: "ended", end_reason: "controller_absent" });
+  });
+
   it("authenticates the outbound agent with the computer-scoped worker credential", async () => {
     const response = await worker.fetch(new Request(
       `https://briar.example/managed-computers/${computerId}/remote-agent`,
