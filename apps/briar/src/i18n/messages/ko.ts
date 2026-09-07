@@ -2767,6 +2767,8 @@ export const ko = {
   "dm.computer.screen": "{name}의 화면",
   "dm.computer.open": "전체 화면으로 열기",
   "dm.computer.close": "사이드 화면으로 돌아가기",
+  "dm.computer.showPanel": "컴퓨터 패널 열기",
+  "dm.computer.hidePanel": "컴퓨터 패널 닫기",
   "managedComputer.remote.open": "화면 열기",
   "managedComputer.remote.unavailable": "원격 화면 기능을 준비 중입니다. 사용 가능해지면 이 컴퓨터에서 바로 설정할 수 있습니다.",
   "managedComputer.remote.title": "관리형 컴퓨터 화면",

@@ -8,6 +8,7 @@ import {
   MonitorUp,
   RefreshCw,
   Scan,
+  X,
 } from "lucide-react";
 import {
   useCallback,
@@ -149,11 +150,17 @@ function useDmAgentComputerTarget(input: {
 }
 
 function DmComputerScreen({
+  id,
+  onClose,
+  open,
   organizationId,
   services,
   target,
   token,
 }: {
+  id?: string;
+  onClose?: () => void;
+  open: boolean;
   organizationId: string;
   services: DmComputerPanelServices;
   target: DmAgentComputerTarget;
@@ -404,6 +411,10 @@ function DmComputerScreen({
     if (rfbRef.current) rfbRef.current.scaleViewport = fitScreen;
   }, [fitScreen]);
 
+  useEffect(() => {
+    setRemoteDesktopKeyboardCapture(open && controlRef.current);
+  }, [open]);
+
   const statusKey = connectionState === "connected"
     ? "managedComputer.remote.connected"
     : connectionState === "connecting"
@@ -417,11 +428,14 @@ function DmComputerScreen({
       aria-label={screenLabel}
       aria-modal={expanded || undefined}
       className={cn(
-        "dm-computer-panel flex min-h-0 shrink-0 flex-col overflow-hidden border-l border-border bg-card text-foreground",
+        "dm-computer-panel min-h-0 shrink-0 overflow-hidden border-l border-border bg-card text-foreground",
+        open ? "flex flex-col" : "hidden",
         expanded
           ? "fixed inset-0 z-[100] h-screen w-screen border-0 bg-zinc-950 text-white outline-none"
-          : "w-[clamp(300px,32vw,420px)] max-[760px]:hidden",
+          : "w-[clamp(300px,32vw,420px)] max-[760px]:absolute max-[760px]:inset-y-0 max-[760px]:right-0 max-[760px]:z-20 max-[760px]:shadow-xl",
       )}
+      hidden={!open}
+      id={id}
       onKeyDownCapture={(event) => {
         if (!expanded) return;
         if (event.key === "Escape") {
@@ -544,6 +558,17 @@ function DmComputerScreen({
               <Minimize2 aria-hidden="true" size={16} />
             </Button>
           </div>
+        ) : onClose ? (
+          <Button
+            aria-label={t("dm.computer.hidePanel")}
+            onClick={onClose}
+            size="icon"
+            title={t("dm.computer.hidePanel")}
+            type="button"
+            variant="ghost"
+          >
+            <X aria-hidden="true" size={16} />
+          </Button>
         ) : null}
       </header>
       {expanded ? (
@@ -702,11 +727,19 @@ function DmComputerScreen({
 
 export function DmComputerPanel({
   agents,
+  id,
+  onAvailabilityChange,
+  onClose,
+  open = true,
   organizationId,
   services = defaultServices,
   token,
 }: {
   agents: readonly ChannelAgentSummary[];
+  id?: string;
+  onAvailabilityChange?: (available: boolean) => void;
+  onClose?: () => void;
+  open?: boolean;
   organizationId: string;
   services?: DmComputerPanelServices;
   token: string;
@@ -717,10 +750,16 @@ export function DmComputerPanel({
     services,
     token,
   });
+  useEffect(() => {
+    onAvailabilityChange?.(target !== null);
+  }, [onAvailabilityChange, target]);
   if (!target) return null;
   return (
     <DmComputerScreen
       key={`${target.computer.id}:${target.agentId}`}
+      id={id}
+      onClose={onClose}
+      open={open}
       organizationId={organizationId}
       services={services}
       target={target}
