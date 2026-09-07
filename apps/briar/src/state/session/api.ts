@@ -3,6 +3,7 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 import {
   loadDashboard,
   loadDashboardDelta,
+  loadDashboardRuns,
   loadOrganizations,
   loadSession,
   loadTeamProjects,
@@ -28,6 +29,7 @@ export interface SessionDataSources {
   readonly loadConnectedTeamIds: typeof loadConnectedTeamIds;
   readonly loadDashboard: typeof loadDashboard;
   readonly loadDashboardDelta: typeof loadDashboardDelta;
+  readonly loadDashboardRuns?: typeof loadDashboardRuns;
   readonly loadOrganizations: typeof loadOrganizations;
   readonly loadSession: typeof loadSession;
   readonly loadTeamProjects: typeof loadTeamProjects;
@@ -38,6 +40,7 @@ export const liveSessionDataSources: SessionDataSources = {
   loadConnectedTeamIds,
   loadDashboard,
   loadDashboardDelta,
+  loadDashboardRuns,
   loadOrganizations,
   loadSession,
   loadTeamProjects,
@@ -74,6 +77,7 @@ export function setSessionDataSources(
     registry.set(teamSyncApiAtom, {
       loadDashboard: next.loadDashboard,
       loadDashboardDelta: next.loadDashboardDelta,
+      loadDashboardRuns: next.loadDashboardRuns,
     });
     registry.set(workspaceApiAtom, {
       loadConnectedTeamIds: next.loadConnectedTeamIds,

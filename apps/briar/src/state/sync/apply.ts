@@ -77,6 +77,7 @@ import {
   teamExecutionPolicyAtom,
   teamGeneratedAtAtom,
   teamLoadedAtom,
+  mobileIssueListStateAtom,
   teamNotificationsAtom,
   teamPayloadCursorAtom,
   teamSettingsAtom,
@@ -238,6 +239,15 @@ function clearTeamState(registry: AtomRegistry, teamId: string) {
   registry.set(teamCursorAtom(teamId), null);
   registry.set(teamPayloadCursorAtom(teamId), null);
   registry.set(teamGeneratedAtAtom(teamId), null);
+  registry.set(mobileIssueListStateAtom(teamId), {
+    loaded: false,
+    nextCursor: null,
+    isLoading: false,
+    isLoadingNextPage: false,
+    filterKey: "",
+    error: null,
+    generatedAt: null,
+  });
   // Nothing of the server's answer is left, so the next payload for this team is
   // its first again.
   registry.set(teamSyncedSinceBootAtom(teamId), false);
@@ -264,6 +274,80 @@ function applyTeamSnapshot(
   );
   registry.set(teamSettingsAtom(teamId), payload.settings);
   writeTeamRuns(registry, teamId, payload.runs);
+  writeTeamWorkers(registry, teamId, payload.workers ?? null);
+  writeTeamMembers(registry, teamId, payload.members ?? null);
+  registry.set(
+    teamOrganizationProvidersAtom(teamId),
+    payload.organizationProviders ?? null,
+  );
+  registry.set(teamExecutionPolicyAtom(teamId), payload.executionPolicy ?? null);
+  registry.set(teamNotificationsAtom(teamId), {
+    conversation: payload.conversationNotifications ?? null,
+    channel: payload.channelNotifications ?? null,
+  });
+  registry.set(teamCursorAtom(teamId), syncCursorOf(payload.cursor));
+  registry.set(teamPayloadCursorAtom(teamId), payload.cursor ?? null);
+  registry.set(teamGeneratedAtAtom(teamId), payload.generatedAt);
+  markTeamSynced(registry, teamId);
+  touchTeam(registry, teamId);
+}
+
+function applyMobileListPage(
+  registry: AtomRegistry,
+  event: Extract<SyncEvent, { kind: "mobile-list-page" }>,
+) {
+  const currentRuns = registry.get(teamRunsAtom(event.teamId)) ?? [];
+  const incoming = new Map(event.page.runs.map((run) => [run.id, run]));
+  const nextRuns = event.replace
+    ? event.page.runs
+    : [
+        ...currentRuns.map((run) => incoming.get(run.id) ?? run),
+        ...event.page.runs.filter((run) => !currentRuns.some((current) => current.id === run.id)),
+      ];
+  registry.update(teamsByIdAtom, (teams) =>
+    upsertManyBy(teams, [event.team], () => event.teamId),
+  );
+  writeTeamRuns(registry, event.teamId, nextRuns);
+  registry.set(teamGeneratedAtAtom(event.teamId), event.page.generatedAt);
+  registry.set(mobileIssueListStateAtom(event.teamId), {
+    loaded: true,
+    nextCursor: event.page.nextCursor,
+    isLoading: false,
+    isLoadingNextPage: false,
+    filterKey: event.filterKey,
+    error: null,
+    generatedAt: event.page.generatedAt,
+  });
+  markTeamSynced(registry, event.teamId);
+  touchTeam(registry, event.teamId);
+}
+
+/**
+ * Applies the existing full dashboard read after a mobile list page is on
+ * screen. The full response refreshes metadata and details for runs already in
+ * the paged list, but it never expands the list with runs that were not in a
+ * fetched page.
+ */
+function applyTeamMetadata(
+  registry: AtomRegistry,
+  teamId: string,
+  payload: DashboardPayload,
+) {
+  const currentRuns = registry.get(teamRunsAtom(teamId)) ?? [];
+  const incomingRuns = new Map(payload.runs.map((run) => [run.id, run]));
+  const refreshedRuns = currentRuns.map(
+    (run) => incomingRuns.get(run.id) ?? run,
+  );
+  const currentTeam = registry.get(teamEntityAtom(teamId));
+  if (currentTeam !== payload.team) {
+    registry.update(teamsByIdAtom, (teams) =>
+      upsertManyBy(teams, [payload.team], () => teamId),
+    );
+  }
+  if (refreshedRuns.some((run, index) => run !== currentRuns[index])) {
+    writeTeamRuns(registry, teamId, refreshedRuns);
+  }
+  registry.set(teamSettingsAtom(teamId), payload.settings);
   writeTeamWorkers(registry, teamId, payload.workers ?? null);
   writeTeamMembers(registry, teamId, payload.members ?? null);
   registry.set(
@@ -599,6 +683,12 @@ function applyAgentSessionsChanged(
 export function applySyncEvent(registry: AtomRegistry, event: SyncEvent): void {
   Atom.batch(() => {
     switch (event.kind) {
+      case "mobile-list-page":
+        applyMobileListPage(registry, event);
+        return;
+      case "team-metadata":
+        applyTeamMetadata(registry, event.teamId, event.payload);
+        return;
       case "team-snapshot":
         applyTeamSnapshot(registry, event.teamId, event.payload);
         return;

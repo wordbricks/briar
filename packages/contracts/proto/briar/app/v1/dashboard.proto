@@ -14,6 +14,7 @@ option swift_prefix = "BriarAPI_";
 
 service DashboardService {
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse);
+  rpc ListDashboardRuns(ListDashboardRunsRequest) returns (ListDashboardRunsResponse);
   rpc SyncDashboard(SyncDashboardRequest) returns (SyncDashboardResponse);
   rpc ListRunEvents(ListRunEventsRequest) returns (ListRunEventsResponse);
 }
@@ -69,10 +70,16 @@ message SyncDashboardResponse {
 message ListRunEventsRequest {
   string team_id = 1;
   string run_id = 2;
+  optional string cursor = 3;
+  uint32 limit = 4;
+  bool include_archived = 5;
 }
 
 message ListRunEventsResponse {
   repeated RunEvent events = 1;
+  optional string next_cursor = 2;
+  bool has_more = 3;
+  bool archives_included = 4;
 }
 
 message IssueDependencyReference {
@@ -286,4 +293,67 @@ message RunEvent {
   repeated string pull_request_urls = 12;
   optional string target_sha = 13;
   google.protobuf.Timestamp recorded_at = 14;
+}
+
+message ListDashboardRunsRequest {
+  string team_id = 1;
+  uint32 page_size = 2;
+  string cursor = 3;
+  repeated DashboardRun.Source sources = 4;
+  repeated RunStatus statuses = 5;
+  optional string query = 6;
+  optional string planning_project_id = 7;
+}
+
+message ListDashboardRunsResponse {
+  repeated DashboardRunSummary runs = 1;
+  optional string next_cursor = 2;
+  google.protobuf.Timestamp generated_at = 3;
+}
+
+message DashboardRunSummary {
+  string id = 1;
+  optional string workspace_id = 2;
+  optional string team_id = 3;
+  optional string planning_project_id = 4;
+  optional string planning_project_name = 5;
+  uint32 run_number = 6;
+  uint32 current_attempt = 7;
+  uint32 current_revision = 8;
+  string source_key = 9;
+  optional google.protobuf.Timestamp source_created_at = 10;
+  string title = 11;
+  RunStatus status = 12;
+  optional string workflow_stage = 13;
+  briar.types.v1.AutoHuntWorkflow workflow = 14;
+  double progress = 15;
+  optional string detail = 16;
+  optional uint32 priority = 17;
+  optional IssueDifficulty difficulty = 18;
+  optional string assignee_user_id = 19;
+  optional string issue_description = 20;
+  optional string result_summary = 21;
+  optional bool full_auto = 22;
+  repeated string pull_request_urls = 23;
+  optional string claimed_by = 24;
+  optional google.protobuf.Timestamp claimed_at = 25;
+  optional google.protobuf.Timestamp lease_expires_at = 26;
+  optional briar.types.v1.AgentProvider preferred_provider = 27;
+  optional string preferred_model = 28;
+  optional string preferred_effort = 29;
+  optional briar.types.v1.AgentProvider requested_provider = 30;
+  optional string requested_model = 31;
+  optional string requested_effort = 32;
+  optional string requested_worker_id = 33;
+  optional string worker_id = 34;
+  google.protobuf.Timestamp started_at = 35;
+  google.protobuf.Timestamp updated_at = 36;
+  optional google.protobuf.Timestamp completed_at = 37;
+  google.protobuf.Timestamp last_event_at = 38;
+  uint32 event_count = 39;
+  optional DashboardRun.ExecutionReadiness execution_readiness = 40;
+  optional uint32 waiting_on_prerequisite_count = 41;
+  optional string repository = 42;
+  bool has_result_review = 43;
+  DashboardRun.Source source = 44;
 }

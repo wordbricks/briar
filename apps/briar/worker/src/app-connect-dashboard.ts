@@ -1,8 +1,10 @@
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import {
+  DashboardRun_Source,
   DashboardService,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import * as Schema from "effect/Schema";
 import { listArchivedRunEvents } from "./archive";
 import type { BriarAuth } from "./auth";
@@ -10,14 +12,21 @@ import {
   getDashboardSyncCursor,
   listDashboardChanges,
 } from "./dashboard-change-repository";
-import { dashboardEventJson, dashboardRunJson } from "./dashboard-json";
+import {
+  dashboardEventJson,
+  dashboardRunJson,
+  dashboardRunSummaryJson,
+} from "./dashboard-json";
 import {
   getHuntRunForProject,
   getTeam,
   getTeamSettings,
   listChannelConversationNotifications,
+  decodeDashboardRunListCursor,
   listDashboardRuns,
+  listDashboardRunSummaries,
   listDashboardRunsByIds,
+  encodeDashboardRunListCursor,
   listHuntRunEvents,
   listIssueAttachments,
   listIssueAttachmentsByRunIds,
@@ -30,6 +39,7 @@ import {
   listIssueRelationsByRunIds,
   listIssueResultReviews,
   listIssueResultReviewsByRunIds,
+  listHuntRunEventsPage,
   resolveHuntEventActorNames,
   type IssueAttachmentRow,
   type IssueDependencyRow,
@@ -49,6 +59,7 @@ import {
   appChannelNotification,
   appConversationNotification,
   appDashboardRun,
+  appDashboardRunSummary,
   appDashboardWorker,
   appExecutionPolicy,
   appOrganizationMember,
@@ -83,6 +94,56 @@ const decodeRunIds = decodeRequestSync(Schema.Struct({
   teamId: UuidString,
   runId: UuidString,
 }));
+
+const sourceForList = (value: DashboardRun_Source) => {
+  switch (value) {
+    case DashboardRun_Source.ISSUE: return "issue" as const;
+    case DashboardRun_Source.ERROR: return "error" as const;
+    case DashboardRun_Source.FEEDBACK: return "feedback" as const;
+    default: throw new HttpError(400, "Unknown dashboard list source");
+  }
+};
+
+const statusForList = (value: RunStatus) => {
+  switch (value) {
+    case RunStatus.BACKLOG: return "backlog" as const;
+    case RunStatus.QUEUED: return "queued" as const;
+    case RunStatus.RUNNING: return "running" as const;
+    case RunStatus.PAUSED: return "paused" as const;
+    case RunStatus.BLOCKED: return "blocked" as const;
+    case RunStatus.FAILED: return "failed" as const;
+    case RunStatus.COMPLETED: return "completed" as const;
+    case RunStatus.CANCELLED: return "cancelled" as const;
+    default: throw new HttpError(400, "Unknown dashboard list status");
+  }
+};
+
+type RunEventsCursor = {
+  readonly occurredAt: string;
+  readonly id: string;
+};
+
+const encodeRunEventsCursor = (value: RunEventsCursor) =>
+  btoa(JSON.stringify(value))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/u, "");
+
+const decodeRunEventsCursor = (encoded: string): RunEventsCursor => {
+  try {
+    const normalized = encoded.replaceAll("-", "+").replaceAll("_", "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    const parsed = JSON.parse(atob(padded)) as Partial<RunEventsCursor>;
+    if (
+      typeof parsed.occurredAt !== "string" ||
+      typeof parsed.id !== "string" ||
+      parsed.id.length === 0
+    ) throw new Error("invalid event cursor shape");
+    return { occurredAt: parsed.occurredAt, id: parsed.id };
+  } catch {
+    throw new HttpError(400, "Invalid run event cursor");
+  }
+};
 
 type RunRelations = {
   readonly attachmentsByRun: Map<string, IssueAttachmentRow[]>;
@@ -262,6 +323,45 @@ export const createAppDashboardService = (
     };
   },
 
+  listDashboardRuns: async (rpcRequest) => {
+    const input = decodeTeamId({ teamId: rpcRequest.teamId });
+    const session = await requireSession(auth, request);
+    const project = await getTeam(db, input.teamId, session.user.id);
+    if (!project) throw new HttpError(404, "Project not found");
+    const cursor = rpcRequest.cursor
+      ? (() => {
+          try {
+            return decodeDashboardRunListCursor(rpcRequest.cursor);
+          } catch {
+            throw new HttpError(400, "Invalid dashboard list cursor");
+          }
+        })()
+      : null;
+    const planningProjectId = rpcRequest.planningProjectId
+      ? decodeRequestSync(Schema.Struct({ planningProjectId: UuidString }))({
+          planningProjectId: rpcRequest.planningProjectId,
+        }).planningProjectId
+      : null;
+    const observedAt = new Date().toISOString();
+    const page = await listDashboardRunSummaries(db, project.id, {
+      pageSize: rpcRequest.pageSize,
+      cursor,
+      sources: rpcRequest.sources.map(sourceForList),
+      statuses: rpcRequest.statuses.map(statusForList),
+      query: rpcRequest.query ?? null,
+      planningProjectId,
+    }, observedAt);
+    return {
+      runs: page.rows.map((run) =>
+        appDashboardRunSummary(dashboardRunSummaryJson(run))
+      ),
+      nextCursor: page.nextCursor
+        ? encodeDashboardRunListCursor(page.nextCursor)
+        : undefined,
+      generatedAt: timestampFromDate(new Date(observedAt)),
+    };
+  },
+
   syncDashboard: async (rpcRequest) => {
     const input = decodeTeamId({ teamId: rpcRequest.teamId });
     if (
@@ -411,19 +511,50 @@ export const createAppDashboardService = (
     if (!project) throw new HttpError(404, "Project not found");
     const run = await getHuntRunForProject(db, project.id, input.runId);
     if (!run) throw new HttpError(404, "Run not found");
-    const [hotEvents, archivedEvents] = await Promise.all([
-      listHuntRunEvents(db, project.id, run.id),
-      listArchivedRunEvents(db, archivesBucket, project.id, run.id),
-    ]);
-    const events = [
-      ...new Map(
-        [...archivedEvents, ...hotEvents].map((event) => [event.id, event]),
-      ).values(),
-    ].sort(
-      (left, right) =>
-        right.occurred_at.localeCompare(left.occurred_at) ||
-        right.id.localeCompare(left.id),
+    const limit = Math.max(
+      25,
+      Math.min(100, rpcRequest.limit > 0 ? rpcRequest.limit : 50),
     );
+    const cursor = rpcRequest.cursor
+      ? decodeRunEventsCursor(rpcRequest.cursor)
+      : null;
+    let events: Awaited<ReturnType<typeof listHuntRunEventsPage>>["events"];
+    let nextCursor: RunEventsCursor | null;
+    if (!rpcRequest.includeArchived) {
+      const page = await listHuntRunEventsPage(db, project.id, run.id, {
+        limit,
+        cursor,
+      });
+      events = page.events;
+      nextCursor = page.nextCursor;
+    } else {
+      const [hotEvents, archivedEvents] = await Promise.all([
+        listHuntRunEvents(db, project.id, run.id),
+        listArchivedRunEvents(db, archivesBucket, project.id, run.id),
+      ]);
+      const merged = [
+        ...new Map(
+          [...archivedEvents, ...hotEvents].map((event) => [event.id, event]),
+        ).values(),
+      ].sort(
+        (left, right) =>
+          right.occurred_at.localeCompare(left.occurred_at) ||
+          right.id.localeCompare(left.id),
+      );
+      const afterCursor = cursor
+        ? merged.filter(
+            (event) =>
+              event.occurred_at < cursor.occurredAt ||
+              (event.occurred_at === cursor.occurredAt &&
+                event.id < cursor.id),
+          )
+        : merged;
+      events = afterCursor.slice(0, limit);
+      const last = events.at(-1);
+      nextCursor = afterCursor.length > limit && last
+        ? { occurredAt: last.occurred_at, id: last.id }
+        : null;
+    }
     const actorNames = await resolveHuntEventActorNames(
       db,
       project.id,
@@ -433,6 +564,9 @@ export const createAppDashboardService = (
       events: events.map((event) =>
         appRunEvent(dashboardEventJson(event, actorNames))
       ),
+      nextCursor: nextCursor ? encodeRunEventsCursor(nextCursor) : undefined,
+      hasMore: nextCursor !== null,
+      archivesIncluded: rpcRequest.includeArchived,
     };
   },
 });

@@ -369,6 +369,8 @@ export type HuntRun = {
   structuredResult: StructuredAgentResult | null;
   executionMetrics?: AgentExecutionMetrics | null;
   resultReviews?: IssueResultReview[];
+  /** Lightweight list responses carry this badge without reviewer details. */
+  hasResultReview?: boolean;
   pullRequestUrls: string[];
   targetSha: string | null;
   sourceCreatedAt: string | null;

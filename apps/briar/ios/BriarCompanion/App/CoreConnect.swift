@@ -268,6 +268,81 @@ extension TeamSettings.CheckpointPolicy.Checkpoint {
 }
 
 extension DashboardRun {
+    init(connectSummary message: BriarAPI_DashboardRunSummary) throws {
+        guard message.hasWorkflow,
+              message.hasStartedAt,
+              message.hasUpdatedAt,
+              message.hasLastEventAt
+        else { throw MobileAPIError.invalidResponse }
+
+        self.init(
+            id: try coreUUID(message.id),
+            workspaceId: message.hasWorkspaceID ? try coreUUID(message.workspaceID) : nil,
+            teamId: message.hasTeamID ? try coreUUID(message.teamID) : nil,
+            projectId: message.hasPlanningProjectID
+                ? try coreUUID(message.planningProjectID)
+                : nil,
+            projectName: message.hasPlanningProjectName
+                ? message.planningProjectName
+                : nil,
+            runNumber: try coreSafeInt(message.runNumber),
+            currentAttempt: try coreSafeInt(message.currentAttempt),
+            currentRevision: try coreSafeInt(message.currentRevision),
+            sourceKey: message.sourceKey,
+            sourceCreatedAt: message.hasSourceCreatedAt
+                ? try coreDate(message.sourceCreatedAt)
+                : nil,
+            title: message.title,
+            status: try coreRunStatus(message.status),
+            workflowStage: message.hasWorkflowStage ? message.workflowStage : nil,
+            workflow: try coreWorkflow(message.workflow),
+            progress: message.progress,
+            detail: message.hasDetail ? message.detail : nil,
+            priority: message.hasPriority ? try coreSafeInt(message.priority) : nil,
+            difficulty: message.hasDifficulty ? try coreDifficulty(message.difficulty) : nil,
+            assigneeUserId: message.hasAssigneeUserID ? message.assigneeUserID : nil,
+            issueDescription: message.hasIssueDescription ? message.issueDescription : nil,
+            executionReadiness: message.hasExecutionReadiness
+                ? try coreExecutionReadiness(message.executionReadiness)
+                : nil,
+            waitingOnPrerequisiteCount: message.hasWaitingOnPrerequisiteCount
+                ? try coreSafeInt(message.waitingOnPrerequisiteCount)
+                : nil,
+            resultSummary: message.hasResultSummary ? message.resultSummary : nil,
+            resultReviews: nil,
+            hasResultReview: message.hasResultReview_p,
+            pullRequestUrls: try message.pullRequestUrls.map(coreURL),
+            preferredProvider: message.hasPreferredProvider
+                ? try coreProvider(message.preferredProvider)
+                : nil,
+            preferredModel: message.hasPreferredModel ? message.preferredModel : nil,
+            preferredEffort: message.hasPreferredEffort
+                ? ModelEffort(rawValue: message.preferredEffort)
+                : nil,
+            fullAuto: message.hasFullAuto ? message.fullAuto : nil,
+            requestedProvider: message.hasRequestedProvider
+                ? try coreProvider(message.requestedProvider)
+                : nil,
+            requestedModel: message.hasRequestedModel ? message.requestedModel : nil,
+            requestedEffort: message.hasRequestedEffort
+                ? ModelEffort(rawValue: message.requestedEffort)
+                : nil,
+            requestedWorkerId: message.hasRequestedWorkerID ? message.requestedWorkerID : nil,
+            claimedBy: message.hasClaimedBy ? message.claimedBy : nil,
+            claimedAt: message.hasClaimedAt ? try coreDate(message.claimedAt) : nil,
+            workerId: message.hasWorkerID ? message.workerID : nil,
+            startedAt: try coreDate(message.startedAt),
+            updatedAt: try coreDate(message.updatedAt),
+            completedAt: message.hasCompletedAt ? try coreDate(message.completedAt) : nil,
+            lastEventAt: ISO8601DateFormatter.mobileContract.string(
+                from: try coreDate(message.lastEventAt)
+            ),
+            eventCount: try coreSafeInt(message.eventCount)
+        )
+
+        _ = try coreRunSource(message.source)
+    }
+
     init(connectMessage message: BriarAPI_DashboardRun) throws {
         guard message.hasWorkflow,
               message.hasStartedAt,
@@ -388,6 +463,17 @@ extension DashboardRun {
         if message.hasExecutionMetrics {
             _ = try coreSafeInt(message.executionMetrics.durationMs)
         }
+    }
+}
+
+extension DashboardRunListPage {
+    init(connectMessage message: BriarAPI_ListDashboardRunsResponse) throws {
+        guard message.hasGeneratedAt else { throw MobileAPIError.invalidResponse }
+        self.init(
+            runs: try message.runs.map { try DashboardRun(connectSummary: $0) },
+            nextCursor: message.hasNextCursor ? message.nextCursor : nil,
+            generatedAt: try coreDate(message.generatedAt)
+        )
     }
 }
 

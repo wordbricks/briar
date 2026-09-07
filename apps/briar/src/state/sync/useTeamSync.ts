@@ -2,9 +2,12 @@ import { useAtomValue } from "@effect/atom-react";
 import { useEffect, useRef } from "react";
 
 import { startDashboardPolling } from "../../lib/dashboard-polling";
+import { boardSourceAtom } from "../board/atoms";
+import { activePlanningProjectIdAtom } from "../dialogs/atoms";
+import { companionStatusAtom } from "../navigation/atoms";
 import { activeOrganizationIdAtom } from "../organization/atoms";
 import { adoptsHydratedSession } from "../persistence/hydration";
-import { demoMode } from "../platform";
+import { companionMode, demoMode } from "../platform";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { activeTeamIdAtom } from "../team/atoms";
@@ -26,8 +29,12 @@ export function useTeamSync() {
   const loader = useTeamSyncLoader();
   const token = useAtomValue(tokenAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
+  const activePlanningProjectId = useAtomValue(activePlanningProjectIdAtom);
+  const boardSource = useAtomValue(boardSourceAtom);
+  const companionStatus = useAtomValue(companionStatusAtom);
   const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
   const previousToken = useRef<string | null | undefined>(undefined);
+  const previousMobileFilter = useRef<string | null>(null);
 
   // The store is session scoped: a new (or cleared) token must never reuse the
   // previous account's entities.
@@ -67,4 +74,23 @@ export function useTeamSync() {
       void loader.refresh(activeTeamId, reason === "poll" ? "delta" : "snapshot"),
     );
   }, [activeTeamId, loader, token]);
+
+  useEffect(() => {
+    if (!companionMode || demoMode || !token || !activeTeamId) return;
+    const filterKey = `${boardSource}:${companionStatus}:${activePlanningProjectId ?? ""}`;
+    if (previousMobileFilter.current === null) {
+      previousMobileFilter.current = filterKey;
+      return;
+    }
+    if (previousMobileFilter.current === filterKey) return;
+    previousMobileFilter.current = filterKey;
+    void loader.refresh(activeTeamId, "snapshot");
+  }, [
+    activePlanningProjectId,
+    activeTeamId,
+    boardSource,
+    companionStatus,
+    loader,
+    token,
+  ]);
 }

@@ -567,8 +567,11 @@ export function RunPage({
     };
   }, [canEditIssueInline, inlineDescription, inlineKeptAttachmentIds, inlineTitle, run.difficulty, run.id, run.priority]);
   useEffect(() => {
-    void loadRunEvents();
-  }, [loadRunEvents, run.eventCount, run.id]);
+    const needsEvents =
+      activeDetailTab === "statusHistory" ||
+      (activeDetailTab === "result" && run.status === "paused");
+    if (needsEvents) void loadRunEvents();
+  }, [activeDetailTab, loadRunEvents, run.eventCount, run.id, run.status]);
   const placementOptions = [{
     label: t("status.backlog"),
     value: "status:backlog"

@@ -8,8 +8,10 @@ import {
   type ChannelNotification as ChannelNotificationMessage,
   type ConversationNotification as ConversationNotificationMessage,
   type DashboardRun as DashboardRunMessage,
+  type DashboardRunSummary as DashboardRunSummaryMessage,
   type RunEvent as RunEventMessage,
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import type {
   AutoHuntQaStatus,
   AutoHuntSource,
@@ -232,6 +234,7 @@ export const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
   structuredResult: structuredResultFromProto(run.structuredResult),
   executionMetrics: agentExecutionMetricsFromProto(run.executionMetrics),
   resultReviews: run.resultReviews.map(resultReviewFromProto),
+  hasResultReview: run.resultReviews.length > 0,
   pullRequestUrls: run.pullRequestUrls,
   targetSha: run.targetSha ?? null,
   sourceCreatedAt: optionalTimestamp(run.sourceCreatedAt),
@@ -255,6 +258,86 @@ export const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
   requestedByUserId: run.requestedByUserId ?? null,
   dispatchMode: dispatchMode(run.dispatchMode),
   dispatchedAt: optionalTimestamp(run.dispatchedAt),
+  workerId: run.workerId ?? null,
+  startedAt: requiredTimestamp(run.startedAt, "run.startedAt"),
+  updatedAt: requiredTimestamp(run.updatedAt, "run.updatedAt"),
+  completedAt: optionalTimestamp(run.completedAt),
+  lastEventAt: requiredTimestamp(run.lastEventAt, "run.lastEventAt"),
+  eventCount: run.eventCount,
+});
+
+const dashboardRunFromSummaryProto = (
+  run: DashboardRunSummaryMessage,
+): HuntRun => ({
+  id: run.id,
+  workspaceId: run.workspaceId || null,
+  teamId: run.teamId || undefined,
+  projectId: run.planningProjectId || undefined,
+  projectName: run.planningProjectName || null,
+  runNumber: run.runNumber,
+  currentAttempt: run.currentAttempt,
+  currentRevision: run.currentRevision,
+  source: runSource(run.source),
+  sourceKey: run.sourceKey,
+  title: run.title,
+  status: runStatusFromProto(run.status),
+  workflowStage: run.workflowStage ?? null,
+  workflow: workflowFromProto(requiredMessage(run.workflow, "run.workflow")),
+  progress: run.progress,
+  pausedAt: null,
+  resumeRequestedAt: null,
+  waitingCheckpoint: null,
+  checkpoint: null,
+  issueCheckpoints: [],
+  fullAuto: run.fullAuto ?? false,
+  detail: run.detail ?? null,
+  priority: run.priority ?? null,
+  difficulty: issueDifficultyFromProto(run.difficulty),
+  assigneeUserId: run.assigneeUserId ?? null,
+  createdByUserId: null,
+  subscribers: [],
+  repository: run.repository ?? "",
+  branch: null,
+  commitSha: null,
+  tracker: null,
+  issueDescription: run.issueDescription ?? null,
+  relatedMessage: null,
+  attachments: [],
+  parent: null,
+  subIssues: [],
+  relatedIssues: [],
+  prerequisites: [],
+  dependents: [],
+  executionReadiness: executionReadiness(run.executionReadiness),
+  waitingOnPrerequisiteCount: run.waitingOnPrerequisiteCount ?? 0,
+  resultSummary: run.resultSummary ?? null,
+  structuredResult: null,
+  executionMetrics: null,
+  resultReviews: [],
+  hasResultReview: run.hasResultReview,
+  pullRequestUrls: run.pullRequestUrls,
+  targetSha: null,
+  sourceCreatedAt: optionalTimestamp(run.sourceCreatedAt),
+  stagingQaStatus: null,
+  productionQaStatus: null,
+  stagingQaDetail: null,
+  productionQaDetail: null,
+  context: null,
+  claimedBy: run.claimedBy ?? null,
+  claimedAt: optionalTimestamp(run.claimedAt),
+  leaseExpiresAt: optionalTimestamp(run.leaseExpiresAt),
+  claimAttempts: 0,
+  agentId: null,
+  preferredProvider: optionalAgentProviderFromProto(run.preferredProvider),
+  preferredModel: run.preferredModel ?? null,
+  preferredEffort: run.preferredEffort ?? null,
+  requestedProvider: optionalAgentProviderFromProto(run.requestedProvider),
+  requestedModel: run.requestedModel ?? null,
+  requestedEffort: run.requestedEffort ?? null,
+  requestedWorkerId: run.requestedWorkerId ?? null,
+  requestedByUserId: null,
+  dispatchMode: null,
+  dispatchedAt: null,
   workerId: run.workerId ?? null,
   startedAt: requiredTimestamp(run.startedAt, "run.startedAt"),
   updatedAt: requiredTimestamp(run.updatedAt, "run.updatedAt"),
@@ -348,6 +431,67 @@ export async function getDashboard(
   };
 }
 
+export type DashboardRunListOptions = {
+  readonly pageSize?: number;
+  readonly cursor?: string | null;
+  readonly sources?: readonly AutoHuntSource[];
+  readonly statuses?: readonly HuntRun["status"][];
+  readonly query?: string | null;
+  readonly planningProjectId?: string | null;
+  readonly signal?: AbortSignal;
+};
+
+export type DashboardRunListPage = {
+  readonly runs: HuntRun[];
+  readonly nextCursor: string | null;
+  readonly generatedAt: string;
+};
+
+const sourceToProto = {
+  issue: DashboardRun_Source.ISSUE,
+  error: DashboardRun_Source.ERROR,
+  feedback: DashboardRun_Source.FEEDBACK,
+} as const;
+
+const statusToProto = {
+  backlog: RunStatus.BACKLOG,
+  queued: RunStatus.QUEUED,
+  running: RunStatus.RUNNING,
+  paused: RunStatus.PAUSED,
+  blocked: RunStatus.BLOCKED,
+  failed: RunStatus.FAILED,
+  completed: RunStatus.COMPLETED,
+  cancelled: RunStatus.CANCELLED,
+} as const;
+
+export async function listDashboardRunsRpc(
+  token: string,
+  projectId: string,
+  options: DashboardRunListOptions = {},
+): Promise<DashboardRunListPage> {
+  const client = requireDashboardClient();
+  const response = await client.listDashboardRuns(
+    {
+      teamId: projectId,
+      pageSize: options.pageSize ?? 40,
+      cursor: options.cursor ?? undefined,
+      sources: options.sources?.map((source) => sourceToProto[source]),
+      statuses: options.statuses?.map((status) => statusToProto[status]),
+      query: options.query ?? undefined,
+      planningProjectId: options.planningProjectId ?? undefined,
+    },
+    appCallOptions(token, options.signal),
+  );
+  return {
+    runs: response.runs.map(dashboardRunFromSummaryProto),
+    nextCursor: response.nextCursor ?? null,
+    generatedAt: requiredTimestamp(
+      response.generatedAt,
+      "dashboardList.generatedAt",
+    ),
+  };
+}
+
 export async function syncDashboard(
   token: string,
   projectId: string,
@@ -397,7 +541,7 @@ export async function listRunEventsRpc(
 ): Promise<HuntEvent[]> {
   const client = requireDashboardClient();
   return (await client.listRunEvents(
-    { teamId: projectId, runId },
+    { teamId: projectId, runId, limit: 50 },
     appCallOptions(token),
   )).events.map(runEventFromProto);
 }

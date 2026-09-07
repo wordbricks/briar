@@ -328,18 +328,28 @@ final class CompanionStore: ObservableObject {
 @MainActor
 final class DashboardStore: ObservableObject {
     @Published private(set) var snapshot: DashboardSnapshot?
+    @Published private(set) var listRuns: [DashboardRun] = []
+    @Published private(set) var listHasLoaded = false
+    @Published private(set) var listNextCursor: String?
+    @Published private(set) var listIsLoading = false
+    @Published private(set) var listIsLoadingNextPage = false
     @Published private(set) var isRefreshing = false
     @Published private(set) var errorMessage: String?
 
     private let dashboardServiceForToken:
         @Sendable (String) -> any BriarAPI_DashboardServiceClientInterface
     private let pollInterval: Duration
+    private let defaults = UserDefaults.standard
     private var projectID: UUID?
     private var token: String?
+    private var listPlanningProjectID: UUID?
+    private var listFilter = TaskFilter.all
     private var generation = 0
     private var refreshRevision = 0
+    private var listRevision = 0
     private var refreshTask: Task<Void, Never>?
     private var refreshTaskForcesSnapshot = false
+    private var listTask: Task<Void, Never>?
     private var pollingTask: Task<Void, Never>?
 
     init(
@@ -360,22 +370,179 @@ final class DashboardStore: ObservableObject {
         self.pollInterval = pollInterval
     }
 
-    func select(projectID: UUID?, token: String?) {
-        guard self.projectID != projectID || self.token != token else { return }
-        generation += 1
-        refreshRevision &+= 1
-        refreshTask?.cancel()
-        refreshTask = nil
-        refreshTaskForcesSnapshot = false
-        pollingTask?.cancel()
-        pollingTask = nil
+    func select(
+        projectID: UUID?,
+        token: String?,
+        planningProjectID: UUID? = nil
+    ) {
+        let projectChanged = self.projectID != projectID || self.token != token
+        let planningProjectChanged = listPlanningProjectID != planningProjectID
+        guard projectChanged || planningProjectChanged else { return }
+        if projectChanged {
+            generation += 1
+            refreshRevision &+= 1
+            refreshTask?.cancel()
+            refreshTask = nil
+            refreshTaskForcesSnapshot = false
+            pollingTask?.cancel()
+            pollingTask = nil
+            snapshot = nil
+            isRefreshing = false
+            errorMessage = nil
+            listFilter = .all
+        }
+        listRevision &+= 1
+        listTask?.cancel()
+        listTask = nil
+        listPlanningProjectID = planningProjectID
         self.projectID = projectID
         self.token = token
-        snapshot = nil
-        isRefreshing = false
-        errorMessage = nil
+        listRuns = projectID.map { loadCachedList(for: $0) } ?? []
+        listHasLoaded = !listRuns.isEmpty
+        listNextCursor = nil
+        listIsLoading = projectID != nil && token != nil && listRuns.isEmpty
+        listIsLoadingNextPage = false
         guard projectID != nil, token != nil else { return }
-        startPolling()
+        if projectChanged {
+            startPolling()
+        } else {
+            Task { await refreshList(replace: true) }
+        }
+    }
+
+    func setListFilter(_ filter: TaskFilter) {
+        guard listFilter != filter else { return }
+        listFilter = filter
+        listRevision &+= 1
+        listTask?.cancel()
+        listTask = nil
+        listRuns = projectID.map { loadCachedList(for: $0) } ?? []
+        listHasLoaded = !listRuns.isEmpty
+        listNextCursor = nil
+        listIsLoading = listRuns.isEmpty
+        guard projectID != nil, token != nil else { return }
+        Task { await refreshList(replace: true) }
+    }
+
+    private struct CachedList: Codable {
+        let runs: [DashboardRun]
+    }
+
+    private func listCacheKey(for projectID: UUID) -> String {
+        "companion.dashboard.list.v1.\(projectID.uuidString).\(listPlanningProjectID?.uuidString ?? "all").\(listFilter.rawValue)"
+    }
+
+    private func loadCachedList(for projectID: UUID) -> [DashboardRun] {
+        guard let data = defaults.data(forKey: listCacheKey(for: projectID)) else {
+            return []
+        }
+        return (try? JSONDecoder().decode(CachedList.self, from: data))?.runs ?? []
+    }
+
+    private func persistList() {
+        guard let projectID else { return }
+        guard let data = try? JSONEncoder().encode(CachedList(runs: listRuns)) else {
+            return
+        }
+        defaults.set(data, forKey: listCacheKey(for: projectID))
+    }
+
+    private func listRequest(cursor: String? = nil) -> BriarAPI_ListDashboardRunsRequest {
+        var request = BriarAPI_ListDashboardRunsRequest()
+        request.teamID = coreUUIDString(projectID!)
+        request.pageSize = 40
+        if let cursor { request.cursor = cursor }
+        if let listPlanningProjectID {
+            request.planningProjectID = coreUUIDString(listPlanningProjectID)
+        }
+        switch listFilter {
+        case .all: break
+        case .active:
+            request.statuses = [.backlog, .queued, .running, .paused, .blocked, .failed]
+        case .attention:
+            request.statuses = [.paused, .blocked, .failed]
+        case .completed:
+            request.statuses = [.completed]
+        }
+        return request
+    }
+
+    private func refreshList(replace: Bool) async {
+        guard let projectID, let token else { return }
+        if let listTask {
+            await listTask.value
+            return
+        }
+        listRevision &+= 1
+        let expectedGeneration = generation
+        let expectedListRevision = listRevision
+        let request = listRequest()
+        let task = Task { [dashboardServiceForToken] in
+            do {
+                let dashboard = dashboardServiceForToken(token)
+                let response = await dashboard.listDashboardRuns(
+                    request: request,
+                    headers: [:]
+                )
+                let page = try await Task.detached(priority: .userInitiated) {
+                    try DashboardRunListPage(connectMessage: response.briarValue())
+                }.value
+                guard
+                    !Task.isCancelled,
+                    expectedGeneration == self.generation,
+                    expectedListRevision == self.listRevision,
+                    self.projectID == projectID,
+                    self.token == token
+                else { return }
+                if replace {
+                    self.listRuns = page.runs
+                } else {
+                    var merged = self.listRuns
+                    let incoming = Dictionary(uniqueKeysWithValues: page.runs.map { ($0.id, $0) })
+                    for index in merged.indices {
+                        if let updated = incoming[merged[index].id] {
+                            merged[index] = updated
+                        }
+                    }
+                    let known = Set(merged.map(\.id))
+                    merged.append(contentsOf: page.runs.filter { !known.contains($0.id) })
+                    self.listRuns = merged
+                }
+                self.listHasLoaded = true
+                self.listNextCursor = page.nextCursor
+                self.listIsLoading = false
+                self.listIsLoadingNextPage = false
+                self.errorMessage = nil
+                self.persistList()
+            } catch is CancellationError {
+                return
+            } catch {
+                guard
+                    expectedGeneration == self.generation,
+                    expectedListRevision == self.listRevision
+                else { return }
+                self.listIsLoading = false
+                self.listIsLoadingNextPage = false
+                if self.listRuns.isEmpty {
+                    self.errorMessage = CompanionStore.message(for: error)
+                }
+            }
+        }
+        listTask = task
+        await task.value
+        if expectedGeneration == generation, expectedListRevision == listRevision {
+            listTask = nil
+        }
+    }
+
+    func loadNextPage() async {
+        guard listNextCursor != nil else { return }
+        if let listTask {
+            await listTask.value
+            return
+        }
+        listIsLoadingNextPage = true
+        await refreshList(replace: false)
     }
 
     func refresh(
@@ -413,6 +580,11 @@ final class DashboardStore: ObservableObject {
                     expectedRefreshRevision == self.refreshRevision
                 else { return }
                 self.snapshot = loaded
+                let fullRuns = Dictionary(uniqueKeysWithValues: loaded.runs.map { ($0.id, $0) })
+                if !self.listRuns.isEmpty {
+                    self.listRuns = self.listRuns.map { fullRuns[$0.id] ?? $0 }
+                    self.persistList()
+                }
                 self.errorMessage = nil
             } catch is CancellationError {
                 return
@@ -469,16 +641,18 @@ final class DashboardStore: ObservableObject {
     private func startPolling() {
         pollingTask?.cancel()
         pollingTask = Task { [pollInterval] in
+            await refreshList(replace: true)
             await refresh()
             while !Task.isCancelled {
                 try? await Task.sleep(for: pollInterval)
                 guard !Task.isCancelled else { return }
+                await refreshList(replace: true)
                 await refresh()
             }
         }
     }
 
-    private static func load(
+    private nonisolated static func load(
         dashboard: any BriarAPI_DashboardServiceClientInterface,
         projectID: UUID,
         current: DashboardSnapshot?,
@@ -521,6 +695,12 @@ final class DashboardStore: ObservableObject {
 
 @MainActor
 final class RunDetailStore: ObservableObject {
+    private struct DecodedRunEventsPage: Sendable {
+        let events: [RunEvent]
+        let nextCursor: String?
+        let archivesIncluded: Bool
+    }
+
     struct AgentTypingStatus: Identifiable, Equatable, Sendable {
         let id: UUID
         let activity: ChannelAgentActivity
@@ -545,6 +725,10 @@ final class RunDetailStore: ObservableObject {
     @Published private(set) var activityFrames: [UUID: IssueAgentActivityFrame] = [:]
     @Published private(set) var evidence: [RunEvidence] = []
     @Published private(set) var loading = false
+    @Published private(set) var eventsLoading = false
+    @Published private(set) var evidenceLoading = false
+    @Published private(set) var eventsNextCursor: String?
+    @Published private(set) var eventsArchivesIncluded = false
     @Published private(set) var errorMessage: String?
 
     private let api: any AuthenticatedDownloadClientProtocol
@@ -566,6 +750,8 @@ final class RunDetailStore: ObservableObject {
     private var activityTask: Task<Void, Never>?
     private var activityExpiryTask: Task<Void, Never>?
     private var activityGeneration = 0
+    private var eventsTask: Task<Void, Never>?
+    private var evidenceTask: Task<Void, Never>?
 
     private static let maxConversationDeltaPagesPerSync = 20
 
@@ -602,42 +788,17 @@ final class RunDetailStore: ObservableObject {
         repeat {
             authoritativeReloadPending = false
             do {
-                var eventRequest = BriarAPI_ListRunEventsRequest()
-                eventRequest.teamID = coreUUIDString(projectID)
-                eventRequest.runID = coreUUIDString(runID)
-                async let eventResponse = dashboardService.listRunEvents(
-                    request: eventRequest,
-                    headers: [:]
-                )
                 var messageRequest = BriarAPI_ListIssueMessagesRequest()
                 messageRequest.projectID = coreUUIDString(projectID)
                 messageRequest.runID = coreUUIDString(runID)
-                async let messageResponse = issueService.listIssueMessages(
+                let messageResponse = await issueService.listIssueMessages(
                     request: messageRequest,
                     headers: [:]
                 )
-                var evidenceRequest = BriarAPI_ListRunEvidenceRequest()
-                evidenceRequest.projectID = coreUUIDString(projectID)
-                evidenceRequest.runID = coreUUIDString(runID)
-                async let evidenceResponse = issueService.listRunEvidence(
-                    request: evidenceRequest,
-                    headers: [:]
-                )
-                let loaded = await (eventResponse, messageResponse, evidenceResponse)
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
-                events = try loaded.0.briarValue().events.map(RunEvent.init(connectMessage:))
-                let messageSnapshot = try IssueMessagesResponse(
-                    connectMessage: loaded.1.briarValue()
-                )
-                let evidenceMessage = try loaded.2.briarValue()
-                guard try issueUUID(evidenceMessage.runID) == runID else {
-                    throw MobileAPIError.invalidResponse
-                }
-                _ = try issueSafeInt(evidenceMessage.attempt)
-                _ = try issueSafeInt(evidenceMessage.revision)
-                let evidenceSnapshot = try evidenceMessage.evidence.map(
-                    RunEvidence.init(connectMessage:)
-                )
+                let messageSnapshot = try await Task.detached(priority: .userInitiated) {
+                    try IssueMessagesResponse(connectMessage: messageResponse.briarValue())
+                }.value
                 let stabilizedMessages = preservingLocallyAcceptedSkillExecutionProposals(
                     in: messageSnapshot.messages
                 )
@@ -654,7 +815,6 @@ final class RunDetailStore: ObservableObject {
                     return $0.id.uuidString < $1.id.uuidString
                 }
                 agentReplies = messageSnapshot.agentReplies
-                evidence = evidenceSnapshot
                 errorMessage = nil
             } catch {
                 guard expectedLifecycleRevision == lifecycleRevision else { return }
@@ -662,6 +822,99 @@ final class RunDetailStore: ObservableObject {
             }
         } while authoritativeReloadPending &&
             expectedLifecycleRevision == lifecycleRevision
+    }
+
+    func loadEvents(includeArchived: Bool = false, reset: Bool = false) async {
+        if let eventsTask {
+            await eventsTask.value
+            return
+        }
+        let expectedLifecycleRevision = lifecycleRevision
+        let cursor = reset ? nil : eventsNextCursor
+        eventsLoading = true
+        let task = Task { [dashboardService] in
+            do {
+                var request = BriarAPI_ListRunEventsRequest()
+                request.teamID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                request.limit = 50
+                request.includeArchived = includeArchived
+                if let cursor { request.cursor = cursor }
+                let response = await dashboardService.listRunEvents(
+                    request: request,
+                    headers: [:]
+                )
+                guard expectedLifecycleRevision == self.lifecycleRevision else { return }
+                let decoded = try await Task.detached(priority: .userInitiated) {
+                    let page = try response.briarValue()
+                    return try DecodedRunEventsPage(
+                        events: page.events.map(RunEvent.init(connectMessage:)),
+                        nextCursor: page.hasNextCursor ? page.nextCursor : nil,
+                        archivesIncluded: page.archivesIncluded
+                    )
+                }.value
+                self.events = reset ? decoded.events : self.events + decoded.events
+                self.eventsNextCursor = decoded.nextCursor
+                self.eventsArchivesIncluded = decoded.archivesIncluded
+                self.errorMessage = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard expectedLifecycleRevision == self.lifecycleRevision else { return }
+                self.errorMessage = CompanionStore.message(for: error)
+            }
+            self.eventsLoading = false
+        }
+        eventsTask = task
+        await task.value
+        if expectedLifecycleRevision == lifecycleRevision {
+            eventsTask = nil
+            eventsLoading = false
+        }
+    }
+
+    func loadEvidence() async {
+        if let evidenceTask {
+            await evidenceTask.value
+            return
+        }
+        let expectedLifecycleRevision = lifecycleRevision
+        evidenceLoading = true
+        let task = Task { [issueService] in
+            do {
+                var request = BriarAPI_ListRunEvidenceRequest()
+                request.projectID = coreUUIDString(projectID)
+                request.runID = coreUUIDString(runID)
+                let response = await issueService.listRunEvidence(
+                    request: request,
+                    headers: [:]
+                )
+                guard expectedLifecycleRevision == self.lifecycleRevision else { return }
+                let evidence = try await Task.detached(priority: .userInitiated) {
+                    let message = try response.briarValue()
+                    guard try issueUUID(message.runID) == runID else {
+                        throw MobileAPIError.invalidResponse
+                    }
+                    _ = try issueSafeInt(message.attempt)
+                    _ = try issueSafeInt(message.revision)
+                    return try message.evidence.map(RunEvidence.init(connectMessage:))
+                }.value
+                self.evidence = evidence
+                self.errorMessage = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard expectedLifecycleRevision == self.lifecycleRevision else { return }
+                self.errorMessage = CompanionStore.message(for: error)
+            }
+            self.evidenceLoading = false
+        }
+        evidenceTask = task
+        await task.value
+        if expectedLifecycleRevision == lifecycleRevision {
+            evidenceTask = nil
+            evidenceLoading = false
+        }
     }
 
     /// Applies issue conversation changes without replacing the whole detail

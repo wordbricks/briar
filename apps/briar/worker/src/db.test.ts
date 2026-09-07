@@ -75,8 +75,10 @@ import {
   deleteIssueMessage,
   pruneExpiredDashboardChanges,
   listDashboardRuns,
+  listDashboardRunSummaries,
   listDashboardRunsByIds,
   listHuntRunEvents,
+  listHuntRunEventsPage,
   resolveHuntEventActorNames,
   listOrganizationIssueSubscriptionRunIds,
   listOrganizationStatusTrayRuns,
@@ -1065,6 +1067,104 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const details = plan.results.map((row) => row.detail).join("\n");
     expect(details).toContain("briar_hunt_runs");
     expect(details).not.toContain("briar_hunt_events");
+  });
+
+  it("paginates a filtered lightweight run list with a stable cursor", async () => {
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
+    const runIds: string[] = [];
+    for (let index = 0; index < 55; index += 1) {
+      const sourceKey = `paged-fixture-${index}`;
+      runIds.push(
+        await recordHuntEvent(
+          db,
+          projectId,
+          event("analyzing", 1_000 + index, {
+            sourceKey,
+            eventKey: `${sourceKey}:running`,
+            title: `Paged fixture ${index}`,
+            status: "running",
+            workflowStage: "analyzing",
+          }),
+        ),
+      );
+    }
+
+    const filters = {
+      pageSize: 30,
+      sources: ["issue"] as const,
+      statuses: ["running"] as const,
+      query: "paged-fixture",
+    };
+    const first = await listDashboardRunSummaries(
+      db,
+      projectId,
+      filters,
+      "2027-01-01T00:00:00.000Z",
+    );
+    expect(first.rows).toHaveLength(30);
+    expect(first.nextCursor).not.toBeNull();
+    expect(first.rows[0]).not.toHaveProperty("subscribers_json");
+
+    const second = await listDashboardRunSummaries(
+      db,
+      projectId,
+      { ...filters, cursor: first.nextCursor },
+      "2027-01-01T00:00:00.000Z",
+    );
+    expect(second.rows).toHaveLength(25);
+    expect(second.nextCursor).toBeNull();
+    expect(new Set(first.rows.map((run) => run.id)).size).toBe(30);
+    expect(
+      first.rows.every((run) => !second.rows.some((next) => next.id === run.id)),
+    ).toBe(true);
+    expect(
+      new Set([...first.rows, ...second.rows].map((run) => run.id)),
+    ).toEqual(new Set(runIds));
+  });
+
+  it("paginates hot run events with an occurred-at and id cursor", async () => {
+    await setStoredWorkflow(db, projectId, releaseWorkflow);
+    const sourceKey = "paged-event-fixture";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 2_000, {
+        sourceKey,
+        eventKey: `${sourceKey}:queued`,
+      }),
+    );
+    for (const [index, stage] of ([
+      "analyzing",
+      "implementing",
+      "pr_open",
+      "staging_qa",
+      "production_qa",
+    ] as const).entries()) {
+      await recordHuntEvent(
+        db,
+        projectId,
+        event(stage, 2_001 + index, {
+          sourceKey,
+          eventKey: `${sourceKey}:${stage}`,
+        }),
+      );
+    }
+
+    const firstPage = await listHuntRunEventsPage(db, projectId, runId, {
+      limit: 3,
+    });
+    expect(firstPage.events).toHaveLength(3);
+    expect(firstPage.nextCursor).not.toBeNull();
+
+    const secondPage = await listHuntRunEventsPage(db, projectId, runId, {
+      limit: 3,
+      cursor: firstPage.nextCursor,
+    });
+    expect(secondPage.events).toHaveLength(3);
+    expect(secondPage.nextCursor).toBeNull();
+    expect(new Set(secondPage.events.map((row) => row.id))).not.toEqual(
+      new Set(firstPage.events.map((row) => row.id)),
+    );
   });
 
   it("loads uncapped lightweight usage runs across an organization", async () => {

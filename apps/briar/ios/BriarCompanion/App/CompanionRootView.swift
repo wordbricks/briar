@@ -366,6 +366,11 @@ struct CompanionRootView: View {
             selectedPlanningProjectID: companion.selectedPlanningProjectID,
             project: project,
             snapshot: dashboard.snapshot,
+            listRuns: dashboard.listRuns,
+            listHasLoaded: dashboard.listHasLoaded,
+            listIsLoading: dashboard.listIsLoading,
+            listIsLoadingNextPage: dashboard.listIsLoadingNextPage,
+            listHasMore: dashboard.listNextCursor != nil,
             errorMessage: dashboard.errorMessage,
             token: token,
             api: downloadClient,
@@ -373,6 +378,8 @@ struct CompanionRootView: View {
             realtimeClient: realtimeClient,
             user: companion.user,
             refresh: { await dashboard.refresh(forceSnapshot: true) },
+            setListFilter: { dashboard.setListFilter($0) },
+            loadNextListPage: { await dashboard.loadNextPage() },
             ensureIssueAvailable: { projectID, runID in
                 var request = BriarAPI_ResolveIssueHierarchyLocationRequest()
                 request.sourceTeamID = coreUUIDString(projectID)
@@ -390,7 +397,11 @@ struct CompanionRootView: View {
                 // aligned before loading the canonical dashboard.
                 companion.selectedProjectID = resolvedTeamID
                 companion.selectPlanningProject(planningProjectID)
-                dashboard.select(projectID: resolvedTeamID, token: token)
+                dashboard.select(
+                    projectID: resolvedTeamID,
+                    token: token,
+                    planningProjectID: planningProjectID
+                )
                 channels.select(
                     organizationID: target.organizationId,
                     token: token
@@ -438,7 +449,11 @@ struct CompanionRootView: View {
         let organizationID = projectID.flatMap { id in
             companion.projects.first(where: { $0.id == id })?.organizationId
         }
-        dashboard.select(projectID: projectID, token: token)
+        dashboard.select(
+            projectID: projectID,
+            token: token,
+            planningProjectID: active ? companion.selectedPlanningProjectID : nil
+        )
         realtime.select(organizationID: organizationID, token: token)
         // Channels follow the selected project's organization, not the project.
         channels.select(

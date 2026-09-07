@@ -837,9 +837,10 @@ describe("RunPage", () => {
         requestedRunId={run.id}
       />,
     );
-    expect(onLoadRunEvents).toHaveBeenCalledTimes(1);
+    expect(onLoadRunEvents).toHaveBeenCalledTimes(0);
     const statusHistoryTab = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(button => button.textContent === "상태");
     await act(async () => statusHistoryTab?.click());
+    expect(onLoadRunEvents).toHaveBeenCalledTimes(1);
     expect(container.querySelectorAll(".issue-status-history-panel .timeline-event")).toHaveLength(1);
     await renderReactTestRoot(
       root,

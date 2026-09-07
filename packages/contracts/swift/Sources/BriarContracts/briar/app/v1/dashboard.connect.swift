@@ -15,6 +15,9 @@ public protocol BriarAPI_DashboardServiceClientInterface: Sendable {
     func `getDashboard`(request: BriarAPI_GetDashboardRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetDashboardResponse>
 
     @available(iOS 13, *)
+    func `listDashboardRuns`(request: BriarAPI_ListDashboardRunsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListDashboardRunsResponse>
+
+    @available(iOS 13, *)
     func `syncDashboard`(request: BriarAPI_SyncDashboardRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SyncDashboardResponse>
 
     @available(iOS 13, *)
@@ -35,6 +38,11 @@ public final class BriarAPI_DashboardServiceClient: BriarAPI_DashboardServiceCli
     }
 
     @available(iOS 13, *)
+    public func `listDashboardRuns`(request: BriarAPI_ListDashboardRunsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListDashboardRunsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.DashboardService/ListDashboardRuns", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `syncDashboard`(request: BriarAPI_SyncDashboardRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SyncDashboardResponse> {
         return await self.client.unary(path: "/briar.app.v1.DashboardService/SyncDashboard", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -47,6 +55,7 @@ public final class BriarAPI_DashboardServiceClient: BriarAPI_DashboardServiceCli
     public enum Metadata {
         public enum Methods {
             public static let getDashboard = Connect.MethodSpec(name: "GetDashboard", service: "briar.app.v1.DashboardService", type: .unary)
+            public static let listDashboardRuns = Connect.MethodSpec(name: "ListDashboardRuns", service: "briar.app.v1.DashboardService", type: .unary)
             public static let syncDashboard = Connect.MethodSpec(name: "SyncDashboard", service: "briar.app.v1.DashboardService", type: .unary)
             public static let listRunEvents = Connect.MethodSpec(name: "ListRunEvents", service: "briar.app.v1.DashboardService", type: .unary)
         }
