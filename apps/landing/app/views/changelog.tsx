@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.215",
+        date: "2026년 9월 8일",
+        title: "DM에서 Agent가 메시지를 받으면 눈 반응을 남깁니다",
+        summary:
+          "DM 답변 작업이 만들어지면 담당 Agent의 👀 반응이 메시지에 표시됩니다. 답변을 기다리는 동안 어떤 Agent가 메시지를 받았는지 이름과 아바타로 확인할 수 있습니다.",
+        items: [
+          "사용자가 보낸 DM에 답변 작업이 생성될 때만 해당 Agent의 👀 반응을 함께 저장합니다. 일반 채널이나 Agent·시스템 메시지에는 자동 반응을 붙이지 않습니다.",
+          "같은 작업이 재시도되어도 Agent 반응은 중복되지 않고, 사용자가 자신의 반응을 취소해도 Agent 반응은 남습니다. 기존 사용자 반응도 보존합니다.",
+          "DM 기억의 실행과 답변 연결 경로를 검사하는 회귀 테스트를 복원했습니다.",
+        ],
+      },
+      {
         version: "1.2.214",
         date: "2026년 9월 7일",
         title: "DM 기억이 무슨 일이 있었는지 에피소드로 남기고, 긴 메시지도 보낼 수 있습니다",
@@ -1873,6 +1885,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.215",
+        date: "September 8, 2026",
+        title: "Agents acknowledge your DM with an eyes reaction",
+        summary:
+          "When a DM reply job is created, the assigned Agent adds a 👀 reaction to your message. Its name and avatar show which Agent received the message while you wait for a reply.",
+        items: [
+          "Acknowledgements are saved with reply jobs for user-authored DMs. Regular channels and Agent or system messages do not receive automatic reactions.",
+          "Retries do not duplicate Agent reactions, and removing your own reaction leaves the Agent reaction intact. Existing user reactions are preserved.",
+          "Restored regression coverage for DM memory execution and its connection to replies.",
+        ],
+      },
       {
         version: "1.2.214",
         date: "September 7, 2026",
