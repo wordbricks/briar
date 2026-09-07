@@ -3,7 +3,6 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import * as Effect from "effect/Effect";
-import { backfillRemoteArchiveStorage } from "./backfill-archive-storage";
 import { verifyProductionGitTarget } from "./production-git-target";
 import { withRemoteOperationLease } from "./remote-operation-lease";
 
@@ -137,14 +136,6 @@ export function baselineAlreadyApplied(
   return cutoff !== null && appliedMigrations.has(cutoff);
 }
 
-const runRequiredMigrationPreflight = (
-  migrationName: string,
-  signal?: AbortSignal,
-) =>
-  migrationName.endsWith("_canonical_archive_storage.sql")
-    ? backfillRemoteArchiveStorage(signal)
-    : Promise.resolve(0);
-
 async function readAppliedMigrations(
   runner: WranglerRunner,
   database: string,
@@ -176,13 +167,19 @@ export async function applyRemoteD1Migrations({
   database = "briar-db",
   migrationsDirectory = join(process.cwd(), "migrations"),
   runner = runWrangler,
-  beforeMigration = runRequiredMigrationPreflight,
+  beforeMigration,
   importRetryDelayMillis = defaultImportRetryDelayMillis,
   signal,
 }: {
   database?: string;
   migrationsDirectory?: string;
   runner?: WranglerRunner;
+  /**
+   * Work a migration needs done before it runs, keyed on its name. Nothing
+   * uses it today: the one caller ran the archive-storage backfill before
+   * `0162_canonical_archive_storage.sql`, which the baseline has absorbed.
+   * The hook stays because the next such migration will need it.
+   */
   beforeMigration?: (migrationName: string, signal?: AbortSignal) => Promise<number>;
   importRetryDelayMillis?: number;
   signal?: AbortSignal;

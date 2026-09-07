@@ -1,130 +1,87 @@
--- IssueService owns three attachment workflows. Opaque bytes still use the
--- shared short-lived upload capability, while purpose, actor, target, mutation
--- identity, and consumption remain fixed by the owning RPC.
--- Migration 0150 already owns the final shared upload shape. This migration
--- adds only Issue-owned receipts and extends the shared authorization guards.
-pragma foreign_keys = on;
+-- GENERATED FILE - DO NOT EDIT BY HAND.
+-- baseline-through: 0199_managed_computer_provider.sql
+-- Continuation 3 of 0000_baseline_through_0199.sql.
 
-drop trigger if exists briar_upload_batch_insert_guard;
-drop trigger if exists briar_upload_batch_immutable;
-drop trigger if exists briar_upload_metadata_immutable;
-drop trigger if exists briar_upload_state_guard;
-drop trigger if exists briar_upload_delete_cleanup;
-
-create table briar_issue_create_mutation_receipts (
-  client_issue_id text primary key not null
-    references briar_hunt_runs (id) on delete cascade check (
-      length(client_issue_id) between 1 and 128
-      and client_issue_id not glob '*[^0-9A-Za-z_-]*'
-    ),
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text not null references briar_projects (id) on delete cascade,
-  user_id text not null references "user" (id) on delete cascade,
-  request_hash text not null check (
-    length(request_hash) = 64
-    and request_hash not glob '*[^0-9a-f]*'
-  ),
-  attachment_upload_ids_json text not null check (
-    length(attachment_upload_ids_json) between 2 and 1024
-    and json_valid(attachment_upload_ids_json)
-    and json_type(attachment_upload_ids_json) = 'array'
-    and json_array_length(attachment_upload_ids_json) between 0 and 5
-  ),
-  response_json text not null check (
-    length(response_json) between 2 and 1000000
-    and json_valid(response_json)
-    and json_type(response_json) = 'object'
-  ),
-  created_at text not null check (
-    length(created_at) between 17 and 64 and created_at = trim(created_at)
-  )
-);
-
-create index briar_issue_create_mutation_receipts_scope_idx
-  on briar_issue_create_mutation_receipts (
-    organization_id, project_id, user_id, client_issue_id
-  );
-
-create table briar_issue_update_mutation_receipts (
-  request_id text primary key not null check (
-    length(request_id) between 1 and 128
-    and request_id not glob '*[^0-9A-Za-z_-]*'
-  ),
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text not null references briar_projects (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade check (
-    length(run_id) between 1 and 128
-    and run_id not glob '*[^0-9A-Za-z_-]*'
-  ),
-  user_id text not null references "user" (id) on delete cascade,
-  request_hash text not null check (
-    length(request_hash) = 64
-    and request_hash not glob '*[^0-9a-f]*'
-  ),
-  attachment_upload_ids_json text not null check (
-    length(attachment_upload_ids_json) between 2 and 1024
-    and json_valid(attachment_upload_ids_json)
-    and json_type(attachment_upload_ids_json) = 'array'
-    and json_array_length(attachment_upload_ids_json) between 0 and 5
-  ),
-  response_json text not null check (
-    length(response_json) between 2 and 1000000
-    and json_valid(response_json)
-    and json_type(response_json) = 'object'
-  ),
-  created_at text not null check (
-    length(created_at) between 17 and 64 and created_at = trim(created_at)
-  )
-);
-
-create index briar_issue_update_mutation_receipts_scope_idx
-  on briar_issue_update_mutation_receipts (
-    organization_id, project_id, run_id, user_id, request_id
-  );
-
-create table briar_issue_message_mutation_receipts (
-  message_id text primary key not null
-    references briar_issue_messages (id) on delete cascade check (
-      length(message_id) between 1 and 128
-      and message_id not glob '*[^0-9A-Za-z_-]*'
-    ),
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  project_id text not null references briar_projects (id) on delete cascade,
-  run_id text not null references briar_hunt_runs (id) on delete cascade check (
-    length(run_id) between 1 and 128
-    and run_id not glob '*[^0-9A-Za-z_-]*'
-  ),
-  user_id text not null references "user" (id) on delete cascade,
-  request_hash text not null check (
-    length(request_hash) = 64
-    and request_hash not glob '*[^0-9a-f]*'
-  ),
-  attachment_upload_ids_json text not null check (
-    length(attachment_upload_ids_json) between 2 and 1024
-    and json_valid(attachment_upload_ids_json)
-    and json_type(attachment_upload_ids_json) = 'array'
-    and json_array_length(attachment_upload_ids_json) between 0 and 5
-  ),
-  response_json text not null check (
-    length(response_json) between 2 and 1000000
-    and json_valid(response_json)
-    and json_type(response_json) = 'object'
-  ),
-  created_at text not null check (
-    length(created_at) between 17 and 64 and created_at = trim(created_at)
-  )
-);
-
-create index briar_issue_message_mutation_receipts_scope_idx
-  on briar_issue_message_mutation_receipts (
-    organization_id, project_id, run_id, user_id, message_id
-  );
-
---> statement-breakpoint
-create trigger briar_upload_batch_insert_guard
+-- @statement
+CREATE TRIGGER briar_dm_memory_forget_learning_payload after insert on briar_dm_memory_exclusions begin
+  insert into briar_dm_memory_purge_documents(space_id, root_document_id, document_id)
+  select new.space_id, new.document_id, source.document_id from briar_dm_memory_sources source
+  where source.space_id = new.space_id and source.source_type = new.source_type and source.source_id = new.source_id
+  on conflict (root_document_id, document_id) do nothing;
+  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
+  values (new.space_id, new.source_type, new.source_id);
+  update briar_dm_memory_jobs set request_targets_json = '[]' where space_id = new.space_id
+    and exists (select 1 from json_each(request_targets_json) target
+      where json_extract(target.value, '$.documentId') in (
+        select document_id from briar_dm_memory_purge_documents where space_id = new.space_id));
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_edit_learning_source after update of body, deleted_at on briar_channel_messages
+when old.body <> new.body or old.deleted_at is not new.deleted_at begin
+  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
+  select distinct space_id, 'message', new.id from briar_dm_memory_learning_inputs
+  where source_type = 'message' and source_id = new.id;
+  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
+  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = new.id);
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_delete_learning_source before delete on briar_channel_messages begin
+  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
+  select distinct space_id, 'message', old.id from briar_dm_memory_learning_inputs
+  where source_type = 'message' and source_id = old.id;
+  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
+  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = old.id);
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_forget_derived_content after update of revocation_epoch on briar_dm_memory_spaces
+when old.revocation_epoch <> new.revocation_epoch begin
+  update briar_dm_memory_documents set status = 'deleted', title = '[deleted]'
+  where space_id = new.id and id in (select source.document_id from briar_dm_memory_sources source
+    join briar_dm_memory_exclusions excluded on excluded.space_id = source.space_id
+      and excluded.source_type = source.source_type and excluded.source_id = source.source_id
+    where source.space_id = new.id);
+  update briar_dm_memory_commits set payload_hash = null where document_id in (
+    select id from briar_dm_memory_documents where space_id = new.id and status = 'deleted');
+  delete from briar_dm_memory_revisions where document_id in (
+    select id from briar_dm_memory_documents where space_id = new.id and status = 'deleted');
+end;
+-- @statement
+CREATE TRIGGER briar_reply_completion_receipt_immutable_update
+before update on briar_reply_completion_receipts
+begin
+  select raise(abort, 'reply completion receipt is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_reply_completion_receipt_immutable_delete
+before delete on briar_reply_completion_receipts
+when exists (
+  select 1 from briar_organizations organization
+  where organization.id = old.organization_id
+)
+begin
+  select raise(abort, 'reply completion receipt is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_message_mutation_receipt_insert_guard
+before insert on briar_channel_message_mutation_receipts
+when not exists (
+  select 1 from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = new.message_id and message.channel_id = new.channel_id
+    and message.author_user_id = new.user_id
+    and channel.organization_id = new.organization_id
+)
+begin
+  select raise(abort, 'invalid channel message receipt');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_message_mutation_receipt_immutable
+before update on briar_channel_message_mutation_receipts
+begin
+  select raise(abort, 'channel message receipt is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_upload_batch_insert_guard
 before insert on briar_upload_batches
 when not (
   (
@@ -304,16 +261,14 @@ when not (
 begin
   select raise(abort, 'invalid upload authorization');
 end;
-
---> statement-breakpoint
-create trigger briar_upload_batch_immutable
+-- @statement
+CREATE TRIGGER briar_upload_batch_immutable
 before update on briar_upload_batches
 begin
   select raise(abort, 'upload batch is immutable');
 end;
-
---> statement-breakpoint
-create trigger briar_upload_metadata_immutable
+-- @statement
+CREATE TRIGGER briar_upload_metadata_immutable
 before update on briar_uploads
 when new.upload_id is not old.upload_id
   or new.batch_request_id is not old.batch_request_id
@@ -329,9 +284,8 @@ when new.upload_id is not old.upload_id
 begin
   select raise(abort, 'upload metadata is immutable');
 end;
-
---> statement-breakpoint
-create trigger briar_issue_create_mutation_receipt_insert_guard
+-- @statement
+CREATE TRIGGER briar_issue_create_mutation_receipt_insert_guard
 before insert on briar_issue_create_mutation_receipts
 when exists (
     select 1 from json_each(new.attachment_upload_ids_json)
@@ -409,9 +363,8 @@ when exists (
 begin
   select raise(abort, 'invalid issue create receipt');
 end;
-
---> statement-breakpoint
-create trigger briar_issue_update_mutation_receipt_insert_guard
+-- @statement
+CREATE TRIGGER briar_issue_update_mutation_receipt_insert_guard
 before insert on briar_issue_update_mutation_receipts
 when exists (
     select 1 from json_each(new.attachment_upload_ids_json)
@@ -489,9 +442,8 @@ when exists (
 begin
   select raise(abort, 'invalid issue update receipt');
 end;
-
---> statement-breakpoint
-create trigger briar_issue_message_mutation_receipt_insert_guard
+-- @statement
+CREATE TRIGGER briar_issue_message_mutation_receipt_insert_guard
 before insert on briar_issue_message_mutation_receipts
 when exists (
     select 1 from json_each(new.attachment_upload_ids_json)
@@ -572,30 +524,26 @@ when exists (
 begin
   select raise(abort, 'invalid issue message receipt');
 end;
-
---> statement-breakpoint
-create trigger briar_issue_create_mutation_receipt_immutable
+-- @statement
+CREATE TRIGGER briar_issue_create_mutation_receipt_immutable
 before update on briar_issue_create_mutation_receipts
 begin
   select raise(abort, 'issue create receipt is immutable');
 end;
-
---> statement-breakpoint
-create trigger briar_issue_update_mutation_receipt_immutable
+-- @statement
+CREATE TRIGGER briar_issue_update_mutation_receipt_immutable
 before update on briar_issue_update_mutation_receipts
 begin
   select raise(abort, 'issue update receipt is immutable');
 end;
-
---> statement-breakpoint
-create trigger briar_issue_message_mutation_receipt_immutable
+-- @statement
+CREATE TRIGGER briar_issue_message_mutation_receipt_immutable
 before update on briar_issue_message_mutation_receipts
 begin
   select raise(abort, 'issue message receipt is immutable');
 end;
-
---> statement-breakpoint
-create trigger briar_upload_state_guard
+-- @statement
+CREATE TRIGGER briar_upload_state_guard
 before update on briar_uploads
 when not (
   (
@@ -789,9 +737,8 @@ when not (
 begin
   select raise(abort, 'invalid upload state transition');
 end;
-
---> statement-breakpoint
-create trigger briar_upload_delete_cleanup
+-- @statement
+CREATE TRIGGER briar_upload_delete_cleanup
 before delete on briar_uploads
 when old.consumed_at is null
 begin
@@ -803,4 +750,266 @@ begin
     strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
     strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
   ) on conflict (object_key) do nothing;
+end;
+-- @statement
+CREATE TRIGGER briar_project_agent_schedule_creator_immutable
+before update of created_by_user_id on briar_project_agent_schedules
+when new.created_by_user_id is not old.created_by_user_id
+  and not (
+    old.created_by_user_id is not null
+    and new.created_by_user_id is null
+    and not exists (
+      select 1 from "user" account
+      where account.id = old.created_by_user_id
+    )
+  )
+begin
+  select raise(abort, 'Agent schedule creator is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_archive_related_object_keys_insert_guard
+before insert on briar_log_archives
+when exists (
+  select 1 from json_each(new.related_object_keys_json) related
+  where related.type <> 'text'
+    or related.value <> trim(related.value)
+    or length(related.value) not between 1 and 1024
+)
+begin
+  select raise(abort, 'invalid archive related object key');
+end;
+-- @statement
+CREATE TRIGGER briar_archive_related_object_keys_update_guard
+before update of related_object_keys_json on briar_log_archives
+when exists (
+  select 1 from json_each(new.related_object_keys_json) related
+  where related.type <> 'text'
+    or related.value <> trim(related.value)
+    or length(related.value) not between 1 and 1024
+)
+begin
+  select raise(abort, 'invalid archive related object key');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_payload_immutable
+before update of action_type, payload_json on briar_channel_action_proposals
+when new.action_type is not old.action_type
+  or new.payload_json is not old.payload_json
+begin
+  select raise(abort, 'channel issue proposal payload is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_proposal_payload_immutable
+before update of action_type, payload_json on briar_issue_action_proposals
+when new.action_type is not old.action_type
+  or new.payload_json is not old.payload_json
+begin
+  select raise(abort, 'conversation issue proposal payload is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_current_insert_guard
+before insert on briar_channel_action_proposals
+when new.action_type = 'request_issue_create'
+  and (
+    json_type(new.payload_json, '$.issue.status') is not null
+    or exists (
+      select 1
+      from json_each(new.payload_json, '$.batch.items') item
+      where json_type(item.value, '$.issue.status') is not null
+    )
+  )
+begin
+  select raise(abort, 'channel issue proposal payload cannot include status');
+end;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_proposal_current_insert_guard
+before insert on briar_issue_action_proposals
+when new.action_type = 'request_issue_create'
+  and json_type(new.payload_json, '$.issue.status') is not null
+begin
+  select raise(abort, 'conversation issue proposal payload cannot include status');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_batch_items_immutable_delete
+before delete on briar_channel_issue_batch_items
+when exists (
+  select 1 from briar_organizations organization
+  where organization.id = old.organization_id
+)
+begin
+  select raise(abort, 'channel issue batch mapping is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_action_insert_guard
+before insert on briar_channel_action_proposals
+when new.action_type <> 'request_issue_create'
+begin
+  select raise(abort, 'channel proposals must create issues');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_action_update_guard
+before update of action_type on briar_channel_action_proposals
+when new.action_type <> 'request_issue_create'
+begin
+  select raise(abort, 'channel proposals must create issues');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_message_blocks_array_insert
+before insert on briar_channel_messages
+when new.blocks_json is not null
+  and case
+    when not json_valid(new.blocks_json) then 1
+    when json_type(new.blocks_json) <> 'array' then 1
+    when json_array_length(new.blocks_json) not between 1 and 50 then 1
+    when length(cast(new.blocks_json as blob)) > 1048576 then 1
+    else 0
+  end
+begin
+  select raise(abort, 'channel message blocks must be a bounded JSON array');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_message_blocks_array_update
+before update of blocks_json on briar_channel_messages
+when new.blocks_json is not null
+  and case
+    when not json_valid(new.blocks_json) then 1
+    when json_type(new.blocks_json) <> 'array' then 1
+    when json_array_length(new.blocks_json) not between 1 and 50 then 1
+    when length(cast(new.blocks_json as blob)) > 1048576 then 1
+    else 0
+  end
+begin
+  select raise(abort, 'channel message blocks must be a bounded JSON array');
+end;
+-- @statement
+CREATE TRIGGER briar_workflow_checkpoint_storage_validate
+instead of insert on briar_workflow_checkpoint_storage_validation
+when not (
+  new.owner in ('project', 'user', 'issue')
+  and new.checkpoints_json is not null
+  and
+  json_valid(new.checkpoints_json)
+  and case
+        when json_valid(new.checkpoints_json)
+          then json_type(new.checkpoints_json)
+        else null
+      end = 'array'
+  and json_array_length(
+        case
+          when json_valid(new.checkpoints_json)
+            then case
+              when json_type(new.checkpoints_json) = 'array'
+                then new.checkpoints_json
+              else '[]'
+            end
+          else '[]'
+        end
+      ) <= 100
+  and not exists (
+    select 1
+    from json_each(
+      case
+        when json_valid(new.checkpoints_json)
+          then case
+            when json_type(new.checkpoints_json) = 'array'
+              then new.checkpoints_json
+            else '[]'
+          end
+        else '[]'
+      end
+    ) checkpoint
+    where checkpoint.type <> 'object'
+       or (
+         select count(*)
+         from json_each(
+           case when checkpoint.type = 'object'
+             then checkpoint.value else '{}'
+           end
+         ) field
+       ) <> 3
+       or coalesce(json_type(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.key'
+       ), '') <> 'text'
+       or length(json_extract(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.key'
+       )) not between 1 and 64
+       or substr(json_extract(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.key'
+       ), 1, 1) not glob '[a-z]'
+       or json_extract(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.key'
+       ) glob '*[^a-z0-9_-]*'
+       or case new.owner
+            when 'project' then json_extract(
+              case when checkpoint.type = 'object'
+                then checkpoint.value else '{}'
+              end,
+              '$.key'
+            ) not glob 'project-*'
+            when 'user' then json_extract(
+              case when checkpoint.type = 'object'
+                then checkpoint.value else '{}'
+              end,
+              '$.key'
+            ) not glob 'user-*'
+            when 'issue' then json_extract(
+              case when checkpoint.type = 'object'
+                then checkpoint.value else '{}'
+              end,
+              '$.key'
+            ) not glob 'issue-*'
+            else 1
+          end
+       or coalesce(json_type(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.stage'
+       ), '') <> 'text'
+       or length(json_extract(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.stage'
+       )) not between 1 and 64
+       or substr(json_extract(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.stage'
+       ), 1, 1) not glob '[a-z]'
+       or json_extract(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.stage'
+       ) glob '*[^a-z0-9_-]*'
+       or coalesce(json_type(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.position'
+       ), '') <> 'text'
+       or json_extract(
+         case when checkpoint.type = 'object'
+           then checkpoint.value else '{}'
+         end,
+         '$.position'
+       ) not in ('before', 'after')
+  )
+)
+begin
+  select raise(abort, 'workflow checkpoints must use the canonical shape');
 end;

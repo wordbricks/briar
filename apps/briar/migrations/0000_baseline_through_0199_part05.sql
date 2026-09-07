@@ -1,5 +1,8 @@
-pragma defer_foreign_keys = on;
+-- GENERATED FILE - DO NOT EDIT BY HAND.
+-- baseline-through: 0199_managed_computer_provider.sql
+-- Continuation 5 of 0000_baseline_through_0199.sql.
 
+-- @statement
 CREATE TRIGGER briar_agent_skill_execution_materialize
 after update of status on briar_agent_skill_execution_proposals
 when old.status = 'pending' and new.status = 'accepted'
@@ -56,7 +59,7 @@ begin
   set materialized_session_payload_json = null
   where id = new.id and materialized_session_payload_json is not null;
 end;
-
+-- @statement
 CREATE TRIGGER briar_conversation_issue_creation_project_guard
 before insert on briar_hunt_runs
 when new.source = 'issue'
@@ -128,7 +131,7 @@ when new.source = 'issue'
 BEGIN
   select raise(abort, 'conversation proposal no longer belongs to project');
 END;
-
+-- @statement
 CREATE TRIGGER briar_hunt_runs_channel_proposal_reservation_required
 before insert on briar_hunt_runs
 when new.source = 'issue'
@@ -294,7 +297,7 @@ when new.source = 'issue'
 BEGIN
   select raise(abort, 'channel proposal approval reservation not found');
 END;
-
+-- @statement
 CREATE TRIGGER briar_hunt_runs_finalize_channel_proposal_approval
 after insert on briar_hunt_runs
 when new.source = 'issue'
@@ -476,21 +479,21 @@ BEGIN
     and project_id = new.project_id and issue_source_key = new.source_key
     and accepted_by_user_id is not null and accepted_at is not null;
 END;
-
+-- @statement
 CREATE TRIGGER briar_channel_issue_approval_audit_atomic_insert_guard
 before insert on briar_channel_issue_approval_audit
 when new.result_verification <> 'atomic'
 begin
   select raise(abort, 'channel issue approval requires atomic verification');
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_issue_approval_audit_atomic_update_guard
 before update of result_verification on briar_channel_issue_approval_audit
 when new.result_verification <> 'atomic'
 begin
   select raise(abort, 'channel issue approval requires atomic verification');
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_issue_approval_finalize_guard
 before update of status on briar_channel_action_proposals
 when old.status = 'pending' and new.status = 'accepted'
@@ -508,7 +511,7 @@ when old.status = 'pending' and new.status = 'accepted'
 begin
   select raise(abort, 'channel proposal acceptance requires atomic approval');
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_approved_backlog_event_guard
 before insert on briar_hunt_events
 when new.status not in ('backlog', 'cancelled')
@@ -529,7 +532,7 @@ begin
     abort, 'channel-approved issue execution requires explicit dispatch'
   );
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_approved_backlog_context_guard
 before update of context_json on briar_hunt_runs
 when old.status in ('backlog', 'cancelled')
@@ -545,7 +548,7 @@ begin
     abort, 'channel-approved issue context is immutable before dispatch'
   );
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_approved_retryable_transfer_guard
 before update of project_id, status on briar_hunt_runs
 when old.status in ('queued', 'blocked', 'failed')
@@ -584,7 +587,7 @@ begin
     abort, 'channel-approved retryable transfer requires execution reset'
   );
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_approved_terminal_transfer_guard
 before update of project_id on briar_hunt_runs
 when old.status in ('completed', 'cancelled')
@@ -600,7 +603,7 @@ begin
     abort, 'channel-approved terminal issue transfer is not allowed'
   );
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_approved_terminal_reactivation_guard
 before update of status on briar_hunt_runs
 when old.status in ('completed', 'cancelled')
@@ -616,7 +619,7 @@ begin
     abort, 'approved issue terminal reactivation requires fresh execution approval'
   );
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_approved_dispatch_clear_guard
 before update of dispatch_request_id, status on briar_hunt_runs
 when old.dispatch_request_id is not null
@@ -633,7 +636,7 @@ begin
     abort, 'channel-approved dispatch cancellation requires backlog reset'
   );
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_approved_dispatch_preference_snapshot
 after update of dispatch_request_id on briar_hunt_runs
 when new.dispatch_request_id is not null
@@ -652,7 +655,7 @@ begin
       preferred_agent_effort = new.requested_agent_effort
   where id = new.id;
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_approved_dispatch_preference_guard
 before update of preferred_agent_provider, preferred_agent_model,
   preferred_agent_effort on briar_hunt_runs
@@ -709,7 +712,7 @@ begin
     abort, 'approved channel issue dispatch preferences are immutable'
   );
 end;
-
+-- @statement
 CREATE TRIGGER briar_hunt_runs_channel_proposal_project_guard
 before insert on briar_hunt_runs
 when new.source = 'issue'
@@ -729,7 +732,7 @@ when new.source = 'issue'
 begin
   select raise(abort, 'channel proposal issue project conflict');
 end;
-
+-- @statement
 CREATE TRIGGER briar_hunt_runs_channel_proposal_reservation_guard
 before insert on briar_hunt_runs
 when new.source = 'issue'
@@ -743,21 +746,21 @@ when new.source = 'issue'
 begin
   select raise(abort, 'channel proposal issue project conflict');
 end;
-
+-- @statement
 CREATE TRIGGER briar_hunt_runs_context_policy_insert_guard
 before insert on briar_hunt_runs
 when json_type(new.context_json, '$.fullAuto') is not null
 begin
   select raise(abort, 'run context cannot contain execution policy');
 end;
-
+-- @statement
 CREATE TRIGGER briar_hunt_runs_context_policy_update_guard
 before update of context_json on briar_hunt_runs
 when json_type(new.context_json, '$.fullAuto') is not null
 begin
   select raise(abort, 'run context cannot contain execution policy');
 end;
-
+-- @statement
 CREATE TRIGGER briar_reply_completion_receipt_insert_guard
 before insert on briar_reply_completion_receipts
 when not (
@@ -828,7 +831,7 @@ when not (
 begin
   select raise(abort, 'invalid reply completion receipt');
 end;
-
+-- @statement
 CREATE TRIGGER briar_channel_reply_session_events_immutable_update
 before update on briar_channel_reply_session_events
 when not (
@@ -847,5 +850,3 @@ when not (
 begin
   select raise(abort, 'Channel reply session events are immutable');
 end;
-
-pragma defer_foreign_keys = off;

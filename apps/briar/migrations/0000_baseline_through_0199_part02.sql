@@ -1,6 +1,6 @@
 -- GENERATED FILE - DO NOT EDIT BY HAND.
--- baseline-through: 0159_allow_duplicate_evidence_image_digests.sql
--- Continuation 2 of 0000_baseline_schema.sql.
+-- baseline-through: 0199_managed_computer_provider.sql
+-- Continuation 2 of 0000_baseline_through_0199.sql.
 
 -- @statement
 CREATE TRIGGER briar_channel_changes_channels_update_sync
@@ -29,6 +29,32 @@ BEGIN
   values (new.organization_id, last_insert_rowid())
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_channel_changes_messages_update_sync
@@ -60,6 +86,39 @@ BEGIN
   from briar_channels channel where channel.id = new.channel_id
   on conflict (organization_id) do update
     set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_dm_memory_close_roster
@@ -119,8 +178,8 @@ CREATE TRIGGER briar_dm_memory_channel_deleted before delete on briar_channels b
 end;
 -- @statement
 CREATE TRIGGER briar_dm_memory_owner_removed before delete on briar_organization_members begin
-  
-  
+
+
   update briar_channels set memory_roster_epoch = memory_roster_epoch + 1
   where organization_id = old.organization_id and id in (
     select channel_id from briar_channel_members where user_id = old.user_id
