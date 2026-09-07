@@ -793,7 +793,8 @@ export type ChannelLinkPreview = {
 
 /** Aggregated emoji reaction on a channel message. */
 export type ChannelMessageReactionPerson = {
-  userId: string;
+  userId?: string;
+  agentId?: string;
   name: string;
   image: string | null;
 };
@@ -802,6 +803,7 @@ export type ChannelMessageReaction = {
   emoji: string;
   count: number;
   userIds: string[];
+  agentIds?: string[];
   /** Profiles for reaction authors who are visible in the message's organization. */
   people?: ChannelMessageReactionPerson[];
 };

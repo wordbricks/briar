@@ -2378,6 +2378,18 @@ private struct ChannelReactionBar: View {
         FlowReactionRow {
             ForEach(message.reactions) { reaction in
                 let mine = currentUserID.map { reaction.userIds.contains($0) } ?? false
+                let authorNames = reaction.people.map { person in
+                    if person.agentId != nil {
+                        return String(
+                            format: L10n.text(.channelReactionAgent, locale: locale),
+                            person.name
+                        )
+                    }
+                    return person.name
+                }
+                let reactionAccessibilityLabel = authorNames.isEmpty
+                    ? "\(reaction.emoji) \(reaction.count)"
+                    : "\(reaction.emoji) \(reaction.count) · \(authorNames.joined(separator: ", "))"
                 Button {
                     Task { await onToggleReaction(reaction.emoji) }
                 } label: {
@@ -2401,6 +2413,7 @@ private struct ChannelReactionBar: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(reactionAccessibilityLabel)
                 .accessibilityIdentifier(
                     "channel-reaction-\(message.id.uuidString.lowercased())-\(reaction.emoji)"
                 )

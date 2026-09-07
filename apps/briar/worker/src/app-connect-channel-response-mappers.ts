@@ -777,11 +777,13 @@ export const appChannelMessage = (message: ChannelMessage) =>
         emoji: reaction.emoji,
         count: reaction.count,
         userIds: reaction.userIds,
+        agentIds: reaction.agentIds ?? [],
         people: (reaction.people ?? []).map((person) =>
           create(ChannelMessageReactionPersonSchema, {
-            userId: person.userId,
+            userId: person.userId ?? "",
             name: person.name,
             image: person.image ?? undefined,
+            agentId: person.agentId,
           })
         ),
       })

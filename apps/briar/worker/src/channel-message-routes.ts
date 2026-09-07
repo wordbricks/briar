@@ -431,6 +431,7 @@ export async function createOrganizationChannelMessage(
       agentReplyEnqueue: {
         organizationId: input.organizationId,
         channelId: channel.id,
+        channelKind: channel.kind,
         triggerMessageId: messageId,
         parentMessageId: request.parentMessageId ?? messageId,
         agents: invokedAgents.map(({

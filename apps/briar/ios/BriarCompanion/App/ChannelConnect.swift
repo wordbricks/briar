@@ -422,7 +422,21 @@ extension ChannelMessageReaction {
         self.init(
             emoji: message.emoji,
             count: try channelSafeInt(message.count),
-            userIds: message.userIds
+            userIds: message.userIds,
+            agentIds: message.agentIds,
+            people: try message.people.map { person in
+                let userId = person.userID.isEmpty ? nil : person.userID
+                let agentId = person.hasAgentID ? person.agentID : nil
+                guard (userId == nil) != (agentId == nil), !person.name.isEmpty else {
+                    throw MobileAPIError.invalidResponse
+                }
+                return ChannelMessageReactionPerson(
+                    userId: userId,
+                    agentId: agentId,
+                    name: person.name,
+                    image: person.hasImage ? person.image : nil
+                )
+            }
         )
     }
 }

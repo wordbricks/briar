@@ -45,4 +45,33 @@ describe("resolveChannelReactionPeople", () => {
       },
     ]);
   });
+
+  it("keeps Agent authors distinct from organization members", () => {
+    expect(
+      resolveChannelReactionPeople({
+        currentUserId: "owner",
+        members: [],
+        reactionPeople: [{
+          agentId: "agent-1",
+          name: "Assistant",
+          image: "https://example.com/assistant.png",
+        }],
+        userIds: [],
+        agentIds: ["agent-1", "missing-agent"],
+      }),
+    ).toEqual([
+      {
+        agentId: "agent-1",
+        name: "Assistant",
+        image: "https://example.com/assistant.png",
+        isCurrentUser: false,
+      },
+      {
+        agentId: "missing-agent",
+        name: null,
+        image: null,
+        isCurrentUser: false,
+      },
+    ]);
+  });
 });

@@ -677,8 +677,12 @@ export const channelMessageFromMessage = (
     emoji: reaction.emoji,
     count: reaction.count,
     userIds: [...reaction.userIds],
+    ...(reaction.agentIds.length > 0
+      ? { agentIds: [...reaction.agentIds] }
+      : {}),
     people: reaction.people.map((person) => ({
-      userId: person.userId,
+      ...(person.userId ? { userId: person.userId } : {}),
+      ...(person.agentId ? { agentId: person.agentId } : {}),
       name: person.name,
       image: person.image ?? null,
     })),

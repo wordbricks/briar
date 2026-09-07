@@ -491,6 +491,11 @@ function reactionPersonLabel(
   person: ChannelReactionPerson,
   t: ReturnType<typeof useI18n>["t"],
 ) {
+  if (person.agentId !== undefined) {
+    return t("channel.reactionAgent", {
+      name: person.name ?? t("channel.reactionUnknown"),
+    });
+  }
   if (person.name && person.isCurrentUser) {
     return `${person.name} (${t("channel.you")})`;
   }
@@ -534,6 +539,7 @@ function ReactionChip({
     members,
     reactionPeople: reaction.people,
     userIds: reaction.userIds,
+    agentIds: reaction.agentIds,
   });
   const { visible, hiddenCount } = previewChannelReactionPeople(people);
   const names = people.map((person) => reactionPersonLabel(person, t));
@@ -579,7 +585,10 @@ function ReactionChip({
           {visible.map((person) => {
             const name = reactionPersonLabel(person, t);
             return (
-              <li className="channel-reaction-person" key={person.userId}>
+              <li
+                className="channel-reaction-person"
+                key={person.agentId ?? person.userId}
+              >
                 <span
                   aria-hidden="true"
                   className="channel-reaction-person-avatar"

@@ -618,6 +618,7 @@ message ChannelMessageReactionPerson {
   string user_id = 1;
   string name = 2;
   optional string image = 3;
+  optional string agent_id = 4;
 }
 
 message ChannelMessageReaction {
@@ -625,6 +626,7 @@ message ChannelMessageReaction {
   uint32 count = 2;
   repeated string user_ids = 3;
   repeated ChannelMessageReactionPerson people = 4;
+  repeated string agent_ids = 5;
 }
 
 message ChannelDocument {

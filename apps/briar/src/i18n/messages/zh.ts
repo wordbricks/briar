@@ -230,6 +230,7 @@ export const zh = {
   "channel.deleting": "正在删除…",
   "channel.reactionPeople": "{emoji} 回应",
   "channel.reactionPeopleLabel": "{emoji} {count} · {names}",
+  "channel.reactionAgent": "Agent {name}",
   "channel.reactionPeopleMore": "另有 {count} 人",
   "channel.reactionUnknown": "未知成员",
   "channel.loadingMessages": "正在加载消息…",

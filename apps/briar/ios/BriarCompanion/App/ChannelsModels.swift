@@ -204,10 +204,25 @@ struct ChannelMessageAttachment: Hashable, Identifiable, Sendable {
     let url: String
 }
 
+struct ChannelMessageReactionPerson: Hashable, Identifiable, Sendable {
+    let userId: String?
+    let agentId: String?
+    let name: String
+    let image: String?
+
+    var id: String {
+        if let agentId { return "agent:\(agentId)" }
+        if let userId { return "user:\(userId)" }
+        return "unknown:\(name)"
+    }
+}
+
 struct ChannelMessageReaction: Hashable, Identifiable, Sendable {
     let emoji: String
     let count: Int
     let userIds: [String]
+    let agentIds: [String]
+    let people: [ChannelMessageReactionPerson]
 
     var id: String { emoji }
 }
