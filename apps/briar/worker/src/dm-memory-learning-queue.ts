@@ -3,7 +3,7 @@ import { dmMemoryLearningExtractBatchSources, dmMemoryLearningExtractMaxWaitMs,
   type DmLearningPolicy } from "../../src/lib/dm-memory-learning-contract";
 import type { DmMemoryReference } from "../../src/lib/dm-memory-query-contract";
 import { sha256 } from "./crypto-digest";
-import { dmLearningLiveSpaceSql } from "./dm-memory-learning-input";
+import { dmLearningConsolidatedObservationSql, dmLearningLiveSpaceSql } from "./dm-memory-learning-input";
 import { dmLearningSpacePolicy } from "./dm-memory-learning-policy";
 
 /** The caller appends these before clearing the completed reply's claim hash. */
@@ -65,7 +65,10 @@ export async function scheduleDmLearningJobs(db: D1Database, organizationId: str
     where space.organization_id = ? and ${dmLearningLiveSpaceSql}
       and (exists (select 1 from briar_dm_memory_learning_outbox outbox where outbox.space_id = space.id and outbox.settled = 0)
         or (space.auto_enabled = 1 and space.use_enabled = 1 and exists (
-          select 1 from briar_dm_memory_observation_events observation where observation.space_id = space.id
+          select 1 from briar_dm_memory_observation_events observation
+            join briar_dm_memory_revisions rev on rev.document_id = observation.document_id
+              and rev.version = observation.document_version
+          where observation.space_id = space.id and ${dmLearningConsolidatedObservationSql}
             and observation.sequence > coalesce((select observation_watermark from briar_dm_memory_learning_state where space_id = space.id), 0))))
     order by coalesce(scheduled.last_scheduled_at, space.created_at), space.id limit 20`).bind(organizationId).all<{ id: string; revocation_epoch: number; provider: string }>()).results;
   let created = 0;
@@ -109,8 +112,12 @@ export async function scheduleDmLearningJobs(db: D1Database, organizationId: str
         created += await enqueueLearningJob(db, { spaceId: space.id, kind: "extract", start: state.source_watermark,
           end: extraction.source_end, dedupeSource: String(space.revocation_epoch), policy, now });
       } else {
-        const observations = await db.prepare(`select count(*) as count, max(sequence) as sequence, min(created_at) as oldest
-          from briar_dm_memory_observation_events where space_id = ? and sequence > ?`)
+        // Episodes are excluded here as well as in the window, so a DM that only
+        // logs what happened never schedules a consolidation that finds nothing.
+        const observations = await db.prepare(`select count(*) as count, max(event.sequence) as sequence, min(event.created_at) as oldest
+          from briar_dm_memory_observation_events event join briar_dm_memory_revisions rev
+            on rev.document_id = event.document_id and rev.version = event.document_version
+          where event.space_id = ? and ${dmLearningConsolidatedObservationSql} and event.sequence > ?`)
           .bind(space.id, state.observation_watermark).first<{ count: number; sequence: number | null; oldest: string | null }>();
         if (observations?.sequence && (observations.count >= 10 ||
           Date.parse(now) - Date.parse(observations.oldest!) >= 24 * 60 * 60 * 1000)) {

@@ -1,7 +1,8 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import { DmLearningProposal, dmLearningAgentPolicy, dmLearningPreferredProvider,
-  dmMemoryLearningVerifiedProviders, resolveDmLearningProvider } from "../../src/lib/dm-memory-learning-contract";
+  dmMemoryLearningVerifiedProviders, resolveDmLearningProvider,
+  type DmLearningChange } from "../../src/lib/dm-memory-learning-contract";
 import { advertisedDmLearningProviders, dmLearningCallReservation, supportsDmMemoryLearning } from "./dm-memory-learning-policy";
 import { normalizeDmLearningProposal, requireDmLearningVerification } from "./dm-memory-learning-validation";
 import { syntheticDmLearningPolicy, syntheticDmLearningSnapshot,
@@ -100,6 +101,34 @@ describe("DM learning proposal and independent verifier boundaries", () => {
       decisions: [{ changeId: "change-1", verdict: "supported" }] })).toThrow("verification_rejected");
     expect(() => requireDmLearningVerification(snapshot, proposal, { approved: true, explicitRequestAuthorized: true,
       decisions: [{ changeId: "change-1", verdict: "supported" }] })).not.toThrow();
+  });
+  it("stores an episode only for a real exchange and never lets it expire", () => {
+    const base = syntheticDmLearningSnapshot();
+    const reply = { type: "message" as const, id: crypto.randomUUID(), version: 1, hash: "c".repeat(64),
+      body: "행동 위험도 규칙 세 가지만 반영하자고 제안합니다.", speaker: "agent" as const,
+      observedAt: "2026-09-01T00:05:00.000Z" };
+    const snapshot = { ...base, sourceEnd: 2, roots: [...base.roots, reply],
+      inputSources: [...base.inputSources, { type: reply.type, id: reply.id, version: reply.version }] };
+    const episode = (overrides: Partial<Parameters<typeof syntheticDmLearningChange>[1]> = {}) =>
+      syntheticDmLearningChange(snapshot, { memoryClass: "log", evidenceType: "observed", title: "제안 3가지",
+        content: "사용자가 프롬프트를 공유했고 Agent는 세 가지만 반영하자고 제안했다.",
+        observedAt: reply.observedAt, validUntil: null, sourceRefs: snapshot.inputSources, ...overrides });
+    const propose = (change: DmLearningChange) => normalizeDmLearningProposal(snapshot,
+      { explicitRequest: false, changes: [change] }, () => "3f1d0a5c-0000-4000-8000-000000000001");
+    // One side of an exchange is not an episode, and an episode without its time
+    // cannot be placed in the brief's timeline.
+    expect(() => propose(episode({ sourceRefs: [snapshot.inputSources[0]!] }))).toThrow("invalid_proposal");
+    expect(() => propose(episode({ sourceRefs: [snapshot.inputSources[1]!] }))).toThrow("invalid_proposal");
+    expect(() => propose(episode({ observedAt: null }))).toThrow("invalid_proposal");
+    const stored = propose(episode());
+    expect(stored[0]!.change.validUntil).toBeNull();
+    // Whatever expiry the model sent is dropped - episodes are kept for good -
+    // and the normalized output is hashed with the proposal, so it must stay deterministic.
+    const guessed = propose(episode({ validUntil: "2027-01-01T00:00:00.000Z" }));
+    expect(guessed[0]!.change.validUntil).toBeNull();
+    expect(JSON.stringify(guessed)).toBe(JSON.stringify(propose(episode({ validUntil: "2027-01-01T00:00:00.000Z" }))));
+    expect(propose(syntheticDmLearningChange(snapshot, { validUntil: "2027-01-01T00:00:00.000Z" }))[0]!.change.validUntil)
+      .toBe("2027-01-01T00:00:00.000Z");
   });
   it("blocks automatic edits to protected documents and circular replacements", () => {
     const snapshot = syntheticDmLearningSnapshot();

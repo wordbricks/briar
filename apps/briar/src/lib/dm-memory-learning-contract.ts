@@ -112,6 +112,15 @@ export const dmMemoryLearningVerifierMaxOutputTokens = 2048;
  * under the 32 events a single snapshot can hold.
  */
 export const dmMemoryLearningRetainedSources = 16;
+/**
+ * Episodes carried into an extract snapshot, newest first. Episodes
+ * (`memory_class = 'log'`) never expire - a year-old exchange must still be
+ * searchable - so every interval adds one for good, and a snapshot holding more
+ * than 128 documents fails the whole space with `input_capacity`. Only recent
+ * episodes are shown, which is enough for the model to extend the current one
+ * instead of duplicating it; older ones stay in the brief and the search index.
+ */
+export const dmMemoryLearningRecentLogsInSnapshot = 16;
 
 /** Learning is built in, so the policy is derived from the provider, never configured. */
 export function dmLearningAgentPolicy(provider: AgentProvider): DmLearningPolicy {

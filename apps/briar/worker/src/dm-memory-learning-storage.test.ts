@@ -3,7 +3,8 @@ import { createClient, createRouterTransport } from "@connectrpc/connect";
 import { WorkerQueueService } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
-import { dmMemoryLearningExtractBatchSources, dmMemoryLearningRetainedSources } from "../../src/lib/dm-memory-learning-contract";
+import { dmMemoryLearningExtractBatchSources, dmMemoryLearningRecentLogsInSnapshot,
+  dmMemoryLearningRetainedSources } from "../../src/lib/dm-memory-learning-contract";
 import { runClaimedDmMemory } from "../../src-cli/dm-memory-learning";
 import { invokeDmLearningModel } from "../../src-cli/dm-memory-learning-model";
 import { createChannel, createChannelMessage } from "./channels";
@@ -169,6 +170,52 @@ describe("durable DM learning inputs and deletion", () => {
       .bind(f.spaceId).first<{ source_watermark: number }>())!.source_watermark).toBe(0);
     expect((await db.prepare("select count(*) as count from briar_dm_memory_learning_outbox where space_id = ? and settled = 0")
       .bind(f.spaceId).first<{ count: number }>())!.count).toBe(1);
+  });
+  it("carries only the recent episodes into a snapshot so they cannot exhaust its document capacity", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    for (let index = 0; index < 20; index++) {
+      await saveDmMemory(db, f.owner, { ...memory(`Episode ${index}: the user asked and the Agent answered.`),
+        title: `Episode ${index}`, memoryClass: "log", observedAt: `2026-08-${String(11 + index).padStart(2, "0")}T00:00:00.000Z` });
+    }
+    await saveDmMemory(db, f.owner, memory("Deploys always go out from main."));
+    await message(f.owner.channelId, "A synthetic exchange to review.");
+    await outbox(f.spaceId, now);
+    await scheduleDmLearningJobs(db, organizationId, now);
+    const space = (await db.prepare("select * from briar_dm_memory_spaces where id = ?").bind(f.spaceId).first<DmLearningSpaceRow>())!;
+    const input = await captureDmLearningInput(db, await job(f.spaceId), space, syntheticDmLearningPolicy, now);
+    const episodes = input.documents.filter((document) => document.memoryClass === "log");
+    expect(episodes).toHaveLength(dmMemoryLearningRecentLogsInSnapshot);
+    // Every durable memory still enters the snapshot; only the oldest episodes drop out.
+    expect(input.documents.filter((document) => document.memoryClass !== "log")).toHaveLength(2);
+    expect(episodes.map((document) => document.observedAt).sort()[0]).toBe("2026-08-15T00:00:00.000Z");
+  });
+  it("keeps episodes out of consolidation until they are rolled into topic history", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    // Ordered first so the shared scheduler budget cannot be spent on other fixtures.
+    const first = async (at: string) => {
+      await db.prepare("update briar_dm_memory_learning_state set last_scheduled_at = '2000-01-01T00:00:00.000Z' where space_id = ?")
+        .bind(f.spaceId).run();
+      await scheduleDmLearningJobs(db, organizationId, at);
+      return db.prepare("select id, kind, source_end from briar_dm_memory_jobs where space_id = ? and kind = 'consolidate'")
+        .bind(f.spaceId).first<{ id: string; kind: string; source_end: number }>();
+    };
+    for (let index = 0; index < 12; index++) {
+      await saveDmMemory(db, f.owner, { ...memory(`Episode ${index}: the user asked and the Agent answered.`),
+        title: `Episode ${index}`, memoryClass: "log", observedAt: `2026-08-${String(11 + index).padStart(2, "0")}T00:00:00.000Z` });
+    }
+    expect(await first(now)).toBeNull();
+    for (let index = 0; index < 10; index++) {
+      await saveDmMemory(db, f.owner, { ...memory(`Durable synthetic fact ${index}.`), title: `Durable ${index}` });
+    }
+    const scheduled = (await first("2026-09-01T00:01:00.000Z"))!;
+    expect(scheduled).toMatchObject({ kind: "consolidate" });
+    const space = (await db.prepare("select * from briar_dm_memory_spaces where id = ?").bind(f.spaceId).first<DmLearningSpaceRow>())!;
+    const consolidating = (await db.prepare("select * from briar_dm_memory_jobs where id = ?")
+      .bind(scheduled.id).first<DmLearningJobRow>())!;
+    const input = await captureDmLearningInput(db, consolidating, space, syntheticDmLearningPolicy, now);
+    expect(input.inputSources.length).toBeGreaterThan(0);
+    expect(input.inputSources.map((source) => input.documents.find((document) => document.id === source.id)?.memoryClass))
+      .not.toContain("log");
   });
   it("forgets every selected root and derived body while preserving unrelated roots and visible chat history", async () => {
     const f = await fixture(), rootId = await message(f.owner.channelId, "A synthetic fact to forget.");
