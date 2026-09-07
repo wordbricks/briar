@@ -819,6 +819,7 @@ enum L10n {
         case channelLastReply
         case channelReact
         case channelReactWith
+        case channelReactionAgent
         case channelCopyText
         case channelDeleteMessage
         case channelDeleteMessageConfirm
@@ -915,6 +916,7 @@ enum L10n {
             case .channelLastReply: "마지막 답글 %@"
             case .channelReact: "React"
             case .channelReactWith: "%@ 리액션"
+            case .channelReactionAgent: "에이전트 %@"
             case .channelCopyText: "텍스트 복사"
             case .channelDeleteMessage: "메시지 삭제"
             case .channelDeleteMessageConfirm: "이 메시지를 삭제할까요? 답글이 있는 원문은 삭제 표시로 남아 스레드를 유지합니다."
@@ -1014,6 +1016,7 @@ enum L10n {
             case .channelLastReply: "last reply %@"
             case .channelReact: "React"
             case .channelReactWith: "React with %@"
+            case .channelReactionAgent: "Agent %@"
             case .channelCopyText: "Copy text"
             case .channelDeleteMessage: "Delete message"
             case .channelDeleteMessageConfirm: "Delete this message? A root with replies will remain as a deleted-message marker so the thread stays available."
@@ -1113,6 +1116,7 @@ enum L10n {
             case .channelLastReply: "最后回复于%@"
             case .channelReact: "React"
             case .channelReactWith: "用 %@ 回应"
+            case .channelReactionAgent: "智能体 %@"
             case .channelCopyText: "复制文本"
             case .channelDeleteMessage: "删除消息"
             case .channelDeleteMessageConfirm: "要删除这条消息吗？如果主消息仍有回复，将保留删除标记以维持话题结构。"

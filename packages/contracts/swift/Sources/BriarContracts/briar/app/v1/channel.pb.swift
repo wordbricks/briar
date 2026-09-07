@@ -2320,11 +2320,21 @@ public nonisolated struct BriarAPI_ChannelMessageReactionPerson: Sendable {
   /// Clears the value of `image`. Subsequent reads from it will return its default value.
   public mutating func clearImage() {self._image = nil}
 
+  public var agentID: String {
+    get {_agentID ?? String()}
+    set {_agentID = newValue}
+  }
+  /// Returns true if `agentID` has been explicitly set.
+  public var hasAgentID: Bool {self._agentID != nil}
+  /// Clears the value of `agentID`. Subsequent reads from it will return its default value.
+  public mutating func clearAgentID() {self._agentID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _image: String? = nil
+  fileprivate var _agentID: String? = nil
 }
 
 public nonisolated struct BriarAPI_ChannelMessageReaction: Sendable {
@@ -2339,6 +2349,8 @@ public nonisolated struct BriarAPI_ChannelMessageReaction: Sendable {
   public var userIds: [String] = []
 
   public var people: [BriarAPI_ChannelMessageReactionPerson] = []
+
+  public var agentIds: [String] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -6832,7 +6844,7 @@ nonisolated extension BriarAPI_ChannelMessageAuthor: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_ChannelMessageReactionPerson: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelMessageReactionPerson"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{1}name\0\u{1}image\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{1}name\0\u{1}image\0\u{3}agent_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6843,6 +6855,7 @@ nonisolated extension BriarAPI_ChannelMessageReactionPerson: SwiftProtobuf.Messa
       case 1: try { try decoder.decodeSingularStringField(value: &self.userID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._image) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._agentID) }()
       default: break
       }
     }
@@ -6862,6 +6875,9 @@ nonisolated extension BriarAPI_ChannelMessageReactionPerson: SwiftProtobuf.Messa
     try { if let v = self._image {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
     } }()
+    try { if let v = self._agentID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6869,6 +6885,7 @@ nonisolated extension BriarAPI_ChannelMessageReactionPerson: SwiftProtobuf.Messa
     if lhs.userID != rhs.userID {return false}
     if lhs.name != rhs.name {return false}
     if lhs._image != rhs._image {return false}
+    if lhs._agentID != rhs._agentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6876,7 +6893,7 @@ nonisolated extension BriarAPI_ChannelMessageReactionPerson: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_ChannelMessageReaction: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelMessageReaction"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}emoji\0\u{1}count\0\u{3}user_ids\0\u{1}people\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}emoji\0\u{1}count\0\u{3}user_ids\0\u{1}people\0\u{3}agent_ids\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6888,6 +6905,7 @@ nonisolated extension BriarAPI_ChannelMessageReaction: SwiftProtobuf.Message, Sw
       case 2: try { try decoder.decodeSingularUInt32Field(value: &self.count) }()
       case 3: try { try decoder.decodeRepeatedStringField(value: &self.userIds) }()
       case 4: try { try decoder.decodeRepeatedMessageField(value: &self.people) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.agentIds) }()
       default: break
       }
     }
@@ -6906,6 +6924,9 @@ nonisolated extension BriarAPI_ChannelMessageReaction: SwiftProtobuf.Message, Sw
     if !self.people.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.people, fieldNumber: 4)
     }
+    if !self.agentIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.agentIds, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6914,6 +6935,7 @@ nonisolated extension BriarAPI_ChannelMessageReaction: SwiftProtobuf.Message, Sw
     if lhs.count != rhs.count {return false}
     if lhs.userIds != rhs.userIds {return false}
     if lhs.people != rhs.people {return false}
+    if lhs.agentIds != rhs.agentIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

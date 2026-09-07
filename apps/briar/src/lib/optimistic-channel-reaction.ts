@@ -42,7 +42,9 @@ export function toggleOptimisticChannelReaction(
   if (hasUser) {
     const nextUserIds = existing.userIds.filter((id) => id !== currentUserId);
     const nextCount = Math.max(0, existing.count - 1);
-    if (nextCount === 0 || nextUserIds.length === 0) {
+    // An Agent reaction can remain after this user's reaction is removed, so
+    // the aggregate only disappears when its total count reaches zero.
+    if (nextCount === 0) {
       return reactions.filter((_, index) => index !== existingIndex);
     }
     const next = [...reactions];

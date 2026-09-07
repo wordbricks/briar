@@ -82109,6 +82109,13 @@ pub struct ChannelMessageReactionPerson {
     /// Field 3: `image`
     #[serde(rename = "image", skip_serializing_if = "::core::option::Option::is_none")]
     pub image: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub agent_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -82119,6 +82126,7 @@ impl ::core::fmt::Debug for ChannelMessageReactionPerson {
             .field("user_id", &self.user_id)
             .field("name", &self.name)
             .field("image", &self.image)
+            .field("agent_id", &self.agent_id)
             .finish()
     }
 }
@@ -82138,6 +82146,16 @@ impl ChannelMessageReactionPerson {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.image = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::agent_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_agent_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.agent_id = Some(value.into());
         self
     }
 }
@@ -82170,6 +82188,9 @@ impl ::buffa::Message for ChannelMessageReactionPerson {
         if let Some(ref v) = self.image {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.agent_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -82188,6 +82209,9 @@ impl ::buffa::Message for ChannelMessageReactionPerson {
         }
         if let Some(ref v) = self.image {
             ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.agent_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -82226,6 +82250,18 @@ impl ::buffa::Message for ChannelMessageReactionPerson {
                     buf,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .agent_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -82237,6 +82273,7 @@ impl ::buffa::Message for ChannelMessageReactionPerson {
         self.user_id.clear();
         self.name.clear();
         self.image = ::core::option::Option::None;
+        self.agent_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -82302,6 +82339,14 @@ pub struct ChannelMessageReaction {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub people: ::buffa::alloc::vec::Vec<ChannelMessageReactionPerson>,
+    /// Field 5: `agent_ids`
+    #[serde(
+        rename = "agentIds",
+        alias = "agent_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub agent_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -82313,6 +82358,7 @@ impl ::core::fmt::Debug for ChannelMessageReaction {
             .field("count", &self.count)
             .field("user_ids", &self.user_ids)
             .field("people", &self.people)
+            .field("agent_ids", &self.agent_ids)
             .finish()
     }
 }
@@ -82360,6 +82406,9 @@ impl ::buffa::Message for ChannelMessageReaction {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        for v in &self.agent_ids {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -82386,6 +82435,9 @@ impl ::buffa::Message for ChannelMessageReaction {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        for v in &self.agent_ids {
+            ::buffa::types::put_string_field(5u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -82437,6 +82489,17 @@ impl ::buffa::Message for ChannelMessageReaction {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.people.push(elem);
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.agent_ids.push(__elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -82449,6 +82512,7 @@ impl ::buffa::Message for ChannelMessageReaction {
         self.count = 0u32;
         self.user_ids.clear();
         self.people.clear();
+        self.agent_ids.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -270425,6 +270489,8 @@ pub mod __buffa {
             pub name: &'a str,
             /// Field 3: `image`
             pub image: ::core::option::Option<&'a str>,
+            /// Field 4: `agent_id`
+            pub agent_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ChannelMessageReactionPersonView<'a> {
@@ -270480,6 +270546,13 @@ pub mod __buffa {
                         )?;
                         view.image = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.agent_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -270512,6 +270585,7 @@ pub mod __buffa {
                     user_id: self.user_id.to_string(),
                     name: self.name.to_string(),
                     image: self.image.map(|s| s.to_string()),
+                    agent_id: self.agent_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -270537,6 +270611,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.image {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if let Some(ref v) = self.agent_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -270556,6 +270633,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.image {
                     ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if let Some(ref v) = self.agent_id {
+                    ::buffa::types::put_string_field(4u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -270586,6 +270666,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.image {
                     __map.serialize_entry("image", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.agent_id {
+                    __map.serialize_entry("agentId", __v)?;
                 }
                 __map.end()
             }
@@ -270703,6 +270786,11 @@ pub mod __buffa {
             pub fn image(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().image
             }
+            /// Field 4: `agent_id`
+            #[must_use]
+            pub fn agent_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().agent_id
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<ChannelMessageReactionPersonView<'static>>,
@@ -270753,6 +270841,8 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::ChannelMessageReactionPersonView<'a>,
             >,
+            /// Field 5: `agent_ids`
+            pub agent_ids: ::buffa::RepeatedView<'a, &'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ChannelMessageReactionView<'a> {
@@ -270832,6 +270922,17 @@ pub mod __buffa {
                                 )?,
                             );
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.agent_ids.push(__elem);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -270869,6 +270970,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    agent_ids: self.agent_ids.iter().map(|s| s.to_string()).collect(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -270901,6 +271003,9 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                for v in &self.agent_ids {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -270928,6 +271033,9 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                for v in &self.agent_ids {
+                    ::buffa::types::put_string_field(5u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -270965,6 +271073,9 @@ pub mod __buffa {
                 }
                 if !self.people.is_empty() {
                     __map.serialize_entry("people", &*self.people)?;
+                }
+                if !self.agent_ids.is_empty() {
+                    __map.serialize_entry("agentIds", &*self.agent_ids)?;
                 }
                 __map.end()
             }
@@ -271085,6 +271196,11 @@ pub mod __buffa {
                 super::super::__buffa::view::ChannelMessageReactionPersonView<'_>,
             > {
                 &self.0.reborrow().people
+            }
+            /// Field 5: `agent_ids`
+            #[must_use]
+            pub fn agent_ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().agent_ids
             }
         }
         impl ::core::convert::From<

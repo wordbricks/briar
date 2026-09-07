@@ -328,6 +328,7 @@ export const en = {
   "channel.deleting": "Deleting…",
   "channel.reactionPeople": "{emoji} reaction",
   "channel.reactionPeopleLabel": "{emoji} {count} · {names}",
+  "channel.reactionAgent": "Agent {name}",
   "channel.reactionPeopleMore": "+{count} more",
   "channel.reactionUnknown": "Unknown member",
   "channel.loadingMessages": "Loading messages…",

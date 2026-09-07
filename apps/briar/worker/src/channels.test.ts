@@ -3405,6 +3405,109 @@ describe("organization channels", () => {
     expect(again).toHaveLength(2);
   });
 
+  it("acknowledges DM reply jobs once per Agent and leaves regular channels unchanged", async () => {
+    const agentId = "aa000000-0000-4000-8000-000000000130";
+    await createOrganizationAgent(db, {
+      id: agentId,
+      organizationId,
+      name: "Reaction Assistant",
+      provider: "claude",
+      model: null,
+      responsibility: "Acknowledge direct messages.",
+      effort: null,
+      createdAt: at(22),
+    });
+
+    const direct = await createDirectMessageThroughApplication({
+      memberIds: [],
+      agentIds: [agentId],
+    });
+    const messageInput = {
+      body: "Please take a look",
+      clientMessageId: "aa000000-0000-4000-8000-000000000131",
+    };
+    const first = await createMessageThroughApplication(
+      direct.channel.id,
+      messageInput,
+    );
+    expect(first.agentReplies).toHaveLength(1);
+    expect(first.message.reactions).toEqual([{
+      emoji: "👀",
+      count: 1,
+      userIds: [],
+      agentIds: [agentId],
+      people: [{
+        agentId,
+        name: "Reaction Assistant",
+        image: null,
+      }],
+    }]);
+
+    const replay = await createMessageThroughApplication(
+      direct.channel.id,
+      messageInput,
+    );
+    expect(replay.message.id).toBe(first.message.id);
+    const reactionCount = await db.prepare(
+      `select count(*) as count from briar_channel_message_reactions
+       where message_id = ? and agent_id = ? and emoji = '👀'`,
+    ).bind(first.message.id, agentId).first<{ count: number }>();
+    expect(reactionCount?.count).toBe(1);
+
+    const withUser = await toggleChannelMessageReaction(db, {
+      channelId: direct.channel.id,
+      messageId: first.message.id,
+      userId: ownerId,
+      emoji: "👀",
+      createdAt: at(23),
+    });
+    expect(withUser?.reactions[0]).toMatchObject({
+      count: 2,
+      userIds: [ownerId],
+      agentIds: [agentId],
+    });
+    const agentOnly = await toggleChannelMessageReaction(db, {
+      channelId: direct.channel.id,
+      messageId: first.message.id,
+      userId: ownerId,
+      emoji: "👀",
+      createdAt: at(24),
+    });
+    expect(agentOnly?.reactions[0]).toMatchObject({
+      count: 1,
+      userIds: [],
+      agentIds: [agentId],
+    });
+
+    const channelId = "e0000000-0000-4000-8000-0000000000a2";
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      kind: "channel",
+      dmKey: null,
+      slug: "reaction-channel",
+      name: "Reaction channel",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: at(25),
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: at(25),
+    });
+    const channelMessage = await createMessageThroughApplication(channelId, {
+      body: "Mention the Agent in a channel",
+      mentionedAgentIds: [agentId],
+      clientMessageId: "aa000000-0000-4000-8000-000000000132",
+    });
+    expect(channelMessage.agentReplies).toHaveLength(1);
+    expect(channelMessage.message.reactions).toEqual([]);
+  });
+
   it("creates an isolated, idempotent self-DM and clears its key when expanded", async () => {
     const createSelf = () => createDirectMessageThroughApplication({
       memberIds: [ownerId],

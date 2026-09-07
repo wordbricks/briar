@@ -272,6 +272,10 @@ export type ChannelMessageMutationCommit = ChannelMessageUploadScope & {
 export type ChannelAgentReplyEnqueueInput = {
   organizationId: string;
   channelId: string;
+  /** The originating channel kind controls DM-only acknowledgement reactions. */
+  channelKind?: ChannelKind;
+  /** Internal guard: only user-authored DM messages may acknowledge an Agent. */
+  addAgentAcknowledgementReaction?: boolean;
   triggerMessageId: string;
   parentMessageId: string;
   agents: Array<{
@@ -996,17 +1000,21 @@ export function isChannelReactionEmoji(value: string) {
 function aggregateReactions(
   rows: Array<{
     message_id: string;
-    user_id: string;
+    user_id: string | null;
+    agent_id: string | null;
     emoji: string;
     created_at: string;
     user_name: string | null;
     user_image: string | null;
+    agent_name: string | null;
+    agent_image: string | null;
   }>,
 ): Map<string, ChannelMessageReaction[]> {
   const byMessage = new Map<
     string,
     Map<string, {
       userIds: string[];
+      agentIds: string[];
       people: ChannelMessageReactionPerson[];
       firstCreatedAt: string;
     }>
@@ -1018,19 +1026,27 @@ function aggregateReactions(
       byMessage.set(row.message_id, emojiMap);
     }
     const current = emojiMap.get(row.emoji);
-    const person = row.user_name === null
-      ? null
-      : {
+    const person = row.agent_id !== null && row.agent_name !== null
+      ? {
+          agentId: row.agent_id,
+          name: row.agent_name,
+          image: row.agent_image,
+        } satisfies ChannelMessageReactionPerson
+      : row.user_id !== null && row.user_name !== null
+      ? {
           userId: row.user_id,
           name: row.user_name,
           image: row.user_image,
-        } satisfies ChannelMessageReactionPerson;
+        } satisfies ChannelMessageReactionPerson
+      : null;
     if (current) {
-      current.userIds.push(row.user_id);
+      if (row.user_id !== null) current.userIds.push(row.user_id);
+      if (row.agent_id !== null) current.agentIds.push(row.agent_id);
       if (person) current.people.push(person);
     } else {
       emojiMap.set(row.emoji, {
-        userIds: [row.user_id],
+        userIds: row.user_id === null ? [] : [row.user_id],
+        agentIds: row.agent_id === null ? [] : [row.agent_id],
         people: person ? [person] : [],
         firstCreatedAt: row.created_at,
       });
@@ -1041,8 +1057,9 @@ function aggregateReactions(
     const reactions = [...emojiMap.entries()]
       .map(([emoji, value]) => ({
         emoji,
-        count: value.userIds.length,
+        count: value.userIds.length + value.agentIds.length,
         userIds: value.userIds,
+        ...(value.agentIds.length > 0 ? { agentIds: value.agentIds } : {}),
         people: value.people,
         firstCreatedAt: value.firstCreatedAt,
       }))
@@ -1819,12 +1836,15 @@ async function attachMessageRelations(
       .all<ChannelMessageAttachmentRow>(),
     db
       .prepare(
-        `select reaction.message_id, reaction.user_id, reaction.emoji,
+        `select reaction.message_id, reaction.user_id, reaction.agent_id,
+                reaction.emoji,
                 reaction.created_at,
                 case when membership.user_id is null then null
                      else author.name end as user_name,
                 case when membership.user_id is null then null
-                     else author.image end as user_image
+                     else author.image end as user_image,
+                agent.name as agent_name,
+                agent.avatar as agent_image
          from briar_channel_message_reactions reaction
          join briar_channel_messages message
           on message.id = reaction.message_id
@@ -1834,17 +1854,24 @@ async function attachMessageRelations(
           on membership.organization_id = channel.organization_id
          and membership.user_id = reaction.user_id
          left join "user" author on author.id = reaction.user_id
+         left join briar_project_agents agent
+          on agent.id = reaction.agent_id
+         and agent.organization_id = channel.organization_id
          where reaction.message_id in (${placeholders})
-         order by reaction.created_at, reaction.emoji, reaction.user_id`,
+         order by reaction.created_at, reaction.emoji,
+                  coalesce(reaction.user_id, reaction.agent_id)`,
       )
       .bind(...ids)
       .all<{
         message_id: string;
-        user_id: string;
+        user_id: string | null;
+        agent_id: string | null;
         emoji: string;
         created_at: string;
         user_name: string | null;
         user_image: string | null;
+        agent_name: string | null;
+        agent_image: string | null;
       }>(),
     db
       .prepare(
@@ -2619,7 +2646,12 @@ export async function createChannelMessage(
       })
     : { sql: "", bindings: [] as unknown[] };
   const agentReplyStatements = input.agentReplyEnqueue
-    ? await channelAgentReplyEnqueueStatements(db, input.agentReplyEnqueue)
+    ? await channelAgentReplyEnqueueStatements(db, {
+        ...input.agentReplyEnqueue,
+        addAgentAcknowledgementReaction:
+          input.authorUserId !== null &&
+          input.agentReplyEnqueue.channelKind === "dm",
+      })
     : [];
   const statements = [
     db
@@ -3114,6 +3146,32 @@ async function channelAgentReplyEnqueueStatements(
           agent.skillId ?? null,
           agent.provider,
         ),
+        ...(input.addAgentAcknowledgementReaction
+          ? [
+              db.prepare(
+                `insert into briar_channel_message_reactions (
+                   message_id, user_id, agent_id, emoji, created_at
+                 )
+                 select ?, null, job.agent_id, '👀', ?
+                 from briar_channel_agent_reply_jobs job
+                 join briar_channels channel on channel.id = job.channel_id
+                 join briar_project_agents agent
+                   on agent.id = job.agent_id
+                  and agent.organization_id = channel.organization_id
+                 where job.channel_id = ?
+                   and job.trigger_message_id = ?
+                   and job.agent_id = ?
+                   and channel.kind = 'dm'
+                 on conflict do nothing`,
+              ).bind(
+                input.triggerMessageId,
+                input.createdAt,
+                input.channelId,
+                input.triggerMessageId,
+                agent.id,
+              ),
+            ]
+          : []),
         // Each message retains its job so a DM reply can stop that message
         // without revoking another message's work in this shared session.
         db.prepare(

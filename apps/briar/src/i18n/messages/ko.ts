@@ -532,6 +532,7 @@ export const ko = {
   "channel.reactionCount": "{emoji} {count}",
   "channel.reactionPeople": "{emoji} 리액션",
   "channel.reactionPeopleLabel": "{emoji} {count} · {names}",
+  "channel.reactionAgent": "에이전트 {name}",
   "channel.reactionPeopleMore": "+{count}명 더",
   "channel.reactionUnknown": "알 수 없는 멤버",
   "channel.messageActions": "메시지 동작",

@@ -61,6 +61,27 @@ describe("toggleOptimisticChannelReaction", () => {
     ]);
   });
 
+  it("keeps an Agent reaction when the current user removes their reaction", () => {
+    const initial: ChannelMessageReaction[] = [
+      {
+        emoji: "👀",
+        count: 2,
+        userIds: ["user-1"],
+        agentIds: ["agent-1"],
+      },
+    ];
+    const result = toggleOptimisticChannelReaction(initial, "👀", "user-1");
+
+    expect(result).toEqual([
+      {
+        emoji: "👀",
+        count: 1,
+        userIds: [],
+        agentIds: ["agent-1"],
+      },
+    ]);
+  });
+
   it("is reversible by toggling the same emoji again", () => {
     const initial: ChannelMessageReaction[] = [
       { emoji: "🎉", count: 1, userIds: ["user-2"] },
