@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { act } from "react";
+import { remoteDesktopCapturesKeyboard } from "../lib/remote-desktop-focus";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,14 +20,7 @@ import {
   type DmComputerRfbConstructor,
 } from "./DmComputerPanel";
 
-type FakeRfb = {
-  focusOnClick: boolean;
-  resizeSession: boolean;
-  scaleViewport: boolean;
-  target: Element;
-  viewOnly: boolean;
-  emit: (type: string, text?: string) => void;
-};
+type FakeRfb = FakeRfbClient;
 
 const noVncState = {
   instances: [] as FakeRfb[],
@@ -40,11 +34,22 @@ class FakeRfbClient {
   resizeSession = true;
   scaleViewport = false;
   viewOnly = false;
-  readonly target: Element;
+  readonly target: HTMLCanvasElement;
+  inputs: string[] = [];
+  clipboardPasteFrom = vi.fn();
+  sendKey = vi.fn();
+  disconnect = vi.fn();
+  blur = vi.fn();
+  sendCtrlAltDel = vi.fn();
   private readonly listeners = new Map<string, Set<(event: Event) => void>>();
 
   constructor(target: HTMLElement) {
-    this.target = target;
+    this.target = document.createElement("canvas");
+    this.target.tabIndex = 0;
+    target.appendChild(this.target);
+    for (const type of ["mousedown", "mouseup", "mousemove", "click", "wheel", "keydown", "keyup", "pointerdown", "pointermove", "pointerup", "touchstart", "touchend"]) {
+      this.target.addEventListener(type, () => this.inputs.push(type));
+    }
     noVncState.instances.push(this);
   }
 
@@ -58,9 +63,7 @@ class FakeRfbClient {
     this.listeners.get(type)?.delete(listener);
   }
 
-  disconnect() {}
-  focus() {}
-  sendCtrlAltDel() {}
+  focus() { this.target.focus(); }
 
   emit(type: string, text?: string) {
     const event = new CustomEvent(type, { detail: { text } });
@@ -267,6 +270,13 @@ describe("DmComputerPanel", () => {
     await act(async () => openButton?.click());
 
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(rfb.viewOnly).toBe(true);
+    const control = container.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(control.getAttribute("aria-checked")).toBe("false");
+    expect(control.getAttribute("aria-label")).toBe("Computer control");
+    expect(document.activeElement).toBe(control);
+    await act(async () => control.click());
+    expect(control.getAttribute("aria-checked")).toBe("true");
     expect(rfb.viewOnly).toBe(false);
     expect(noVncState.instances).toHaveLength(1);
 
@@ -309,6 +319,139 @@ describe("DmComputerPanel", () => {
       "computer-1",
       "remote-session-1",
     );
+  });
+
+  async function openScreen() {
+    const testRoot = createReactTestRoot({ attachToDocument: true });
+    await renderReactTestRoot(testRoot.root, <I18nProvider>
+      <DmComputerPanel agents={[dmAgent()]} organizationId="organization-1" services={services} token="session-token" />
+    </I18nProvider>);
+    await vi.waitFor(() => expect(noVncState.instances).toHaveLength(1));
+    const rfb = noVncState.instances[0]!;
+    await act(async () => rfb.emit("connect"));
+    const open = testRoot.container.querySelector<HTMLButtonElement>('[aria-label="Open full screen"]')!;
+    await act(async () => open.click());
+    const control = testRoot.container.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    return { ...testRoot, rfb, control };
+  }
+
+  function paste(target: Element, text: string) {
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { getData: () => text } });
+    target.dispatchEvent(event);
+  }
+
+  it("blocks screen input until explicit control and cancels queued paste on opt-out", async () => {
+    const { cleanup, container, control, rfb } = await openScreen();
+    expect(remoteDesktopCapturesKeyboard()).toBe(false);
+    const sendInputs = () => {
+      for (const type of ["mousedown", "mouseup", "mousemove", "click", "wheel", "keydown", "keyup", "pointerdown", "pointermove", "pointerup", "touchstart", "touchend"]) {
+        rfb.target.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
+      }
+      paste(rfb.target, "private clipboard");
+    };
+    await act(async () => sendInputs());
+    expect(rfb.inputs).toEqual([]);
+    expect(rfb.clipboardPasteFrom).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Input blocked");
+    expect(container.textContent).toContain("sign in, or take over from the agent");
+    const cad = [...container.querySelectorAll("button")].find(button => button.textContent?.includes("Ctrl Alt Del"))!;
+    expect(cad.disabled).toBe(true);
+    await act(async () => control.click());
+    expect(remoteDesktopCapturesKeyboard()).toBe(true);
+    expect(rfb.focusOnClick).toBe(true);
+    await act(async () => {
+      rfb.target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, buttons: 1 }));
+      rfb.target.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, buttons: 1 }));
+      rfb.target.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 10 }));
+      rfb.target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "a" }));
+      cad.click();
+      paste(rfb.target, "first");
+      paste(rfb.target, "queued");
+    });
+    expect(rfb.inputs).toEqual(["mousedown", "mousemove", "wheel", "keydown"]);
+    expect(rfb.sendCtrlAltDel).toHaveBeenCalledTimes(1);
+    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("first");
+    const releaseCapture = vi.fn((event: MouseEvent) => {
+      rfb.target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, buttons: 0 }));
+      event.preventDefault();
+    });
+    window.addEventListener("mouseup", releaseCapture, { once: true });
+    await act(async () => control.click());
+    expect(rfb.inputs.at(-1)).toBe("mouseup");
+    expect(rfb.blur).toHaveBeenCalled();
+    expect(releaseCapture).toHaveBeenCalledTimes(1);
+    expect(rfb.viewOnly).toBe(true);
+    expect(rfb.focusOnClick).toBe(false);
+    expect(remoteDesktopCapturesKeyboard()).toBe(false);
+    rfb.inputs = [];
+    await act(async () => sendInputs());
+    await act(async () => new Promise(resolve => setTimeout(resolve, 600)));
+    expect(rfb.inputs).toEqual([]);
+    expect(rfb.sendKey).not.toHaveBeenCalled();
+    expect(rfb.clipboardPasteFrom).toHaveBeenCalledTimes(1);
+    expect(createRemoteSession).toHaveBeenCalledTimes(1);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+    expect(rfb.disconnect).not.toHaveBeenCalled();
+    await cleanup();
+  });
+
+  it("pastes only after consent while keeping the existing handoff session", async () => {
+    const { cleanup, control, rfb } = await openScreen();
+    await act(async () => control.click());
+    await act(async () => paste(rfb.target, "login text"));
+    await act(async () => new Promise(resolve => setTimeout(resolve, 600)));
+    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("login text");
+    expect(rfb.sendKey.mock.calls).toEqual([
+      [0xffe1, "ShiftLeft", true], [0xff63, "Insert", true],
+      [0xff63, "Insert", false], [0xffe1, "ShiftLeft", false],
+    ]);
+    expect(createRemoteSession).toHaveBeenCalledTimes(1);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+    await cleanup();
+  });
+
+  it.each(["disconnect", "securityfailure"])("resets consent after %s and ignores stale connection events", async (event) => {
+    const { cleanup, container, control, rfb } = await openScreen();
+    await act(async () => control.click());
+    await act(async () => rfb.emit(event));
+    expect(control.getAttribute("aria-checked")).toBe("false");
+    expect(control.disabled).toBe(true);
+    expect(rfb.viewOnly).toBe(true);
+    expect(remoteDesktopCapturesKeyboard()).toBe(false);
+    const reconnect = [...container.querySelectorAll("button")].find(button => button.textContent === "Reconnect")!;
+    await act(async () => reconnect.click());
+    await vi.waitFor(() => expect(noVncState.instances).toHaveLength(2));
+    const next = noVncState.instances[1]!;
+    await act(async () => next.emit("connect"));
+    expect(next.viewOnly).toBe(true);
+    expect(control.getAttribute("aria-checked")).toBe("false");
+    expect(createRemoteSession).toHaveBeenLastCalledWith("session-token", "organization-1", "computer-1", expect.objectContaining({ reconnectSessionId: ticket.session.id }));
+    await act(async () => control.click());
+    await act(async () => rfb.emit("disconnect"));
+    expect(next.viewOnly).toBe(false);
+    await cleanup();
+    expect(remoteDesktopCapturesKeyboard()).toBe(false);
+  });
+
+  it("returns keyboard focus to control with Tab and reopens in view-only after Escape", async () => {
+    const { cleanup, container, control, rfb } = await openScreen();
+    expect(document.activeElement).toBe(control);
+    await act(async () => control.click());
+    rfb.focus();
+    await act(async () => rfb.target.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true })));
+    expect(document.activeElement).toBe(control);
+    expect(rfb.inputs).toEqual([]);
+    await act(async () => rfb.target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })));
+    expect(rfb.viewOnly).toBe(true);
+    const open = container.querySelector<HTMLButtonElement>('[aria-label="Open full screen"]')!;
+    expect(document.activeElement).toBe(open);
+    await act(async () => open.click());
+    expect(container.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("false");
+    expect(rfb.viewOnly).toBe(true);
+    expect(createRemoteSession).toHaveBeenCalledTimes(1);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+    await cleanup();
   });
 
   it("keeps the live screen when the DM roster resolves again", async () => {
