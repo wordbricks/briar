@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type UIEvent,
   type MutableRefObject,
 } from "react";
 
@@ -18,6 +19,8 @@ import { type AgentProvider } from "@/lib/team-llm";
 import { runIsProcessingAtom } from "@/state/agent-sessions/atoms";
 import { boardSourceAtom, companionRunIdsAtom } from "@/state/board/atoms";
 import { runAtom } from "@/state/entities/runs";
+import { mobileIssueListStateAtom } from "@/state/team/atoms";
+import { useTeamSyncLoader } from "@/state/sync/loader";
 import type { PlanningProject, Project } from "@/types";
 import { BoardCard } from "./BoardCard";
 import { CompanionTaskSwipeAction } from "./CompanionTaskSwipeAction";
@@ -95,11 +98,22 @@ export function CompanionTaskBoard({
 }) {
   const { t } = useI18n();
   const runIds = useAtomValue(companionRunIdsAtom(teamId));
+  const listState = useAtomValue(mobileIssueListStateAtom(teamId));
+  const syncLoader = useTeamSyncLoader();
   const [source, setSource] = useAtom(boardSourceAtom);
   const [isSourceFilterOpen, setIsSourceFilterOpen] = useState(false);
   const [cursorRunId, setCursorRunId] = useState<string | null>(null);
   const sourceFilterRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    if (
+      element.scrollHeight - element.scrollTop - element.clientHeight < 480
+    ) {
+      void syncLoader.loadNextPage(teamId);
+    }
+  };
 
   useEffect(() => {
     if (!isSourceFilterOpen) return;
@@ -191,7 +205,7 @@ export function CompanionTaskBoard({
     ],
   );
 
-  return <div className="dashboard-scroll">
+  return <div className="dashboard-scroll" onScroll={handleScroll}>
       <div className="queue-header">
         <div className="queue-heading">
           <div className="queue-heading-copy">
@@ -230,6 +244,9 @@ export function CompanionTaskBoard({
               <section aria-label={t("companion.navTasks")} className="kanban-column slate companion-task-stream" data-kanban-column-collapsed="false" data-kanban-column-id="companion-tasks">
                 <div className="kanban-column-content">
                   {runIds.map(runId => <CompanionTaskRow context={context} key={runId} runId={runId} />)}
+                  {listState.isLoadingNextPage && <div aria-live="polite" aria-busy="true" className="py-4" role="status">
+                    <LoadingState label={t("dashboard.loadingIssues")} />
+                  </div>}
                 </div>
               </section>
             </div>}

@@ -101,6 +101,61 @@ export const listHuntRunEvents = (
 ): Promise<Array<HuntEventRow>> =>
   runD1(db, listHuntRunEventsEffect(projectId, runId));
 
+export type HuntRunEventsPageCursor = {
+  readonly occurredAt: string;
+  readonly id: string;
+};
+
+export async function listHuntRunEventsPage(
+  db: D1Database,
+  projectId: string,
+  runId: string,
+  options: {
+    readonly limit: number;
+    readonly cursor?: HuntRunEventsPageCursor | null;
+  },
+) {
+  const conditions = [
+    "run.project_id = ?",
+    "event.run_id = ?",
+  ];
+  const bindings: Array<string | number> = [projectId, runId];
+  if (options.cursor) {
+    conditions.push(
+      "(event.occurred_at < ? or (event.occurred_at = ? and event.id < ?))",
+    );
+    bindings.push(
+      options.cursor.occurredAt,
+      options.cursor.occurredAt,
+      options.cursor.id,
+    );
+  }
+  const result = await db
+    .prepare(
+      `select event.id, event.run_id, event.event_key, event.attempt,
+              event.revision, event.stage, event.status, event.workflow_stage,
+              event.detail, event.actor, event.branch, event.commit_sha,
+              event.qa_status, event.tracker_issue_state,
+              event.pull_request_urls, event.target_sha,
+              event.occurred_at, event.recorded_at
+       from briar_hunt_events event
+       join briar_hunt_runs run on run.id = event.run_id
+       where ${conditions.join(" and ")}
+       order by event.occurred_at desc, event.id desc
+       limit ?`,
+    )
+    .bind(...bindings, options.limit + 1)
+    .all<HuntEventRow>();
+  const events = result.results.slice(0, options.limit);
+  const last = events.at(-1);
+  return {
+    events,
+    nextCursor: result.results.length > options.limit && last
+      ? { occurredAt: last.occurred_at, id: last.id }
+      : null,
+  };
+}
+
 export const resolveHuntEventActorNames = (
   db: D1Database,
   projectId: string,

@@ -65,6 +65,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let resultSummary: String?
     let structuredResult: StructuredRunResult?
     let resultReviews: [ResultReview]?
+    let hasResultReview: Bool?
     let pullRequestUrls: [URL]?
     let branch: String?
     let commitSha: String?
@@ -126,6 +127,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         resultSummary: String? = nil,
         structuredResult: StructuredRunResult? = nil,
         resultReviews: [ResultReview]? = nil,
+        hasResultReview: Bool? = nil,
         pullRequestUrls: [URL]? = nil,
         branch: String? = nil,
         commitSha: String? = nil,
@@ -186,6 +188,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.resultSummary = resultSummary
         self.structuredResult = structuredResult
         self.resultReviews = resultReviews
+        self.hasResultReview = hasResultReview ?? (resultReviews?.isEmpty == false ? true : nil)
         self.pullRequestUrls = pullRequestUrls
         self.branch = branch
         self.commitSha = commitSha
@@ -495,6 +498,12 @@ struct DashboardSnapshot: Equatable, Sendable {
         self.cursor = cursor
         self.generatedAt = generatedAt
     }
+}
+
+struct DashboardRunListPage: Equatable, Sendable {
+    let runs: [DashboardRun]
+    let nextCursor: String?
+    let generatedAt: Date
 }
 
 struct DashboardDelta: Equatable, Sendable {

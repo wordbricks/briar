@@ -33,6 +33,11 @@ struct CompanionShellView: View {
     var selectedPlanningProjectID: UUID? = nil
     let project: Project
     let snapshot: DashboardSnapshot?
+    let listRuns: [DashboardRun]
+    let listHasLoaded: Bool
+    let listIsLoading: Bool
+    let listIsLoadingNextPage: Bool
+    let listHasMore: Bool
     let errorMessage: String?
     let token: String
     let api: any AuthenticatedDownloadClientProtocol
@@ -40,6 +45,8 @@ struct CompanionShellView: View {
     let realtimeClient: (any MobileRealtimeClientProtocol)?
     let user: CurrentUser?
     let refresh: () async -> Void
+    let setListFilter: (TaskFilter) -> Void
+    let loadNextListPage: () async -> Void
     let ensureIssueAvailable: (UUID, UUID) async -> Bool
     let selectProject: (UUID) -> Void
     var selectPlanningProject: (UUID?) -> Void = { _ in }
@@ -161,6 +168,11 @@ struct CompanionShellView: View {
                     selectedPlanningProjectID: selectedPlanningProjectID,
                     projectAgents: agents.agents.filter { $0.projectId == project.id },
                     snapshot: snapshot,
+                    listRuns: listRuns,
+                    listHasLoaded: listHasLoaded,
+                    listIsLoading: listIsLoading,
+                    listIsLoadingNextPage: listIsLoadingNextPage,
+                    listHasMore: listHasMore,
                     errorMessage: errorMessage,
                     token: token,
                     api: api,
@@ -169,6 +181,8 @@ struct CompanionShellView: View {
                     currentUserID: user?.id,
                     issueConversationView: issueConversationView,
                     refresh: refresh,
+                    setListFilter: setListFilter,
+                    loadNextPage: loadNextListPage,
                     onRelatedMessageOpen: openRelatedMessage,
                     onSkillSessionMaterialized: { agents.materialize($0) },
                     onSkillSessionOpen: { projectID, sessionID in
@@ -567,6 +581,11 @@ struct TaskListView: View {
     let selectedPlanningProjectID: UUID?
     let projectAgents: [ProjectAgent]
     let snapshot: DashboardSnapshot?
+    let listRuns: [DashboardRun]
+    let listHasLoaded: Bool
+    let listIsLoading: Bool
+    let listIsLoadingNextPage: Bool
+    let listHasMore: Bool
     let errorMessage: String?
     let token: String
     let api: any AuthenticatedDownloadClientProtocol
@@ -575,6 +594,8 @@ struct TaskListView: View {
     let currentUserID: String?
     let issueConversationView: IssueConversationViewTracker?
     let refresh: () async -> Void
+    let setListFilter: (TaskFilter) -> Void
+    let loadNextPage: () async -> Void
     let onRelatedMessageOpen: (RelatedMessageReference) -> Void
     let onSkillSessionMaterialized: SkillSessionMaterializedHandler
     let onSkillSessionOpen: SkillSessionOpenHandler
@@ -587,6 +608,11 @@ struct TaskListView: View {
         selectedPlanningProjectID: UUID? = nil,
         projectAgents: [ProjectAgent] = [],
         snapshot: DashboardSnapshot?,
+        listRuns: [DashboardRun] = [],
+        listHasLoaded: Bool = false,
+        listIsLoading: Bool = false,
+        listIsLoadingNextPage: Bool = false,
+        listHasMore: Bool = false,
         errorMessage: String?,
         token: String,
         api: any AuthenticatedDownloadClientProtocol,
@@ -595,6 +621,8 @@ struct TaskListView: View {
         currentUserID: String? = nil,
         issueConversationView: IssueConversationViewTracker? = nil,
         refresh: @escaping () async -> Void,
+        setListFilter: @escaping (TaskFilter) -> Void = { _ in },
+        loadNextPage: @escaping () async -> Void = {},
         onRelatedMessageOpen: @escaping (RelatedMessageReference) -> Void = { _ in },
         onSkillSessionMaterialized: @escaping SkillSessionMaterializedHandler = { _ in },
         onSkillSessionOpen: @escaping SkillSessionOpenHandler = { _, _ in }
@@ -605,6 +633,11 @@ struct TaskListView: View {
         self.selectedPlanningProjectID = selectedPlanningProjectID
         self.projectAgents = projectAgents
         self.snapshot = snapshot
+        self.listRuns = listRuns
+        self.listHasLoaded = listHasLoaded
+        self.listIsLoading = listIsLoading
+        self.listIsLoadingNextPage = listIsLoadingNextPage
+        self.listHasMore = listHasMore
         self.errorMessage = errorMessage
         self.token = token
         self.api = api
@@ -613,6 +646,8 @@ struct TaskListView: View {
         self.currentUserID = currentUserID
         self.issueConversationView = issueConversationView
         self.refresh = refresh
+        self.setListFilter = setListFilter
+        self.loadNextPage = loadNextPage
         self.onRelatedMessageOpen = onRelatedMessageOpen
         self.onSkillSessionMaterialized = onSkillSessionMaterialized
         self.onSkillSessionOpen = onSkillSessionOpen
@@ -626,13 +661,14 @@ struct TaskListView: View {
     }
 
     private var runs: [DashboardRun] {
-        let scopedRuns = (snapshot?.runs ?? []).filter { run in
+        let sourceRuns = listHasLoaded ? listRuns : (snapshot?.runs ?? [])
+        let scopedRuns = sourceRuns.filter { run in
             guard let selectedPlanningProjectID else { return true }
             return run.projectId == nil || run.projectId == selectedPlanningProjectID
         }
-        return TaskOrdering.byMostRecentlyUpdated(
-            scopedRuns.filter(filter.includes)
-        )
+        return listHasLoaded
+            ? scopedRuns.filter(filter.includes)
+            : TaskOrdering.byMostRecentlyUpdated(scopedRuns.filter(filter.includes))
     }
 
     var body: some View {
@@ -646,8 +682,11 @@ struct TaskListView: View {
             .padding(.horizontal)
             .padding(.vertical, 10)
             .accessibilityIdentifier("task-filter")
+            .onChange(of: filter) { _, updated in
+                setListFilter(updated)
+            }
 
-            if let errorMessage, snapshot == nil {
+            if let errorMessage, !listHasLoaded, snapshot == nil {
                 OfflineStateView(message: errorMessage, refresh: refresh)
             } else {
                 List {
@@ -664,7 +703,7 @@ struct TaskListView: View {
                                 .foregroundStyle(.red)
                         }
                     }
-                    if snapshot == nil {
+                    if !listHasLoaded && (snapshot == nil || listIsLoading) {
                         HStack {
                             Spacer()
                             ProgressView(L10n.text("작업을 불러오는 중…"))
@@ -687,7 +726,7 @@ struct TaskListView: View {
                                     services: services,
                                     realtimeClient: realtimeClient,
                                     projects: projects,
-                                    allRuns: snapshot?.runs ?? [],
+                                    allRuns: listHasLoaded ? listRuns : (snapshot?.runs ?? []),
                                     projectAgents: projectAgents,
                                     workers: snapshot?.workers ?? [],
                                     providers: snapshot?.organizationProviders ?? [],
@@ -752,6 +791,19 @@ struct TaskListView: View {
                                 }
                             }
                         }
+                    }
+                    if listIsLoadingNextPage {
+                        Section {
+                            HStack {
+                                Spacer()
+                                ProgressView(L10n.text("작업을 불러오는 중…"))
+                                Spacer()
+                            }
+                        }
+                    } else if listHasMore, !runs.isEmpty {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear { Task { await loadNextPage() } }
                     }
                     if let generatedAt = snapshot?.generatedAt {
                         Section {
@@ -1022,7 +1074,7 @@ struct RunRow: View {
                 Spacer(minLength: 8)
                 StatusBadge(
                     status: run.status,
-                    reviewed: !(run.resultReviews ?? []).isEmpty
+                    reviewed: run.hasResultReview == true || !(run.resultReviews ?? []).isEmpty
                 )
                 .fixedSize(horizontal: true, vertical: false)
             }
@@ -1420,7 +1472,7 @@ struct RunDetailView: View {
             model: run.preferredModel,
             effort: run.preferredEffort
         ))
-        _reviewCompleted = State(initialValue: !(run.resultReviews ?? []).isEmpty)
+        _reviewCompleted = State(initialValue: run.hasResultReview == true || !(run.resultReviews ?? []).isEmpty)
         _subscribers = State(initialValue: run.subscribers ?? [])
         _transferTargetProjectID = State(initialValue: projects.first(where: {
             $0.id != projectID &&
@@ -1622,6 +1674,11 @@ struct RunDetailView: View {
                     }
                 } else {
                     issueConversationView?.leave(runID: run.id)
+                }
+                if tab == .result {
+                    Task { await detail.loadEvidence() }
+                } else if tab == .logs {
+                    Task { await detail.loadEvents() }
                 }
             }
             .onChange(of: run.status) { _, status in
@@ -3156,6 +3213,10 @@ struct RunDetailView: View {
     private var resultTabContent: some View {
         detailLoadingContent
 
+        if detail.evidenceLoading {
+            Section { ProgressView(L10n.text("증빙을 불러오는 중…", locale: locale)) }
+        }
+
         if let summary = run.structuredResult?.summary ?? run.resultSummary, !summary.isEmpty {
             Section(L10n.text("결과", locale: locale)) {
                 MarkdownText(markdown: summary)
@@ -3197,7 +3258,7 @@ struct RunDetailView: View {
             }
         }
 
-        if resultIsEmpty, !detail.loading, detail.errorMessage == nil {
+        if resultIsEmpty, !detail.loading, !detail.evidenceLoading, detail.errorMessage == nil {
             Section { ContentUnavailableView(L10n.text("결과 없음", locale: locale), systemImage: "checkmark.seal") }
         }
     }
@@ -3205,6 +3266,7 @@ struct RunDetailView: View {
     private var resultIsEmpty: Bool {
         let summary = run.structuredResult?.summary ?? run.resultSummary
         return summary?.isEmpty != false &&
+            run.hasResultReview != true &&
             run.resultReviews?.isEmpty != false &&
             detail.evidence.isEmpty
     }
@@ -3259,6 +3321,9 @@ struct RunDetailView: View {
     @ViewBuilder
     private var logsTabContent: some View {
         detailLoadingContent
+        if detail.eventsLoading {
+            Section { ProgressView(L10n.text("실행 로그를 불러오는 중…", locale: locale)) }
+        }
         if detail.events.isEmpty, !detail.loading, detail.errorMessage == nil {
             Section { ContentUnavailableView(L10n.text("로그 없음", locale: locale), systemImage: "text.alignleft") }
         } else if !detail.events.isEmpty {
@@ -3277,6 +3342,22 @@ struct RunDetailView: View {
                         Text(event.actorName ?? event.actor).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+            }
+        }
+        if let nextCursor = detail.eventsNextCursor, !nextCursor.isEmpty {
+            Section {
+                Button(L10n.text("다음 로그 불러오기", locale: locale)) {
+                    Task { await detail.loadEvents(includeArchived: detail.eventsArchivesIncluded) }
+                }
+                .disabled(detail.eventsLoading)
+            }
+        }
+        if !detail.eventsArchivesIncluded {
+            Section {
+                Button(L10n.text("보관 로그 불러오기", locale: locale)) {
+                    Task { await detail.loadEvents(includeArchived: true, reset: true) }
+                }
+                .disabled(detail.eventsLoading)
             }
         }
     }
@@ -3300,7 +3381,7 @@ struct RunDetailView: View {
                 HStack {
                     StatusBadge(
                         status: localStatus,
-                        reviewed: !(run.resultReviews ?? []).isEmpty
+                        reviewed: run.hasResultReview == true || !(run.resultReviews ?? []).isEmpty
                     )
                     if let runNumber = run.runNumber {
                         Text(verbatim: "\(issueKeyPrefix)-\(runNumber)")

@@ -268,9 +268,24 @@ public nonisolated struct BriarAPI_ListRunEventsRequest: Sendable {
 
   public var runID: String = String()
 
+  public var cursor: String {
+    get {_cursor ?? String()}
+    set {_cursor = newValue}
+  }
+  /// Returns true if `cursor` has been explicitly set.
+  public var hasCursor: Bool {self._cursor != nil}
+  /// Clears the value of `cursor`. Subsequent reads from it will return its default value.
+  public mutating func clearCursor() {self._cursor = nil}
+
+  public var limit: UInt32 = 0
+
+  public var includeArchived: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _cursor: String? = nil
 }
 
 public nonisolated struct BriarAPI_ListRunEventsResponse: Sendable {
@@ -280,9 +295,24 @@ public nonisolated struct BriarAPI_ListRunEventsResponse: Sendable {
 
   public var events: [BriarAPI_RunEvent] = []
 
+  public var nextCursor: String {
+    get {_nextCursor ?? String()}
+    set {_nextCursor = newValue}
+  }
+  /// Returns true if `nextCursor` has been explicitly set.
+  public var hasNextCursor: Bool {self._nextCursor != nil}
+  /// Clears the value of `nextCursor`. Subsequent reads from it will return its default value.
+  public mutating func clearNextCursor() {self._nextCursor = nil}
+
+  public var hasMore_p: Bool = false
+
+  public var archivesIncluded: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _nextCursor: String? = nil
 }
 
 public nonisolated struct BriarAPI_IssueDependencyReference: Sendable {
@@ -1572,6 +1602,440 @@ public nonisolated struct BriarAPI_RunEvent: Sendable {
   fileprivate var _recordedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
+public nonisolated struct BriarAPI_ListDashboardRunsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var teamID: String = String()
+
+  public var pageSize: UInt32 = 0
+
+  public var cursor: String = String()
+
+  public var sources: [BriarAPI_DashboardRun.Source] = []
+
+  public var statuses: [BriarAPI_RunStatus] = []
+
+  public var query: String {
+    get {_query ?? String()}
+    set {_query = newValue}
+  }
+  /// Returns true if `query` has been explicitly set.
+  public var hasQuery: Bool {self._query != nil}
+  /// Clears the value of `query`. Subsequent reads from it will return its default value.
+  public mutating func clearQuery() {self._query = nil}
+
+  public var planningProjectID: String {
+    get {_planningProjectID ?? String()}
+    set {_planningProjectID = newValue}
+  }
+  /// Returns true if `planningProjectID` has been explicitly set.
+  public var hasPlanningProjectID: Bool {self._planningProjectID != nil}
+  /// Clears the value of `planningProjectID`. Subsequent reads from it will return its default value.
+  public mutating func clearPlanningProjectID() {self._planningProjectID = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _query: String? = nil
+  fileprivate var _planningProjectID: String? = nil
+}
+
+public nonisolated struct BriarAPI_ListDashboardRunsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var runs: [BriarAPI_DashboardRunSummary] = []
+
+  public var nextCursor: String {
+    get {_nextCursor ?? String()}
+    set {_nextCursor = newValue}
+  }
+  /// Returns true if `nextCursor` has been explicitly set.
+  public var hasNextCursor: Bool {self._nextCursor != nil}
+  /// Clears the value of `nextCursor`. Subsequent reads from it will return its default value.
+  public mutating func clearNextCursor() {self._nextCursor = nil}
+
+  public var generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_generatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_generatedAt = newValue}
+  }
+  /// Returns true if `generatedAt` has been explicitly set.
+  public var hasGeneratedAt: Bool {self._generatedAt != nil}
+  /// Clears the value of `generatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearGeneratedAt() {self._generatedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _nextCursor: String? = nil
+  fileprivate var _generatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public nonisolated struct BriarAPI_DashboardRunSummary: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String {
+    get {_storage._id}
+    set {_uniqueStorage()._id = newValue}
+  }
+
+  public var workspaceID: String {
+    get {_storage._workspaceID ?? String()}
+    set {_uniqueStorage()._workspaceID = newValue}
+  }
+  /// Returns true if `workspaceID` has been explicitly set.
+  public var hasWorkspaceID: Bool {_storage._workspaceID != nil}
+  /// Clears the value of `workspaceID`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkspaceID() {_uniqueStorage()._workspaceID = nil}
+
+  public var teamID: String {
+    get {_storage._teamID ?? String()}
+    set {_uniqueStorage()._teamID = newValue}
+  }
+  /// Returns true if `teamID` has been explicitly set.
+  public var hasTeamID: Bool {_storage._teamID != nil}
+  /// Clears the value of `teamID`. Subsequent reads from it will return its default value.
+  public mutating func clearTeamID() {_uniqueStorage()._teamID = nil}
+
+  public var planningProjectID: String {
+    get {_storage._planningProjectID ?? String()}
+    set {_uniqueStorage()._planningProjectID = newValue}
+  }
+  /// Returns true if `planningProjectID` has been explicitly set.
+  public var hasPlanningProjectID: Bool {_storage._planningProjectID != nil}
+  /// Clears the value of `planningProjectID`. Subsequent reads from it will return its default value.
+  public mutating func clearPlanningProjectID() {_uniqueStorage()._planningProjectID = nil}
+
+  public var planningProjectName: String {
+    get {_storage._planningProjectName ?? String()}
+    set {_uniqueStorage()._planningProjectName = newValue}
+  }
+  /// Returns true if `planningProjectName` has been explicitly set.
+  public var hasPlanningProjectName: Bool {_storage._planningProjectName != nil}
+  /// Clears the value of `planningProjectName`. Subsequent reads from it will return its default value.
+  public mutating func clearPlanningProjectName() {_uniqueStorage()._planningProjectName = nil}
+
+  public var runNumber: UInt32 {
+    get {_storage._runNumber}
+    set {_uniqueStorage()._runNumber = newValue}
+  }
+
+  public var currentAttempt: UInt32 {
+    get {_storage._currentAttempt}
+    set {_uniqueStorage()._currentAttempt = newValue}
+  }
+
+  public var currentRevision: UInt32 {
+    get {_storage._currentRevision}
+    set {_uniqueStorage()._currentRevision = newValue}
+  }
+
+  public var sourceKey: String {
+    get {_storage._sourceKey}
+    set {_uniqueStorage()._sourceKey = newValue}
+  }
+
+  public var sourceCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._sourceCreatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._sourceCreatedAt = newValue}
+  }
+  /// Returns true if `sourceCreatedAt` has been explicitly set.
+  public var hasSourceCreatedAt: Bool {_storage._sourceCreatedAt != nil}
+  /// Clears the value of `sourceCreatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearSourceCreatedAt() {_uniqueStorage()._sourceCreatedAt = nil}
+
+  public var title: String {
+    get {_storage._title}
+    set {_uniqueStorage()._title = newValue}
+  }
+
+  public var status: BriarAPI_RunStatus {
+    get {_storage._status}
+    set {_uniqueStorage()._status = newValue}
+  }
+
+  public var workflowStage: String {
+    get {_storage._workflowStage ?? String()}
+    set {_uniqueStorage()._workflowStage = newValue}
+  }
+  /// Returns true if `workflowStage` has been explicitly set.
+  public var hasWorkflowStage: Bool {_storage._workflowStage != nil}
+  /// Clears the value of `workflowStage`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkflowStage() {_uniqueStorage()._workflowStage = nil}
+
+  public var workflow: BriarTypes_AutoHuntWorkflow {
+    get {_storage._workflow ?? BriarTypes_AutoHuntWorkflow()}
+    set {_uniqueStorage()._workflow = newValue}
+  }
+  /// Returns true if `workflow` has been explicitly set.
+  public var hasWorkflow: Bool {_storage._workflow != nil}
+  /// Clears the value of `workflow`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkflow() {_uniqueStorage()._workflow = nil}
+
+  public var progress: Double {
+    get {_storage._progress}
+    set {_uniqueStorage()._progress = newValue}
+  }
+
+  public var detail: String {
+    get {_storage._detail ?? String()}
+    set {_uniqueStorage()._detail = newValue}
+  }
+  /// Returns true if `detail` has been explicitly set.
+  public var hasDetail: Bool {_storage._detail != nil}
+  /// Clears the value of `detail`. Subsequent reads from it will return its default value.
+  public mutating func clearDetail() {_uniqueStorage()._detail = nil}
+
+  public var priority: UInt32 {
+    get {_storage._priority ?? 0}
+    set {_uniqueStorage()._priority = newValue}
+  }
+  /// Returns true if `priority` has been explicitly set.
+  public var hasPriority: Bool {_storage._priority != nil}
+  /// Clears the value of `priority`. Subsequent reads from it will return its default value.
+  public mutating func clearPriority() {_uniqueStorage()._priority = nil}
+
+  public var difficulty: BriarAPI_IssueDifficulty {
+    get {_storage._difficulty ?? .unspecified}
+    set {_uniqueStorage()._difficulty = newValue}
+  }
+  /// Returns true if `difficulty` has been explicitly set.
+  public var hasDifficulty: Bool {_storage._difficulty != nil}
+  /// Clears the value of `difficulty`. Subsequent reads from it will return its default value.
+  public mutating func clearDifficulty() {_uniqueStorage()._difficulty = nil}
+
+  public var assigneeUserID: String {
+    get {_storage._assigneeUserID ?? String()}
+    set {_uniqueStorage()._assigneeUserID = newValue}
+  }
+  /// Returns true if `assigneeUserID` has been explicitly set.
+  public var hasAssigneeUserID: Bool {_storage._assigneeUserID != nil}
+  /// Clears the value of `assigneeUserID`. Subsequent reads from it will return its default value.
+  public mutating func clearAssigneeUserID() {_uniqueStorage()._assigneeUserID = nil}
+
+  public var issueDescription: String {
+    get {_storage._issueDescription ?? String()}
+    set {_uniqueStorage()._issueDescription = newValue}
+  }
+  /// Returns true if `issueDescription` has been explicitly set.
+  public var hasIssueDescription: Bool {_storage._issueDescription != nil}
+  /// Clears the value of `issueDescription`. Subsequent reads from it will return its default value.
+  public mutating func clearIssueDescription() {_uniqueStorage()._issueDescription = nil}
+
+  public var resultSummary: String {
+    get {_storage._resultSummary ?? String()}
+    set {_uniqueStorage()._resultSummary = newValue}
+  }
+  /// Returns true if `resultSummary` has been explicitly set.
+  public var hasResultSummary: Bool {_storage._resultSummary != nil}
+  /// Clears the value of `resultSummary`. Subsequent reads from it will return its default value.
+  public mutating func clearResultSummary() {_uniqueStorage()._resultSummary = nil}
+
+  public var fullAuto: Bool {
+    get {_storage._fullAuto ?? false}
+    set {_uniqueStorage()._fullAuto = newValue}
+  }
+  /// Returns true if `fullAuto` has been explicitly set.
+  public var hasFullAuto: Bool {_storage._fullAuto != nil}
+  /// Clears the value of `fullAuto`. Subsequent reads from it will return its default value.
+  public mutating func clearFullAuto() {_uniqueStorage()._fullAuto = nil}
+
+  public var pullRequestUrls: [String] {
+    get {_storage._pullRequestUrls}
+    set {_uniqueStorage()._pullRequestUrls = newValue}
+  }
+
+  public var claimedBy: String {
+    get {_storage._claimedBy ?? String()}
+    set {_uniqueStorage()._claimedBy = newValue}
+  }
+  /// Returns true if `claimedBy` has been explicitly set.
+  public var hasClaimedBy: Bool {_storage._claimedBy != nil}
+  /// Clears the value of `claimedBy`. Subsequent reads from it will return its default value.
+  public mutating func clearClaimedBy() {_uniqueStorage()._claimedBy = nil}
+
+  public var claimedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._claimedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._claimedAt = newValue}
+  }
+  /// Returns true if `claimedAt` has been explicitly set.
+  public var hasClaimedAt: Bool {_storage._claimedAt != nil}
+  /// Clears the value of `claimedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearClaimedAt() {_uniqueStorage()._claimedAt = nil}
+
+  public var leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._leaseExpiresAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._leaseExpiresAt = newValue}
+  }
+  /// Returns true if `leaseExpiresAt` has been explicitly set.
+  public var hasLeaseExpiresAt: Bool {_storage._leaseExpiresAt != nil}
+  /// Clears the value of `leaseExpiresAt`. Subsequent reads from it will return its default value.
+  public mutating func clearLeaseExpiresAt() {_uniqueStorage()._leaseExpiresAt = nil}
+
+  public var preferredProvider: BriarTypes_AgentProvider {
+    get {_storage._preferredProvider ?? .unspecified}
+    set {_uniqueStorage()._preferredProvider = newValue}
+  }
+  /// Returns true if `preferredProvider` has been explicitly set.
+  public var hasPreferredProvider: Bool {_storage._preferredProvider != nil}
+  /// Clears the value of `preferredProvider`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredProvider() {_uniqueStorage()._preferredProvider = nil}
+
+  public var preferredModel: String {
+    get {_storage._preferredModel ?? String()}
+    set {_uniqueStorage()._preferredModel = newValue}
+  }
+  /// Returns true if `preferredModel` has been explicitly set.
+  public var hasPreferredModel: Bool {_storage._preferredModel != nil}
+  /// Clears the value of `preferredModel`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredModel() {_uniqueStorage()._preferredModel = nil}
+
+  public var preferredEffort: String {
+    get {_storage._preferredEffort ?? String()}
+    set {_uniqueStorage()._preferredEffort = newValue}
+  }
+  /// Returns true if `preferredEffort` has been explicitly set.
+  public var hasPreferredEffort: Bool {_storage._preferredEffort != nil}
+  /// Clears the value of `preferredEffort`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredEffort() {_uniqueStorage()._preferredEffort = nil}
+
+  public var requestedProvider: BriarTypes_AgentProvider {
+    get {_storage._requestedProvider ?? .unspecified}
+    set {_uniqueStorage()._requestedProvider = newValue}
+  }
+  /// Returns true if `requestedProvider` has been explicitly set.
+  public var hasRequestedProvider: Bool {_storage._requestedProvider != nil}
+  /// Clears the value of `requestedProvider`. Subsequent reads from it will return its default value.
+  public mutating func clearRequestedProvider() {_uniqueStorage()._requestedProvider = nil}
+
+  public var requestedModel: String {
+    get {_storage._requestedModel ?? String()}
+    set {_uniqueStorage()._requestedModel = newValue}
+  }
+  /// Returns true if `requestedModel` has been explicitly set.
+  public var hasRequestedModel: Bool {_storage._requestedModel != nil}
+  /// Clears the value of `requestedModel`. Subsequent reads from it will return its default value.
+  public mutating func clearRequestedModel() {_uniqueStorage()._requestedModel = nil}
+
+  public var requestedEffort: String {
+    get {_storage._requestedEffort ?? String()}
+    set {_uniqueStorage()._requestedEffort = newValue}
+  }
+  /// Returns true if `requestedEffort` has been explicitly set.
+  public var hasRequestedEffort: Bool {_storage._requestedEffort != nil}
+  /// Clears the value of `requestedEffort`. Subsequent reads from it will return its default value.
+  public mutating func clearRequestedEffort() {_uniqueStorage()._requestedEffort = nil}
+
+  public var requestedWorkerID: String {
+    get {_storage._requestedWorkerID ?? String()}
+    set {_uniqueStorage()._requestedWorkerID = newValue}
+  }
+  /// Returns true if `requestedWorkerID` has been explicitly set.
+  public var hasRequestedWorkerID: Bool {_storage._requestedWorkerID != nil}
+  /// Clears the value of `requestedWorkerID`. Subsequent reads from it will return its default value.
+  public mutating func clearRequestedWorkerID() {_uniqueStorage()._requestedWorkerID = nil}
+
+  public var workerID: String {
+    get {_storage._workerID ?? String()}
+    set {_uniqueStorage()._workerID = newValue}
+  }
+  /// Returns true if `workerID` has been explicitly set.
+  public var hasWorkerID: Bool {_storage._workerID != nil}
+  /// Clears the value of `workerID`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkerID() {_uniqueStorage()._workerID = nil}
+
+  public var startedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._startedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._startedAt = newValue}
+  }
+  /// Returns true if `startedAt` has been explicitly set.
+  public var hasStartedAt: Bool {_storage._startedAt != nil}
+  /// Clears the value of `startedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearStartedAt() {_uniqueStorage()._startedAt = nil}
+
+  public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._updatedAt = newValue}
+  }
+  /// Returns true if `updatedAt` has been explicitly set.
+  public var hasUpdatedAt: Bool {_storage._updatedAt != nil}
+  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdatedAt() {_uniqueStorage()._updatedAt = nil}
+
+  public var completedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._completedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._completedAt = newValue}
+  }
+  /// Returns true if `completedAt` has been explicitly set.
+  public var hasCompletedAt: Bool {_storage._completedAt != nil}
+  /// Clears the value of `completedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCompletedAt() {_uniqueStorage()._completedAt = nil}
+
+  public var lastEventAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_storage._lastEventAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._lastEventAt = newValue}
+  }
+  /// Returns true if `lastEventAt` has been explicitly set.
+  public var hasLastEventAt: Bool {_storage._lastEventAt != nil}
+  /// Clears the value of `lastEventAt`. Subsequent reads from it will return its default value.
+  public mutating func clearLastEventAt() {_uniqueStorage()._lastEventAt = nil}
+
+  public var eventCount: UInt32 {
+    get {_storage._eventCount}
+    set {_uniqueStorage()._eventCount = newValue}
+  }
+
+  public var executionReadiness: BriarAPI_DashboardRun.ExecutionReadiness {
+    get {_storage._executionReadiness ?? .unspecified}
+    set {_uniqueStorage()._executionReadiness = newValue}
+  }
+  /// Returns true if `executionReadiness` has been explicitly set.
+  public var hasExecutionReadiness: Bool {_storage._executionReadiness != nil}
+  /// Clears the value of `executionReadiness`. Subsequent reads from it will return its default value.
+  public mutating func clearExecutionReadiness() {_uniqueStorage()._executionReadiness = nil}
+
+  public var waitingOnPrerequisiteCount: UInt32 {
+    get {_storage._waitingOnPrerequisiteCount ?? 0}
+    set {_uniqueStorage()._waitingOnPrerequisiteCount = newValue}
+  }
+  /// Returns true if `waitingOnPrerequisiteCount` has been explicitly set.
+  public var hasWaitingOnPrerequisiteCount: Bool {_storage._waitingOnPrerequisiteCount != nil}
+  /// Clears the value of `waitingOnPrerequisiteCount`. Subsequent reads from it will return its default value.
+  public mutating func clearWaitingOnPrerequisiteCount() {_uniqueStorage()._waitingOnPrerequisiteCount = nil}
+
+  public var repository: String {
+    get {_storage._repository ?? String()}
+    set {_uniqueStorage()._repository = newValue}
+  }
+  /// Returns true if `repository` has been explicitly set.
+  public var hasRepository: Bool {_storage._repository != nil}
+  /// Clears the value of `repository`. Subsequent reads from it will return its default value.
+  public mutating func clearRepository() {_uniqueStorage()._repository = nil}
+
+  public var hasResultReview_p: Bool {
+    get {_storage._hasResultReview_p}
+    set {_uniqueStorage()._hasResultReview_p = newValue}
+  }
+
+  public var source: BriarAPI_DashboardRun.Source {
+    get {_storage._source}
+    set {_uniqueStorage()._source = newValue}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "briar.app.v1"
@@ -2004,7 +2468,7 @@ nonisolated extension BriarAPI_SyncDashboardResponse: SwiftProtobuf.Message, Swi
 
 nonisolated extension BriarAPI_ListRunEventsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListRunEventsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}team_id\0\u{3}run_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}team_id\0\u{3}run_id\0\u{1}cursor\0\u{1}limit\0\u{3}include_archived\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2014,17 +2478,33 @@ nonisolated extension BriarAPI_ListRunEventsRequest: SwiftProtobuf.Message, Swif
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.teamID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.runID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._cursor) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.limit) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.includeArchived) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.teamID.isEmpty {
       try visitor.visitSingularStringField(value: self.teamID, fieldNumber: 1)
     }
     if !self.runID.isEmpty {
       try visitor.visitSingularStringField(value: self.runID, fieldNumber: 2)
+    }
+    try { if let v = self._cursor {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    if self.limit != 0 {
+      try visitor.visitSingularUInt32Field(value: self.limit, fieldNumber: 4)
+    }
+    if self.includeArchived != false {
+      try visitor.visitSingularBoolField(value: self.includeArchived, fieldNumber: 5)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -2032,6 +2512,9 @@ nonisolated extension BriarAPI_ListRunEventsRequest: SwiftProtobuf.Message, Swif
   public static func ==(lhs: BriarAPI_ListRunEventsRequest, rhs: BriarAPI_ListRunEventsRequest) -> Bool {
     if lhs.teamID != rhs.teamID {return false}
     if lhs.runID != rhs.runID {return false}
+    if lhs._cursor != rhs._cursor {return false}
+    if lhs.limit != rhs.limit {return false}
+    if lhs.includeArchived != rhs.includeArchived {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2039,7 +2522,7 @@ nonisolated extension BriarAPI_ListRunEventsRequest: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_ListRunEventsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListRunEventsResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}events\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}events\0\u{3}next_cursor\0\u{3}has_more\0\u{3}archives_included\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2048,20 +2531,39 @@ nonisolated extension BriarAPI_ListRunEventsResponse: SwiftProtobuf.Message, Swi
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.events) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._nextCursor) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.hasMore_p) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.archivesIncluded) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.events.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.events, fieldNumber: 1)
+    }
+    try { if let v = self._nextCursor {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    if self.hasMore_p != false {
+      try visitor.visitSingularBoolField(value: self.hasMore_p, fieldNumber: 3)
+    }
+    if self.archivesIncluded != false {
+      try visitor.visitSingularBoolField(value: self.archivesIncluded, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_ListRunEventsResponse, rhs: BriarAPI_ListRunEventsResponse) -> Bool {
     if lhs.events != rhs.events {return false}
+    if lhs._nextCursor != rhs._nextCursor {return false}
+    if lhs.hasMore_p != rhs.hasMore_p {return false}
+    if lhs.archivesIncluded != rhs.archivesIncluded {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3264,6 +3766,485 @@ nonisolated extension BriarAPI_RunEvent: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.pullRequestUrls != rhs.pullRequestUrls {return false}
     if lhs._targetSha != rhs._targetSha {return false}
     if lhs._recordedAt != rhs._recordedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListDashboardRunsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListDashboardRunsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}team_id\0\u{3}page_size\0\u{1}cursor\0\u{1}sources\0\u{1}statuses\0\u{1}query\0\u{3}planning_project_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.teamID) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.pageSize) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.cursor) }()
+      case 4: try { try decoder.decodeRepeatedEnumField(value: &self.sources) }()
+      case 5: try { try decoder.decodeRepeatedEnumField(value: &self.statuses) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._query) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._planningProjectID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.teamID.isEmpty {
+      try visitor.visitSingularStringField(value: self.teamID, fieldNumber: 1)
+    }
+    if self.pageSize != 0 {
+      try visitor.visitSingularUInt32Field(value: self.pageSize, fieldNumber: 2)
+    }
+    if !self.cursor.isEmpty {
+      try visitor.visitSingularStringField(value: self.cursor, fieldNumber: 3)
+    }
+    if !self.sources.isEmpty {
+      try visitor.visitPackedEnumField(value: self.sources, fieldNumber: 4)
+    }
+    if !self.statuses.isEmpty {
+      try visitor.visitPackedEnumField(value: self.statuses, fieldNumber: 5)
+    }
+    try { if let v = self._query {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._planningProjectID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListDashboardRunsRequest, rhs: BriarAPI_ListDashboardRunsRequest) -> Bool {
+    if lhs.teamID != rhs.teamID {return false}
+    if lhs.pageSize != rhs.pageSize {return false}
+    if lhs.cursor != rhs.cursor {return false}
+    if lhs.sources != rhs.sources {return false}
+    if lhs.statuses != rhs.statuses {return false}
+    if lhs._query != rhs._query {return false}
+    if lhs._planningProjectID != rhs._planningProjectID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_ListDashboardRunsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListDashboardRunsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}runs\0\u{3}next_cursor\0\u{3}generated_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.runs) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._nextCursor) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._generatedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.runs.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.runs, fieldNumber: 1)
+    }
+    try { if let v = self._nextCursor {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._generatedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_ListDashboardRunsResponse, rhs: BriarAPI_ListDashboardRunsResponse) -> Bool {
+    if lhs.runs != rhs.runs {return false}
+    if lhs._nextCursor != rhs._nextCursor {return false}
+    if lhs._generatedAt != rhs._generatedAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_DashboardRunSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DashboardRunSummary"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}workspace_id\0\u{3}team_id\0\u{3}planning_project_id\0\u{3}planning_project_name\0\u{3}run_number\0\u{3}current_attempt\0\u{3}current_revision\0\u{3}source_key\0\u{3}source_created_at\0\u{1}title\0\u{1}status\0\u{3}workflow_stage\0\u{1}workflow\0\u{1}progress\0\u{1}detail\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{3}issue_description\0\u{3}result_summary\0\u{3}full_auto\0\u{3}pull_request_urls\0\u{3}claimed_by\0\u{3}claimed_at\0\u{3}lease_expires_at\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}requested_provider\0\u{3}requested_model\0\u{3}requested_effort\0\u{3}requested_worker_id\0\u{3}worker_id\0\u{3}started_at\0\u{3}updated_at\0\u{3}completed_at\0\u{3}last_event_at\0\u{3}event_count\0\u{3}execution_readiness\0\u{3}waiting_on_prerequisite_count\0\u{1}repository\0\u{3}has_result_review\0\u{1}source\0")
+
+  fileprivate class _StorageClass {
+    var _id: String = String()
+    var _workspaceID: String? = nil
+    var _teamID: String? = nil
+    var _planningProjectID: String? = nil
+    var _planningProjectName: String? = nil
+    var _runNumber: UInt32 = 0
+    var _currentAttempt: UInt32 = 0
+    var _currentRevision: UInt32 = 0
+    var _sourceKey: String = String()
+    var _sourceCreatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _title: String = String()
+    var _status: BriarAPI_RunStatus = .unspecified
+    var _workflowStage: String? = nil
+    var _workflow: BriarTypes_AutoHuntWorkflow? = nil
+    var _progress: Double = 0
+    var _detail: String? = nil
+    var _priority: UInt32? = nil
+    var _difficulty: BriarAPI_IssueDifficulty? = nil
+    var _assigneeUserID: String? = nil
+    var _issueDescription: String? = nil
+    var _resultSummary: String? = nil
+    var _fullAuto: Bool? = nil
+    var _pullRequestUrls: [String] = []
+    var _claimedBy: String? = nil
+    var _claimedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _leaseExpiresAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _preferredProvider: BriarTypes_AgentProvider? = nil
+    var _preferredModel: String? = nil
+    var _preferredEffort: String? = nil
+    var _requestedProvider: BriarTypes_AgentProvider? = nil
+    var _requestedModel: String? = nil
+    var _requestedEffort: String? = nil
+    var _requestedWorkerID: String? = nil
+    var _workerID: String? = nil
+    var _startedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _completedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _lastEventAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _eventCount: UInt32 = 0
+    var _executionReadiness: BriarAPI_DashboardRun.ExecutionReadiness? = nil
+    var _waitingOnPrerequisiteCount: UInt32? = nil
+    var _repository: String? = nil
+    var _hasResultReview_p: Bool = false
+    var _source: BriarAPI_DashboardRun.Source = .unspecified
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _workspaceID = source._workspaceID
+      _teamID = source._teamID
+      _planningProjectID = source._planningProjectID
+      _planningProjectName = source._planningProjectName
+      _runNumber = source._runNumber
+      _currentAttempt = source._currentAttempt
+      _currentRevision = source._currentRevision
+      _sourceKey = source._sourceKey
+      _sourceCreatedAt = source._sourceCreatedAt
+      _title = source._title
+      _status = source._status
+      _workflowStage = source._workflowStage
+      _workflow = source._workflow
+      _progress = source._progress
+      _detail = source._detail
+      _priority = source._priority
+      _difficulty = source._difficulty
+      _assigneeUserID = source._assigneeUserID
+      _issueDescription = source._issueDescription
+      _resultSummary = source._resultSummary
+      _fullAuto = source._fullAuto
+      _pullRequestUrls = source._pullRequestUrls
+      _claimedBy = source._claimedBy
+      _claimedAt = source._claimedAt
+      _leaseExpiresAt = source._leaseExpiresAt
+      _preferredProvider = source._preferredProvider
+      _preferredModel = source._preferredModel
+      _preferredEffort = source._preferredEffort
+      _requestedProvider = source._requestedProvider
+      _requestedModel = source._requestedModel
+      _requestedEffort = source._requestedEffort
+      _requestedWorkerID = source._requestedWorkerID
+      _workerID = source._workerID
+      _startedAt = source._startedAt
+      _updatedAt = source._updatedAt
+      _completedAt = source._completedAt
+      _lastEventAt = source._lastEventAt
+      _eventCount = source._eventCount
+      _executionReadiness = source._executionReadiness
+      _waitingOnPrerequisiteCount = source._waitingOnPrerequisiteCount
+      _repository = source._repository
+      _hasResultReview_p = source._hasResultReview_p
+      _source = source._source
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._workspaceID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._teamID) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._planningProjectID) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._planningProjectName) }()
+        case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._runNumber) }()
+        case 7: try { try decoder.decodeSingularUInt32Field(value: &_storage._currentAttempt) }()
+        case 8: try { try decoder.decodeSingularUInt32Field(value: &_storage._currentRevision) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._sourceKey) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._sourceCreatedAt) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._title) }()
+        case 12: try { try decoder.decodeSingularEnumField(value: &_storage._status) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._workflowStage) }()
+        case 14: try { try decoder.decodeSingularMessageField(value: &_storage._workflow) }()
+        case 15: try { try decoder.decodeSingularDoubleField(value: &_storage._progress) }()
+        case 16: try { try decoder.decodeSingularStringField(value: &_storage._detail) }()
+        case 17: try { try decoder.decodeSingularUInt32Field(value: &_storage._priority) }()
+        case 18: try { try decoder.decodeSingularEnumField(value: &_storage._difficulty) }()
+        case 19: try { try decoder.decodeSingularStringField(value: &_storage._assigneeUserID) }()
+        case 20: try { try decoder.decodeSingularStringField(value: &_storage._issueDescription) }()
+        case 21: try { try decoder.decodeSingularStringField(value: &_storage._resultSummary) }()
+        case 22: try { try decoder.decodeSingularBoolField(value: &_storage._fullAuto) }()
+        case 23: try { try decoder.decodeRepeatedStringField(value: &_storage._pullRequestUrls) }()
+        case 24: try { try decoder.decodeSingularStringField(value: &_storage._claimedBy) }()
+        case 25: try { try decoder.decodeSingularMessageField(value: &_storage._claimedAt) }()
+        case 26: try { try decoder.decodeSingularMessageField(value: &_storage._leaseExpiresAt) }()
+        case 27: try { try decoder.decodeSingularEnumField(value: &_storage._preferredProvider) }()
+        case 28: try { try decoder.decodeSingularStringField(value: &_storage._preferredModel) }()
+        case 29: try { try decoder.decodeSingularStringField(value: &_storage._preferredEffort) }()
+        case 30: try { try decoder.decodeSingularEnumField(value: &_storage._requestedProvider) }()
+        case 31: try { try decoder.decodeSingularStringField(value: &_storage._requestedModel) }()
+        case 32: try { try decoder.decodeSingularStringField(value: &_storage._requestedEffort) }()
+        case 33: try { try decoder.decodeSingularStringField(value: &_storage._requestedWorkerID) }()
+        case 34: try { try decoder.decodeSingularStringField(value: &_storage._workerID) }()
+        case 35: try { try decoder.decodeSingularMessageField(value: &_storage._startedAt) }()
+        case 36: try { try decoder.decodeSingularMessageField(value: &_storage._updatedAt) }()
+        case 37: try { try decoder.decodeSingularMessageField(value: &_storage._completedAt) }()
+        case 38: try { try decoder.decodeSingularMessageField(value: &_storage._lastEventAt) }()
+        case 39: try { try decoder.decodeSingularUInt32Field(value: &_storage._eventCount) }()
+        case 40: try { try decoder.decodeSingularEnumField(value: &_storage._executionReadiness) }()
+        case 41: try { try decoder.decodeSingularUInt32Field(value: &_storage._waitingOnPrerequisiteCount) }()
+        case 42: try { try decoder.decodeSingularStringField(value: &_storage._repository) }()
+        case 43: try { try decoder.decodeSingularBoolField(value: &_storage._hasResultReview_p) }()
+        case 44: try { try decoder.decodeSingularEnumField(value: &_storage._source) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._id.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      }
+      try { if let v = _storage._workspaceID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._teamID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._planningProjectID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._planningProjectName {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+      } }()
+      if _storage._runNumber != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._runNumber, fieldNumber: 6)
+      }
+      if _storage._currentAttempt != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._currentAttempt, fieldNumber: 7)
+      }
+      if _storage._currentRevision != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._currentRevision, fieldNumber: 8)
+      }
+      if !_storage._sourceKey.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._sourceKey, fieldNumber: 9)
+      }
+      try { if let v = _storage._sourceCreatedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      if !_storage._title.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._title, fieldNumber: 11)
+      }
+      if _storage._status != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._status, fieldNumber: 12)
+      }
+      try { if let v = _storage._workflowStage {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 13)
+      } }()
+      try { if let v = _storage._workflow {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
+      } }()
+      if _storage._progress.bitPattern != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._progress, fieldNumber: 15)
+      }
+      try { if let v = _storage._detail {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._priority {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 17)
+      } }()
+      try { if let v = _storage._difficulty {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 18)
+      } }()
+      try { if let v = _storage._assigneeUserID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 19)
+      } }()
+      try { if let v = _storage._issueDescription {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 20)
+      } }()
+      try { if let v = _storage._resultSummary {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 21)
+      } }()
+      try { if let v = _storage._fullAuto {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 22)
+      } }()
+      if !_storage._pullRequestUrls.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._pullRequestUrls, fieldNumber: 23)
+      }
+      try { if let v = _storage._claimedBy {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 24)
+      } }()
+      try { if let v = _storage._claimedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 25)
+      } }()
+      try { if let v = _storage._leaseExpiresAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
+      } }()
+      try { if let v = _storage._preferredProvider {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 27)
+      } }()
+      try { if let v = _storage._preferredModel {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 28)
+      } }()
+      try { if let v = _storage._preferredEffort {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 29)
+      } }()
+      try { if let v = _storage._requestedProvider {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 30)
+      } }()
+      try { if let v = _storage._requestedModel {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 31)
+      } }()
+      try { if let v = _storage._requestedEffort {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 32)
+      } }()
+      try { if let v = _storage._requestedWorkerID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 33)
+      } }()
+      try { if let v = _storage._workerID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 34)
+      } }()
+      try { if let v = _storage._startedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 35)
+      } }()
+      try { if let v = _storage._updatedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 36)
+      } }()
+      try { if let v = _storage._completedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 37)
+      } }()
+      try { if let v = _storage._lastEventAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 38)
+      } }()
+      if _storage._eventCount != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._eventCount, fieldNumber: 39)
+      }
+      try { if let v = _storage._executionReadiness {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 40)
+      } }()
+      try { if let v = _storage._waitingOnPrerequisiteCount {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 41)
+      } }()
+      try { if let v = _storage._repository {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 42)
+      } }()
+      if _storage._hasResultReview_p != false {
+        try visitor.visitSingularBoolField(value: _storage._hasResultReview_p, fieldNumber: 43)
+      }
+      if _storage._source != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._source, fieldNumber: 44)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DashboardRunSummary, rhs: BriarAPI_DashboardRunSummary) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._workspaceID != rhs_storage._workspaceID {return false}
+        if _storage._teamID != rhs_storage._teamID {return false}
+        if _storage._planningProjectID != rhs_storage._planningProjectID {return false}
+        if _storage._planningProjectName != rhs_storage._planningProjectName {return false}
+        if _storage._runNumber != rhs_storage._runNumber {return false}
+        if _storage._currentAttempt != rhs_storage._currentAttempt {return false}
+        if _storage._currentRevision != rhs_storage._currentRevision {return false}
+        if _storage._sourceKey != rhs_storage._sourceKey {return false}
+        if _storage._sourceCreatedAt != rhs_storage._sourceCreatedAt {return false}
+        if _storage._title != rhs_storage._title {return false}
+        if _storage._status != rhs_storage._status {return false}
+        if _storage._workflowStage != rhs_storage._workflowStage {return false}
+        if _storage._workflow != rhs_storage._workflow {return false}
+        if _storage._progress != rhs_storage._progress {return false}
+        if _storage._detail != rhs_storage._detail {return false}
+        if _storage._priority != rhs_storage._priority {return false}
+        if _storage._difficulty != rhs_storage._difficulty {return false}
+        if _storage._assigneeUserID != rhs_storage._assigneeUserID {return false}
+        if _storage._issueDescription != rhs_storage._issueDescription {return false}
+        if _storage._resultSummary != rhs_storage._resultSummary {return false}
+        if _storage._fullAuto != rhs_storage._fullAuto {return false}
+        if _storage._pullRequestUrls != rhs_storage._pullRequestUrls {return false}
+        if _storage._claimedBy != rhs_storage._claimedBy {return false}
+        if _storage._claimedAt != rhs_storage._claimedAt {return false}
+        if _storage._leaseExpiresAt != rhs_storage._leaseExpiresAt {return false}
+        if _storage._preferredProvider != rhs_storage._preferredProvider {return false}
+        if _storage._preferredModel != rhs_storage._preferredModel {return false}
+        if _storage._preferredEffort != rhs_storage._preferredEffort {return false}
+        if _storage._requestedProvider != rhs_storage._requestedProvider {return false}
+        if _storage._requestedModel != rhs_storage._requestedModel {return false}
+        if _storage._requestedEffort != rhs_storage._requestedEffort {return false}
+        if _storage._requestedWorkerID != rhs_storage._requestedWorkerID {return false}
+        if _storage._workerID != rhs_storage._workerID {return false}
+        if _storage._startedAt != rhs_storage._startedAt {return false}
+        if _storage._updatedAt != rhs_storage._updatedAt {return false}
+        if _storage._completedAt != rhs_storage._completedAt {return false}
+        if _storage._lastEventAt != rhs_storage._lastEventAt {return false}
+        if _storage._eventCount != rhs_storage._eventCount {return false}
+        if _storage._executionReadiness != rhs_storage._executionReadiness {return false}
+        if _storage._waitingOnPrerequisiteCount != rhs_storage._waitingOnPrerequisiteCount {return false}
+        if _storage._repository != rhs_storage._repository {return false}
+        if _storage._hasResultReview_p != rhs_storage._hasResultReview_p {return false}
+        if _storage._source != rhs_storage._source {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -10,8 +10,10 @@ import type {
   DashboardDeltaPayload,
   DashboardPayload,
   HuntRun,
+  Project,
   TeamSettings,
 } from "../../types";
+import type { DashboardRunListPage } from "../../lib/api";
 
 /*
   Everything that may change the normalized store, expressed as data.
@@ -23,6 +25,21 @@ import type {
   quietly inventing a different one.
 */
 export type SyncEvent =
+  /** One page from the mobile list endpoint, merged without expanding it to a full dashboard. */
+  | {
+      readonly kind: "mobile-list-page";
+      readonly teamId: string;
+      readonly page: DashboardRunListPage;
+      readonly team: Project;
+      readonly filterKey: string;
+      readonly replace: boolean;
+    }
+  /** A full dashboard fetched after the mobile list is already visible. */
+  | {
+      readonly kind: "team-metadata";
+      readonly teamId: string;
+      readonly payload: DashboardPayload;
+    }
   /**
    * A full `DashboardPayload` replaces everything known about the team. Run
    * order is the server's, verbatim and uncapped, which is what the dashboard
