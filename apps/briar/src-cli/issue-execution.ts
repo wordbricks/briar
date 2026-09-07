@@ -15,6 +15,8 @@ import { type AgentProvider } from "../src/lib/agent-provider";
 import {
   createDetachedTranscriptSequencer,
   detachedAgentPrompt,
+  detachedIssueExecutionAgent,
+  invalidIssueExecutionProfileRunEvent,
   detachedProviderBlockedRunEvent,
   detachedProviderBlockFromPayload,
   detachedRunContinuationPrompt,
@@ -143,6 +145,35 @@ function detachedReplyAgent(input: {
   };
 }
 
+function issueRuntimeConfig(
+  config: Config,
+  project: TeamConfig,
+  issue: Pick<ClaimedRun, "runId" | "sourceKey" | "claimToken" | "leaseExpiresAt">,
+  workerToken: string,
+): Config {
+  const activeProject = config.teams.find((candidate) => candidate.id === project.id) ??
+    project;
+  return {
+    ...structuredClone(config),
+    userToken: undefined,
+    workerDeviceIdentity: undefined,
+    managedComputer: undefined,
+    teams: [{
+      ...structuredClone(activeProject),
+      agentToken: undefined,
+      executionWorker: activeProject.executionWorker
+        ? { ...structuredClone(activeProject.executionWorker), token: workerToken }
+        : undefined,
+      activeClaim: {
+        runId: issue.runId,
+        sourceKey: issue.sourceKey,
+        token: issue.claimToken,
+        leaseExpiresAt: issue.leaseExpiresAt,
+      },
+    }],
+  };
+}
+
 async function runClaimedIssue(
   config: Config,
   project: TeamConfig,
@@ -152,20 +183,7 @@ async function runClaimedIssue(
   reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
 ) {
   const runtimeDirectory = issueWorkerSessionDirectory(configDirectory, issue);
-  const runtimeConfig = structuredClone(config);
-  runtimeConfig.teams = runtimeConfig.teams.map((candidate) =>
-    candidate.id === project.id
-      ? {
-          ...candidate,
-          activeClaim: {
-            runId: issue.runId,
-            sourceKey: issue.sourceKey,
-            token: issue.claimToken,
-            leaseExpiresAt: issue.leaseExpiresAt,
-          },
-        }
-      : candidate,
-  );
+  const runtimeConfig = issueRuntimeConfig(config, project, issue, workerToken);
   await saveConfigAt(runtimeDirectory, runtimeConfig);
   try {
     await runClaimedIssueInRuntime(
@@ -191,17 +209,6 @@ async function runClaimedIssueInRuntime(
   runtimeDirectory: string,
   reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
 ) {
-  const execution = issue.execution ??
-    (issue.agent
-      ? {
-          provider: issue.agent.provider,
-          model: issue.agent.model,
-          effort: issue.agent.effort,
-        }
-      : null);
-  if (!execution) {
-    throw new Error("이 실행에 사용할 프로바이더가 지정되지 않았습니다.");
-  }
   const activeProject =
     config.teams.find((candidate) => candidate.id === project.id) ?? project;
   const executionRpc = createAuthenticatedWorkerExecutionClient(
@@ -212,6 +219,65 @@ async function runClaimedIssueInRuntime(
     case: "work" as const,
     value: workClaimIdentityToProto(issue),
   };
+  const failInvalidExecutionProfile = async (detail: string) => {
+    await executionRpc.recordRunEvent(
+      workerRunEventRequest({
+        projectId: project.id,
+        target: runEventTarget,
+        event: invalidIssueExecutionProfileRunEvent({
+          attempt: issue.currentAttempt,
+          revision: issue.currentRevision,
+          workflowStage: issue.startStage,
+          occurredAt: new Date().toISOString(),
+          actor:
+            `briar-worker:${activeProject.executionWorker?.workerId ?? "unknown"}`,
+          repository: issue.repository,
+          detail,
+        }),
+      }),
+    );
+  };
+  const execution = issue.execution ??
+    (issue.agent
+      ? {
+          provider: issue.agent.provider,
+          model: issue.agent.model,
+          effort: issue.agent.effort,
+        }
+      : null);
+  if (!execution) {
+    await failInvalidExecutionProfile(
+      "The claimed issue has neither an approved execution provider nor a selected Agent provider.",
+    );
+    return;
+  }
+  const organizationId = activeProject.executionWorker?.organizationId;
+  if (!organizationId) {
+    await failInvalidExecutionProfile(
+      "The active Worker configuration does not bind the claimed project to an organization.",
+    );
+    return;
+  }
+  const logicalAgent = issue.agent
+    ? detachedAgentWithActiveSkill(issue.agent, issue.activeSkill)
+    : null;
+  let detachedAgent: DetachedAgent;
+  try {
+    detachedAgent = detachedIssueExecutionAgent({
+      agent: logicalAgent,
+      runId: issue.runId,
+      organizationId,
+      projectId: project.id,
+      provider: execution.provider,
+      model: execution.model,
+      effort: execution.effort,
+    });
+  } catch (error) {
+    await failInvalidExecutionProfile(
+      error instanceof Error ? error.message : String(error),
+    );
+    return;
+  }
   const { workspace, workspaceError } = await allocateClaimWorkspace(
     config,
     activeProject,
@@ -250,11 +316,8 @@ async function runClaimedIssueInRuntime(
       }
     }),
   );
-  const logicalAgent = issue.agent
-    ? detachedAgentWithActiveSkill(issue.agent, issue.activeSkill)
-    : null;
   const prompt = detachedAgentPrompt({
-    agent: logicalAgent,
+    agent: detachedAgent,
     snapshot: {
       runId: issue.runId,
       runNumber: issue.runNumber,
@@ -298,16 +361,6 @@ async function runClaimedIssueInRuntime(
     BRIAR_CONFIG_HOME: runtimeDirectory,
   });
 
-  const detachedAgent: DetachedAgent = {
-    id: logicalAgent?.id ?? issue.runId,
-    name: logicalAgent?.name ?? "Briar Worker",
-    provider: execution.provider,
-    model: execution.model,
-    effort: execution.effort,
-    responsibility: logicalAgent?.responsibility ?? "",
-    skills: logicalAgent?.skills ?? [],
-    activeSkill: logicalAgent?.activeSkill ?? null,
-  };
   const providerAttachments = agentImageAttachments(attachments);
 
   const executionStartedAt = Date.now();
@@ -559,6 +612,7 @@ export {
   releaseCachedAnalysisWorktree,
   detachedAgentWithActiveSkill,
   detachedReplyAgent,
+  issueRuntimeConfig,
   runClaimedIssue,
   runClaimedIssueInRuntime,
 };
