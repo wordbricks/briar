@@ -9,6 +9,7 @@ import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import {
   DM_REPLY_SETTLE_MAX_RETRY_MS,
   DM_REPLY_SETTLE_MIN_RETRY_MS,
+  checkpointChannelReplySession,
   completeChannelReply,
   createChannel,
   getChannelAgentReplyJob,
@@ -325,6 +326,41 @@ describe("direct message reply bursts", () => {
     expect(await claim()).toBeNull();
     await finish(firstClaim!);
     expect((await claim())?.workId).toBe(second.job.id);
+  });
+
+  it("resumes the provider conversation only for an explicit reply", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "run the deploy check");
+    await stopTyping(first.job.id);
+    const firstClaim = await claim();
+    expect(firstClaim?.session?.conversationId).toBeNull();
+    await checkpointChannelReplySession(db, {
+      jobId: firstClaim!.workId,
+      deviceId,
+      workerId,
+      claimTokenHash: sha256(firstClaim!.claimToken),
+      conversationId: "provider-conversation-501",
+      observedAt: new Date().toISOString(),
+    });
+    await finish(firstClaim!);
+
+    // A message the person simply sent starts its own conversation.
+    const plain = await send(channelId, "hi");
+    await stopTyping(plain.job.id);
+    const plainClaim = await claim();
+    expect(plainClaim?.workId).toBe(plain.job.id);
+    expect(plainClaim?.session?.conversationId).toBeNull();
+    await finish(plainClaim!);
+
+    // Replying to a message points at that work, so the conversation carries.
+    const answer = await send(channelId, "keep going", {
+      parentMessageId: first.messageId,
+    });
+    await stopTyping(answer.job.id);
+    const answerClaim = await claim();
+    expect(answerClaim?.workId).toBe(answer.job.id);
+    expect(answerClaim?.session?.conversationId)
+      .toBe("provider-conversation-501");
   });
 
   it("recognizes only explicit whole stop commands", () => {
