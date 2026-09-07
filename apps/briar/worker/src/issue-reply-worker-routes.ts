@@ -73,9 +73,6 @@ export async function claimNextIssueReplyWork(input: {
       staleBefore: new Date(
         Date.parse(observedAt) - WORKER_STALE_AFTER_MS,
       ).toISOString(),
-      computerUseProvidersJson: JSON.stringify(
-        runtime.computerUse?.providers ?? [],
-      ),
     });
     if (!job) return null;
     scheduleProjectRealtimePublish(env, db, input.projectId, context);

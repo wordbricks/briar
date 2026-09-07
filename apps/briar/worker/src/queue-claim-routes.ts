@@ -19,7 +19,6 @@ import {
   auditExecutionEvent,
   leaseExpiryFrom,
   reapStalledHuntRuns,
-  executionWorkerRuntime,
   workerStateAt,
 } from "./workers";
 
@@ -66,12 +65,6 @@ export async function claimNextQueueWork(input: {
       workerId: authenticatedWorkerId,
       workerDeviceId: authenticatedWorker?.principal.deviceId,
       detachedOnly: Boolean(authenticatedWorkerId),
-      computerUseProvidersJson: authenticatedWorker
-        ? JSON.stringify(
-            executionWorkerRuntime(authenticatedWorker.binding).computerUse
-              ?.providers ?? [],
-          )
-        : null,
     });
     if (!run && input.runId) {
       const waiting = await db

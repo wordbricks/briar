@@ -3717,7 +3717,6 @@ export async function claimNextChannelAgentReply(
       provider: assigned.agent_provider,
       model: assigned.runtime_model,
       effort: assigned.runtime_effort,
-      computerUsePolicy: assigned.computer_use_policy,
       observedAt: input.claimedAt,
     });
     if (availability === "available") continue;
@@ -3855,10 +3854,6 @@ export async function claimNextChannelAgentReply(
       candidate.runtime_effort,
     );
     if (!supportsSelection) continue;
-    if (
-      candidate.computer_use_policy === "unattended" &&
-      !input.runtime.computerUse?.providers.includes(candidate.agent_provider)
-    ) continue;
 
     const sessionExpired = candidate.session_retained_until <= input.claimedAt;
     if (
@@ -3882,7 +3877,6 @@ export async function claimNextChannelAgentReply(
         candidate.agent_provider,
         candidate.runtime_model,
         candidate.runtime_effort,
-        candidate.computer_use_policy,
       ]);
       let available = preferredAvailability.get(preferenceKey);
       if (available === undefined) {
@@ -3893,7 +3887,6 @@ export async function claimNextChannelAgentReply(
           provider: candidate.agent_provider,
           model: candidate.runtime_model,
           effort: candidate.runtime_effort,
-          computerUsePolicy: candidate.computer_use_policy,
           observedAt: input.claimedAt,
         });
         preferredAvailability.set(preferenceKey, available);

@@ -63,7 +63,6 @@ async function resolveDesignatedWorker(
     readonly provider: TeamAgentRow["provider"];
     readonly model: string | null;
     readonly effort: TeamAgentRow["effort"];
-    readonly computerUsePolicy: TeamAgentRow["computer_use_policy"];
   },
   services: TeamAgentApplicationServices,
 ) {
@@ -75,7 +74,6 @@ async function resolveDesignatedWorker(
     provider: input.provider,
     model: input.model,
     effort: input.effort,
-    computerUsePolicy: input.computerUsePolicy,
     observedAt: new Date().toISOString(),
   });
   if (!worker) {
@@ -111,7 +109,6 @@ export async function createTeamAgentApplication(
       provider: write.provider,
       model: write.model ?? null,
       effort: write.effort ?? null,
-      computerUsePolicy: write.computerUsePolicy ?? "disabled",
     },
     services,
   );
@@ -147,8 +144,6 @@ export async function updateTeamAgentApplication(
     throw new TeamAgentApplicationError("agent_not_found", "Agent not found");
   }
   const nextEffort = write.effort === undefined ? existing.effort : write.effort;
-  const nextComputerUsePolicy = write.computerUsePolicy ??
-    existing.computer_use_policy;
   const designatedWorker = await resolveDesignatedWorker(
     db,
     {
@@ -161,7 +156,6 @@ export async function updateTeamAgentApplication(
       provider: write.provider,
       model: write.model ?? null,
       effort: nextEffort,
-      computerUsePolicy: nextComputerUsePolicy,
     },
     services,
   );

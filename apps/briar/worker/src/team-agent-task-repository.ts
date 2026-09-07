@@ -184,7 +184,6 @@ export async function claimNextTeamAgentTask(
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
-    computerUseProvidersJson?: string;
   },
 ) {
   // Migration 0092 is a deployment prerequisite, so this hot path never
@@ -227,13 +226,6 @@ export async function claimNextTeamAgentTask(
              from briar_execution_worker_healthy_providers healthy
              where healthy.worker_id = ?
                and healthy.provider = skill.provider
-           )
-           and (
-             agent.computer_use_policy = 'disabled'
-             or exists (
-               select 1 from json_each(?) computer_provider
-               where computer_provider.value = skill.provider
-             )
            )
            ${skillExecutionEligibility}
            and exists (
@@ -299,7 +291,6 @@ export async function claimNextTeamAgentTask(
       projectId,
       input.workerId,
       input.workerId,
-      input.computerUseProvidersJson ?? "[]",
       input.workerId,
       input.claimedAt,
       input.claimedAt,
