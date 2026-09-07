@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ApiError } from "../../lib/api/errors";
 import {
   testChannelAgent,
   testChannelAgentReply,
@@ -31,6 +32,30 @@ describe("channelConversationError", () => {
   it("uses an Error message and stringifies anything else", () => {
     expect(channelConversationError(new Error("offline"))).toBe("offline");
     expect(channelConversationError("offline")).toBe("offline");
+  });
+
+  /*
+    Connect never hands the API's own error to the call site: `runUnaryCall`
+    attaches its rejection handler outside the interceptor chain, so the
+    `ApiError` the transport raises is re-wrapped by `ConnectError.from` under
+    the `unknown` code. A rejected message reached the toast as
+    "[unknown] Invalid request" until this unwrapped it.
+  */
+  it("reads through the wrapper Connect puts around an ApiError", () => {
+    const apiError = new ApiError(400, "Invalid request");
+    const wrapped = new Error("[unknown] Invalid request", {
+      cause: apiError,
+    });
+    expect(channelConversationError(wrapped)).toBe("Invalid request");
+  });
+
+  it("names the field a validation failure rejected", () => {
+    const apiError = new ApiError(400, "Invalid request", undefined, [
+      { path: ["body"], message: "Expected a value with a length of at most 50000" },
+    ]);
+    expect(channelConversationError(new Error("[unknown] Invalid request", {
+      cause: apiError,
+    }))).toBe("body: Expected a value with a length of at most 50000");
   });
 });
 

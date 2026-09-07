@@ -19,10 +19,11 @@ import {
   retainedMentions,
   type MentionTarget,
 } from "../lib/channel-mentions";
-import type {
-  ChannelAgentSkill,
-  ChannelAgentSummary,
-  ChannelMember,
+import {
+  channelMessageBodyMaxLength,
+  type ChannelAgentSkill,
+  type ChannelAgentSummary,
+  type ChannelMember,
 } from "../lib/channels-contract";
 import {
   isChannelAttachmentTypeSupported,
@@ -255,8 +256,17 @@ export function useChannelComposer<T extends ComposerInput>({
     setAttachmentError(null);
   };
 
+  /*
+    The message the server would be asked to store, measured before it is asked.
+    A body over the ceiling used to be found out only by the round trip, which
+    answered with a validation error and threw the draft away; the send button
+    reads this and Enter stops here, so the text stays in the box.
+  */
+  const bodyOverflows =
+    channelBodyWithImages(body, images).length > channelMessageBodyMaxLength;
+
   const submit = () => {
-    if ((!body.trim() && images.length === 0) || busy) return;
+    if ((!body.trim() && images.length === 0) || busy || bodyOverflows) return;
     if (onInvite && body.trim() === "/invite" && images.length === 0) {
       onInvite();
     } else {
@@ -426,6 +436,7 @@ export function useChannelComposer<T extends ComposerInput>({
     attachmentError,
     attachmentInputRef,
     body,
+    bodyOverflows,
     dragging,
     handleCaret,
     handleChange,

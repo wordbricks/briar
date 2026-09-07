@@ -13,6 +13,7 @@ import {
   updateChannelThreadSubscription,
 } from "../../lib/api";
 import {
+  channelMessageBodyMaxLength,
   type ChannelExecutionProposal,
   type ChannelMessage,
   type ChannelSummary,
@@ -150,6 +151,7 @@ export interface ChannelConversationActionContext {
     readonly you: string;
     readonly deleteMessageConfirm: string;
     readonly executionTargetUnavailable: string;
+    readonly messageTooLong: string;
     readonly skillApprovalUnavailable: string;
   };
 }
@@ -247,6 +249,19 @@ export function createChannelConversationActions(
     const api = resolveApi();
     const context = options.context();
     const { imageCache } = context;
+    /*
+      The composer disables its send button past the ceiling, so this catches
+      the callers that are not it. Answering here keeps the draft out of the
+      timeline: the round trip would have rejected the body anyway, after
+      showing it as sent and taking it back again.
+    */
+    if (body.trim().length > channelMessageBodyMaxLength) {
+      reportChannelConversationError(
+        registry,
+        new Error(context.text.messageTooLong),
+      );
+      return;
+    }
     const sendContext = loader.captureSurface();
     const clientMessageId = crypto.randomUUID();
     const attachmentUrls = attachments.map((attachment) =>
@@ -869,6 +884,9 @@ export function useChannelConversationActions(
       you: t("channel.you"),
       deleteMessageConfirm: t("channel.deleteMessageConfirm"),
       executionTargetUnavailable: t("executionApproval.targetUnavailable"),
+      messageTooLong: t("channel.messageTooLong", {
+        max: channelMessageBodyMaxLength.toLocaleString(),
+      }),
       skillApprovalUnavailable: t("skillExecution.approvalUnavailable"),
     },
   };
