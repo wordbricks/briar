@@ -1,371 +1,57 @@
--- Worker runtime metadata crosses the Connect boundary as one generated
--- WorkerRuntimeAdvertisement. Store that same ProtoJSON document instead of
--- maintaining three parallel SQL columns and hand-written JSON projections.
+-- GENERATED FILE - DO NOT EDIT BY HAND.
+-- baseline-through: 0199_managed_computer_provider.sql
+-- Continuation 4 of 0000_baseline_through_0199.sql.
 
-drop trigger if exists briar_dashboard_workers_update_sync;
-drop trigger if exists briar_agent_skill_execution_task_claim_guard;
-drop trigger if exists briar_agent_skill_execution_accept_guard;
-
--- Early development data may contain the old `{}` placeholder or a partial
--- provider catalog. It cannot be converted without inventing runtime facts.
--- Preserve the Agent's display label, clear the restrictive reference, and
--- delete those unusable project bindings before tightening the contract.
-create table briar_invalid_execution_worker_runtime_ids (
-  id text primary key not null
-);
-
-insert into briar_invalid_execution_worker_runtime_ids (id)
-select worker.id
-from briar_execution_workers worker
-where case
-  when not json_valid(worker.capabilities_json)
-    or not json_valid(worker.versions_json)
-    then 1
-  else (
-  worker.agent_provider not in (
-    'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter'
-  )
-  or json_type(worker.capabilities_json, '$.providers') is not 'array'
-  or exists (
-    select 1
-    from json_each(worker.capabilities_json, '$.providers') provider
-    where provider.type is not 'text'
-      or provider.value not in (
-        'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter'
-      )
-  )
-  or (
-    select count(*)
-    from json_each(worker.capabilities_json, '$.providers')
-  ) <> (
-    select count(distinct provider.value)
-    from json_each(worker.capabilities_json, '$.providers') provider
-  )
-  or json_type(worker.capabilities_json, '$.providerHealth') is not 'object'
-  or (
-    select count(*) from json_each(
-      worker.capabilities_json, '$.providerHealth'
-    )
-  ) <> 7
-  or (
-    select count(*)
-    from json_each(worker.capabilities_json, '$.providerHealth') health
-    where health.key in (
-      'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter'
-    ) and health.type = 'object'
-  ) <> 7
-  or exists (
-    select 1
-    from json_each(worker.capabilities_json, '$.providerHealth') health
-    where (json_type(health.value, '$.installed') is not 'true'
-        and json_type(health.value, '$.installed') is not 'false')
-      or (json_type(health.value, '$.authenticated') is not 'true'
-        and json_type(health.value, '$.authenticated') is not 'false')
-      or (json_type(health.value, '$.healthy') is not 'true'
-        and json_type(health.value, '$.healthy') is not 'false')
-      or (json_type(health.value, '$.usageExhausted') is not 'true'
-        and json_type(health.value, '$.usageExhausted') is not 'false')
-      or (json_type(health.value, '$.reason') is not 'null'
-        and json_type(health.value, '$.reason') is not 'text')
-      or (json_type(health.value, '$.maxUsedPercent') is not 'null'
-        and json_type(health.value, '$.maxUsedPercent') is not 'integer'
-        and json_type(health.value, '$.maxUsedPercent') is not 'real')
-      or length(coalesce(json_extract(health.value, '$.reason'), '')) > 64
-      or coalesce(json_extract(health.value, '$.maxUsedPercent'), 0) < 0
-      or coalesce(json_extract(health.value, '$.maxUsedPercent'), 0) > 100
-  )
-  or exists (
-    select 1
-    from json_each(worker.capabilities_json, '$.providerHealth') health
-    where json_extract(health.value, '$.healthy') = 1
-      and not exists (
-        select 1
-        from json_each(worker.capabilities_json, '$.providers') provider
-        where provider.value = health.key
-      )
-  )
-  or exists (
-    select 1
-    from json_each(worker.capabilities_json, '$.providers') provider
-    where not exists (
-      select 1
-      from json_each(worker.capabilities_json, '$.providerHealth') health
-      where health.key = provider.value
-        and json_extract(health.value, '$.healthy') = 1
-    )
-  )
-  or json_type(
-    worker.capabilities_json, '$.providerCapabilities'
-  ) is not 'object'
-  or (
-    select count(*) from json_each(
-      worker.capabilities_json, '$.providerCapabilities'
-    )
-  ) <> 7
-  or (
-    select count(*)
-    from json_each(
-      worker.capabilities_json, '$.providerCapabilities'
-    ) capability
-    where capability.key in (
-      'codex', 'claude', 'cursor', 'grok', 'agy', 'opencode', 'openrouter'
-    ) and capability.type = 'object'
-  ) <> 7
-  or exists (
-    select 1
-    from json_each(
-      worker.capabilities_json, '$.providerCapabilities'
-    ) capability
-    where json_type(capability.value, '$.provider') is not null
-      or json_type(capability.value, '$.models') is not 'array'
-      or json_type(capability.value, '$.defaultEfforts') is not 'array'
-      or (json_type(capability.value, '$.allowCustomModels') is not 'true'
-        and json_type(capability.value, '$.allowCustomModels') is not 'false')
-      or (json_type(capability.value, '$.error') is not 'null'
-        and json_type(capability.value, '$.error') is not 'text')
-  )
-  or (json_type(worker.capabilities_json, '$.worktrees') is not 'true'
-    and json_type(worker.capabilities_json, '$.worktrees') is not 'false')
-  or json_type(
-    worker.capabilities_json, '$.workflowRequirements'
-  ) is not 'array'
-  or (json_type(worker.capabilities_json, '$.remoteUpdates') is not null
-    and json_type(worker.capabilities_json, '$.remoteUpdates') is not 'object')
-  or json_type(worker.versions_json) is not 'object'
-  or exists (
-    select 1
-    from json_each(worker.versions_json) version
-    where version.type is not 'text'
-      or length(version.key) > 64
-      or length(version.value) > 64
-  )
-  )
+-- @statement
+CREATE TRIGGER briar_project_mandatory_checkpoints_shape_insert
+before insert on briar_project_settings
+begin
+  insert into briar_workflow_checkpoint_storage_validation (
+    owner, checkpoints_json
+  ) values ('project', new.mandatory_checkpoints_json);
 end;
-
-update briar_project_agents
-set designated_worker_id = null
-where designated_worker_id in (
-  select id from briar_invalid_execution_worker_runtime_ids
-);
-
--- A reply-session lease pairs its device and worker identities. Letting the
--- worker FK clear only owner_worker_id would violate that invariant, so release
--- the whole lease before removing an unusable runtime advertisement.
-update briar_channel_reply_sessions
-set owner_device_id = null, owner_worker_id = null
-where owner_worker_id in (
-  select id from briar_invalid_execution_worker_runtime_ids
-);
-
-delete from briar_execution_workers
-where id in (select id from briar_invalid_execution_worker_runtime_ids);
-
--- Convert the complete legacy catalogs losslessly to protobuf JSON field and
--- enum names. JSON null is the ProtoJSON representation of an unset optional
--- field, while explicit scalar defaults remain legal ProtoJSON.
-update briar_execution_workers as worker
-set capabilities_json = json_object(
-  'agentProvider', case worker.agent_provider
-    when 'codex' then 'AGENT_PROVIDER_CODEX'
-    when 'claude' then 'AGENT_PROVIDER_CLAUDE'
-    when 'cursor' then 'AGENT_PROVIDER_CURSOR'
-    when 'grok' then 'AGENT_PROVIDER_GROK'
-    when 'agy' then 'AGENT_PROVIDER_AGY'
-    when 'opencode' then 'AGENT_PROVIDER_OPENCODE'
-    when 'openrouter' then 'AGENT_PROVIDER_OPENROUTER'
-  end,
-  'providerHealth', json((
-    select json_group_array(json(health_json))
-    from (
-      select json_object(
-        'provider', case health.key
-          when 'codex' then 'AGENT_PROVIDER_CODEX'
-          when 'claude' then 'AGENT_PROVIDER_CLAUDE'
-          when 'cursor' then 'AGENT_PROVIDER_CURSOR'
-          when 'grok' then 'AGENT_PROVIDER_GROK'
-          when 'agy' then 'AGENT_PROVIDER_AGY'
-          when 'opencode' then 'AGENT_PROVIDER_OPENCODE'
-          when 'openrouter' then 'AGENT_PROVIDER_OPENROUTER'
-        end,
-        'installed', json(case
-          when json_extract(health.value, '$.installed') = 1
-            then 'true' else 'false' end),
-        'authenticated', json(case
-          when json_extract(health.value, '$.authenticated') = 1
-            then 'true' else 'false' end),
-        'healthy', json(case
-          when json_extract(health.value, '$.healthy') = 1
-            then 'true' else 'false' end),
-        'reason', json_extract(health.value, '$.reason'),
-        'usageExhausted', json(case
-          when json_extract(health.value, '$.usageExhausted') = 1
-            then 'true' else 'false' end),
-        'maxUsedPercent', json_extract(health.value, '$.maxUsedPercent')
-      ) as health_json
-      from json_each(
-        worker.capabilities_json, '$.providerHealth'
-      ) health
-      order by case health.key
-        when 'codex' then 1 when 'claude' then 2 when 'cursor' then 3
-        when 'grok' then 4 when 'agy' then 5 when 'opencode' then 6
-        when 'openrouter' then 7
-      end
-    ) ordered_health
-  )),
-  'capabilities', json_object(
-    'providerCapabilities', json((
-      select json_group_array(json(capability_json))
-      from (
-        select json_patch(
-          json(capability.value),
-          json_object(
-            'provider', case capability.key
-              when 'codex' then 'AGENT_PROVIDER_CODEX'
-              when 'claude' then 'AGENT_PROVIDER_CLAUDE'
-              when 'cursor' then 'AGENT_PROVIDER_CURSOR'
-              when 'grok' then 'AGENT_PROVIDER_GROK'
-              when 'agy' then 'AGENT_PROVIDER_AGY'
-              when 'opencode' then 'AGENT_PROVIDER_OPENCODE'
-              when 'openrouter' then 'AGENT_PROVIDER_OPENROUTER'
-            end
-          )
-        ) as capability_json
-        from json_each(
-          worker.capabilities_json, '$.providerCapabilities'
-        ) capability
-        order by case capability.key
-          when 'codex' then 1 when 'claude' then 2 when 'cursor' then 3
-          when 'grok' then 4 when 'agy' then 5 when 'opencode' then 6
-          when 'openrouter' then 7
-        end
-      ) ordered_capabilities
-    )),
-    'remoteUpdates', json_extract(
-      worker.capabilities_json, '$.remoteUpdates'
-    ),
-    'worktrees', json(case
-      when json_extract(worker.capabilities_json, '$.worktrees') = 1
-        then 'true' else 'false' end),
-    'workflowRequirements', json_extract(
-      worker.capabilities_json, '$.workflowRequirements'
-    ),
-    'dmMemoryProtocol', json_extract(
-      worker.capabilities_json, '$.dmMemory.protocol'
-    )
-  ),
-  'versions', json(worker.versions_json)
-);
-
-alter table briar_execution_workers
-  rename column capabilities_json to runtime_proto_json;
-alter table briar_execution_workers drop column versions_json;
-alter table briar_execution_workers drop column agent_provider;
-
-insert or ignore into briar_invalid_execution_worker_runtime_ids (id)
-select id
-from briar_execution_workers
-where length(cast(runtime_proto_json as blob)) > 1048576;
-
-update briar_project_agents
-set designated_worker_id = null
-where designated_worker_id in (
-  select id from briar_invalid_execution_worker_runtime_ids
-);
-
-update briar_channel_reply_sessions
-set owner_device_id = null, owner_worker_id = null
-where owner_worker_id in (
-  select id from briar_invalid_execution_worker_runtime_ids
-);
-
-delete from briar_execution_workers
-where id in (select id from briar_invalid_execution_worker_runtime_ids);
-
-drop table briar_invalid_execution_worker_runtime_ids;
-
--- SQL safety guards need a queryable relational projection. It is derived
--- exclusively from the stored generated message and carries no mutable state.
-create view briar_execution_worker_healthy_providers as
-select worker.id as worker_id,
-       case json_extract(health.value, '$.provider')
-         when 'AGENT_PROVIDER_CODEX' then 'codex'
-         when 'AGENT_PROVIDER_CLAUDE' then 'claude'
-         when 'AGENT_PROVIDER_CURSOR' then 'cursor'
-         when 'AGENT_PROVIDER_GROK' then 'grok'
-         when 'AGENT_PROVIDER_AGY' then 'agy'
-         when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
-         when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
-       end as provider,
-       case json_extract(worker.runtime_proto_json, '$.agentProvider')
-         when 'AGENT_PROVIDER_CODEX' then 'codex'
-         when 'AGENT_PROVIDER_CLAUDE' then 'claude'
-         when 'AGENT_PROVIDER_CURSOR' then 'cursor'
-         when 'AGENT_PROVIDER_GROK' then 'grok'
-         when 'AGENT_PROVIDER_AGY' then 'agy'
-         when 'AGENT_PROVIDER_OPENCODE' then 'opencode'
-         when 'AGENT_PROVIDER_OPENROUTER' then 'openrouter'
-       end as agent_provider
-from briar_execution_workers worker,
-     json_each(worker.runtime_proto_json, '$.providerHealth') health
-where json_extract(health.value, '$.healthy') = 1
-  and json_extract(health.value, '$.provider') in (
-    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-  );
-
--- This view centralizes the subset of the generated contract on which SQL
--- scheduling depends. Full message validation remains at the Connect ingress.
-create view briar_invalid_execution_worker_runtime as
-select worker.id
-from briar_execution_workers worker
-where not (
-  json_valid(worker.runtime_proto_json)
-  and json_type(worker.runtime_proto_json) = 'object'
-  and length(cast(worker.runtime_proto_json as blob)) <= 1048576
-  and json_extract(worker.runtime_proto_json, '$.agentProvider') in (
-    'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-    'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-    'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-  )
-  and json_type(worker.runtime_proto_json, '$.providerHealth') = 'array'
-  and json_array_length(worker.runtime_proto_json, '$.providerHealth') = 7
-  and (
-    select count(distinct json_extract(health.value, '$.provider'))
-    from json_each(worker.runtime_proto_json, '$.providerHealth') health
-    where health.type = 'object'
-      and json_extract(health.value, '$.provider') in (
-        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-      )
-  ) = 7
-  and json_type(worker.runtime_proto_json, '$.capabilities') = 'object'
-  and json_type(
-    worker.runtime_proto_json, '$.capabilities.providerCapabilities'
-  ) = 'array'
-  and json_array_length(
-    worker.runtime_proto_json, '$.capabilities.providerCapabilities'
-  ) = 7
-  and (
-    select count(distinct json_extract(capability.value, '$.provider'))
-    from json_each(
-      worker.runtime_proto_json, '$.capabilities.providerCapabilities'
-    ) capability
-    where capability.type = 'object'
-      and json_extract(capability.value, '$.provider') in (
-        'AGENT_PROVIDER_CODEX', 'AGENT_PROVIDER_CLAUDE',
-        'AGENT_PROVIDER_CURSOR', 'AGENT_PROVIDER_GROK', 'AGENT_PROVIDER_AGY',
-        'AGENT_PROVIDER_OPENCODE', 'AGENT_PROVIDER_OPENROUTER'
-      )
-  ) = 7
-  and (
-    json_type(worker.runtime_proto_json, '$.versions') is null
-    or json_type(worker.runtime_proto_json, '$.versions') = 'object'
-  )
-);
-
-create trigger briar_execution_worker_runtime_insert_guard
+-- @statement
+CREATE TRIGGER briar_project_mandatory_checkpoints_shape_update
+before update of mandatory_checkpoints_json on briar_project_settings
+begin
+  insert into briar_workflow_checkpoint_storage_validation (
+    owner, checkpoints_json
+  ) values ('project', new.mandatory_checkpoints_json);
+end;
+-- @statement
+CREATE TRIGGER briar_user_default_checkpoints_shape_insert
+before insert on briar_user_workflow_checkpoint_defaults
+begin
+  insert into briar_workflow_checkpoint_storage_validation (
+    owner, checkpoints_json
+  ) values ('user', new.checkpoints_json);
+end;
+-- @statement
+CREATE TRIGGER briar_user_default_checkpoints_shape_update
+before update of checkpoints_json on briar_user_workflow_checkpoint_defaults
+begin
+  insert into briar_workflow_checkpoint_storage_validation (
+    owner, checkpoints_json
+  ) values ('user', new.checkpoints_json);
+end;
+-- @statement
+CREATE TRIGGER briar_issue_checkpoints_shape_insert
+before insert on briar_hunt_runs
+begin
+  insert into briar_workflow_checkpoint_storage_validation (
+    owner, checkpoints_json
+  ) values ('issue', new.issue_checkpoints_json);
+end;
+-- @statement
+CREATE TRIGGER briar_issue_checkpoints_shape_update
+before update of issue_checkpoints_json on briar_hunt_runs
+begin
+  insert into briar_workflow_checkpoint_storage_validation (
+    owner, checkpoints_json
+  ) values ('issue', new.issue_checkpoints_json);
+end;
+-- @statement
+CREATE TRIGGER briar_execution_worker_runtime_insert_guard
 after insert on briar_execution_workers
 when exists (
   select 1 from briar_invalid_execution_worker_runtime invalid
@@ -374,8 +60,7 @@ when exists (
 begin
   select raise(abort, 'Worker runtime ProtoJSON is invalid');
 end;
-
-
+-- @statement
 CREATE TRIGGER briar_agent_skill_execution_task_claim_guard
 before update of claim_token_hash on briar_project_agent_task_jobs
 when new.claim_token_hash is not null
@@ -462,8 +147,8 @@ when new.claim_token_hash is not null
 BEGIN
   select raise(abort, 'Agent Skill execution approval audit is missing or stale');
 END;
-
-create trigger briar_agent_skill_execution_accept_guard
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_accept_guard
 before update of status on briar_agent_skill_execution_proposals
 when old.status = 'pending' and new.status = 'accepted' and not (
   old.requested_worker_id is null and old.requested_worker_label is null
@@ -715,9 +400,8 @@ when old.status = 'pending' and new.status = 'accepted' and not (
 begin
   select raise(abort, 'Agent Skill execution proposal is stale');
 end;
-
-
-create trigger briar_execution_worker_runtime_update_guard
+-- @statement
+CREATE TRIGGER briar_execution_worker_runtime_update_guard
 after update of runtime_proto_json on briar_execution_workers
 when exists (
   select 1 from briar_invalid_execution_worker_runtime invalid
@@ -726,13 +410,8 @@ when exists (
 begin
   select raise(abort, 'Worker runtime ProtoJSON is invalid');
 end;
-
--- Exercise the permanent write guard against every converted row before the
--- migration can commit.
-update briar_execution_workers
-set runtime_proto_json = runtime_proto_json;
-
-create trigger briar_dashboard_workers_update_sync
+-- @statement
+CREATE TRIGGER briar_dashboard_workers_update_sync
 after update on briar_execution_workers
 when old.project_id is not new.project_id
   or old.device_id is not new.device_id
@@ -751,4 +430,215 @@ begin
   values (new.project_id, last_insert_rowid())
   on conflict (project_id) do update
     set current_version = excluded.current_version;
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_run_structured_result_insert_guard
+before insert on briar_hunt_runs
+when new.structured_result_json is not null
+  and case
+    when not json_valid(new.structured_result_json) then 1
+    when json_type(new.structured_result_json) <> 'object' then 1
+    when length(cast(new.structured_result_json as blob)) > 131072 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'structured agent result must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_run_structured_result_update_guard
+before update of structured_result_json on briar_hunt_runs
+when new.structured_result_json is not null
+  and case
+    when not json_valid(new.structured_result_json) then 1
+    when json_type(new.structured_result_json) <> 'object' then 1
+    when length(cast(new.structured_result_json as blob)) > 131072 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'structured agent result must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_schedule_run_structured_result_insert_guard
+before insert on briar_project_agent_schedule_runs
+when new.structured_result_json is not null
+  and case
+    when not json_valid(new.structured_result_json) then 1
+    when json_type(new.structured_result_json) <> 'object' then 1
+    when length(cast(new.structured_result_json as blob)) > 131072 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'structured agent result must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_schedule_run_structured_result_update_guard
+before update of structured_result_json
+on briar_project_agent_schedule_runs
+when new.structured_result_json is not null
+  and case
+    when not json_valid(new.structured_result_json) then 1
+    when json_type(new.structured_result_json) <> 'object' then 1
+    when length(cast(new.structured_result_json as blob)) > 131072 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'structured agent result must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_run_execution_metrics_insert_guard
+before insert on briar_hunt_runs
+when new.execution_metrics_json is not null
+  and case
+    when not json_valid(new.execution_metrics_json) then 1
+    when json_type(new.execution_metrics_json) <> 'object' then 1
+    when length(cast(new.execution_metrics_json as blob)) > 4096 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'agent execution metrics must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_run_execution_metrics_update_guard
+before update of execution_metrics_json on briar_hunt_runs
+when new.execution_metrics_json is not null
+  and case
+    when not json_valid(new.execution_metrics_json) then 1
+    when json_type(new.execution_metrics_json) <> 'object' then 1
+    when length(cast(new.execution_metrics_json as blob)) > 4096 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'agent execution metrics must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_project_agent_session_payload_insert_guard
+after insert on briar_project_agent_sessions
+when exists (
+  select 1 from briar_invalid_project_agent_session_payload invalid
+  where invalid.project_id = new.project_id and invalid.id = new.id
+)
+begin
+  select raise(abort, 'invalid stored project Agent session payload');
+end;
+-- @statement
+CREATE TRIGGER briar_project_agent_session_payload_update_guard
+after update of payload_json, agent_id, status, session_type,
+  started_at, completed_at, updated_at, requested_by_user_id
+on briar_project_agent_sessions
+when exists (
+  select 1 from briar_invalid_project_agent_session_payload invalid
+  where invalid.project_id = new.project_id and invalid.id = new.id
+)
+begin
+  select raise(abort, 'invalid stored project Agent session payload');
+end;
+-- @statement
+CREATE TRIGGER briar_project_agent_session_summary_insert_guard
+after insert on briar_project_agent_session_summaries
+when exists (
+  select 1 from briar_invalid_project_agent_session_summary invalid
+  where invalid.project_id = new.project_id
+    and invalid.session_id = new.session_id
+)
+begin
+  select raise(abort, 'invalid stored project Agent session summary');
+end;
+-- @statement
+CREATE TRIGGER briar_project_agent_session_summary_update_guard
+after update of summary_json, updated_at
+on briar_project_agent_session_summaries
+when exists (
+  select 1 from briar_invalid_project_agent_session_summary invalid
+  where invalid.project_id = new.project_id
+    and invalid.session_id = new.session_id
+)
+begin
+  select raise(abort, 'invalid stored project Agent session summary');
+end;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_payload_insert_guard
+before insert on briar_agent_skill_execution_proposals
+when new.materialized_session_payload_json is not null
+begin
+  select raise(abort, 'Agent Skill session payload is transient');
+end;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_payload_update_guard
+before update of status, materialized_session_payload_json
+on briar_agent_skill_execution_proposals
+when not (
+  new.materialized_session_payload_json is old.materialized_session_payload_json
+  or (
+    old.status = 'pending' and new.status = 'accepted'
+    and new.execution_mode = 'task'
+    and old.materialized_session_payload_json is null
+    and new.materialized_session_payload_json is not null
+  )
+  or (
+    old.status = 'accepted' and new.status = 'accepted'
+    and new.execution_mode = 'task'
+    and old.materialized_session_payload_json is not null
+    and new.materialized_session_payload_json is null
+    and exists (
+      select 1 from briar_project_agent_sessions session
+      where session.project_id = new.project_id
+        and session.id = new.result_session_id
+    )
+  )
+)
+begin
+  select raise(abort, 'invalid Agent Skill session payload transition');
+end;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_payload_accept_guard
+before update of status on briar_agent_skill_execution_proposals
+when old.status = 'pending' and new.status = 'accepted' and (
+  (new.execution_mode = 'conversation'
+    and new.materialized_session_payload_json is not null)
+  or
+  (new.execution_mode = 'task' and case
+    when new.materialized_session_payload_json is null then 1
+    when length(cast(new.materialized_session_payload_json as blob)) > 1048576
+      then 1
+    when not json_valid(new.materialized_session_payload_json) then 1
+    when json_type(new.materialized_session_payload_json) <> 'object' then 1
+    else not (
+      json_extract(new.materialized_session_payload_json, '$.dispatchGroupId')
+        is new.result_session_id
+      and json_extract(new.materialized_session_payload_json, '$.agentName')
+        is new.agent_name
+      and json_extract(new.materialized_session_payload_json, '$.skillId')
+        is new.skill_id
+      and json_extract(new.materialized_session_payload_json, '$.trigger')
+        = 'manual'
+      and json_extract(new.materialized_session_payload_json, '$.request')
+        is new.request
+      and json_extract(
+        new.materialized_session_payload_json, '$.requestedWorkerId'
+      ) is new.requested_worker_id
+      and json_extract(new.materialized_session_payload_json, '$.workerId')
+        is new.requested_worker_id
+    )
+  end)
+)
+begin
+  select raise(abort, 'invalid materialized Agent Skill session payload');
 end;

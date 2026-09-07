@@ -295,9 +295,10 @@ and does not change the cache key. Set `BRIAR_CI_SERIAL_CONTEXTS=true` to run
 the contexts one at a time on constrained machines, or set
 `VITEST_MAX_WORKERS` explicitly to cap the pool.
 
-The 16 cutover regressions are loaded through four domain-grouped Vitest entry
-files. Each entry pays for one workerd boot and resets its D1 database between
-cutover cases. Local CI does not also run `d1:migrate:local`: the cutover suite
+The surviving cutover regressions are loaded through domain-grouped Vitest
+entry files — two of them, since the `0199` squash retired the tests whose
+migrations the baseline absorbed. Each entry pays for one workerd boot and
+resets its D1 database between cutover cases. Local CI does not also run `d1:migrate:local`: the cutover suite
 already exercises the real migration files, and the extra Wrangler replay was
 redundant. The standalone task remains available for manual local migration
 checks and is independently cached.
@@ -325,7 +326,7 @@ seed. The `worker-d1` Vitest project loads it in one batch instead of replaying
 every migration into each test file's isolated database.
 
 The migrations remain the source of truth. `d1:migrate:local`, `d1:migrate:remote`
-and the four domain-grouped migration entries still use the real files, so
+and the domain-grouped migration entries still use the real files, so
 migration behaviour is never validated through the snapshot. `db.test.ts` and
 `workflow-v2.test.ts` are repository integration tests rather than cutover
 tests and run in the `worker-d1` project on the snapshot schema.
@@ -346,12 +347,24 @@ diff — use it when the fast check disagrees with what you expect.
 
 ### The squashed baseline
 
-`apps/briar/migrations/0000_baseline_schema.sql` and its two continuation parts
-are the schema and seeded rows of a database migrated through
-`0159_allow_duplicate_evidence_image_digests.sql`. They replace the 171 files
-at or below that cut-off, which are in git history. The cut-off sits one below
-the lowest migration any cutover test pins by name, so every replay those tests
-do is unchanged.
+`apps/briar/migrations/0000_baseline_through_0199.sql` and its four
+continuation parts are the schema and seeded rows of a database migrated
+through `0199_managed_computer_provider.sql`. They replace every file at or
+below that cut-off, which are in git history.
+
+The cut-off is bounded by the cutover tests, which replay a migration by name
+to assert what it did to real rows: it can sit no higher than one below the
+lowest migration any of them pins. Raising it therefore means retiring tests,
+and that is the real cost — the first squash (cut-off `0159`) kept every one of
+them, the second retired the seventeen that pinned `0160`–`0180`. Retire a
+cutover test only once its migration is applied in production and has been for
+several releases: the transformation it guards has then already happened
+everywhere, a fresh database gets the baseline instead, and git history keeps
+the record of what it asserted.
+
+Name each baseline after its cut-off rather than reusing one name. A database
+that stopped partway through the squashed history must not silently match a
+recorded name; under a fresh name it is caught by the check below instead.
 
 The baseline must never run against a database that already holds the history
 it replaces: its triggers and views are the cut-off's, and later migrations
@@ -380,6 +393,13 @@ bun run scripts/generate-d1-baseline-migration.ts <through.sql> <output.sql> [--
 `--drop` names a data-only migration whose rows are deliberately left behind.
 Check first that no test reads those rows back: the block cutover test used to
 pick a row out of the restored Slack history rather than seeding its own.
+
+Two things go stale when the cut-off passes them. `beforeMigration` in
+`scripts/apply-remote-d1-migrations.ts` keys work to a migration by name — its
+last user ran the archive-storage backfill before
+`0162_canonical_archive_storage.sql` and was removed when the baseline absorbed
+that file. And a cutover test whose migration is now inside the baseline cannot
+run at all, because the intermediate schema it replays to no longer exists.
 
 Any audit exception must be narrow, dated, and recorded in
 [`security-exceptions.md`](security-exceptions.md) with a removal condition.
