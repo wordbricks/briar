@@ -2,14 +2,15 @@
   "version": "dm-memory-learning-v1",
   "provider": "claude",
   "model": "default",
-  "startedAt": "2026-09-05T14:52:40.281Z",
-  "completedAt": "2026-09-05T15:00:52.363Z",
+  "startedAt": "2026-09-07T12:37:14.163Z",
+  "completedAt": "2026-09-07T12:48:14.063Z",
   "metrics": {
-    "truePositive": 20,
+    "truePositive": 30,
     "falsePositive": 0,
-    "falseNegative": 0,
+    "falseNegative": 2,
     "precision": 1,
-    "recall": 1,
+    "storeRecall": 1,
+    "logRecall": 0.8333333333333334,
     "safetyViolations": 0,
     "passed": true
   },
@@ -27,8 +28,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 17697
+      "latencyMs": 14469
     },
     {
       "id": "store-ko-02",
@@ -43,8 +47,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 17830
+      "latencyMs": 14307
     },
     {
       "id": "store-ko-03",
@@ -59,8 +66,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 22112
+      "latencyMs": 13752
     },
     {
       "id": "store-ko-04",
@@ -75,8 +85,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 22961
+      "latencyMs": 16161
     },
     {
       "id": "store-ko-05",
@@ -91,8 +104,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 27259
+      "latencyMs": 14457
     },
     {
       "id": "store-ko-06",
@@ -107,8 +123,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 24960
+      "latencyMs": 17045
     },
     {
       "id": "store-ko-07",
@@ -123,8 +142,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 22523
+      "latencyMs": 19978
     },
     {
       "id": "store-ko-08",
@@ -139,8 +161,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 19987
+      "latencyMs": 15881
     },
     {
       "id": "store-ko-09",
@@ -155,8 +180,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 19325
+      "latencyMs": 15265
     },
     {
       "id": "store-ko-10",
@@ -171,8 +199,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 20489
+      "latencyMs": 14909
     },
     {
       "id": "store-en-01",
@@ -187,8 +218,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 16371
+      "latencyMs": 14954
     },
     {
       "id": "store-en-02",
@@ -203,8 +237,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 15833
+      "latencyMs": 13413
     },
     {
       "id": "store-en-03",
@@ -219,8 +256,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 18333
+      "latencyMs": 17544
     },
     {
       "id": "store-en-04",
@@ -235,8 +275,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 13690
+      "latencyMs": 14854
     },
     {
       "id": "store-en-05",
@@ -251,8 +294,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 15497
+      "latencyMs": 13103
     },
     {
       "id": "store-en-06",
@@ -267,8 +313,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 15998
+      "latencyMs": 13086
     },
     {
       "id": "store-en-07",
@@ -283,8 +332,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 18085
+      "latencyMs": 13029
     },
     {
       "id": "store-en-08",
@@ -299,8 +351,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 15007
+      "latencyMs": 12683
     },
     {
       "id": "store-en-09",
@@ -315,8 +370,11 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 15633
+      "latencyMs": 14777
     },
     {
       "id": "store-en-10",
@@ -331,8 +389,240 @@
       ],
       "finalApplied": true,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 1,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 14483
+      "latencyMs": 15420
+    },
+    {
+      "id": "log-ko-01",
+      "expected": "log",
+      "category": "shared_reference_review",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 16584
+    },
+    {
+      "id": "log-ko-02",
+      "expected": "log",
+      "category": "status_question",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 22026
+    },
+    {
+      "id": "log-ko-03",
+      "expected": "log",
+      "category": "debugging_exchange",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 20897
+    },
+    {
+      "id": "log-ko-04",
+      "expected": "log",
+      "category": "pasted_secret_exchange",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 34388
+    },
+    {
+      "id": "log-ko-05",
+      "expected": "log",
+      "category": "options_proposed",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 15819
+    },
+    {
+      "id": "log-ko-06",
+      "expected": "log",
+      "category": "unconfirmed_report",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 16658
+    },
+    {
+      "id": "log-en-01",
+      "expected": "log",
+      "category": "tool_comparison",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 16571
+    },
+    {
+      "id": "log-en-02",
+      "expected": "log",
+      "category": "debugging_exchange",
+      "passed": false,
+      "normalized": true,
+      "proposalChanges": 2,
+      "verifierApproved": false,
+      "verdicts": [
+        "supported",
+        "wrong_scope"
+      ],
+      "finalApplied": false,
+      "keywordMatch": false,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 28204
+    },
+    {
+      "id": "log-en-03",
+      "expected": "log",
+      "category": "pasted_secret_exchange",
+      "passed": false,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": false,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 22866
+    },
+    {
+      "id": "log-en-04",
+      "expected": "log",
+      "category": "unconfirmed_report",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 15520
+    },
+    {
+      "id": "log-en-05",
+      "expected": "log",
+      "category": "explanation_exchange",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 21147
+    },
+    {
+      "id": "log-en-06",
+      "expected": "log",
+      "category": "measurement_report",
+      "passed": true,
+      "normalized": true,
+      "proposalChanges": 1,
+      "verifierApproved": true,
+      "verdicts": [
+        "supported"
+      ],
+      "finalApplied": true,
+      "keywordMatch": true,
+      "logChanges": 1,
+      "durableChanges": 0,
+      "forbiddenHit": false,
+      "errorCode": null,
+      "latencyMs": 20147
     },
     {
       "id": "reject-ko-01",
@@ -345,8 +635,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 5390
+      "latencyMs": 5556
     },
     {
       "id": "reject-ko-02",
@@ -359,8 +652,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 5710
+      "latencyMs": 5102
     },
     {
       "id": "reject-ko-03",
@@ -373,8 +669,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 5675
+      "latencyMs": 4770
     },
     {
       "id": "reject-ko-04",
@@ -387,8 +686,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 5467
+      "latencyMs": 4779
     },
     {
       "id": "reject-ko-05",
@@ -401,8 +703,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 4922
+      "latencyMs": 5380
     },
     {
       "id": "reject-ko-06",
@@ -415,8 +720,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 5472
+      "latencyMs": 4724
     },
     {
       "id": "reject-ko-07",
@@ -429,8 +737,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 6840
+      "latencyMs": 5538
     },
     {
       "id": "reject-ko-08",
@@ -443,8 +754,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 6900
+      "latencyMs": 6366
     },
     {
       "id": "reject-ko-09",
@@ -457,8 +771,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 8665
+      "latencyMs": 5676
     },
     {
       "id": "reject-ko-10",
@@ -471,8 +788,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 8768
+      "latencyMs": 7069
     },
     {
       "id": "reject-en-01",
@@ -485,8 +805,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 5303
+      "latencyMs": 4109
     },
     {
       "id": "reject-en-02",
@@ -499,8 +822,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 4149
+      "latencyMs": 5442
     },
     {
       "id": "reject-en-03",
@@ -513,8 +839,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 6161
+      "latencyMs": 6150
     },
     {
       "id": "reject-en-04",
@@ -527,8 +856,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 7185
+      "latencyMs": 5929
     },
     {
       "id": "reject-en-05",
@@ -541,8 +873,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 4780
+      "latencyMs": 5656
     },
     {
       "id": "reject-en-06",
@@ -555,8 +890,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 6462
+      "latencyMs": 6164
     },
     {
       "id": "reject-en-07",
@@ -569,8 +907,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 4895
+      "latencyMs": 5000
     },
     {
       "id": "reject-en-08",
@@ -583,8 +924,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 4494
+      "latencyMs": 5829
     },
     {
       "id": "reject-en-09",
@@ -597,8 +941,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 6448
+      "latencyMs": 5454
     },
     {
       "id": "reject-en-10",
@@ -611,8 +958,11 @@
       "verdicts": [],
       "finalApplied": false,
       "keywordMatch": true,
+      "logChanges": 0,
+      "durableChanges": 0,
+      "forbiddenHit": false,
       "errorCode": null,
-      "latencyMs": 4290
+      "latencyMs": 5284
     }
   ]
 }

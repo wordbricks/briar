@@ -1,6 +1,6 @@
-import type {
-  DmLearningChange, DmLearningDocument, DmLearningProposal, DmLearningRoot,
-  DmLearningSnapshot, DmLearningSourceRef, DmLearningVerification,
+import {
+  dmMemoryLearningLogRetentionMs, type DmLearningChange, type DmLearningDocument, type DmLearningProposal,
+  type DmLearningRoot, type DmLearningSnapshot, type DmLearningSourceRef, type DmLearningVerification,
 } from "../../src/lib/dm-memory-learning-contract";
 
 export class DmLearningError extends Error {
@@ -101,6 +101,18 @@ export function normalizeDmLearningProposal(
     if (snapshot.kind === "explicit_request" && !cited.some((root) => root.speaker === "user" &&
       key(root) === key(snapshot.requestSource!))) invalid();
     if (change.evidenceType === "explicit_user" && !cited.some((root) => root.speaker === "user")) invalid();
+    // An episode is an attributed record of an exchange, so it needs both sides
+    // of that exchange and the time it happened; a single message cannot be one.
+    // Retention is the server's, never the model's: the expiry it sent is
+    // replaced with the policy value derived from the observation time.
+    let validUntil = change.validUntil;
+    if (change.memoryClass === "log") {
+      if (change.documentKind !== "observation" || !change.observedAt) invalid();
+      if (!cited.some((root) => root.speaker === "user") || !cited.some((root) => root.speaker === "agent")) invalid();
+      const observed = Date.parse(change.observedAt);
+      if (!Number.isSafeInteger(observed)) invalid();
+      validUntil = new Date(observed + dmMemoryLearningLogRetentionMs).toISOString();
+    }
     let replacementId: string | null = null;
     let replacementVersion: number | null = null;
     if (change.action === "supersede") {
@@ -153,12 +165,12 @@ export function normalizeDmLearningProposal(
         document.id !== documentId && normalizedBody(document.body) === canonical)) invalid();
       if (target && normalizedBody(target.body) === canonical && target.memoryClass === change.memoryClass &&
         target.evidenceType === change.evidenceType && target.observedAt === change.observedAt &&
-        target.validUntil === change.validUntil && target.conflicted === change.conflicted &&
+        target.validUntil === validUntil && target.conflicted === change.conflicted &&
         target.sourceLanguage === change.sourceLanguage && target.title === change.title &&
         cited.every((source) => target.sources.some((existing) => key(source) === key(existing)))) invalid();
       generatedBodies.add(canonical);
     }
-    return { change, documentId, version: target ? target.version + 1 : 1, body,
+    return { change: { ...change, validUntil }, documentId, version: target ? target.version + 1 : 1, body,
       protectedByUser: snapshot.kind === "explicit_request",
       replacementId, replacementVersion, roots: linked.map(({ itemId, source }) => ({ itemId,
         source: { type: source.type, id: source.id, version: source.version, hash: source.hash } })) };

@@ -112,6 +112,20 @@ export const dmMemoryLearningVerifierMaxOutputTokens = 2048;
  * under the 32 events a single snapshot can hold.
  */
 export const dmMemoryLearningRetainedSources = 16;
+/**
+ * How long an episode (`memory_class = 'log'`) stays readable. Retention is a
+ * policy value the server stamps itself: an episode records what an interval
+ * exchanged, not a durable fact, and the model must never choose how long its
+ * own summary survives. `expireDmMemories` retires it once this passes.
+ */
+export const dmMemoryLearningLogRetentionMs = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Episodes carried into an extract snapshot, newest first. Every interval may
+ * add one, and a snapshot holding more than 128 documents fails the whole space
+ * with `input_capacity`, so only recent episodes are shown - enough for the
+ * model to extend the current one instead of duplicating it.
+ */
+export const dmMemoryLearningRecentLogsInSnapshot = 16;
 
 /** Learning is built in, so the policy is derived from the provider, never configured. */
 export function dmLearningAgentPolicy(provider: AgentProvider): DmLearningPolicy {

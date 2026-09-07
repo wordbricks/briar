@@ -22,6 +22,50 @@
     { "id": "store-en-09", "expected": "store", "category": "reusable_project_fact", "keywords": ["Vectorize", "body"], "roots": [{ "speaker": "user", "body": "Our Vectorize metadata must never contain the original memory body." }] },
     { "id": "store-en-10", "expected": "store", "category": "durable_preference", "keywords": ["concise", "status"], "roots": [{ "speaker": "user", "body": "Keep future status updates concise and state the remaining uncertainty explicitly." }] },
 
+    { "id": "log-ko-01", "expected": "log", "category": "shared_reference_review", "keywords": ["gist"], "roots": [
+      { "speaker": "user", "body": "Poke 프롬프트 Gist를 공유할게요. 우리 Agent 프롬프트에 반영할 만한 게 있을까요?" },
+      { "speaker": "agent", "body": "통째로 가져오지 말고 행동 위험도 규칙, 기억 저장 검증, 실패의 일인칭 소유 세 가지만 반영하자고 제안합니다." }] },
+    { "id": "log-ko-02", "expected": "log", "category": "status_question", "keywords": ["#1757"], "roots": [
+      { "speaker": "user", "body": "PR #1757 지금 어디까지 진행됐나요?" },
+      { "speaker": "agent", "body": "PR #1757은 병합됐다고 확인했고, 남은 작업은 릴리스 노트 작성이라고 정리해 두었습니다." }] },
+    { "id": "log-ko-03", "expected": "log", "category": "debugging_exchange", "keywords": ["로그인"], "roots": [
+      { "speaker": "user", "body": "어제부터 모바일에서 로그인이 실패한다는 제보가 들어왔어요." },
+      { "speaker": "agent", "body": "세션 쿠키의 SameSite 설정이 원인일 가능성이 크다고 보고, 재현 케이스를 먼저 만들어 보자고 제안합니다." },
+      { "speaker": "user", "body": "좋아요, 재현부터 해 주세요." }] },
+    { "id": "log-ko-04", "expected": "log", "category": "pasted_secret_exchange", "keywords": ["스테이징"],
+      "forbidden": ["sk-synthetic-do-not-store-98765"], "roots": [
+      { "speaker": "user", "body": "스테이징 접속 설정을 도와주세요. 제 임시 API 키는 sk-synthetic-do-not-store-98765 입니다." },
+      { "speaker": "agent", "body": "키는 어디에도 저장하지 않겠습니다. 셸 환경 변수로만 두고 설정 파일에는 참조만 남기자고 제안합니다." }] },
+    { "id": "log-ko-05", "expected": "log", "category": "options_proposed", "keywords": ["온보딩"], "roots": [
+      { "speaker": "user", "body": "신규 사용자 온보딩 화면을 개선할 방법을 몇 가지 제안해 주세요." },
+      { "speaker": "agent", "body": "빈 상태 안내, 첫 작업 체크리스트, 샘플 프로젝트 자동 생성 세 가지를 제안했고 그중 체크리스트를 먼저 해 보자고 권했습니다." }] },
+    { "id": "log-ko-06", "expected": "log", "category": "unconfirmed_report", "keywords": ["마이그레이션"], "roots": [
+      { "speaker": "user", "body": "마이그레이션 적용됐는지 봐 주세요." },
+      { "speaker": "agent", "body": "적용된 것 같다고 보이지만 실제 결과는 확인하지 못했습니다. 확인 방법을 알려 주시면 다시 보겠습니다." }] },
+    { "id": "log-en-01", "expected": "log", "category": "tool_comparison", "keywords": ["ripgrep"], "roots": [
+      { "speaker": "user", "body": "Should we switch our search step from grep to ripgrep?" },
+      { "speaker": "agent", "body": "I compared both and recommended ripgrep for the repository scan, while noting grep stays fine for the small hook scripts." }] },
+    { "id": "log-en-02", "expected": "log", "category": "debugging_exchange", "keywords": ["flaky"], "roots": [
+      { "speaker": "user", "body": "The worker test suite has been flaky since Monday." },
+      { "speaker": "agent", "body": "I proposed quarantining the two timing-sensitive cases first and rerunning the suite ten times to measure the failure rate." },
+      { "speaker": "user", "body": "Go ahead with that plan." }] },
+    { "id": "log-en-03", "expected": "log", "category": "pasted_secret_exchange", "keywords": ["password"],
+      "forbidden": ["synthetic-password-do-not-save-77"], "roots": [
+      { "speaker": "user", "body": "Here is the throwaway database password so you can help me wire the config: synthetic-password-do-not-save-77." },
+      { "speaker": "agent", "body": "I will not keep that password anywhere. I proposed reading it from an environment variable and leaving only the variable name in the config." }] },
+    { "id": "log-en-04", "expected": "log", "category": "unconfirmed_report", "keywords": ["deploy"],
+      "forbidden": ["is complete", "was completed"], "roots": [
+      { "speaker": "user", "body": "Did the staging deploy go out?" },
+      { "speaker": "agent", "body": "It probably finished, but I never checked the health endpoint, so I cannot confirm it." }] },
+    { "id": "log-en-05", "expected": "log", "category": "explanation_exchange", "keywords": ["eval"], "roots": [
+      { "speaker": "user", "body": "How does the learning eval gate decide whether a provider is allowed?" },
+      { "speaker": "agent", "body": "I explained that the eval needs precision above 95 percent and no committed reject case before a provider joins the list." },
+      { "speaker": "user", "body": "And what happens if only recall drops?" },
+      { "speaker": "agent", "body": "I answered that recall below the threshold also blocks the provider, and suggested rerunning the failing cases first." }] },
+    { "id": "log-en-06", "expected": "log", "category": "measurement_report", "keywords": ["bundle"], "roots": [
+      { "speaker": "user", "body": "Can we make the web bundle smaller?" },
+      { "speaker": "agent", "body": "I measured the bundle at 2.1 MB and proposed splitting the editor route out before touching dependencies." }] },
+
     { "id": "reject-ko-01", "expected": "reject", "category": "one_off_format", "roots": [{ "speaker": "user", "body": "이번 답변만 표로 정리해 주세요." }] },
     { "id": "reject-ko-02", "expected": "reject", "category": "incidental_mood", "roots": [{ "speaker": "user", "body": "오늘은 그냥 좀 피곤하고 짜증이 나네요." }] },
     { "id": "reject-ko-03", "expected": "reject", "category": "secret", "roots": [{ "speaker": "user", "body": "테스트용 API 키는 sk-synthetic-do-not-store-12345 입니다." }] },

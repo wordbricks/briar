@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 import { channelMemoryCitationSchema } from "../../src/lib/channels-contract";
 import {
-  DmLearningSnapshot, type DmLearningDocument, type DmLearningPolicy,
+  dmMemoryLearningRecentLogsInSnapshot, DmLearningSnapshot, type DmLearningDocument, type DmLearningPolicy,
   type DmLearningRoot, type DmLearningSourceRef,
 } from "../../src/lib/dm-memory-learning-contract";
 import { sha256 } from "./crypto-digest";
@@ -22,6 +22,16 @@ export type DmLearningSpaceRow = {
   id: string; organization_id: string; channel_id: string; owner_user_id: string; agent_id: string;
   memory_revision: number; revocation_epoch: number; use_enabled: number; auto_enabled: number;
 };
+/**
+ * Which observation events a consolidation may see. The D1 trigger captures
+ * version 1 of every observation document, episodes included, but consolidate
+ * folds durable claims into topics; an episode is a dated line about one
+ * interval and would only be restated. Rolling episodes into a topic's History
+ * is a later change, so until then a `log` revision neither schedules a
+ * consolidation nor enters its window. Joined against the current revision, so
+ * a purged revision drops out with its document.
+ */
+export const dmLearningConsolidatedObservationSql = "rev.memory_class <> 'log'";
 const refKey = (ref: DmLearningSourceRef) => `${ref.type}:${ref.id}:${ref.version}`;
 const sourceKey = (ref: DmLearningSourceRef) => `${ref.type}:${ref.id}`;
 const iso = (value: string) => new Date(value).toISOString();
@@ -71,20 +81,31 @@ export async function captureDmLearningInput(
     roots.set(refKey(ref), root);
     return root;
   };
-  const rows = (await db.prepare(`select doc.id, doc.current_version, doc.kind, doc.title, doc.conflicted,
+  type DocumentRow = { id: string; current_version: number; kind: "observation" | "topic";
+    title: string; conflicted: number; body: string; body_hash: string;
+    memory_class: "profile" | "log" | "note"; evidence_type: "explicit_user" | "observed";
+    protected_by_user: number; source_language: string; observed_at: string | null; valid_until: string | null };
+  const documentSql = (memoryClass: string, order: string, limit: number) =>
+    `select doc.id, doc.current_version, doc.kind, doc.title, doc.conflicted,
       rev.body, rev.body_hash, rev.memory_class, rev.evidence_type, rev.protected_by_user,
       rev.source_language, rev.observed_at, rev.valid_until
     from briar_dm_memory_documents doc join briar_dm_memory_revisions rev
       on rev.document_id = doc.id and rev.version = doc.current_version
-    where doc.space_id = ? and ${dmMemoryReadableDocument}
+    where doc.space_id = ? and ${dmMemoryReadableDocument} and rev.memory_class ${memoryClass}
       and (? <> 'explicit_request' or exists (select 1 from json_each(?) target
         where json_extract(target.value, '$.documentId') = doc.id
           and json_extract(target.value, '$.version') = doc.current_version))
-    order by doc.id limit 129`)
-    .bind(space.id, now, job.kind, job.request_targets_json).all<{ id: string; current_version: number; kind: "observation" | "topic";
-      title: string; conflicted: number; body: string; body_hash: string;
-      memory_class: "profile" | "log" | "note"; evidence_type: "explicit_user" | "observed";
-      protected_by_user: number; source_language: string; observed_at: string | null; valid_until: string | null }>()).results;
+    order by ${order} limit ${limit}`;
+  const bindings = [space.id, now, job.kind, job.request_targets_json] as const;
+  // Every reviewed interval may add one episode, so unbounded they would push
+  // the space past the 128-document cap and fail all learning for it. Only the
+  // newest ones are shown, which is all the model needs to extend rather than
+  // duplicate the current episode; older ones stay readable in the brief.
+  const rows = [
+    ...(await db.prepare(documentSql("<> 'log'", "doc.id", 129)).bind(...bindings).all<DocumentRow>()).results,
+    ...(await db.prepare(documentSql("= 'log'", "rev.observed_at desc, doc.id", dmMemoryLearningRecentLogsInSnapshot))
+      .bind(...bindings).all<DocumentRow>()).results,
+  ];
   if (rows.length > 128) throw new DmLearningError("input_capacity");
   if (job.kind === "explicit_request") {
     const targets = Schema.decodeUnknownSync(Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)))(
@@ -94,13 +115,17 @@ export async function captureDmLearningInput(
     }
   }
   const documents: DmLearningDocument[] = [];
-  const observationWindow = job.kind === "consolidate" ? (await db.prepare(`select sequence, document_id, document_version
-    from briar_dm_memory_observation_events where space_id = ? and sequence > ? and sequence <= ?
-    order by sequence limit 32`).bind(space.id, job.source_start, job.source_end)
+  const observationWindow = job.kind === "consolidate" ? (await db.prepare(`select event.sequence, event.document_id, event.document_version
+    from briar_dm_memory_observation_events event join briar_dm_memory_revisions rev
+      on rev.document_id = event.document_id and rev.version = event.document_version
+    where event.space_id = ? and ${dmLearningConsolidatedObservationSql} and event.sequence > ? and event.sequence <= ?
+    order by event.sequence limit 32`).bind(space.id, job.source_start, job.source_end)
     .all<{ sequence: number; document_id: string; document_version: number }>()).results : [];
   const observationEnd = observationWindow.at(-1)?.sequence ?? job.source_end;
-  const laterObservations = job.kind === "consolidate" ? new Set((await db.prepare(`select document_id
-    from briar_dm_memory_observation_events where space_id = ? and sequence > ?`)
+  const laterObservations = job.kind === "consolidate" ? new Set((await db.prepare(`select event.document_id
+    from briar_dm_memory_observation_events event join briar_dm_memory_revisions rev
+      on rev.document_id = event.document_id and rev.version = event.document_version
+    where event.space_id = ? and ${dmLearningConsolidatedObservationSql} and event.sequence > ?`)
     .bind(space.id, observationEnd).all<{ document_id: string }>()).results.map((row) => row.document_id)) : new Set<string>();
   for (const row of rows) {
     if (laterObservations.has(row.id)) continue;
