@@ -7,6 +7,7 @@ import type {
   ChannelAgentActivityDescriptor,
   ChannelAgentActivityFrame,
 } from "../../lib/channel-agent-activity";
+import { apiErrorIssueMessages, findApiError } from "../../lib/api/errors";
 
 /*
   The pure half of a channel conversation.
@@ -29,8 +30,25 @@ export {
 } from "../../lib/channel-message-merge";
 export { applyChannelMessageDeletion } from "../../lib/channel-message-deletion";
 
-/** The message describing a failed conversation request. */
+/*
+  The message describing a failed conversation request.
+
+  The RPC layer raises an `ApiError` carrying the status, the code and the
+  validation issues the API answered with — but Connect never lets that error
+  reach the call site unchanged. `runUnaryCall` attaches its rejection handler
+  outside the interceptor chain, so whatever an interceptor throws is re-wrapped
+  by `ConnectError.from`, which defaults to the `unknown` code and prefixes it:
+  a rejected message used to be toasted as "[unknown] Invalid request" while the
+  reason for it sat in `cause`. Unwrapping is what turns that back into the
+  sentence the API actually sent, and a validation failure names the field it
+  rejected rather than only that something was invalid.
+*/
 export function channelConversationError(cause: unknown): string {
+  const apiError = findApiError(cause);
+  if (apiError) {
+    const issues = apiErrorIssueMessages(apiError);
+    return issues.length > 0 ? issues.join("\n") : apiError.message;
+  }
   return cause instanceof Error ? cause.message : String(cause);
 }
 

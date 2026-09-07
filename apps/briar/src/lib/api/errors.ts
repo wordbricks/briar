@@ -34,7 +34,12 @@ export class ApiResponseDecodeError extends Data.TaggedError(
   }
 }
 
-function findApiError(error: unknown): ApiError | undefined {
+/**
+ * The `ApiError` behind `error`, however deeply the transport wrapped it.
+ * Connect re-wraps an interceptor's error in a `ConnectError` before the caller
+ * sees it, so the API's own status and message are reached through `cause`.
+ */
+export function findApiError(error: unknown): ApiError | undefined {
   const visited = new Set<object>();
   let current = error;
 
