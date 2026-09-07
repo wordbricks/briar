@@ -320,11 +320,9 @@ lease aborts; an abandoned lease expires after 20 minutes.
 ### The D1 schema snapshot
 
 `apps/briar/migrations-snapshot/schema.sql` is a generated dump of the fully
-migrated D1 database: every migration except
-`0142_restore_cvs_slack_history.sql` (6 MB of restored customer messages, no
-schema change), plus the rows that data-only migrations seed. The `worker-d1`
-Vitest project loads it in one batch instead of replaying ~190 migrations into
-each test file's isolated database.
+migrated D1 database — every migration, plus the rows that data-only migrations
+seed. The `worker-d1` Vitest project loads it in one batch instead of replaying
+every migration into each test file's isolated database.
 
 The migrations remain the source of truth. `d1:migrate:local`, `d1:migrate:remote`
 and the four domain-grouped migration entries still use the real files, so
@@ -345,6 +343,43 @@ header against the migration files on disk and fails in under a second if either
 the migrations changed without a regeneration or the snapshot was hand-edited.
 `bun run d1:snapshot:check:full` regenerates into a temporary file and prints a
 diff — use it when the fast check disagrees with what you expect.
+
+### The squashed baseline
+
+`apps/briar/migrations/0000_baseline_schema.sql` and its two continuation parts
+are the schema and seeded rows of a database migrated through
+`0159_allow_duplicate_evidence_image_digests.sql`. They replace the 171 files
+at or below that cut-off, which are in git history. The cut-off sits one below
+the lowest migration any cutover test pins by name, so every replay those tests
+do is unchanged.
+
+The baseline must never run against a database that already holds the history
+it replaces: its triggers and views are the cut-off's, and later migrations
+have since replaced them. `d1:migrate:remote` handles that itself —
+`baselineAlreadyApplied` in `scripts/apply-remote-d1-migrations.ts` records the
+baseline as applied, without running it, on any database whose history reaches
+the cut-off. A database that stopped partway through the squashed history has
+neither the schema nor the files to reach it, so the baseline runs there and
+fails loudly rather than stranding it.
+
+`d1:migrate:local` calls Wrangler directly and has no such hook, so an existing
+local database predating the squash has to be recreated once:
+
+```sh
+rm -rf apps/briar/.wrangler/state/v3/d1 && bun run d1:migrate:local
+```
+
+To move the cut-off again later, regenerate from a checkout that still has the
+history being squashed. The generator verifies, before writing, that
+`[baseline, …above the cut-off]` reproduces the whole history byte for byte:
+
+```sh
+bun run scripts/generate-d1-baseline-migration.ts <through.sql> <output.sql> [--drop <name.sql>]…
+```
+
+`--drop` names a data-only migration whose rows are deliberately left behind.
+Check first that no test reads those rows back: the block cutover test used to
+pick a row out of the restored Slack history rather than seeding its own.
 
 Any audit exception must be narrow, dated, and recorded in
 [`security-exceptions.md`](security-exceptions.md) with a removal condition.

@@ -4,35 +4,36 @@ import { describe, expect, test } from "vitest";
 import { agentProviders } from "../apps/briar/src/lib/agent-provider";
 import {
   agentProviderConstraints,
-  currentSqlProviderList,
+  seededAgentProviders,
 } from "./agent-provider-sql-constraints";
 
 const schema = readFileSync(
   resolve(import.meta.dirname, "../apps/briar/migrations-snapshot/schema.sql"),
   "utf8",
 );
-const constraints = agentProviderConstraints(schema);
 const catalog = [...agentProviders].sort();
 
-describe("persisted agent provider constraints", () => {
-  test("the snapshot actually constrains provider columns", () => {
-    expect(constraints.length).toBeGreaterThan(10);
+describe("the persisted agent provider catalog", () => {
+  test("is the lookup table, seeded with exactly the wire providers", () => {
+    expect([...seededAgentProviders(schema)].sort()).toEqual(catalog);
   });
 
-  test("every constraint lists exactly the wire providers", () => {
-    const drifted = constraints
-      .filter(({ providers }) =>
-        [...providers].sort().join(",") !== catalog.join(",")
-      )
+  test("no column spells the provider list out again", () => {
+    // A CHECK list is not a second copy of the catalog, it is a column that
+    // will reject the next provider: adding one is a row in the lookup table,
+    // and no row can widen a CHECK. Give the column a foreign key into
+    // briar_agent_providers instead.
+    const spelledOut = agentProviderConstraints(schema)
       .map(({ table, column, providers }) =>
         `${table}.${column}: ${providers.join(", ")}`
       );
-    expect(drifted).toEqual([]);
+    expect(spelledOut).toEqual([]);
   });
 
-  test("the generator finds the list a new provider is appended to", () => {
-    expect(currentSqlProviderList(schema, agentProviders).length).toBe(
-      agentProviders.length,
-    );
+  test("every provider column is a key into the lookup table", () => {
+    const references = schema.match(
+      /foreign key \("[a-z0-9_]*provider"\) references briar_agent_providers \(provider\)/gu,
+    ) ?? [];
+    expect(references.length).toBeGreaterThan(10);
   });
 });

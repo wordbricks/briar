@@ -35,8 +35,8 @@ export type WorkerTestPluginOptions = {
   excludeMigrations?: readonly string[];
   /**
    * Bind the committed schema snapshot instead of the migration list. Each test
-   * file gets an isolated D1, so replaying ~190 migrations per file dominated
-   * setup time; loading one generated dump does the same work once.
+   * file gets an isolated D1, so replaying the whole migration list per file
+   * dominated setup time; loading one generated dump does the same work once.
    * `scripts/generate-d1-schema-snapshot.ts` keeps the snapshot current and
    * `bun run d1:snapshot:check` fails CI when it drifts.
    */

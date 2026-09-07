@@ -186,3 +186,86 @@ describe("remote D1 migration imports", () => {
     expect(imports).toBe(1);
   });
 });
+
+/**
+ * A squashed baseline creates the tables, views and triggers a database has at
+ * its cut-off. A database that already ran that history must record it instead
+ * of running it, or the cut-off's triggers and views would replace the ones
+ * later migrations installed. See `baselineAlreadyApplied`.
+ */
+describe("a squashed baseline migration", () => {
+  const baselineSql = [
+    "-- GENERATED FILE - DO NOT EDIT BY HAND.",
+    "-- baseline-through: 0159_last_squashed.sql",
+    "",
+    'CREATE TABLE IF NOT EXISTS "thing" (id text primary key not null);',
+    "",
+  ].join("\n");
+
+  async function applyWith(applied: readonly string[]) {
+    const migrationsDirectory = await mkdtemp(join(tmpdir(), "briar-test-"));
+    temporaryDirectories.push(migrationsDirectory);
+    await writeFile(join(migrationsDirectory, "0000_baseline.sql"), baselineSql);
+    await writeFile(join(migrationsDirectory, "0160_after.sql"), "SELECT 160;\n");
+
+    const imported = new Map<string, string>();
+    const appliedNames = [...applied];
+    const runner = vi.fn<WranglerRunner>(async (args, captureOutput) => {
+      if (captureOutput) {
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify([
+            { success: true, results: appliedNames.map((name) => ({ name })) },
+          ]),
+        };
+      }
+      const fileIndex = args.indexOf("--file");
+      if (fileIndex >= 0) {
+        const sql = await readFile(args[fileIndex + 1]!, "utf8");
+        const name = migrationNameFromImportedSql(sql);
+        if (name) {
+          imported.set(name, sql);
+          if (!appliedNames.includes(name)) appliedNames.push(name);
+        }
+      }
+      return { exitCode: 0, stdout: "" };
+    });
+
+    const exitCode = await applyRemoteD1Migrations({
+      migrationsDirectory,
+      runner,
+      importRetryDelayMillis: 0,
+    });
+    return { exitCode, imported };
+  }
+
+  it("records itself without running on a database holding the squashed history", async () => {
+    const { exitCode, imported } = await applyWith(["0159_last_squashed.sql"]);
+    expect(exitCode).toBe(0);
+    expect(imported.get("0000_baseline.sql")).not.toContain("CREATE TABLE");
+    expect(imported.get("0000_baseline.sql")).toContain(
+      "INSERT INTO d1_migrations (name) VALUES ('0000_baseline.sql');",
+    );
+    // Everything above the cut-off still applies normally.
+    expect(imported.get("0160_after.sql")).toContain("SELECT 160;");
+  });
+
+  it("runs on a fresh database", async () => {
+    const { exitCode, imported } = await applyWith([]);
+    expect(exitCode).toBe(0);
+    expect(imported.get("0000_baseline.sql")).toContain(
+      'CREATE TABLE IF NOT EXISTS "thing"',
+    );
+  });
+
+  it("runs on a database that stopped short of the cut-off", async () => {
+    // Neither the schema the baseline describes nor the files to reach it, so
+    // running it and failing on the tables it already has is the honest
+    // outcome — quietly recording it would strand the database mid-history.
+    const { exitCode, imported } = await applyWith(["0100_partway.sql"]);
+    expect(exitCode).toBe(0);
+    expect(imported.get("0000_baseline.sql")).toContain(
+      'CREATE TABLE IF NOT EXISTS "thing"',
+    );
+  });
+});

@@ -1,11 +1,15 @@
 import { agentProviders } from "../apps/briar/src/lib/agent-provider";
 
 /**
- * D1 stores a provider as text guarded by a `check (… in (…))` list, so the
- * persisted provider catalog is spread across every constrained column. These
- * helpers read those lists back out of SQL, which is what lets the migration
- * generator and the drift test work from the schema instead of a hand-copied
- * provider list.
+ * D1 stores the provider catalog as rows in `briar_agent_providers`, and every
+ * provider column is a foreign key into it. These helpers read that catalog
+ * back out of SQL, and find the `check (… in (…))` lists it replaced, so the
+ * migration generator and the drift test work from the schema instead of a
+ * hand-copied provider list.
+ *
+ * A surviving CHECK list is drift, not a second source of truth: it would
+ * reject a provider the catalog already advertises, and no row inserted into
+ * the lookup table could widen it.
  */
 export type AgentProviderConstraint = {
   readonly table: string;
@@ -13,6 +17,12 @@ export type AgentProviderConstraint = {
   readonly providers: readonly string[];
   /** The `'codex', 'claude', …` text between the parentheses, verbatim. */
   readonly listText: string;
+  /**
+   * Where `listText` starts in the SQL it was read from. Two columns of one
+   * table often spell the same list, so a caller that has to edit the clause
+   * around a constraint cannot find it by searching for the text again.
+   */
+  readonly listIndex: number;
 };
 
 const tablePattern = /\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?"?([a-z0-9_]+)"?/giu;
@@ -55,30 +65,20 @@ export function agentProviderConstraints(
       column,
       providers,
       listText: list,
+      listIndex: match.index + match[0].indexOf(list),
     });
   }
   return constraints;
 }
 
+const seedPattern =
+  /\binsert\s+into\s+"?briar_agent_providers"?\s*\([^)]*\)\s*values\s*\(\s*'([a-z][a-z0-9_-]*)'/giu;
+
 /**
- * The provider list a new provider must be appended to, taken from the schema
- * so its ordering matches the SQL text exactly. Throws when the schema and the
- * platform catalog disagree, which is the drift the generator must not paper
- * over.
+ * The providers `sql` seeds into `briar_agent_providers`, in file order. Reads
+ * migrations and the schema snapshot alike, since both spell the seed as one
+ * `insert into … values (…)` per provider.
  */
-export function currentSqlProviderList(
-  sql: string,
-  expected: readonly string[],
-): readonly string[] {
-  const wanted = new Set(expected);
-  const match = agentProviderConstraints(sql).find(({ providers }) =>
-    providers.length === wanted.size &&
-    providers.every((provider) => wanted.has(provider))
-  );
-  if (!match) {
-    throw new Error(
-      `No provider constraint lists exactly ${[...wanted].sort().join(", ")}.`,
-    );
-  }
-  return match.providers;
+export function seededAgentProviders(sql: string): string[] {
+  return [...sql.matchAll(seedPattern)].map((match) => match[1]!);
 }

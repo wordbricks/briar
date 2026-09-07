@@ -5,9 +5,8 @@ import { workerD1TestFiles } from "./vitest.worker.test-files";
 
 export default defineConfig(async () => ({
   // Loads apps/briar/migrations-snapshot/schema.sql rather than replaying the
-  // migration history in every isolated D1. The snapshot skips
-  // 0142_restore_cvs_slack_history.sql, which restores historical customer
-  // messages without changing the schema; the migration suite still runs it.
+  // migration history in every isolated D1. The migration suite still replays
+  // the real files.
   plugins: [await createWorkerTestPlugin({ schemaSnapshot: true })],
   test: {
     name: "worker-d1",

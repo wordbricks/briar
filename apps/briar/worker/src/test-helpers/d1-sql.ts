@@ -92,7 +92,7 @@ export async function executeD1Sql(db: D1Database, sql: string) {
   }
 }
 
-// Must match STATEMENT_SENTINEL in scripts/generate-d1-schema-snapshot.ts. The
+// Must match STATEMENT_SENTINEL in scripts/d1-schema-dump.ts. The
 // generator records the statement boundaries so the snapshot needs no SQL
 // parsing here: splitD1Sql mis-handles the `case ... end,` bodies of several
 // triggers, and re-parsing 480 KB per test file would waste the time this
