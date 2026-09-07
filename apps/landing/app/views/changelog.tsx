@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.214",
+        date: "2026년 9월 7일",
+        title: "DM 기억이 무슨 일이 있었는지 에피소드로 남기고, 긴 메시지도 보낼 수 있습니다",
+        summary:
+          "DM 자동 학습이 사용자와 Agent가 무엇을 주고받았는지를 한 줄 에피소드로 저장하고, 다음 답변의 최근 기록으로 실어줍니다. 학습은 답변마다가 아니라 대화가 8건 쌓일 때마다 돌고, 빈 검토는 구간을 버리지 않으며, 하루 호출 한도는 48회로 늘었습니다. 채널 메시지 본문 한도가 50,000자로 올라가고 전송 실패 이유가 그대로 보입니다.",
+        items: [
+          "DM 자동 학습이 사용자가 무엇을 요청했고 Agent가 무엇을 제안·보고했는지를 귀속 서술 한 줄로 저장합니다. 에피소드는 사용자와 Agent 메시지를 모두 근거로 인용해야 하고, 비밀은 담지 않으며, 만료 없이 보관되어 오래된 대화도 검색으로 찾을 수 있습니다.",
+          "빈 검토가 구간을 소비하지 않고 최근 16건까지 다음 검토로 넘겨 한 문답이 아니라 대화 한 토막을 보고 판단합니다. 학습은 검토되지 않은 메시지 8건이 쌓이거나 하루가 지나면 돌고, 하루 호출 한도는 48회로, 한도를 소진하면 실패 대신 다음 리셋까지 기다립니다.",
+          "채널 메시지 본문 한도가 10,000자에서 50,000자로 올랐습니다. 한도를 넘으면 전송이 비활성화되어 초안이 남고, 서버가 거부한 경우 실제 이유와 필드명이 그대로 표시됩니다.",
+          "DM 창의 컴퓨터 패널을 메모리 버튼 옆 토글로 열고 닫을 수 있습니다. 닫아도 진행 중인 원격 세션은 유지되고, 좁은 창에서는 덮개로 열립니다.",
+        ],
+      },
+      {
         version: "1.2.213",
         date: "2026년 9월 7일",
         title: "DM은 답장일 때만 이어지고, 모바일 목록이 바로 뜹니다",
@@ -1860,6 +1873,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.214",
+        date: "September 7, 2026",
+        title: "DM memory keeps episodes of what happened, and long messages send",
+        summary:
+          "Automatic DM learning now records what the user and the Agent exchanged as one-line episodes and carries them into the next reply as recent history. Learning runs per stretch of eight messages instead of per reply, an empty review keeps its window, and the daily call limit is now 48. Channel message bodies can be up to 50,000 characters, and a rejected send shows its real reason.",
+        items: [
+          "Automatic DM learning stores what the user asked and what the Agent proposed or reported as a single attributed line. An episode must cite both a user and an Agent message, never carries a secret, and is kept without expiry so old conversations stay searchable.",
+          "An empty review no longer consumes its window: up to 16 recent messages carry into the next review so the model judges a stretch of conversation, not one exchange. Learning runs once eight unreviewed messages accumulate or a day passes, the daily call limit is 48, and a spent budget waits for the next reset instead of failing.",
+          "Channel message bodies now allow 50,000 characters instead of 10,000. Over the limit, sending is disabled so the draft stays, and a server rejection shows the actual reason and field name.",
+          "The computer panel in a DM can be opened and closed with a toggle next to the memory button. Closing it keeps a live remote session, and on narrow windows it opens as an overlay.",
+        ],
+      },
       {
         version: "1.2.213",
         date: "September 7, 2026",
