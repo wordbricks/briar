@@ -5,8 +5,14 @@ import {
 } from "./agent-runner";
 import type { Config, TeamConfig } from "./config-contract";
 import type { DetachedProviderTurnResult } from "./detached-provider-turn";
-import { runClaimedProjectAgentTask } from "./reply-execution";
-import type { ClaimedProjectAgentTask } from "./worker-queue-contract";
+import {
+  channelReplyFailureReport,
+  runClaimedProjectAgentTask,
+} from "./reply-execution";
+import type {
+  ClaimedChannelReply,
+  ClaimedProjectAgentTask,
+} from "./worker-queue-contract";
 import type { GitRunner } from "./worktree";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -392,5 +398,36 @@ describe("Project Agent task worktrees", () => {
 
     expect(providerRan).toBe(false);
     expect(cleanupRan).toBe(false);
+  });
+});
+
+describe("reporting a failed channel reply", () => {
+  const reply = (memory: boolean) =>
+    ({ ...(memory ? { memory: { protocol: 1 } } : {}) }) as
+      Pick<ClaimedChannelReply, "memory">;
+
+  it("logs what failed beside the code a DM is allowed to report", () => {
+    const report = channelReplyFailureReport(
+      new TypeError("private recalled text"),
+      reply(true),
+    );
+    expect(report.reported).toBe("memory_reply_failed");
+    expect(report.diagnostic).toContain("TypeError");
+    expect(report.diagnostic).not.toContain("private recalled text");
+  });
+
+  it("keeps the message of a reply that carries no DM memory", () => {
+    const report = channelReplyFailureReport(
+      new Error("workspace allocation failed"),
+      reply(false),
+    );
+    expect(report.reported).toBe("workspace allocation failed");
+  });
+
+  it("keeps a code the redaction already recognizes", () => {
+    expect(channelReplyFailureReport(
+      new Error("memory_scope_revoked"),
+      reply(true),
+    ).reported).toBe("memory_scope_revoked");
   });
 });

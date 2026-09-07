@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fromJson, toJson, type JsonValue } from "@bufbuild/protobuf";
 import { ValueSchema } from "@bufbuild/protobuf/wkt";
-import { ConnectError } from "@connectrpc/connect";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { ApplicationErrorDetailSchema } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import * as Schema from "effect/Schema";
 import {
@@ -238,4 +238,61 @@ const executionErrorCodes = new Set([
 export function dmMemoryExecutionError(error: unknown): Error {
   const code = error instanceof Error ? error.message : "";
   return new Error(executionErrorCodes.has(code) ? code : "memory_reply_failed");
+}
+
+const machineCodeKeys = ["code", "syscall", "errno"] as const;
+const stackFrames = (error: unknown) => {
+  const stack = error instanceof Error && typeof error.stack === "string"
+    ? error.stack
+    : "";
+  return stack
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("at "))
+    .slice(0, 8);
+};
+
+/*
+  What an operator gets when the message itself cannot be kept.
+
+  `dmMemoryExecutionError` collapses everything it does not recognize into
+  `memory_reply_failed`, which is right — provider stderr and recalled memory
+  echo the DM — but it left a failing DM with no trace at all: the app said
+  "답변을 생성하지 못했습니다", the Worker log said nothing, and a real outage
+  (a conversation too large to resume, 2026-09-07) had to be diagnosed by
+  comparing D1 rows against another DM that still worked.
+
+  This is the shape of the failure without its text: the error's class, the
+  short machine codes carried by Connect and Node system errors, and the stack
+  frames. None of them can hold DM content — a frame is a function name and a
+  position — so this is safe in the Worker log next to the redacted code. The
+  message stays out unless an operator asks for it by setting
+  BRIAR_DM_REPLY_ERROR_DETAIL, which never reaches the server either way.
+*/
+export function dmMemoryErrorDiagnostic(
+  error: unknown,
+  environment: Record<string, string | undefined> = process.env,
+): string {
+  const parts = [
+    error instanceof Error
+      ? error.constructor?.name || "Error"
+      : `non-error:${typeof error}`,
+  ];
+  if (error instanceof ConnectError) parts.push(`connect=${Code[error.code]}`);
+  const applicationCode = applicationErrorCode(error);
+  if (applicationCode) parts.push(`application=${applicationCode}`);
+  for (const key of machineCodeKeys) {
+    const value = error instanceof Error && key in error
+      ? (error as unknown as Record<string, unknown>)[key]
+      : undefined;
+    if (typeof value === "string" || typeof value === "number") {
+      parts.push(`${key}=${value}`);
+    }
+  }
+  if (environment.BRIAR_DM_REPLY_ERROR_DETAIL?.trim()) {
+    parts.push(`message=${error instanceof Error ? error.message : String(error)}`);
+  }
+  const frames = stackFrames(error);
+  return [parts.join(" "), ...(frames.length ? [frames.join(" < ")] : [])]
+    .join(" | ");
 }

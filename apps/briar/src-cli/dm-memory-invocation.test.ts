@@ -9,10 +9,12 @@ import {
   GetDmMemoryBriefResponseSchema,
   LookupDmMemoryResponseSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { stat } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import {
   DmMemoryInvocation,
+  dmMemoryErrorDiagnostic,
   dmMemoryExecutionError,
 } from "./dm-memory-invocation";
 import type { ClaimedChannelReply } from "./worker-queue-contract";
@@ -114,5 +116,46 @@ describe("DM memory Connect invocation", () => {
       .toMatchObject({ message: "memory_reply_failed" });
     expect(dmMemoryExecutionError(new Error("memory_scope_revoked")))
       .toMatchObject({ message: "memory_scope_revoked" });
+  });
+
+  it("describes a redacted failure without repeating what it said", () => {
+    const diagnostic = dmMemoryErrorDiagnostic(
+      new TypeError("private recalled text"),
+      {},
+    );
+    expect(diagnostic).not.toContain("private recalled text");
+    expect(diagnostic).toContain("TypeError");
+    expect(diagnostic).toMatch(/\bat /u);
+  });
+
+  it("keeps the machine codes a transport or system failure carries", () => {
+    expect(dmMemoryErrorDiagnostic(
+      new ConnectError("private recalled text", Code.Unavailable),
+      {},
+    )).toContain("connect=Unavailable");
+    const systemError = Object.assign(new Error("private recalled text"), {
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    const diagnostic = dmMemoryErrorDiagnostic(systemError, {});
+    expect(diagnostic).toContain("code=ENOSPC");
+    expect(diagnostic).toContain("syscall=write");
+    expect(diagnostic).not.toContain("private recalled text");
+  });
+
+  it("reports a value that is not an error at all", () => {
+    expect(dmMemoryErrorDiagnostic("private recalled text", {}))
+      .toBe("non-error:string");
+  });
+
+  it("adds the message only when an operator asks for it", () => {
+    expect(dmMemoryErrorDiagnostic(
+      new Error("private recalled text"),
+      { BRIAR_DM_REPLY_ERROR_DETAIL: "1" },
+    )).toContain("message=private recalled text");
+    expect(dmMemoryErrorDiagnostic(
+      new Error("private recalled text"),
+      { BRIAR_DM_REPLY_ERROR_DETAIL: "  " },
+    )).not.toContain("private recalled text");
   });
 });
