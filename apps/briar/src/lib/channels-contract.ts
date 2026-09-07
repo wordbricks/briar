@@ -130,6 +130,18 @@ export const channelNameSchema = Schema.Trim.check(
 );
 export const channelTopicSchema = Schema.Trim.check(Schema.isMaxLength(500));
 export const channelMessageBodySchema = boundedTrimmedText(1, 10_000);
+/*
+  What a person may type, which is longer than what the rest of the channel
+  writes. A pasted prompt or a log excerpt is a normal message and used to be
+  rejected at 10,000 characters; an Agent reply, a webhook post and a delegation
+  request keep the older bound, because each of those has its own column and its
+  own `check (length(…) between 1 and 10000)` behind it.
+*/
+export const channelMessageBodyMaxLength = 50_000;
+export const channelMessageInputBodySchema = boundedTrimmedText(
+  1,
+  channelMessageBodyMaxLength,
+);
 export const channelWebhookNameSchema = Schema.Trim.check(
   Schema.isLengthBetween(1, 100),
 );
@@ -440,7 +452,7 @@ export const directMessageInputSchema = strict(Schema.Struct({
 );
 
 export const channelMessageInputSchema = strict(Schema.Struct({
-  body: channelMessageBodySchema,
+  body: channelMessageInputBodySchema,
   clientMessageId: Schema.optional(canonicalUuidSchema),
   skillId: nullableDefault(canonicalUuidSchema),
   parentMessageId: nullableDefault(canonicalUuidSchema),

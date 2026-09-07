@@ -4,9 +4,10 @@ import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
-import type {
-  ChannelAgentSummary,
-  ChannelMember,
+import {
+  channelMessageBodyMaxLength,
+  type ChannelAgentSummary,
+  type ChannelMember,
 } from "../lib/channels-contract";
 import type { MentionTarget } from "../lib/channel-mentions";
 import {
@@ -171,7 +172,7 @@ function Harness({
       </ol>
       <output data-testid="images">{composer.images.length}</output>
       <output data-testid="error">{composer.attachmentError}</output>
-      <button type="submit">Send</button>
+      <button disabled={composer.bodyOverflows} type="submit">Send</button>
     </form>
   );
 }
@@ -233,6 +234,45 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
       [],
       [],
     );
+
+    await cleanup();
+  });
+
+  /*
+    The ceiling used to be found out by the round trip, which rejected the body
+    and cleared the box on the way back. Refusing here keeps the draft.
+  */
+  it("refuses to send a body past the ceiling and keeps the draft", async () => {
+    const onSend = vi.fn<OnSend>();
+    const { cleanup, container } = await renderHarness({
+      onSend,
+      submitOnEnter: true,
+    });
+    const input = container.querySelector<HTMLInputElement>(
+      '[data-testid="composer"]',
+    )!;
+    const tooLong = "a".repeat(channelMessageBodyMaxLength + 1);
+    await typeInto(input, tooLong);
+
+    expect(
+      container.querySelector<HTMLButtonElement>('button[type="submit"]')
+        ?.disabled,
+    ).toBe(true);
+    await act(async () => input.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }),
+    ));
+    await act(async () => container.querySelector("form")?.requestSubmit());
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input.value).toBe(tooLong);
+
+    await typeInto(input, "a".repeat(channelMessageBodyMaxLength));
+    expect(
+      container.querySelector<HTMLButtonElement>('button[type="submit"]')
+        ?.disabled,
+    ).toBe(false);
+    await act(async () => container.querySelector("form")?.requestSubmit());
+    expect(onSend).toHaveBeenCalledTimes(1);
 
     await cleanup();
   });

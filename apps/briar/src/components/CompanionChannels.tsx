@@ -1505,6 +1505,7 @@ export function CompanionChannelComposer({
     attachmentError,
     attachmentInputRef,
     body,
+    bodyOverflows,
     dragging,
     handleCaret,
     handleChange,
@@ -1635,7 +1636,7 @@ export function CompanionChannelComposer({
       {body.trim() || images.length > 0 ? (
         <Button
           aria-label={t("run.sendMessage")}
-          disabled={busy}
+          disabled={busy || bodyOverflows}
           size="icon"
           type="submit"
         >

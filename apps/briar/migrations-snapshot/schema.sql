@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 854a8e3d6b4ccf91d464a090fe495578269b3af3dd06e0a329f3f395858c0838
--- snapshot-digest: c6bc5d878c25c983be1d8391dcd32a14314111290e56741dba3362fe566b5d60
+-- migrations-digest: dc42cb5293c30b018ac265f714e005af48cc987dc21f5bf15a3d5c25c70da568
+-- snapshot-digest: 18fbf520e45051fe6064ea9f18068e509af0696f07a7a2ab050c432efcb8643d
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2323,56 +2323,6 @@ CREATE TABLE IF NOT EXISTS "briar_channel_action_proposals" (
   unique (channel_id, trigger_message_id)
 );
 -- @statement
-CREATE TABLE IF NOT EXISTS "briar_channel_messages" (
-  id text primary key not null,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  parent_message_id text
-    references "briar_channel_messages" (id) on delete cascade,
-  author_user_id text references "user" (id) on delete set null,
-  author_agent_id text
-    references briar_project_agents (id) on delete set null,
-  author_agent_name text check (
-    author_agent_name is null
-    or length(trim(author_agent_name)) between 1 and 100
-  ),
-  author_agent_provider text,
-  author_webhook_id text
-    references briar_channel_webhooks (id) on delete set null,
-  author_webhook_name text check (
-    author_webhook_name is null
-    or length(trim(author_webhook_name)) between 1 and 100
-  ),
-  webhook_event_id text check (
-    webhook_event_id is null
-    or (webhook_event_id = trim(webhook_event_id)
-      and length(webhook_event_id) between 1 and 200)
-  ),
-  body text not null check (
-    body = trim(body) and length(body) between 1 and 10000
-  ),
-  created_at text not null,
-  updated_at text not null, blocks_json text check (
-    blocks_json is null
-    or (json_valid(blocks_json) and length(blocks_json) <= 65536)
-  ), deleted_at text, memory_source_version integer not null default 1,
-  check (parent_message_id is null or parent_message_id <> id),
-  check (
-    author_agent_name is not null
-    or (author_agent_id is null and author_agent_provider is null)
-  ),
-  check (author_webhook_name is not null or author_webhook_id is null),
-  check (
-    (author_user_id is not null)
-    + (author_agent_name is not null)
-    + (author_webhook_name is not null) = 1
-  ),
-  check (
-    (author_webhook_name is null and webhook_event_id is null)
-    or author_webhook_name is not null
-  ),
-  foreign key ("author_agent_provider") references briar_agent_providers (provider)
-);
--- @statement
 CREATE TABLE briar_channel_reply_sessions (
   id text primary key not null,
   organization_id text not null
@@ -3715,6 +3665,56 @@ CREATE TABLE briar_whatsapp_user_links (
   unique (connection_id, phone_number)
 );
 -- @statement
+CREATE TABLE IF NOT EXISTS "briar_channel_messages" (
+  id text primary key not null,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  parent_message_id text
+    references "briar_channel_messages" (id) on delete cascade,
+  author_user_id text references "user" (id) on delete set null,
+  author_agent_id text
+    references briar_project_agents (id) on delete set null,
+  author_agent_name text check (
+    author_agent_name is null
+    or length(trim(author_agent_name)) between 1 and 100
+  ),
+  author_agent_provider text,
+  author_webhook_id text
+    references briar_channel_webhooks (id) on delete set null,
+  author_webhook_name text check (
+    author_webhook_name is null
+    or length(trim(author_webhook_name)) between 1 and 100
+  ),
+  webhook_event_id text check (
+    webhook_event_id is null
+    or (webhook_event_id = trim(webhook_event_id)
+      and length(webhook_event_id) between 1 and 200)
+  ),
+  body text not null check (
+    body = trim(body) and length(body) between 1 and 50000
+  ),
+  created_at text not null,
+  updated_at text not null, blocks_json text check (
+    blocks_json is null
+    or (json_valid(blocks_json) and length(blocks_json) <= 65536)
+  ), deleted_at text, memory_source_version integer not null default 1,
+  check (parent_message_id is null or parent_message_id <> id),
+  check (
+    author_agent_name is not null
+    or (author_agent_id is null and author_agent_provider is null)
+  ),
+  check (author_webhook_name is not null or author_webhook_id is null),
+  check (
+    (author_user_id is not null)
+    + (author_agent_name is not null)
+    + (author_webhook_name is not null) = 1
+  ),
+  check (
+    (author_webhook_name is null and webhook_event_id is null)
+    or author_webhook_name is not null
+  ),
+  foreign key ("author_agent_provider") references briar_agent_providers (provider)
+);
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -4676,20 +4676,6 @@ CREATE INDEX briar_agent_skill_execution_audit_session_idx
 CREATE INDEX briar_run_execution_attempts_project_idx
   on briar_run_execution_attempts (project_id, id);
 -- @statement
-CREATE INDEX briar_channel_messages_root_idx
-  on briar_channel_messages (channel_id, created_at, id)
-  where parent_message_id is null;
--- @statement
-CREATE INDEX briar_channel_messages_thread_idx
-  on briar_channel_messages (parent_message_id, created_at, id);
--- @statement
-CREATE INDEX briar_channel_messages_channel_idx
-  on briar_channel_messages (channel_id, created_at, id);
--- @statement
-CREATE UNIQUE INDEX briar_channel_messages_webhook_event_idx
-  on briar_channel_messages (author_webhook_id, webhook_event_id)
-  where author_webhook_id is not null and webhook_event_id is not null;
--- @statement
 CREATE INDEX briar_hunt_runs_project_created_idx
   on briar_hunt_runs (project_id, source_created_at, created_by_user_id);
 -- @statement
@@ -4817,10 +4803,6 @@ CREATE INDEX briar_merge_batch_candidates_pull_request_head_idx
   on briar_merge_batch_candidates (
     repository_id, pull_request_number, frozen_head_sha, state
   );
--- @statement
-CREATE INDEX briar_channel_messages_deleted_idx
-  on briar_channel_messages (channel_id, deleted_at)
-  where deleted_at is not null;
 -- @statement
 CREATE INDEX briar_channel_reply_sessions_owner_idx
   on briar_channel_reply_sessions (
@@ -4998,6 +4980,24 @@ CREATE INDEX briar_channel_agent_reply_jobs_superseded_by_idx
 -- @statement
 CREATE INDEX briar_channel_reply_sessions_channel_agent_activity_idx
   on briar_channel_reply_sessions (channel_id, agent_id, last_activity_at desc);
+-- @statement
+CREATE INDEX briar_channel_messages_root_idx
+  on briar_channel_messages (channel_id, created_at, id)
+  where parent_message_id is null;
+-- @statement
+CREATE INDEX briar_channel_messages_thread_idx
+  on briar_channel_messages (parent_message_id, created_at, id);
+-- @statement
+CREATE INDEX briar_channel_messages_channel_idx
+  on briar_channel_messages (channel_id, created_at, id);
+-- @statement
+CREATE UNIQUE INDEX briar_channel_messages_webhook_event_idx
+  on briar_channel_messages (author_webhook_id, webhook_event_id)
+  where author_webhook_id is not null and webhook_event_id is not null;
+-- @statement
+CREATE INDEX briar_channel_messages_deleted_idx
+  on briar_channel_messages (channel_id, deleted_at)
+  where deleted_at is not null;
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN
@@ -6476,206 +6476,6 @@ BEGIN
   select raise(abort, 'Agent Skill execution approval audit is immutable');
 END;
 -- @statement
-CREATE TRIGGER briar_inbox_channel_mentions_insert_sync
-after insert on briar_channel_message_mentions BEGIN
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  where message.id = new.message_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = new.message_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = new.message_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_inbox_channel_mentions_delete_sync
-before delete on briar_channel_message_mentions BEGIN
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  where message.id = old.message_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = old.message_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = old.message_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_changes_reactions_insert_sync
-after insert on briar_channel_message_reactions BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) select channel.organization_id, message.channel_id, 'message', new.message_id,
-           'upsert', datetime('now')
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = new.message_id;
-  insert into briar_channel_sync_state (organization_id, current_version)
-  select channel.organization_id, last_insert_rowid()
-  from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  where message.id = new.message_id
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  where message.id = new.message_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = new.message_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = new.message_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_changes_reactions_delete_sync
-after delete on briar_channel_message_reactions BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) select channel.organization_id, message.channel_id, 'message', old.message_id,
-           'upsert', datetime('now')
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = old.message_id;
-  insert into briar_channel_sync_state (organization_id, current_version)
-  select channel.organization_id, last_insert_rowid()
-  from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  where message.id = old.message_id
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  where message.id = old.message_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = old.message_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channel_messages message
-    join briar_channels channel on channel.id = message.channel_id
-    where message.id = old.message_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
 CREATE TRIGGER briar_dashboard_issue_rework_proposals_insert_sync
 after insert on briar_issue_rework_proposals BEGIN
   insert into briar_dashboard_changes (
@@ -6819,15 +6619,6 @@ when not (
 )
 begin
   select raise(abort, 'run workflow must use canonical v2 checkpoints');
-END;
--- @statement
-CREATE TRIGGER briar_channel_reply_skill_snapshot_update
-after update of skill_id on briar_channel_agent_reply_jobs
-when new.skill_id is not null and new.selected_skill_id_snapshot is null
-BEGIN
-  update briar_channel_agent_reply_jobs
-  set selected_skill_id_snapshot = new.skill_id
-  where id = new.id;
 END;
 -- @statement
 CREATE TRIGGER briar_conversation_issue_creation_finalize
@@ -8301,49 +8092,6 @@ BEGIN
   on conflict (project_id) do update set current_version = excluded.current_version;
 END;
 -- @statement
-CREATE TRIGGER briar_channel_changes_reply_jobs_update_sync
-after update on briar_channel_agent_reply_jobs
-when old.lease_expires_at is new.lease_expires_at
-  or old.updated_at is not new.updated_at
-BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.organization_id, new.channel_id, 'reply_job', new.id, 'upsert',
-    datetime('now')
-  );
-  insert into briar_channel_sync_state (organization_id, current_version)
-  values (new.organization_id, last_insert_rowid())
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  values (new.organization_id, 1)
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
 CREATE TRIGGER briar_issue_subscriptions_run_insert
 after insert on briar_hunt_runs
 when new.assignee_user_id is not null BEGIN
@@ -8373,180 +8121,6 @@ when new.assignee_user_id is not null
    and membership.user_id = new.assignee_user_id
   where project.id = new.project_id
   on conflict (run_id, user_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_channel_changes_messages_insert_sync
-after insert on briar_channel_messages BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) select channel.organization_id, new.channel_id, 'message', new.id,
-           'upsert', datetime('now')
-    from briar_channels channel where channel.id = new.channel_id;
-  insert into briar_channel_sync_state (organization_id, current_version)
-  select channel.organization_id, last_insert_rowid()
-  from briar_channels channel where channel.id = new.channel_id
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channels channel where channel.id = new.channel_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = new.channel_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = new.channel_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_changes_messages_delete_sync
-after delete on briar_channel_messages BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) select channel.organization_id, old.channel_id, 'message', old.id,
-           'delete', datetime('now')
-    from briar_channels channel where channel.id = old.channel_id;
-  insert into briar_channel_sync_state (organization_id, current_version)
-  select channel.organization_id, last_insert_rowid()
-  from briar_channels channel where channel.id = old.channel_id
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channels channel where channel.id = old.channel_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = old.channel_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = old.channel_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_channel_message_invalidate
-after update of body on briar_channel_messages
-when new.body <> old.body
-BEGIN
-  update briar_agent_skill_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = new.updated_at
-  where source_kind = 'channel' and trigger_message_id = new.id
-    and status = 'pending';
-END;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_channel_message_delete_invalidate
-before delete on briar_channel_messages
-BEGIN
-  update briar_agent_skill_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where source_kind = 'channel' and status = 'pending'
-    and old.id in (trigger_message_id, reply_message_id);
-END;
--- @statement
-CREATE TRIGGER briar_channel_changes_reply_jobs_insert_sync
-after insert on briar_channel_agent_reply_jobs BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.organization_id, new.channel_id, 'reply_job', new.id, 'upsert',
-    datetime('now')
-  );
-  insert into briar_channel_sync_state (organization_id, current_version)
-  values (new.organization_id, last_insert_rowid())
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  values (new.organization_id, 1)
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_reply_skill_snapshot_insert
-after insert on briar_channel_agent_reply_jobs
-when new.skill_id is not null and new.selected_skill_id_snapshot is null
-BEGIN
-  update briar_channel_agent_reply_jobs
-  set selected_skill_id_snapshot = new.skill_id
-  where id = new.id;
-END;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_channel_job_delete_invalidate
-before delete on briar_channel_agent_reply_jobs
-BEGIN
-  update briar_agent_skill_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where source_kind = 'channel' and status = 'pending'
-    and (source_reply_job_id = old.id or delegated_by_reply_job_id = old.id);
 END;
 -- @statement
 CREATE TRIGGER briar_issue_execution_proposal_insert_guard
@@ -8863,106 +8437,6 @@ and (
 ) >= 5
 BEGIN
   select raise(abort, 'An Agent can have at most 5 Skills');
-END;
--- @statement
-CREATE TRIGGER briar_channel_thread_subscriptions_author_insert
-after insert on briar_channel_messages
-when new.author_user_id is not null BEGIN
-  insert into briar_channel_thread_subscriptions (
-    root_message_id, channel_id, organization_id, user_id, created_at
-  )
-  select coalesce(new.parent_message_id, new.id), new.channel_id,
-         channel.organization_id, new.author_user_id, new.created_at
-  from briar_channels channel
-  join briar_organization_members membership
-    on membership.organization_id = channel.organization_id
-   and membership.user_id = new.author_user_id
-  where channel.id = new.channel_id
-  on conflict (root_message_id, user_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_channel_thread_subscriptions_mention_insert
-after insert on briar_channel_message_mentions BEGIN
-  insert into briar_channel_thread_subscriptions (
-    root_message_id, channel_id, organization_id, user_id, created_at
-  )
-  select coalesce(message.parent_message_id, message.id), message.channel_id,
-         channel.organization_id, new.user_id, new.created_at
-  from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  join briar_organization_members membership
-    on membership.organization_id = channel.organization_id
-   and membership.user_id = new.user_id
-  where message.id = new.message_id
-  on conflict (root_message_id, user_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_channel_notification_message_insert
-after insert on briar_channel_messages
-when new.parent_message_id is not null BEGIN
-  insert into briar_channel_notification_inbox (
-    user_id, organization_id, message_id, notification_reason, created_at
-  )
-  select subscription.user_id, subscription.organization_id, new.id,
-         iif(root.author_user_id = subscription.user_id, 'thread_reply', 'subscription'),
-         new.created_at
-  from briar_channel_thread_subscriptions subscription
-  join briar_channel_messages root
-    on root.id = subscription.root_message_id
-   and root.channel_id = new.channel_id
-  where subscription.root_message_id = new.parent_message_id
-    and (new.author_user_id is null
-         or new.author_user_id <> subscription.user_id)
-    and julianday(new.created_at) >= julianday(subscription.created_at)
-  on conflict (user_id, message_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_channel_notification_mention_insert
-after insert on briar_channel_message_mentions
-BEGIN
-  insert into briar_channel_notification_inbox (
-    user_id, organization_id, message_id, notification_reason, created_at
-  )
-  select new.user_id, channel.organization_id, message.id,
-         'mention', message.created_at
-  from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  where message.id = new.message_id
-    and (message.author_user_id is null
-         or message.author_user_id <> new.user_id)
-  on conflict (user_id, message_id) do update set
-    organization_id = excluded.organization_id,
-    notification_reason = 'mention',
-    created_at = excluded.created_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_notification_mention_delete
-after delete on briar_channel_message_mentions
-BEGIN
-  delete from briar_channel_notification_inbox
-  where user_id = old.user_id and message_id = old.message_id;
-
-  insert into briar_channel_notification_inbox (
-    user_id, organization_id, message_id, notification_reason, created_at
-  )
-  select subscription.user_id, subscription.organization_id, message.id,
-         iif(root.author_user_id = subscription.user_id, 'thread_reply', 'subscription'),
-         message.created_at
-  from briar_channel_messages message
-  join briar_channel_thread_subscriptions subscription
-    on subscription.root_message_id = coalesce(
-         message.parent_message_id, message.id
-       )
-   and subscription.user_id = old.user_id
-  join briar_channel_messages root
-    on root.id = subscription.root_message_id
-   and root.channel_id = message.channel_id
-  where message.id = old.message_id
-    and message.parent_message_id is not null
-    and (message.author_user_id is null
-         or message.author_user_id <> old.user_id)
-    and julianday(message.created_at) >= julianday(subscription.created_at)
-  on conflict (user_id, message_id) do nothing;
 END;
 -- @statement
 CREATE TRIGGER briar_issue_agent_reply_skill_snapshot_immutable
@@ -9358,84 +8832,6 @@ begin
   select raise(abort, 'invalid Agent Skill execution mode or origin');
 end;
 -- @statement
-CREATE TRIGGER briar_agent_skill_execution_result_job_insert_guard
-before insert on briar_channel_agent_reply_jobs
-when new.approved_skill_execution_proposal_id is not null
-  and not exists (
-    select 1
-    from briar_agent_skill_execution_proposals proposal
-    join briar_channel_agent_reply_jobs source
-      on source.id = proposal.source_reply_job_id
-     and source.session_id = proposal.result_session_id
-    where proposal.id = new.approved_skill_execution_proposal_id
-      and proposal.status = 'accepted'
-      and proposal.source_kind = 'channel'
-      and proposal.execution_mode = 'conversation'
-      and proposal.channel_id = new.channel_id
-      and proposal.project_id = new.project_id
-      and proposal.agent_id = new.agent_id
-      and proposal.skill_id = new.skill_id
-      and proposal.result_session_id = new.session_id
-      and proposal.result_reply_job_id = new.id
-      and proposal.result_message_id = new.reply_message_id
-      and proposal.reply_message_id = new.trigger_message_id
-      and proposal.thread_root_message_id = new.parent_message_id
-      and proposal.request = new.skill_execution_request_snapshot
-      and proposal.skill_id = new.selected_skill_id_snapshot
-      and proposal.agent_name = new.selected_agent_name_snapshot
-      and proposal.agent_responsibility =
-        new.selected_agent_responsibility_snapshot
-      and proposal.skill_name = new.selected_skill_name_snapshot
-      and proposal.skill_instructions =
-        new.selected_skill_instructions_snapshot
-      and proposal.skill_kind = new.selected_skill_kind_snapshot
-      and proposal.provider = new.selected_skill_provider_snapshot
-      and proposal.model is new.selected_skill_model_snapshot
-      and proposal.effort is new.selected_skill_effort_snapshot
-  )
-begin
-  select raise(abort, 'invalid approved Agent Skill conversation job');
-end;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_result_job_origin_immutable
-before update of approved_skill_execution_proposal_id
-on briar_channel_agent_reply_jobs
-when new.approved_skill_execution_proposal_id is not
-  old.approved_skill_execution_proposal_id
-begin
-  select raise(abort, 'approved Agent Skill conversation origin is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_result_job_failure_publish
-after update of status on briar_channel_agent_reply_jobs
-when old.status in ('queued', 'running') and new.status = 'failed'
-  and new.approved_skill_execution_proposal_id is not null
-begin
-  insert or ignore into briar_channel_messages (
-    id, channel_id, parent_message_id, author_user_id, author_agent_id,
-    author_agent_name, author_agent_provider, body, created_at, updated_at
-  )
-  select proposal.result_message_id, proposal.channel_id,
-         proposal.thread_root_message_id, null, proposal.agent_id,
-         proposal.agent_name, proposal.provider,
-         '**Skill execution failed**' || char(10) || char(10) ||
-           substr(coalesce(new.error, 'The Skill failed without an error summary.'),
-                  1, 9000),
-         new.updated_at, new.updated_at
-  from briar_agent_skill_execution_proposals proposal
-  where proposal.id = new.approved_skill_execution_proposal_id
-    and proposal.status = 'accepted'
-    and proposal.execution_mode = 'conversation'
-    and proposal.result_reply_job_id = new.id
-    and proposal.result_message_id = new.reply_message_id
-    and exists (
-      select 1 from briar_channel_messages root
-      where root.id = proposal.thread_root_message_id
-        and root.channel_id = proposal.channel_id
-        and root.parent_message_id is null
-    );
-end;
--- @statement
 CREATE TRIGGER briar_agent_skill_execution_mode_immutable
 before update of execution_mode, approval_policy, thread_root_message_id
 on briar_agent_skill_execution_proposals
@@ -9653,86 +9049,6 @@ before delete on briar_issue_subscriptions BEGIN
   select run.project_id, last_insert_rowid()
   from briar_hunt_runs run where run.id = old.run_id
   on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_channel_thread_subscriptions_insert_sync
-after insert on briar_channel_thread_subscriptions BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.organization_id, new.channel_id, 'message', new.root_message_id,
-    'upsert', datetime('now')
-  );
-  insert into briar_channel_sync_state (organization_id, current_version)
-  values (new.organization_id, last_insert_rowid())
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  values (new.organization_id, 1)
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_thread_subscriptions_delete_sync
-before delete on briar_channel_thread_subscriptions BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) values (
-    old.organization_id, old.channel_id, 'message', old.root_message_id,
-    'upsert', datetime('now')
-  );
-  insert into briar_channel_sync_state (organization_id, current_version)
-  values (old.organization_id, last_insert_rowid())
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  values (old.organization_id, 1)
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = old.organization_id
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = old.organization_id
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_mobile_push_outbox_sync_delete
@@ -10446,70 +9762,6 @@ BEGIN
     updated_at = excluded.updated_at;
 END;
 -- @statement
-CREATE TRIGGER briar_channel_changes_messages_update_sync
-after update on briar_channel_messages
-when old.memory_source_version = new.memory_source_version
-  or old.id is not new.id
-  or old.channel_id is not new.channel_id
-  or old.parent_message_id is not new.parent_message_id
-  or old.author_user_id is not new.author_user_id
-  or old.author_agent_id is not new.author_agent_id
-  or old.author_agent_name is not new.author_agent_name
-  or old.author_agent_provider is not new.author_agent_provider
-  or old.author_webhook_id is not new.author_webhook_id
-  or old.author_webhook_name is not new.author_webhook_name
-  or old.webhook_event_id is not new.webhook_event_id
-  or old.body is not new.body
-  or old.created_at is not new.created_at
-  or old.updated_at is not new.updated_at
-  or old.blocks_json is not new.blocks_json
-  or old.deleted_at is not new.deleted_at
-BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) select channel.organization_id, new.channel_id, 'message', new.id,
-           'upsert', datetime('now')
-    from briar_channels channel where channel.id = new.channel_id;
-  insert into briar_channel_sync_state (organization_id, current_version)
-  select channel.organization_id, last_insert_rowid()
-  from briar_channels channel where channel.id = new.channel_id
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channels channel where channel.id = new.channel_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = new.channel_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = new.channel_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
 CREATE TRIGGER briar_dm_memory_close_roster
 after update of memory_roster_epoch on briar_channels
 when old.memory_roster_epoch <> new.memory_roster_epoch
@@ -10599,31 +9851,6 @@ when old.revocation_epoch <> new.revocation_epoch begin
     lease_token_hash = null, lease_expires_at = null, error_code = 'scope_revoked'
   where space_id = new.id and kind in ('extract', 'consolidate', 'explicit_request')
     and status in ('pending', 'running', 'retry_wait');
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_message_changed
-after update of body, deleted_at on briar_channel_messages
-when old.body <> new.body or old.deleted_at is not new.deleted_at
-begin
-  update briar_channel_messages set memory_source_version = old.memory_source_version + 1
-  where id = new.id;
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1,
-    revocation_epoch = revocation_epoch + 1
-  where id in (select space_id from briar_dm_memory_sources
-    where source_type = 'message' and source_id = new.id);
-  update briar_dm_memory_documents set status = 'invalidated'
-  where status = 'active' and id in (select document_id from briar_dm_memory_sources
-    where source_type = 'message' and source_id = new.id);
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_message_deleted before delete on briar_channel_messages begin
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1,
-    revocation_epoch = revocation_epoch + 1
-  where id in (select space_id from briar_dm_memory_sources
-    where source_type = 'message' and source_id = old.id);
-  update briar_dm_memory_documents set status = 'invalidated'
-  where status = 'active' and id in (select document_id from briar_dm_memory_sources
-    where source_type = 'message' and source_id = old.id);
 end;
 -- @statement
 CREATE TRIGGER briar_dm_memory_chunk_purge after delete on briar_dm_memory_chunks
@@ -10863,11 +10090,6 @@ when old.memory_revision <> new.memory_revision begin
     where job_id in (select job_id from briar_dm_memory_reply_fences where space_id = new.id);
 end;
 -- @statement
-CREATE TRIGGER briar_dm_memory_lookup_claim_ended after update of status on briar_channel_agent_reply_jobs
-when old.status = 'running' and new.status <> 'running' begin
-  delete from briar_channel_reply_lookups where job_id = new.id;
-end;
--- @statement
 CREATE TRIGGER briar_dm_memory_citations_forgotten after update of status on briar_dm_memory_documents
 when new.status = 'deleted' begin
   delete from briar_dm_memory_reply_citations where document_id = new.id;
@@ -10886,19 +10108,6 @@ when old.current_version <> new.current_version or
         join briar_dm_memory_documents current on current.id = link.document_id and current.current_version = link.document_version
     ) select id from affected where id <> new.id
   );
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_capture_message after insert on briar_channel_messages begin
-  insert into briar_dm_memory_source_events(space_id, message_id, created_at)
-  select space.id, new.id, new.created_at from briar_dm_memory_spaces space
-  join briar_dm_memory_live_rosters live on live.organization_id = space.organization_id
-    and live.channel_id = space.channel_id and live.owner_user_id = space.owner_user_id
-    and live.agent_id = space.agent_id and live.roster_epoch = space.roster_epoch
-  where space.channel_id = new.channel_id and space.status = 'active'
-    and space.use_enabled = 1 and space.auto_enabled = 1 and new.deleted_at is null
-    and julianday(new.created_at) >= julianday(space.auto_enabled_at)
-    and (new.author_user_id = space.owner_user_id or new.author_agent_id = space.agent_id)
-  on conflict (space_id, message_id) do nothing;
 end;
 -- @statement
 CREATE TRIGGER briar_dm_memory_capture_observation after insert on briar_dm_memory_revisions begin
@@ -10973,23 +10182,6 @@ CREATE TRIGGER briar_dm_memory_forget_learning_payload after insert on briar_dm_
         select document_id from briar_dm_memory_purge_documents where space_id = new.space_id));
 end;
 -- @statement
-CREATE TRIGGER briar_dm_memory_edit_learning_source after update of body, deleted_at on briar_channel_messages
-when old.body <> new.body or old.deleted_at is not new.deleted_at begin
-  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
-  select distinct space_id, 'message', new.id from briar_dm_memory_learning_inputs
-  where source_type = 'message' and source_id = new.id;
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
-  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = new.id);
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_delete_learning_source before delete on briar_channel_messages begin
-  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
-  select distinct space_id, 'message', old.id from briar_dm_memory_learning_inputs
-  where source_type = 'message' and source_id = old.id;
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
-  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = old.id);
-end;
--- @statement
 CREATE TRIGGER briar_dm_memory_forget_derived_content after update of revocation_epoch on briar_dm_memory_spaces
 when old.revocation_epoch <> new.revocation_epoch begin
   update briar_dm_memory_documents set status = 'deleted', title = '[deleted]'
@@ -11017,25 +10209,6 @@ when exists (
 )
 begin
   select raise(abort, 'reply completion receipt is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_channel_message_mutation_receipt_insert_guard
-before insert on briar_channel_message_mutation_receipts
-when not exists (
-  select 1 from briar_channel_messages message
-  join briar_channels channel on channel.id = message.channel_id
-  where message.id = new.message_id and message.channel_id = new.channel_id
-    and message.author_user_id = new.user_id
-    and channel.organization_id = new.organization_id
-)
-begin
-  select raise(abort, 'invalid channel message receipt');
-end;
--- @statement
-CREATE TRIGGER briar_channel_message_mutation_receipt_immutable
-before update on briar_channel_message_mutation_receipts
-begin
-  select raise(abort, 'channel message receipt is immutable');
 end;
 -- @statement
 CREATE TRIGGER briar_upload_batch_insert_guard
@@ -11809,34 +10982,6 @@ before update of action_type on briar_channel_action_proposals
 when new.action_type <> 'request_issue_create'
 begin
   select raise(abort, 'channel proposals must create issues');
-end;
--- @statement
-CREATE TRIGGER briar_channel_message_blocks_array_insert
-before insert on briar_channel_messages
-when new.blocks_json is not null
-  and case
-    when not json_valid(new.blocks_json) then 1
-    when json_type(new.blocks_json) <> 'array' then 1
-    when json_array_length(new.blocks_json) not between 1 and 50 then 1
-    when length(cast(new.blocks_json as blob)) > 1048576 then 1
-    else 0
-  end
-begin
-  select raise(abort, 'channel message blocks must be a bounded JSON array');
-end;
--- @statement
-CREATE TRIGGER briar_channel_message_blocks_array_update
-before update of blocks_json on briar_channel_messages
-when new.blocks_json is not null
-  and case
-    when not json_valid(new.blocks_json) then 1
-    when json_type(new.blocks_json) <> 'array' then 1
-    when json_array_length(new.blocks_json) not between 1 and 50 then 1
-    when length(cast(new.blocks_json as blob)) > 1048576 then 1
-    else 0
-  end
-begin
-  select raise(abort, 'channel message blocks must be a bounded JSON array');
 end;
 -- @statement
 CREATE TRIGGER briar_workflow_checkpoint_storage_validate
@@ -13440,39 +12585,6 @@ begin
   select raise(abort, 'invalid reply completion receipt');
 end;
 -- @statement
-CREATE TRIGGER briar_channel_reply_session_events_immutable_update
-before update on briar_channel_reply_session_events
-when not (
-  old.reply_job_id is not null
-  and new.reply_job_id is null
-  and new.id is old.id
-  and new.session_id is old.session_id
-  and new.event_type is old.event_type
-  and new.reason is old.reason
-  and new.from_worker_id is old.from_worker_id
-  and new.to_worker_id is old.to_worker_id
-  and new.retained_until is old.retained_until
-  and new.detail_json is old.detail_json
-  and new.occurred_at is old.occurred_at
-)
-begin
-  select raise(abort, 'Channel reply session events are immutable');
-end;
--- @statement
-CREATE TRIGGER briar_channel_reply_agent_message_hop_insert_guard
-before insert on briar_channel_agent_reply_jobs
-when new.agent_message_hop > 0
-BEGIN
-  select case
-    when new.delegated_by_reply_job_id is not null
-      then raise(abort, 'delegated reply cannot carry an Agent message hop')
-  end;
-  select case
-    when new.origin_reply_job_id is null
-      then raise(abort, 'Agent message hop requires an origin reply job')
-  end;
-END;
--- @statement
 CREATE TRIGGER briar_channel_reply_agent_message_hop_update_guard
 before update of
   agent_message_hop, origin_reply_job_id, delegated_by_reply_job_id
@@ -13542,4 +12654,892 @@ begin
     where member.organization_id = new.organization_id
       and member.user_id = new.user_id
   ) then raise(abort, 'WhatsApp link user must be an organization member') end;
+end;
+-- @statement
+CREATE TRIGGER briar_channel_changes_messages_insert_sync
+after insert on briar_channel_messages BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) select channel.organization_id, new.channel_id, 'message', new.id,
+           'upsert', datetime('now')
+    from briar_channels channel where channel.id = new.channel_id;
+  insert into briar_channel_sync_state (organization_id, current_version)
+  select channel.organization_id, last_insert_rowid()
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_changes_messages_delete_sync
+after delete on briar_channel_messages BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) select channel.organization_id, old.channel_id, 'message', old.id,
+           'delete', datetime('now')
+    from briar_channels channel where channel.id = old.channel_id;
+  insert into briar_channel_sync_state (organization_id, current_version)
+  select channel.organization_id, last_insert_rowid()
+  from briar_channels channel where channel.id = old.channel_id
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = old.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = old.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = old.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_channel_message_invalidate
+after update of body on briar_channel_messages
+when new.body <> old.body
+BEGIN
+  update briar_agent_skill_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = new.updated_at
+  where source_kind = 'channel' and trigger_message_id = new.id
+    and status = 'pending';
+END;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_channel_message_delete_invalidate
+before delete on briar_channel_messages
+BEGIN
+  update briar_agent_skill_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where source_kind = 'channel' and status = 'pending'
+    and old.id in (trigger_message_id, reply_message_id);
+END;
+-- @statement
+CREATE TRIGGER briar_channel_thread_subscriptions_author_insert
+after insert on briar_channel_messages
+when new.author_user_id is not null BEGIN
+  insert into briar_channel_thread_subscriptions (
+    root_message_id, channel_id, organization_id, user_id, created_at
+  )
+  select coalesce(new.parent_message_id, new.id), new.channel_id,
+         channel.organization_id, new.author_user_id, new.created_at
+  from briar_channels channel
+  join briar_organization_members membership
+    on membership.organization_id = channel.organization_id
+   and membership.user_id = new.author_user_id
+  where channel.id = new.channel_id
+  on conflict (root_message_id, user_id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_notification_message_insert
+after insert on briar_channel_messages
+when new.parent_message_id is not null BEGIN
+  insert into briar_channel_notification_inbox (
+    user_id, organization_id, message_id, notification_reason, created_at
+  )
+  select subscription.user_id, subscription.organization_id, new.id,
+         iif(root.author_user_id = subscription.user_id, 'thread_reply', 'subscription'),
+         new.created_at
+  from briar_channel_thread_subscriptions subscription
+  join briar_channel_messages root
+    on root.id = subscription.root_message_id
+   and root.channel_id = new.channel_id
+  where subscription.root_message_id = new.parent_message_id
+    and (new.author_user_id is null
+         or new.author_user_id <> subscription.user_id)
+    and julianday(new.created_at) >= julianday(subscription.created_at)
+  on conflict (user_id, message_id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_changes_messages_update_sync
+after update on briar_channel_messages
+when old.memory_source_version = new.memory_source_version
+  or old.id is not new.id
+  or old.channel_id is not new.channel_id
+  or old.parent_message_id is not new.parent_message_id
+  or old.author_user_id is not new.author_user_id
+  or old.author_agent_id is not new.author_agent_id
+  or old.author_agent_name is not new.author_agent_name
+  or old.author_agent_provider is not new.author_agent_provider
+  or old.author_webhook_id is not new.author_webhook_id
+  or old.author_webhook_name is not new.author_webhook_name
+  or old.webhook_event_id is not new.webhook_event_id
+  or old.body is not new.body
+  or old.created_at is not new.created_at
+  or old.updated_at is not new.updated_at
+  or old.blocks_json is not new.blocks_json
+  or old.deleted_at is not new.deleted_at
+BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) select channel.organization_id, new.channel_id, 'message', new.id,
+           'upsert', datetime('now')
+    from briar_channels channel where channel.id = new.channel_id;
+  insert into briar_channel_sync_state (organization_id, current_version)
+  select channel.organization_id, last_insert_rowid()
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_dm_memory_message_changed
+after update of body, deleted_at on briar_channel_messages
+when old.body <> new.body or old.deleted_at is not new.deleted_at
+begin
+  update briar_channel_messages set memory_source_version = old.memory_source_version + 1
+  where id = new.id;
+  update briar_dm_memory_spaces set memory_revision = memory_revision + 1,
+    revocation_epoch = revocation_epoch + 1
+  where id in (select space_id from briar_dm_memory_sources
+    where source_type = 'message' and source_id = new.id);
+  update briar_dm_memory_documents set status = 'invalidated'
+  where status = 'active' and id in (select document_id from briar_dm_memory_sources
+    where source_type = 'message' and source_id = new.id);
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_message_deleted before delete on briar_channel_messages begin
+  update briar_dm_memory_spaces set memory_revision = memory_revision + 1,
+    revocation_epoch = revocation_epoch + 1
+  where id in (select space_id from briar_dm_memory_sources
+    where source_type = 'message' and source_id = old.id);
+  update briar_dm_memory_documents set status = 'invalidated'
+  where status = 'active' and id in (select document_id from briar_dm_memory_sources
+    where source_type = 'message' and source_id = old.id);
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_capture_message after insert on briar_channel_messages begin
+  insert into briar_dm_memory_source_events(space_id, message_id, created_at)
+  select space.id, new.id, new.created_at from briar_dm_memory_spaces space
+  join briar_dm_memory_live_rosters live on live.organization_id = space.organization_id
+    and live.channel_id = space.channel_id and live.owner_user_id = space.owner_user_id
+    and live.agent_id = space.agent_id and live.roster_epoch = space.roster_epoch
+  where space.channel_id = new.channel_id and space.status = 'active'
+    and space.use_enabled = 1 and space.auto_enabled = 1 and new.deleted_at is null
+    and julianday(new.created_at) >= julianday(space.auto_enabled_at)
+    and (new.author_user_id = space.owner_user_id or new.author_agent_id = space.agent_id)
+  on conflict (space_id, message_id) do nothing;
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_edit_learning_source after update of body, deleted_at on briar_channel_messages
+when old.body <> new.body or old.deleted_at is not new.deleted_at begin
+  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
+  select distinct space_id, 'message', new.id from briar_dm_memory_learning_inputs
+  where source_type = 'message' and source_id = new.id;
+  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
+  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = new.id);
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_delete_learning_source before delete on briar_channel_messages begin
+  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
+  select distinct space_id, 'message', old.id from briar_dm_memory_learning_inputs
+  where source_type = 'message' and source_id = old.id;
+  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
+  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = old.id);
+end;
+-- @statement
+CREATE TRIGGER briar_channel_message_blocks_array_insert
+before insert on briar_channel_messages
+when new.blocks_json is not null
+  and case
+    when not json_valid(new.blocks_json) then 1
+    when json_type(new.blocks_json) <> 'array' then 1
+    when json_array_length(new.blocks_json) not between 1 and 50 then 1
+    when length(cast(new.blocks_json as blob)) > 1048576 then 1
+    else 0
+  end
+begin
+  select raise(abort, 'channel message blocks must be a bounded JSON array');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_message_blocks_array_update
+before update of blocks_json on briar_channel_messages
+when new.blocks_json is not null
+  and case
+    when not json_valid(new.blocks_json) then 1
+    when json_type(new.blocks_json) <> 'array' then 1
+    when json_array_length(new.blocks_json) not between 1 and 50 then 1
+    when length(cast(new.blocks_json as blob)) > 1048576 then 1
+    else 0
+  end
+begin
+  select raise(abort, 'channel message blocks must be a bounded JSON array');
+end;
+-- @statement
+CREATE TRIGGER briar_inbox_channel_mentions_insert_sync
+after insert on briar_channel_message_mentions BEGIN
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = new.message_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_inbox_channel_mentions_delete_sync
+before delete on briar_channel_message_mentions BEGIN
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = old.message_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_thread_subscriptions_mention_insert
+after insert on briar_channel_message_mentions BEGIN
+  insert into briar_channel_thread_subscriptions (
+    root_message_id, channel_id, organization_id, user_id, created_at
+  )
+  select coalesce(message.parent_message_id, message.id), message.channel_id,
+         channel.organization_id, new.user_id, new.created_at
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  join briar_organization_members membership
+    on membership.organization_id = channel.organization_id
+   and membership.user_id = new.user_id
+  where message.id = new.message_id
+  on conflict (root_message_id, user_id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_notification_mention_insert
+after insert on briar_channel_message_mentions
+BEGIN
+  insert into briar_channel_notification_inbox (
+    user_id, organization_id, message_id, notification_reason, created_at
+  )
+  select new.user_id, channel.organization_id, message.id,
+         'mention', message.created_at
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = new.message_id
+    and (message.author_user_id is null
+         or message.author_user_id <> new.user_id)
+  on conflict (user_id, message_id) do update set
+    organization_id = excluded.organization_id,
+    notification_reason = 'mention',
+    created_at = excluded.created_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_notification_mention_delete
+after delete on briar_channel_message_mentions
+BEGIN
+  delete from briar_channel_notification_inbox
+  where user_id = old.user_id and message_id = old.message_id;
+
+  insert into briar_channel_notification_inbox (
+    user_id, organization_id, message_id, notification_reason, created_at
+  )
+  select subscription.user_id, subscription.organization_id, message.id,
+         iif(root.author_user_id = subscription.user_id, 'thread_reply', 'subscription'),
+         message.created_at
+  from briar_channel_messages message
+  join briar_channel_thread_subscriptions subscription
+    on subscription.root_message_id = coalesce(
+         message.parent_message_id, message.id
+       )
+   and subscription.user_id = old.user_id
+  join briar_channel_messages root
+    on root.id = subscription.root_message_id
+   and root.channel_id = message.channel_id
+  where message.id = old.message_id
+    and message.parent_message_id is not null
+    and (message.author_user_id is null
+         or message.author_user_id <> old.user_id)
+    and julianday(message.created_at) >= julianday(subscription.created_at)
+  on conflict (user_id, message_id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_message_mutation_receipt_insert_guard
+before insert on briar_channel_message_mutation_receipts
+when not exists (
+  select 1 from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = new.message_id and message.channel_id = new.channel_id
+    and message.author_user_id = new.user_id
+    and channel.organization_id = new.organization_id
+)
+begin
+  select raise(abort, 'invalid channel message receipt');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_message_mutation_receipt_immutable
+before update on briar_channel_message_mutation_receipts
+begin
+  select raise(abort, 'channel message receipt is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_changes_reactions_insert_sync
+after insert on briar_channel_message_reactions BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) select channel.organization_id, message.channel_id, 'message', new.message_id,
+           'upsert', datetime('now')
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id;
+  insert into briar_channel_sync_state (organization_id, current_version)
+  select channel.organization_id, last_insert_rowid()
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = new.message_id
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = new.message_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = new.message_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_changes_reactions_delete_sync
+after delete on briar_channel_message_reactions BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) select channel.organization_id, message.channel_id, 'message', old.message_id,
+           'upsert', datetime('now')
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id;
+  insert into briar_channel_sync_state (organization_id, current_version)
+  select channel.organization_id, last_insert_rowid()
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = old.message_id
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channel_messages message
+  join briar_channels channel on channel.id = message.channel_id
+  where message.id = old.message_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channel_messages message
+    join briar_channels channel on channel.id = message.channel_id
+    where message.id = old.message_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_thread_subscriptions_insert_sync
+after insert on briar_channel_thread_subscriptions BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.organization_id, new.channel_id, 'message', new.root_message_id,
+    'upsert', datetime('now')
+  );
+  insert into briar_channel_sync_state (organization_id, current_version)
+  values (new.organization_id, last_insert_rowid())
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_thread_subscriptions_delete_sync
+before delete on briar_channel_thread_subscriptions BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) values (
+    old.organization_id, old.channel_id, 'message', old.root_message_id,
+    'upsert', datetime('now')
+  );
+  insert into briar_channel_sync_state (organization_id, current_version)
+  values (old.organization_id, last_insert_rowid())
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (old.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = old.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = old.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_reply_skill_snapshot_update
+after update of skill_id on briar_channel_agent_reply_jobs
+when new.skill_id is not null and new.selected_skill_id_snapshot is null
+BEGIN
+  update briar_channel_agent_reply_jobs
+  set selected_skill_id_snapshot = new.skill_id
+  where id = new.id;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_changes_reply_jobs_update_sync
+after update on briar_channel_agent_reply_jobs
+when old.lease_expires_at is new.lease_expires_at
+  or old.updated_at is not new.updated_at
+BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.organization_id, new.channel_id, 'reply_job', new.id, 'upsert',
+    datetime('now')
+  );
+  insert into briar_channel_sync_state (organization_id, current_version)
+  values (new.organization_id, last_insert_rowid())
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_changes_reply_jobs_insert_sync
+after insert on briar_channel_agent_reply_jobs BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.organization_id, new.channel_id, 'reply_job', new.id, 'upsert',
+    datetime('now')
+  );
+  insert into briar_channel_sync_state (organization_id, current_version)
+  values (new.organization_id, last_insert_rowid())
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_reply_skill_snapshot_insert
+after insert on briar_channel_agent_reply_jobs
+when new.skill_id is not null and new.selected_skill_id_snapshot is null
+BEGIN
+  update briar_channel_agent_reply_jobs
+  set selected_skill_id_snapshot = new.skill_id
+  where id = new.id;
+END;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_channel_job_delete_invalidate
+before delete on briar_channel_agent_reply_jobs
+BEGIN
+  update briar_agent_skill_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where source_kind = 'channel' and status = 'pending'
+    and (source_reply_job_id = old.id or delegated_by_reply_job_id = old.id);
+END;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_result_job_insert_guard
+before insert on briar_channel_agent_reply_jobs
+when new.approved_skill_execution_proposal_id is not null
+  and not exists (
+    select 1
+    from briar_agent_skill_execution_proposals proposal
+    join briar_channel_agent_reply_jobs source
+      on source.id = proposal.source_reply_job_id
+     and source.session_id = proposal.result_session_id
+    where proposal.id = new.approved_skill_execution_proposal_id
+      and proposal.status = 'accepted'
+      and proposal.source_kind = 'channel'
+      and proposal.execution_mode = 'conversation'
+      and proposal.channel_id = new.channel_id
+      and proposal.project_id = new.project_id
+      and proposal.agent_id = new.agent_id
+      and proposal.skill_id = new.skill_id
+      and proposal.result_session_id = new.session_id
+      and proposal.result_reply_job_id = new.id
+      and proposal.result_message_id = new.reply_message_id
+      and proposal.reply_message_id = new.trigger_message_id
+      and proposal.thread_root_message_id = new.parent_message_id
+      and proposal.request = new.skill_execution_request_snapshot
+      and proposal.skill_id = new.selected_skill_id_snapshot
+      and proposal.agent_name = new.selected_agent_name_snapshot
+      and proposal.agent_responsibility =
+        new.selected_agent_responsibility_snapshot
+      and proposal.skill_name = new.selected_skill_name_snapshot
+      and proposal.skill_instructions =
+        new.selected_skill_instructions_snapshot
+      and proposal.skill_kind = new.selected_skill_kind_snapshot
+      and proposal.provider = new.selected_skill_provider_snapshot
+      and proposal.model is new.selected_skill_model_snapshot
+      and proposal.effort is new.selected_skill_effort_snapshot
+  )
+begin
+  select raise(abort, 'invalid approved Agent Skill conversation job');
+end;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_result_job_origin_immutable
+before update of approved_skill_execution_proposal_id
+on briar_channel_agent_reply_jobs
+when new.approved_skill_execution_proposal_id is not
+  old.approved_skill_execution_proposal_id
+begin
+  select raise(abort, 'approved Agent Skill conversation origin is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_result_job_failure_publish
+after update of status on briar_channel_agent_reply_jobs
+when old.status in ('queued', 'running') and new.status = 'failed'
+  and new.approved_skill_execution_proposal_id is not null
+begin
+  insert or ignore into briar_channel_messages (
+    id, channel_id, parent_message_id, author_user_id, author_agent_id,
+    author_agent_name, author_agent_provider, body, created_at, updated_at
+  )
+  select proposal.result_message_id, proposal.channel_id,
+         proposal.thread_root_message_id, null, proposal.agent_id,
+         proposal.agent_name, proposal.provider,
+         '**Skill execution failed**' || char(10) || char(10) ||
+           substr(coalesce(new.error, 'The Skill failed without an error summary.'),
+                  1, 9000),
+         new.updated_at, new.updated_at
+  from briar_agent_skill_execution_proposals proposal
+  where proposal.id = new.approved_skill_execution_proposal_id
+    and proposal.status = 'accepted'
+    and proposal.execution_mode = 'conversation'
+    and proposal.result_reply_job_id = new.id
+    and proposal.result_message_id = new.reply_message_id
+    and exists (
+      select 1 from briar_channel_messages root
+      where root.id = proposal.thread_root_message_id
+        and root.channel_id = proposal.channel_id
+        and root.parent_message_id is null
+    );
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_lookup_claim_ended after update of status on briar_channel_agent_reply_jobs
+when old.status = 'running' and new.status <> 'running' begin
+  delete from briar_channel_reply_lookups where job_id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_channel_reply_agent_message_hop_insert_guard
+before insert on briar_channel_agent_reply_jobs
+when new.agent_message_hop > 0
+BEGIN
+  select case
+    when new.delegated_by_reply_job_id is not null
+      then raise(abort, 'delegated reply cannot carry an Agent message hop')
+  end;
+  select case
+    when new.origin_reply_job_id is null
+      then raise(abort, 'Agent message hop requires an origin reply job')
+  end;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_reply_session_events_immutable_update
+before update on briar_channel_reply_session_events
+when not (
+  old.reply_job_id is not null
+  and new.reply_job_id is null
+  and new.id is old.id
+  and new.session_id is old.session_id
+  and new.event_type is old.event_type
+  and new.reason is old.reason
+  and new.from_worker_id is old.from_worker_id
+  and new.to_worker_id is old.to_worker_id
+  and new.retained_until is old.retained_until
+  and new.detail_json is old.detail_json
+  and new.occurred_at is old.occurred_at
+)
+begin
+  select raise(abort, 'Channel reply session events are immutable');
 end;

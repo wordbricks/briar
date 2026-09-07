@@ -3528,6 +3528,7 @@ function Composer({
     attachmentError,
     attachmentInputRef,
     body,
+    bodyOverflows,
     dragging,
     handleCaret,
     handleChange,
@@ -3710,7 +3711,9 @@ function Composer({
           <button
             aria-label={t("channel.send")}
             className="channel-composer-send"
-            disabled={busy || (!body.trim() && images.length === 0)}
+            disabled={
+              busy || bodyOverflows || (!body.trim() && images.length === 0)
+            }
             type="submit"
           >
             <Send size={16} />

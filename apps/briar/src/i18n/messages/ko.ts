@@ -555,7 +555,7 @@ export const ko = {
   "channel.deleteDescription": "채널의 대화와 첨부 파일이 영구적으로 삭제되며 되돌릴 수 없습니다.",
   "channel.deleting": "삭제 중…",
   "channel.messagePlaceholder": "#{name}에 메시지 보내기",
-  "channel.messageAria": "채널 메시지",
+  "channel.messageAria": "채널 메시지", "channel.messageTooLong": "메시지는 {max}자를 넘을 수 없습니다.",
   "channel.mentionCandidates": "멘션 후보",
   "channel.projectAgent": "팀 에이전트",
   "channel.orgAgent": "조직 에이전트",

@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   channelIncomingWebhookMessageSchema,
   channelMessageBlocksFallback,
+  channelMessageBodyMaxLength,
+  channelMessageBodySchema,
   channelMessageInputSchema,
   channelProposalAcceptInputSchema,
   channelProposalPayloadSchema,
@@ -104,6 +106,27 @@ describe("channel message contract", () => {
       mentionedAgentIds: [agentId],
       preferredDeviceId: agentId,
     });
+  });
+
+  /*
+    A person may paste a prompt or a log excerpt, which the older 10,000 bound
+    rejected. What an Agent, a webhook or a delegation writes keeps that bound,
+    because each of those has a column of its own behind it.
+  */
+  it("takes a body up to the ceiling and nothing past it", () => {
+    expect(
+      accepts(channelMessageInputSchema, {
+        body: "a".repeat(channelMessageBodyMaxLength),
+      }),
+    ).toBe(true);
+    expect(
+      accepts(channelMessageInputSchema, {
+        body: "a".repeat(channelMessageBodyMaxLength + 1),
+      }),
+    ).toBe(false);
+    expect(accepts(channelMessageInputSchema, { body: "   " })).toBe(false);
+    expect(accepts(channelMessageBodySchema, "a".repeat(10_000))).toBe(true);
+    expect(accepts(channelMessageBodySchema, "a".repeat(10_001))).toBe(false);
   });
 
   it("canonicalizes channel proposal accept project IDs", () => {
