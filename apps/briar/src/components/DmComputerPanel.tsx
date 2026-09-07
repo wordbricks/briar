@@ -1,6 +1,8 @@
 import type RFB from "@novnc/novnc";
 import {
   Expand,
+  Eye,
+  MousePointer2,
   Keyboard,
   Minimize2,
   MonitorUp,
@@ -11,6 +13,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  type SyntheticEvent,
   useRef,
   useState,
 } from "react";
@@ -157,14 +160,16 @@ function DmComputerScreen({
   token: string;
 }) {
   const { t } = useI18n();
-  const shellRef = useRef<HTMLElement | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const targetRef = useRef<HTMLDivElement | null>(null);
   const openButtonRef = useRef<HTMLButtonElement | null>(null);
   const rfbRef = useRef<RFB | null>(null);
   const remoteSessionIdRef = useRef<string | null>(null);
   const generationRef = useRef(0);
   const endingRef = useRef(false);
-  const expandedRef = useRef(false);
+  const controlRef = useRef(false);
+  const controlButtonRef = useRef<HTMLButtonElement | null>(null);
+  const mouseRef = useRef<{ target: EventTarget; x: number; y: number } | null>(null);
   const fitScreenRef = useRef(true);
   const wasExpandedRef = useRef(false);
   const { controller: clipboardController, state: clipboardState } =
@@ -173,23 +178,70 @@ function DmComputerScreen({
     useState<ConnectionState>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [controlling, setControlling] = useState(false);
+  const [inputHint, setInputHint] = useState(false);
   const [fitScreen, setFitScreen] = useState(true);
   const [pasteController] = useState(() =>
     createRemoteDesktopPasteController({
-      getTarget: () => rfbRef.current,
+      getTarget: () => controlRef.current ? rfbRef.current : null,
     })
   );
   const storageKey =
     `briar.remoteDesktop.${target.computer.id}.${target.agentId}`;
   const screenLabel = t("dm.computer.screen", { name: target.agentName });
 
-  const destroyRfb = useCallback(() => {
-    clipboardController.reset();
+  const releaseControl = useCallback(() => {
     pasteController.reset();
+    const rfb = rfbRef.current;
+    // Release held keys/buttons while input is still enabled, then gate all
+    // future input. Release noVNC's window-level pointer capture explicitly.
+    if (controlRef.current) {
+      rfb?.blur();
+      const mouse = mouseRef.current;
+      if (mouse) {
+        const options = {
+          bubbles: true, cancelable: true, buttons: 0,
+          clientX: mouse.x, clientY: mouse.y,
+        };
+        // noVNC proxies window mouseup to its canvas and releases capture.
+        // Without capture (e.g. a touch gesture), release on the canvas itself.
+        const release = new MouseEvent("mouseup", options);
+        window.dispatchEvent(release);
+        if (!release.defaultPrevented) {
+          mouse.target.dispatchEvent(new MouseEvent("mouseup", options));
+        }
+      }
+    }
+    mouseRef.current = null;
+    controlRef.current = false;
+    if (rfb) {
+      rfb.viewOnly = true;
+      rfb.focusOnClick = false;
+    }
+    setRemoteDesktopKeyboardCapture(false);
+    setControlling(false);
+  }, [pasteController]);
+
+  const closeExpanded = useCallback(() => {
+    releaseControl();
+    setExpanded(false);
+  }, [releaseControl]);
+
+  const blockReadOnlyInput = (event: SyntheticEvent) => {
+    if (controlRef.current || !targetRef.current?.contains(event.target as Node)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (expanded) setInputHint(true);
+    return true;
+  };
+
+  const destroyRfb = useCallback(() => {
+    releaseControl();
+    clipboardController.reset();
     const rfb = rfbRef.current;
     rfbRef.current = null;
     rfb?.disconnect();
-  }, [clipboardController, pasteController]);
+  }, [clipboardController, releaseControl]);
 
   const connect = useCallback(async (reconnect: boolean) => {
     const generation = ++generationRef.current;
@@ -245,8 +297,8 @@ function DmComputerScreen({
         shared: false,
         wsProtocols: [ticket.socket.protocol],
       });
-      rfb.focusOnClick = expandedRef.current;
-      rfb.viewOnly = !expandedRef.current;
+      rfb.focusOnClick = false;
+      rfb.viewOnly = true;
       rfb.clipViewport = false;
       rfb.scaleViewport = fitScreenRef.current;
       rfb.resizeSession = false;
@@ -256,14 +308,15 @@ function DmComputerScreen({
         if (generation !== generationRef.current) return;
         setConnectionState("connected");
         setError(null);
-        if (expandedRef.current) rfb.focus();
       });
       rfb.addEventListener("disconnect", () => {
         if (generation !== generationRef.current || endingRef.current) return;
+        releaseControl();
         setConnectionState("reconnect");
       });
       rfb.addEventListener("securityfailure", () => {
         if (generation !== generationRef.current) return;
+        releaseControl();
         setConnectionState("error");
         setError(t("managedComputer.remote.error.relay"));
       });
@@ -286,6 +339,7 @@ function DmComputerScreen({
     destroyRfb,
     organizationId,
     services,
+    releaseControl,
     storageKey,
     t,
     target.agentId,
@@ -324,16 +378,9 @@ function DmComputerScreen({
   ]);
 
   useEffect(() => {
-    expandedRef.current = expanded;
-    setRemoteDesktopKeyboardCapture(expanded);
-    const rfb = rfbRef.current;
-    if (rfb) {
-      rfb.viewOnly = !expanded;
-      rfb.focusOnClick = expanded;
-    }
     if (expanded) {
       shellRef.current?.focus({ preventScroll: true });
-      window.setTimeout(() => rfbRef.current?.focus(), 0);
+      controlButtonRef.current?.focus();
     } else {
       setFitScreen(true);
       if (wasExpandedRef.current) openButtonRef.current?.focus();
@@ -346,11 +393,11 @@ function DmComputerScreen({
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      setExpanded(false);
+      closeExpanded();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [expanded]);
+  }, [closeExpanded, expanded]);
 
   useEffect(() => {
     fitScreenRef.current = fitScreen;
@@ -366,7 +413,7 @@ function DmComputerScreen({
         : "managedComputer.remote.failed";
 
   return (
-    <aside
+    <div
       aria-label={screenLabel}
       aria-modal={expanded || undefined}
       className={cn(
@@ -375,13 +422,26 @@ function DmComputerScreen({
           ? "fixed inset-0 z-[100] h-screen w-screen border-0 bg-zinc-950 text-white outline-none"
           : "w-[clamp(300px,32vw,420px)] max-[760px]:hidden",
       )}
+      onKeyDownCapture={(event) => {
+        if (!expanded) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          closeExpanded();
+        } else if (event.key === "Tab" && targetRef.current?.contains(event.target as Node)) {
+          event.preventDefault();
+          event.stopPropagation();
+          rfbRef.current?.blur();
+          controlButtonRef.current?.focus();
+        }
+      }}
       ref={shellRef}
       role={expanded ? "dialog" : "complementary"}
       tabIndex={expanded ? -1 : undefined}
     >
       <header
         className={cn(
-          "flex h-[52px] shrink-0 items-center justify-between gap-3 border-b px-4",
+          "flex min-h-[52px] shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-2",
           expanded
             ? "border-white/10 bg-zinc-900/95"
             : "border-border bg-card",
@@ -416,7 +476,33 @@ function DmComputerScreen({
           </div>
         </div>
         {expanded ? (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              aria-label={t("dm.computer.control")}
+              aria-checked={controlling}
+              className="border-white/30 bg-white/5 text-white hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white"
+              disabled={connectionState !== "connected"}
+              onClick={() => {
+                if (controlRef.current) {
+                  releaseControl();
+                } else if (expanded && connectionState === "connected" && rfbRef.current) {
+                  controlRef.current = true;
+                  rfbRef.current.viewOnly = false;
+                  rfbRef.current.focusOnClick = true;
+                  setRemoteDesktopKeyboardCapture(true);
+                  setControlling(true);
+                  setInputHint(false);
+                }
+              }}
+              ref={controlButtonRef}
+              role="switch"
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {controlling ? <MousePointer2 aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
+              {t("dm.computer.control")}: {t(controlling ? "dm.computer.controlling" : "dm.computer.viewOnly")}
+            </Button>
             <RemoteDesktopClipboardButton
               onCopy={clipboardController.copyToLocal}
               state={clipboardState}
@@ -435,8 +521,10 @@ function DmComputerScreen({
             </Button>
             <Button
               className="border-white/15 bg-white/5 text-white hover:bg-white/10"
-              disabled={connectionState !== "connected"}
-              onClick={() => rfbRef.current?.sendCtrlAltDel()}
+              disabled={!controlling || connectionState !== "connected"}
+              onClick={() => {
+                if (controlRef.current) rfbRef.current?.sendCtrlAltDel();
+              }}
               size="sm"
               type="button"
               variant="outline"
@@ -447,7 +535,7 @@ function DmComputerScreen({
             <Button
               aria-label={t("dm.computer.close")}
               className="border-white/15 bg-white/5 text-white hover:bg-white/10 active:scale-[.96]"
-              onClick={() => setExpanded(false)}
+              onClick={closeExpanded}
               size="icon"
               title={t("dm.computer.close")}
               type="button"
@@ -458,6 +546,12 @@ function DmComputerScreen({
           </div>
         ) : null}
       </header>
+      {expanded ? (
+        <div aria-live="polite" className="shrink-0 border-b border-white/10 bg-zinc-900 px-4 py-2 text-xs text-zinc-200">
+          {t(controlling ? "dm.computer.controlHint" : "dm.computer.viewHint")}
+          {inputHint ? <span className="ml-2 font-semibold">{t("dm.computer.inputBlocked")}</span> : null}
+        </div>
+      ) : null}
 
       <div
         className={cn(
@@ -477,6 +571,7 @@ function DmComputerScreen({
           data-briar-remote-desktop="true"
           data-tauri-drag-region="false"
           onKeyDownCapture={(event) => {
+            if (blockReadOnlyInput(event)) return;
             if (
               expanded &&
               connectionState === "connected" &&
@@ -488,11 +583,12 @@ function DmComputerScreen({
           onKeyDown={(event) => {
             if (expanded) event.stopPropagation();
           }}
+          onKeyUpCapture={blockReadOnlyInput}
           onKeyUp={(event) => {
             if (expanded) event.stopPropagation();
           }}
           onPasteCapture={(event) => {
-            if (!expanded || connectionState !== "connected") return;
+            if (blockReadOnlyInput(event) || !expanded || connectionState !== "connected") return;
             const text = event.clipboardData.getData("text/plain");
             if (!pasteController.enqueue(text)) return;
             event.preventDefault();
@@ -500,7 +596,50 @@ function DmComputerScreen({
           }}
           tabIndex={expanded ? -1 : undefined}
         >
-          <div className="size-full" ref={targetRef} />
+          <div
+            className="size-full"
+            onClickCapture={blockReadOnlyInput}
+            onContextMenuCapture={blockReadOnlyInput}
+            onMouseDownCapture={(event) => {
+              if (blockReadOnlyInput(event)) return;
+              mouseRef.current = { target: event.target, x: event.clientX, y: event.clientY };
+            }}
+            onMouseMoveCapture={(event) => {
+              if (!controlRef.current) {
+                event.stopPropagation();
+                return;
+              }
+              if (mouseRef.current) {
+                mouseRef.current.x = event.clientX;
+                mouseRef.current.y = event.clientY;
+              }
+            }}
+            onMouseUpCapture={(event) => {
+              if (blockReadOnlyInput(event)) return;
+              if (event.buttons === 0) mouseRef.current = null;
+            }}
+            onPointerDownCapture={blockReadOnlyInput}
+            onPointerMoveCapture={(event) => {
+              if (!controlRef.current) event.stopPropagation();
+            }}
+            onPointerUpCapture={blockReadOnlyInput}
+            onTouchStartCapture={(event) => {
+              if (blockReadOnlyInput(event)) return;
+              const touch = event.touches[0];
+              if (touch) mouseRef.current = { target: event.target, x: touch.clientX, y: touch.clientY };
+            }}
+            onTouchMoveCapture={(event) => {
+              if (blockReadOnlyInput(event)) return;
+              const touch = event.touches[0];
+              if (touch && mouseRef.current) {
+                mouseRef.current.x = touch.clientX;
+                mouseRef.current.y = touch.clientY;
+              }
+            }}
+            onTouchEndCapture={blockReadOnlyInput}
+            onWheelCapture={blockReadOnlyInput}
+            ref={targetRef}
+          />
           {connectionState !== "connected" ? (
             <div className="absolute inset-0 grid place-items-center bg-black/80 p-5 text-center text-white">
               <div className="grid max-w-xs justify-items-center gap-2.5">
@@ -557,7 +696,7 @@ function DmComputerScreen({
           </div>
         </div>
       ) : null}
-    </aside>
+    </div>
   );
 }
 
