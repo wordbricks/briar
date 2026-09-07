@@ -15,7 +15,7 @@ describe("DM learning proposal and independent verifier boundaries", () => {
     expect(dmLearningPreferredProvider("claude")).toBe("claude");
     expect(dmLearningPreferredProvider("grok")).toBe("codex");
     expect(dmLearningAgentPolicy("codex")).toEqual(syntheticDmLearningPolicy);
-    expect(dmLearningAgentPolicy("codex")).toMatchObject({ spaceDailyCalls: 24, organizationDailyCalls: 240,
+    expect(dmLearningAgentPolicy("codex")).toMatchObject({ spaceDailyCalls: 48, organizationDailyCalls: 240,
       maxInputBytes: 131_072, spaceDailyMicroUsd: 0, organizationDailyMicroUsd: 0 });
     expect(dmLearningAgentPolicy("codex").proposer).toMatchObject({ transport: "agent", maxOutputTokens: 4096 });
     expect(dmLearningAgentPolicy("codex").verifier).toMatchObject({ transport: "agent", maxOutputTokens: 2048 });

@@ -93,7 +93,15 @@ export type DmLearningPolicy = typeof DmLearningPolicy.Type;
  */
 export const dmMemoryLearningVerifiedProviders = ["codex", "claude"] as const;
 export const dmMemoryLearningMaxInputBytes = 131_072;
-export const dmMemoryLearningSpaceDailyCalls = 24;
+/**
+ * Automatic extraction waits for this many unreviewed source events, so one
+ * review reads a stretch of conversation instead of a single exchange and a
+ * busy DM spends a job per stretch rather than per reply.
+ */
+export const dmMemoryLearningExtractBatchSources = 8;
+/** A quiet DM is still reviewed once its oldest waiting reply is this old. */
+export const dmMemoryLearningExtractMaxWaitMs = 24 * 60 * 60 * 1000;
+export const dmMemoryLearningSpaceDailyCalls = 48;
 export const dmMemoryLearningOrganizationDailyCalls = 240;
 export const dmMemoryLearningProposerMaxOutputTokens = 4096;
 export const dmMemoryLearningVerifierMaxOutputTokens = 2048;

@@ -1,5 +1,6 @@
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
-import type { DmLearningPolicy } from "../../src/lib/dm-memory-learning-contract";
+import { dmMemoryLearningExtractBatchSources, dmMemoryLearningExtractMaxWaitMs,
+  type DmLearningPolicy } from "../../src/lib/dm-memory-learning-contract";
 import type { DmMemoryReference } from "../../src/lib/dm-memory-query-contract";
 import { sha256 } from "./crypto-digest";
 import { dmLearningLiveSpaceSql } from "./dm-memory-learning-input";
@@ -92,10 +93,19 @@ export async function scheduleDmLearningJobs(db: D1Database, organizationId: str
         dedupeSource: `${explicit.reply_job_id}:${space.revocation_epoch}`, policy, now });
     } else {
       // max(end) collects the current burst, but min(available_at) never moves the first event's deadline.
-      const extraction = await db.prepare(`select max(source_end) as source_end, min(available_at) as available_at
+      // What counts as unreviewed starts after the last completed review, not at the
+      // watermark: an empty review keeps its window, and those retained events are
+      // not new conversation. Job rows are never deleted, only their payloads.
+      const extraction = await db.prepare(`select max(source_end) as source_end, min(available_at) as available_at,
+          min(created_at) as oldest, (select count(*) from briar_dm_memory_source_events event where event.space_id = ?
+            and event.sequence > max(?, coalesce((select max(reviewed.source_end) from briar_dm_memory_jobs reviewed
+              where reviewed.space_id = ? and reviewed.kind = 'extract' and reviewed.status in ('succeeded', 'no_change')), 0))) as unreviewed
         from briar_dm_memory_learning_outbox where space_id = ? and kind = 'extract' and settled = 0 and source_end > ?`)
-        .bind(space.id, state.source_watermark).first<{ source_end: number | null; available_at: string | null }>();
-      if (extraction?.source_end && extraction.available_at! <= now) {
+        .bind(space.id, state.source_watermark, space.id, space.id, state.source_watermark)
+        .first<{ source_end: number | null; available_at: string | null; oldest: string | null; unreviewed: number }>();
+      if (extraction?.source_end && extraction.available_at! <= now &&
+        (extraction.unreviewed >= dmMemoryLearningExtractBatchSources ||
+          Date.parse(now) - Date.parse(extraction.oldest!) >= dmMemoryLearningExtractMaxWaitMs)) {
         created += await enqueueLearningJob(db, { spaceId: space.id, kind: "extract", start: state.source_watermark,
           end: extraction.source_end, dedupeSource: String(space.revocation_epoch), policy, now });
       } else {

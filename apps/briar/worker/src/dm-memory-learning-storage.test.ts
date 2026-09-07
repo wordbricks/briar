@@ -3,7 +3,7 @@ import { createClient, createRouterTransport } from "@connectrpc/connect";
 import { WorkerQueueService } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
-import { dmMemoryLearningRetainedSources } from "../../src/lib/dm-memory-learning-contract";
+import { dmMemoryLearningExtractBatchSources, dmMemoryLearningRetainedSources } from "../../src/lib/dm-memory-learning-contract";
 import { runClaimedDmMemory } from "../../src-cli/dm-memory-learning";
 import { invokeDmLearningModel } from "../../src-cli/dm-memory-learning-model";
 import { createChannel, createChannelMessage } from "./channels";
@@ -88,12 +88,14 @@ describe("durable DM learning inputs and deletion", () => {
     await db.prepare(`update briar_dm_memory_spaces set auto_enabled = 1, auto_enabled_at = ?, updated_at = ? where id = ?`)
       .bind(now, now, spaceId).run();
   }
-  async function outbox(spaceId: string, availableAt: string) {
+  // Aged a day by default so a one-message fixture is reviewed at once; pass
+  // `now` as createdAt to exercise the volume gate itself.
+  async function outbox(spaceId: string, availableAt: string, createdAt = "2026-08-31T00:00:00.000Z") {
     await db.prepare(`insert into briar_dm_memory_learning_outbox
       (reply_job_id, space_id, kind, source_end, revocation_epoch, available_at, created_at)
       select ?, space.id, 'extract', (select max(sequence) from briar_dm_memory_source_events where space_id = space.id),
         space.revocation_epoch, ?, ? from briar_dm_memory_spaces space where space.id = ?`)
-      .bind(crypto.randomUUID(), availableAt, now, spaceId).run();
+      .bind(crypto.randomUUID(), availableAt, createdAt, spaceId).run();
   }
   async function job(spaceId: string): Promise<DmLearningJobRow> {
     return (await db.prepare(`select * from briar_dm_memory_jobs where space_id = ? and kind = 'extract' order by created_at limit 1`)
@@ -120,25 +122,38 @@ describe("durable DM learning inputs and deletion", () => {
     ]);
     return jobId;
   }
-  it("captures only future opt-in messages and fixes the first debounce deadline", async () => {
+  it("captures only future opt-in messages and waits for a stretch of them", async () => {
     const f = await fixture();
     await message(f.owner.channelId, "Before opt-in");
     await enable(f.spaceId);
     const first = await message(f.owner.channelId, "First future fact");
-    await outbox(f.spaceId, "2026-09-01T00:00:15.000Z");
+    await outbox(f.spaceId, "2026-09-01T00:00:15.000Z", now);
+    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:15.000Z");
+    expect(await job(f.spaceId)).toBeNull();
+    const rest: string[] = [];
+    for (let i = 2; i <= dmMemoryLearningExtractBatchSources; i++) rest.push(await message(f.owner.channelId, `Future fact ${i}`));
+    await outbox(f.spaceId, "2026-09-01T00:00:29.000Z", now);
+    // Enough messages, but the first reply's deadline still gates the batch.
     await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:14.000Z");
     expect(await job(f.spaceId)).toBeNull();
-    const second = await message(f.owner.channelId, "Second future fact");
-    await outbox(f.spaceId, "2026-09-01T00:00:29.000Z");
     await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:15.000Z");
     const created = await job(f.spaceId);
     expect(created).toMatchObject({ kind: "extract", status: "pending", source_start: 0 });
     const events = (await db.prepare(`select message_id from briar_dm_memory_source_events where space_id = ? order by sequence`)
       .bind(f.spaceId).all<{ message_id: string }>()).results;
-    expect(events.map((event) => event.message_id)).toEqual([first, second]);
+    expect(events.map((event) => event.message_id)).toEqual([first, ...rest]);
     await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:01:00.000Z");
     expect((await db.prepare(`select count(*) as count from briar_dm_memory_jobs where space_id = ? and kind = 'extract'`)
       .bind(f.spaceId).first<{ count: number }>())!.count).toBe(1);
+  });
+  it("reviews a quiet DM once its oldest waiting reply is a day old", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    await message(f.owner.channelId, "A single quiet fact");
+    await outbox(f.spaceId, now, "2026-08-31T00:00:00.001Z");
+    await scheduleDmLearningJobs(db, organizationId, now);
+    expect(await job(f.spaceId)).toBeNull();
+    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:00.001Z");
+    expect(await job(f.spaceId)).toMatchObject({ kind: "extract", status: "pending", source_start: 0 });
   });
   it("splits a durable interval beyond the chat snapshot without consuming its remainder", async () => {
     const f = await fixture(); await enable(f.spaceId);
@@ -270,7 +285,7 @@ describe("durable DM learning inputs and deletion", () => {
     const status = await readDmLearningStatus(db, f.owner, f.spaceId, now);
     expect(status?.configuration).toMatchObject({ agentProvider: "grok", agentProviderVerified: false,
       workerAvailable: true, proposer: { transport: "agent", provider: "codex", model: "default" },
-      verifier: { transport: "agent", provider: "codex", model: "default" }, costTracked: false, spaceDailyCalls: 24 });
+      verifier: { transport: "agent", provider: "codex", model: "default" }, costTracked: false, spaceDailyCalls: 48 });
     try {
       await setRuntime(workerRuntimeProtoJsonFixture({ providers: ["codex"], dmMemoryLearning: true }));
       expect((await readDmLearningStatus(db, f.owner, f.spaceId, now))?.configuration?.workerAvailable).toBe(false);
@@ -353,6 +368,25 @@ describe("durable DM learning inputs and deletion", () => {
     const next = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
     expect(next?.snapshot).toMatchObject({ kind: "extract", sourceStart: first.claim.snapshot.sourceStart });
     expect(next?.snapshot.inputSources).toHaveLength(3);
+  });
+  it("does not count a retained window toward the next stretch", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    await message(f.owner.channelId, "Write the release notes in Korean.");
+    await message(f.owner.channelId, "The changelog too.");
+    await outbox(f.spaceId, now);
+    const first = await emptyExtraction(f.spaceId);
+    expect(first.watermark).toBe(first.claim.snapshot.sourceStart);
+    await message(f.owner.channelId, "One more line after the review.");
+    await outbox(f.spaceId, now, now);
+    await scheduleDmLearningJobs(db, organizationId, now);
+    expect((await db.prepare(`select count(*) as count from briar_dm_memory_jobs where space_id = ? and kind = 'extract'`)
+      .bind(f.spaceId).first<{ count: number }>())!.count).toBe(1);
+    for (let i = 2; i <= dmMemoryLearningExtractBatchSources; i++) await message(f.owner.channelId, `Later line ${i}`);
+    await outbox(f.spaceId, now, now);
+    await scheduleDmLearningJobs(db, organizationId, now);
+    const next = await db.prepare(`select source_start, status from briar_dm_memory_jobs where space_id = ? and kind = 'extract'
+      and status = 'pending'`).bind(f.spaceId).first<{ source_start: number; status: string }>();
+    expect(next).toEqual({ source_start: first.claim.snapshot.sourceStart, status: "pending" });
   });
   it("releases the oldest sources once a retained window reaches its bound", async () => {
     const f = await fixture(); await enable(f.spaceId);
