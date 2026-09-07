@@ -90,8 +90,15 @@ export async function failDmLearningClaim(db: D1Database, identity: DmLearningCl
     .bind(identity.jobId, identity.claimTokenHash, identity.workerId, identity.deviceId, identity.organizationId)
     .first<{ attempt: number; calls_used: number }>();
   if (!row) return false;
-  const retry = transient && row.attempt < 3 && row.calls_used < 6;
-  const availableAt = new Date(Date.parse(now) + (retry ? (2 ** row.attempt * 5000 + Math.floor(random() * 2000)) : 0)).toISOString();
+  // A spent daily budget is a calendar limit, not a defect: the job waits for
+  // the UTC reset that clears it, and gives back the attempt the claim charged,
+  // instead of failing and blocking its space until someone retries by hand.
+  // The job's own six-call ceiling is a defect and still fails.
+  const deferred = code === "budget_exhausted" && row.calls_used < 6;
+  const retry = deferred || (transient && row.attempt < 3 && row.calls_used < 6);
+  const availableAt = deferred
+    ? new Date(Date.parse(`${now.slice(0, 10)}T00:00:00.000Z`) + 86_400_000).toISOString()
+    : new Date(Date.parse(now) + (retry ? (2 ** row.attempt * 5000 + Math.floor(random() * 2000)) : 0)).toISOString();
   await db.batch([
     ...(accounting ? [db.prepare(`update briar_dm_memory_model_calls set input_tokens = ?, output_tokens = ?, cost_micro_usd = ?
       where id = ? and job_id = ? and claim_token_hash = ? and status = 'reserved'
@@ -99,9 +106,9 @@ export async function failDmLearningClaim(db: D1Database, identity: DmLearningCl
       .bind(accounting.usage.inputTokens, accounting.usage.outputTokens, accounting.usage.costMicroUsd,
         accounting.callId, identity.jobId, identity.claimTokenHash, identity.claimTokenHash)] : []),
     db.prepare(`update briar_dm_memory_jobs set status = ?, error_code = ?, input_json = null, input_hash = null,
-      lease_token_hash = null, lease_expires_at = null, available_at = ?, updated_at = ?
+      lease_token_hash = null, lease_expires_at = null, attempt = attempt - ?, available_at = ?, updated_at = ?
       where id = ? and status = 'running' and lease_token_hash = ?`)
-      .bind(retry ? "retry_wait" : "failed", code, availableAt, now, identity.jobId, identity.claimTokenHash),
+      .bind(retry ? "retry_wait" : "failed", code, Number(deferred), availableAt, now, identity.jobId, identity.claimTokenHash),
     db.prepare(`update briar_dm_memory_proposals set proposal_json = null, normalized_json = null,
       status = case when ? = 'stale' then 'stale' else 'rejected' end, terminal_at = ?
       where job_id = ? and status = 'proposed' and id in (select id from briar_dm_memory_model_calls where claim_token_hash = ?)

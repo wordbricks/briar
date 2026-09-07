@@ -8,7 +8,7 @@ import { runClaimedDmMemory } from "../../src-cli/dm-memory-learning";
 import { invokeDmLearningModel } from "../../src-cli/dm-memory-learning-model";
 import { createChannel, createChannelMessage } from "./channels";
 import { sha256 } from "./crypto-digest";
-import { claimDmLearningJob } from "./dm-memory-learning-claims";
+import { claimDmLearningJob, failDmLearningClaim } from "./dm-memory-learning-claims";
 import { captureDmLearningInput, type DmLearningJobRow, type DmLearningSpaceRow } from "./dm-memory-learning-input";
 import { scheduleDmLearningJobs } from "./dm-memory-learning-queue";
 import { retryDmLearningJob } from "./dm-memory-learning-retry";
@@ -430,6 +430,28 @@ describe("durable DM learning inputs and deletion", () => {
     await expect(reserveDmLearningModelCall(db, { ...next.common, callId: crypto.randomUUID(), stage: "proposing" }))
       .rejects.toMatchObject({ code: "budget_exhausted" });
     expect((await job(next.spaceId)).calls_used).toBe(6);
+    // The job's own ceiling is a defect, not a calendar limit: it fails for good.
+    expect(await failDmLearningClaim(db, next.identity, "budget_exhausted", now)).toBe(true);
+    expect(await job(next.spaceId)).toMatchObject({ status: "failed", error_code: "budget_exhausted" });
+  });
+  it("waits for the daily reset instead of failing when the space budget is spent", async () => {
+    const f = await claimedLearning();
+    const day = syntheticDmLearningPolicy.spaceDailyCalls;
+    await db.batch(Array.from({ length: day }, () => db.prepare(`insert into briar_dm_memory_model_calls
+      (id, job_id, space_id, organization_id, claim_token_hash, stage, input_hash, proposal_hash, model_json, reserved_micro_usd, created_at)
+      values (?, ?, ?, ?, ?, 'proposing', ?, null, '{}', 0, ?)`)
+      .bind(crypto.randomUUID(), f.claim.workId, f.spaceId, organizationId, "d".repeat(64), "e".repeat(64), now)));
+    await expect(reserveDmLearningModelCall(db, { ...f.common, callId: crypto.randomUUID(), stage: "proposing" }))
+      .rejects.toMatchObject({ code: "budget_exhausted" });
+    expect(await failDmLearningClaim(db, f.identity, "budget_exhausted", now)).toBe(true);
+    expect(await job(f.spaceId)).toMatchObject({ status: "retry_wait", error_code: "budget_exhausted", attempt: 0,
+      available_at: "2026-09-02T00:00:00.000Z", input_json: null, lease_token_hash: null,
+      source_start: f.claim.snapshot.sourceStart, source_end: f.claim.snapshot.sourceEnd });
+    // The waiting job still serializes its space; nothing new is scheduled behind it.
+    await message(f.owner.channelId, "Another line while the budget is spent."); await outbox(f.spaceId, now);
+    expect(await scheduleDmLearningJobs(db, organizationId, now)).toBe(0);
+    expect((await db.prepare("select source_watermark from briar_dm_memory_learning_state where space_id = ?")
+      .bind(f.spaceId).first<{ source_watermark: number }>())!.source_watermark).toBe(0);
   });
   it("clears terminal model copies after 24 hours and retains the body-free accounting", async () => {
     const f = await claimedLearning(), callId = crypto.randomUUID();
