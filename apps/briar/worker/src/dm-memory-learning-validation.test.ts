@@ -102,7 +102,7 @@ describe("DM learning proposal and independent verifier boundaries", () => {
     expect(() => requireDmLearningVerification(snapshot, proposal, { approved: true, explicitRequestAuthorized: true,
       decisions: [{ changeId: "change-1", verdict: "supported" }] })).not.toThrow();
   });
-  it("stores an episode only for a real exchange and stamps the retention itself", () => {
+  it("stores an episode only for a real exchange and never lets it expire", () => {
     const base = syntheticDmLearningSnapshot();
     const reply = { type: "message" as const, id: crypto.randomUUID(), version: 1, hash: "c".repeat(64),
       body: "행동 위험도 규칙 세 가지만 반영하자고 제안합니다.", speaker: "agent" as const,
@@ -116,18 +116,19 @@ describe("DM learning proposal and independent verifier boundaries", () => {
     const propose = (change: DmLearningChange) => normalizeDmLearningProposal(snapshot,
       { explicitRequest: false, changes: [change] }, () => "3f1d0a5c-0000-4000-8000-000000000001");
     // One side of an exchange is not an episode, and an episode without its time
-    // has no retention to derive.
+    // cannot be placed in the brief's timeline.
     expect(() => propose(episode({ sourceRefs: [snapshot.inputSources[0]!] }))).toThrow("invalid_proposal");
     expect(() => propose(episode({ sourceRefs: [snapshot.inputSources[1]!] }))).toThrow("invalid_proposal");
     expect(() => propose(episode({ observedAt: null }))).toThrow("invalid_proposal");
     const stored = propose(episode());
-    expect(stored[0]!.change.validUntil).toBe("2026-09-08T00:05:00.000Z");
-    // Whatever expiry the model sent is replaced by policy, and the normalized
-    // output is hashed with the proposal, so it must stay deterministic.
+    expect(stored[0]!.change.validUntil).toBeNull();
+    // Whatever expiry the model sent is dropped - episodes are kept for good -
+    // and the normalized output is hashed with the proposal, so it must stay deterministic.
     const guessed = propose(episode({ validUntil: "2027-01-01T00:00:00.000Z" }));
-    expect(guessed[0]!.change.validUntil).toBe("2026-09-08T00:05:00.000Z");
+    expect(guessed[0]!.change.validUntil).toBeNull();
     expect(JSON.stringify(guessed)).toBe(JSON.stringify(propose(episode({ validUntil: "2027-01-01T00:00:00.000Z" }))));
-    expect(propose(syntheticDmLearningChange(snapshot))[0]!.change.validUntil).toBeNull();
+    expect(propose(syntheticDmLearningChange(snapshot, { validUntil: "2027-01-01T00:00:00.000Z" }))[0]!.change.validUntil)
+      .toBe("2027-01-01T00:00:00.000Z");
   });
   it("blocks automatic edits to protected documents and circular replacements", () => {
     const snapshot = syntheticDmLearningSnapshot();

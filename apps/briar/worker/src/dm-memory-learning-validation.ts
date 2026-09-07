@@ -1,6 +1,6 @@
-import {
-  dmMemoryLearningLogRetentionMs, type DmLearningChange, type DmLearningDocument, type DmLearningProposal,
-  type DmLearningRoot, type DmLearningSnapshot, type DmLearningSourceRef, type DmLearningVerification,
+import type {
+  DmLearningChange, DmLearningDocument, DmLearningProposal, DmLearningRoot,
+  DmLearningSnapshot, DmLearningSourceRef, DmLearningVerification,
 } from "../../src/lib/dm-memory-learning-contract";
 
 export class DmLearningError extends Error {
@@ -103,15 +103,13 @@ export function normalizeDmLearningProposal(
     if (change.evidenceType === "explicit_user" && !cited.some((root) => root.speaker === "user")) invalid();
     // An episode is an attributed record of an exchange, so it needs both sides
     // of that exchange and the time it happened; a single message cannot be one.
-    // Retention is the server's, never the model's: the expiry it sent is
-    // replaced with the policy value derived from the observation time.
+    // Episodes are kept for good - a year-old exchange must still be searchable -
+    // so whatever expiry the model sent is dropped rather than trusted.
     let validUntil = change.validUntil;
     if (change.memoryClass === "log") {
       if (change.documentKind !== "observation" || !change.observedAt) invalid();
       if (!cited.some((root) => root.speaker === "user") || !cited.some((root) => root.speaker === "agent")) invalid();
-      const observed = Date.parse(change.observedAt);
-      if (!Number.isSafeInteger(observed)) invalid();
-      validUntil = new Date(observed + dmMemoryLearningLogRetentionMs).toISOString();
+      validUntil = null;
     }
     let replacementId: string | null = null;
     let replacementVersion: number | null = null;

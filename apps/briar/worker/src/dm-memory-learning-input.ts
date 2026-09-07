@@ -97,16 +97,17 @@ export async function captureDmLearningInput(
           and json_extract(target.value, '$.version') = doc.current_version))
     order by ${order} limit ${limit}`;
   const bindings = [space.id, now, job.kind, job.request_targets_json] as const;
-  // Every reviewed interval may add one episode, so unbounded they would push
-  // the space past the 128-document cap and fail all learning for it. Only the
-  // newest ones are shown, which is all the model needs to extend rather than
-  // duplicate the current episode; older ones stay readable in the brief.
-  const rows = [
-    ...(await db.prepare(documentSql("<> 'log'", "doc.id", 129)).bind(...bindings).all<DocumentRow>()).results,
+  // Every reviewed interval adds one episode for good, so unbounded they would
+  // push the space past the 128-document cap and fail all learning for it. Only
+  // the newest ones are shown, which is all the model needs to extend rather
+  // than duplicate the current episode; older ones stay in the brief and the
+  // search index. The cap itself counts durable documents only, so the bounded
+  // episode list can never tip a space over it.
+  const durable = (await db.prepare(documentSql("<> 'log'", "doc.id", 129)).bind(...bindings).all<DocumentRow>()).results;
+  if (durable.length > 128) throw new DmLearningError("input_capacity");
+  const rows = [...durable,
     ...(await db.prepare(documentSql("= 'log'", "rev.observed_at desc, doc.id", dmMemoryLearningRecentLogsInSnapshot))
-      .bind(...bindings).all<DocumentRow>()).results,
-  ];
-  if (rows.length > 128) throw new DmLearningError("input_capacity");
+      .bind(...bindings).all<DocumentRow>()).results];
   if (job.kind === "explicit_request") {
     const targets = Schema.decodeUnknownSync(Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)))(
       JSON.parse(job.request_targets_json));

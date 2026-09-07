@@ -113,17 +113,12 @@ export const dmMemoryLearningVerifierMaxOutputTokens = 2048;
  */
 export const dmMemoryLearningRetainedSources = 16;
 /**
- * How long an episode (`memory_class = 'log'`) stays readable. Retention is a
- * policy value the server stamps itself: an episode records what an interval
- * exchanged, not a durable fact, and the model must never choose how long its
- * own summary survives. `expireDmMemories` retires it once this passes.
- */
-export const dmMemoryLearningLogRetentionMs = 7 * 24 * 60 * 60 * 1000;
-/**
- * Episodes carried into an extract snapshot, newest first. Every interval may
- * add one, and a snapshot holding more than 128 documents fails the whole space
- * with `input_capacity`, so only recent episodes are shown - enough for the
- * model to extend the current one instead of duplicating it.
+ * Episodes carried into an extract snapshot, newest first. Episodes
+ * (`memory_class = 'log'`) never expire - a year-old exchange must still be
+ * searchable - so every interval adds one for good, and a snapshot holding more
+ * than 128 documents fails the whole space with `input_capacity`. Only recent
+ * episodes are shown, which is enough for the model to extend the current one
+ * instead of duplicating it; older ones stay in the brief and the search index.
  */
 export const dmMemoryLearningRecentLogsInSnapshot = 16;
 
