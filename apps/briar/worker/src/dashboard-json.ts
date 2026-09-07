@@ -11,6 +11,7 @@ import {
   parseStructuredResult,
 } from "./agent-result-json";
 import type {
+  DashboardRunSummaryRow,
   HuntEventRow,
   HuntRunRow,
   IssueAttachmentRow,
@@ -278,5 +279,62 @@ export function dashboardRunJson(
     completedAt: run.completed_at,
     lastEventAt: run.last_event_at,
     eventCount: run.event_count,
+  };
+}
+
+/**
+ * The mobile issue stream deliberately contains only fields needed to render a
+ * row and open the basic detail view. Attachments, relations, structured
+ * results, and subscribers stay on the full dashboard/detail paths.
+ */
+export function dashboardRunSummaryJson(run: DashboardRunSummaryRow) {
+  const status = run.paused_at ? ("paused" as const) : run.status;
+  const workflow = normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json));
+  const waitingOnPrerequisiteCount = Number(run.waiting_on_prerequisite_count ?? 0);
+  return {
+    id: run.id,
+    workspaceId: run.workspace_id ?? null,
+    teamId: run.team_id ?? run.project_id,
+    projectId: run.planning_project_id,
+    projectName: run.planning_project_name ?? null,
+    runNumber: run.run_number,
+    currentAttempt: run.current_attempt,
+    currentRevision: run.current_revision,
+    source: run.source,
+    sourceKey: run.source_key,
+    sourceCreatedAt: run.source_created_at,
+    title: run.title,
+    status,
+    workflowStage: run.workflow_stage,
+    workflow,
+    progress: progressForAutoHuntRun(status, run.workflow_stage, workflow),
+    detail: run.detail,
+    priority: run.priority,
+    difficulty: run.difficulty,
+    assigneeUserId: run.assignee_user_id,
+    issueDescription: run.issue_description,
+    resultSummary: run.result_summary,
+    fullAuto: runIsFullAuto(run),
+    pullRequestUrls: parseJsonArray(run.pull_request_urls),
+    claimedBy: run.claimed_by,
+    claimedAt: run.claimed_at,
+    leaseExpiresAt: run.lease_expires_at,
+    preferredProvider: run.preferred_agent_provider,
+    preferredModel: run.preferred_agent_model,
+    preferredEffort: run.preferred_agent_effort,
+    requestedProvider: run.requested_agent_provider,
+    requestedModel: run.requested_agent_model,
+    requestedEffort: run.requested_agent_effort,
+    requestedWorkerId: run.requested_worker_id,
+    workerId: run.worker_id,
+    startedAt: run.started_at,
+    updatedAt: run.updated_at,
+    completedAt: run.completed_at,
+    lastEventAt: run.last_event_at,
+    eventCount: run.event_count,
+    executionReadiness: waitingOnPrerequisiteCount > 0 ? "waiting" : "ready",
+    waitingOnPrerequisiteCount,
+    repository: run.repository,
+    hasResultReview: Boolean(run.has_result_review),
   };
 }

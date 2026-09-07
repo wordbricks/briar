@@ -7,9 +7,12 @@ import { createTestRegistry, type AtomRegistry } from "../registry";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import {
   activeTeamIdAtom,
+  mobileIssueListStateAtom,
   staleTeamIdAtom,
+  teamsAtom,
   teamCursorAtom,
 } from "../team/atoms";
+import { teamRunsAtom } from "../entities/runs";
 import { applySyncEvent } from "./apply";
 import { createTeamSyncLoader, type TeamSyncApi } from "./loader";
 import { readTeamView } from "../../test/team-view";
@@ -269,5 +272,52 @@ describe("team sync loader", () => {
     const withoutToken = setUp(teamA, null);
     await withoutToken.loader.refresh(teamA);
     expect(withoutToken.server.snapshotRequests).toEqual([]);
+  });
+
+  it("loads and appends mobile cursor pages without duplicate requests", async () => {
+    const firstRun = { ...demoDashboard.runs[0], id: "mobile-run-1", teamId: teamA };
+    const secondRun = { ...demoDashboard.runs[0], id: "mobile-run-2", teamId: teamA };
+    const requests: Array<string | null | undefined> = [];
+    const registry = createTestRegistry([
+      [tokenAtom, "token-1"],
+      [activeTeamIdAtom, teamA],
+      [teamsAtom, [{ ...demoDashboard.team, id: teamA }]],
+    ]);
+    const api: TeamSyncApi = {
+      loadDashboard: async () => snapshotOf(teamA, 1),
+      loadDashboardDelta: async () => deltaOf(),
+      loadDashboardRuns: async (_token, teamId, options) => {
+        requests.push(options?.cursor);
+        return options?.cursor
+          ? {
+              runs: [secondRun],
+              nextCursor: null,
+              generatedAt: "2026-09-03T00:00:01.000Z",
+            }
+          : {
+              runs: [firstRun],
+              nextCursor: "cursor-1",
+              generatedAt: "2026-09-03T00:00:00.000Z",
+            };
+      },
+    };
+    const loader = createTeamSyncLoader(registry, api, {
+      companionMode: true,
+      demoMode: false,
+    });
+
+    await loader.refresh(teamA, "snapshot");
+    expect(registry.get(mobileIssueListStateAtom(teamA)).nextCursor).toBe("cursor-1");
+    expect(registry.get(teamRunsAtom(teamA))?.map((run) => run.id)).toEqual([
+      firstRun.id,
+    ]);
+
+    await Promise.all([loader.loadNextPage(teamA), loader.loadNextPage(teamA)]);
+    expect(requests).toEqual([undefined, "cursor-1"]);
+    expect(registry.get(teamRunsAtom(teamA))?.map((run) => run.id)).toEqual([
+      firstRun.id,
+      secondRun.id,
+    ]);
+    expect(registry.get(mobileIssueListStateAtom(teamA)).nextCursor).toBeNull();
   });
 });

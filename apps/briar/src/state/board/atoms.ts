@@ -6,9 +6,10 @@ import { teamEntityAtom } from "../entities/teams";
 import { sameReferences, shallowArrayEqual } from "../entities/upsert";
 import { activePlanningProjectIdAtom } from "../dialogs/atoms";
 import { companionStatusAtom } from "../navigation/atoms";
+import { companionMode } from "../platform";
 import type { AtomRegistry } from "../registry";
 import {
-  teamGeneratedAtAtom,
+  teamLoadedAtom,
   teamSettingsAtom,
 } from "../team/atoms";
 import {
@@ -126,9 +127,7 @@ export function resetBoardViewState(registry: AtomRegistry) {
 export const boardLoadedAtom = Atom.family((teamId: string) =>
   Atom.make(
     (get) =>
-      get(teamGeneratedAtAtom(teamId)) !== null &&
-      get(teamEntityAtom(teamId)) !== null &&
-      get(teamSettingsAtom(teamId)) !== null &&
+      get(teamLoadedAtom(teamId)) &&
       get(teamRunIdsAtom(teamId)) !== null,
   ).pipe(Atom.withLabel(`board/${teamId}/loaded`)),
 );
@@ -230,15 +229,15 @@ export const boardRunCountAtom = Atom.family((teamId: string) =>
 export const companionRunIdsAtom = Atom.family((teamId: string) =>
   Atom.make((get): string[] => {
     const runs = get(runsByIdAtom);
-    return sortRunIdsByUpdatedDesc(
-      runs,
-      filterRunIds(runs, get(boardScopedRunIdsAtom(teamId)), {
-        query: "",
-        source: get(boardSourceAtom),
-        status: get(companionStatusAtom),
-        propertyFilters: get(boardPropertyFiltersAtom),
-      }),
-    );
+    const ids = filterRunIds(runs, get(boardScopedRunIdsAtom(teamId)), {
+      query: "",
+      source: get(boardSourceAtom),
+      status: get(companionStatusAtom),
+      propertyFilters: get(boardPropertyFiltersAtom),
+    });
+    // The paged mobile endpoint already returns its keyset order. Sorting the
+    // accumulated ids again would let a later page move earlier rows around.
+    return companionMode ? ids : sortRunIdsByUpdatedDesc(runs, ids);
   }).pipe(
     Atom.withEquality<string[]>(sameReferences),
     Atom.withLabel(`board/${teamId}/companionRunIds`),

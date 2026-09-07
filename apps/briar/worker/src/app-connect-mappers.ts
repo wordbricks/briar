@@ -34,6 +34,7 @@ import {
   DashboardRun_ExecutionReadiness,
   DashboardRun_QaStatus,
   DashboardRun_Source,
+  DashboardRunSummarySchema,
   DashboardRunSchema,
   DashboardWorker_Readiness,
   DashboardWorker_State,
@@ -78,7 +79,11 @@ import type {
 } from "../../src/lib/auto-hunt-contract";
 import type { AgentProvider as AgentProviderName } from "../../src/lib/agent-provider";
 import type { StructuredAgentResult } from "../../src/lib/agent-result";
-import type { dashboardEventJson, dashboardRunJson } from "./dashboard-json";
+import type {
+  dashboardEventJson,
+  dashboardRunJson,
+  dashboardRunSummaryJson,
+} from "./dashboard-json";
 import type { InboxFeedMessage } from "./inbox-feed";
 import type {
   channelConversationNotificationJson,
@@ -724,6 +729,69 @@ export const appDashboardRun = (run: DashboardRunJson) =>
     claimAttempts: run.claimAttempts,
     agentId: run.agentId ?? undefined,
   });
+
+export const appDashboardRunSummary = (
+  run: ReturnType<typeof dashboardRunSummaryJson>,
+) => create(DashboardRunSummarySchema, {
+  id: run.id,
+  workspaceId: run.workspaceId ?? undefined,
+  teamId: run.teamId ?? undefined,
+  source: {
+    issue: DashboardRun_Source.ISSUE,
+    error: DashboardRun_Source.ERROR,
+    feedback: DashboardRun_Source.FEEDBACK,
+  }[run.source],
+  planningProjectId: run.projectId ?? undefined,
+  planningProjectName: run.projectName ?? undefined,
+  runNumber: run.runNumber,
+  currentAttempt: run.currentAttempt,
+  currentRevision: run.currentRevision,
+  sourceKey: run.sourceKey,
+  sourceCreatedAt: run.sourceCreatedAt
+    ? timestamp(run.sourceCreatedAt)
+    : undefined,
+  title: run.title,
+  status: runStatus[run.status],
+  workflowStage: run.workflowStage ?? undefined,
+  workflow: appWorkflow(run.workflow),
+  progress: run.progress,
+  detail: run.detail ?? undefined,
+  priority: run.priority ?? undefined,
+  difficulty: run.difficulty ? issueDifficulty[run.difficulty] : undefined,
+  assigneeUserId: run.assigneeUserId ?? undefined,
+  issueDescription: run.issueDescription ?? undefined,
+  resultSummary: run.resultSummary ?? undefined,
+  fullAuto: run.fullAuto,
+  pullRequestUrls: run.pullRequestUrls,
+  claimedBy: run.claimedBy ?? undefined,
+  claimedAt: run.claimedAt ? timestamp(run.claimedAt) : undefined,
+  leaseExpiresAt: run.leaseExpiresAt
+    ? timestamp(run.leaseExpiresAt)
+    : undefined,
+  preferredProvider: run.preferredProvider
+    ? agentProvider[run.preferredProvider]
+    : undefined,
+  preferredModel: run.preferredModel ?? undefined,
+  preferredEffort: run.preferredEffort ?? undefined,
+  requestedProvider: run.requestedProvider
+    ? agentProvider[run.requestedProvider]
+    : undefined,
+  requestedModel: run.requestedModel ?? undefined,
+  requestedEffort: run.requestedEffort ?? undefined,
+  requestedWorkerId: run.requestedWorkerId ?? undefined,
+  workerId: run.workerId ?? undefined,
+  startedAt: timestamp(run.startedAt),
+  updatedAt: timestamp(run.updatedAt),
+  completedAt: run.completedAt ? timestamp(run.completedAt) : undefined,
+  lastEventAt: timestamp(run.lastEventAt),
+  eventCount: run.eventCount,
+  executionReadiness: run.executionReadiness === "ready"
+    ? DashboardRun_ExecutionReadiness.READY
+    : DashboardRun_ExecutionReadiness.WAITING,
+  waitingOnPrerequisiteCount: run.waitingOnPrerequisiteCount,
+  repository: run.repository ?? undefined,
+  hasResultReview: run.hasResultReview,
+});
 
 export const appDashboardWorker = (
   worker: ReturnType<typeof workerJson>,

@@ -12,12 +12,12 @@ import type {
 } from "../../types";
 import { defineTaskAction } from "../actions";
 import { demoSelectionApplies } from "../demo-fixtures";
-import { teamRunsAtom } from "../entities/runs";
+import { teamRunIdsAtom, teamRunsAtom } from "../entities/runs";
 import { teamEntityAtom } from "../entities/teams";
 import { shallowArrayEqual } from "../entities/upsert";
 import { teamWorkersAtom } from "../entities/workers";
 import { activeOrganizationIdAtom } from "../organization/atoms";
-import { demoMode, lockedTeamIdAtom } from "../platform";
+import { companionMode, demoMode, lockedTeamIdAtom } from "../platform";
 
 /*
   Teams (`Project` in the type layer) the account can open, which one is
@@ -219,12 +219,43 @@ export const teamPayloadCursorAtom = Atom.family((teamId: string) =>
   ),
 );
 
+/** State of the lightweight mobile issue list for one team and filter set. */
+export interface MobileIssueListState {
+  readonly loaded: boolean;
+  readonly nextCursor: string | null;
+  readonly isLoading: boolean;
+  readonly isLoadingNextPage: boolean;
+  readonly filterKey: string;
+  readonly error: string | null;
+  readonly generatedAt: string | null;
+}
+
+export const mobileIssueListStateAtom = Atom.family((teamId: string) =>
+  Atom.make<MobileIssueListState>({
+    loaded: false,
+    nextCursor: null,
+    isLoading: false,
+    isLoadingNextPage: false,
+    filterKey: "",
+    error: null,
+    generatedAt: null,
+  }).pipe(Atom.keepAlive, Atom.withLabel(`team/${teamId}/mobileList`)),
+);
+
 /** The team has a payload on hand, so switching to it renders immediately. */
 export const teamLoadedAtom = Atom.family((teamId: string) =>
   Atom.make(
-    (get) =>
-      get(teamGeneratedAtAtom(teamId)) !== null &&
-      get(teamSettingsAtom(teamId)) !== null,
+    (get) => {
+      const hasFullDashboard =
+        get(teamGeneratedAtAtom(teamId)) !== null &&
+        get(teamSettingsAtom(teamId)) !== null;
+      const hasMobileList =
+        companionMode &&
+        (get(mobileIssueListStateAtom(teamId)).loaded ||
+          get(teamRunIdsAtom(teamId)) !== null) &&
+        get(teamEntityAtom(teamId)) !== null;
+      return hasFullDashboard || hasMobileList;
+    },
   ).pipe(Atom.keepAlive, Atom.withLabel(`team/${teamId}/loaded`)),
 );
 

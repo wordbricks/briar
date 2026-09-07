@@ -23,6 +23,8 @@ import SwiftProtobuf
 open class BriarAPI_DashboardServiceClientMock: BriarAPI_DashboardServiceClientInterface, @unchecked Sendable {
     /// Mocked for async calls to `getDashboard()`.
     public var mockAsyncGetDashboard = { (_: BriarAPI_GetDashboardRequest) -> ResponseMessage<BriarAPI_GetDashboardResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listDashboardRuns()`.
+    public var mockAsyncListDashboardRuns = { (_: BriarAPI_ListDashboardRunsRequest) -> ResponseMessage<BriarAPI_ListDashboardRunsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `syncDashboard()`.
     public var mockAsyncSyncDashboard = { (_: BriarAPI_SyncDashboardRequest) -> ResponseMessage<BriarAPI_SyncDashboardResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listRunEvents()`.
@@ -32,6 +34,10 @@ open class BriarAPI_DashboardServiceClientMock: BriarAPI_DashboardServiceClientI
 
     open func `getDashboard`(request: BriarAPI_GetDashboardRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetDashboardResponse> {
         return self.mockAsyncGetDashboard(request)
+    }
+
+    open func `listDashboardRuns`(request: BriarAPI_ListDashboardRunsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListDashboardRunsResponse> {
+        return self.mockAsyncListDashboardRuns(request)
     }
 
     open func `syncDashboard`(request: BriarAPI_SyncDashboardRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SyncDashboardResponse> {

@@ -68,8 +68,15 @@ import {
 } from "./app-rpc/inbox";
 import {
   getDashboard,
+  listDashboardRunsRpc,
   listRunEventsRpc,
   syncDashboard,
+  type DashboardRunListOptions,
+  type DashboardRunListPage,
+} from "./app-rpc/dashboard";
+export type {
+  DashboardRunListOptions,
+  DashboardRunListPage,
 } from "./app-rpc/dashboard";
 export {
   cancelProjectAgentTask,
@@ -394,6 +401,15 @@ export async function loadDashboardDelta(
 ): Promise<DashboardDeltaPayload> {
   const delta = await syncDashboard(token, projectId, cursor, signal);
   return { ...delta, runs: normalizeDashboardRuns(delta.runs) };
+}
+
+export async function loadDashboardRuns(
+  token: string,
+  projectId: string,
+  options: Omit<DashboardRunListOptions, "signal"> = {},
+  signal?: AbortSignal,
+): Promise<DashboardRunListPage> {
+  return listDashboardRunsRpc(token, projectId, { ...options, signal });
 }
 
 export async function loadRunEvents(

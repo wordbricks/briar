@@ -67,7 +67,12 @@ export { syncGithubPullRequest } from "./github-pull-request-repository";
 
 export {
   listHuntRunEvents,
+  listHuntRunEventsPage,
   resolveHuntEventActorNames,
+} from "./hunt-event-history-repository";
+
+export type {
+  HuntRunEventsPageCursor,
 } from "./hunt-event-history-repository";
 
 export type {
@@ -99,9 +104,20 @@ export type { HuntMoveOutcome } from "./hunt-run-move-repository";
 export {
   listDashboardRuns,
   listDashboardRunsByIds,
+  listDashboardRunSummaries,
   listOrganizationStatusTrayRuns,
 } from "./hunt-run-read-repository";
-export type { OrganizationStatusTrayRunRow } from "./hunt-run-read-repository";
+export {
+  decodeDashboardRunListCursor,
+  encodeDashboardRunListCursor,
+} from "./hunt-run-read-repository";
+export type {
+  DashboardRunListCursor,
+  DashboardRunListFilters,
+  DashboardRunListPage,
+  DashboardRunSummaryRow,
+  OrganizationStatusTrayRunRow,
+} from "./hunt-run-read-repository";
 
 export { recoverHuntRun } from "./hunt-run-recovery-repository";
 export type {
