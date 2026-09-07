@@ -1,3 +1,4 @@
+import { dmReplySteerStatements } from "./dm-reply-steer";
 import { isDmReplyStop } from "./dm-reply-stop";
 import { createHash } from "node:crypto";
 import { env as cloudflareEnv } from "cloudflare:workers";
@@ -18,6 +19,7 @@ import {
   getLiveDmChannelReplySession,
   listChannelThreadMessages,
   nextChannelReplySettleWaitMs,
+  renewChannelReplyLease,
 } from "./channels";
 import { createOrganizationAgent } from "./organization-agents";
 import apiWorker from "./index";
@@ -278,7 +280,8 @@ describe("direct message reply bursts", () => {
       claimTokenHash,
       observedAt: claimed.claimedAt!,
     });
-    await completeChannelReply(db, job!, {
+    if (!job) return null;
+    return completeChannelReply(db, job, {
       jobId: job!.id,
       deviceId,
       workerId,
@@ -291,7 +294,6 @@ describe("direct message reply bursts", () => {
       agentProvider: "claude",
       completedAt: new Date().toISOString(),
     });
-    return job!;
   };
 
   it("keeps a second direct message in the first message's session", async () => {
@@ -361,6 +363,173 @@ describe("direct message reply bursts", () => {
     expect(answerClaim?.workId).toBe(answer.job.id);
     expect(answerClaim?.session?.conversationId)
       .toBe("provider-conversation-501");
+  });
+
+  const acknowledgeSteer = async (work: NonNullable<Awaited<ReturnType<typeof claim>>>) => {
+    const response = await apiWorker.fetch(new Request(
+      "https://briar.example/briar.worker.v1.WorkerQueueService/AcknowledgeChannelReplySteer", {
+        method: "POST",
+        headers: { authorization: `Bearer ${workerToken}`,
+          "connect-protocol-version": "1", "content-type": "application/json" },
+        body: JSON.stringify({ projectId, workerId, work: {
+          workId: work.workId, runId: work.channelId, claimToken: work.claimToken,
+          channelReply: { organizationId },
+        } }),
+      }), env());
+    expect(response.status).toBe(200);
+    return (await response.json() as { released?: boolean }).released === true;
+  };
+
+  it.each([29_999, 30_000, 30_001])("uses the inclusive receive-time boundary at %i ms", async (gap) => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "first input");
+    await stopTyping(first.job.id, 31);
+    const running = (await claim())!;
+    const next = await send(channelId, "second input");
+    const incoming = (await getChannelAgentReplyJob(db, organizationId, next.job.id))!;
+    await db.prepare("update briar_channel_agent_reply_jobs set last_input_at = ? where id = ?")
+      .bind(new Date(Date.parse(incoming.created_at) - gap).toISOString(), first.job.id).run();
+    await db.batch(dmReplySteerStatements(db, next.job.id));
+    const absorbed = (await getChannelAgentReplyJob(db, organizationId, next.job.id))!;
+    expect(absorbed.superseded_by_reply_job_id).toBe(gap <= 30_000 ? first.job.id : null);
+    expect(await acknowledgeSteer(running)).toBe(gap <= 30_000);
+  });
+
+  it("slides the window across a burst longer than thirty seconds", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "first");
+    await stopTyping(first.job.id, 31);
+    await claim();
+    const base = Date.now();
+    await db.prepare("update briar_channel_agent_reply_jobs set last_input_at = ? where id = ?")
+      .bind(new Date(base - 60_000).toISOString(), first.job.id).run();
+    const second = await send(channelId, "second");
+    await db.prepare("update briar_channel_agent_reply_jobs set created_at = ? where id = ?")
+      .bind(new Date(base - 30_000).toISOString(), second.job.id).run();
+    await db.batch(dmReplySteerStatements(db, second.job.id));
+    const third = await send(channelId, "third");
+    await db.prepare("update briar_channel_agent_reply_jobs set created_at = ? where id = ?")
+      .bind(new Date(base).toISOString(), third.job.id).run();
+    await db.batch(dmReplySteerStatements(db, third.job.id));
+    expect(await getChannelAgentReplyJob(db, organizationId, first.job.id))
+      .toMatchObject({ steer_revision: 2, last_input_at: new Date(base).toISOString() });
+    for (const input of [second, third]) {
+      expect(await getChannelAgentReplyJob(db, organizationId, input.job.id))
+        .toMatchObject({ superseded_by_reply_job_id: first.job.id });
+    }
+  });
+
+  it("stops the response when a person replies stop to an absorbed input", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "task");
+    await stopTyping(first.job.id, 3);
+    const running = (await claim())!;
+    const detail = await send(channelId, "detail");
+    await send(channelId, "stop", { parentMessageId: detail.messageId });
+    expect(await getChannelAgentReplyJob(db, organizationId, first.job.id))
+      .toMatchObject({ status: "completed" });
+    expect(await acknowledgeSteer(running)).toBe(false);
+    expect(await claim()).toBeNull();
+  });
+
+  it("fences the old result and resumes one response with every input and the saved conversation", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "inspect the deployment");
+    await stopTyping(first.job.id, 3);
+    const running = (await claim())!;
+    await checkpointChannelReplySession(db, {
+      jobId: running.workId, deviceId, workerId,
+      claimTokenHash: sha256(running.claimToken), conversationId: "steer-conversation",
+      observedAt: new Date().toISOString(),
+    });
+    const inputs = [first.messageId];
+    for (let i = 0; i < 12; i++) inputs.push((await send(channelId, `followup ${i}`)).messageId);
+    expect(await claim()).toBeNull();
+    expect(await finish(running)).toBeNull();
+    expect(await renewChannelReplyLease(db, {
+      jobId: running.workId, deviceId, workerId, claimTokenHash: sha256(running.claimToken),
+      observedAt: new Date().toISOString(), leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })).toBeNull();
+    expect(await acknowledgeSteer(running)).toBe(true);
+    expect(await acknowledgeSteer(running)).toBe(true);
+    // Input arriving between shutdown acknowledgement and reclaim still belongs to the response.
+    inputs.push((await send(channelId, "one last detail")).messageId);
+    const resumed = (await claim())!;
+    expect(resumed.workId).toBe(running.workId);
+    expect(resumed.claimToken).not.toBe(running.claimToken);
+    expect(resumed.session?.conversationId).toBe("steer-conversation");
+    expect(new Set(resumed.pendingTriggerMessageIds)).toEqual(new Set(inputs));
+    expect(resumed.snapshot.messages).toHaveLength(inputs.length);
+    expect(await acknowledgeSteer(running)).toBe(false);
+    expect(await finish(running)).toBeNull();
+    expect(await finish(resumed)).not.toBeNull();
+    expect(await claim()).toBeNull();
+    const replies = await db.prepare("select id from briar_channel_messages where channel_id = ? and author_agent_id = ?")
+      .bind(channelId, agentId).all();
+    expect(replies.results).toHaveLength(1);
+  });
+
+  it("keeps messages beyond a gap out of the running response and claims them afterwards", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "first task");
+    await stopTyping(first.job.id, 3);
+    const running = (await claim())!;
+    await send(channelId, "first task detail");
+    expect(await acknowledgeSteer(running)).toBe(true);
+    const resumed = (await claim())!;
+    await db.prepare("update briar_channel_agent_reply_jobs set last_input_at = ? where id = ?")
+      .bind(new Date(Date.now() - 31_000).toISOString(), first.job.id).run();
+    const next = await send(channelId, "a different task");
+    const nextDetail = await send(channelId, "different task detail");
+    for (const item of [next, nextDetail]) {
+      expect(await getChannelAgentReplyJob(db, organizationId, item.job.id))
+        .toMatchObject({ status: "queued", superseded_by_reply_job_id: null });
+    }
+    expect(await acknowledgeSteer(resumed)).toBe(false);
+    await finish(resumed);
+    await stopTyping(next.job.id);
+    expect((await claim())?.workId).toBe(next.job.id);
+  });
+
+  it("serializes input arrival against the final answer transaction", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "task");
+    await stopTyping(first.job.id, 3);
+    const running = (await claim())!;
+    const [next, completed] = await Promise.all([
+      send(channelId, "racing detail"), finish(running),
+    ]);
+    const nextJob = (await getChannelAgentReplyJob(db, organizationId, next.job.id))!;
+    if (nextJob.superseded_by_reply_job_id) {
+      expect(completed).toBeNull();
+      expect(await acknowledgeSteer(running)).toBe(true);
+      const resumed = (await claim())!;
+      expect(resumed.pendingTriggerMessageIds).toContain(next.messageId);
+      await finish(resumed);
+    } else {
+      expect(completed).not.toBeNull();
+      await stopTyping(next.job.id);
+      await finish((await claim())!);
+    }
+    expect(await claim()).toBeNull();
+    const rows = await db.prepare("select id from briar_channel_messages where channel_id = ? and author_agent_id = ?")
+      .bind(channelId, agentId).all();
+    expect(rows.results).toHaveLength(nextJob.superseded_by_reply_job_id ? 1 : 2);
+  });
+
+  it("recovers pending input after a Worker dies without acknowledging shutdown", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "task");
+    await stopTyping(first.job.id, 3);
+    const running = (await claim())!;
+    const next = await send(channelId, "detail");
+    await db.prepare("update briar_channel_agent_reply_jobs set lease_expires_at = ?, attempts = 3 where id = ?")
+      .bind(new Date(Date.now() - 1_000).toISOString(), first.job.id).run();
+    const recovered = (await claim())!;
+    expect(recovered.workId).toBe(first.job.id);
+    expect(recovered.pendingTriggerMessageIds).toContain(next.messageId);
+    expect(await finish(running)).toBeNull();
+    expect(await finish(recovered)).not.toBeNull();
   });
 
   it("recognizes only explicit whole stop commands", () => {

@@ -488,7 +488,7 @@ export async function createOrganizationChannelMessage(
   );
   // Push beats the Worker's 15-60s idle poll: a queued reply is claimable the
   // moment this mutation commits, so tell the organization's Workers now.
-  if (input.env && (stopReply || agentReplies.some((reply) => reply.status === "queued"))) {
+  if (input.env && (stopReply || agentReplies.some((reply) => reply.status === "queued" || reply.superseded_by_reply_job_id !== null))) {
     wakeOrganizationWorkers(
       input.env,
       input.organizationId,

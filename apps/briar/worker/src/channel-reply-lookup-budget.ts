@@ -99,12 +99,14 @@ export async function currentReplyLookupCache(db: D1Database, reservation: Reply
 export async function cleanupAbandonedReplyLookups(db: D1Database, now: string) {
   const staleJobs = `select job.id from briar_channel_agent_reply_jobs job
     where (job.status <> 'running' or julianday(job.lease_expires_at) <= julianday(?))
+      and not (job.status = 'queued' and job.steer_revision > job.applied_steer_revision
+        and job.lease_expires_at is not null and job.lease_expires_at > ?)
       and (exists (select 1 from briar_channel_reply_lookups lookup where lookup.job_id = job.id)
         or exists (select 1 from briar_dm_memory_discovered_refs ref where ref.job_id = job.id))
     order by job.updated_at limit 100`;
   // Both reads run in the same transaction. A completed reply no longer needs its discovery set.
   await db.batch([
-    db.prepare(`delete from briar_channel_reply_lookups where job_id in (${staleJobs})`).bind(now),
-    db.prepare(`delete from briar_dm_memory_discovered_refs where job_id in (${staleJobs})`).bind(now),
+    db.prepare(`delete from briar_channel_reply_lookups where job_id in (${staleJobs})`).bind(now, now),
+    db.prepare(`delete from briar_dm_memory_discovered_refs where job_id in (${staleJobs})`).bind(now, now),
   ]);
 }

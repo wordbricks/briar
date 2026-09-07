@@ -287,6 +287,25 @@ describe("DM memory in active channel claims", () => {
     ).toMatchObject({ documents: [{ status: "stale_reference" }] });
   });
 
+  it("keeps discovered references when a steer resumes the same private conversation", async () => {
+    const f = await fixture();
+    const reply = (await claim())!;
+    await brief(reply);
+    await lookup(reply, {
+      operation: "get", documents: [{ documentId: f.documentId, version: 1 }],
+    });
+    await db.prepare(`update briar_channel_agent_reply_jobs
+      set status = 'queued', steer_revision = 1 where id = ?`).bind(reply.workId).run();
+    await cleanupAbandonedReplyLookups(db, new Date().toISOString());
+    const resumed = (await claim())!;
+    const refs = await db.prepare(`select document_id, claim_token_hash
+      from briar_dm_memory_discovered_refs where job_id = ?`).bind(reply.workId)
+      .all<{ document_id: string; claim_token_hash: string }>();
+    expect(refs.results).toContainEqual({ document_id: f.documentId,
+      claim_token_hash: await sha256(resumed.claimToken) });
+    expect(resumed.claimToken).not.toBe(reply.claimToken);
+  });
+
   it("M12/M17 counts new turns, replays a lost response once and shares its limit with organization lookups", async () => {
     const f = await fixture();
     const reply = await claim();
@@ -653,6 +672,42 @@ describe("DM memory in active channel claims", () => {
         `select 1 from briar_dm_memory_discovered_refs where job_id = ?`,
       ).bind(reply!.workId).first(),
     ).toBeNull();
+  });
+
+  it.each([
+    { status: "queued", lease: null, retained: false },
+    { status: "queued", lease: "2000-01-01T00:00:00.000Z", retained: false },
+    { status: "completed", lease: null, retained: false },
+    { status: "completed", lease: "2999-01-01T00:00:00.000Z", retained: false },
+    { status: "queued", lease: "2999-01-01T00:00:00.000Z", retained: true },
+  ])("cleans pending steer lookup records for $status / $lease (retained: $retained)", async ({ status, lease, retained }) => {
+    const f = await fixture();
+    const reply = (await claim())!;
+    await brief(reply);
+    await lookup(reply, {
+      operation: "get", documents: [{ documentId: f.documentId, version: 1 }],
+    });
+    expect((await countLookups(reply.workId))?.count).toBe(1);
+    const reference = () => db.prepare(
+      `select 1 from briar_dm_memory_discovered_refs where job_id = ?`,
+    ).bind(reply.workId).first();
+    expect(await reference()).not.toBeNull();
+    await db.prepare(`update briar_channel_agent_reply_jobs
+      set status = ?, steer_revision = 1, applied_steer_revision = 0, lease_expires_at = ?
+      where id = ?`).bind(status, lease, reply.workId).run();
+    // The status trigger clears the original cache. Seed an abandoned record
+    // after that transition so this exercises the scheduled cleanup itself.
+    await db.prepare(`insert into briar_channel_reply_lookups
+      (job_id, claim_token_hash, request_id, kind, lease_token, lease_expires_at, response_json, created_at)
+      values (?, ?, ?, 'memory', ?, ?, '{}', ?)`)
+      .bind(reply.workId, await sha256(reply.claimToken), crypto.randomUUID(),
+        crypto.randomUUID(), new Date().toISOString(), new Date().toISOString()).run();
+
+    await cleanupAbandonedReplyLookups(db, new Date().toISOString());
+
+    expect((await countLookups(reply.workId))?.count).toBe(retained ? 1 : 0);
+    if (retained) expect(await reference()).not.toBeNull();
+    else expect(await reference()).toBeNull();
   });
 
   it("M24 expires before invocation without waiting for the scheduled sweep", async () => {

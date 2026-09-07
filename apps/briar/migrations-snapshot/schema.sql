@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 724148c7ab37a019d6de5f1aa988cf57a7af96980f683018eccb9bacf397c0d0
--- snapshot-digest: b21e05fd58ce2ec26c99ed2779cb85ba90887f329b6660fb7ab3b6f1daf2b8e4
+-- migrations-digest: effca123b74d73052e13ea71820c69a935072374a065028d5bb228cf257a25c1
+-- snapshot-digest: 9a33e1cd4a635f2416702047fe5bb2dd519647d10091925ef27268a180aab56a
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2407,7 +2407,7 @@ CREATE TABLE briar_channel_agent_reply_jobs (
   default 0 check (planned_update_resume in (0, 1)), session_id text
   references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0, agent_message_hop integer not null default 0
     check (agent_message_hop between 0 and 2), origin_reply_job_id text
-    references briar_channel_agent_reply_jobs (id) on delete cascade, superseded_by_reply_job_id text,
+    references briar_channel_agent_reply_jobs (id) on delete cascade, superseded_by_reply_job_id text, steer_revision integer not null default 0, applied_steer_revision integer not null default 0, last_input_at text, steer_restart_count integer not null default 0,
   unique (channel_id, trigger_message_id, agent_id),
   foreign key ("agent_provider") references briar_agent_providers (provider)
 );

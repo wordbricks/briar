@@ -52,6 +52,17 @@ export async function bindDmMemoryReplyClaim(db: D1Database, input: {
         protocol = excluded.protocol, created_at = excluded.created_at returning space_id`)
       .bind(input.jobId, input.claimTokenHash, input.supportsMemory ? 1 : 0, now, selected.id,
         input.jobId, input.claimTokenHash, now),
+    // A steer resumes the same native transcript. Keep its discovered citation
+    // authority only while the memory scope has not been revoked.
+    db.prepare(`update or ignore briar_dm_memory_discovered_refs set claim_token_hash = ?
+      where job_id = ? and claim_token_hash <> ? and ? = 1 and ${gate}
+        and exists (select 1 from briar_channel_agent_reply_jobs job
+          join briar_channel_reply_sessions session on session.id = job.session_id
+          join briar_dm_memory_spaces space on space.id = session.memory_space_id
+          where job.id = briar_dm_memory_discovered_refs.job_id and job.steer_revision > 0
+            and space.id = ? and session.memory_revocation_epoch = space.revocation_epoch)`)
+      .bind(input.claimTokenHash, input.jobId, input.claimTokenHash, input.supportsMemory ? 1 : 0,
+        input.jobId, input.claimTokenHash, now, selected.id),
     db.prepare(`update briar_channel_reply_sessions as session
       set conversation_id = case when ? = 1 and session.memory_space_id = ?
         and session.memory_revocation_epoch = (select revocation_epoch from briar_dm_memory_spaces where id = ?)
