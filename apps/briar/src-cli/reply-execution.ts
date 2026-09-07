@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   DmMemoryInvocation,
+  dmMemoryErrorDiagnostic,
   dmMemoryExecutionError,
 } from "./dm-memory-invocation";
 import {
@@ -739,7 +740,7 @@ async function runClaimedChannelReply(
           reply.memory
             ? dmMemoryExecutionError(error).message
             : error instanceof Error ? error.message : String(error)
-        }`,
+        } | ${dmMemoryErrorDiagnostic(error)}`,
       );
     },
   });
@@ -1102,7 +1103,7 @@ async function runClaimedChannelReply(
               reply.memory
                 ? dmMemoryExecutionError(error).message
                 : error instanceof Error ? error.message : String(error)
-            }`,
+            } | ${dmMemoryErrorDiagnostic(error)}`,
           );
         } finally {
           releaseCachedAnalysisWorktree(sessionWorktreePath);
@@ -1117,6 +1118,25 @@ async function runClaimedChannelReply(
   }
 }
 
+/**
+ * What a failed reply tells Briar, and what this Worker logs beside it. A DM
+ * reports only the redacted code — the message can echo the conversation — so
+ * the diagnostic is the operator's only account of what actually broke; it
+ * carries the failure's shape and never its text.
+ */
+export function channelReplyFailureReport(
+  error: unknown,
+  reply: Pick<ClaimedChannelReply, "memory">,
+) {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    reported: reply.memory && !detachedProviderBlockOf(error)
+      ? dmMemoryExecutionError(error).message
+      : message,
+    diagnostic: dmMemoryErrorDiagnostic(error),
+  };
+}
+
 async function failClaimedChannelReply(
   config: Config,
   project: TeamConfig,
@@ -1127,6 +1147,10 @@ async function failClaimedChannelReply(
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
   const block = detachedProviderBlockOf(error);
+  const { reported, diagnostic } = channelReplyFailureReport(error, reply);
+  console.error(
+    `channel reply ${reply.workId} failed: ${reported} | ${diagnostic}`,
+  );
   await createReplyCompletionClient(config.apiUrl, workerToken)
     .completeChannelReply({
       projectId: project.id,
@@ -1134,11 +1158,7 @@ async function failClaimedChannelReply(
       work: reply,
       outcome: {
         case: "failure",
-        error: block
-          ? error instanceof Error ? error.message : String(error)
-          : reply.memory
-            ? dmMemoryExecutionError(error).message
-            : error instanceof Error ? error.message : String(error),
+        error: reported,
         // A block names the provider and its reason, never the DM content,
         // so the memory privacy fence keeps it.
         ...(block ? { block: reply.memory ? dmSafeProviderBlock(block) : block } : {}),
