@@ -3,13 +3,20 @@
 import { act } from "react";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { I18nProvider } from "../i18n";
 import { RegistryContext } from "@effect/atom-react";
 import { createTestRegistry } from "../state/registry";
 import { activeOrganizationIdAtom } from "../state/organization/atoms";
 import { tokenAtom } from "../state/session/atoms";
 import type { ChannelMessage, ChannelSummary } from "../lib/channels-contract";
+import type {
+  ManagedComputer,
+  OrganizationExecutionWorker,
+  ProjectAgent,
+} from "../types";
 import { Channels } from "./Channels";
+import type { DmComputerPanelServices, DmComputerRfbConstructor } from "./DmComputerPanel";
 
 /*
   The conversation loader reads its credentials from the registry rather than
@@ -767,6 +774,9 @@ describe("Channels", () => {
     expect(
       container.querySelector('button[aria-label="Memory"]'),
     ).toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Computer"]'),
+    ).toBeNull();
 
     const back = container.querySelector<HTMLButtonElement>(
       ".channel-header-back",
@@ -776,5 +786,296 @@ describe("Channels", () => {
     expect(backCount).toBe(1);
 
     await cleanup();
+  });
+
+  const writableDirectMessage: ChannelSummary = {
+    ...selectedChannel,
+    id: "dm-1",
+    slug: "dm-1",
+    name: "Ava",
+    kind: "dm",
+    visibility: "private",
+    memberCount: 2,
+    agentCount: 1,
+    dmParticipants: [
+      { type: "user", id: "user-1", name: "Sam", image: null },
+      { type: "user", id: "user-2", name: "Ava", image: null },
+    ],
+  };
+
+  it("keeps Memory and hides Computer when a writable DM has no screen", async () => {
+    vi.stubGlobal("fetch", createChannelFetch((method) => method === "GetChannel"
+      ? {
+          channel: channelSummaryWire(writableDirectMessage),
+          members: [],
+          agents: [],
+          messages: [],
+          agentReplies: [],
+        }
+      : {}));
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
+      <RegistryContext.Provider value={createChannelTestRegistry()}>
+      <I18nProvider>
+        <Channels
+          activeChannelId={writableDirectMessage.id}
+          channelCatalogCursor={0}
+          channels={[writableDirectMessage]}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          surface="dm"
+          token="token"
+        />
+      </I18nProvider>
+      </RegistryContext.Provider>,
+    );
+    await act(async () => Promise.resolve());
+
+    const memory = container.querySelector('button[aria-label="Memory"]');
+    const members = container.querySelector(".channel-header-members");
+    expect(memory).not.toBeNull();
+    expect(members).not.toBeNull();
+    expect(memory?.nextElementSibling).toBe(members);
+    expect(
+      container.querySelector('button[aria-label="Computer"]'),
+    ).toBeNull();
+    expect(container.querySelector(".dm-computer-panel")).toBeNull();
+
+    await cleanup();
+  });
+
+  it("toggles the computer panel from the header next to Memory", async () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("min-width: 761px"),
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent() {
+        return false;
+      },
+    })) as typeof window.matchMedia;
+    mockIPC(async () => undefined);
+    vi.stubGlobal("fetch", createChannelFetch((method) => method === "GetChannel"
+      ? {
+          channel: channelSummaryWire(writableDirectMessage),
+          members: [],
+          agents: [{
+            agentId: "agent-1",
+            name: "QA Engineer",
+            provider: 1,
+            projectId: "project-1",
+            projectName: "Briar",
+            responsibility: "QA",
+            skills: [],
+            createdAt: "2026-09-02T00:00:00.000Z",
+            computerUsePolicy: 2,
+          }],
+          messages: [],
+          agentReplies: [],
+        }
+      : {}));
+
+    const managedComputer: ManagedComputer = {
+      id: "computer-1",
+      organizationId: "org-1",
+      requesterUserId: "user-1",
+      state: "ready",
+      provider: "aws",
+      label: null,
+      region: "us-east-1",
+      instanceId: "i-1",
+      volumeId: "vol-1",
+      deviceId: "device-1",
+      error: null,
+      retryCount: 0,
+      retryAvailable: false,
+      createdAt: "2026-09-02T00:00:00.000Z",
+      expiresAt: "2026-10-02T00:00:00.000Z",
+      updatedAt: "2026-09-02T00:00:00.000Z",
+    };
+    const organizationWorker: OrganizationExecutionWorker = {
+      deviceId: "device-1",
+      ownerUserId: "user-1",
+      ownerName: "Jay",
+      label: "Managed computer",
+      state: "online",
+      maxConcurrentSessions: 1,
+      activeSessions: 0,
+      lastHeartbeatAt: "2026-09-02T00:00:00.000Z",
+      createdAt: "2026-09-02T00:00:00.000Z",
+      bindings: [{
+        id: "worker-binding-1",
+        projectId: "project-1",
+        projectName: "Briar",
+        agentProvider: "codex",
+        providers: ["codex"],
+        state: "online",
+        acceptingWork: true,
+        readiness: "available",
+        readinessDetail: null,
+      }],
+    };
+    const projectAgent: ProjectAgent = {
+      id: "agent-1",
+      teamId: "project-1",
+      name: "QA Engineer",
+      avatar: null,
+      codexPet: null,
+      provider: "codex",
+      model: null,
+      effort: null,
+      computerUsePolicy: "unattended",
+      designatedWorkerId: "worker-binding-1",
+      designatedWorkerLabel: "QA computer",
+      description: "Checks the product",
+      responsibility: "QA",
+      skill: "",
+      skills: [],
+      calendarColor: "#7d5ce7",
+      createdAt: "2026-09-02T00:00:00.000Z",
+      updatedAt: "2026-09-02T00:00:00.000Z",
+    };
+    class ToggleTestRfb {
+      viewOnly = true;
+      focusOnClick = false;
+      clipViewport = false;
+      scaleViewport = false;
+      resizeSession = false;
+      compressionLevel = 0;
+      qualityLevel = 0;
+      constructor(target: HTMLElement) {
+        target.appendChild(document.createElement("canvas"));
+      }
+      addEventListener() {}
+      removeEventListener() {}
+      disconnect() {}
+      blur() {}
+    }
+    const createRemoteSession = vi.fn(async () => ({
+      session: {
+        id: "remote-session-1",
+        managedComputerId: "computer-1",
+        agentId: "agent-1",
+        state: "created" as const,
+        connectionGeneration: 1,
+        tokenExpiresAt: "2026-09-02T00:10:00.000Z",
+        maxExpiresAt: "2026-09-02T01:00:00.000Z",
+        connectedAt: null,
+        disconnectedAt: null,
+        endedAt: null,
+      },
+      socket: {
+        url: "wss://remote.example.test/session",
+        protocol: "briar.remote.v1.test-token",
+      },
+      reconnected: false,
+    }));
+    const endRemoteSession = vi.fn(async () => undefined);
+    const computerPanelServices: DmComputerPanelServices = {
+      createRemoteSession,
+      endRemoteSession,
+      loadComputers: vi.fn(async () => ({
+        computers: [managedComputer],
+        generatedAt: "2026-09-02T00:00:00.000Z",
+      })),
+      loadProjectAgents: vi.fn(async () => [projectAgent]),
+      loadRfbClient: async () =>
+        ToggleTestRfb as unknown as DmComputerRfbConstructor,
+      loadWorkers: vi.fn(async () => ({
+        workers: [organizationWorker],
+        latestVersion: null,
+        canManage: true,
+        generatedAt: "2026-09-02T00:00:00.000Z",
+      })),
+    };
+
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <RegistryContext.Provider value={createChannelTestRegistry()}>
+      <I18nProvider>
+        <Channels
+          activeChannelId={writableDirectMessage.id}
+          channelCatalogCursor={0}
+          channels={[writableDirectMessage]}
+          computerPanelServices={computerPanelServices}
+          currentUserId="user-1"
+          onChannelSelect={() => undefined}
+          onChannelsChange={() => undefined}
+          organizationId="org-1"
+          surface="dm"
+          token="token"
+        />
+      </I18nProvider>
+      </RegistryContext.Provider>,
+    );
+
+    const memory = await vi.waitFor(() => {
+      const button = container.querySelector('button[aria-label="Memory"]');
+      expect(button).not.toBeNull();
+      return button!;
+    });
+    const computer = await vi.waitFor(() => {
+      const button = container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Computer"]',
+      );
+      expect(button).not.toBeNull();
+      return button!;
+    });
+    const panel = await vi.waitFor(() => {
+      const node = container.querySelector<HTMLElement>(".dm-computer-panel");
+      expect(node).not.toBeNull();
+      return node!;
+    });
+
+    expect(memory.nextElementSibling).toBe(computer);
+    expect(computer.getAttribute("aria-pressed")).toBe("true");
+    expect(computer.getAttribute("title")).toBe("Hide computer panel");
+    expect(computer.getAttribute("aria-controls")).toBe(panel.id);
+    expect(panel.hidden).toBe(false);
+    expect(container.querySelector(".channel-header-members")).not.toBeNull();
+
+    const hideOnPanel = panel.querySelector<HTMLButtonElement>(
+      'button[aria-label="Hide computer panel"]',
+    );
+    expect(hideOnPanel).not.toBeNull();
+    await act(async () => hideOnPanel?.click());
+    expect(computer.getAttribute("aria-pressed")).toBe("false");
+    expect(panel.hidden).toBe(true);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+
+    await act(async () => computer.click());
+    expect(computer.getAttribute("aria-pressed")).toBe("true");
+    expect(panel.hidden).toBe(false);
+
+    await act(async () => computer.focus());
+    expect(document.activeElement).toBe(computer);
+    await act(async () => computer.click());
+    expect(computer.getAttribute("aria-pressed")).toBe("false");
+    expect(computer.getAttribute("title")).toBe("Show computer panel");
+    expect(panel.hidden).toBe(true);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+    expect(createRemoteSession).toHaveBeenCalledTimes(1);
+
+    await act(async () => computer.click());
+    expect(computer.getAttribute("aria-pressed")).toBe("true");
+    expect(panel.hidden).toBe(false);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+    expect(createRemoteSession).toHaveBeenCalledTimes(1);
+
+    await cleanup();
+    window.matchMedia = originalMatchMedia;
+    clearMocks();
+    delete (window as Window & { __TAURI_INTERNALS__?: unknown })
+      .__TAURI_INTERNALS__;
   });
 });

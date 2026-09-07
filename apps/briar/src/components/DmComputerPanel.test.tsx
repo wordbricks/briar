@@ -454,6 +454,77 @@ describe("DmComputerPanel", () => {
     await cleanup();
   });
 
+  it("hides the side panel without ending the remote session", async () => {
+    const onAvailabilityChange = vi.fn();
+    const onClose = vi.fn();
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    const panel = (open: boolean) => (
+      <I18nProvider>
+        <DmComputerPanel
+          agents={[dmAgent()]}
+          onAvailabilityChange={onAvailabilityChange}
+          onClose={onClose}
+          open={open}
+          organizationId="organization-1"
+          services={services}
+          token="session-token"
+        />
+      </I18nProvider>
+    );
+    await renderReactTestRoot(root, panel(true));
+    await vi.waitFor(() => expect(noVncState.instances).toHaveLength(1));
+    await vi.waitFor(() =>
+      expect(onAvailabilityChange).toHaveBeenCalledWith(true),
+    );
+    const panelNode = () =>
+      container.querySelector<HTMLElement>(".dm-computer-panel");
+    expect(panelNode()?.hidden).toBe(false);
+    const hide = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Hide computer panel"]',
+    );
+    expect(hide).not.toBeNull();
+    await act(async () => hide?.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    await renderReactTestRoot(root, panel(false));
+    await flush();
+    expect(panelNode()?.hidden).toBe(true);
+    expect(createRemoteSession).toHaveBeenCalledTimes(1);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+    expect(noVncState.instances).toHaveLength(1);
+
+    await renderReactTestRoot(root, panel(true));
+    await flush();
+    expect(panelNode()?.hidden).toBe(false);
+    expect(createRemoteSession).toHaveBeenCalledTimes(1);
+    expect(endRemoteSession).not.toHaveBeenCalled();
+    await cleanup();
+  });
+
+  it("reports that no computer is available when the roster has none", async () => {
+    const onAvailabilityChange = vi.fn();
+    const { cleanup, container, root } = createReactTestRoot();
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <DmComputerPanel
+          agents={[]}
+          onAvailabilityChange={onAvailabilityChange}
+          organizationId="organization-1"
+          services={services}
+          token="session-token"
+        />
+      </I18nProvider>,
+    );
+    await flush();
+    expect(container.querySelector(".dm-computer-panel")).toBeNull();
+    expect(onAvailabilityChange).toHaveBeenCalledWith(false);
+    expect(createRemoteSession).not.toHaveBeenCalled();
+    await cleanup();
+  });
+
   it("keeps the live screen when the DM roster resolves again", async () => {
     const { cleanup, root } = createReactTestRoot({ attachToDocument: true });
     const panel = () => (

@@ -10,6 +10,7 @@ import {
   Lock,
   MessageCircle,
   MessageSquare,
+  MonitorUp,
   MoreHorizontal,
   Paperclip,
   Search,
@@ -24,7 +25,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import { DmMemoryCitations } from "./DmMemoryCitations";
-import { DmComputerPanel } from "./DmComputerPanel";
+import { DmComputerPanel, type DmComputerPanelServices } from "./DmComputerPanel";
 import {
   lazy,
   Suspense,
@@ -239,6 +240,7 @@ type ChannelsProps = {
   onRelayOpen?: (relay: ChannelMessageRelay) => void;
   /** Leaves a read-only Agent conversation for wherever it was opened from. */
   onReadOnlyBack?: () => void;
+  computerPanelServices?: DmComputerPanelServices;
 };
 
 /** Only opened from the DM header menu, so it loads on demand. */
@@ -250,6 +252,11 @@ const desktopChannelMessagePageSize = 20;
 const desktopChannelVirtualizationThreshold = 40;
 const desktopChannelEstimatedMessageHeight = 112;
 const desktopChannelVirtualOverscan = 6;
+
+const preferOpenComputerPanel = () =>
+  typeof window.matchMedia === "function"
+    ? window.matchMedia("(min-width: 761px)").matches
+    : true;
 
 type ChannelInviteCandidate =
   | { type: "user"; id: string; member: OrganizationMember }
@@ -363,9 +370,15 @@ export function Channels({
   onCreateAgent,
   onRelayOpen,
   onReadOnlyBack,
+  computerPanelServices,
   surface = "channel",
 }: ChannelsProps) {
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [computerPanelOpen, setComputerPanelOpen] = useState(
+    preferOpenComputerPanel,
+  );
+  const [computerPanelAvailable, setComputerPanelAvailable] = useState(false);
+  const computerPanelId = useId();
   const { t, localeTag } = useI18n();
   const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
   useEffect(() => {
@@ -1307,7 +1320,7 @@ export function Channels({
       {!showRequestedThreadOnly ? (
         <div
           className={surface === "dm"
-            ? "flex min-h-0 min-w-0 overflow-hidden"
+            ? "relative flex min-h-0 min-w-0 overflow-hidden"
             : "contents"}
         >
         <section
@@ -1375,6 +1388,23 @@ export function Channels({
                   aria-label={t("memory.title")} title={t("memory.title")} onClick={() => setMemoryOpen(true)}>
                   <Brain size={16} aria-hidden="true" />
                 </button>}
+                {surface === "dm" && !readOnly && computerPanelAvailable ? (
+                  <button
+                    type="button"
+                    className="channel-header-icon"
+                    aria-controls={computerPanelId}
+                    aria-label={t("dm.computer.title")}
+                    aria-pressed={computerPanelOpen}
+                    title={t(
+                      computerPanelOpen
+                        ? "dm.computer.hidePanel"
+                        : "dm.computer.showPanel",
+                    )}
+                    onClick={() => setComputerPanelOpen((open) => !open)}
+                  >
+                    <MonitorUp size={16} aria-hidden="true" />
+                  </button>
+                ) : null}
                 {surface === "channel" ? <button
                   type="button"
                   className="channel-header-icon"
@@ -1508,7 +1538,12 @@ export function Channels({
         {surface === "dm" && !readOnly ? (
           <DmComputerPanel
             agents={agents}
+            id={computerPanelId}
+            onAvailabilityChange={setComputerPanelAvailable}
+            onClose={() => setComputerPanelOpen(false)}
+            open={computerPanelOpen}
             organizationId={organizationId}
+            services={computerPanelServices}
             token={token}
           />
         ) : null}

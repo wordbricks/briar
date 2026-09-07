@@ -1614,6 +1614,8 @@ export const en = {
   "dm.computer.screen": "{name}'s screen",
   "dm.computer.open": "Open full screen",
   "dm.computer.close": "Return to side panel",
+  "dm.computer.showPanel": "Show computer panel",
+  "dm.computer.hidePanel": "Hide computer panel",
   "managedComputer.remote.open": "Open screen",
   "managedComputer.remote.unavailable": "Remote screen access is being prepared. You can finish setup on this computer when it becomes available.",
   "managedComputer.remote.title": "Managed computer screen",

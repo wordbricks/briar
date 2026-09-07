@@ -1468,6 +1468,8 @@ export const zh = {
   "dm.computer.screen": "{name} 的屏幕",
   "dm.computer.open": "全屏打开",
   "dm.computer.close": "返回侧边屏幕",
+  "dm.computer.showPanel": "打开电脑面板",
+  "dm.computer.hidePanel": "关闭电脑面板",
   "managedComputer.remote.open": "打开屏幕",
   "managedComputer.remote.unavailable": "远程屏幕功能正在准备中。启用后即可在这台电脑上完成设置。",
   "managedComputer.remote.title": "托管电脑屏幕",

@@ -4659,7 +4659,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-size: 13px;
   font-weight: 600;
 }
-.channel-header-icon:hover { background: var(--muted, #f3f0ea); color: var(--foreground, #1c1915); }
+.channel-header-icon:hover,
+.channel-header-icon[aria-pressed="true"] { background: var(--muted, #f3f0ea); color: var(--foreground, #1c1915); }
 .channel-header-members span { line-height: 1; }
 
 .channel-invite-overlay {
