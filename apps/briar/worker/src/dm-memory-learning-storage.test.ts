@@ -3,6 +3,7 @@ import { createClient, createRouterTransport } from "@connectrpc/connect";
 import { WorkerQueueService } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
+import { dmMemoryLearningRetainedSources } from "../../src/lib/dm-memory-learning-contract";
 import { runClaimedDmMemory } from "../../src-cli/dm-memory-learning";
 import { invokeDmLearningModel } from "../../src-cli/dm-memory-learning-model";
 import { createChannel, createChannelMessage } from "./channels";
@@ -57,9 +58,14 @@ describe("durable DM learning inputs and deletion", () => {
     await db.prepare(`insert into briar_execution_worker_credentials(device_id, token_hash, created_at) values (?, ?, ?)`)
       .bind(deviceId, await sha256(workerToken), now).run();
   }, 120_000);
+  // An empty review deliberately leaves its window behind, so earlier fixtures
+  // stay schedulable; settling them keeps each test's claim on its own space.
   beforeEach(async () => {
-    await db.prepare(`update briar_dm_memory_jobs set status = 'failed'
-      where kind in ('extract', 'explicit_request', 'consolidate') and status in ('pending', 'running', 'retry_wait')`).run();
+    await db.batch([
+      db.prepare(`update briar_dm_memory_jobs set status = 'failed'
+        where kind in ('extract', 'explicit_request', 'consolidate') and status in ('pending', 'running', 'retry_wait')`),
+      db.prepare("update briar_dm_memory_learning_outbox set settled = 1 where settled = 0"),
+    ]);
   });
   const memory = (body: string) => ({ requestId: crypto.randomUUID(), title: "Synthetic preference", body,
     memoryClass: "profile" as const, sourceLanguage: "en", observedAt: now, validUntil: null });
@@ -321,6 +327,59 @@ describe("durable DM learning inputs and deletion", () => {
       .bind(f.spaceId).first<{ source_watermark: number }>())!.source_watermark).toBe(0);
     await expect(submitDmLearningVerification(db, { ...submit, verification: { approved: true, explicitRequestAuthorized: false,
       decisions: [{ changeId: "change-1", verdict: "supported" }] } })).rejects.toMatchObject({ code: "scope_revoked" });
+  });
+  async function emptyExtraction(spaceId: string) {
+    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    if (!claim) throw new Error("Synthetic extraction was not claimed");
+    const identity = { organizationId, workerId, deviceId, jobId: claim.workId, claimTokenHash: await sha256(claim.claimToken) };
+    const callId = crypto.randomUUID(), common = { identity, inputHash: claim.inputHash, now };
+    await reserveDmLearningModelCall(db, { ...common, callId, stage: "proposing" });
+    const result = await submitDmLearningProposal(db, { ...common, callId, proposal: { explicitRequest: false, changes: [] }, usage });
+    expect(result.status).toBe("no_change");
+    const state = (await db.prepare("select source_watermark from briar_dm_memory_learning_state where space_id = ?")
+      .bind(spaceId).first<{ source_watermark: number }>())!;
+    return { claim, watermark: state.source_watermark };
+  }
+  it("keeps an empty extraction window so the next review reads it with what follows", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    await message(f.owner.channelId, "Write the release notes in Korean.");
+    await message(f.owner.channelId, "The changelog too.");
+    await outbox(f.spaceId, now);
+    const first = await emptyExtraction(f.spaceId);
+    expect(first.claim.snapshot.inputSources).toHaveLength(2);
+    expect(first.watermark).toBe(first.claim.snapshot.sourceStart);
+    await message(f.owner.channelId, "And keep that for every repository.");
+    await outbox(f.spaceId, now);
+    const next = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    expect(next?.snapshot).toMatchObject({ kind: "extract", sourceStart: first.claim.snapshot.sourceStart });
+    expect(next?.snapshot.inputSources).toHaveLength(3);
+  });
+  it("releases the oldest sources once a retained window reaches its bound", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    for (let i = 0; i < 20; i++) await message(f.owner.channelId, `Synthetic retained exchange ${i}`);
+    await outbox(f.spaceId, now);
+    const { claim, watermark } = await emptyExtraction(f.spaceId);
+    expect(claim.snapshot.inputSources).toHaveLength(20);
+    expect(watermark).toBeGreaterThan(claim.snapshot.sourceStart);
+    expect((await db.prepare(`select count(*) as count from briar_dm_memory_source_events
+      where space_id = ? and sequence > ?`).bind(f.spaceId, watermark).first<{ count: number }>())!.count)
+      .toBe(dmMemoryLearningRetainedSources);
+  });
+  it("releases a window the capture cannot grow so the messages behind it stay reachable", async () => {
+    const f = await fixture(); await enable(f.spaceId);
+    for (let i = 0; i < 15; i++) await message(f.owner.channelId, `${i}`.padEnd(10_000, "x"));
+    await outbox(f.spaceId, now);
+    const first = await emptyExtraction(f.spaceId);
+    expect(first.claim.snapshot.inputSources.length).toBeLessThan(dmMemoryLearningRetainedSources);
+    expect(first.watermark).toBe(first.claim.snapshot.sourceStart);
+    await message(f.owner.channelId, "16".padEnd(10_000, "x"));
+    await outbox(f.spaceId, now);
+    const second = await emptyExtraction(f.spaceId);
+    expect(second.claim.snapshot.sourceEnd).toBe(first.claim.snapshot.sourceEnd);
+    expect(second.watermark).toBe(second.claim.snapshot.sourceEnd);
+    expect((await db.prepare(`select count(*) as count from briar_dm_memory_source_events
+      where space_id = ? and sequence > ?`).bind(f.spaceId, second.watermark).first<{ count: number }>())!.count)
+      .toBeGreaterThan(0);
   });
   it("finishes a valid empty proposal after one call but enforces six total reservations", async () => {
     const f = await claimedLearning(), callId = crypto.randomUUID();

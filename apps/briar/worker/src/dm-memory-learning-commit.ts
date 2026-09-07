@@ -1,11 +1,34 @@
 import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
-import type { DmLearningCommitResult, DmLearningProposal, DmLearningSnapshot } from "../../src/lib/dm-memory-learning-contract";
+import { dmMemoryLearningRetainedSources, type DmLearningCommitResult, type DmLearningProposal,
+  type DmLearningSnapshot } from "../../src/lib/dm-memory-learning-contract";
 import { sha256 } from "./crypto-digest";
 import { dmLearningClaimCurrentSql, type DmLearningClaimIdentity } from "./dm-memory-learning-claims";
 import { dmLearningInputsCurrentSql } from "./dm-memory-learning-input";
 import type { NormalizedDmLearningChange } from "./dm-memory-learning-validation";
 
 const commitGate = "exists (select 1 from briar_dm_memory_commits where id = ? and applied = 0)";
+
+/**
+ * Where an extraction that proposed nothing leaves its watermark. A consumed
+ * window never returns, and one exchange on its own rarely carries a durable
+ * fact, so an empty review keeps its messages for the next one to read together
+ * with what follows them. Only the newest `dmMemoryLearningRetainedSources`
+ * events are kept, so the window cannot outgrow a snapshot. A window that
+ * already ended where an earlier empty review ended is released in full: the
+ * capture is holding it at its own capacity, and keeping it would leave the
+ * messages behind it permanently out of reach.
+ */
+async function emptyExtractWatermark(db: D1Database, identity: DmLearningClaimIdentity, snapshot: DmLearningSnapshot) {
+  const dropped = await db.prepare(`select sequence from briar_dm_memory_source_events
+    where space_id = ? and sequence > ? and sequence <= ? order by sequence desc limit 1 offset ?`)
+    .bind(snapshot.memorySpaceId, snapshot.sourceStart, snapshot.sourceEnd, dmMemoryLearningRetainedSources)
+    .first<{ sequence: number }>();
+  if (dropped) return dropped.sequence;
+  const stalled = await db.prepare(`select 1 from briar_dm_memory_jobs where space_id = ? and kind = 'extract'
+    and status = 'no_change' and id <> ? and source_start = ? and source_end >= ? limit 1`)
+    .bind(snapshot.memorySpaceId, identity.jobId, snapshot.sourceStart, snapshot.sourceEnd).first();
+  return stalled ? snapshot.sourceEnd : snapshot.sourceStart;
+}
 
 /** Every dependent write uses one ledger row admitted by the live CAS predicate. */
 export async function dmLearningCommitStatements(db: D1Database, input: {
@@ -16,6 +39,8 @@ export async function dmLearningCommitStatements(db: D1Database, input: {
   const { identity, snapshot, normalized, now } = input;
   const commitId = crypto.randomUUID();
   const noChange = normalized.length === 0;
+  const sourceWatermark = noChange && snapshot.kind === "extract"
+    ? await emptyExtractWatermark(db, identity, snapshot) : snapshot.sourceEnd;
   const result: DmLearningCommitResult = { status: noChange ? "no_change" : "succeeded",
     revocationEpoch: snapshot.revocationEpoch + Number(normalized.some((item) => item.change.action !== "create")),
     documents: normalized.map((item) => ({ documentId: item.documentId,
@@ -100,7 +125,7 @@ export async function dmLearningCommitStatements(db: D1Database, input: {
     observation_watermark = case when ? = 'consolidate' then ? else observation_watermark end,
     last_consolidation_succeeded_at = case when ? = 'consolidate' then ? else last_consolidation_succeeded_at end,
     updated_at = ? where space_id = ? and ${commitGate}`)
-    .bind(snapshot.kind, snapshot.sourceEnd, snapshot.kind, snapshot.sourceEnd, snapshot.kind, now,
+    .bind(snapshot.kind, sourceWatermark, snapshot.kind, snapshot.sourceEnd, snapshot.kind, now,
       now, snapshot.memorySpaceId, commitId));
   statements.push(db.prepare(`update briar_dm_memory_learning_outbox set settled = 1 where space_id = ?
     and ((kind = 'extract' and ? = 'extract' and source_end <= ?)
