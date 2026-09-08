@@ -203,6 +203,7 @@ const channelSuccess = (
 ) => {
   const base = {
     body: result.body,
+    acknowledgementReaction: result.acknowledgementReaction ?? undefined,
     conversationId: conversationId ?? undefined,
     attachments: attachmentIds.map((uploadId) => ({ uploadId })),
     memoryCitations: (result.memoryCitations ?? []).map((reference) => ({

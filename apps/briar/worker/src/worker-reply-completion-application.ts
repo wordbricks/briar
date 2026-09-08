@@ -1055,6 +1055,7 @@ export async function completeChannelReplyApplication(
         workerId: scope.workerId,
         claimTokenHash: scope.claimTokenHash,
         body: result.body,
+        acknowledgementReaction: result.acknowledgementReaction,
         memoryCitations: result.memoryCitations,
         memorySaveRequest: result.memorySaveRequest,
         document,

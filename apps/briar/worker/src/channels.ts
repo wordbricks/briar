@@ -1,3 +1,4 @@
+import { channelAcknowledgementReactionStatements } from "./channel-acknowledgement-reaction";
 import { dmReplySteerStatements } from "./dm-reply-steer";
 import { dmReplyStopStatements, type DmReplyStop } from "./dm-reply-stop";
 import * as Schema from "effect/Schema";
@@ -3226,6 +3227,11 @@ async function channelAgentReplyEnqueueStatements(
                    and job.trigger_message_id = ?
                    and job.agent_id = ?
                    and channel.kind = 'dm'
+                   and not exists (
+                     select 1 from briar_channel_message_reactions existing
+                     where existing.message_id = job.trigger_message_id
+                       and existing.agent_id = job.agent_id
+                   )
                  on conflict do nothing`,
               ).bind(
                 input.triggerMessageId,
@@ -4594,6 +4600,7 @@ export async function failChannelReply(
 }
 
 export type ChannelReplyCompletionInput = {
+  acknowledgementReaction?: string | null;
   memoryCitations?: readonly { documentId: string; version: number }[] | null;
   memorySaveRequest?: {
     readonly documents: readonly { documentId: string; version: number }[];
@@ -6127,6 +6134,16 @@ export async function completeChannelReply(
       input.completedAt,
       input.completedAt,
     ),
+    ...(input.acknowledgementReaction &&
+        input.acknowledgementReaction !== "👀" &&
+        input.acknowledgementReaction.length <= 32 &&
+        input.acknowledgementReaction === input.acknowledgementReaction.trim() &&
+        isChannelReactionEmoji(input.acknowledgementReaction)
+      ? channelAcknowledgementReactionStatements(db, {
+          ...input,
+          emoji: input.acknowledgementReaction,
+        })
+      : []),
     db
       .prepare(
         `update briar_channel_agent_reply_jobs

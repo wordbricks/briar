@@ -148,6 +148,7 @@ describe("generated reply completion client", () => {
         attachments: [],
         result: {
           body: "Attached the plan and proposal.",
+          acknowledgementReaction: "🙏",
           document: {
             title: "Plan",
             markdown: "# Plan",
@@ -177,6 +178,7 @@ describe("generated reply completion client", () => {
     expect(completeChannel.mock.calls[0]![0].outcome).toMatchObject({
       case: "success",
       value: {
+        acknowledgementReaction: "🙏",
         action: {
           case: "artifacts",
           value: { document: { title: "Plan" }, proposal: { case: "issue" } },

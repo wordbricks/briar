@@ -17586,6 +17586,15 @@ pub struct ChannelReplySuccess {
         DmMemorySaveRequest,
         ::buffa::Inline<DmMemorySaveRequest>,
     >,
+    /// Optional DM reaction selected with the reply; invalid values retain the acknowledgement.
+    ///
+    /// Field 6: `acknowledgement_reaction`
+    #[serde(
+        rename = "acknowledgementReaction",
+        alias = "acknowledgement_reaction",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub acknowledgement_reaction: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(flatten)]
     pub action: ::core::option::Option<__buffa::oneof::channel_reply_success::Action>,
     #[serde(skip)]
@@ -17600,6 +17609,7 @@ impl ::core::fmt::Debug for ChannelReplySuccess {
             .field("attachments", &self.attachments)
             .field("memory_citations", &self.memory_citations)
             .field("memory_save_request", &self.memory_save_request)
+            .field("acknowledgement_reaction", &self.acknowledgement_reaction)
             .field("action", &self.action)
             .finish()
     }
@@ -17620,6 +17630,16 @@ impl ChannelReplySuccess {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.conversation_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::acknowledgement_reaction`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_acknowledgement_reaction(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.acknowledgement_reaction = Some(value.into());
         self
     }
 }
@@ -17672,6 +17692,9 @@ impl ::buffa::Message for ChannelReplySuccess {
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
+        }
+        if let Some(ref v) = self.acknowledgement_reaction {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         if let ::core::option::Option::Some(ref v) = self.action {
             match v {
@@ -17748,6 +17771,9 @@ impl ::buffa::Message for ChannelReplySuccess {
                 buf,
             );
             self.memory_save_request.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.acknowledgement_reaction {
+            ::buffa::types::put_string_field(6u32, v, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.action {
             match v {
@@ -17852,6 +17878,18 @@ impl ::buffa::Message for ChannelReplySuccess {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .acknowledgement_reaction
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -17953,6 +17991,7 @@ impl ::buffa::Message for ChannelReplySuccess {
         self.attachments.clear();
         self.memory_citations.clear();
         self.memory_save_request = ::buffa::MessageField::none();
+        self.acknowledgement_reaction = ::core::option::Option::None;
         self.action = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -17998,6 +18037,9 @@ impl<'de> serde::Deserialize<'de> for ChannelReplySuccess {
                         DmMemorySaveRequest,
                         ::buffa::Inline<DmMemorySaveRequest>,
                     >,
+                > = None;
+                let mut __f_acknowledgement_reaction: ::core::option::Option<
+                    ::core::option::Option<::buffa::alloc::string::String>,
                 > = None;
                 let mut __oneof_action: ::core::option::Option<
                     __buffa::oneof::channel_reply_success::Action,
@@ -18082,6 +18124,14 @@ impl<'de> serde::Deserialize<'de> for ChannelReplySuccess {
                                             DmMemorySaveRequest,
                                             ::buffa::Inline<DmMemorySaveRequest>,
                                         >,
+                                    >()?,
+                            );
+                        }
+                        "acknowledgementReaction" | "acknowledgement_reaction" => {
+                            __f_acknowledgement_reaction = Some(
+                                map
+                                    .next_value::<
+                                        ::core::option::Option<::buffa::alloc::string::String>,
                                     >()?,
                             );
                         }
@@ -18207,6 +18257,9 @@ impl<'de> serde::Deserialize<'de> for ChannelReplySuccess {
                 }
                 if let ::core::option::Option::Some(v) = __f_memory_save_request {
                     __r.memory_save_request = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_acknowledgement_reaction {
+                    __r.acknowledgement_reaction = v;
                 }
                 __r.action = __oneof_action;
                 Ok(__r)
@@ -73806,6 +73859,10 @@ pub mod __buffa {
             pub memory_save_request: ::buffa::MessageFieldView<
                 super::super::__buffa::view::DmMemorySaveRequestView<'a>,
             >,
+            /// Optional DM reaction selected with the reply; invalid values retain the acknowledgement.
+            ///
+            /// Field 6: `acknowledgement_reaction`
+            pub acknowledgement_reaction: ::core::option::Option<&'a str>,
             pub action: ::core::option::Option<
                 super::super::__buffa::view::oneof::channel_reply_success::Action<'a>,
             >,
@@ -73883,6 +73940,15 @@ pub mod __buffa {
                                 );
                             }
                         }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.acknowledgement_reaction = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -74098,6 +74164,9 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    acknowledgement_reaction: self
+                        .acknowledgement_reaction
+                        .map(|s| s.to_string()),
                     action: match self.action.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
@@ -74187,6 +74256,9 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(ref v) = self.acknowledgement_reaction {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 if let ::core::option::Option::Some(ref v) = self.action {
                     match v {
                         super::super::__buffa::view::oneof::channel_reply_success::Action::Artifacts(
@@ -74272,6 +74344,9 @@ pub mod __buffa {
                     );
                     self.memory_save_request.write_to(__cache, buf);
                 }
+                if let Some(ref v) = self.acknowledgement_reaction {
+                    ::buffa::types::put_string_field(6u32, v, buf);
+                }
                 if let ::core::option::Option::Some(ref v) = self.action {
                     match v {
                         super::super::__buffa::view::oneof::channel_reply_success::Action::Artifacts(
@@ -74356,6 +74431,10 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("memorySaveRequest", __v)?;
                     }
+                }
+                if let ::core::option::Option::Some(__v) = self.acknowledgement_reaction
+                {
+                    __map.serialize_entry("acknowledgementReaction", __v)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.action {
                     match __ov {
@@ -74518,6 +74597,13 @@ pub mod __buffa {
                 super::super::__buffa::view::DmMemorySaveRequestView<'_>,
             > {
                 &self.0.reborrow().memory_save_request
+            }
+            /// Optional DM reaction selected with the reply; invalid values retain the acknowledgement.
+            ///
+            /// Field 6: `acknowledgement_reaction`
+            #[must_use]
+            pub fn acknowledgement_reaction(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().acknowledgement_reaction
             }
             /// Oneof `action`.
             #[must_use]

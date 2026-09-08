@@ -1,3 +1,4 @@
+import { channelAcknowledgementReactionSchema } from "./channel-acknowledgement-reaction";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
@@ -1195,6 +1196,7 @@ export const channelMemorySaveRequestSchema = strict(Schema.Struct({
   }));
 
 export const channelReplyCompletionSchema = strict(Schema.Struct({
+  acknowledgementReaction: Schema.optional(channelAcknowledgementReactionSchema),
   memorySaveRequest: Schema.optional(
     Schema.NullOr(channelMemorySaveRequestSchema),
   ),

@@ -94,16 +94,16 @@ const strictSchemaOptions = {
 export function providerStructuredOutputContract<T, E, RE>(
   provider: AgentProvider,
   schema: Schema.ConstraintCodec<T, E, never, RE>,
+  normalizeInput: (input: unknown) => unknown = (input) => input,
 ) {
   const transformed = providerCodecTransformers[provider](schema);
-  const decode = Schema.decodeUnknownSync(
+  const decodeValue = Schema.decodeUnknownSync(
     transformed.codec,
     strictSchemaOptions,
   );
-  const decodeJson = Schema.decodeUnknownSync(
-    Schema.fromJsonString(transformed.codec),
-    strictSchemaOptions,
-  );
+  const decode = (input: unknown) => decodeValue(normalizeInput(input));
+  const parseJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
+  const decodeJson = (input: string) => decode(parseJson(input));
   return {
     jsonSchema: transformed.jsonSchema,
     decode,
