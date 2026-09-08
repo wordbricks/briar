@@ -619,7 +619,7 @@ export function RunPage({
   const difficultyOptions = [{
     label: t("run.notSet"),
     value: "none"
-  }, ...(["easy", "normal", "hard", "expert"] as const).map(value => ({
+  }, ...(["easy", "normal", "hard"] as const).map(value => ({
     label: t(`issue.difficulty.${value}` as MessageKey),
     value,
     leading: <IssueDifficultyIcon difficulty={value} size={14} />

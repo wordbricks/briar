@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: b551b62911096dab3e2a1c912fe114cbe8b210fb958be4de6eb2440749e7133f
--- snapshot-digest: 3bf04a4a920174eca34764ac7058200e596c8fc6dab27b965a1c28544779368b
+-- migrations-digest: d470baded0175dea61866ac384b7a3ac2f3d9327315464ffac46f33784aeeba4
+-- snapshot-digest: 877e9d82335acd3a9230980c9a6957811c5f42cc5328e9147dda6170d4f56188
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2095,6 +2095,143 @@ CREATE TABLE briar_agent_skills (
   default 'explicit' check (approval_policy in ('invoke_is_consent', 'explicit')),
   foreign key ("provider") references briar_agent_providers (provider));
 -- @statement
+CREATE TABLE IF NOT EXISTS "briar_hunt_runs" (
+  run_number integer primary key autoincrement,
+  id text not null unique,
+  project_id text not null references briar_projects (id) on delete cascade,
+  source text not null check (source in ('issue', 'error', 'feedback')),
+  source_key text not null check (
+    source_key = trim(source_key) and length(source_key) between 1 and 200
+  ),
+  title text not null check (length(trim(title)) between 1 and 300),
+  stage text not null check (stage in (
+    'queued', 'analyzing', 'implementing', 'pr_open', 'staging_qa',
+    'production_qa', 'completed', 'blocked', 'failed', 'cancelled'
+  )),
+  detail text check (detail is null or length(detail) <= 4000),
+  repository text not null check (length(trim(repository)) between 1 and 500),
+  branch text check (branch is null or length(trim(branch)) between 1 and 500),
+  commit_sha text check (
+    commit_sha is null or (
+      length(commit_sha) between 7 and 64
+      and commit_sha not glob '*[^0-9a-f]*'
+    )
+  ),
+  started_at text not null,
+  completed_at text,
+  last_event_at text not null,
+  created_at text not null,
+  updated_at text not null,
+  priority integer check (priority is null or priority between 1 and 4),
+  tracker_provider text
+    check (tracker_provider is null or length(trim(tracker_provider)) between 1 and 50),
+  tracker_issue_id text
+    check (tracker_issue_id is null or length(trim(tracker_issue_id)) between 1 and 200),
+  tracker_issue_identifier text
+    check (tracker_issue_identifier is null or length(trim(tracker_issue_identifier)) between 1 and 100),
+  tracker_issue_url text
+    check (tracker_issue_url is null or length(trim(tracker_issue_url)) between 1 and 1000),
+  tracker_issue_state text
+    check (tracker_issue_state is null or length(trim(tracker_issue_state)) between 1 and 100),
+  issue_description text
+    check (issue_description is null or length(issue_description) <= 100000),
+  result_summary text
+    check (result_summary is null or length(result_summary) <= 100000),
+  pull_request_urls text not null default '[]'
+    check (json_valid(pull_request_urls) and json_type(pull_request_urls) = 'array'),
+  target_sha text check (
+    target_sha is null or (
+      length(target_sha) between 7 and 64
+      and target_sha not glob '*[^0-9a-f]*'
+    )
+  ),
+  source_created_at text,
+  staging_qa_status text
+    check (staging_qa_status is null or staging_qa_status in ('pending', 'passed', 'skipped')),
+  production_qa_status text
+    check (production_qa_status is null or production_qa_status in ('pending', 'passed', 'skipped')),
+  staging_qa_detail text
+    check (staging_qa_detail is null or length(staging_qa_detail) <= 100000),
+  production_qa_detail text
+    check (production_qa_detail is null or length(production_qa_detail) <= 100000),
+  context_json text check (
+    context_json is null or (
+      json_valid(context_json) and json_type(context_json) = 'object'
+    )
+  ),
+  claim_token_hash text check (
+    claim_token_hash is null or (
+      length(claim_token_hash) = 64
+      and claim_token_hash not glob '*[^0-9a-f]*'
+    )
+  ),
+  claimed_by text
+    check (claimed_by is null or length(trim(claimed_by)) between 1 and 128),
+  claimed_at text,
+  lease_expires_at text,
+  claim_attempts integer not null default 0 check (claim_attempts >= 0),
+  current_attempt integer not null default 1 check (current_attempt >= 1),
+  workflow_stage text,
+  workflow_snapshot_json text not null
+    default '{"version":1,"stages":[{"id":"repository_workflow_pending","label":"Repository workflow pending","required":true}],"completion":{"requiredStages":["repository_workflow_pending"]},"release":{"enabled":false}}'
+    check (
+      json_valid(workflow_snapshot_json)
+      and json_type(workflow_snapshot_json) = 'object'
+    ),
+  worker_id text references briar_execution_workers (id) on delete set null,
+  status text not null default 'queued' check (status in (
+    'backlog', 'queued', 'running', 'blocked', 'failed', 'completed', 'cancelled'
+  )),
+  current_revision integer not null default 1 check (current_revision >= 1),
+  structured_result_json text,
+  agent_id text references briar_project_agents (id) on delete set null,
+  requested_worker_id text
+    references briar_execution_workers (id) on delete set null,
+  requested_by_user_id text references "user" (id) on delete set null,
+  dispatch_mode text check (dispatch_mode in ('any', 'specific')),
+  dispatch_request_id text,
+  dispatched_at text,
+  requested_agent_provider text,
+  preferred_agent_provider text,
+  preferred_agent_model text check (
+    preferred_agent_model is null
+    or length(trim(preferred_agent_model)) between 1 and 100
+  ),
+  preferred_agent_effort text check (
+    preferred_agent_effort is null
+    or preferred_agent_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  requested_agent_model text check (
+    requested_agent_model is null
+    or length(trim(requested_agent_model)) between 1 and 100
+  ),
+  requested_agent_effort text check (
+    requested_agent_effort is null
+    or requested_agent_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+  ),
+  event_count integer not null default 0 check (event_count >= 0),
+  execution_metrics_json text, paused_at text, waiting_checkpoint_key text, waiting_checkpoint_revision integer
+  check (waiting_checkpoint_revision is null or waiting_checkpoint_revision >= 1), resume_requested_at text, assignee_user_id text references "user" (id) on delete set null, issue_checkpoints_json text
+  not null default '[]' check (
+    json_valid(issue_checkpoints_json)
+    and json_type(issue_checkpoints_json) = 'array'
+  ), last_execution_id text, created_by_user_id text
+  references "user" (id) on delete set null, planned_update_resume integer not null
+  default 0 check (planned_update_resume in (0, 1)), difficulty text
+  check (difficulty in ('easy', 'normal', 'hard')), team_id text
+  references briar_teams (id) on delete cascade, planning_project_id text
+  references briar_planning_projects (id) on delete restrict, full_auto integer not null default 0
+  check (full_auto in (0, 1)), requires_claim_token integer not null default 0
+  check (requires_claim_token in (0, 1)),
+  unique (project_id, source, source_key),
+  check (
+    (stage in ('completed', 'cancelled') and completed_at is not null)
+    or (stage not in ('completed', 'cancelled') and completed_at is null)
+  ),
+  foreign key ("requested_agent_provider") references briar_agent_providers (provider),
+  foreign key ("preferred_agent_provider") references briar_agent_providers (provider)
+);
+-- @statement
 CREATE TABLE IF NOT EXISTS "briar_agent_transcript_sessions" (
   session_id text primary key not null check (
     session_id = trim(session_id) and length(session_id) between 1 and 128
@@ -3588,149 +3725,6 @@ CREATE TABLE briar_channel_message_attachments (
   image_height is null or (typeof(image_height) = 'integer' and image_height > 0)
 ));
 -- @statement
-CREATE TABLE briar_issue_difficulties (
-  difficulty text primary key not null,
-  proto_name text not null unique
-    check (proto_name = 'ISSUE_DIFFICULTY_' || upper(difficulty))
-) strict;
--- @statement
-CREATE TABLE IF NOT EXISTS "briar_hunt_runs" (
-  run_number integer primary key autoincrement,
-  id text not null unique,
-  project_id text not null references briar_projects (id) on delete cascade,
-  source text not null check (source in ('issue', 'error', 'feedback')),
-  source_key text not null check (
-    source_key = trim(source_key) and length(source_key) between 1 and 200
-  ),
-  title text not null check (length(trim(title)) between 1 and 300),
-  stage text not null check (stage in (
-    'queued', 'analyzing', 'implementing', 'pr_open', 'staging_qa',
-    'production_qa', 'completed', 'blocked', 'failed', 'cancelled'
-  )),
-  detail text check (detail is null or length(detail) <= 4000),
-  repository text not null check (length(trim(repository)) between 1 and 500),
-  branch text check (branch is null or length(trim(branch)) between 1 and 500),
-  commit_sha text check (
-    commit_sha is null or (
-      length(commit_sha) between 7 and 64
-      and commit_sha not glob '*[^0-9a-f]*'
-    )
-  ),
-  started_at text not null,
-  completed_at text,
-  last_event_at text not null,
-  created_at text not null,
-  updated_at text not null,
-  priority integer check (priority is null or priority between 1 and 4),
-  tracker_provider text
-    check (tracker_provider is null or length(trim(tracker_provider)) between 1 and 50),
-  tracker_issue_id text
-    check (tracker_issue_id is null or length(trim(tracker_issue_id)) between 1 and 200),
-  tracker_issue_identifier text
-    check (tracker_issue_identifier is null or length(trim(tracker_issue_identifier)) between 1 and 100),
-  tracker_issue_url text
-    check (tracker_issue_url is null or length(trim(tracker_issue_url)) between 1 and 1000),
-  tracker_issue_state text
-    check (tracker_issue_state is null or length(trim(tracker_issue_state)) between 1 and 100),
-  issue_description text
-    check (issue_description is null or length(issue_description) <= 100000),
-  result_summary text
-    check (result_summary is null or length(result_summary) <= 100000),
-  pull_request_urls text not null default '[]'
-    check (json_valid(pull_request_urls) and json_type(pull_request_urls) = 'array'),
-  target_sha text check (
-    target_sha is null or (
-      length(target_sha) between 7 and 64
-      and target_sha not glob '*[^0-9a-f]*'
-    )
-  ),
-  source_created_at text,
-  staging_qa_status text
-    check (staging_qa_status is null or staging_qa_status in ('pending', 'passed', 'skipped')),
-  production_qa_status text
-    check (production_qa_status is null or production_qa_status in ('pending', 'passed', 'skipped')),
-  staging_qa_detail text
-    check (staging_qa_detail is null or length(staging_qa_detail) <= 100000),
-  production_qa_detail text
-    check (production_qa_detail is null or length(production_qa_detail) <= 100000),
-  context_json text check (
-    context_json is null or (
-      json_valid(context_json) and json_type(context_json) = 'object'
-    )
-  ),
-  claim_token_hash text check (
-    claim_token_hash is null or (
-      length(claim_token_hash) = 64
-      and claim_token_hash not glob '*[^0-9a-f]*'
-    )
-  ),
-  claimed_by text
-    check (claimed_by is null or length(trim(claimed_by)) between 1 and 128),
-  claimed_at text,
-  lease_expires_at text,
-  claim_attempts integer not null default 0 check (claim_attempts >= 0),
-  current_attempt integer not null default 1 check (current_attempt >= 1),
-  workflow_stage text,
-  workflow_snapshot_json text not null
-    default '{"version":1,"stages":[{"id":"repository_workflow_pending","label":"Repository workflow pending","required":true}],"completion":{"requiredStages":["repository_workflow_pending"]},"release":{"enabled":false}}'
-    check (
-      json_valid(workflow_snapshot_json)
-      and json_type(workflow_snapshot_json) = 'object'
-    ),
-  worker_id text references briar_execution_workers (id) on delete set null,
-  status text not null default 'queued' check (status in (
-    'backlog', 'queued', 'running', 'blocked', 'failed', 'completed', 'cancelled'
-  )),
-  current_revision integer not null default 1 check (current_revision >= 1),
-  structured_result_json text,
-  agent_id text references briar_project_agents (id) on delete set null,
-  requested_worker_id text
-    references briar_execution_workers (id) on delete set null,
-  requested_by_user_id text references "user" (id) on delete set null,
-  dispatch_mode text check (dispatch_mode in ('any', 'specific')),
-  dispatch_request_id text,
-  dispatched_at text,
-  requested_agent_provider text,
-  preferred_agent_provider text,
-  preferred_agent_model text check (
-    preferred_agent_model is null
-    or length(trim(preferred_agent_model)) between 1 and 100
-  ),
-  preferred_agent_effort text check (
-    preferred_agent_effort is null
-    or preferred_agent_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  requested_agent_model text check (
-    requested_agent_model is null
-    or length(trim(requested_agent_model)) between 1 and 100
-  ),
-  requested_agent_effort text check (
-    requested_agent_effort is null
-    or requested_agent_effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
-  ),
-  event_count integer not null default 0 check (event_count >= 0),
-  execution_metrics_json text, paused_at text, waiting_checkpoint_key text, waiting_checkpoint_revision integer
-  check (waiting_checkpoint_revision is null or waiting_checkpoint_revision >= 1), resume_requested_at text, assignee_user_id text references "user" (id) on delete set null, issue_checkpoints_json text
-  not null default '[]' check (
-    json_valid(issue_checkpoints_json)
-    and json_type(issue_checkpoints_json) = 'array'
-  ), last_execution_id text, created_by_user_id text
-  references "user" (id) on delete set null, planned_update_resume integer not null
-  default 0 check (planned_update_resume in (0, 1)), difficulty text, team_id text
-  references briar_teams (id) on delete cascade, planning_project_id text
-  references briar_planning_projects (id) on delete restrict, full_auto integer not null default 0
-  check (full_auto in (0, 1)), requires_claim_token integer not null default 0
-  check (requires_claim_token in (0, 1)),
-  unique (project_id, source, source_key),
-  check (
-    (stage in ('completed', 'cancelled') and completed_at is not null)
-    or (stage not in ('completed', 'cancelled') and completed_at is null)
-  ),
-  foreign key ("requested_agent_provider") references briar_agent_providers (provider),
-  foreign key ("preferred_agent_provider") references briar_agent_providers (provider),
-  foreign key ("difficulty") references briar_issue_difficulties (difficulty)
-);
--- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -3770,14 +3764,6 @@ INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('openrouter
 INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('vertex','AGENT_PROVIDER_VERTEX');
 -- @statement
 INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('pi','AGENT_PROVIDER_PI');
--- @statement
-INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('easy','ISSUE_DIFFICULTY_EASY');
--- @statement
-INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('normal','ISSUE_DIFFICULTY_NORMAL');
--- @statement
-INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('hard','ISSUE_DIFFICULTY_HARD');
--- @statement
-INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('expert','ISSUE_DIFFICULTY_EXPERT');
 -- @statement
 CREATE VIEW briar_run_child_storage_a_project_mismatches as
 select child.project_id as stale_project_id,
@@ -4525,6 +4511,39 @@ CREATE INDEX briar_issue_messages_parent_idx
 CREATE INDEX briar_agent_transcript_sessions_project_idx
   on briar_agent_transcript_sessions (project_id, last_event_at desc);
 -- @statement
+CREATE INDEX briar_hunt_runs_project_idx
+  on briar_hunt_runs (project_id, last_event_at desc);
+-- @statement
+CREATE INDEX briar_hunt_runs_attention_idx
+  on briar_hunt_runs (project_id, last_event_at desc)
+  where stage in ('blocked', 'failed');
+-- @statement
+CREATE INDEX briar_hunt_runs_tracker_issue_idx
+  on briar_hunt_runs (project_id, tracker_provider, tracker_issue_id)
+  where tracker_issue_id is not null;
+-- @statement
+CREATE UNIQUE INDEX briar_hunt_runs_tracker_issue_unique_idx
+  on briar_hunt_runs (project_id, tracker_provider, tracker_issue_id)
+  where tracker_provider is not null and tracker_issue_id is not null;
+-- @statement
+CREATE INDEX briar_hunt_runs_worker_idx
+  on briar_hunt_runs (worker_id, last_event_at desc);
+-- @statement
+CREATE INDEX briar_hunt_runs_status_idx
+  on briar_hunt_runs (project_id, status, last_event_at desc);
+-- @statement
+CREATE INDEX briar_hunt_runs_queue_claim_idx on briar_hunt_runs (
+  project_id, priority, source_created_at, lease_expires_at
+) where status = 'queued';
+-- @statement
+CREATE UNIQUE INDEX briar_hunt_runs_dispatch_request_idx
+  on briar_hunt_runs (project_id, dispatch_request_id)
+  where dispatch_request_id is not null;
+-- @statement
+CREATE INDEX briar_hunt_runs_dispatch_queue_idx on briar_hunt_runs (
+  project_id, status, requested_worker_id, agent_id, dispatched_at
+);
+-- @statement
 CREATE INDEX briar_run_stage_progress_lookup_idx
   on briar_run_stage_progress (run_id, attempt, revision, stage_id);
 -- @statement
@@ -4536,6 +4555,19 @@ CREATE INDEX briar_run_checkpoint_progress_lookup_idx
 CREATE UNIQUE INDEX briar_run_checkpoint_waiting_unique_idx
   on briar_run_checkpoint_progress (run_id, attempt, revision)
   where state = 'waiting';
+-- @statement
+CREATE INDEX briar_hunt_runs_waiting_checkpoint_idx
+  on briar_hunt_runs (
+    project_id, waiting_checkpoint_revision, waiting_checkpoint_key
+  )
+  where waiting_checkpoint_key is not null;
+-- @statement
+CREATE INDEX briar_hunt_runs_resume_requested_idx
+  on briar_hunt_runs(project_id, resume_requested_at, run_number)
+  where resume_requested_at is not null;
+-- @statement
+CREATE INDEX briar_hunt_runs_assignee_idx
+  on briar_hunt_runs (project_id, assignee_user_id, updated_at desc);
 -- @statement
 CREATE INDEX briar_run_pull_requests_current_idx
   on briar_run_pull_requests (run_id, attempt, revision, state);
@@ -4595,10 +4627,16 @@ CREATE INDEX briar_run_cost_records_usage_idx
   on briar_run_cost_records (execution_id, usage_key)
   where usage_key is not null;
 -- @statement
+CREATE INDEX briar_hunt_runs_project_run_number_idx
+  on briar_hunt_runs (project_id, run_number);
+-- @statement
 CREATE INDEX briar_log_archives_project_sessions_idx
   on briar_log_archives (project_id, scope_id, period_end, id)
   where archive_kind = 'project_agent_sessions'
     and status in ('verified', 'complete');
+-- @statement
+CREATE INDEX briar_hunt_runs_source_identity_project_idx
+  on briar_hunt_runs (source, source_key, project_id);
 -- @statement
 CREATE UNIQUE INDEX briar_issue_action_proposals_issue_source_key_idx
   on briar_issue_action_proposals (issue_source_key)
@@ -4645,6 +4683,9 @@ CREATE INDEX briar_agent_skill_execution_audit_session_idx
 CREATE INDEX briar_run_execution_attempts_project_idx
   on briar_run_execution_attempts (project_id, id);
 -- @statement
+CREATE INDEX briar_hunt_runs_project_created_idx
+  on briar_hunt_runs (project_id, source_created_at, created_by_user_id);
+-- @statement
 CREATE INDEX briar_agent_worklog_entries_session_sequence_idx
   on briar_agent_worklog_entries (session_id, sequence, entry_id);
 -- @statement
@@ -4655,6 +4696,13 @@ CREATE INDEX briar_agent_transcript_segments_session_sequence_idx
   on briar_agent_transcript_segments (
     session_id, first_sequence, last_sequence
   );
+-- @statement
+CREATE INDEX briar_hunt_runs_github_reconcile_idx
+  on briar_hunt_runs (paused_at, id)
+  where status = 'running'
+    and paused_at is not null
+    and resume_requested_at is null
+    and workflow_stage = 'pr_open';
 -- @statement
 CREATE INDEX briar_project_agents_project_idx
   on briar_project_agents (project_id, created_at, id);
@@ -4803,6 +4851,12 @@ CREATE INDEX briar_channel_thread_subscriptions_user_idx
 -- @statement
 CREATE INDEX briar_channel_thread_subscriptions_channel_idx
   on briar_channel_thread_subscriptions (channel_id, root_message_id);
+-- @statement
+CREATE INDEX briar_hunt_runs_planning_project_idx
+  on briar_hunt_runs (planning_project_id, last_event_at desc, id);
+-- @statement
+CREATE INDEX briar_hunt_runs_team_hierarchy_idx
+  on briar_hunt_runs (team_id, last_event_at desc, id);
 -- @statement
 CREATE INDEX briar_issue_key_aliases_run_idx
   on briar_issue_key_aliases (run_id, created_at, team_id);
@@ -4969,74 +5023,6 @@ CREATE INDEX briar_channel_message_attachments_message_idx
 -- @statement
 CREATE INDEX briar_channel_message_attachments_channel_idx
   on briar_channel_message_attachments (organization_id, channel_id, message_id);
--- @statement
-CREATE INDEX briar_hunt_runs_project_idx
-  on briar_hunt_runs (project_id, last_event_at desc);
--- @statement
-CREATE INDEX briar_hunt_runs_attention_idx
-  on briar_hunt_runs (project_id, last_event_at desc)
-  where stage in ('blocked', 'failed');
--- @statement
-CREATE INDEX briar_hunt_runs_tracker_issue_idx
-  on briar_hunt_runs (project_id, tracker_provider, tracker_issue_id)
-  where tracker_issue_id is not null;
--- @statement
-CREATE UNIQUE INDEX briar_hunt_runs_tracker_issue_unique_idx
-  on briar_hunt_runs (project_id, tracker_provider, tracker_issue_id)
-  where tracker_provider is not null and tracker_issue_id is not null;
--- @statement
-CREATE INDEX briar_hunt_runs_worker_idx
-  on briar_hunt_runs (worker_id, last_event_at desc);
--- @statement
-CREATE INDEX briar_hunt_runs_status_idx
-  on briar_hunt_runs (project_id, status, last_event_at desc);
--- @statement
-CREATE INDEX briar_hunt_runs_queue_claim_idx on briar_hunt_runs (
-  project_id, priority, source_created_at, lease_expires_at
-) where status = 'queued';
--- @statement
-CREATE UNIQUE INDEX briar_hunt_runs_dispatch_request_idx
-  on briar_hunt_runs (project_id, dispatch_request_id)
-  where dispatch_request_id is not null;
--- @statement
-CREATE INDEX briar_hunt_runs_dispatch_queue_idx on briar_hunt_runs (
-  project_id, status, requested_worker_id, agent_id, dispatched_at
-);
--- @statement
-CREATE INDEX briar_hunt_runs_waiting_checkpoint_idx
-  on briar_hunt_runs (
-    project_id, waiting_checkpoint_revision, waiting_checkpoint_key
-  )
-  where waiting_checkpoint_key is not null;
--- @statement
-CREATE INDEX briar_hunt_runs_resume_requested_idx
-  on briar_hunt_runs(project_id, resume_requested_at, run_number)
-  where resume_requested_at is not null;
--- @statement
-CREATE INDEX briar_hunt_runs_assignee_idx
-  on briar_hunt_runs (project_id, assignee_user_id, updated_at desc);
--- @statement
-CREATE INDEX briar_hunt_runs_project_run_number_idx
-  on briar_hunt_runs (project_id, run_number);
--- @statement
-CREATE INDEX briar_hunt_runs_source_identity_project_idx
-  on briar_hunt_runs (source, source_key, project_id);
--- @statement
-CREATE INDEX briar_hunt_runs_project_created_idx
-  on briar_hunt_runs (project_id, source_created_at, created_by_user_id);
--- @statement
-CREATE INDEX briar_hunt_runs_github_reconcile_idx
-  on briar_hunt_runs (paused_at, id)
-  where status = 'running'
-    and paused_at is not null
-    and resume_requested_at is null
-    and workflow_stage = 'pr_open';
--- @statement
-CREATE INDEX briar_hunt_runs_planning_project_idx
-  on briar_hunt_runs (planning_project_id, last_event_at desc, id);
--- @statement
-CREATE INDEX briar_hunt_runs_team_hierarchy_idx
-  on briar_hunt_runs (team_id, last_event_at desc, id);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN
@@ -5657,6 +5643,60 @@ after delete on briar_project_execution_worker_allowlist BEGIN
   on conflict (project_id) do update set current_version = excluded.current_version;
 END;
 -- @statement
+CREATE TRIGGER briar_dashboard_dependencies_insert_sync
+after insert on briar_issue_dependencies BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values
+    (new.project_id, 'run', new.prerequisite_run_id, 'upsert', datetime('now')),
+    (new.project_id, 'run', new.dependent_run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_dependencies_delete_sync
+before delete on briar_issue_dependencies BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values
+    (old.project_id, 'run', old.prerequisite_run_id, 'upsert', datetime('now')),
+    (old.project_id, 'run', old.dependent_run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_messages_insert_sync
+after insert on briar_issue_messages BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (new.project_id, 'notifications', new.id, 'replace', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_messages_update_sync
+after update on briar_issue_messages BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (new.project_id, 'notifications', new.id, 'replace', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_messages_delete_sync
+before delete on briar_issue_messages BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (old.project_id, 'notifications', old.id, 'replace', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
 CREATE TRIGGER briar_dashboard_workers_insert_sync
 after insert on briar_execution_workers BEGIN
   insert into briar_dashboard_changes (
@@ -5674,6 +5714,101 @@ before delete on briar_execution_workers BEGIN
   ) values (old.project_id, 'worker', old.id, 'delete', datetime('now'));
   insert into briar_dashboard_sync_state (project_id, current_version)
   values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_events_insert_sync
+after insert on briar_hunt_events BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) select project_id, 'run', new.run_id, 'upsert', datetime('now')
+    from briar_hunt_runs where id = new.run_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select project_id, last_insert_rowid() from briar_hunt_runs where id = new.run_id
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_events_update_sync
+after update on briar_hunt_events BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) select project_id, 'run', new.run_id, 'upsert', datetime('now')
+    from briar_hunt_runs where id = new.run_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select project_id, last_insert_rowid() from briar_hunt_runs where id = new.run_id
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_events_delete_sync
+after delete on briar_hunt_events BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) select project_id, 'run', old.run_id, 'upsert', datetime('now')
+    from briar_hunt_runs where id = old.run_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select project_id, last_insert_rowid() from briar_hunt_runs where id = old.run_id
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_mentions_insert_sync
+after insert on briar_issue_message_mentions BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) select message.project_id, 'notifications', new.message_id, 'replace', datetime('now')
+    from briar_issue_messages message where message.id = new.message_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select message.project_id, last_insert_rowid()
+    from briar_issue_messages message where message.id = new.message_id
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_mentions_delete_sync
+after delete on briar_issue_message_mentions BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) select message.project_id, 'notifications', old.message_id, 'replace', datetime('now')
+    from briar_issue_messages message where message.id = old.message_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select message.project_id, last_insert_rowid()
+    from briar_issue_messages message where message.id = old.message_id
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_events_increment_run_event_count
+after insert on briar_hunt_events BEGIN
+  update briar_hunt_runs
+  set event_count = event_count + 1
+  where id = new.run_id;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_events_decrement_run_event_count
+after delete on briar_hunt_events BEGIN
+  update briar_hunt_runs
+  set event_count = max(event_count - 1, 0)
+  where id = old.run_id;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_result_reviews_insert_sync
+after insert on briar_issue_result_reviews BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) select project_id, 'run', new.run_id, 'upsert', datetime('now')
+      from briar_hunt_runs where id = new.run_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select project_id, last_insert_rowid()
+    from briar_hunt_runs where id = new.run_id
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_result_reviews_delete_sync
+after delete on briar_issue_result_reviews BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) select project_id, 'run', old.run_id, 'upsert', datetime('now')
+      from briar_hunt_runs where id = old.run_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select project_id, last_insert_rowid()
+    from briar_hunt_runs where id = old.run_id
   on conflict (project_id) do update set current_version = excluded.current_version;
 END;
 -- @statement
@@ -5704,6 +5839,346 @@ BEGIN
    where worker.device_id = new.id
   on conflict (project_id) do update set current_version =
     max(briar_dashboard_sync_state.current_version, excluded.current_version);
+END;
+-- @statement
+CREATE TRIGGER briar_quarantined_transcript_session_project_guard
+before update of project_id, run_id on briar_agent_transcript_sessions
+when (new.project_id <> old.project_id or new.run_id is not old.run_id)
+  and exists (
+    select 1 from briar_channel_issue_transfer_quarantine quarantine
+    where quarantine.entity_kind = 'agent_transcript_session'
+      and quarantine.entity_id = old.session_id
+  )
+BEGIN
+  select raise(abort, 'quarantined transcript ownership is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_quarantined_transcript_archive_project_guard
+before update of project_id on briar_log_archives
+when new.project_id <> old.project_id
+  and exists (
+    select 1 from briar_channel_issue_transfer_quarantine quarantine
+    where quarantine.entity_kind = 'agent_transcript_archive'
+      and quarantine.entity_id = old.id
+  )
+BEGIN
+  select raise(abort, 'quarantined transcript ownership is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_mismatched_transcript_archive_quarantine
+after insert on briar_log_archives
+when new.archive_kind = 'agent_transcript'
+  and new.run_id is not null
+  and exists (
+    select 1 from briar_hunt_runs run
+    where run.id = new.run_id and run.project_id <> new.project_id
+  )
+BEGIN
+  insert into briar_channel_issue_transfer_quarantine (
+    entity_kind, entity_id, run_id, source_project_id, target_project_id,
+    reason, detected_at
+  )
+  select 'agent_transcript_archive', new.id, new.run_id, new.project_id,
+         run.project_id, 'unverified_transcript_ownership', datetime('now')
+  from briar_hunt_runs run where run.id = new.run_id
+  on conflict (entity_kind, entity_id) do nothing;
+
+  insert into briar_channel_issue_transfer_quarantine (
+    entity_kind, entity_id, run_id, source_project_id, target_project_id,
+    reason, detected_at
+  )
+  select 'agent_transcript_session', new.scope_id, new.run_id, new.project_id,
+         run.project_id, 'unverified_transcript_ownership', datetime('now')
+  from briar_hunt_runs run where run.id = new.run_id
+  on conflict (entity_kind, entity_id) do nothing;
+
+  update briar_log_archives
+  set status = 'failed',
+      failure_count = failure_count + 1,
+      last_error = 'Transcript archive ownership requires remediation'
+  where id = new.id and status in ('verified', 'complete');
+END;
+-- @statement
+CREATE TRIGGER briar_mismatched_transcript_archive_verify_guard
+before update of status on briar_log_archives
+when new.archive_kind = 'agent_transcript'
+  and new.status in ('verified', 'complete')
+  and new.run_id is not null
+  and exists (
+    select 1 from briar_hunt_runs run
+    where run.id = new.run_id and run.project_id <> new.project_id
+  )
+BEGIN
+  select raise(abort, 'transcript archive ownership requires remediation');
+END;
+-- @statement
+CREATE TRIGGER briar_mismatched_run_archive_insert_guard
+before insert on briar_log_archives
+when new.archive_kind not in ('execution_audit', 'agent_transcript')
+  and new.run_id is not null
+  and not exists (
+    select 1 from briar_hunt_runs run
+    where run.id = new.run_id and run.project_id = new.project_id
+  )
+BEGIN
+  select raise(abort, 'run archive project does not match current run');
+END;
+-- @statement
+CREATE TRIGGER briar_transcript_session_run_insert_guard
+before insert on briar_agent_transcript_sessions
+when new.run_id is not null
+  and not exists (
+    select 1 from briar_hunt_runs run
+    where run.id = new.run_id and run.project_id = new.project_id
+  )
+BEGIN
+  select raise(abort, 'transcript run does not belong to project');
+END;
+-- @statement
+CREATE TRIGGER briar_transcript_session_run_update_guard
+before update of run_id, project_id on briar_agent_transcript_sessions
+when new.run_id is not null
+  and not exists (
+    select 1 from briar_hunt_runs run
+    where run.id = new.run_id and run.project_id = new.project_id
+  )
+  and not exists (
+    select 1 from briar_channel_issue_transfer_quarantine quarantine
+    where quarantine.entity_kind = 'agent_transcript_session'
+      and quarantine.entity_id = old.session_id
+  )
+BEGIN
+  select raise(abort, 'transcript run does not belong to project');
+END;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_creation_finalize_guard
+before update of status on briar_issue_action_proposals
+when old.status = 'pending'
+  and new.status = 'accepted'
+  and old.action_type = 'request_issue_create'
+  and not (
+    old.approval_reserved_by_user_id is not null
+    and old.approval_reserved_at is not null
+    and old.issue_source_key is not null
+    and new.approval_reserved_by_user_id is
+      old.approval_reserved_by_user_id
+    and new.approval_reserved_at is old.approval_reserved_at
+    and new.issue_source_key is old.issue_source_key
+    and new.accepted_by_user_id is old.approval_reserved_by_user_id
+    and new.accepted_at = old.approval_reserved_at
+    and new.result_run_id is not null
+    and exists (
+      select 1
+      from briar_hunt_runs conversation
+      where conversation.id = old.conversation_run_id
+        and conversation.project_id = old.project_id
+    )
+    and exists (
+      select 1
+      from briar_hunt_runs result
+      where result.id = new.result_run_id
+        and result.project_id = old.project_id
+        and result.source = 'issue'
+        and result.source_key = old.issue_source_key
+        and result.status = 'backlog' and result.stage = 'queued'
+        and result.workflow_stage is null
+        and result.worker_id is null
+        and result.agent_id is null
+        and result.requested_worker_id is null
+        and result.claim_token_hash is null
+        and result.claimed_by is null and result.claimed_at is null
+        and result.lease_expires_at is null
+        and result.last_execution_id is null
+        and result.dispatch_mode is null
+        and result.dispatch_request_id is null
+        and result.dispatched_at is null
+        and result.requested_by_user_id is null
+        and result.requested_agent_provider is null
+        and result.requested_agent_model is null
+        and result.requested_agent_effort is null
+        and result.completed_at is null
+        and result.paused_at is null
+        and result.resume_requested_at is null
+    )
+  )
+BEGIN
+  select raise(abort, 'conversation proposal acceptance requires reservation');
+END;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_reservation_immutable
+before update of approval_reserved_by_user_id, approval_reserved_at,
+                 issue_source_key
+on briar_issue_action_proposals
+when old.action_type = 'request_issue_create'
+  and old.issue_source_key is not null
+  and not (
+    new.issue_source_key is old.issue_source_key
+    and (
+      (
+        new.approval_reserved_at is old.approval_reserved_at
+        and (
+          new.approval_reserved_by_user_id is
+            old.approval_reserved_by_user_id
+          or (
+            old.approval_reserved_by_user_id is not null
+            and new.approval_reserved_by_user_id is null
+          )
+        )
+      )
+      or (
+        old.approval_reserved_by_user_id is null
+        and new.approval_reserved_by_user_id is not null
+        and new.approval_reserved_at is not null
+      )
+    )
+  )
+BEGIN
+  select raise(abort, 'conversation proposal reservation is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_approval_audit_insert
+after update of status on briar_issue_action_proposals
+when old.status = 'pending'
+  and new.status = 'accepted'
+  and old.action_type = 'request_issue_create'
+BEGIN
+  insert into briar_channel_issue_approval_audit (
+    id, proposal_id, organization_id, channel_id, project_id, run_id,
+    approved_by_user_id, approved_at, issue_source_key, result_verification,
+    payload_json, created_at
+  )
+  select old.id || ':conversation-approval:' || new.result_run_id,
+         old.id, project.organization_id,
+         'conversation:' || old.conversation_run_id,
+         old.project_id, new.result_run_id, new.accepted_by_user_id,
+         new.accepted_at, old.issue_source_key, 'atomic', old.payload_json,
+         new.accepted_at
+  from briar_projects project where project.id = old.project_id
+  on conflict (id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_changes_proposals_insert_sync
+after insert on briar_channel_action_proposals BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) select channel.organization_id, new.channel_id, 'proposal', new.id,
+           'upsert', datetime('now')
+    from briar_channels channel where channel.id = new.channel_id;
+  insert into briar_channel_sync_state (organization_id, current_version)
+  select channel.organization_id, last_insert_rowid()
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_changes_proposals_update_sync
+after update on briar_channel_action_proposals BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) select channel.organization_id, new.channel_id, 'proposal', new.id,
+           'upsert', datetime('now')
+    from briar_channels channel where channel.id = new.channel_id;
+  insert into briar_channel_sync_state (organization_id, current_version)
+  select channel.organization_id, last_insert_rowid()
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  select channel.organization_id, 1
+  from briar_channels channel where channel.id = new.channel_id
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id in (
+    select channel.organization_id
+    from briar_channels channel where channel.id = new.channel_id
+  )
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_create_execution_intent_insert_guard
+before insert on briar_channel_action_proposals
+when not (
+  (new.execute_after_create = 0 and new.execution_proposal_id is null)
+  or (
+    new.execute_after_create = 1
+    and new.execution_proposal_id is not null
+    and new.action_type = 'request_issue_create'
+    and new.status = 'pending'
+  )
+)
+BEGIN
+  select raise(abort, 'invalid channel create execution intent');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_create_execution_intent_insert_guard
+before insert on briar_issue_action_proposals
+when not (
+  (new.execute_after_create = 0 and new.execution_proposal_id is null)
+  or (
+    new.execute_after_create = 1
+    and new.execution_proposal_id is not null
+    and new.action_type = 'request_issue_create'
+    and new.status = 'pending'
+  )
+)
+BEGIN
+  select raise(abort, 'invalid issue create execution intent');
 END;
 -- @statement
 CREATE TRIGGER briar_issue_execution_organization_delete_invalidate
@@ -5916,6 +6391,72 @@ BEGIN
   select raise(abort, 'issue execution approval audit is immutable');
 END;
 -- @statement
+CREATE TRIGGER briar_channel_create_execution_intent_immutable
+before update of execute_after_create, execution_proposal_id
+on briar_channel_action_proposals
+when old.execute_after_create <> new.execute_after_create
+  or old.execution_proposal_id is not new.execution_proposal_id
+BEGIN
+  select raise(abort, 'channel create execution intent is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_create_execution_intent_immutable
+before update of execute_after_create, execution_proposal_id
+on briar_issue_action_proposals
+when old.execute_after_create <> new.execute_after_create
+  or old.execution_proposal_id is not new.execution_proposal_id
+BEGIN
+  select raise(abort, 'issue create execution intent is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_create_materialize_execution_proposal
+after update of status on briar_issue_action_proposals
+when old.status = 'pending' and new.status = 'accepted'
+  and new.action_type = 'request_issue_create'
+  and new.execute_after_create = 1
+  and new.execution_proposal_id is not null
+  and new.result_run_id is not null
+BEGIN
+  insert into briar_issue_execution_proposals (
+    id, organization_id, project_id, source_kind, channel_id,
+    conversation_run_id, trigger_message_id, reply_message_id,
+    target_run_id, target_title, target_run_updated_at,
+    proposed_by_agent_id, delegated_by_agent_id, delegated_by_agent_name,
+    origin_create_proposal_id, created_at, updated_at
+  )
+  select new.execution_proposal_id, project.organization_id, new.project_id,
+         'issue', null, new.conversation_run_id, new.trigger_message_id,
+         new.reply_message_id, run.id, run.title, run.updated_at,
+         conversation.agent_id, null, null, new.id,
+         new.accepted_at, new.accepted_at
+  from briar_hunt_runs run
+  join briar_hunt_runs conversation
+    on conversation.id = new.conversation_run_id
+   and conversation.project_id = new.project_id
+  join briar_projects project on project.id = new.project_id
+  where run.id = new.result_run_id and run.project_id = new.project_id
+    and run.status = 'backlog' and run.stage = 'queued'
+    and run.dispatch_request_id is null and run.claim_token_hash is null
+  on conflict (id) do nothing;
+
+  select raise(abort, 'issue execution proposal was not materialized')
+  where not exists (
+    select 1
+    from briar_issue_execution_proposals proposal
+    where proposal.id = new.execution_proposal_id
+      and proposal.project_id = new.project_id
+      and proposal.source_kind = 'issue'
+      and proposal.channel_id is null
+      and proposal.conversation_run_id = new.conversation_run_id
+      and proposal.trigger_message_id = new.trigger_message_id
+      and proposal.reply_message_id = new.reply_message_id
+      and proposal.target_run_id = new.result_run_id
+      and proposal.origin_create_proposal_id = new.id
+      and proposal.status = 'pending'
+      and proposal.dispatch_request_id is null
+  );
+END;
+-- @statement
 CREATE TRIGGER briar_agent_skill_execution_audit_immutable_update
 before update on briar_agent_skill_execution_approval_audit
 when not (
@@ -5958,6 +6499,396 @@ when exists (
 )
 BEGIN
   select raise(abort, 'Agent Skill execution approval audit is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_issue_rework_proposals_insert_sync
+after insert on briar_issue_rework_proposals BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.project_id, 'notifications', new.reply_message_id, 'replace',
+    datetime('now')
+  );
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_issue_rework_proposals_update_sync
+after update on briar_issue_rework_proposals BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.project_id, 'notifications', new.reply_message_id, 'replace',
+    datetime('now')
+  );
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_issue_action_proposals_insert_sync
+after insert on briar_issue_action_proposals BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.project_id, 'notifications', new.reply_message_id, 'replace',
+    datetime('now')
+  );
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_issue_action_proposals_update_sync
+after update on briar_issue_action_proposals BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.project_id, 'notifications', new.reply_message_id, 'replace',
+    datetime('now')
+  );
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_subscriptions_message_author_insert
+after insert on briar_issue_messages
+when new.author_user_id is not null BEGIN
+  insert into briar_issue_subscriptions (
+    run_id, organization_id, user_id, created_at
+  )
+  select new.run_id, project.organization_id, new.author_user_id, new.created_at
+  from briar_hunt_runs run
+  join briar_projects project on project.id = run.project_id
+  join briar_organization_members membership
+    on membership.organization_id = project.organization_id
+   and membership.user_id = new.author_user_id
+  where run.id = new.run_id and run.project_id = new.project_id
+  on conflict (run_id, user_id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_subscriptions_mention_insert
+after insert on briar_issue_message_mentions BEGIN
+  insert into briar_issue_subscriptions (
+    run_id, organization_id, user_id, created_at
+  )
+  select message.run_id, project.organization_id, new.user_id, new.created_at
+  from briar_issue_messages message
+  join briar_projects project on project.id = message.project_id
+  join briar_organization_members membership
+    on membership.organization_id = project.organization_id
+   and membership.user_id = new.user_id
+  where message.id = new.message_id
+  on conflict (run_id, user_id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_runs_insert_sync
+after insert on briar_hunt_runs BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (new.project_id, 'run', new.id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_runs_delete_sync
+before delete on briar_hunt_runs BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (old.project_id, 'run', old.id, 'delete', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_workflow_v2_insert
+before insert on briar_hunt_runs
+when not (
+  json_valid(new.workflow_snapshot_json)
+  and json_extract(new.workflow_snapshot_json, '$.version') = 2
+  and json_type(new.workflow_snapshot_json, '$.execution.checkpoints') = 'array'
+  and not exists (
+    select 1 from json_each(new.workflow_snapshot_json, '$.execution') field
+    where field.key <> 'checkpoints'
+  )
+  and not exists (
+    select 1 from json_each(new.workflow_snapshot_json, '$.execution.checkpoints') checkpoint
+    where json_extract(checkpoint.value, '$.key') not glob 'project-*'
+      and json_extract(checkpoint.value, '$.key') not glob 'user-*'
+      and json_extract(checkpoint.value, '$.key') not glob 'issue-*'
+  )
+)
+begin
+  select raise(abort, 'run workflow must use canonical v2 checkpoints');
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_workflow_v2_update
+before update of workflow_snapshot_json on briar_hunt_runs
+when not (
+  json_valid(new.workflow_snapshot_json)
+  and json_extract(new.workflow_snapshot_json, '$.version') = 2
+  and json_type(new.workflow_snapshot_json, '$.execution.checkpoints') = 'array'
+  and not exists (
+    select 1 from json_each(new.workflow_snapshot_json, '$.execution') field
+    where field.key <> 'checkpoints'
+  )
+  and not exists (
+    select 1 from json_each(new.workflow_snapshot_json, '$.execution.checkpoints') checkpoint
+    where json_extract(checkpoint.value, '$.key') not glob 'project-*'
+      and json_extract(checkpoint.value, '$.key') not glob 'user-*'
+      and json_extract(checkpoint.value, '$.key') not glob 'issue-*'
+  )
+)
+begin
+  select raise(abort, 'run workflow must use canonical v2 checkpoints');
+END;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_creation_finalize
+after insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-conversation-approved:%'
+BEGIN
+  update briar_issue_action_proposals
+  set status = 'accepted',
+      accepted_by_user_id = approval_reserved_by_user_id,
+      accepted_at = approval_reserved_at,
+      result_run_id = new.id,
+      updated_at = approval_reserved_at
+  where status = 'pending'
+    and action_type = 'request_issue_create'
+    and project_id = new.project_id
+    and approval_reserved_by_user_id is not null
+    and approval_reserved_at is not null
+    and issue_source_key = new.source_key;
+END;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_acceptance_transfer_guard
+before update of project_id on briar_hunt_runs
+when new.project_id <> old.project_id
+  and exists (
+    select 1 from briar_issue_action_proposals proposal
+    where proposal.status = 'pending'
+      and proposal.action_type = 'request_issue_create'
+      and (
+        (
+          proposal.conversation_run_id = old.id
+          and proposal.approval_reserved_by_user_id is not null
+        )
+        or (
+          old.source = 'issue'
+          and proposal.issue_source_key is not null
+          and old.source_key = proposal.issue_source_key
+        )
+      )
+  )
+BEGIN
+  select raise(abort, 'conversation proposal acceptance in progress');
+END;
+-- @statement
+CREATE TRIGGER briar_verified_run_archive_transfer_guard
+before update of project_id on briar_hunt_runs
+when new.project_id <> old.project_id
+  and exists (
+    select 1 from briar_log_archives archive
+    where archive.run_id = old.id and archive.status = 'verified'
+      and archive.archive_kind <> 'execution_audit'
+  )
+BEGIN
+  select raise(abort, 'verified run archive prevents transfer');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_reserved_proposal_delete_guard
+before delete on briar_issue_execution_proposals
+when old.status = 'pending' and old.dispatch_request_id is not null
+  and exists (
+    select 1 from briar_organizations organization
+    where organization.id = old.organization_id
+  )
+  and exists (
+    select 1 from briar_projects project where project.id = old.project_id
+  )
+  and exists (
+    select 1 from briar_hunt_runs run where run.id = old.target_run_id
+  )
+BEGIN
+  select raise(abort, 'reserved execution proposal cannot be deleted');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_identity_immutable
+before update on briar_issue_execution_proposals
+when new.id is not old.id
+  or new.organization_id is not old.organization_id
+  or new.project_id is not old.project_id
+  or new.source_kind is not old.source_kind
+  or not (
+    new.channel_id is old.channel_id
+    or (
+      old.channel_id is not null and new.channel_id is null
+      and not exists (
+        select 1 from briar_channels channel where channel.id = old.channel_id
+      )
+    )
+  )
+  or not (
+    new.conversation_run_id is old.conversation_run_id
+    or (
+      old.conversation_run_id is not null and new.conversation_run_id is null
+      and not exists (
+        select 1 from briar_hunt_runs run
+        where run.id = old.conversation_run_id
+      )
+    )
+  )
+  or new.trigger_message_id is not old.trigger_message_id
+  or new.reply_message_id is not old.reply_message_id
+  or new.target_run_id is not old.target_run_id
+  or new.target_title is not old.target_title
+  or new.target_run_updated_at is not old.target_run_updated_at
+  or not (
+    new.proposed_by_agent_id is old.proposed_by_agent_id
+    or (old.proposed_by_agent_id is not null
+        and new.proposed_by_agent_id is null
+        and not exists (
+          select 1 from briar_project_agents agent
+          where agent.id = old.proposed_by_agent_id
+        ))
+  )
+  or not (
+    new.delegated_by_agent_id is old.delegated_by_agent_id
+    or (old.delegated_by_agent_id is not null
+        and new.delegated_by_agent_id is null
+        and not exists (
+          select 1 from briar_project_agents agent
+          where agent.id = old.delegated_by_agent_id
+        ))
+  )
+  or new.delegated_by_agent_name is not old.delegated_by_agent_name
+  or new.origin_create_proposal_id is not old.origin_create_proposal_id
+  or new.created_at is not old.created_at
+BEGIN
+  select raise(abort, 'issue execution proposal identity is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_status_guard
+before update of status, generation on briar_issue_execution_proposals
+when not (
+  (new.status = old.status and new.generation = old.generation)
+  or (
+    old.status = 'pending' and new.status = 'accepted'
+    and new.generation = old.generation
+  )
+  or (
+    old.status in ('pending', 'accepted')
+    and new.status = 'invalidated'
+    and new.generation = old.generation + 1
+  )
+)
+BEGIN
+  select raise(abort, 'invalid issue execution proposal transition');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_reservation_immutable
+before update of approval_reserved_by_user_id, approval_reserved_at,
+                 requested_provider, requested_model, requested_effort,
+                 requested_worker_id, dispatch_request_id
+on briar_issue_execution_proposals
+when old.dispatch_request_id is not null
+  and not (
+    (
+      new.approval_reserved_by_user_id is old.approval_reserved_by_user_id
+      or (
+        old.approval_reserved_by_user_id is not null
+        and new.approval_reserved_by_user_id is null
+        and not exists (
+          select 1 from "user" account
+          where account.id = old.approval_reserved_by_user_id
+        )
+      )
+    )
+    and new.approval_reserved_at is old.approval_reserved_at
+    and new.requested_provider is old.requested_provider
+    and new.requested_model is old.requested_model
+    and new.requested_effort is old.requested_effort
+    and (
+      new.requested_worker_id is old.requested_worker_id
+      or (
+        old.requested_worker_id is not null
+        and new.requested_worker_id is null
+        and not exists (
+          select 1 from briar_execution_workers worker
+          where worker.id = old.requested_worker_id
+        )
+      )
+    )
+    and new.dispatch_request_id is old.dispatch_request_id
+  )
+BEGIN
+  select raise(abort, 'issue execution approval reservation is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_deleted_approver_invalidate
+after update of approval_reserved_by_user_id
+on briar_issue_execution_proposals
+when old.approval_reserved_by_user_id is not null
+  and new.approval_reserved_by_user_id is null
+  and new.status <> 'invalidated'
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where id = new.id and status <> 'invalidated';
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_deleted_agent_invalidate
+after update of proposed_by_agent_id
+on briar_issue_execution_proposals
+when old.proposed_by_agent_id is not null
+  and new.proposed_by_agent_id is null
+  and new.status <> 'invalidated'
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where id = new.id and status <> 'invalidated';
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_deleted_delegator_invalidate
+after update of delegated_by_agent_id
+on briar_issue_execution_proposals
+when old.delegated_by_agent_id is not null
+  and new.delegated_by_agent_id is null
+  and new.status <> 'invalidated'
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where id = new.id and status <> 'invalidated';
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_deleted_worker_invalidate
+after update of requested_worker_id
+on briar_issue_execution_proposals
+when old.requested_worker_id is not null
+  and new.requested_worker_id is null
+  and new.status <> 'invalidated'
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where id = new.id and status <> 'invalidated';
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_conversation_delete_invalidate
+before delete on briar_hunt_runs
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where source_kind = 'issue' and conversation_run_id = old.id
+    and status <> 'invalidated';
 END;
 -- @statement
 CREATE TRIGGER briar_issue_execution_channel_roster_remove_invalidate
@@ -6008,6 +6939,532 @@ BEGIN
           )
       )
     );
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_acceptance_immutable
+before update of accepted_by_user_id, accepted_at
+on briar_issue_execution_proposals
+when not (
+  (
+    old.status = 'pending' and new.status = 'accepted'
+    and old.accepted_by_user_id is null and old.accepted_at is null
+    and new.accepted_by_user_id is old.approval_reserved_by_user_id
+    and new.accepted_at = old.approval_reserved_at
+  )
+  or (
+    old.status in ('accepted', 'invalidated')
+    and new.status = old.status
+    and old.accepted_by_user_id is not null
+    and new.accepted_by_user_id is null
+    and not exists (
+      select 1 from "user" account
+      where account.id = old.accepted_by_user_id
+    )
+    and new.accepted_at is old.accepted_at
+  )
+  or (
+    new.accepted_by_user_id is old.accepted_by_user_id
+    and new.accepted_at is old.accepted_at
+  )
+)
+BEGIN
+  select raise(abort, 'issue execution proposal acceptance is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_claim_approval_guard
+before update of claim_token_hash on briar_hunt_runs
+when old.claim_token_hash is null and new.claim_token_hash is not null
+  and new.dispatch_request_id is not null
+  and (
+    exists (
+      select 1 from briar_issue_execution_proposals proposal
+      where proposal.dispatch_request_id = new.dispatch_request_id
+    )
+    or exists (
+      select 1 from briar_issue_execution_approval_audit approval
+      where approval.dispatch_request_id = new.dispatch_request_id
+    )
+  )
+  and not exists (
+    select 1 from briar_issue_execution_approval_audit approval
+    where approval.project_id = new.project_id
+      and approval.run_id = new.id
+      and approval.dispatch_request_id = new.dispatch_request_id
+      and approval.provider = new.requested_agent_provider
+      and approval.model is new.requested_agent_model
+      and approval.effort is new.requested_agent_effort
+      and approval.worker_id is new.requested_worker_id
+      and approval.approved_by_user_id is new.requested_by_user_id
+      and approval.proposed_by_agent_id is new.agent_id
+  )
+BEGIN
+  select raise(abort, 'conversational execution approval audit is missing');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_dispatch_guard
+before update of dispatch_request_id on briar_hunt_runs
+when new.dispatch_request_id is not null
+  and new.dispatch_request_id is not old.dispatch_request_id
+  and exists (
+    select 1 from briar_issue_execution_proposals proposal
+    where proposal.dispatch_request_id = new.dispatch_request_id
+  )
+  and not exists (
+    select 1
+    from briar_issue_execution_proposals proposal
+    where proposal.dispatch_request_id = new.dispatch_request_id
+      and proposal.status = 'pending'
+      and proposal.organization_id = (
+        select project.organization_id from briar_projects project
+        where project.id = old.project_id
+      )
+      and proposal.project_id = old.project_id
+      and proposal.target_run_id = old.id
+      and proposal.target_run_updated_at = old.updated_at
+      and proposal.approval_reserved_by_user_id is not null
+      and proposal.approval_reserved_at is not null
+      and proposal.requested_provider is not null
+      and old.status = 'backlog' and old.stage = 'queued'
+      and old.workflow_stage is null
+      and old.worker_id is null and old.requested_worker_id is null
+      and old.claim_token_hash is null and old.claimed_by is null
+      and old.claimed_at is null and old.lease_expires_at is null
+      and old.last_execution_id is null
+      and old.dispatch_mode is null and old.dispatch_request_id is null
+      and old.dispatched_at is null and old.requested_by_user_id is null
+      and old.completed_at is null and old.paused_at is null
+      and old.resume_requested_at is null
+      and new.status = 'queued' and new.stage = 'queued'
+      and new.workflow_stage is null
+      and new.requested_by_user_id = proposal.approval_reserved_by_user_id
+      and new.requested_agent_provider = proposal.requested_provider
+      and new.requested_agent_model is proposal.requested_model
+      and new.requested_agent_effort is proposal.requested_effort
+      and new.requested_worker_id is proposal.requested_worker_id
+      and new.dispatch_mode = iif(
+        proposal.requested_worker_id is null, 'any', 'specific'
+      )
+      and new.dispatched_at = proposal.approval_reserved_at
+  )
+BEGIN
+  select raise(abort, 'execution proposal target is stale');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_dispatch_agent_guard
+before update of dispatch_request_id on briar_hunt_runs
+when new.dispatch_request_id is not null
+  and new.dispatch_request_id is not old.dispatch_request_id
+  and exists (
+    select 1 from briar_issue_execution_proposals proposal
+    where proposal.dispatch_request_id = new.dispatch_request_id
+  )
+  and not exists (
+    select 1
+    from briar_issue_execution_proposals proposal
+    where proposal.dispatch_request_id = new.dispatch_request_id
+      and proposal.status = 'pending'
+      and (
+        proposal.proposed_by_agent_id is null
+        or (
+          new.agent_id = proposal.proposed_by_agent_id
+          and exists (
+            select 1 from briar_project_agents agent
+            where agent.id = proposal.proposed_by_agent_id
+              and agent.project_id = proposal.project_id
+              and agent.organization_id = proposal.organization_id
+          )
+        )
+      )
+  )
+BEGIN
+  select raise(abort, 'execution proposal Agent is stale');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_dispatch_issue_source_guard
+before update of dispatch_request_id on briar_hunt_runs
+when new.dispatch_request_id is not null
+  and new.dispatch_request_id is not old.dispatch_request_id
+  and exists (
+    select 1 from briar_issue_execution_proposals proposal
+    where proposal.dispatch_request_id = new.dispatch_request_id
+      and proposal.source_kind = 'issue'
+  )
+  and not exists (
+    select 1
+    from briar_issue_execution_proposals proposal
+    join briar_hunt_runs conversation
+      on conversation.id = proposal.conversation_run_id
+     and conversation.project_id = proposal.project_id
+    join briar_issue_messages reply
+      on reply.id = proposal.reply_message_id
+     and reply.run_id = conversation.id
+     and reply.project_id = conversation.project_id
+    join briar_projects project on project.id = conversation.project_id
+    join briar_organization_members membership
+      on membership.organization_id = project.organization_id
+     and membership.user_id = proposal.approval_reserved_by_user_id
+    where proposal.dispatch_request_id = new.dispatch_request_id
+      and proposal.status = 'pending' and proposal.source_kind = 'issue'
+      and project.organization_id = proposal.organization_id
+  )
+BEGIN
+  select raise(abort, 'issue execution proposal source is stale');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_dispatch_audit_guard
+before insert on briar_execution_audit_events
+when new.request_id is not null
+  and exists (
+    select 1 from briar_issue_execution_proposals proposal
+    where proposal.dispatch_request_id = new.request_id
+  )
+  and not exists (
+    select 1
+    from briar_issue_execution_proposals proposal
+    join briar_hunt_runs run
+      on run.id = proposal.target_run_id
+     and run.project_id = proposal.project_id
+    where proposal.dispatch_request_id = new.request_id
+      and proposal.status = 'pending'
+      and proposal.approval_reserved_by_user_id is not null
+      and proposal.approval_reserved_at is not null
+      and new.action = 'dispatched'
+      and new.organization_id = proposal.organization_id
+      and new.project_id = proposal.project_id
+      and new.run_id = proposal.target_run_id
+      and new.worker_id is proposal.requested_worker_id
+      and new.agent_id is proposal.proposed_by_agent_id
+      and new.actor_user_id is proposal.approval_reserved_by_user_id
+      and new.occurred_at = proposal.approval_reserved_at
+      and run.dispatch_request_id = proposal.dispatch_request_id
+      and run.dispatched_at = proposal.approval_reserved_at
+      and run.requested_by_user_id = proposal.approval_reserved_by_user_id
+      and run.requested_agent_provider = proposal.requested_provider
+      and run.requested_agent_model is proposal.requested_model
+      and run.requested_agent_effort is proposal.requested_effort
+      and run.requested_worker_id is proposal.requested_worker_id
+  )
+BEGIN
+  select raise(abort, 'invalid issue execution dispatch audit');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_dispatch_finalize
+after insert on briar_execution_audit_events
+when new.action = 'dispatched' and new.request_id is not null
+  and exists (
+    select 1 from briar_issue_execution_proposals proposal
+    where proposal.dispatch_request_id = new.request_id
+  )
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'accepted',
+      accepted_by_user_id = approval_reserved_by_user_id,
+      accepted_at = approval_reserved_at,
+      updated_at = approval_reserved_at
+  where dispatch_request_id = new.request_id and status = 'pending'
+    and organization_id = new.organization_id
+    and project_id = new.project_id and target_run_id = new.run_id
+    and approval_reserved_by_user_id is new.actor_user_id
+    and approval_reserved_at = new.occurred_at;
+
+  select raise(abort, 'execution approval was not finalized')
+  where changes() <> 1;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_accept_guard
+before update of status on briar_issue_execution_proposals
+when old.status = 'pending' and new.status = 'accepted'
+  and not (
+    old.approval_reserved_by_user_id is not null
+    and old.approval_reserved_at is not null
+    and old.dispatch_request_id is not null
+    and new.accepted_by_user_id is old.approval_reserved_by_user_id
+    and new.accepted_at = old.approval_reserved_at
+    and new.generation = old.generation
+    and exists (
+      select 1 from briar_hunt_runs run
+      where run.id = old.target_run_id and run.project_id = old.project_id
+        and run.dispatch_request_id = old.dispatch_request_id
+        and run.dispatched_at = old.approval_reserved_at
+        and run.requested_by_user_id = old.approval_reserved_by_user_id
+        and run.requested_agent_provider = old.requested_provider
+        and run.requested_agent_model is old.requested_model
+        and run.requested_agent_effort is old.requested_effort
+        and run.requested_worker_id is old.requested_worker_id
+    )
+    and exists (
+      select 1 from briar_execution_audit_events audit
+      where audit.organization_id = old.organization_id
+        and audit.project_id = old.project_id
+        and audit.run_id = old.target_run_id
+        and audit.request_id = old.dispatch_request_id
+        and audit.actor_user_id is old.approval_reserved_by_user_id
+        and audit.action = 'dispatched'
+    )
+  )
+BEGIN
+  select raise(abort, 'execution proposal acceptance requires dispatch audit');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_audit_insert
+after update of status on briar_issue_execution_proposals
+when old.status = 'pending' and new.status = 'accepted'
+BEGIN
+  insert into briar_issue_execution_approval_audit (
+    id, proposal_id, organization_id, project_id, source_kind, channel_id,
+    conversation_run_id, run_id, generation, approved_by_user_id,
+    approved_at, provider, model, effort, worker_id, dispatch_request_id,
+    proposed_by_agent_id, delegated_by_agent_id, created_at
+  ) values (
+    new.id || ':approval:' || new.generation, new.id, new.organization_id,
+    new.project_id, new.source_kind, new.channel_id,
+    new.conversation_run_id, new.target_run_id, new.generation,
+    new.accepted_by_user_id, new.accepted_at, new.requested_provider,
+    new.requested_model, new.requested_effort, new.requested_worker_id,
+    new.dispatch_request_id, new.proposed_by_agent_id,
+    new.delegated_by_agent_id, new.accepted_at
+  );
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_dispatch_clear_guard
+before update of dispatch_request_id, status on briar_hunt_runs
+when old.dispatch_request_id is not null
+  and new.dispatch_request_id is null
+  and new.status not in ('completed', 'cancelled')
+  and (
+    exists (
+      select 1 from briar_issue_execution_proposals proposal
+      where proposal.target_run_id = old.id
+        and proposal.project_id = old.project_id
+        and proposal.dispatch_request_id = old.dispatch_request_id
+    )
+    or exists (
+      select 1 from briar_issue_execution_approval_audit approval
+      where approval.run_id = old.id
+        and approval.project_id = old.project_id
+        and approval.dispatch_request_id = old.dispatch_request_id
+    )
+  )
+  and not (
+    new.status = 'backlog' and new.stage = 'queued'
+    and new.workflow_stage is null
+    and new.agent_id is null
+    and new.worker_id is null and new.requested_worker_id is null
+    and new.claim_token_hash is null and new.claimed_by is null
+    and new.claimed_at is null and new.lease_expires_at is null
+    and new.last_execution_id is null
+    and new.dispatch_mode is null and new.dispatched_at is null
+    and new.requested_by_user_id is null
+    and new.requested_agent_provider is null
+    and new.requested_agent_model is null
+    and new.requested_agent_effort is null
+    and new.paused_at is null and new.resume_requested_at is null
+    and new.completed_at is null
+  )
+BEGIN
+  select raise(
+    abort, 'conversational execution cancellation requires backlog reset'
+  );
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_retryable_transfer_guard
+before update of project_id, status on briar_hunt_runs
+when old.status in ('queued', 'blocked', 'failed')
+  and new.project_id <> old.project_id
+  and old.dispatch_request_id is not null
+  and (
+    exists (
+      select 1 from briar_issue_execution_proposals proposal
+      where proposal.target_run_id = old.id
+        and proposal.project_id = old.project_id
+        and proposal.dispatch_request_id = old.dispatch_request_id
+    )
+    or exists (
+      select 1 from briar_issue_execution_approval_audit approval
+      where approval.run_id = old.id
+        and approval.project_id = old.project_id
+        and approval.dispatch_request_id = old.dispatch_request_id
+    )
+  )
+  and not (
+    new.status = 'backlog' and new.stage = 'queued'
+    and new.workflow_stage is null
+    and new.agent_id is null
+    and new.worker_id is null and new.requested_worker_id is null
+    and new.claim_token_hash is null and new.claimed_by is null
+    and new.claimed_at is null and new.lease_expires_at is null
+    and new.last_execution_id is null
+    and new.dispatch_mode is null and new.dispatch_request_id is null
+    and new.dispatched_at is null and new.requested_by_user_id is null
+    and new.requested_agent_provider is null
+    and new.requested_agent_model is null
+    and new.requested_agent_effort is null
+    and new.paused_at is null and new.resume_requested_at is null
+    and new.completed_at is null
+  )
+BEGIN
+  select raise(
+    abort, 'conversational execution transfer requires backlog reset'
+  );
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_terminal_transfer_guard
+before update of project_id on briar_hunt_runs
+when old.status in ('completed', 'cancelled')
+  and new.project_id <> old.project_id
+  and exists (
+    select 1 from briar_issue_execution_approval_audit approval
+    where approval.run_id = old.id
+      and approval.project_id = old.project_id
+  )
+BEGIN
+  select raise(
+    abort, 'conversationally approved terminal issue transfer is not allowed'
+  );
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_terminal_reactivation_guard
+before update of status on briar_hunt_runs
+when old.status in ('completed', 'cancelled')
+  and new.status not in ('completed', 'cancelled')
+  and exists (
+    select 1 from briar_issue_execution_approval_audit approval
+    where approval.run_id = old.id
+      and approval.project_id = old.project_id
+  )
+BEGIN
+  select raise(
+    abort, 'conversational execution reactivation requires fresh approval'
+  );
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_target_mutation_invalidate
+after update of updated_at on briar_hunt_runs
+when new.updated_at is not old.updated_at
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = new.updated_at
+  where target_run_id = new.id and status = 'pending'
+    and target_run_updated_at is not new.updated_at
+    and not (
+      dispatch_request_id is not null
+      and new.project_id = project_id
+      and new.dispatch_request_id = dispatch_request_id
+      and new.dispatched_at = approval_reserved_at
+      and new.requested_by_user_id = approval_reserved_by_user_id
+      and new.requested_agent_provider = requested_provider
+      and new.requested_agent_model is requested_model
+      and new.requested_agent_effort is requested_effort
+      and new.requested_worker_id is requested_worker_id
+      and new.status = 'queued' and new.stage = 'queued'
+      and new.workflow_stage is null
+    );
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_transfer_invalidate
+after update of project_id on briar_hunt_runs
+when new.project_id <> old.project_id
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = new.updated_at
+  where target_run_id = new.id and status <> 'invalidated';
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_unassign_invalidate
+after update of dispatch_request_id on briar_hunt_runs
+when old.dispatch_request_id is not null and new.dispatch_request_id is null
+BEGIN
+  update briar_issue_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = new.updated_at
+  where target_run_id = new.id and status <> 'invalidated'
+    and dispatch_request_id = old.dispatch_request_id;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_execution_proposals_insert_sync
+after insert on briar_issue_execution_proposals
+when new.source_kind = 'channel'
+BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.organization_id, new.channel_id, 'proposal', new.id, 'upsert',
+    datetime('now')
+  );
+  insert into briar_channel_sync_state (organization_id, current_version)
+  values (new.organization_id, last_insert_rowid())
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
+END;
+-- @statement
+CREATE TRIGGER briar_channel_execution_proposals_update_sync
+after update on briar_issue_execution_proposals
+when new.source_kind = 'channel' and new.channel_id is not null
+BEGIN
+  insert into briar_channel_changes (
+    organization_id, channel_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.organization_id, new.channel_id, 'proposal', new.id, 'upsert',
+    datetime('now')
+  );
+  insert into briar_channel_sync_state (organization_id, current_version)
+  values (new.organization_id, last_insert_rowid())
+  on conflict (organization_id) do update
+    set current_version = excluded.current_version;
+  insert into briar_organization_inbox_sync_state (
+    organization_id, current_version
+  )
+  values (new.organization_id, 1)
+  on conflict (organization_id) do update set
+    current_version = briar_organization_inbox_sync_state.current_version + 1;
+  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
+  select state.organization_id, state.current_version,
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict(organization_id) do update set
+    version = max(briar_mobile_push_outbox.version, excluded.version),
+    updated_at = excluded.updated_at;
+  insert into briar_organization_inbox_realtime_outbox (
+    organization_id, version, updated_at
+  )
+  select state.organization_id, state.current_version, datetime('now')
+  from briar_organization_inbox_sync_state state
+  where state.organization_id = new.organization_id
+  on conflict (organization_id) do update set
+    version = max(
+      briar_organization_inbox_realtime_outbox.version,
+      excluded.version
+    ),
+    updated_at = excluded.updated_at;
 END;
 -- @statement
 CREATE TRIGGER briar_project_agent_task_completion_receipt_insert_guard
@@ -6065,6 +7522,46 @@ when new.selected_skill_id_snapshot is not old.selected_skill_id_snapshot
     old.skill_execution_request_snapshot
 BEGIN
   select raise(abort, 'channel Agent Skill reply snapshot is immutable');
+END;
+-- @statement
+CREATE TRIGGER briar_channel_action_skill_execution_exclusive
+before insert on briar_channel_action_proposals
+when exists (
+  select 1 from briar_agent_skill_execution_proposals skill_execution
+  where skill_execution.reply_message_id = new.reply_message_id
+)
+BEGIN
+  select raise(abort, 'channel proposal conflicts with Agent Skill execution');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_action_skill_execution_exclusive
+before insert on briar_issue_action_proposals
+when exists (
+  select 1 from briar_agent_skill_execution_proposals skill_execution
+  where skill_execution.reply_message_id = new.reply_message_id
+)
+BEGIN
+  select raise(abort, 'issue proposal conflicts with Agent Skill execution');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_rework_skill_execution_exclusive
+before insert on briar_issue_rework_proposals
+when exists (
+  select 1 from briar_agent_skill_execution_proposals skill_execution
+  where skill_execution.reply_message_id = new.reply_message_id
+)
+BEGIN
+  select raise(abort, 'rework proposal conflicts with Agent Skill execution');
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_skill_execution_exclusive
+before insert on briar_issue_execution_proposals
+when exists (
+  select 1 from briar_agent_skill_execution_proposals skill_execution
+  where skill_execution.reply_message_id = new.reply_message_id
+)
+BEGIN
+  select raise(abort, 'issue execution conflicts with Agent Skill execution');
 END;
 -- @statement
 CREATE TRIGGER briar_agent_skill_execution_identity_immutable
@@ -6491,6 +7988,38 @@ BEGIN
       or new.status <> 'completed');
 END;
 -- @statement
+CREATE TRIGGER briar_agent_skill_execution_issue_message_invalidate
+after update of body on briar_issue_messages
+when new.body <> old.body
+BEGIN
+  update briar_agent_skill_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = new.updated_at
+  where source_kind = 'issue' and trigger_message_id = new.id
+    and status = 'pending';
+END;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_issue_message_delete_invalidate
+before delete on briar_issue_messages
+BEGIN
+  update briar_agent_skill_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where source_kind = 'issue' and status = 'pending'
+    and old.id in (trigger_message_id, reply_message_id);
+END;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_issue_assignment_invalidate
+after update of agent_id, project_id on briar_hunt_runs
+when new.agent_id is not old.agent_id or new.project_id <> old.project_id
+BEGIN
+  update briar_agent_skill_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = new.updated_at
+  where source_kind = 'issue' and conversation_run_id = new.id
+    and status = 'pending';
+END;
+-- @statement
 CREATE TRIGGER briar_agent_skill_execution_channel_sync_insert
 after insert on briar_agent_skill_execution_proposals
 when new.source_kind = 'channel'
@@ -6575,6 +8104,298 @@ BEGIN
     updated_at = excluded.updated_at;
 END;
 -- @statement
+CREATE TRIGGER briar_dashboard_runs_update_sync
+after update on briar_hunt_runs
+when old.lease_expires_at is new.lease_expires_at
+  or old.updated_at is not new.updated_at
+BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (new.project_id, 'run', new.id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_subscriptions_run_insert
+after insert on briar_hunt_runs
+when new.assignee_user_id is not null BEGIN
+  insert into briar_issue_subscriptions (
+    run_id, organization_id, user_id, created_at
+  )
+  select new.id, project.organization_id, new.assignee_user_id, new.started_at
+  from briar_projects project
+  join briar_organization_members membership
+    on membership.organization_id = project.organization_id
+   and membership.user_id = new.assignee_user_id
+  where project.id = new.project_id
+  on conflict (run_id, user_id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_subscriptions_assignee_update
+after update of assignee_user_id on briar_hunt_runs
+when new.assignee_user_id is not null
+  and new.assignee_user_id is not old.assignee_user_id BEGIN
+  insert into briar_issue_subscriptions (
+    run_id, organization_id, user_id, created_at
+  )
+  select new.id, project.organization_id, new.assignee_user_id, new.updated_at
+  from briar_projects project
+  join briar_organization_members membership
+    on membership.organization_id = project.organization_id
+   and membership.user_id = new.assignee_user_id
+  where project.id = new.project_id
+  on conflict (run_id, user_id) do nothing;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_proposal_insert_guard
+before insert on briar_issue_execution_proposals
+when not (
+  new.status = 'pending' and new.generation = 1
+  and new.approval_reserved_by_user_id is null
+  and new.approval_reserved_at is null
+  and new.requested_provider is null and new.requested_model is null
+  and new.requested_effort is null and new.requested_worker_id is null
+  and new.dispatch_request_id is null
+  and new.accepted_by_user_id is null and new.accepted_at is null
+  and exists (
+    select 1
+    from briar_projects project
+    join briar_hunt_runs target
+      on target.id = new.target_run_id and target.project_id = project.id
+    where project.id = new.project_id
+      and project.organization_id = new.organization_id
+      and target.title = new.target_title
+      and target.updated_at = new.target_run_updated_at
+      and target.status = 'backlog' and target.stage = 'queued'
+      and target.workflow_stage is null
+      and target.worker_id is null and target.requested_worker_id is null
+      and target.claim_token_hash is null and target.claimed_by is null
+      and target.claimed_at is null and target.lease_expires_at is null
+      and target.last_execution_id is null
+      and target.dispatch_mode is null and target.dispatch_request_id is null
+      and target.dispatched_at is null and target.requested_by_user_id is null
+      and target.completed_at is null and target.paused_at is null
+      and target.resume_requested_at is null
+  )
+  and (
+    new.proposed_by_agent_id is null
+    or exists (
+      select 1 from briar_project_agents agent
+      where agent.id = new.proposed_by_agent_id
+        and agent.project_id = new.project_id
+        and agent.organization_id = new.organization_id
+    )
+  )
+  and (
+    (
+      new.source_kind = 'channel'
+      and new.proposed_by_agent_id is not null
+      and exists (
+        select 1
+        from briar_channels channel
+        join briar_channel_messages reply
+          on reply.id = new.reply_message_id
+         and reply.channel_id = channel.id
+        join briar_channel_agents roster
+          on roster.channel_id = channel.id
+         and roster.agent_id = new.proposed_by_agent_id
+        where channel.id = new.channel_id
+          and channel.organization_id = new.organization_id
+          and reply.author_agent_id = new.proposed_by_agent_id
+      )
+      and (
+        (new.origin_create_proposal_id is null)
+        or exists (
+          select 1 from briar_channel_action_proposals origin
+          where origin.id = new.origin_create_proposal_id
+            and origin.channel_id = new.channel_id
+            and origin.reply_message_id = new.reply_message_id
+            and origin.result_run_id = new.target_run_id
+            and origin.execution_proposal_id = new.id
+            and origin.execute_after_create = 1
+            and origin.status = 'accepted'
+        )
+      )
+    )
+    or
+    (
+      new.source_kind = 'issue'
+      and exists (
+        select 1
+        from briar_hunt_runs conversation
+        join briar_issue_messages reply
+          on reply.id = new.reply_message_id
+         and reply.run_id = conversation.id
+         and reply.project_id = conversation.project_id
+        where conversation.id = new.conversation_run_id
+          and conversation.project_id = new.project_id
+      )
+      and (
+        (
+          new.origin_create_proposal_id is null
+          and new.target_run_id = new.conversation_run_id
+        )
+        or exists (
+          select 1 from briar_issue_action_proposals origin
+          where origin.id = new.origin_create_proposal_id
+            and origin.conversation_run_id = new.conversation_run_id
+            and origin.reply_message_id = new.reply_message_id
+            and origin.result_run_id = new.target_run_id
+            and origin.execution_proposal_id = new.id
+            and origin.execute_after_create = 1
+            and origin.status = 'accepted'
+        )
+      )
+    )
+  )
+)
+BEGIN
+  select raise(abort, 'invalid issue execution proposal');
+END;
+-- @statement
+CREATE TRIGGER briar_channel_create_materialize_execution_proposal
+after update of status on briar_channel_action_proposals
+when old.status = 'pending' and new.status = 'accepted'
+  and new.action_type = 'request_issue_create'
+  and new.execute_after_create = 1
+  and new.execution_proposal_id is not null
+  and new.result_run_id is not null
+BEGIN
+  insert into briar_issue_execution_proposals (
+    id, organization_id, project_id, source_kind, channel_id,
+    conversation_run_id, trigger_message_id, reply_message_id,
+    target_run_id, target_title, target_run_updated_at,
+    proposed_by_agent_id, delegated_by_agent_id, delegated_by_agent_name,
+    origin_create_proposal_id, created_at, updated_at
+  )
+  select new.execution_proposal_id, channel.organization_id, new.project_id,
+         'channel', new.channel_id, null, new.trigger_message_id,
+         new.reply_message_id, run.id, run.title, run.updated_at,
+         reply.author_agent_id, parent.agent_id, parent_agent.name,
+         new.id, new.accepted_at, new.accepted_at
+  from briar_hunt_runs run
+  join briar_channels channel on channel.id = new.channel_id
+  join briar_channel_messages reply on reply.id = new.reply_message_id
+  left join briar_channel_agent_reply_jobs child
+    on child.reply_message_id = new.reply_message_id
+  left join briar_channel_agent_reply_jobs parent
+    on parent.id = child.delegated_by_reply_job_id
+  left join briar_project_agents parent_agent on parent_agent.id = parent.agent_id
+  where run.id = new.result_run_id and run.project_id = new.project_id
+    and run.status = 'backlog' and run.stage = 'queued'
+    and run.dispatch_request_id is null and run.claim_token_hash is null
+  on conflict (id) do nothing;
+
+  select raise(abort, 'channel execution proposal was not materialized')
+  where not exists (
+    select 1
+    from briar_issue_execution_proposals proposal
+    join briar_channels channel on channel.id = new.channel_id
+    where proposal.id = new.execution_proposal_id
+      and proposal.organization_id = channel.organization_id
+      and proposal.project_id = new.project_id
+      and proposal.source_kind = 'channel'
+      and proposal.channel_id = new.channel_id
+      and proposal.conversation_run_id is null
+      and proposal.trigger_message_id = new.trigger_message_id
+      and proposal.reply_message_id = new.reply_message_id
+      and proposal.target_run_id = new.result_run_id
+      and proposal.origin_create_proposal_id = new.id
+      and proposal.status = 'pending'
+      and proposal.dispatch_request_id is null
+  );
+END;
+-- @statement
+CREATE TRIGGER briar_issue_execution_dispatch_channel_source_guard
+before update of dispatch_request_id on briar_hunt_runs
+when new.dispatch_request_id is not null
+  and new.dispatch_request_id is not old.dispatch_request_id
+  and exists (
+    select 1 from briar_issue_execution_proposals proposal
+    where proposal.dispatch_request_id = new.dispatch_request_id
+      and proposal.source_kind = 'channel'
+  )
+  and not exists (
+    select 1
+    from briar_issue_execution_proposals proposal
+    join briar_channels channel on channel.id = proposal.channel_id
+    join briar_organization_members membership
+      on membership.organization_id = channel.organization_id
+     and membership.user_id = proposal.approval_reserved_by_user_id
+    join briar_channel_messages reply
+      on reply.id = proposal.reply_message_id
+     and reply.channel_id = channel.id
+    join briar_project_agents agent
+      on agent.id = proposal.proposed_by_agent_id
+     and agent.id = reply.author_agent_id
+     and agent.project_id = proposal.project_id
+     and agent.organization_id = proposal.organization_id
+    join briar_channel_agents roster
+      on roster.channel_id = channel.id and roster.agent_id = agent.id
+    where proposal.dispatch_request_id = new.dispatch_request_id
+      and proposal.status = 'pending' and proposal.source_kind = 'channel'
+      and channel.organization_id = proposal.organization_id
+      and channel.archived_at is null
+      and (
+        channel.visibility = 'public'
+        or exists (
+          select 1 from briar_channel_members channel_member
+          where channel_member.channel_id = channel.id
+            and channel_member.user_id = proposal.approval_reserved_by_user_id
+        )
+      )
+      and (
+        proposal.delegated_by_agent_id is null
+        or exists (
+          select 1
+          from briar_project_agents source_agent
+          join briar_channel_agents source_roster
+            on source_roster.channel_id = channel.id
+           and source_roster.agent_id = source_agent.id
+          join briar_channel_agent_reply_jobs child
+            on child.reply_message_id = proposal.reply_message_id
+          join briar_channel_agent_reply_jobs parent
+            on parent.id = child.delegated_by_reply_job_id
+           and parent.agent_id = source_agent.id
+          where source_agent.id = proposal.delegated_by_agent_id
+            and source_agent.organization_id = proposal.organization_id
+            and source_agent.project_id is null
+        )
+      )
+  )
+BEGIN
+  select raise(abort, 'channel execution proposal source is stale');
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_issue_execution_proposals_insert_sync
+after insert on briar_issue_execution_proposals
+when new.source_kind = 'issue' BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.project_id, 'notifications', new.reply_message_id, 'replace',
+    datetime('now')
+  );
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_issue_execution_proposals_update_sync
+after update on briar_issue_execution_proposals
+when new.source_kind = 'issue' BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.project_id, 'notifications', new.reply_message_id, 'replace',
+    datetime('now')
+  );
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
 CREATE TRIGGER briar_dashboard_issue_skill_proposals_insert_sync
 after insert on briar_agent_skill_execution_proposals
 when new.source_kind = 'issue' BEGIN
@@ -6603,6 +8424,21 @@ when new.source_kind = 'issue' BEGIN
   on conflict (project_id) do update set current_version = excluded.current_version;
 END;
 -- @statement
+CREATE TRIGGER briar_issue_subscriptions_creator_insert
+after insert on briar_hunt_runs
+when new.created_by_user_id is not null BEGIN
+  insert into briar_issue_subscriptions (
+    run_id, organization_id, user_id, created_at
+  )
+  select new.id, project.organization_id, new.created_by_user_id, new.started_at
+  from briar_projects project
+  join briar_organization_members membership
+    on membership.organization_id = project.organization_id
+   and membership.user_id = new.created_by_user_id
+  where project.id = new.project_id
+  on conflict (run_id, user_id) do nothing;
+END;
+-- @statement
 CREATE TRIGGER briar_agent_skills_max_count_insert
 before insert on briar_agent_skills
 when not exists (
@@ -6627,6 +8463,91 @@ and (
 BEGIN
   select raise(abort, 'An Agent can have at most 5 Skills');
 END;
+-- @statement
+CREATE TRIGGER briar_issue_agent_reply_skill_snapshot_immutable
+before update of selected_skill_id_snapshot, selected_agent_name_snapshot,
+                 selected_agent_responsibility_snapshot,
+                 selected_skill_name_snapshot,
+                 selected_skill_instructions_snapshot,
+                 selected_skill_kind_snapshot,
+                 selected_skill_provider_snapshot,
+                 selected_skill_model_snapshot,
+                 selected_skill_effort_snapshot,
+                 skill_execution_request_snapshot
+on briar_issue_agent_reply_jobs
+when new.selected_skill_id_snapshot is not old.selected_skill_id_snapshot
+  or new.selected_agent_name_snapshot is not old.selected_agent_name_snapshot
+  or new.selected_agent_responsibility_snapshot is not
+    old.selected_agent_responsibility_snapshot
+  or new.selected_skill_name_snapshot is not old.selected_skill_name_snapshot
+  or new.selected_skill_instructions_snapshot is not
+    old.selected_skill_instructions_snapshot
+  or new.selected_skill_kind_snapshot is not old.selected_skill_kind_snapshot
+  or new.selected_skill_provider_snapshot is not
+    old.selected_skill_provider_snapshot
+  or new.selected_skill_model_snapshot is not old.selected_skill_model_snapshot
+  or new.selected_skill_effort_snapshot is not old.selected_skill_effort_snapshot
+  or new.skill_execution_request_snapshot is not
+    old.skill_execution_request_snapshot
+begin
+  select raise(abort, 'issue Agent Skill reply snapshot is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_issue_job_invalidate
+after update of project_id, run_id, trigger_message_id, reply_message_id,
+                skill_id, selected_skill_id_snapshot, status
+on briar_issue_agent_reply_jobs
+begin
+  update briar_agent_skill_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = new.updated_at
+  where source_kind = 'issue' and source_reply_job_id = old.id
+    and status = 'pending'
+    and (new.project_id is not old.project_id
+      or new.run_id is not old.run_id
+      or new.trigger_message_id is not old.trigger_message_id
+      or new.reply_message_id is not old.reply_message_id
+      or new.skill_id is not old.skill_id
+      or new.selected_skill_id_snapshot is not old.selected_skill_id_snapshot
+      or new.status <> 'completed');
+end;
+-- @statement
+CREATE TRIGGER briar_agent_skill_execution_issue_job_delete_invalidate
+before delete on briar_issue_agent_reply_jobs
+begin
+  update briar_agent_skill_execution_proposals
+  set status = 'invalidated', generation = generation + 1,
+      updated_at = datetime('now')
+  where source_kind = 'issue' and source_reply_job_id = old.id
+    and status = 'pending';
+end;
+-- @statement
+CREATE TRIGGER briar_dashboard_issue_reply_jobs_insert_sync
+after insert on briar_issue_agent_reply_jobs begin
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.project_id, 'notifications', new.trigger_message_id, 'replace',
+    datetime('now')
+  );
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+end;
+-- @statement
+CREATE TRIGGER briar_dashboard_issue_reply_jobs_update_sync
+after update of status, claimed_worker_id, agent_provider, error, completed_at
+on briar_issue_agent_reply_jobs begin
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (
+    new.project_id, 'notifications', new.trigger_message_id, 'replace',
+    datetime('now')
+  );
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+end;
 -- @statement
 CREATE TRIGGER briar_project_stranded_run_child_delete_guard
 before delete on briar_projects
@@ -6979,6 +8900,61 @@ begin
   select raise(abort, 'Agent Skill execution result origin is immutable');
 end;
 -- @statement
+CREATE TRIGGER briar_channel_issue_proposal_decline_guard
+before update of declined_by_user_id, declined_at
+on briar_channel_action_proposals
+when not (
+  old.action_type = 'request_issue_create'
+  and old.status = 'pending'
+  and old.declined_by_user_id is null
+  and old.declined_at is null
+  and old.accepted_by_user_id is null
+  and old.accepted_at is null
+  and old.issue_source_key is null
+  and new.declined_by_user_id is not null
+  and new.declined_at is not null
+)
+begin
+  select raise(abort, 'channel issue proposal decline is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_declined_accept_guard
+before update of status, accepted_by_user_id, accepted_at, issue_source_key
+on briar_channel_action_proposals
+when old.action_type = 'request_issue_create'
+  and old.declined_at is not null
+  and (
+    new.status is not old.status
+    or new.accepted_by_user_id is not old.accepted_by_user_id
+    or new.accepted_at is not old.accepted_at
+    or new.issue_source_key is not old.issue_source_key
+  )
+begin
+
+
+  select raise(ignore);
+end;
+-- @statement
+CREATE TRIGGER briar_dashboard_attachments_insert_sync
+after insert on briar_issue_attachments BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (new.project_id, 'run', new.run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_attachments_delete_sync
+after delete on briar_issue_attachments BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (old.project_id, 'run', old.run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
 CREATE TRIGGER briar_dashboard_members_insert_sync
 after insert on briar_organization_members BEGIN
   insert into briar_dashboard_changes (
@@ -7072,6 +9048,32 @@ before delete on briar_project_members BEGIN
   values (old.project_id, 1)
   on conflict (project_id) do update set
     current_version = briar_dashboard_sync_state.current_version + 1;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_subscriptions_insert_sync
+after insert on briar_issue_subscriptions BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  )
+  select run.project_id, 'run', run.id, 'upsert', datetime('now')
+  from briar_hunt_runs run where run.id = new.run_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select run.project_id, last_insert_rowid()
+  from briar_hunt_runs run where run.id = new.run_id
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_subscriptions_delete_sync
+before delete on briar_issue_subscriptions BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  )
+  select run.project_id, 'run', run.id, 'upsert', datetime('now')
+  from briar_hunt_runs run where run.id = old.run_id;
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  select run.project_id, last_insert_rowid()
+  from briar_hunt_runs run where run.id = old.run_id
+  on conflict (project_id) do update set current_version = excluded.current_version;
 END;
 -- @statement
 CREATE TRIGGER briar_mobile_push_outbox_sync_delete
@@ -7211,6 +9213,69 @@ END;
 CREATE TRIGGER briar_teams_delete_issues_before_projects
 before delete on briar_teams BEGIN
   delete from briar_hunt_runs where project_id = old.id;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_assign_default_project
+after insert on briar_hunt_runs
+when new.planning_project_id is null BEGIN
+  update briar_hunt_runs
+  set team_id = coalesce(new.team_id, new.project_id),
+      planning_project_id = (
+    select project.id
+    from briar_planning_projects project
+    where project.team_id = new.project_id and project.is_default = 1
+  )
+  where id = new.id;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_validate_team_insert
+before insert on briar_hunt_runs
+when new.team_id is not null and new.team_id <> new.project_id BEGIN
+  select raise(abort, 'legacy project id must match issue team');
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_sync_team_after_insert
+after insert on briar_hunt_runs
+when new.team_id is null BEGIN
+  update briar_hunt_runs set team_id = new.project_id where id = new.id;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_validate_team_update
+before update of team_id on briar_hunt_runs
+when new.team_id is null or new.team_id <> new.project_id BEGIN
+  select raise(abort, 'legacy project id must match issue team');
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_validate_project_insert
+before insert on briar_hunt_runs
+when new.planning_project_id is not null BEGIN
+  select case when not exists (
+    select 1 from briar_planning_projects project
+    where project.id = new.planning_project_id
+      and project.team_id = new.project_id
+  ) then raise(abort, 'issue project must belong to its team') end;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_validate_project_update
+before update of planning_project_id on briar_hunt_runs BEGIN
+  select case when new.planning_project_id is null or not exists (
+    select 1 from briar_planning_projects project
+    where project.id = new.planning_project_id
+      and project.team_id = new.project_id
+  ) then raise(abort, 'issue project must belong to its team') end;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_reclassify_after_team_transfer
+after update of project_id on briar_hunt_runs
+when old.project_id <> new.project_id BEGIN
+  update briar_hunt_runs
+  set team_id = new.project_id,
+      planning_project_id = (
+    select project.id
+    from briar_planning_projects project
+    where project.team_id = new.project_id and project.is_default = 1
+  )
+  where id = new.id;
 END;
 -- @statement
 CREATE TRIGGER briar_teams_create_default_project_after_insert
@@ -7846,6 +9911,155 @@ begin
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where id = new.space_id;
 end;
 -- @statement
+CREATE TRIGGER briar_issue_hierarchy_validate_insert
+before insert on briar_issue_parent_links BEGIN
+  select case when not exists (
+    select 1 from briar_hunt_runs parent
+    where parent.id = new.parent_run_id and parent.project_id = new.project_id
+  ) or not exists (
+    select 1 from briar_hunt_runs child
+    where child.id = new.child_run_id and child.project_id = new.project_id
+  ) then raise(abort, 'issue hierarchy endpoints must belong to the project') end;
+  select case when exists (
+    with recursive descendants(run_id) as (
+      values (new.child_run_id)
+      union
+      select hierarchy.child_run_id
+      from briar_issue_parent_links hierarchy
+      join descendants on descendants.run_id = hierarchy.parent_run_id
+      where hierarchy.project_id = new.project_id
+    )
+    select 1 from descendants where run_id = new.parent_run_id
+  ) then raise(abort, 'issue hierarchy would create a cycle') end;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_hierarchy_validate_update
+before update of project_id, parent_run_id, child_run_id
+on briar_issue_parent_links BEGIN
+  select case when not exists (
+    select 1 from briar_hunt_runs parent
+    where parent.id = new.parent_run_id and parent.project_id = new.project_id
+  ) or not exists (
+    select 1 from briar_hunt_runs child
+    where child.id = new.child_run_id and child.project_id = new.project_id
+  ) then raise(abort, 'issue hierarchy endpoints must belong to the project') end;
+  select case when exists (
+    with recursive descendants(run_id) as (
+      values (new.child_run_id)
+      union
+      select hierarchy.child_run_id
+      from briar_issue_parent_links hierarchy
+      join descendants on descendants.run_id = hierarchy.parent_run_id
+      where hierarchy.project_id = new.project_id
+        and hierarchy.child_run_id <> old.child_run_id
+    )
+    select 1 from descendants where run_id = new.parent_run_id
+  ) then raise(abort, 'issue hierarchy would create a cycle') end;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_relations_validate_insert
+before insert on briar_issue_relations BEGIN
+  select case when not exists (
+    select 1 from briar_hunt_runs first_run
+    where first_run.id = new.first_run_id
+      and first_run.project_id = new.project_id
+  ) or not exists (
+    select 1 from briar_hunt_runs second_run
+    where second_run.id = new.second_run_id
+      and second_run.project_id = new.project_id
+  ) then raise(abort, 'related issue endpoints must belong to the project') end;
+END;
+-- @statement
+CREATE TRIGGER briar_issue_relations_validate_update
+before update of project_id, first_run_id, second_run_id
+on briar_issue_relations BEGIN
+  select case when not exists (
+    select 1 from briar_hunt_runs first_run
+    where first_run.id = new.first_run_id
+      and first_run.project_id = new.project_id
+  ) or not exists (
+    select 1 from briar_hunt_runs second_run
+    where second_run.id = new.second_run_id
+      and second_run.project_id = new.project_id
+  ) then raise(abort, 'related issue endpoints must belong to the project') end;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_hierarchy_insert_sync
+after insert on briar_issue_parent_links BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values
+    (new.project_id, 'run', new.parent_run_id, 'upsert', datetime('now')),
+    (new.project_id, 'run', new.child_run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_hierarchy_update_sync
+after update on briar_issue_parent_links BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values
+    (old.project_id, 'run', old.parent_run_id, 'upsert', datetime('now')),
+    (old.project_id, 'run', old.child_run_id, 'upsert', datetime('now')),
+    (new.project_id, 'run', new.parent_run_id, 'upsert', datetime('now')),
+    (new.project_id, 'run', new.child_run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_hierarchy_delete_sync
+before delete on briar_issue_parent_links BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values
+    (old.project_id, 'run', old.parent_run_id, 'upsert', datetime('now')),
+    (old.project_id, 'run', old.child_run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_relations_insert_sync
+after insert on briar_issue_relations BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values
+    (new.project_id, 'run', new.first_run_id, 'upsert', datetime('now')),
+    (new.project_id, 'run', new.second_run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_relations_update_sync
+after update on briar_issue_relations BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values
+    (old.project_id, 'run', old.first_run_id, 'upsert', datetime('now')),
+    (old.project_id, 'run', old.second_run_id, 'upsert', datetime('now')),
+    (new.project_id, 'run', new.first_run_id, 'upsert', datetime('now')),
+    (new.project_id, 'run', new.second_run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_relations_delete_sync
+before delete on briar_issue_relations BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values
+    (old.project_id, 'run', old.first_run_id, 'upsert', datetime('now')),
+    (old.project_id, 'run', old.second_run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
 CREATE TRIGGER briar_dm_memory_reply_revoked
 after update of revocation_epoch on briar_dm_memory_spaces
 when old.revocation_epoch <> new.revocation_epoch begin
@@ -8226,6 +10440,264 @@ begin
   select raise(abort, 'upload metadata is immutable');
 end;
 -- @statement
+CREATE TRIGGER briar_issue_create_mutation_receipt_insert_guard
+before insert on briar_issue_create_mutation_receipts
+when exists (
+    select 1 from json_each(new.attachment_upload_ids_json)
+    where type != 'text'
+  )
+  or json_array_length(new.attachment_upload_ids_json) != (
+    select count(distinct value)
+    from json_each(new.attachment_upload_ids_json)
+  )
+  or json_array_length(new.attachment_upload_ids_json) != (
+    select count(*)
+    from briar_uploads upload
+    join briar_upload_batches batch
+      on batch.request_id = upload.batch_request_id
+    join briar_issue_attachments attachment
+      on attachment.id = upload.upload_id
+     and attachment.project_id = new.project_id
+     and attachment.run_id = new.client_issue_id
+    where batch.purpose = 'issue_create'
+      and batch.organization_id = new.organization_id
+      and batch.project_id = new.project_id
+      and batch.channel_id is null
+      and batch.user_id = new.user_id
+      and batch.work_id = new.client_issue_id
+      and batch.run_id is null
+      and batch.worker_id is null and batch.device_id is null
+      and batch.claim_token_hash is null
+      and batch.expires_at > new.created_at
+      and upload.uploaded_at is not null and upload.consumed_at is null
+      and exists (
+        select 1 from json_each(new.attachment_upload_ids_json) expected
+        where expected.value = upload.upload_id
+      )
+      and attachment.object_key = upload.object_key
+      and attachment.filename = upload.filename
+      and attachment.content_type = upload.content_type
+      and attachment.byte_size = upload.byte_size
+  )
+  or 1 < (
+    select count(distinct upload.batch_request_id)
+    from briar_uploads upload
+    join briar_upload_batches batch
+      on batch.request_id = upload.batch_request_id
+    where batch.purpose = 'issue_create'
+      and batch.organization_id = new.organization_id
+      and batch.project_id = new.project_id
+      and batch.user_id = new.user_id
+      and batch.work_id = new.client_issue_id
+      and exists (
+        select 1 from json_each(new.attachment_upload_ids_json) expected
+        where expected.value = upload.upload_id
+      )
+  )
+  or not exists (
+    select 1
+    from briar_hunt_runs run
+    join briar_projects project on project.id = run.project_id
+    join briar_organization_members membership
+      on membership.organization_id = project.organization_id
+     and membership.user_id = new.user_id
+    where run.id = new.client_issue_id and run.project_id = new.project_id
+      and run.created_by_user_id = new.user_id
+      and project.organization_id = new.organization_id
+      and membership.role in ('owner', 'co-owner', 'developer', 'editor')
+      and (
+        membership.role in ('owner', 'co-owner')
+        or exists (
+          select 1 from briar_project_members project_member
+          where project_member.project_id = project.id
+            and project_member.organization_id = project.organization_id
+            and project_member.user_id = new.user_id
+        )
+      )
+  )
+begin
+  select raise(abort, 'invalid issue create receipt');
+end;
+-- @statement
+CREATE TRIGGER briar_issue_update_mutation_receipt_insert_guard
+before insert on briar_issue_update_mutation_receipts
+when exists (
+    select 1 from json_each(new.attachment_upload_ids_json)
+    where type != 'text'
+  )
+  or json_array_length(new.attachment_upload_ids_json) != (
+    select count(distinct value)
+    from json_each(new.attachment_upload_ids_json)
+  )
+  or json_array_length(new.attachment_upload_ids_json) != (
+    select count(*)
+    from briar_uploads upload
+    join briar_upload_batches batch
+      on batch.request_id = upload.batch_request_id
+    join briar_issue_attachments attachment
+      on attachment.id = upload.upload_id
+     and attachment.project_id = new.project_id
+     and attachment.run_id = new.run_id
+    where batch.purpose = 'issue_update'
+      and batch.organization_id = new.organization_id
+      and batch.project_id = new.project_id
+      and batch.channel_id is null
+      and batch.user_id = new.user_id
+      and batch.work_id = new.request_id
+      and batch.run_id = new.run_id
+      and batch.worker_id is null and batch.device_id is null
+      and batch.claim_token_hash is null
+      and batch.expires_at > new.created_at
+      and upload.uploaded_at is not null and upload.consumed_at is null
+      and exists (
+        select 1 from json_each(new.attachment_upload_ids_json) expected
+        where expected.value = upload.upload_id
+      )
+      and attachment.object_key = upload.object_key
+      and attachment.filename = upload.filename
+      and attachment.content_type = upload.content_type
+      and attachment.byte_size = upload.byte_size
+  )
+  or 1 < (
+    select count(distinct upload.batch_request_id)
+    from briar_uploads upload
+    join briar_upload_batches batch
+      on batch.request_id = upload.batch_request_id
+    where batch.purpose = 'issue_update'
+      and batch.organization_id = new.organization_id
+      and batch.project_id = new.project_id
+      and batch.user_id = new.user_id
+      and batch.work_id = new.request_id
+      and batch.run_id = new.run_id
+      and exists (
+        select 1 from json_each(new.attachment_upload_ids_json) expected
+        where expected.value = upload.upload_id
+      )
+  )
+  or not exists (
+    select 1
+    from briar_hunt_runs run
+    join briar_projects project on project.id = run.project_id
+    join briar_organization_members membership
+      on membership.organization_id = project.organization_id
+     and membership.user_id = new.user_id
+    where run.id = new.run_id and run.project_id = new.project_id
+      and project.organization_id = new.organization_id
+      and membership.role in ('owner', 'co-owner', 'developer', 'editor')
+      and (
+        membership.role in ('owner', 'co-owner')
+        or exists (
+          select 1 from briar_project_members project_member
+          where project_member.project_id = project.id
+            and project_member.organization_id = project.organization_id
+            and project_member.user_id = new.user_id
+        )
+      )
+  )
+begin
+  select raise(abort, 'invalid issue update receipt');
+end;
+-- @statement
+CREATE TRIGGER briar_issue_message_mutation_receipt_insert_guard
+before insert on briar_issue_message_mutation_receipts
+when exists (
+    select 1 from json_each(new.attachment_upload_ids_json)
+    where type != 'text'
+  )
+  or json_array_length(new.attachment_upload_ids_json) != (
+    select count(distinct value)
+    from json_each(new.attachment_upload_ids_json)
+  )
+  or json_array_length(new.attachment_upload_ids_json) != (
+    select count(*)
+    from briar_uploads upload
+    join briar_upload_batches batch
+      on batch.request_id = upload.batch_request_id
+    join briar_issue_attachments attachment
+      on attachment.id = upload.upload_id
+     and attachment.project_id = new.project_id
+     and attachment.run_id = new.run_id
+    where batch.purpose = 'issue_message'
+      and batch.organization_id = new.organization_id
+      and batch.project_id = new.project_id
+      and batch.channel_id is null
+      and batch.user_id = new.user_id
+      and batch.work_id = new.message_id
+      and batch.run_id = new.run_id
+      and batch.worker_id is null and batch.device_id is null
+      and batch.claim_token_hash is null
+      and batch.expires_at > new.created_at
+      and upload.uploaded_at is not null and upload.consumed_at is null
+      and exists (
+        select 1 from json_each(new.attachment_upload_ids_json) expected
+        where expected.value = upload.upload_id
+      )
+      and attachment.object_key = upload.object_key
+      and attachment.filename = upload.filename
+      and attachment.content_type = upload.content_type
+      and attachment.byte_size = upload.byte_size
+  )
+  or 1 < (
+    select count(distinct upload.batch_request_id)
+    from briar_uploads upload
+    join briar_upload_batches batch
+      on batch.request_id = upload.batch_request_id
+    where batch.purpose = 'issue_message'
+      and batch.organization_id = new.organization_id
+      and batch.project_id = new.project_id
+      and batch.user_id = new.user_id
+      and batch.work_id = new.message_id
+      and batch.run_id = new.run_id
+      and exists (
+        select 1 from json_each(new.attachment_upload_ids_json) expected
+        where expected.value = upload.upload_id
+      )
+  )
+  or not exists (
+    select 1
+    from briar_issue_messages message
+    join briar_hunt_runs run
+      on run.id = message.run_id and run.project_id = message.project_id
+    join briar_projects project on project.id = run.project_id
+    join briar_organization_members membership
+      on membership.organization_id = project.organization_id
+     and membership.user_id = new.user_id
+    where message.id = new.message_id
+      and message.project_id = new.project_id and message.run_id = new.run_id
+      and project.organization_id = new.organization_id
+      and membership.role in ('owner', 'co-owner', 'developer', 'editor')
+      and (
+        membership.role in ('owner', 'co-owner')
+        or exists (
+          select 1 from briar_project_members project_member
+          where project_member.project_id = project.id
+            and project_member.organization_id = project.organization_id
+            and project_member.user_id = new.user_id
+        )
+      )
+  )
+begin
+  select raise(abort, 'invalid issue message receipt');
+end;
+-- @statement
+CREATE TRIGGER briar_issue_create_mutation_receipt_immutable
+before update on briar_issue_create_mutation_receipts
+begin
+  select raise(abort, 'issue create receipt is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_issue_update_mutation_receipt_immutable
+before update on briar_issue_update_mutation_receipts
+begin
+  select raise(abort, 'issue update receipt is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_issue_message_mutation_receipt_immutable
+before update on briar_issue_message_mutation_receipts
+begin
+  select raise(abort, 'issue message receipt is immutable');
+end;
+-- @statement
 CREATE TRIGGER briar_upload_state_guard
 before update on briar_uploads
 when not (
@@ -8450,6 +10922,69 @@ begin
   select raise(abort, 'Agent schedule creator is immutable');
 end;
 -- @statement
+CREATE TRIGGER briar_archive_related_object_keys_insert_guard
+before insert on briar_log_archives
+when exists (
+  select 1 from json_each(new.related_object_keys_json) related
+  where related.type <> 'text'
+    or related.value <> trim(related.value)
+    or length(related.value) not between 1 and 1024
+)
+begin
+  select raise(abort, 'invalid archive related object key');
+end;
+-- @statement
+CREATE TRIGGER briar_archive_related_object_keys_update_guard
+before update of related_object_keys_json on briar_log_archives
+when exists (
+  select 1 from json_each(new.related_object_keys_json) related
+  where related.type <> 'text'
+    or related.value <> trim(related.value)
+    or length(related.value) not between 1 and 1024
+)
+begin
+  select raise(abort, 'invalid archive related object key');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_payload_immutable
+before update of action_type, payload_json on briar_channel_action_proposals
+when new.action_type is not old.action_type
+  or new.payload_json is not old.payload_json
+begin
+  select raise(abort, 'channel issue proposal payload is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_proposal_payload_immutable
+before update of action_type, payload_json on briar_issue_action_proposals
+when new.action_type is not old.action_type
+  or new.payload_json is not old.payload_json
+begin
+  select raise(abort, 'conversation issue proposal payload is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_current_insert_guard
+before insert on briar_channel_action_proposals
+when new.action_type = 'request_issue_create'
+  and (
+    json_type(new.payload_json, '$.issue.status') is not null
+    or exists (
+      select 1
+      from json_each(new.payload_json, '$.batch.items') item
+      where json_type(item.value, '$.issue.status') is not null
+    )
+  )
+begin
+  select raise(abort, 'channel issue proposal payload cannot include status');
+end;
+-- @statement
+CREATE TRIGGER briar_conversation_issue_proposal_current_insert_guard
+before insert on briar_issue_action_proposals
+when new.action_type = 'request_issue_create'
+  and json_type(new.payload_json, '$.issue.status') is not null
+begin
+  select raise(abort, 'conversation issue proposal payload cannot include status');
+end;
+-- @statement
 CREATE TRIGGER briar_channel_issue_batch_items_immutable_delete
 before delete on briar_channel_issue_batch_items
 when exists (
@@ -8458,6 +10993,20 @@ when exists (
 )
 begin
   select raise(abort, 'channel issue batch mapping is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_action_insert_guard
+before insert on briar_channel_action_proposals
+when new.action_type <> 'request_issue_create'
+begin
+  select raise(abort, 'channel proposals must create issues');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_proposal_action_update_guard
+before update of action_type on briar_channel_action_proposals
+when new.action_type <> 'request_issue_create'
+begin
+  select raise(abort, 'channel proposals must create issues');
 end;
 -- @statement
 CREATE TRIGGER briar_workflow_checkpoint_storage_validate
@@ -8622,6 +11171,22 @@ begin
   insert into briar_workflow_checkpoint_storage_validation (
     owner, checkpoints_json
   ) values ('user', new.checkpoints_json);
+end;
+-- @statement
+CREATE TRIGGER briar_issue_checkpoints_shape_insert
+before insert on briar_hunt_runs
+begin
+  insert into briar_workflow_checkpoint_storage_validation (
+    owner, checkpoints_json
+  ) values ('issue', new.issue_checkpoints_json);
+end;
+-- @statement
+CREATE TRIGGER briar_issue_checkpoints_shape_update
+before update of issue_checkpoints_json on briar_hunt_runs
+begin
+  insert into briar_workflow_checkpoint_storage_validation (
+    owner, checkpoints_json
+  ) values ('issue', new.issue_checkpoints_json);
 end;
 -- @statement
 CREATE TRIGGER briar_execution_worker_runtime_insert_guard
@@ -9005,6 +11570,38 @@ begin
     set current_version = excluded.current_version;
 end;
 -- @statement
+CREATE TRIGGER briar_hunt_run_structured_result_insert_guard
+before insert on briar_hunt_runs
+when new.structured_result_json is not null
+  and case
+    when not json_valid(new.structured_result_json) then 1
+    when json_type(new.structured_result_json) <> 'object' then 1
+    when length(cast(new.structured_result_json as blob)) > 131072 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'structured agent result must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_run_structured_result_update_guard
+before update of structured_result_json on briar_hunt_runs
+when new.structured_result_json is not null
+  and case
+    when not json_valid(new.structured_result_json) then 1
+    when json_type(new.structured_result_json) <> 'object' then 1
+    when length(cast(new.structured_result_json as blob)) > 131072 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'structured agent result must be a bounded JSON object'
+  );
+end;
+-- @statement
 CREATE TRIGGER briar_schedule_run_structured_result_insert_guard
 before insert on briar_project_agent_schedule_runs
 when new.structured_result_json is not null
@@ -9035,6 +11632,38 @@ begin
   select raise(
     abort,
     'structured agent result must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_run_execution_metrics_insert_guard
+before insert on briar_hunt_runs
+when new.execution_metrics_json is not null
+  and case
+    when not json_valid(new.execution_metrics_json) then 1
+    when json_type(new.execution_metrics_json) <> 'object' then 1
+    when length(cast(new.execution_metrics_json as blob)) > 4096 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'agent execution metrics must be a bounded JSON object'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_run_execution_metrics_update_guard
+before update of execution_metrics_json on briar_hunt_runs
+when new.execution_metrics_json is not null
+  and case
+    when not json_valid(new.execution_metrics_json) then 1
+    when json_type(new.execution_metrics_json) <> 'object' then 1
+    when length(cast(new.execution_metrics_json as blob)) > 4096 then 1
+    else 0
+  end
+begin
+  select raise(
+    abort,
+    'agent execution metrics must be a bounded JSON object'
   );
 end;
 -- @statement
@@ -9209,6 +11838,426 @@ begin
   where id = new.id and materialized_session_payload_json is not null;
 end;
 -- @statement
+CREATE TRIGGER briar_conversation_issue_creation_project_guard
+before insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-conversation-approved:%'
+  and not exists (
+    select 1 from briar_hunt_runs existing
+    where existing.project_id = new.project_id
+      and existing.source = new.source
+      and existing.source_key = new.source_key
+  )
+  and (
+    new.status <> 'backlog'
+    or new.stage <> 'queued'
+    or new.workflow_stage is not null
+    or new.worker_id is not null
+    or new.agent_id is not null
+    or new.requested_worker_id is not null
+    or new.claim_token_hash is not null
+    or new.claimed_by is not null
+    or new.claimed_at is not null
+    or new.lease_expires_at is not null
+    or new.last_execution_id is not null
+    or new.dispatch_mode is not null
+    or new.dispatch_request_id is not null
+    or new.dispatched_at is not null
+    or new.requested_by_user_id is not null
+    or new.requested_agent_provider is not null
+    or new.requested_agent_model is not null
+    or new.requested_agent_effort is not null
+    or new.completed_at is not null
+    or new.paused_at is not null
+    or new.resume_requested_at is not null
+    or not exists (
+      select 1
+      from briar_issue_action_proposals proposal
+      join briar_hunt_runs conversation
+        on conversation.id = proposal.conversation_run_id
+       and conversation.project_id = proposal.project_id
+      where proposal.status = 'pending'
+        and proposal.action_type = 'request_issue_create'
+        and proposal.project_id = new.project_id
+        and proposal.approval_reserved_by_user_id is not null
+        and proposal.approval_reserved_at is not null
+        and proposal.issue_source_key = new.source_key
+        and new.title = json_extract(proposal.payload_json, '$.issue.title')
+        and new.issue_description is
+          json_extract(proposal.payload_json, '$.issue.description')
+        and new.priority is
+          json_extract(proposal.payload_json, '$.issue.priority')
+        and new.issue_checkpoints_json = '[]'
+        and new.preferred_agent_provider is null
+        and new.preferred_agent_model is null
+        and new.preferred_agent_effort is null
+        and json_extract(new.context_json, '$.origin') =
+          'briar-conversation'
+        and json_extract(new.context_json, '$.proposalId') = proposal.id
+        and json_extract(new.context_json, '$.conversationRunId') =
+          proposal.conversation_run_id
+        and new.full_auto = 0
+        and new.requires_claim_token = 0
+    )
+    or exists (
+      select 1 from briar_hunt_runs existing
+      where existing.source = new.source
+        and existing.source_key = new.source_key
+        and existing.project_id <> new.project_id
+    )
+  )
+BEGIN
+  select raise(abort, 'conversation proposal no longer belongs to project');
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_channel_proposal_reservation_required
+before insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-channel-approved:%'
+  and not exists (
+    select 1 from briar_hunt_runs existing
+    where existing.project_id = new.project_id
+      and existing.source = new.source
+      and existing.source_key = new.source_key
+  )
+  and not exists (
+    select 1
+    from briar_channel_action_proposals proposal
+    join briar_channels channel on channel.id = proposal.channel_id
+    join briar_projects project
+      on project.id = proposal.project_id
+     and project.organization_id = channel.organization_id
+    where proposal.status = 'pending'
+      and proposal.action_type = 'request_issue_create'
+      and proposal.project_id = new.project_id
+      and proposal.issue_source_key = new.source_key
+      and proposal.accepted_by_user_id is not null
+      and proposal.accepted_at is not null
+      and (
+        length(new.source_key) = 87
+        and substr(new.source_key, 1, 23) = 'briar-channel-approved:'
+        and substr(new.source_key, 24) not glob '*[^0-9a-f]*'
+      )
+      and (
+        json_type(proposal.payload_json) = 'object'
+        and (select count(*) from json_each(proposal.payload_json)) = 1
+        and json_type(proposal.payload_json, '$.issue') = 'object'
+        and (
+          select count(*)
+          from json_each(proposal.payload_json, '$.issue')
+        ) = 3
+        and json_type(proposal.payload_json, '$.issue.title') = 'text'
+        and json_type(
+          proposal.payload_json, '$.issue.description'
+        ) in ('text', 'null')
+        and json_type(
+          proposal.payload_json, '$.issue.priority'
+        ) in ('integer', 'null')
+      )
+      and (
+        new.title = json_extract(proposal.payload_json, '$.issue.title')
+        and new.issue_description is
+          json_extract(proposal.payload_json, '$.issue.description')
+        and new.priority is
+          json_extract(proposal.payload_json, '$.issue.priority')
+        and new.status = 'backlog'
+        and new.stage = 'queued'
+        and new.workflow_stage is null
+        and new.issue_checkpoints_json = '[]'
+        and new.detail =
+          '채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.'
+        and new.repository = coalesce(
+          (select settings.github_repository
+           from briar_project_settings settings
+           where settings.project_id = proposal.project_id),
+          project.name
+        )
+      )
+      and (
+        new.assignee_user_id is null
+        and new.agent_id is null
+        and new.worker_id is null
+        and new.requested_worker_id is null
+        and new.claim_token_hash is null
+        and new.claimed_by is null
+        and new.claimed_at is null
+        and new.lease_expires_at is null
+        and new.claim_attempts = 0
+        and new.current_attempt = 1
+        and new.current_revision = 1
+        and new.full_auto = 0
+        and new.requires_claim_token = 0
+      )
+      and (
+        new.last_execution_id is null
+        and new.dispatch_mode is null
+        and new.dispatch_request_id is null
+        and new.dispatched_at is null
+        and new.requested_by_user_id is null
+        and new.requested_agent_provider is null
+        and new.requested_agent_model is null
+        and new.requested_agent_effort is null
+        and new.preferred_agent_provider is null
+        and new.preferred_agent_model is null
+        and new.preferred_agent_effort is null
+      )
+      and (
+        new.branch is null
+        and new.commit_sha is null
+        and new.tracker_provider is null
+        and new.tracker_issue_id is null
+        and new.tracker_issue_identifier is null
+        and new.tracker_issue_url is null
+        and new.tracker_issue_state is null
+        and new.result_summary is null
+        and new.structured_result_json is null
+        and new.pull_request_urls = '[]'
+        and new.target_sha is null
+        and new.staging_qa_status is null
+        and new.production_qa_status is null
+        and new.staging_qa_detail is null
+        and new.production_qa_detail is null
+        and new.execution_metrics_json is null
+      )
+      and (
+        new.completed_at is null
+        and new.paused_at is null
+        and new.resume_requested_at is null
+        and new.waiting_checkpoint_key is null
+        and new.waiting_checkpoint_revision is null
+        and new.event_count = 0
+        and new.source_created_at = proposal.created_at
+        and new.started_at = proposal.created_at
+        and new.last_event_at = proposal.created_at
+        and new.created_at = new.updated_at
+      )
+      and (
+        json_type(new.context_json) = 'object'
+        and (select count(*) from json_each(new.context_json)) = 6
+        and json_type(new.context_json, '$.origin') = 'text'
+        and json_extract(new.context_json, '$.origin') = 'briar-channel'
+        and json_type(new.context_json, '$.proposalId') = 'text'
+        and json_extract(new.context_json, '$.proposalId') = proposal.id
+        and json_type(new.context_json, '$.channelId') = 'text'
+        and json_extract(new.context_json, '$.channelId') = proposal.channel_id
+        and json_type(new.context_json, '$.issueId') = 'text'
+        and json_extract(new.context_json, '$.issueId') = proposal.id
+        and json_type(new.context_json, '$.attachmentCount') = 'integer'
+        and json_extract(new.context_json, '$.attachmentCount') = 0
+        and json_type(new.context_json, '$.relatedMessage') = 'object'
+        and (
+          select count(*)
+          from json_each(new.context_json, '$.relatedMessage')
+        ) = 4
+        and json_type(
+          new.context_json, '$.relatedMessage.organizationId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.organizationId'
+        ) = channel.organization_id
+        and json_type(
+          new.context_json, '$.relatedMessage.channelId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.channelId'
+        ) = proposal.channel_id
+        and json_type(
+          new.context_json, '$.relatedMessage.messageId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.messageId'
+        ) = proposal.reply_message_id
+        and json_type(
+          new.context_json, '$.relatedMessage.rootMessageId'
+        ) = 'text'
+      )
+  )
+BEGIN
+  select raise(abort, 'channel proposal approval reservation not found');
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_finalize_channel_proposal_approval
+after insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-channel-approved:%'
+  and exists (
+    select 1
+    from briar_channel_action_proposals proposal
+    join briar_channels channel on channel.id = proposal.channel_id
+    join briar_projects project
+      on project.id = proposal.project_id
+     and project.organization_id = channel.organization_id
+    where proposal.status = 'pending'
+      and proposal.action_type = 'request_issue_create'
+      and proposal.project_id = new.project_id
+      and proposal.issue_source_key = new.source_key
+      and proposal.accepted_by_user_id is not null
+      and proposal.accepted_at is not null
+      and (
+        length(new.source_key) = 87
+        and substr(new.source_key, 1, 23) = 'briar-channel-approved:'
+        and substr(new.source_key, 24) not glob '*[^0-9a-f]*'
+      )
+      and (
+        json_type(proposal.payload_json) = 'object'
+        and (select count(*) from json_each(proposal.payload_json)) = 1
+        and json_type(proposal.payload_json, '$.issue') = 'object'
+        and (
+          select count(*)
+          from json_each(proposal.payload_json, '$.issue')
+        ) = 3
+        and json_type(proposal.payload_json, '$.issue.title') = 'text'
+        and json_type(
+          proposal.payload_json, '$.issue.description'
+        ) in ('text', 'null')
+        and json_type(
+          proposal.payload_json, '$.issue.priority'
+        ) in ('integer', 'null')
+      )
+      and (
+        new.title = json_extract(proposal.payload_json, '$.issue.title')
+        and new.issue_description is
+          json_extract(proposal.payload_json, '$.issue.description')
+        and new.priority is
+          json_extract(proposal.payload_json, '$.issue.priority')
+        and new.status = 'backlog'
+        and new.stage = 'queued'
+        and new.workflow_stage is null
+        and new.issue_checkpoints_json = '[]'
+        and new.detail =
+          '채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.'
+        and new.repository = coalesce(
+          (select settings.github_repository
+           from briar_project_settings settings
+           where settings.project_id = proposal.project_id),
+          project.name
+        )
+      )
+      and (
+        new.assignee_user_id is null
+        and new.agent_id is null
+        and new.worker_id is null
+        and new.requested_worker_id is null
+        and new.claim_token_hash is null
+        and new.claimed_by is null
+        and new.claimed_at is null
+        and new.lease_expires_at is null
+        and new.claim_attempts = 0
+        and new.current_attempt = 1
+        and new.current_revision = 1
+        and new.full_auto = 0
+        and new.requires_claim_token = 0
+      )
+      and (
+        new.last_execution_id is null
+        and new.dispatch_mode is null
+        and new.dispatch_request_id is null
+        and new.dispatched_at is null
+        and new.requested_by_user_id is null
+        and new.requested_agent_provider is null
+        and new.requested_agent_model is null
+        and new.requested_agent_effort is null
+        and new.preferred_agent_provider is null
+        and new.preferred_agent_model is null
+        and new.preferred_agent_effort is null
+      )
+      and (
+        new.branch is null
+        and new.commit_sha is null
+        and new.tracker_provider is null
+        and new.tracker_issue_id is null
+        and new.tracker_issue_identifier is null
+        and new.tracker_issue_url is null
+        and new.tracker_issue_state is null
+        and new.result_summary is null
+        and new.structured_result_json is null
+        and new.pull_request_urls = '[]'
+        and new.target_sha is null
+        and new.staging_qa_status is null
+        and new.production_qa_status is null
+        and new.staging_qa_detail is null
+        and new.production_qa_detail is null
+        and new.execution_metrics_json is null
+      )
+      and (
+        new.completed_at is null
+        and new.paused_at is null
+        and new.resume_requested_at is null
+        and new.waiting_checkpoint_key is null
+        and new.waiting_checkpoint_revision is null
+        and new.event_count = 0
+        and new.source_created_at = proposal.created_at
+        and new.started_at = proposal.created_at
+        and new.last_event_at = proposal.created_at
+        and new.created_at = new.updated_at
+      )
+      and (
+        json_type(new.context_json) = 'object'
+        and (select count(*) from json_each(new.context_json)) = 6
+        and json_type(new.context_json, '$.origin') = 'text'
+        and json_extract(new.context_json, '$.origin') = 'briar-channel'
+        and json_type(new.context_json, '$.proposalId') = 'text'
+        and json_extract(new.context_json, '$.proposalId') = proposal.id
+        and json_type(new.context_json, '$.channelId') = 'text'
+        and json_extract(new.context_json, '$.channelId') = proposal.channel_id
+        and json_type(new.context_json, '$.issueId') = 'text'
+        and json_extract(new.context_json, '$.issueId') = proposal.id
+        and json_type(new.context_json, '$.attachmentCount') = 'integer'
+        and json_extract(new.context_json, '$.attachmentCount') = 0
+        and json_type(new.context_json, '$.relatedMessage') = 'object'
+        and (
+          select count(*)
+          from json_each(new.context_json, '$.relatedMessage')
+        ) = 4
+        and json_type(
+          new.context_json, '$.relatedMessage.organizationId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.organizationId'
+        ) = channel.organization_id
+        and json_type(
+          new.context_json, '$.relatedMessage.channelId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.channelId'
+        ) = proposal.channel_id
+        and json_type(
+          new.context_json, '$.relatedMessage.messageId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.messageId'
+        ) = proposal.reply_message_id
+        and json_type(
+          new.context_json, '$.relatedMessage.rootMessageId'
+        ) = 'text'
+      )
+  )
+BEGIN
+  insert into briar_channel_issue_approval_audit (
+    id, proposal_id, organization_id, channel_id, project_id, run_id,
+    approved_by_user_id, approved_at, issue_source_key, result_verification,
+    payload_json, created_at
+  )
+  select proposal.id || ':approval:' || proposal.issue_source_key,
+         proposal.id, channel.organization_id, proposal.channel_id,
+         proposal.project_id, new.id, proposal.accepted_by_user_id,
+         proposal.accepted_at, proposal.issue_source_key, 'atomic',
+         proposal.payload_json, proposal.accepted_at
+  from briar_channel_action_proposals proposal
+  join briar_channels channel on channel.id = proposal.channel_id
+  where proposal.status = 'pending'
+    and proposal.action_type = 'request_issue_create'
+    and proposal.project_id = new.project_id
+    and proposal.issue_source_key = new.source_key
+    and proposal.accepted_by_user_id is not null
+    and proposal.accepted_at is not null;
+  update briar_channel_action_proposals
+  set status = 'accepted', result_run_id = new.id, updated_at = accepted_at
+  where status = 'pending' and action_type = 'request_issue_create'
+    and project_id = new.project_id and issue_source_key = new.source_key
+    and accepted_by_user_id is not null and accepted_at is not null;
+END;
+-- @statement
 CREATE TRIGGER briar_channel_issue_approval_audit_atomic_insert_guard
 before insert on briar_channel_issue_approval_audit
 when new.result_verification <> 'atomic'
@@ -9221,6 +12270,273 @@ before update of result_verification on briar_channel_issue_approval_audit
 when new.result_verification <> 'atomic'
 begin
   select raise(abort, 'channel issue approval requires atomic verification');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_issue_approval_finalize_guard
+before update of status on briar_channel_action_proposals
+when old.status = 'pending' and new.status = 'accepted'
+  and old.action_type = 'request_issue_create'
+  and not exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.proposal_id = old.id
+      and approval.result_verification = 'atomic'
+      and approval.run_id = new.result_run_id
+      and approval.project_id = new.project_id
+      and approval.issue_source_key = new.issue_source_key
+      and approval.approved_by_user_id is new.accepted_by_user_id
+      and approval.approved_at = new.accepted_at
+  )
+begin
+  select raise(abort, 'channel proposal acceptance requires atomic approval');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_approved_backlog_event_guard
+before insert on briar_hunt_events
+when new.status not in ('backlog', 'cancelled')
+  and new.actor not like 'briar-app:%'
+  and exists (
+    select 1
+    from briar_hunt_runs run
+    join briar_channel_issue_approval_audit approval
+      on approval.run_id = run.id
+     and approval.issue_source_key = run.source_key
+    where run.id = new.run_id
+      and run.source = 'issue'
+      and run.status in ('backlog', 'cancelled')
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'channel-approved issue execution requires explicit dispatch'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_channel_approved_backlog_context_guard
+before update of context_json on briar_hunt_runs
+when old.status in ('backlog', 'cancelled')
+  and new.context_json is not old.context_json
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'channel-approved issue context is immutable before dispatch'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_channel_approved_retryable_transfer_guard
+before update of project_id, status on briar_hunt_runs
+when old.status in ('queued', 'blocked', 'failed')
+  and new.project_id <> old.project_id
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+  and not (
+    new.status = 'backlog'
+    and new.stage = 'queued'
+    and new.workflow_stage is null
+    and new.agent_id is null
+    and new.worker_id is null
+    and new.requested_worker_id is null
+    and new.claim_token_hash is null
+    and new.claimed_by is null
+    and new.claimed_at is null
+    and new.lease_expires_at is null
+    and new.last_execution_id is null
+    and new.dispatch_mode is null
+    and new.dispatch_request_id is null
+    and new.dispatched_at is null
+    and new.requested_by_user_id is null
+    and new.requested_agent_provider is null
+    and new.requested_agent_model is null
+    and new.requested_agent_effort is null
+    and new.paused_at is null
+    and new.resume_requested_at is null
+    and new.completed_at is null
+  )
+begin
+  select raise(
+    abort, 'channel-approved retryable transfer requires execution reset'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_channel_approved_terminal_transfer_guard
+before update of project_id on briar_hunt_runs
+when old.status in ('completed', 'cancelled')
+  and new.project_id <> old.project_id
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'channel-approved terminal issue transfer is not allowed'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_channel_approved_terminal_reactivation_guard
+before update of status on briar_hunt_runs
+when old.status in ('completed', 'cancelled')
+  and new.status not in ('completed', 'cancelled')
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'approved issue terminal reactivation requires fresh execution approval'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_channel_approved_dispatch_clear_guard
+before update of dispatch_request_id, status on briar_hunt_runs
+when old.dispatch_request_id is not null
+  and new.dispatch_request_id is null
+  and new.status not in ('backlog', 'completed', 'cancelled')
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  select raise(
+    abort, 'channel-approved dispatch cancellation requires backlog reset'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_channel_approved_dispatch_preference_snapshot
+after update of dispatch_request_id on briar_hunt_runs
+when new.dispatch_request_id is not null
+  and new.dispatch_request_id is not old.dispatch_request_id
+  and new.requested_agent_provider is not null
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = new.id
+      and approval.issue_source_key = new.source_key
+      and approval.result_verification = 'atomic'
+  )
+begin
+  update briar_hunt_runs
+  set preferred_agent_provider = new.requested_agent_provider,
+      preferred_agent_model = new.requested_agent_model,
+      preferred_agent_effort = new.requested_agent_effort
+  where id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_channel_approved_dispatch_preference_guard
+before update of preferred_agent_provider, preferred_agent_model,
+  preferred_agent_effort on briar_hunt_runs
+when old.dispatch_request_id is not null
+  and exists (
+    select 1 from briar_channel_issue_approval_audit approval
+    where approval.run_id = old.id
+      and approval.issue_source_key = old.source_key
+      and approval.result_verification = 'atomic'
+  )
+  and not (
+    new.preferred_agent_provider is old.preferred_agent_provider
+    and new.preferred_agent_model is old.preferred_agent_model
+    and new.preferred_agent_effort is old.preferred_agent_effort
+  )
+  and not (
+    new.dispatch_request_id is old.dispatch_request_id
+    and new.requested_agent_provider is old.requested_agent_provider
+    and new.requested_agent_model is old.requested_agent_model
+    and new.requested_agent_effort is old.requested_agent_effort
+    and new.preferred_agent_provider is old.requested_agent_provider
+    and new.preferred_agent_model is old.requested_agent_model
+    and new.preferred_agent_effort is old.requested_agent_effort
+  )
+  and not (
+    new.project_id is old.project_id
+    and new.source is old.source
+    and new.source_key is old.source_key
+    and new.dispatch_request_id is not null
+    and new.dispatch_request_id is not old.dispatch_request_id
+    and new.dispatched_at is not null
+    and new.requested_by_user_id is not null
+    and new.requested_agent_provider is not null
+    and new.status = 'queued'
+    and new.stage = 'queued'
+    and new.workflow_stage is null
+    and new.dispatch_mode in ('any', 'specific')
+    and (
+      (new.dispatch_mode = 'any' and new.requested_worker_id is null)
+      or
+      (new.dispatch_mode = 'specific' and new.requested_worker_id is not null)
+    )
+    and new.worker_id is null
+    and new.claim_token_hash is null
+    and new.claimed_by is null
+    and new.claimed_at is null
+    and new.lease_expires_at is null
+    and new.preferred_agent_provider is new.requested_agent_provider
+    and new.preferred_agent_model is new.requested_agent_model
+    and new.preferred_agent_effort is new.requested_agent_effort
+  )
+begin
+  select raise(
+    abort, 'approved channel issue dispatch preferences are immutable'
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_channel_proposal_project_guard
+before insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-channel-approved:%'
+  and not exists (
+    select 1 from briar_hunt_runs existing
+    where existing.source = new.source
+      and existing.source_key = new.source_key
+      and existing.project_id = new.project_id
+  )
+  and exists (
+    select 1 from briar_hunt_runs existing
+    where existing.source = new.source
+      and existing.source_key = new.source_key
+      and existing.project_id <> new.project_id
+  )
+begin
+  select raise(abort, 'channel proposal issue project conflict');
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_channel_proposal_reservation_guard
+before insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-channel-approved:%'
+  and exists (
+    select 1 from briar_channel_action_proposals proposal
+    where proposal.issue_source_key = new.source_key
+      and proposal.project_id is not null
+      and proposal.project_id <> new.project_id
+  )
+begin
+  select raise(abort, 'channel proposal issue project conflict');
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_context_policy_insert_guard
+before insert on briar_hunt_runs
+when json_type(new.context_json, '$.fullAuto') is not null
+begin
+  select raise(abort, 'run context cannot contain execution policy');
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_context_policy_update_guard
+before update of context_json on briar_hunt_runs
+when json_type(new.context_json, '$.fullAuto') is not null
+begin
+  select raise(abort, 'run context cannot contain execution policy');
 end;
 -- @statement
 CREATE TRIGGER briar_reply_completion_receipt_insert_guard
@@ -10321,3400 +13637,6 @@ begin
   delete from briar_worker_update_reservations where work_type = 'dmMemory' and work_id = new.id;
 end;
 -- @statement
-CREATE TRIGGER briar_project_agent_task_jobs_update_claim_fence
-before update of claim_token_hash on briar_project_agent_task_jobs
-when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
-begin
-  select raise(ignore) where exists (
-    select 1 from briar_execution_worker_update_requests request
-    join briar_execution_workers worker on worker.device_id = request.device_id
-    where worker.id = new.claimed_worker_id and request.status = 'requested'
-      and request.handoff_state <> 'idle'
-  );
-  select raise(ignore) where exists (
-    select 1 from briar_worker_update_reservations reservation
-    where reservation.work_type = 'projectAgentTask' and reservation.work_id = new.id
-      and reservation.device_id is not (
-        select device_id from briar_execution_workers where id = new.claimed_worker_id
-      )
-  );
-  select raise(ignore) where old.planned_update_resume = 0 and exists (
-    select 1 from briar_worker_update_reservations reservation
-    join briar_execution_workers worker on worker.device_id = reservation.device_id
-    where worker.id = new.claimed_worker_id
-  );
-end;
--- @statement
-CREATE TRIGGER briar_project_agent_task_jobs_update_reservation_release
-after update of status, planned_update_resume on briar_project_agent_task_jobs
-when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
-begin
-  delete from briar_worker_update_reservations
-    where work_type = 'projectAgentTask' and work_id = new.id;
-end;
--- @statement
-CREATE TRIGGER briar_channel_agent_reply_jobs_update_claim_fence
-before update of claim_token_hash on briar_channel_agent_reply_jobs
-when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
-begin
-  select raise(ignore) where exists (
-    select 1 from briar_execution_worker_update_requests request
-    join briar_execution_workers worker on worker.device_id = request.device_id
-    where worker.id = new.claimed_worker_id and request.status = 'requested'
-      and request.handoff_state <> 'idle'
-  );
-  select raise(ignore) where exists (
-    select 1 from briar_worker_update_reservations reservation
-    where reservation.work_type = 'channelReply' and reservation.work_id = new.id
-      and reservation.device_id is not (
-        select device_id from briar_execution_workers where id = new.claimed_worker_id
-      )
-  );
-  select raise(ignore) where old.planned_update_resume = 0 and exists (
-    select 1 from briar_worker_update_reservations reservation
-    join briar_execution_workers worker on worker.device_id = reservation.device_id
-    where worker.id = new.claimed_worker_id
-  );
-end;
--- @statement
-CREATE TRIGGER briar_channel_agent_reply_jobs_update_reservation_release
-after update of status, planned_update_resume on briar_channel_agent_reply_jobs
-when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
-begin
-  delete from briar_worker_update_reservations
-    where work_type = 'channelReply' and work_id = new.id;
-end;
--- @statement
-CREATE TRIGGER briar_dashboard_dependencies_insert_sync
-after insert on briar_issue_dependencies BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values
-    (new.project_id, 'run', new.prerequisite_run_id, 'upsert', datetime('now')),
-    (new.project_id, 'run', new.dependent_run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_dependencies_delete_sync
-before delete on briar_issue_dependencies BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values
-    (old.project_id, 'run', old.prerequisite_run_id, 'upsert', datetime('now')),
-    (old.project_id, 'run', old.dependent_run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (old.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_messages_insert_sync
-after insert on briar_issue_messages BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (new.project_id, 'notifications', new.id, 'replace', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_messages_update_sync
-after update on briar_issue_messages BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (new.project_id, 'notifications', new.id, 'replace', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_messages_delete_sync
-before delete on briar_issue_messages BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (old.project_id, 'notifications', old.id, 'replace', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (old.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_events_insert_sync
-after insert on briar_hunt_events BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) select project_id, 'run', new.run_id, 'upsert', datetime('now')
-    from briar_hunt_runs where id = new.run_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select project_id, last_insert_rowid() from briar_hunt_runs where id = new.run_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_events_update_sync
-after update on briar_hunt_events BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) select project_id, 'run', new.run_id, 'upsert', datetime('now')
-    from briar_hunt_runs where id = new.run_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select project_id, last_insert_rowid() from briar_hunt_runs where id = new.run_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_events_delete_sync
-after delete on briar_hunt_events BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) select project_id, 'run', old.run_id, 'upsert', datetime('now')
-    from briar_hunt_runs where id = old.run_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select project_id, last_insert_rowid() from briar_hunt_runs where id = old.run_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_mentions_insert_sync
-after insert on briar_issue_message_mentions BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) select message.project_id, 'notifications', new.message_id, 'replace', datetime('now')
-    from briar_issue_messages message where message.id = new.message_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select message.project_id, last_insert_rowid()
-    from briar_issue_messages message where message.id = new.message_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_mentions_delete_sync
-after delete on briar_issue_message_mentions BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) select message.project_id, 'notifications', old.message_id, 'replace', datetime('now')
-    from briar_issue_messages message where message.id = old.message_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select message.project_id, last_insert_rowid()
-    from briar_issue_messages message where message.id = old.message_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_hunt_events_increment_run_event_count
-after insert on briar_hunt_events BEGIN
-  update briar_hunt_runs
-  set event_count = event_count + 1
-  where id = new.run_id;
-END;
--- @statement
-CREATE TRIGGER briar_hunt_events_decrement_run_event_count
-after delete on briar_hunt_events BEGIN
-  update briar_hunt_runs
-  set event_count = max(event_count - 1, 0)
-  where id = old.run_id;
-END;
--- @statement
-CREATE TRIGGER briar_issue_result_reviews_insert_sync
-after insert on briar_issue_result_reviews BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) select project_id, 'run', new.run_id, 'upsert', datetime('now')
-      from briar_hunt_runs where id = new.run_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select project_id, last_insert_rowid()
-    from briar_hunt_runs where id = new.run_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_issue_result_reviews_delete_sync
-after delete on briar_issue_result_reviews BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) select project_id, 'run', old.run_id, 'upsert', datetime('now')
-      from briar_hunt_runs where id = old.run_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select project_id, last_insert_rowid()
-    from briar_hunt_runs where id = old.run_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_quarantined_transcript_session_project_guard
-before update of project_id, run_id on briar_agent_transcript_sessions
-when (new.project_id <> old.project_id or new.run_id is not old.run_id)
-  and exists (
-    select 1 from briar_channel_issue_transfer_quarantine quarantine
-    where quarantine.entity_kind = 'agent_transcript_session'
-      and quarantine.entity_id = old.session_id
-  )
-BEGIN
-  select raise(abort, 'quarantined transcript ownership is immutable');
-END;
--- @statement
-CREATE TRIGGER briar_quarantined_transcript_archive_project_guard
-before update of project_id on briar_log_archives
-when new.project_id <> old.project_id
-  and exists (
-    select 1 from briar_channel_issue_transfer_quarantine quarantine
-    where quarantine.entity_kind = 'agent_transcript_archive'
-      and quarantine.entity_id = old.id
-  )
-BEGIN
-  select raise(abort, 'quarantined transcript ownership is immutable');
-END;
--- @statement
-CREATE TRIGGER briar_mismatched_transcript_archive_quarantine
-after insert on briar_log_archives
-when new.archive_kind = 'agent_transcript'
-  and new.run_id is not null
-  and exists (
-    select 1 from briar_hunt_runs run
-    where run.id = new.run_id and run.project_id <> new.project_id
-  )
-BEGIN
-  insert into briar_channel_issue_transfer_quarantine (
-    entity_kind, entity_id, run_id, source_project_id, target_project_id,
-    reason, detected_at
-  )
-  select 'agent_transcript_archive', new.id, new.run_id, new.project_id,
-         run.project_id, 'unverified_transcript_ownership', datetime('now')
-  from briar_hunt_runs run where run.id = new.run_id
-  on conflict (entity_kind, entity_id) do nothing;
-
-  insert into briar_channel_issue_transfer_quarantine (
-    entity_kind, entity_id, run_id, source_project_id, target_project_id,
-    reason, detected_at
-  )
-  select 'agent_transcript_session', new.scope_id, new.run_id, new.project_id,
-         run.project_id, 'unverified_transcript_ownership', datetime('now')
-  from briar_hunt_runs run where run.id = new.run_id
-  on conflict (entity_kind, entity_id) do nothing;
-
-  update briar_log_archives
-  set status = 'failed',
-      failure_count = failure_count + 1,
-      last_error = 'Transcript archive ownership requires remediation'
-  where id = new.id and status in ('verified', 'complete');
-END;
--- @statement
-CREATE TRIGGER briar_mismatched_transcript_archive_verify_guard
-before update of status on briar_log_archives
-when new.archive_kind = 'agent_transcript'
-  and new.status in ('verified', 'complete')
-  and new.run_id is not null
-  and exists (
-    select 1 from briar_hunt_runs run
-    where run.id = new.run_id and run.project_id <> new.project_id
-  )
-BEGIN
-  select raise(abort, 'transcript archive ownership requires remediation');
-END;
--- @statement
-CREATE TRIGGER briar_mismatched_run_archive_insert_guard
-before insert on briar_log_archives
-when new.archive_kind not in ('execution_audit', 'agent_transcript')
-  and new.run_id is not null
-  and not exists (
-    select 1 from briar_hunt_runs run
-    where run.id = new.run_id and run.project_id = new.project_id
-  )
-BEGIN
-  select raise(abort, 'run archive project does not match current run');
-END;
--- @statement
-CREATE TRIGGER briar_transcript_session_run_insert_guard
-before insert on briar_agent_transcript_sessions
-when new.run_id is not null
-  and not exists (
-    select 1 from briar_hunt_runs run
-    where run.id = new.run_id and run.project_id = new.project_id
-  )
-BEGIN
-  select raise(abort, 'transcript run does not belong to project');
-END;
--- @statement
-CREATE TRIGGER briar_transcript_session_run_update_guard
-before update of run_id, project_id on briar_agent_transcript_sessions
-when new.run_id is not null
-  and not exists (
-    select 1 from briar_hunt_runs run
-    where run.id = new.run_id and run.project_id = new.project_id
-  )
-  and not exists (
-    select 1 from briar_channel_issue_transfer_quarantine quarantine
-    where quarantine.entity_kind = 'agent_transcript_session'
-      and quarantine.entity_id = old.session_id
-  )
-BEGIN
-  select raise(abort, 'transcript run does not belong to project');
-END;
--- @statement
-CREATE TRIGGER briar_conversation_issue_creation_finalize_guard
-before update of status on briar_issue_action_proposals
-when old.status = 'pending'
-  and new.status = 'accepted'
-  and old.action_type = 'request_issue_create'
-  and not (
-    old.approval_reserved_by_user_id is not null
-    and old.approval_reserved_at is not null
-    and old.issue_source_key is not null
-    and new.approval_reserved_by_user_id is
-      old.approval_reserved_by_user_id
-    and new.approval_reserved_at is old.approval_reserved_at
-    and new.issue_source_key is old.issue_source_key
-    and new.accepted_by_user_id is old.approval_reserved_by_user_id
-    and new.accepted_at = old.approval_reserved_at
-    and new.result_run_id is not null
-    and exists (
-      select 1
-      from briar_hunt_runs conversation
-      where conversation.id = old.conversation_run_id
-        and conversation.project_id = old.project_id
-    )
-    and exists (
-      select 1
-      from briar_hunt_runs result
-      where result.id = new.result_run_id
-        and result.project_id = old.project_id
-        and result.source = 'issue'
-        and result.source_key = old.issue_source_key
-        and result.status = 'backlog' and result.stage = 'queued'
-        and result.workflow_stage is null
-        and result.worker_id is null
-        and result.agent_id is null
-        and result.requested_worker_id is null
-        and result.claim_token_hash is null
-        and result.claimed_by is null and result.claimed_at is null
-        and result.lease_expires_at is null
-        and result.last_execution_id is null
-        and result.dispatch_mode is null
-        and result.dispatch_request_id is null
-        and result.dispatched_at is null
-        and result.requested_by_user_id is null
-        and result.requested_agent_provider is null
-        and result.requested_agent_model is null
-        and result.requested_agent_effort is null
-        and result.completed_at is null
-        and result.paused_at is null
-        and result.resume_requested_at is null
-    )
-  )
-BEGIN
-  select raise(abort, 'conversation proposal acceptance requires reservation');
-END;
--- @statement
-CREATE TRIGGER briar_conversation_issue_reservation_immutable
-before update of approval_reserved_by_user_id, approval_reserved_at,
-                 issue_source_key
-on briar_issue_action_proposals
-when old.action_type = 'request_issue_create'
-  and old.issue_source_key is not null
-  and not (
-    new.issue_source_key is old.issue_source_key
-    and (
-      (
-        new.approval_reserved_at is old.approval_reserved_at
-        and (
-          new.approval_reserved_by_user_id is
-            old.approval_reserved_by_user_id
-          or (
-            old.approval_reserved_by_user_id is not null
-            and new.approval_reserved_by_user_id is null
-          )
-        )
-      )
-      or (
-        old.approval_reserved_by_user_id is null
-        and new.approval_reserved_by_user_id is not null
-        and new.approval_reserved_at is not null
-      )
-    )
-  )
-BEGIN
-  select raise(abort, 'conversation proposal reservation is immutable');
-END;
--- @statement
-CREATE TRIGGER briar_conversation_issue_approval_audit_insert
-after update of status on briar_issue_action_proposals
-when old.status = 'pending'
-  and new.status = 'accepted'
-  and old.action_type = 'request_issue_create'
-BEGIN
-  insert into briar_channel_issue_approval_audit (
-    id, proposal_id, organization_id, channel_id, project_id, run_id,
-    approved_by_user_id, approved_at, issue_source_key, result_verification,
-    payload_json, created_at
-  )
-  select old.id || ':conversation-approval:' || new.result_run_id,
-         old.id, project.organization_id,
-         'conversation:' || old.conversation_run_id,
-         old.project_id, new.result_run_id, new.accepted_by_user_id,
-         new.accepted_at, old.issue_source_key, 'atomic', old.payload_json,
-         new.accepted_at
-  from briar_projects project where project.id = old.project_id
-  on conflict (id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_channel_changes_proposals_insert_sync
-after insert on briar_channel_action_proposals BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) select channel.organization_id, new.channel_id, 'proposal', new.id,
-           'upsert', datetime('now')
-    from briar_channels channel where channel.id = new.channel_id;
-  insert into briar_channel_sync_state (organization_id, current_version)
-  select channel.organization_id, last_insert_rowid()
-  from briar_channels channel where channel.id = new.channel_id
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channels channel where channel.id = new.channel_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = new.channel_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = new.channel_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_changes_proposals_update_sync
-after update on briar_channel_action_proposals BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) select channel.organization_id, new.channel_id, 'proposal', new.id,
-           'upsert', datetime('now')
-    from briar_channels channel where channel.id = new.channel_id;
-  insert into briar_channel_sync_state (organization_id, current_version)
-  select channel.organization_id, last_insert_rowid()
-  from briar_channels channel where channel.id = new.channel_id
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  select channel.organization_id, 1
-  from briar_channels channel where channel.id = new.channel_id
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = new.channel_id
-  )
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id in (
-    select channel.organization_id
-    from briar_channels channel where channel.id = new.channel_id
-  )
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_create_execution_intent_insert_guard
-before insert on briar_channel_action_proposals
-when not (
-  (new.execute_after_create = 0 and new.execution_proposal_id is null)
-  or (
-    new.execute_after_create = 1
-    and new.execution_proposal_id is not null
-    and new.action_type = 'request_issue_create'
-    and new.status = 'pending'
-  )
-)
-BEGIN
-  select raise(abort, 'invalid channel create execution intent');
-END;
--- @statement
-CREATE TRIGGER briar_issue_create_execution_intent_insert_guard
-before insert on briar_issue_action_proposals
-when not (
-  (new.execute_after_create = 0 and new.execution_proposal_id is null)
-  or (
-    new.execute_after_create = 1
-    and new.execution_proposal_id is not null
-    and new.action_type = 'request_issue_create'
-    and new.status = 'pending'
-  )
-)
-BEGIN
-  select raise(abort, 'invalid issue create execution intent');
-END;
--- @statement
-CREATE TRIGGER briar_channel_create_execution_intent_immutable
-before update of execute_after_create, execution_proposal_id
-on briar_channel_action_proposals
-when old.execute_after_create <> new.execute_after_create
-  or old.execution_proposal_id is not new.execution_proposal_id
-BEGIN
-  select raise(abort, 'channel create execution intent is immutable');
-END;
--- @statement
-CREATE TRIGGER briar_issue_create_execution_intent_immutable
-before update of execute_after_create, execution_proposal_id
-on briar_issue_action_proposals
-when old.execute_after_create <> new.execute_after_create
-  or old.execution_proposal_id is not new.execution_proposal_id
-BEGIN
-  select raise(abort, 'issue create execution intent is immutable');
-END;
--- @statement
-CREATE TRIGGER briar_issue_create_materialize_execution_proposal
-after update of status on briar_issue_action_proposals
-when old.status = 'pending' and new.status = 'accepted'
-  and new.action_type = 'request_issue_create'
-  and new.execute_after_create = 1
-  and new.execution_proposal_id is not null
-  and new.result_run_id is not null
-BEGIN
-  insert into briar_issue_execution_proposals (
-    id, organization_id, project_id, source_kind, channel_id,
-    conversation_run_id, trigger_message_id, reply_message_id,
-    target_run_id, target_title, target_run_updated_at,
-    proposed_by_agent_id, delegated_by_agent_id, delegated_by_agent_name,
-    origin_create_proposal_id, created_at, updated_at
-  )
-  select new.execution_proposal_id, project.organization_id, new.project_id,
-         'issue', null, new.conversation_run_id, new.trigger_message_id,
-         new.reply_message_id, run.id, run.title, run.updated_at,
-         conversation.agent_id, null, null, new.id,
-         new.accepted_at, new.accepted_at
-  from briar_hunt_runs run
-  join briar_hunt_runs conversation
-    on conversation.id = new.conversation_run_id
-   and conversation.project_id = new.project_id
-  join briar_projects project on project.id = new.project_id
-  where run.id = new.result_run_id and run.project_id = new.project_id
-    and run.status = 'backlog' and run.stage = 'queued'
-    and run.dispatch_request_id is null and run.claim_token_hash is null
-  on conflict (id) do nothing;
-
-  select raise(abort, 'issue execution proposal was not materialized')
-  where not exists (
-    select 1
-    from briar_issue_execution_proposals proposal
-    where proposal.id = new.execution_proposal_id
-      and proposal.project_id = new.project_id
-      and proposal.source_kind = 'issue'
-      and proposal.channel_id is null
-      and proposal.conversation_run_id = new.conversation_run_id
-      and proposal.trigger_message_id = new.trigger_message_id
-      and proposal.reply_message_id = new.reply_message_id
-      and proposal.target_run_id = new.result_run_id
-      and proposal.origin_create_proposal_id = new.id
-      and proposal.status = 'pending'
-      and proposal.dispatch_request_id is null
-  );
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_issue_rework_proposals_insert_sync
-after insert on briar_issue_rework_proposals BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.project_id, 'notifications', new.reply_message_id, 'replace',
-    datetime('now')
-  );
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_issue_rework_proposals_update_sync
-after update on briar_issue_rework_proposals BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.project_id, 'notifications', new.reply_message_id, 'replace',
-    datetime('now')
-  );
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_issue_action_proposals_insert_sync
-after insert on briar_issue_action_proposals BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.project_id, 'notifications', new.reply_message_id, 'replace',
-    datetime('now')
-  );
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_issue_action_proposals_update_sync
-after update on briar_issue_action_proposals BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.project_id, 'notifications', new.reply_message_id, 'replace',
-    datetime('now')
-  );
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_issue_subscriptions_message_author_insert
-after insert on briar_issue_messages
-when new.author_user_id is not null BEGIN
-  insert into briar_issue_subscriptions (
-    run_id, organization_id, user_id, created_at
-  )
-  select new.run_id, project.organization_id, new.author_user_id, new.created_at
-  from briar_hunt_runs run
-  join briar_projects project on project.id = run.project_id
-  join briar_organization_members membership
-    on membership.organization_id = project.organization_id
-   and membership.user_id = new.author_user_id
-  where run.id = new.run_id and run.project_id = new.project_id
-  on conflict (run_id, user_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_issue_subscriptions_mention_insert
-after insert on briar_issue_message_mentions BEGIN
-  insert into briar_issue_subscriptions (
-    run_id, organization_id, user_id, created_at
-  )
-  select message.run_id, project.organization_id, new.user_id, new.created_at
-  from briar_issue_messages message
-  join briar_projects project on project.id = message.project_id
-  join briar_organization_members membership
-    on membership.organization_id = project.organization_id
-   and membership.user_id = new.user_id
-  where message.id = new.message_id
-  on conflict (run_id, user_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_runs_insert_sync
-after insert on briar_hunt_runs BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (new.project_id, 'run', new.id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_runs_delete_sync
-before delete on briar_hunt_runs BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (old.project_id, 'run', old.id, 'delete', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (old.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_workflow_v2_insert
-before insert on briar_hunt_runs
-when not (
-  json_valid(new.workflow_snapshot_json)
-  and json_extract(new.workflow_snapshot_json, '$.version') = 2
-  and json_type(new.workflow_snapshot_json, '$.execution.checkpoints') = 'array'
-  and not exists (
-    select 1 from json_each(new.workflow_snapshot_json, '$.execution') field
-    where field.key <> 'checkpoints'
-  )
-  and not exists (
-    select 1 from json_each(new.workflow_snapshot_json, '$.execution.checkpoints') checkpoint
-    where json_extract(checkpoint.value, '$.key') not glob 'project-*'
-      and json_extract(checkpoint.value, '$.key') not glob 'user-*'
-      and json_extract(checkpoint.value, '$.key') not glob 'issue-*'
-  )
-)
-begin
-  select raise(abort, 'run workflow must use canonical v2 checkpoints');
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_workflow_v2_update
-before update of workflow_snapshot_json on briar_hunt_runs
-when not (
-  json_valid(new.workflow_snapshot_json)
-  and json_extract(new.workflow_snapshot_json, '$.version') = 2
-  and json_type(new.workflow_snapshot_json, '$.execution.checkpoints') = 'array'
-  and not exists (
-    select 1 from json_each(new.workflow_snapshot_json, '$.execution') field
-    where field.key <> 'checkpoints'
-  )
-  and not exists (
-    select 1 from json_each(new.workflow_snapshot_json, '$.execution.checkpoints') checkpoint
-    where json_extract(checkpoint.value, '$.key') not glob 'project-*'
-      and json_extract(checkpoint.value, '$.key') not glob 'user-*'
-      and json_extract(checkpoint.value, '$.key') not glob 'issue-*'
-  )
-)
-begin
-  select raise(abort, 'run workflow must use canonical v2 checkpoints');
-END;
--- @statement
-CREATE TRIGGER briar_conversation_issue_creation_finalize
-after insert on briar_hunt_runs
-when new.source = 'issue'
-  and new.source_key like 'briar-conversation-approved:%'
-BEGIN
-  update briar_issue_action_proposals
-  set status = 'accepted',
-      accepted_by_user_id = approval_reserved_by_user_id,
-      accepted_at = approval_reserved_at,
-      result_run_id = new.id,
-      updated_at = approval_reserved_at
-  where status = 'pending'
-    and action_type = 'request_issue_create'
-    and project_id = new.project_id
-    and approval_reserved_by_user_id is not null
-    and approval_reserved_at is not null
-    and issue_source_key = new.source_key;
-END;
--- @statement
-CREATE TRIGGER briar_conversation_issue_acceptance_transfer_guard
-before update of project_id on briar_hunt_runs
-when new.project_id <> old.project_id
-  and exists (
-    select 1 from briar_issue_action_proposals proposal
-    where proposal.status = 'pending'
-      and proposal.action_type = 'request_issue_create'
-      and (
-        (
-          proposal.conversation_run_id = old.id
-          and proposal.approval_reserved_by_user_id is not null
-        )
-        or (
-          old.source = 'issue'
-          and proposal.issue_source_key is not null
-          and old.source_key = proposal.issue_source_key
-        )
-      )
-  )
-BEGIN
-  select raise(abort, 'conversation proposal acceptance in progress');
-END;
--- @statement
-CREATE TRIGGER briar_verified_run_archive_transfer_guard
-before update of project_id on briar_hunt_runs
-when new.project_id <> old.project_id
-  and exists (
-    select 1 from briar_log_archives archive
-    where archive.run_id = old.id and archive.status = 'verified'
-      and archive.archive_kind <> 'execution_audit'
-  )
-BEGIN
-  select raise(abort, 'verified run archive prevents transfer');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_reserved_proposal_delete_guard
-before delete on briar_issue_execution_proposals
-when old.status = 'pending' and old.dispatch_request_id is not null
-  and exists (
-    select 1 from briar_organizations organization
-    where organization.id = old.organization_id
-  )
-  and exists (
-    select 1 from briar_projects project where project.id = old.project_id
-  )
-  and exists (
-    select 1 from briar_hunt_runs run where run.id = old.target_run_id
-  )
-BEGIN
-  select raise(abort, 'reserved execution proposal cannot be deleted');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_identity_immutable
-before update on briar_issue_execution_proposals
-when new.id is not old.id
-  or new.organization_id is not old.organization_id
-  or new.project_id is not old.project_id
-  or new.source_kind is not old.source_kind
-  or not (
-    new.channel_id is old.channel_id
-    or (
-      old.channel_id is not null and new.channel_id is null
-      and not exists (
-        select 1 from briar_channels channel where channel.id = old.channel_id
-      )
-    )
-  )
-  or not (
-    new.conversation_run_id is old.conversation_run_id
-    or (
-      old.conversation_run_id is not null and new.conversation_run_id is null
-      and not exists (
-        select 1 from briar_hunt_runs run
-        where run.id = old.conversation_run_id
-      )
-    )
-  )
-  or new.trigger_message_id is not old.trigger_message_id
-  or new.reply_message_id is not old.reply_message_id
-  or new.target_run_id is not old.target_run_id
-  or new.target_title is not old.target_title
-  or new.target_run_updated_at is not old.target_run_updated_at
-  or not (
-    new.proposed_by_agent_id is old.proposed_by_agent_id
-    or (old.proposed_by_agent_id is not null
-        and new.proposed_by_agent_id is null
-        and not exists (
-          select 1 from briar_project_agents agent
-          where agent.id = old.proposed_by_agent_id
-        ))
-  )
-  or not (
-    new.delegated_by_agent_id is old.delegated_by_agent_id
-    or (old.delegated_by_agent_id is not null
-        and new.delegated_by_agent_id is null
-        and not exists (
-          select 1 from briar_project_agents agent
-          where agent.id = old.delegated_by_agent_id
-        ))
-  )
-  or new.delegated_by_agent_name is not old.delegated_by_agent_name
-  or new.origin_create_proposal_id is not old.origin_create_proposal_id
-  or new.created_at is not old.created_at
-BEGIN
-  select raise(abort, 'issue execution proposal identity is immutable');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_status_guard
-before update of status, generation on briar_issue_execution_proposals
-when not (
-  (new.status = old.status and new.generation = old.generation)
-  or (
-    old.status = 'pending' and new.status = 'accepted'
-    and new.generation = old.generation
-  )
-  or (
-    old.status in ('pending', 'accepted')
-    and new.status = 'invalidated'
-    and new.generation = old.generation + 1
-  )
-)
-BEGIN
-  select raise(abort, 'invalid issue execution proposal transition');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_reservation_immutable
-before update of approval_reserved_by_user_id, approval_reserved_at,
-                 requested_provider, requested_model, requested_effort,
-                 requested_worker_id, dispatch_request_id
-on briar_issue_execution_proposals
-when old.dispatch_request_id is not null
-  and not (
-    (
-      new.approval_reserved_by_user_id is old.approval_reserved_by_user_id
-      or (
-        old.approval_reserved_by_user_id is not null
-        and new.approval_reserved_by_user_id is null
-        and not exists (
-          select 1 from "user" account
-          where account.id = old.approval_reserved_by_user_id
-        )
-      )
-    )
-    and new.approval_reserved_at is old.approval_reserved_at
-    and new.requested_provider is old.requested_provider
-    and new.requested_model is old.requested_model
-    and new.requested_effort is old.requested_effort
-    and (
-      new.requested_worker_id is old.requested_worker_id
-      or (
-        old.requested_worker_id is not null
-        and new.requested_worker_id is null
-        and not exists (
-          select 1 from briar_execution_workers worker
-          where worker.id = old.requested_worker_id
-        )
-      )
-    )
-    and new.dispatch_request_id is old.dispatch_request_id
-  )
-BEGIN
-  select raise(abort, 'issue execution approval reservation is immutable');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_deleted_approver_invalidate
-after update of approval_reserved_by_user_id
-on briar_issue_execution_proposals
-when old.approval_reserved_by_user_id is not null
-  and new.approval_reserved_by_user_id is null
-  and new.status <> 'invalidated'
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where id = new.id and status <> 'invalidated';
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_deleted_agent_invalidate
-after update of proposed_by_agent_id
-on briar_issue_execution_proposals
-when old.proposed_by_agent_id is not null
-  and new.proposed_by_agent_id is null
-  and new.status <> 'invalidated'
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where id = new.id and status <> 'invalidated';
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_deleted_delegator_invalidate
-after update of delegated_by_agent_id
-on briar_issue_execution_proposals
-when old.delegated_by_agent_id is not null
-  and new.delegated_by_agent_id is null
-  and new.status <> 'invalidated'
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where id = new.id and status <> 'invalidated';
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_deleted_worker_invalidate
-after update of requested_worker_id
-on briar_issue_execution_proposals
-when old.requested_worker_id is not null
-  and new.requested_worker_id is null
-  and new.status <> 'invalidated'
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where id = new.id and status <> 'invalidated';
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_conversation_delete_invalidate
-before delete on briar_hunt_runs
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where source_kind = 'issue' and conversation_run_id = old.id
-    and status <> 'invalidated';
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_acceptance_immutable
-before update of accepted_by_user_id, accepted_at
-on briar_issue_execution_proposals
-when not (
-  (
-    old.status = 'pending' and new.status = 'accepted'
-    and old.accepted_by_user_id is null and old.accepted_at is null
-    and new.accepted_by_user_id is old.approval_reserved_by_user_id
-    and new.accepted_at = old.approval_reserved_at
-  )
-  or (
-    old.status in ('accepted', 'invalidated')
-    and new.status = old.status
-    and old.accepted_by_user_id is not null
-    and new.accepted_by_user_id is null
-    and not exists (
-      select 1 from "user" account
-      where account.id = old.accepted_by_user_id
-    )
-    and new.accepted_at is old.accepted_at
-  )
-  or (
-    new.accepted_by_user_id is old.accepted_by_user_id
-    and new.accepted_at is old.accepted_at
-  )
-)
-BEGIN
-  select raise(abort, 'issue execution proposal acceptance is immutable');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_claim_approval_guard
-before update of claim_token_hash on briar_hunt_runs
-when old.claim_token_hash is null and new.claim_token_hash is not null
-  and new.dispatch_request_id is not null
-  and (
-    exists (
-      select 1 from briar_issue_execution_proposals proposal
-      where proposal.dispatch_request_id = new.dispatch_request_id
-    )
-    or exists (
-      select 1 from briar_issue_execution_approval_audit approval
-      where approval.dispatch_request_id = new.dispatch_request_id
-    )
-  )
-  and not exists (
-    select 1 from briar_issue_execution_approval_audit approval
-    where approval.project_id = new.project_id
-      and approval.run_id = new.id
-      and approval.dispatch_request_id = new.dispatch_request_id
-      and approval.provider = new.requested_agent_provider
-      and approval.model is new.requested_agent_model
-      and approval.effort is new.requested_agent_effort
-      and approval.worker_id is new.requested_worker_id
-      and approval.approved_by_user_id is new.requested_by_user_id
-      and approval.proposed_by_agent_id is new.agent_id
-  )
-BEGIN
-  select raise(abort, 'conversational execution approval audit is missing');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_dispatch_guard
-before update of dispatch_request_id on briar_hunt_runs
-when new.dispatch_request_id is not null
-  and new.dispatch_request_id is not old.dispatch_request_id
-  and exists (
-    select 1 from briar_issue_execution_proposals proposal
-    where proposal.dispatch_request_id = new.dispatch_request_id
-  )
-  and not exists (
-    select 1
-    from briar_issue_execution_proposals proposal
-    where proposal.dispatch_request_id = new.dispatch_request_id
-      and proposal.status = 'pending'
-      and proposal.organization_id = (
-        select project.organization_id from briar_projects project
-        where project.id = old.project_id
-      )
-      and proposal.project_id = old.project_id
-      and proposal.target_run_id = old.id
-      and proposal.target_run_updated_at = old.updated_at
-      and proposal.approval_reserved_by_user_id is not null
-      and proposal.approval_reserved_at is not null
-      and proposal.requested_provider is not null
-      and old.status = 'backlog' and old.stage = 'queued'
-      and old.workflow_stage is null
-      and old.worker_id is null and old.requested_worker_id is null
-      and old.claim_token_hash is null and old.claimed_by is null
-      and old.claimed_at is null and old.lease_expires_at is null
-      and old.last_execution_id is null
-      and old.dispatch_mode is null and old.dispatch_request_id is null
-      and old.dispatched_at is null and old.requested_by_user_id is null
-      and old.completed_at is null and old.paused_at is null
-      and old.resume_requested_at is null
-      and new.status = 'queued' and new.stage = 'queued'
-      and new.workflow_stage is null
-      and new.requested_by_user_id = proposal.approval_reserved_by_user_id
-      and new.requested_agent_provider = proposal.requested_provider
-      and new.requested_agent_model is proposal.requested_model
-      and new.requested_agent_effort is proposal.requested_effort
-      and new.requested_worker_id is proposal.requested_worker_id
-      and new.dispatch_mode = iif(
-        proposal.requested_worker_id is null, 'any', 'specific'
-      )
-      and new.dispatched_at = proposal.approval_reserved_at
-  )
-BEGIN
-  select raise(abort, 'execution proposal target is stale');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_dispatch_agent_guard
-before update of dispatch_request_id on briar_hunt_runs
-when new.dispatch_request_id is not null
-  and new.dispatch_request_id is not old.dispatch_request_id
-  and exists (
-    select 1 from briar_issue_execution_proposals proposal
-    where proposal.dispatch_request_id = new.dispatch_request_id
-  )
-  and not exists (
-    select 1
-    from briar_issue_execution_proposals proposal
-    where proposal.dispatch_request_id = new.dispatch_request_id
-      and proposal.status = 'pending'
-      and (
-        proposal.proposed_by_agent_id is null
-        or (
-          new.agent_id = proposal.proposed_by_agent_id
-          and exists (
-            select 1 from briar_project_agents agent
-            where agent.id = proposal.proposed_by_agent_id
-              and agent.project_id = proposal.project_id
-              and agent.organization_id = proposal.organization_id
-          )
-        )
-      )
-  )
-BEGIN
-  select raise(abort, 'execution proposal Agent is stale');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_dispatch_issue_source_guard
-before update of dispatch_request_id on briar_hunt_runs
-when new.dispatch_request_id is not null
-  and new.dispatch_request_id is not old.dispatch_request_id
-  and exists (
-    select 1 from briar_issue_execution_proposals proposal
-    where proposal.dispatch_request_id = new.dispatch_request_id
-      and proposal.source_kind = 'issue'
-  )
-  and not exists (
-    select 1
-    from briar_issue_execution_proposals proposal
-    join briar_hunt_runs conversation
-      on conversation.id = proposal.conversation_run_id
-     and conversation.project_id = proposal.project_id
-    join briar_issue_messages reply
-      on reply.id = proposal.reply_message_id
-     and reply.run_id = conversation.id
-     and reply.project_id = conversation.project_id
-    join briar_projects project on project.id = conversation.project_id
-    join briar_organization_members membership
-      on membership.organization_id = project.organization_id
-     and membership.user_id = proposal.approval_reserved_by_user_id
-    where proposal.dispatch_request_id = new.dispatch_request_id
-      and proposal.status = 'pending' and proposal.source_kind = 'issue'
-      and project.organization_id = proposal.organization_id
-  )
-BEGIN
-  select raise(abort, 'issue execution proposal source is stale');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_dispatch_audit_guard
-before insert on briar_execution_audit_events
-when new.request_id is not null
-  and exists (
-    select 1 from briar_issue_execution_proposals proposal
-    where proposal.dispatch_request_id = new.request_id
-  )
-  and not exists (
-    select 1
-    from briar_issue_execution_proposals proposal
-    join briar_hunt_runs run
-      on run.id = proposal.target_run_id
-     and run.project_id = proposal.project_id
-    where proposal.dispatch_request_id = new.request_id
-      and proposal.status = 'pending'
-      and proposal.approval_reserved_by_user_id is not null
-      and proposal.approval_reserved_at is not null
-      and new.action = 'dispatched'
-      and new.organization_id = proposal.organization_id
-      and new.project_id = proposal.project_id
-      and new.run_id = proposal.target_run_id
-      and new.worker_id is proposal.requested_worker_id
-      and new.agent_id is proposal.proposed_by_agent_id
-      and new.actor_user_id is proposal.approval_reserved_by_user_id
-      and new.occurred_at = proposal.approval_reserved_at
-      and run.dispatch_request_id = proposal.dispatch_request_id
-      and run.dispatched_at = proposal.approval_reserved_at
-      and run.requested_by_user_id = proposal.approval_reserved_by_user_id
-      and run.requested_agent_provider = proposal.requested_provider
-      and run.requested_agent_model is proposal.requested_model
-      and run.requested_agent_effort is proposal.requested_effort
-      and run.requested_worker_id is proposal.requested_worker_id
-  )
-BEGIN
-  select raise(abort, 'invalid issue execution dispatch audit');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_dispatch_finalize
-after insert on briar_execution_audit_events
-when new.action = 'dispatched' and new.request_id is not null
-  and exists (
-    select 1 from briar_issue_execution_proposals proposal
-    where proposal.dispatch_request_id = new.request_id
-  )
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'accepted',
-      accepted_by_user_id = approval_reserved_by_user_id,
-      accepted_at = approval_reserved_at,
-      updated_at = approval_reserved_at
-  where dispatch_request_id = new.request_id and status = 'pending'
-    and organization_id = new.organization_id
-    and project_id = new.project_id and target_run_id = new.run_id
-    and approval_reserved_by_user_id is new.actor_user_id
-    and approval_reserved_at = new.occurred_at;
-
-  select raise(abort, 'execution approval was not finalized')
-  where changes() <> 1;
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_accept_guard
-before update of status on briar_issue_execution_proposals
-when old.status = 'pending' and new.status = 'accepted'
-  and not (
-    old.approval_reserved_by_user_id is not null
-    and old.approval_reserved_at is not null
-    and old.dispatch_request_id is not null
-    and new.accepted_by_user_id is old.approval_reserved_by_user_id
-    and new.accepted_at = old.approval_reserved_at
-    and new.generation = old.generation
-    and exists (
-      select 1 from briar_hunt_runs run
-      where run.id = old.target_run_id and run.project_id = old.project_id
-        and run.dispatch_request_id = old.dispatch_request_id
-        and run.dispatched_at = old.approval_reserved_at
-        and run.requested_by_user_id = old.approval_reserved_by_user_id
-        and run.requested_agent_provider = old.requested_provider
-        and run.requested_agent_model is old.requested_model
-        and run.requested_agent_effort is old.requested_effort
-        and run.requested_worker_id is old.requested_worker_id
-    )
-    and exists (
-      select 1 from briar_execution_audit_events audit
-      where audit.organization_id = old.organization_id
-        and audit.project_id = old.project_id
-        and audit.run_id = old.target_run_id
-        and audit.request_id = old.dispatch_request_id
-        and audit.actor_user_id is old.approval_reserved_by_user_id
-        and audit.action = 'dispatched'
-    )
-  )
-BEGIN
-  select raise(abort, 'execution proposal acceptance requires dispatch audit');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_audit_insert
-after update of status on briar_issue_execution_proposals
-when old.status = 'pending' and new.status = 'accepted'
-BEGIN
-  insert into briar_issue_execution_approval_audit (
-    id, proposal_id, organization_id, project_id, source_kind, channel_id,
-    conversation_run_id, run_id, generation, approved_by_user_id,
-    approved_at, provider, model, effort, worker_id, dispatch_request_id,
-    proposed_by_agent_id, delegated_by_agent_id, created_at
-  ) values (
-    new.id || ':approval:' || new.generation, new.id, new.organization_id,
-    new.project_id, new.source_kind, new.channel_id,
-    new.conversation_run_id, new.target_run_id, new.generation,
-    new.accepted_by_user_id, new.accepted_at, new.requested_provider,
-    new.requested_model, new.requested_effort, new.requested_worker_id,
-    new.dispatch_request_id, new.proposed_by_agent_id,
-    new.delegated_by_agent_id, new.accepted_at
-  );
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_dispatch_clear_guard
-before update of dispatch_request_id, status on briar_hunt_runs
-when old.dispatch_request_id is not null
-  and new.dispatch_request_id is null
-  and new.status not in ('completed', 'cancelled')
-  and (
-    exists (
-      select 1 from briar_issue_execution_proposals proposal
-      where proposal.target_run_id = old.id
-        and proposal.project_id = old.project_id
-        and proposal.dispatch_request_id = old.dispatch_request_id
-    )
-    or exists (
-      select 1 from briar_issue_execution_approval_audit approval
-      where approval.run_id = old.id
-        and approval.project_id = old.project_id
-        and approval.dispatch_request_id = old.dispatch_request_id
-    )
-  )
-  and not (
-    new.status = 'backlog' and new.stage = 'queued'
-    and new.workflow_stage is null
-    and new.agent_id is null
-    and new.worker_id is null and new.requested_worker_id is null
-    and new.claim_token_hash is null and new.claimed_by is null
-    and new.claimed_at is null and new.lease_expires_at is null
-    and new.last_execution_id is null
-    and new.dispatch_mode is null and new.dispatched_at is null
-    and new.requested_by_user_id is null
-    and new.requested_agent_provider is null
-    and new.requested_agent_model is null
-    and new.requested_agent_effort is null
-    and new.paused_at is null and new.resume_requested_at is null
-    and new.completed_at is null
-  )
-BEGIN
-  select raise(
-    abort, 'conversational execution cancellation requires backlog reset'
-  );
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_retryable_transfer_guard
-before update of project_id, status on briar_hunt_runs
-when old.status in ('queued', 'blocked', 'failed')
-  and new.project_id <> old.project_id
-  and old.dispatch_request_id is not null
-  and (
-    exists (
-      select 1 from briar_issue_execution_proposals proposal
-      where proposal.target_run_id = old.id
-        and proposal.project_id = old.project_id
-        and proposal.dispatch_request_id = old.dispatch_request_id
-    )
-    or exists (
-      select 1 from briar_issue_execution_approval_audit approval
-      where approval.run_id = old.id
-        and approval.project_id = old.project_id
-        and approval.dispatch_request_id = old.dispatch_request_id
-    )
-  )
-  and not (
-    new.status = 'backlog' and new.stage = 'queued'
-    and new.workflow_stage is null
-    and new.agent_id is null
-    and new.worker_id is null and new.requested_worker_id is null
-    and new.claim_token_hash is null and new.claimed_by is null
-    and new.claimed_at is null and new.lease_expires_at is null
-    and new.last_execution_id is null
-    and new.dispatch_mode is null and new.dispatch_request_id is null
-    and new.dispatched_at is null and new.requested_by_user_id is null
-    and new.requested_agent_provider is null
-    and new.requested_agent_model is null
-    and new.requested_agent_effort is null
-    and new.paused_at is null and new.resume_requested_at is null
-    and new.completed_at is null
-  )
-BEGIN
-  select raise(
-    abort, 'conversational execution transfer requires backlog reset'
-  );
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_terminal_transfer_guard
-before update of project_id on briar_hunt_runs
-when old.status in ('completed', 'cancelled')
-  and new.project_id <> old.project_id
-  and exists (
-    select 1 from briar_issue_execution_approval_audit approval
-    where approval.run_id = old.id
-      and approval.project_id = old.project_id
-  )
-BEGIN
-  select raise(
-    abort, 'conversationally approved terminal issue transfer is not allowed'
-  );
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_terminal_reactivation_guard
-before update of status on briar_hunt_runs
-when old.status in ('completed', 'cancelled')
-  and new.status not in ('completed', 'cancelled')
-  and exists (
-    select 1 from briar_issue_execution_approval_audit approval
-    where approval.run_id = old.id
-      and approval.project_id = old.project_id
-  )
-BEGIN
-  select raise(
-    abort, 'conversational execution reactivation requires fresh approval'
-  );
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_target_mutation_invalidate
-after update of updated_at on briar_hunt_runs
-when new.updated_at is not old.updated_at
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = new.updated_at
-  where target_run_id = new.id and status = 'pending'
-    and target_run_updated_at is not new.updated_at
-    and not (
-      dispatch_request_id is not null
-      and new.project_id = project_id
-      and new.dispatch_request_id = dispatch_request_id
-      and new.dispatched_at = approval_reserved_at
-      and new.requested_by_user_id = approval_reserved_by_user_id
-      and new.requested_agent_provider = requested_provider
-      and new.requested_agent_model is requested_model
-      and new.requested_agent_effort is requested_effort
-      and new.requested_worker_id is requested_worker_id
-      and new.status = 'queued' and new.stage = 'queued'
-      and new.workflow_stage is null
-    );
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_transfer_invalidate
-after update of project_id on briar_hunt_runs
-when new.project_id <> old.project_id
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = new.updated_at
-  where target_run_id = new.id and status <> 'invalidated';
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_unassign_invalidate
-after update of dispatch_request_id on briar_hunt_runs
-when old.dispatch_request_id is not null and new.dispatch_request_id is null
-BEGIN
-  update briar_issue_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = new.updated_at
-  where target_run_id = new.id and status <> 'invalidated'
-    and dispatch_request_id = old.dispatch_request_id;
-END;
--- @statement
-CREATE TRIGGER briar_channel_execution_proposals_insert_sync
-after insert on briar_issue_execution_proposals
-when new.source_kind = 'channel'
-BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.organization_id, new.channel_id, 'proposal', new.id, 'upsert',
-    datetime('now')
-  );
-  insert into briar_channel_sync_state (organization_id, current_version)
-  values (new.organization_id, last_insert_rowid())
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  values (new.organization_id, 1)
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_execution_proposals_update_sync
-after update on briar_issue_execution_proposals
-when new.source_kind = 'channel' and new.channel_id is not null
-BEGIN
-  insert into briar_channel_changes (
-    organization_id, channel_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.organization_id, new.channel_id, 'proposal', new.id, 'upsert',
-    datetime('now')
-  );
-  insert into briar_channel_sync_state (organization_id, current_version)
-  values (new.organization_id, last_insert_rowid())
-  on conflict (organization_id) do update
-    set current_version = excluded.current_version;
-  insert into briar_organization_inbox_sync_state (
-    organization_id, current_version
-  )
-  values (new.organization_id, 1)
-  on conflict (organization_id) do update set
-    current_version = briar_organization_inbox_sync_state.current_version + 1;
-  insert into briar_mobile_push_outbox (organization_id, version, updated_at)
-  select state.organization_id, state.current_version,
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict(organization_id) do update set
-    version = max(briar_mobile_push_outbox.version, excluded.version),
-    updated_at = excluded.updated_at;
-  insert into briar_organization_inbox_realtime_outbox (
-    organization_id, version, updated_at
-  )
-  select state.organization_id, state.current_version, datetime('now')
-  from briar_organization_inbox_sync_state state
-  where state.organization_id = new.organization_id
-  on conflict (organization_id) do update set
-    version = max(
-      briar_organization_inbox_realtime_outbox.version,
-      excluded.version
-    ),
-    updated_at = excluded.updated_at;
-END;
--- @statement
-CREATE TRIGGER briar_channel_action_skill_execution_exclusive
-before insert on briar_channel_action_proposals
-when exists (
-  select 1 from briar_agent_skill_execution_proposals skill_execution
-  where skill_execution.reply_message_id = new.reply_message_id
-)
-BEGIN
-  select raise(abort, 'channel proposal conflicts with Agent Skill execution');
-END;
--- @statement
-CREATE TRIGGER briar_issue_action_skill_execution_exclusive
-before insert on briar_issue_action_proposals
-when exists (
-  select 1 from briar_agent_skill_execution_proposals skill_execution
-  where skill_execution.reply_message_id = new.reply_message_id
-)
-BEGIN
-  select raise(abort, 'issue proposal conflicts with Agent Skill execution');
-END;
--- @statement
-CREATE TRIGGER briar_issue_rework_skill_execution_exclusive
-before insert on briar_issue_rework_proposals
-when exists (
-  select 1 from briar_agent_skill_execution_proposals skill_execution
-  where skill_execution.reply_message_id = new.reply_message_id
-)
-BEGIN
-  select raise(abort, 'rework proposal conflicts with Agent Skill execution');
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_skill_execution_exclusive
-before insert on briar_issue_execution_proposals
-when exists (
-  select 1 from briar_agent_skill_execution_proposals skill_execution
-  where skill_execution.reply_message_id = new.reply_message_id
-)
-BEGIN
-  select raise(abort, 'issue execution conflicts with Agent Skill execution');
-END;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_issue_message_invalidate
-after update of body on briar_issue_messages
-when new.body <> old.body
-BEGIN
-  update briar_agent_skill_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = new.updated_at
-  where source_kind = 'issue' and trigger_message_id = new.id
-    and status = 'pending';
-END;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_issue_message_delete_invalidate
-before delete on briar_issue_messages
-BEGIN
-  update briar_agent_skill_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where source_kind = 'issue' and status = 'pending'
-    and old.id in (trigger_message_id, reply_message_id);
-END;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_issue_assignment_invalidate
-after update of agent_id, project_id on briar_hunt_runs
-when new.agent_id is not old.agent_id or new.project_id <> old.project_id
-BEGIN
-  update briar_agent_skill_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = new.updated_at
-  where source_kind = 'issue' and conversation_run_id = new.id
-    and status = 'pending';
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_runs_update_sync
-after update on briar_hunt_runs
-when old.lease_expires_at is new.lease_expires_at
-  or old.updated_at is not new.updated_at
-BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (new.project_id, 'run', new.id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_issue_subscriptions_run_insert
-after insert on briar_hunt_runs
-when new.assignee_user_id is not null BEGIN
-  insert into briar_issue_subscriptions (
-    run_id, organization_id, user_id, created_at
-  )
-  select new.id, project.organization_id, new.assignee_user_id, new.started_at
-  from briar_projects project
-  join briar_organization_members membership
-    on membership.organization_id = project.organization_id
-   and membership.user_id = new.assignee_user_id
-  where project.id = new.project_id
-  on conflict (run_id, user_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_issue_subscriptions_assignee_update
-after update of assignee_user_id on briar_hunt_runs
-when new.assignee_user_id is not null
-  and new.assignee_user_id is not old.assignee_user_id BEGIN
-  insert into briar_issue_subscriptions (
-    run_id, organization_id, user_id, created_at
-  )
-  select new.id, project.organization_id, new.assignee_user_id, new.updated_at
-  from briar_projects project
-  join briar_organization_members membership
-    on membership.organization_id = project.organization_id
-   and membership.user_id = new.assignee_user_id
-  where project.id = new.project_id
-  on conflict (run_id, user_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_proposal_insert_guard
-before insert on briar_issue_execution_proposals
-when not (
-  new.status = 'pending' and new.generation = 1
-  and new.approval_reserved_by_user_id is null
-  and new.approval_reserved_at is null
-  and new.requested_provider is null and new.requested_model is null
-  and new.requested_effort is null and new.requested_worker_id is null
-  and new.dispatch_request_id is null
-  and new.accepted_by_user_id is null and new.accepted_at is null
-  and exists (
-    select 1
-    from briar_projects project
-    join briar_hunt_runs target
-      on target.id = new.target_run_id and target.project_id = project.id
-    where project.id = new.project_id
-      and project.organization_id = new.organization_id
-      and target.title = new.target_title
-      and target.updated_at = new.target_run_updated_at
-      and target.status = 'backlog' and target.stage = 'queued'
-      and target.workflow_stage is null
-      and target.worker_id is null and target.requested_worker_id is null
-      and target.claim_token_hash is null and target.claimed_by is null
-      and target.claimed_at is null and target.lease_expires_at is null
-      and target.last_execution_id is null
-      and target.dispatch_mode is null and target.dispatch_request_id is null
-      and target.dispatched_at is null and target.requested_by_user_id is null
-      and target.completed_at is null and target.paused_at is null
-      and target.resume_requested_at is null
-  )
-  and (
-    new.proposed_by_agent_id is null
-    or exists (
-      select 1 from briar_project_agents agent
-      where agent.id = new.proposed_by_agent_id
-        and agent.project_id = new.project_id
-        and agent.organization_id = new.organization_id
-    )
-  )
-  and (
-    (
-      new.source_kind = 'channel'
-      and new.proposed_by_agent_id is not null
-      and exists (
-        select 1
-        from briar_channels channel
-        join briar_channel_messages reply
-          on reply.id = new.reply_message_id
-         and reply.channel_id = channel.id
-        join briar_channel_agents roster
-          on roster.channel_id = channel.id
-         and roster.agent_id = new.proposed_by_agent_id
-        where channel.id = new.channel_id
-          and channel.organization_id = new.organization_id
-          and reply.author_agent_id = new.proposed_by_agent_id
-      )
-      and (
-        (new.origin_create_proposal_id is null)
-        or exists (
-          select 1 from briar_channel_action_proposals origin
-          where origin.id = new.origin_create_proposal_id
-            and origin.channel_id = new.channel_id
-            and origin.reply_message_id = new.reply_message_id
-            and origin.result_run_id = new.target_run_id
-            and origin.execution_proposal_id = new.id
-            and origin.execute_after_create = 1
-            and origin.status = 'accepted'
-        )
-      )
-    )
-    or
-    (
-      new.source_kind = 'issue'
-      and exists (
-        select 1
-        from briar_hunt_runs conversation
-        join briar_issue_messages reply
-          on reply.id = new.reply_message_id
-         and reply.run_id = conversation.id
-         and reply.project_id = conversation.project_id
-        where conversation.id = new.conversation_run_id
-          and conversation.project_id = new.project_id
-      )
-      and (
-        (
-          new.origin_create_proposal_id is null
-          and new.target_run_id = new.conversation_run_id
-        )
-        or exists (
-          select 1 from briar_issue_action_proposals origin
-          where origin.id = new.origin_create_proposal_id
-            and origin.conversation_run_id = new.conversation_run_id
-            and origin.reply_message_id = new.reply_message_id
-            and origin.result_run_id = new.target_run_id
-            and origin.execution_proposal_id = new.id
-            and origin.execute_after_create = 1
-            and origin.status = 'accepted'
-        )
-      )
-    )
-  )
-)
-BEGIN
-  select raise(abort, 'invalid issue execution proposal');
-END;
--- @statement
-CREATE TRIGGER briar_channel_create_materialize_execution_proposal
-after update of status on briar_channel_action_proposals
-when old.status = 'pending' and new.status = 'accepted'
-  and new.action_type = 'request_issue_create'
-  and new.execute_after_create = 1
-  and new.execution_proposal_id is not null
-  and new.result_run_id is not null
-BEGIN
-  insert into briar_issue_execution_proposals (
-    id, organization_id, project_id, source_kind, channel_id,
-    conversation_run_id, trigger_message_id, reply_message_id,
-    target_run_id, target_title, target_run_updated_at,
-    proposed_by_agent_id, delegated_by_agent_id, delegated_by_agent_name,
-    origin_create_proposal_id, created_at, updated_at
-  )
-  select new.execution_proposal_id, channel.organization_id, new.project_id,
-         'channel', new.channel_id, null, new.trigger_message_id,
-         new.reply_message_id, run.id, run.title, run.updated_at,
-         reply.author_agent_id, parent.agent_id, parent_agent.name,
-         new.id, new.accepted_at, new.accepted_at
-  from briar_hunt_runs run
-  join briar_channels channel on channel.id = new.channel_id
-  join briar_channel_messages reply on reply.id = new.reply_message_id
-  left join briar_channel_agent_reply_jobs child
-    on child.reply_message_id = new.reply_message_id
-  left join briar_channel_agent_reply_jobs parent
-    on parent.id = child.delegated_by_reply_job_id
-  left join briar_project_agents parent_agent on parent_agent.id = parent.agent_id
-  where run.id = new.result_run_id and run.project_id = new.project_id
-    and run.status = 'backlog' and run.stage = 'queued'
-    and run.dispatch_request_id is null and run.claim_token_hash is null
-  on conflict (id) do nothing;
-
-  select raise(abort, 'channel execution proposal was not materialized')
-  where not exists (
-    select 1
-    from briar_issue_execution_proposals proposal
-    join briar_channels channel on channel.id = new.channel_id
-    where proposal.id = new.execution_proposal_id
-      and proposal.organization_id = channel.organization_id
-      and proposal.project_id = new.project_id
-      and proposal.source_kind = 'channel'
-      and proposal.channel_id = new.channel_id
-      and proposal.conversation_run_id is null
-      and proposal.trigger_message_id = new.trigger_message_id
-      and proposal.reply_message_id = new.reply_message_id
-      and proposal.target_run_id = new.result_run_id
-      and proposal.origin_create_proposal_id = new.id
-      and proposal.status = 'pending'
-      and proposal.dispatch_request_id is null
-  );
-END;
--- @statement
-CREATE TRIGGER briar_issue_execution_dispatch_channel_source_guard
-before update of dispatch_request_id on briar_hunt_runs
-when new.dispatch_request_id is not null
-  and new.dispatch_request_id is not old.dispatch_request_id
-  and exists (
-    select 1 from briar_issue_execution_proposals proposal
-    where proposal.dispatch_request_id = new.dispatch_request_id
-      and proposal.source_kind = 'channel'
-  )
-  and not exists (
-    select 1
-    from briar_issue_execution_proposals proposal
-    join briar_channels channel on channel.id = proposal.channel_id
-    join briar_organization_members membership
-      on membership.organization_id = channel.organization_id
-     and membership.user_id = proposal.approval_reserved_by_user_id
-    join briar_channel_messages reply
-      on reply.id = proposal.reply_message_id
-     and reply.channel_id = channel.id
-    join briar_project_agents agent
-      on agent.id = proposal.proposed_by_agent_id
-     and agent.id = reply.author_agent_id
-     and agent.project_id = proposal.project_id
-     and agent.organization_id = proposal.organization_id
-    join briar_channel_agents roster
-      on roster.channel_id = channel.id and roster.agent_id = agent.id
-    where proposal.dispatch_request_id = new.dispatch_request_id
-      and proposal.status = 'pending' and proposal.source_kind = 'channel'
-      and channel.organization_id = proposal.organization_id
-      and channel.archived_at is null
-      and (
-        channel.visibility = 'public'
-        or exists (
-          select 1 from briar_channel_members channel_member
-          where channel_member.channel_id = channel.id
-            and channel_member.user_id = proposal.approval_reserved_by_user_id
-        )
-      )
-      and (
-        proposal.delegated_by_agent_id is null
-        or exists (
-          select 1
-          from briar_project_agents source_agent
-          join briar_channel_agents source_roster
-            on source_roster.channel_id = channel.id
-           and source_roster.agent_id = source_agent.id
-          join briar_channel_agent_reply_jobs child
-            on child.reply_message_id = proposal.reply_message_id
-          join briar_channel_agent_reply_jobs parent
-            on parent.id = child.delegated_by_reply_job_id
-           and parent.agent_id = source_agent.id
-          where source_agent.id = proposal.delegated_by_agent_id
-            and source_agent.organization_id = proposal.organization_id
-            and source_agent.project_id is null
-        )
-      )
-  )
-BEGIN
-  select raise(abort, 'channel execution proposal source is stale');
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_issue_execution_proposals_insert_sync
-after insert on briar_issue_execution_proposals
-when new.source_kind = 'issue' BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.project_id, 'notifications', new.reply_message_id, 'replace',
-    datetime('now')
-  );
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_issue_execution_proposals_update_sync
-after update on briar_issue_execution_proposals
-when new.source_kind = 'issue' BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.project_id, 'notifications', new.reply_message_id, 'replace',
-    datetime('now')
-  );
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_issue_subscriptions_creator_insert
-after insert on briar_hunt_runs
-when new.created_by_user_id is not null BEGIN
-  insert into briar_issue_subscriptions (
-    run_id, organization_id, user_id, created_at
-  )
-  select new.id, project.organization_id, new.created_by_user_id, new.started_at
-  from briar_projects project
-  join briar_organization_members membership
-    on membership.organization_id = project.organization_id
-   and membership.user_id = new.created_by_user_id
-  where project.id = new.project_id
-  on conflict (run_id, user_id) do nothing;
-END;
--- @statement
-CREATE TRIGGER briar_issue_agent_reply_skill_snapshot_immutable
-before update of selected_skill_id_snapshot, selected_agent_name_snapshot,
-                 selected_agent_responsibility_snapshot,
-                 selected_skill_name_snapshot,
-                 selected_skill_instructions_snapshot,
-                 selected_skill_kind_snapshot,
-                 selected_skill_provider_snapshot,
-                 selected_skill_model_snapshot,
-                 selected_skill_effort_snapshot,
-                 skill_execution_request_snapshot
-on briar_issue_agent_reply_jobs
-when new.selected_skill_id_snapshot is not old.selected_skill_id_snapshot
-  or new.selected_agent_name_snapshot is not old.selected_agent_name_snapshot
-  or new.selected_agent_responsibility_snapshot is not
-    old.selected_agent_responsibility_snapshot
-  or new.selected_skill_name_snapshot is not old.selected_skill_name_snapshot
-  or new.selected_skill_instructions_snapshot is not
-    old.selected_skill_instructions_snapshot
-  or new.selected_skill_kind_snapshot is not old.selected_skill_kind_snapshot
-  or new.selected_skill_provider_snapshot is not
-    old.selected_skill_provider_snapshot
-  or new.selected_skill_model_snapshot is not old.selected_skill_model_snapshot
-  or new.selected_skill_effort_snapshot is not old.selected_skill_effort_snapshot
-  or new.skill_execution_request_snapshot is not
-    old.skill_execution_request_snapshot
-begin
-  select raise(abort, 'issue Agent Skill reply snapshot is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_issue_job_invalidate
-after update of project_id, run_id, trigger_message_id, reply_message_id,
-                skill_id, selected_skill_id_snapshot, status
-on briar_issue_agent_reply_jobs
-begin
-  update briar_agent_skill_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = new.updated_at
-  where source_kind = 'issue' and source_reply_job_id = old.id
-    and status = 'pending'
-    and (new.project_id is not old.project_id
-      or new.run_id is not old.run_id
-      or new.trigger_message_id is not old.trigger_message_id
-      or new.reply_message_id is not old.reply_message_id
-      or new.skill_id is not old.skill_id
-      or new.selected_skill_id_snapshot is not old.selected_skill_id_snapshot
-      or new.status <> 'completed');
-end;
--- @statement
-CREATE TRIGGER briar_agent_skill_execution_issue_job_delete_invalidate
-before delete on briar_issue_agent_reply_jobs
-begin
-  update briar_agent_skill_execution_proposals
-  set status = 'invalidated', generation = generation + 1,
-      updated_at = datetime('now')
-  where source_kind = 'issue' and source_reply_job_id = old.id
-    and status = 'pending';
-end;
--- @statement
-CREATE TRIGGER briar_dashboard_issue_reply_jobs_insert_sync
-after insert on briar_issue_agent_reply_jobs begin
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.project_id, 'notifications', new.trigger_message_id, 'replace',
-    datetime('now')
-  );
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-end;
--- @statement
-CREATE TRIGGER briar_dashboard_issue_reply_jobs_update_sync
-after update of status, claimed_worker_id, agent_provider, error, completed_at
-on briar_issue_agent_reply_jobs begin
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (
-    new.project_id, 'notifications', new.trigger_message_id, 'replace',
-    datetime('now')
-  );
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-end;
--- @statement
-CREATE TRIGGER briar_channel_issue_proposal_decline_guard
-before update of declined_by_user_id, declined_at
-on briar_channel_action_proposals
-when not (
-  old.action_type = 'request_issue_create'
-  and old.status = 'pending'
-  and old.declined_by_user_id is null
-  and old.declined_at is null
-  and old.accepted_by_user_id is null
-  and old.accepted_at is null
-  and old.issue_source_key is null
-  and new.declined_by_user_id is not null
-  and new.declined_at is not null
-)
-begin
-  select raise(abort, 'channel issue proposal decline is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_channel_issue_proposal_declined_accept_guard
-before update of status, accepted_by_user_id, accepted_at, issue_source_key
-on briar_channel_action_proposals
-when old.action_type = 'request_issue_create'
-  and old.declined_at is not null
-  and (
-    new.status is not old.status
-    or new.accepted_by_user_id is not old.accepted_by_user_id
-    or new.accepted_at is not old.accepted_at
-    or new.issue_source_key is not old.issue_source_key
-  )
-begin
-
-
-  select raise(ignore);
-end;
--- @statement
-CREATE TRIGGER briar_dashboard_attachments_insert_sync
-after insert on briar_issue_attachments BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (new.project_id, 'run', new.run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_attachments_delete_sync
-after delete on briar_issue_attachments BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (old.project_id, 'run', old.run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (old.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_issue_subscriptions_insert_sync
-after insert on briar_issue_subscriptions BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  )
-  select run.project_id, 'run', run.id, 'upsert', datetime('now')
-  from briar_hunt_runs run where run.id = new.run_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select run.project_id, last_insert_rowid()
-  from briar_hunt_runs run where run.id = new.run_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_issue_subscriptions_delete_sync
-before delete on briar_issue_subscriptions BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  )
-  select run.project_id, 'run', run.id, 'upsert', datetime('now')
-  from briar_hunt_runs run where run.id = old.run_id;
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  select run.project_id, last_insert_rowid()
-  from briar_hunt_runs run where run.id = old.run_id
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_assign_default_project
-after insert on briar_hunt_runs
-when new.planning_project_id is null BEGIN
-  update briar_hunt_runs
-  set team_id = coalesce(new.team_id, new.project_id),
-      planning_project_id = (
-    select project.id
-    from briar_planning_projects project
-    where project.team_id = new.project_id and project.is_default = 1
-  )
-  where id = new.id;
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_validate_team_insert
-before insert on briar_hunt_runs
-when new.team_id is not null and new.team_id <> new.project_id BEGIN
-  select raise(abort, 'legacy project id must match issue team');
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_sync_team_after_insert
-after insert on briar_hunt_runs
-when new.team_id is null BEGIN
-  update briar_hunt_runs set team_id = new.project_id where id = new.id;
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_validate_team_update
-before update of team_id on briar_hunt_runs
-when new.team_id is null or new.team_id <> new.project_id BEGIN
-  select raise(abort, 'legacy project id must match issue team');
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_validate_project_insert
-before insert on briar_hunt_runs
-when new.planning_project_id is not null BEGIN
-  select case when not exists (
-    select 1 from briar_planning_projects project
-    where project.id = new.planning_project_id
-      and project.team_id = new.project_id
-  ) then raise(abort, 'issue project must belong to its team') end;
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_validate_project_update
-before update of planning_project_id on briar_hunt_runs BEGIN
-  select case when new.planning_project_id is null or not exists (
-    select 1 from briar_planning_projects project
-    where project.id = new.planning_project_id
-      and project.team_id = new.project_id
-  ) then raise(abort, 'issue project must belong to its team') end;
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_reclassify_after_team_transfer
-after update of project_id on briar_hunt_runs
-when old.project_id <> new.project_id BEGIN
-  update briar_hunt_runs
-  set team_id = new.project_id,
-      planning_project_id = (
-    select project.id
-    from briar_planning_projects project
-    where project.team_id = new.project_id and project.is_default = 1
-  )
-  where id = new.id;
-END;
--- @statement
-CREATE TRIGGER briar_issue_hierarchy_validate_insert
-before insert on briar_issue_parent_links BEGIN
-  select case when not exists (
-    select 1 from briar_hunt_runs parent
-    where parent.id = new.parent_run_id and parent.project_id = new.project_id
-  ) or not exists (
-    select 1 from briar_hunt_runs child
-    where child.id = new.child_run_id and child.project_id = new.project_id
-  ) then raise(abort, 'issue hierarchy endpoints must belong to the project') end;
-  select case when exists (
-    with recursive descendants(run_id) as (
-      values (new.child_run_id)
-      union
-      select hierarchy.child_run_id
-      from briar_issue_parent_links hierarchy
-      join descendants on descendants.run_id = hierarchy.parent_run_id
-      where hierarchy.project_id = new.project_id
-    )
-    select 1 from descendants where run_id = new.parent_run_id
-  ) then raise(abort, 'issue hierarchy would create a cycle') end;
-END;
--- @statement
-CREATE TRIGGER briar_issue_hierarchy_validate_update
-before update of project_id, parent_run_id, child_run_id
-on briar_issue_parent_links BEGIN
-  select case when not exists (
-    select 1 from briar_hunt_runs parent
-    where parent.id = new.parent_run_id and parent.project_id = new.project_id
-  ) or not exists (
-    select 1 from briar_hunt_runs child
-    where child.id = new.child_run_id and child.project_id = new.project_id
-  ) then raise(abort, 'issue hierarchy endpoints must belong to the project') end;
-  select case when exists (
-    with recursive descendants(run_id) as (
-      values (new.child_run_id)
-      union
-      select hierarchy.child_run_id
-      from briar_issue_parent_links hierarchy
-      join descendants on descendants.run_id = hierarchy.parent_run_id
-      where hierarchy.project_id = new.project_id
-        and hierarchy.child_run_id <> old.child_run_id
-    )
-    select 1 from descendants where run_id = new.parent_run_id
-  ) then raise(abort, 'issue hierarchy would create a cycle') end;
-END;
--- @statement
-CREATE TRIGGER briar_issue_relations_validate_insert
-before insert on briar_issue_relations BEGIN
-  select case when not exists (
-    select 1 from briar_hunt_runs first_run
-    where first_run.id = new.first_run_id
-      and first_run.project_id = new.project_id
-  ) or not exists (
-    select 1 from briar_hunt_runs second_run
-    where second_run.id = new.second_run_id
-      and second_run.project_id = new.project_id
-  ) then raise(abort, 'related issue endpoints must belong to the project') end;
-END;
--- @statement
-CREATE TRIGGER briar_issue_relations_validate_update
-before update of project_id, first_run_id, second_run_id
-on briar_issue_relations BEGIN
-  select case when not exists (
-    select 1 from briar_hunt_runs first_run
-    where first_run.id = new.first_run_id
-      and first_run.project_id = new.project_id
-  ) or not exists (
-    select 1 from briar_hunt_runs second_run
-    where second_run.id = new.second_run_id
-      and second_run.project_id = new.project_id
-  ) then raise(abort, 'related issue endpoints must belong to the project') end;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_hierarchy_insert_sync
-after insert on briar_issue_parent_links BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values
-    (new.project_id, 'run', new.parent_run_id, 'upsert', datetime('now')),
-    (new.project_id, 'run', new.child_run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_hierarchy_update_sync
-after update on briar_issue_parent_links BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values
-    (old.project_id, 'run', old.parent_run_id, 'upsert', datetime('now')),
-    (old.project_id, 'run', old.child_run_id, 'upsert', datetime('now')),
-    (new.project_id, 'run', new.parent_run_id, 'upsert', datetime('now')),
-    (new.project_id, 'run', new.child_run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_hierarchy_delete_sync
-before delete on briar_issue_parent_links BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values
-    (old.project_id, 'run', old.parent_run_id, 'upsert', datetime('now')),
-    (old.project_id, 'run', old.child_run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (old.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_relations_insert_sync
-after insert on briar_issue_relations BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values
-    (new.project_id, 'run', new.first_run_id, 'upsert', datetime('now')),
-    (new.project_id, 'run', new.second_run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_relations_update_sync
-after update on briar_issue_relations BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values
-    (old.project_id, 'run', old.first_run_id, 'upsert', datetime('now')),
-    (old.project_id, 'run', old.second_run_id, 'upsert', datetime('now')),
-    (new.project_id, 'run', new.first_run_id, 'upsert', datetime('now')),
-    (new.project_id, 'run', new.second_run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_relations_delete_sync
-before delete on briar_issue_relations BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values
-    (old.project_id, 'run', old.first_run_id, 'upsert', datetime('now')),
-    (old.project_id, 'run', old.second_run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (old.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_issue_create_mutation_receipt_insert_guard
-before insert on briar_issue_create_mutation_receipts
-when exists (
-    select 1 from json_each(new.attachment_upload_ids_json)
-    where type != 'text'
-  )
-  or json_array_length(new.attachment_upload_ids_json) != (
-    select count(distinct value)
-    from json_each(new.attachment_upload_ids_json)
-  )
-  or json_array_length(new.attachment_upload_ids_json) != (
-    select count(*)
-    from briar_uploads upload
-    join briar_upload_batches batch
-      on batch.request_id = upload.batch_request_id
-    join briar_issue_attachments attachment
-      on attachment.id = upload.upload_id
-     and attachment.project_id = new.project_id
-     and attachment.run_id = new.client_issue_id
-    where batch.purpose = 'issue_create'
-      and batch.organization_id = new.organization_id
-      and batch.project_id = new.project_id
-      and batch.channel_id is null
-      and batch.user_id = new.user_id
-      and batch.work_id = new.client_issue_id
-      and batch.run_id is null
-      and batch.worker_id is null and batch.device_id is null
-      and batch.claim_token_hash is null
-      and batch.expires_at > new.created_at
-      and upload.uploaded_at is not null and upload.consumed_at is null
-      and exists (
-        select 1 from json_each(new.attachment_upload_ids_json) expected
-        where expected.value = upload.upload_id
-      )
-      and attachment.object_key = upload.object_key
-      and attachment.filename = upload.filename
-      and attachment.content_type = upload.content_type
-      and attachment.byte_size = upload.byte_size
-  )
-  or 1 < (
-    select count(distinct upload.batch_request_id)
-    from briar_uploads upload
-    join briar_upload_batches batch
-      on batch.request_id = upload.batch_request_id
-    where batch.purpose = 'issue_create'
-      and batch.organization_id = new.organization_id
-      and batch.project_id = new.project_id
-      and batch.user_id = new.user_id
-      and batch.work_id = new.client_issue_id
-      and exists (
-        select 1 from json_each(new.attachment_upload_ids_json) expected
-        where expected.value = upload.upload_id
-      )
-  )
-  or not exists (
-    select 1
-    from briar_hunt_runs run
-    join briar_projects project on project.id = run.project_id
-    join briar_organization_members membership
-      on membership.organization_id = project.organization_id
-     and membership.user_id = new.user_id
-    where run.id = new.client_issue_id and run.project_id = new.project_id
-      and run.created_by_user_id = new.user_id
-      and project.organization_id = new.organization_id
-      and membership.role in ('owner', 'co-owner', 'developer', 'editor')
-      and (
-        membership.role in ('owner', 'co-owner')
-        or exists (
-          select 1 from briar_project_members project_member
-          where project_member.project_id = project.id
-            and project_member.organization_id = project.organization_id
-            and project_member.user_id = new.user_id
-        )
-      )
-  )
-begin
-  select raise(abort, 'invalid issue create receipt');
-end;
--- @statement
-CREATE TRIGGER briar_issue_update_mutation_receipt_insert_guard
-before insert on briar_issue_update_mutation_receipts
-when exists (
-    select 1 from json_each(new.attachment_upload_ids_json)
-    where type != 'text'
-  )
-  or json_array_length(new.attachment_upload_ids_json) != (
-    select count(distinct value)
-    from json_each(new.attachment_upload_ids_json)
-  )
-  or json_array_length(new.attachment_upload_ids_json) != (
-    select count(*)
-    from briar_uploads upload
-    join briar_upload_batches batch
-      on batch.request_id = upload.batch_request_id
-    join briar_issue_attachments attachment
-      on attachment.id = upload.upload_id
-     and attachment.project_id = new.project_id
-     and attachment.run_id = new.run_id
-    where batch.purpose = 'issue_update'
-      and batch.organization_id = new.organization_id
-      and batch.project_id = new.project_id
-      and batch.channel_id is null
-      and batch.user_id = new.user_id
-      and batch.work_id = new.request_id
-      and batch.run_id = new.run_id
-      and batch.worker_id is null and batch.device_id is null
-      and batch.claim_token_hash is null
-      and batch.expires_at > new.created_at
-      and upload.uploaded_at is not null and upload.consumed_at is null
-      and exists (
-        select 1 from json_each(new.attachment_upload_ids_json) expected
-        where expected.value = upload.upload_id
-      )
-      and attachment.object_key = upload.object_key
-      and attachment.filename = upload.filename
-      and attachment.content_type = upload.content_type
-      and attachment.byte_size = upload.byte_size
-  )
-  or 1 < (
-    select count(distinct upload.batch_request_id)
-    from briar_uploads upload
-    join briar_upload_batches batch
-      on batch.request_id = upload.batch_request_id
-    where batch.purpose = 'issue_update'
-      and batch.organization_id = new.organization_id
-      and batch.project_id = new.project_id
-      and batch.user_id = new.user_id
-      and batch.work_id = new.request_id
-      and batch.run_id = new.run_id
-      and exists (
-        select 1 from json_each(new.attachment_upload_ids_json) expected
-        where expected.value = upload.upload_id
-      )
-  )
-  or not exists (
-    select 1
-    from briar_hunt_runs run
-    join briar_projects project on project.id = run.project_id
-    join briar_organization_members membership
-      on membership.organization_id = project.organization_id
-     and membership.user_id = new.user_id
-    where run.id = new.run_id and run.project_id = new.project_id
-      and project.organization_id = new.organization_id
-      and membership.role in ('owner', 'co-owner', 'developer', 'editor')
-      and (
-        membership.role in ('owner', 'co-owner')
-        or exists (
-          select 1 from briar_project_members project_member
-          where project_member.project_id = project.id
-            and project_member.organization_id = project.organization_id
-            and project_member.user_id = new.user_id
-        )
-      )
-  )
-begin
-  select raise(abort, 'invalid issue update receipt');
-end;
--- @statement
-CREATE TRIGGER briar_issue_message_mutation_receipt_insert_guard
-before insert on briar_issue_message_mutation_receipts
-when exists (
-    select 1 from json_each(new.attachment_upload_ids_json)
-    where type != 'text'
-  )
-  or json_array_length(new.attachment_upload_ids_json) != (
-    select count(distinct value)
-    from json_each(new.attachment_upload_ids_json)
-  )
-  or json_array_length(new.attachment_upload_ids_json) != (
-    select count(*)
-    from briar_uploads upload
-    join briar_upload_batches batch
-      on batch.request_id = upload.batch_request_id
-    join briar_issue_attachments attachment
-      on attachment.id = upload.upload_id
-     and attachment.project_id = new.project_id
-     and attachment.run_id = new.run_id
-    where batch.purpose = 'issue_message'
-      and batch.organization_id = new.organization_id
-      and batch.project_id = new.project_id
-      and batch.channel_id is null
-      and batch.user_id = new.user_id
-      and batch.work_id = new.message_id
-      and batch.run_id = new.run_id
-      and batch.worker_id is null and batch.device_id is null
-      and batch.claim_token_hash is null
-      and batch.expires_at > new.created_at
-      and upload.uploaded_at is not null and upload.consumed_at is null
-      and exists (
-        select 1 from json_each(new.attachment_upload_ids_json) expected
-        where expected.value = upload.upload_id
-      )
-      and attachment.object_key = upload.object_key
-      and attachment.filename = upload.filename
-      and attachment.content_type = upload.content_type
-      and attachment.byte_size = upload.byte_size
-  )
-  or 1 < (
-    select count(distinct upload.batch_request_id)
-    from briar_uploads upload
-    join briar_upload_batches batch
-      on batch.request_id = upload.batch_request_id
-    where batch.purpose = 'issue_message'
-      and batch.organization_id = new.organization_id
-      and batch.project_id = new.project_id
-      and batch.user_id = new.user_id
-      and batch.work_id = new.message_id
-      and batch.run_id = new.run_id
-      and exists (
-        select 1 from json_each(new.attachment_upload_ids_json) expected
-        where expected.value = upload.upload_id
-      )
-  )
-  or not exists (
-    select 1
-    from briar_issue_messages message
-    join briar_hunt_runs run
-      on run.id = message.run_id and run.project_id = message.project_id
-    join briar_projects project on project.id = run.project_id
-    join briar_organization_members membership
-      on membership.organization_id = project.organization_id
-     and membership.user_id = new.user_id
-    where message.id = new.message_id
-      and message.project_id = new.project_id and message.run_id = new.run_id
-      and project.organization_id = new.organization_id
-      and membership.role in ('owner', 'co-owner', 'developer', 'editor')
-      and (
-        membership.role in ('owner', 'co-owner')
-        or exists (
-          select 1 from briar_project_members project_member
-          where project_member.project_id = project.id
-            and project_member.organization_id = project.organization_id
-            and project_member.user_id = new.user_id
-        )
-      )
-  )
-begin
-  select raise(abort, 'invalid issue message receipt');
-end;
--- @statement
-CREATE TRIGGER briar_issue_create_mutation_receipt_immutable
-before update on briar_issue_create_mutation_receipts
-begin
-  select raise(abort, 'issue create receipt is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_issue_update_mutation_receipt_immutable
-before update on briar_issue_update_mutation_receipts
-begin
-  select raise(abort, 'issue update receipt is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_issue_message_mutation_receipt_immutable
-before update on briar_issue_message_mutation_receipts
-begin
-  select raise(abort, 'issue message receipt is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_archive_related_object_keys_insert_guard
-before insert on briar_log_archives
-when exists (
-  select 1 from json_each(new.related_object_keys_json) related
-  where related.type <> 'text'
-    or related.value <> trim(related.value)
-    or length(related.value) not between 1 and 1024
-)
-begin
-  select raise(abort, 'invalid archive related object key');
-end;
--- @statement
-CREATE TRIGGER briar_archive_related_object_keys_update_guard
-before update of related_object_keys_json on briar_log_archives
-when exists (
-  select 1 from json_each(new.related_object_keys_json) related
-  where related.type <> 'text'
-    or related.value <> trim(related.value)
-    or length(related.value) not between 1 and 1024
-)
-begin
-  select raise(abort, 'invalid archive related object key');
-end;
--- @statement
-CREATE TRIGGER briar_channel_issue_proposal_payload_immutable
-before update of action_type, payload_json on briar_channel_action_proposals
-when new.action_type is not old.action_type
-  or new.payload_json is not old.payload_json
-begin
-  select raise(abort, 'channel issue proposal payload is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_conversation_issue_proposal_payload_immutable
-before update of action_type, payload_json on briar_issue_action_proposals
-when new.action_type is not old.action_type
-  or new.payload_json is not old.payload_json
-begin
-  select raise(abort, 'conversation issue proposal payload is immutable');
-end;
--- @statement
-CREATE TRIGGER briar_channel_issue_proposal_current_insert_guard
-before insert on briar_channel_action_proposals
-when new.action_type = 'request_issue_create'
-  and (
-    json_type(new.payload_json, '$.issue.status') is not null
-    or exists (
-      select 1
-      from json_each(new.payload_json, '$.batch.items') item
-      where json_type(item.value, '$.issue.status') is not null
-    )
-  )
-begin
-  select raise(abort, 'channel issue proposal payload cannot include status');
-end;
--- @statement
-CREATE TRIGGER briar_conversation_issue_proposal_current_insert_guard
-before insert on briar_issue_action_proposals
-when new.action_type = 'request_issue_create'
-  and json_type(new.payload_json, '$.issue.status') is not null
-begin
-  select raise(abort, 'conversation issue proposal payload cannot include status');
-end;
--- @statement
-CREATE TRIGGER briar_channel_issue_proposal_action_insert_guard
-before insert on briar_channel_action_proposals
-when new.action_type <> 'request_issue_create'
-begin
-  select raise(abort, 'channel proposals must create issues');
-end;
--- @statement
-CREATE TRIGGER briar_channel_issue_proposal_action_update_guard
-before update of action_type on briar_channel_action_proposals
-when new.action_type <> 'request_issue_create'
-begin
-  select raise(abort, 'channel proposals must create issues');
-end;
--- @statement
-CREATE TRIGGER briar_issue_checkpoints_shape_insert
-before insert on briar_hunt_runs
-begin
-  insert into briar_workflow_checkpoint_storage_validation (
-    owner, checkpoints_json
-  ) values ('issue', new.issue_checkpoints_json);
-end;
--- @statement
-CREATE TRIGGER briar_issue_checkpoints_shape_update
-before update of issue_checkpoints_json on briar_hunt_runs
-begin
-  insert into briar_workflow_checkpoint_storage_validation (
-    owner, checkpoints_json
-  ) values ('issue', new.issue_checkpoints_json);
-end;
--- @statement
-CREATE TRIGGER briar_hunt_run_structured_result_insert_guard
-before insert on briar_hunt_runs
-when new.structured_result_json is not null
-  and case
-    when not json_valid(new.structured_result_json) then 1
-    when json_type(new.structured_result_json) <> 'object' then 1
-    when length(cast(new.structured_result_json as blob)) > 131072 then 1
-    else 0
-  end
-begin
-  select raise(
-    abort,
-    'structured agent result must be a bounded JSON object'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_hunt_run_structured_result_update_guard
-before update of structured_result_json on briar_hunt_runs
-when new.structured_result_json is not null
-  and case
-    when not json_valid(new.structured_result_json) then 1
-    when json_type(new.structured_result_json) <> 'object' then 1
-    when length(cast(new.structured_result_json as blob)) > 131072 then 1
-    else 0
-  end
-begin
-  select raise(
-    abort,
-    'structured agent result must be a bounded JSON object'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_hunt_run_execution_metrics_insert_guard
-before insert on briar_hunt_runs
-when new.execution_metrics_json is not null
-  and case
-    when not json_valid(new.execution_metrics_json) then 1
-    when json_type(new.execution_metrics_json) <> 'object' then 1
-    when length(cast(new.execution_metrics_json as blob)) > 4096 then 1
-    else 0
-  end
-begin
-  select raise(
-    abort,
-    'agent execution metrics must be a bounded JSON object'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_hunt_run_execution_metrics_update_guard
-before update of execution_metrics_json on briar_hunt_runs
-when new.execution_metrics_json is not null
-  and case
-    when not json_valid(new.execution_metrics_json) then 1
-    when json_type(new.execution_metrics_json) <> 'object' then 1
-    when length(cast(new.execution_metrics_json as blob)) > 4096 then 1
-    else 0
-  end
-begin
-  select raise(
-    abort,
-    'agent execution metrics must be a bounded JSON object'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_conversation_issue_creation_project_guard
-before insert on briar_hunt_runs
-when new.source = 'issue'
-  and new.source_key like 'briar-conversation-approved:%'
-  and not exists (
-    select 1 from briar_hunt_runs existing
-    where existing.project_id = new.project_id
-      and existing.source = new.source
-      and existing.source_key = new.source_key
-  )
-  and (
-    new.status <> 'backlog'
-    or new.stage <> 'queued'
-    or new.workflow_stage is not null
-    or new.worker_id is not null
-    or new.agent_id is not null
-    or new.requested_worker_id is not null
-    or new.claim_token_hash is not null
-    or new.claimed_by is not null
-    or new.claimed_at is not null
-    or new.lease_expires_at is not null
-    or new.last_execution_id is not null
-    or new.dispatch_mode is not null
-    or new.dispatch_request_id is not null
-    or new.dispatched_at is not null
-    or new.requested_by_user_id is not null
-    or new.requested_agent_provider is not null
-    or new.requested_agent_model is not null
-    or new.requested_agent_effort is not null
-    or new.completed_at is not null
-    or new.paused_at is not null
-    or new.resume_requested_at is not null
-    or not exists (
-      select 1
-      from briar_issue_action_proposals proposal
-      join briar_hunt_runs conversation
-        on conversation.id = proposal.conversation_run_id
-       and conversation.project_id = proposal.project_id
-      where proposal.status = 'pending'
-        and proposal.action_type = 'request_issue_create'
-        and proposal.project_id = new.project_id
-        and proposal.approval_reserved_by_user_id is not null
-        and proposal.approval_reserved_at is not null
-        and proposal.issue_source_key = new.source_key
-        and new.title = json_extract(proposal.payload_json, '$.issue.title')
-        and new.issue_description is
-          json_extract(proposal.payload_json, '$.issue.description')
-        and new.priority is
-          json_extract(proposal.payload_json, '$.issue.priority')
-        and new.issue_checkpoints_json = '[]'
-        and new.preferred_agent_provider is null
-        and new.preferred_agent_model is null
-        and new.preferred_agent_effort is null
-        and json_extract(new.context_json, '$.origin') =
-          'briar-conversation'
-        and json_extract(new.context_json, '$.proposalId') = proposal.id
-        and json_extract(new.context_json, '$.conversationRunId') =
-          proposal.conversation_run_id
-        and new.full_auto = 0
-        and new.requires_claim_token = 0
-    )
-    or exists (
-      select 1 from briar_hunt_runs existing
-      where existing.source = new.source
-        and existing.source_key = new.source_key
-        and existing.project_id <> new.project_id
-    )
-  )
-BEGIN
-  select raise(abort, 'conversation proposal no longer belongs to project');
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_channel_proposal_reservation_required
-before insert on briar_hunt_runs
-when new.source = 'issue'
-  and new.source_key like 'briar-channel-approved:%'
-  and not exists (
-    select 1 from briar_hunt_runs existing
-    where existing.project_id = new.project_id
-      and existing.source = new.source
-      and existing.source_key = new.source_key
-  )
-  and not exists (
-    select 1
-    from briar_channel_action_proposals proposal
-    join briar_channels channel on channel.id = proposal.channel_id
-    join briar_projects project
-      on project.id = proposal.project_id
-     and project.organization_id = channel.organization_id
-    where proposal.status = 'pending'
-      and proposal.action_type = 'request_issue_create'
-      and proposal.project_id = new.project_id
-      and proposal.issue_source_key = new.source_key
-      and proposal.accepted_by_user_id is not null
-      and proposal.accepted_at is not null
-      and (
-        length(new.source_key) = 87
-        and substr(new.source_key, 1, 23) = 'briar-channel-approved:'
-        and substr(new.source_key, 24) not glob '*[^0-9a-f]*'
-      )
-      and (
-        json_type(proposal.payload_json) = 'object'
-        and (select count(*) from json_each(proposal.payload_json)) = 1
-        and json_type(proposal.payload_json, '$.issue') = 'object'
-        and (
-          select count(*)
-          from json_each(proposal.payload_json, '$.issue')
-        ) = 3
-        and json_type(proposal.payload_json, '$.issue.title') = 'text'
-        and json_type(
-          proposal.payload_json, '$.issue.description'
-        ) in ('text', 'null')
-        and json_type(
-          proposal.payload_json, '$.issue.priority'
-        ) in ('integer', 'null')
-      )
-      and (
-        new.title = json_extract(proposal.payload_json, '$.issue.title')
-        and new.issue_description is
-          json_extract(proposal.payload_json, '$.issue.description')
-        and new.priority is
-          json_extract(proposal.payload_json, '$.issue.priority')
-        and new.status = 'backlog'
-        and new.stage = 'queued'
-        and new.workflow_stage is null
-        and new.issue_checkpoints_json = '[]'
-        and new.detail =
-          '채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.'
-        and new.repository = coalesce(
-          (select settings.github_repository
-           from briar_project_settings settings
-           where settings.project_id = proposal.project_id),
-          project.name
-        )
-      )
-      and (
-        new.assignee_user_id is null
-        and new.agent_id is null
-        and new.worker_id is null
-        and new.requested_worker_id is null
-        and new.claim_token_hash is null
-        and new.claimed_by is null
-        and new.claimed_at is null
-        and new.lease_expires_at is null
-        and new.claim_attempts = 0
-        and new.current_attempt = 1
-        and new.current_revision = 1
-        and new.full_auto = 0
-        and new.requires_claim_token = 0
-      )
-      and (
-        new.last_execution_id is null
-        and new.dispatch_mode is null
-        and new.dispatch_request_id is null
-        and new.dispatched_at is null
-        and new.requested_by_user_id is null
-        and new.requested_agent_provider is null
-        and new.requested_agent_model is null
-        and new.requested_agent_effort is null
-        and new.preferred_agent_provider is null
-        and new.preferred_agent_model is null
-        and new.preferred_agent_effort is null
-      )
-      and (
-        new.branch is null
-        and new.commit_sha is null
-        and new.tracker_provider is null
-        and new.tracker_issue_id is null
-        and new.tracker_issue_identifier is null
-        and new.tracker_issue_url is null
-        and new.tracker_issue_state is null
-        and new.result_summary is null
-        and new.structured_result_json is null
-        and new.pull_request_urls = '[]'
-        and new.target_sha is null
-        and new.staging_qa_status is null
-        and new.production_qa_status is null
-        and new.staging_qa_detail is null
-        and new.production_qa_detail is null
-        and new.execution_metrics_json is null
-      )
-      and (
-        new.completed_at is null
-        and new.paused_at is null
-        and new.resume_requested_at is null
-        and new.waiting_checkpoint_key is null
-        and new.waiting_checkpoint_revision is null
-        and new.event_count = 0
-        and new.source_created_at = proposal.created_at
-        and new.started_at = proposal.created_at
-        and new.last_event_at = proposal.created_at
-        and new.created_at = new.updated_at
-      )
-      and (
-        json_type(new.context_json) = 'object'
-        and (select count(*) from json_each(new.context_json)) = 6
-        and json_type(new.context_json, '$.origin') = 'text'
-        and json_extract(new.context_json, '$.origin') = 'briar-channel'
-        and json_type(new.context_json, '$.proposalId') = 'text'
-        and json_extract(new.context_json, '$.proposalId') = proposal.id
-        and json_type(new.context_json, '$.channelId') = 'text'
-        and json_extract(new.context_json, '$.channelId') = proposal.channel_id
-        and json_type(new.context_json, '$.issueId') = 'text'
-        and json_extract(new.context_json, '$.issueId') = proposal.id
-        and json_type(new.context_json, '$.attachmentCount') = 'integer'
-        and json_extract(new.context_json, '$.attachmentCount') = 0
-        and json_type(new.context_json, '$.relatedMessage') = 'object'
-        and (
-          select count(*)
-          from json_each(new.context_json, '$.relatedMessage')
-        ) = 4
-        and json_type(
-          new.context_json, '$.relatedMessage.organizationId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.organizationId'
-        ) = channel.organization_id
-        and json_type(
-          new.context_json, '$.relatedMessage.channelId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.channelId'
-        ) = proposal.channel_id
-        and json_type(
-          new.context_json, '$.relatedMessage.messageId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.messageId'
-        ) = proposal.reply_message_id
-        and json_type(
-          new.context_json, '$.relatedMessage.rootMessageId'
-        ) = 'text'
-      )
-  )
-BEGIN
-  select raise(abort, 'channel proposal approval reservation not found');
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_finalize_channel_proposal_approval
-after insert on briar_hunt_runs
-when new.source = 'issue'
-  and new.source_key like 'briar-channel-approved:%'
-  and exists (
-    select 1
-    from briar_channel_action_proposals proposal
-    join briar_channels channel on channel.id = proposal.channel_id
-    join briar_projects project
-      on project.id = proposal.project_id
-     and project.organization_id = channel.organization_id
-    where proposal.status = 'pending'
-      and proposal.action_type = 'request_issue_create'
-      and proposal.project_id = new.project_id
-      and proposal.issue_source_key = new.source_key
-      and proposal.accepted_by_user_id is not null
-      and proposal.accepted_at is not null
-      and (
-        length(new.source_key) = 87
-        and substr(new.source_key, 1, 23) = 'briar-channel-approved:'
-        and substr(new.source_key, 24) not glob '*[^0-9a-f]*'
-      )
-      and (
-        json_type(proposal.payload_json) = 'object'
-        and (select count(*) from json_each(proposal.payload_json)) = 1
-        and json_type(proposal.payload_json, '$.issue') = 'object'
-        and (
-          select count(*)
-          from json_each(proposal.payload_json, '$.issue')
-        ) = 3
-        and json_type(proposal.payload_json, '$.issue.title') = 'text'
-        and json_type(
-          proposal.payload_json, '$.issue.description'
-        ) in ('text', 'null')
-        and json_type(
-          proposal.payload_json, '$.issue.priority'
-        ) in ('integer', 'null')
-      )
-      and (
-        new.title = json_extract(proposal.payload_json, '$.issue.title')
-        and new.issue_description is
-          json_extract(proposal.payload_json, '$.issue.description')
-        and new.priority is
-          json_extract(proposal.payload_json, '$.issue.priority')
-        and new.status = 'backlog'
-        and new.stage = 'queued'
-        and new.workflow_stage is null
-        and new.issue_checkpoints_json = '[]'
-        and new.detail =
-          '채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.'
-        and new.repository = coalesce(
-          (select settings.github_repository
-           from briar_project_settings settings
-           where settings.project_id = proposal.project_id),
-          project.name
-        )
-      )
-      and (
-        new.assignee_user_id is null
-        and new.agent_id is null
-        and new.worker_id is null
-        and new.requested_worker_id is null
-        and new.claim_token_hash is null
-        and new.claimed_by is null
-        and new.claimed_at is null
-        and new.lease_expires_at is null
-        and new.claim_attempts = 0
-        and new.current_attempt = 1
-        and new.current_revision = 1
-        and new.full_auto = 0
-        and new.requires_claim_token = 0
-      )
-      and (
-        new.last_execution_id is null
-        and new.dispatch_mode is null
-        and new.dispatch_request_id is null
-        and new.dispatched_at is null
-        and new.requested_by_user_id is null
-        and new.requested_agent_provider is null
-        and new.requested_agent_model is null
-        and new.requested_agent_effort is null
-        and new.preferred_agent_provider is null
-        and new.preferred_agent_model is null
-        and new.preferred_agent_effort is null
-      )
-      and (
-        new.branch is null
-        and new.commit_sha is null
-        and new.tracker_provider is null
-        and new.tracker_issue_id is null
-        and new.tracker_issue_identifier is null
-        and new.tracker_issue_url is null
-        and new.tracker_issue_state is null
-        and new.result_summary is null
-        and new.structured_result_json is null
-        and new.pull_request_urls = '[]'
-        and new.target_sha is null
-        and new.staging_qa_status is null
-        and new.production_qa_status is null
-        and new.staging_qa_detail is null
-        and new.production_qa_detail is null
-        and new.execution_metrics_json is null
-      )
-      and (
-        new.completed_at is null
-        and new.paused_at is null
-        and new.resume_requested_at is null
-        and new.waiting_checkpoint_key is null
-        and new.waiting_checkpoint_revision is null
-        and new.event_count = 0
-        and new.source_created_at = proposal.created_at
-        and new.started_at = proposal.created_at
-        and new.last_event_at = proposal.created_at
-        and new.created_at = new.updated_at
-      )
-      and (
-        json_type(new.context_json) = 'object'
-        and (select count(*) from json_each(new.context_json)) = 6
-        and json_type(new.context_json, '$.origin') = 'text'
-        and json_extract(new.context_json, '$.origin') = 'briar-channel'
-        and json_type(new.context_json, '$.proposalId') = 'text'
-        and json_extract(new.context_json, '$.proposalId') = proposal.id
-        and json_type(new.context_json, '$.channelId') = 'text'
-        and json_extract(new.context_json, '$.channelId') = proposal.channel_id
-        and json_type(new.context_json, '$.issueId') = 'text'
-        and json_extract(new.context_json, '$.issueId') = proposal.id
-        and json_type(new.context_json, '$.attachmentCount') = 'integer'
-        and json_extract(new.context_json, '$.attachmentCount') = 0
-        and json_type(new.context_json, '$.relatedMessage') = 'object'
-        and (
-          select count(*)
-          from json_each(new.context_json, '$.relatedMessage')
-        ) = 4
-        and json_type(
-          new.context_json, '$.relatedMessage.organizationId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.organizationId'
-        ) = channel.organization_id
-        and json_type(
-          new.context_json, '$.relatedMessage.channelId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.channelId'
-        ) = proposal.channel_id
-        and json_type(
-          new.context_json, '$.relatedMessage.messageId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.messageId'
-        ) = proposal.reply_message_id
-        and json_type(
-          new.context_json, '$.relatedMessage.rootMessageId'
-        ) = 'text'
-      )
-  )
-BEGIN
-  insert into briar_channel_issue_approval_audit (
-    id, proposal_id, organization_id, channel_id, project_id, run_id,
-    approved_by_user_id, approved_at, issue_source_key, result_verification,
-    payload_json, created_at
-  )
-  select proposal.id || ':approval:' || proposal.issue_source_key,
-         proposal.id, channel.organization_id, proposal.channel_id,
-         proposal.project_id, new.id, proposal.accepted_by_user_id,
-         proposal.accepted_at, proposal.issue_source_key, 'atomic',
-         proposal.payload_json, proposal.accepted_at
-  from briar_channel_action_proposals proposal
-  join briar_channels channel on channel.id = proposal.channel_id
-  where proposal.status = 'pending'
-    and proposal.action_type = 'request_issue_create'
-    and proposal.project_id = new.project_id
-    and proposal.issue_source_key = new.source_key
-    and proposal.accepted_by_user_id is not null
-    and proposal.accepted_at is not null;
-  update briar_channel_action_proposals
-  set status = 'accepted', result_run_id = new.id, updated_at = accepted_at
-  where status = 'pending' and action_type = 'request_issue_create'
-    and project_id = new.project_id and issue_source_key = new.source_key
-    and accepted_by_user_id is not null and accepted_at is not null;
-END;
--- @statement
-CREATE TRIGGER briar_channel_issue_approval_finalize_guard
-before update of status on briar_channel_action_proposals
-when old.status = 'pending' and new.status = 'accepted'
-  and old.action_type = 'request_issue_create'
-  and not exists (
-    select 1 from briar_channel_issue_approval_audit approval
-    where approval.proposal_id = old.id
-      and approval.result_verification = 'atomic'
-      and approval.run_id = new.result_run_id
-      and approval.project_id = new.project_id
-      and approval.issue_source_key = new.issue_source_key
-      and approval.approved_by_user_id is new.accepted_by_user_id
-      and approval.approved_at = new.accepted_at
-  )
-begin
-  select raise(abort, 'channel proposal acceptance requires atomic approval');
-end;
--- @statement
-CREATE TRIGGER briar_channel_approved_backlog_event_guard
-before insert on briar_hunt_events
-when new.status not in ('backlog', 'cancelled')
-  and new.actor not like 'briar-app:%'
-  and exists (
-    select 1
-    from briar_hunt_runs run
-    join briar_channel_issue_approval_audit approval
-      on approval.run_id = run.id
-     and approval.issue_source_key = run.source_key
-    where run.id = new.run_id
-      and run.source = 'issue'
-      and run.status in ('backlog', 'cancelled')
-      and approval.result_verification = 'atomic'
-  )
-begin
-  select raise(
-    abort, 'channel-approved issue execution requires explicit dispatch'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_channel_approved_backlog_context_guard
-before update of context_json on briar_hunt_runs
-when old.status in ('backlog', 'cancelled')
-  and new.context_json is not old.context_json
-  and exists (
-    select 1 from briar_channel_issue_approval_audit approval
-    where approval.run_id = old.id
-      and approval.issue_source_key = old.source_key
-      and approval.result_verification = 'atomic'
-  )
-begin
-  select raise(
-    abort, 'channel-approved issue context is immutable before dispatch'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_channel_approved_retryable_transfer_guard
-before update of project_id, status on briar_hunt_runs
-when old.status in ('queued', 'blocked', 'failed')
-  and new.project_id <> old.project_id
-  and exists (
-    select 1 from briar_channel_issue_approval_audit approval
-    where approval.run_id = old.id
-      and approval.issue_source_key = old.source_key
-      and approval.result_verification = 'atomic'
-  )
-  and not (
-    new.status = 'backlog'
-    and new.stage = 'queued'
-    and new.workflow_stage is null
-    and new.agent_id is null
-    and new.worker_id is null
-    and new.requested_worker_id is null
-    and new.claim_token_hash is null
-    and new.claimed_by is null
-    and new.claimed_at is null
-    and new.lease_expires_at is null
-    and new.last_execution_id is null
-    and new.dispatch_mode is null
-    and new.dispatch_request_id is null
-    and new.dispatched_at is null
-    and new.requested_by_user_id is null
-    and new.requested_agent_provider is null
-    and new.requested_agent_model is null
-    and new.requested_agent_effort is null
-    and new.paused_at is null
-    and new.resume_requested_at is null
-    and new.completed_at is null
-  )
-begin
-  select raise(
-    abort, 'channel-approved retryable transfer requires execution reset'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_channel_approved_terminal_transfer_guard
-before update of project_id on briar_hunt_runs
-when old.status in ('completed', 'cancelled')
-  and new.project_id <> old.project_id
-  and exists (
-    select 1 from briar_channel_issue_approval_audit approval
-    where approval.run_id = old.id
-      and approval.issue_source_key = old.source_key
-      and approval.result_verification = 'atomic'
-  )
-begin
-  select raise(
-    abort, 'channel-approved terminal issue transfer is not allowed'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_channel_approved_terminal_reactivation_guard
-before update of status on briar_hunt_runs
-when old.status in ('completed', 'cancelled')
-  and new.status not in ('completed', 'cancelled')
-  and exists (
-    select 1 from briar_channel_issue_approval_audit approval
-    where approval.run_id = old.id
-      and approval.issue_source_key = old.source_key
-      and approval.result_verification = 'atomic'
-  )
-begin
-  select raise(
-    abort, 'approved issue terminal reactivation requires fresh execution approval'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_channel_approved_dispatch_clear_guard
-before update of dispatch_request_id, status on briar_hunt_runs
-when old.dispatch_request_id is not null
-  and new.dispatch_request_id is null
-  and new.status not in ('backlog', 'completed', 'cancelled')
-  and exists (
-    select 1 from briar_channel_issue_approval_audit approval
-    where approval.run_id = old.id
-      and approval.issue_source_key = old.source_key
-      and approval.result_verification = 'atomic'
-  )
-begin
-  select raise(
-    abort, 'channel-approved dispatch cancellation requires backlog reset'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_channel_approved_dispatch_preference_snapshot
-after update of dispatch_request_id on briar_hunt_runs
-when new.dispatch_request_id is not null
-  and new.dispatch_request_id is not old.dispatch_request_id
-  and new.requested_agent_provider is not null
-  and exists (
-    select 1 from briar_channel_issue_approval_audit approval
-    where approval.run_id = new.id
-      and approval.issue_source_key = new.source_key
-      and approval.result_verification = 'atomic'
-  )
-begin
-  update briar_hunt_runs
-  set preferred_agent_provider = new.requested_agent_provider,
-      preferred_agent_model = new.requested_agent_model,
-      preferred_agent_effort = new.requested_agent_effort
-  where id = new.id;
-end;
--- @statement
-CREATE TRIGGER briar_channel_approved_dispatch_preference_guard
-before update of preferred_agent_provider, preferred_agent_model,
-  preferred_agent_effort on briar_hunt_runs
-when old.dispatch_request_id is not null
-  and exists (
-    select 1 from briar_channel_issue_approval_audit approval
-    where approval.run_id = old.id
-      and approval.issue_source_key = old.source_key
-      and approval.result_verification = 'atomic'
-  )
-  and not (
-    new.preferred_agent_provider is old.preferred_agent_provider
-    and new.preferred_agent_model is old.preferred_agent_model
-    and new.preferred_agent_effort is old.preferred_agent_effort
-  )
-  and not (
-    new.dispatch_request_id is old.dispatch_request_id
-    and new.requested_agent_provider is old.requested_agent_provider
-    and new.requested_agent_model is old.requested_agent_model
-    and new.requested_agent_effort is old.requested_agent_effort
-    and new.preferred_agent_provider is old.requested_agent_provider
-    and new.preferred_agent_model is old.requested_agent_model
-    and new.preferred_agent_effort is old.requested_agent_effort
-  )
-  and not (
-    new.project_id is old.project_id
-    and new.source is old.source
-    and new.source_key is old.source_key
-    and new.dispatch_request_id is not null
-    and new.dispatch_request_id is not old.dispatch_request_id
-    and new.dispatched_at is not null
-    and new.requested_by_user_id is not null
-    and new.requested_agent_provider is not null
-    and new.status = 'queued'
-    and new.stage = 'queued'
-    and new.workflow_stage is null
-    and new.dispatch_mode in ('any', 'specific')
-    and (
-      (new.dispatch_mode = 'any' and new.requested_worker_id is null)
-      or
-      (new.dispatch_mode = 'specific' and new.requested_worker_id is not null)
-    )
-    and new.worker_id is null
-    and new.claim_token_hash is null
-    and new.claimed_by is null
-    and new.claimed_at is null
-    and new.lease_expires_at is null
-    and new.preferred_agent_provider is new.requested_agent_provider
-    and new.preferred_agent_model is new.requested_agent_model
-    and new.preferred_agent_effort is new.requested_agent_effort
-  )
-begin
-  select raise(
-    abort, 'approved channel issue dispatch preferences are immutable'
-  );
-end;
--- @statement
-CREATE TRIGGER briar_hunt_runs_channel_proposal_project_guard
-before insert on briar_hunt_runs
-when new.source = 'issue'
-  and new.source_key like 'briar-channel-approved:%'
-  and not exists (
-    select 1 from briar_hunt_runs existing
-    where existing.source = new.source
-      and existing.source_key = new.source_key
-      and existing.project_id = new.project_id
-  )
-  and exists (
-    select 1 from briar_hunt_runs existing
-    where existing.source = new.source
-      and existing.source_key = new.source_key
-      and existing.project_id <> new.project_id
-  )
-begin
-  select raise(abort, 'channel proposal issue project conflict');
-end;
--- @statement
-CREATE TRIGGER briar_hunt_runs_channel_proposal_reservation_guard
-before insert on briar_hunt_runs
-when new.source = 'issue'
-  and new.source_key like 'briar-channel-approved:%'
-  and exists (
-    select 1 from briar_channel_action_proposals proposal
-    where proposal.issue_source_key = new.source_key
-      and proposal.project_id is not null
-      and proposal.project_id <> new.project_id
-  )
-begin
-  select raise(abort, 'channel proposal issue project conflict');
-end;
--- @statement
-CREATE TRIGGER briar_hunt_runs_context_policy_insert_guard
-before insert on briar_hunt_runs
-when json_type(new.context_json, '$.fullAuto') is not null
-begin
-  select raise(abort, 'run context cannot contain execution policy');
-end;
--- @statement
-CREATE TRIGGER briar_hunt_runs_context_policy_update_guard
-before update of context_json on briar_hunt_runs
-when json_type(new.context_json, '$.fullAuto') is not null
-begin
-  select raise(abort, 'run context cannot contain execution policy');
-end;
--- @statement
 CREATE TRIGGER briar_hunt_runs_update_claim_fence
 before update of claim_token_hash on briar_hunt_runs
 when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
@@ -13747,6 +13669,38 @@ begin
     where work_type = 'issue' and work_id = new.id;
 end;
 -- @statement
+CREATE TRIGGER briar_project_agent_task_jobs_update_claim_fence
+before update of claim_token_hash on briar_project_agent_task_jobs
+when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
+begin
+  select raise(ignore) where exists (
+    select 1 from briar_execution_worker_update_requests request
+    join briar_execution_workers worker on worker.device_id = request.device_id
+    where worker.id = new.claimed_worker_id and request.status = 'requested'
+      and request.handoff_state <> 'idle'
+  );
+  select raise(ignore) where exists (
+    select 1 from briar_worker_update_reservations reservation
+    where reservation.work_type = 'projectAgentTask' and reservation.work_id = new.id
+      and reservation.device_id is not (
+        select device_id from briar_execution_workers where id = new.claimed_worker_id
+      )
+  );
+  select raise(ignore) where old.planned_update_resume = 0 and exists (
+    select 1 from briar_worker_update_reservations reservation
+    join briar_execution_workers worker on worker.device_id = reservation.device_id
+    where worker.id = new.claimed_worker_id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_project_agent_task_jobs_update_reservation_release
+after update of status, planned_update_resume on briar_project_agent_task_jobs
+when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
+begin
+  delete from briar_worker_update_reservations
+    where work_type = 'projectAgentTask' and work_id = new.id;
+end;
+-- @statement
 CREATE TRIGGER briar_issue_agent_reply_jobs_update_claim_fence
 before update of claim_token_hash on briar_issue_agent_reply_jobs
 when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
@@ -13777,4 +13731,36 @@ when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
 begin
   delete from briar_worker_update_reservations
     where work_type = 'issueReply' and work_id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_channel_agent_reply_jobs_update_claim_fence
+before update of claim_token_hash on briar_channel_agent_reply_jobs
+when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
+begin
+  select raise(ignore) where exists (
+    select 1 from briar_execution_worker_update_requests request
+    join briar_execution_workers worker on worker.device_id = request.device_id
+    where worker.id = new.claimed_worker_id and request.status = 'requested'
+      and request.handoff_state <> 'idle'
+  );
+  select raise(ignore) where exists (
+    select 1 from briar_worker_update_reservations reservation
+    where reservation.work_type = 'channelReply' and reservation.work_id = new.id
+      and reservation.device_id is not (
+        select device_id from briar_execution_workers where id = new.claimed_worker_id
+      )
+  );
+  select raise(ignore) where old.planned_update_resume = 0 and exists (
+    select 1 from briar_worker_update_reservations reservation
+    join briar_execution_workers worker on worker.device_id = reservation.device_id
+    where worker.id = new.claimed_worker_id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_channel_agent_reply_jobs_update_reservation_release
+after update of status, planned_update_resume on briar_channel_agent_reply_jobs
+when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
+begin
+  delete from briar_worker_update_reservations
+    where work_type = 'channelReply' and work_id = new.id;
 end;

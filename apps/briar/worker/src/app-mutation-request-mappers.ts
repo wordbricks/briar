@@ -99,8 +99,6 @@ export const appIssueDifficulty = (
       return "normal" as const;
     case IssueDifficulty.HARD:
       return "hard" as const;
-    case IssueDifficulty.EXPERT:
-      return "expert" as const;
     case IssueDifficulty.UNSPECIFIED:
     case undefined:
       return null;

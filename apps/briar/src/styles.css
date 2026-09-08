@@ -965,7 +965,6 @@ body { overflow: hidden; font-synthesis: none; }
 .issue-difficulty-icon.easy { color:#318267; }
 .issue-difficulty-icon.normal { color:#5d63a6; }
 .issue-difficulty-icon.hard { color:#b45162; }
-.issue-difficulty-icon.expert { color:#8d3f8f; }
 .kanban-card-badges > .issue-difficulty-icon { min-height:22px; padding:0 7px; border:1px solid color-mix(in srgb,currentColor 24%,var(--border)); border-radius:7px; background:color-mix(in srgb,currentColor 8%,var(--card)); }
 .kanban-card-assignee-badges > span { padding:0; border:1px solid var(--border); box-shadow:none; }
 .kanban-card-assignee-badges > span + span { margin-left:-4px; }

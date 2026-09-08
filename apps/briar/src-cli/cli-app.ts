@@ -314,7 +314,7 @@ const issueUpdateCommand = Command.make(
       Flag.withDescription("Clear the issue priority"),
       Flag.withDefault(false),
     ),
-    difficulty: Flag.choice("difficulty", ["easy", "normal", "hard", "expert"]).pipe(
+    difficulty: Flag.choice("difficulty", ["easy", "normal", "hard"]).pipe(
       Flag.withDescription("New issue difficulty"),
       Flag.optional,
     ),

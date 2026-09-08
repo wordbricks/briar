@@ -218,7 +218,7 @@ type IssueUpdateState = {
   title: string;
   description: string | null;
   priority: number | null;
-  difficulty: "easy" | "normal" | "hard" | "expert" | null;
+  difficulty: "easy" | "normal" | "hard" | null;
   assigneeUserId: string | null;
 };
 
@@ -241,7 +241,6 @@ const difficultyFromProto = (value: IssueDifficulty) => {
     case IssueDifficulty.EASY: return "easy" as const;
     case IssueDifficulty.NORMAL: return "normal" as const;
     case IssueDifficulty.HARD: return "hard" as const;
-    case IssueDifficulty.EXPERT: return "expert" as const;
     default: return null;
   }
 };
@@ -251,7 +250,6 @@ const difficultyToProto = (value: IssueUpdateState["difficulty"]) => {
     case "easy": return IssueDifficulty.EASY;
     case "normal": return IssueDifficulty.NORMAL;
     case "hard": return IssueDifficulty.HARD;
-    case "expert": return IssueDifficulty.EXPERT;
     case null: return undefined;
   }
 };

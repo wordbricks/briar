@@ -298,9 +298,6 @@ export function CreateIssueDialog({
           }, {
             label: t("issue.difficulty.hard"),
             value: "hard"
-          }, {
-            label: t("issue.difficulty.expert"),
-            value: "expert"
           }]} value={difficulty ?? ""} />
             <ProviderModelSelector className="issue-provider-model-selector" compact disabled={isSubmitting} groupLabel={`${t("issue.preferredProvider")} · ${t("issue.preferredModel")}`} modelLabel={t("issue.preferredModel")} modelSearchEmptyMessage={t("issue.noModelsFound")} modelSearchPlaceholder={t("issue.searchModels")} modelValue={preferredModel} onModelChange={value => {
             setPreferredModel(value);

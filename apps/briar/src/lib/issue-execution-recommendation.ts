@@ -85,36 +85,6 @@ const recommendedModelsByDifficulty = {
       signatures: [["opus", "5"]],
     },
   ],
-  expert: [
-    {
-      provider: "claude",
-      effort: "max",
-      // Two signatures, because Fable 5's long-context row reaches the
-      // catalog under two shapes and the tokenizer folds each differently:
-      //
-      //   * the catalog ID `claude-fable-5-1[1m]`, which every Worker
-      //     reports, folds to ["claude", "fable", "5", "1", "1m"];
-      //   * the folded label `Fable · claude-fable-5-1`, which only Workers
-      //     on Briar 1.2.219 or newer produce, folds to
-      //     ["fable", "claude", "fable", "5", "1"].
-      //
-      // ["fable", "5", "1"] covers both. ["fable", "5", "1m"] additionally
-      // covers the bare alias shape `fable-5[1m]`, where neither the ID nor
-      // the label carries the resolved model.
-      //
-      // Neither signature matches a plain `claude-fable-5` row
-      // (["claude", "fable", "5"]), and that is deliberate: Fable 5 scores
-      // below the Opus 5 that `hard` already picks, so an expert issue on a
-      // Worker that only advertises plain Fable 5 has to fall through to
-      // Astra rather than trade down.
-      signatures: [["fable", "5", "1"], ["fable", "5", "1m"]],
-    },
-    {
-      provider: "codex",
-      effort: "ultra",
-      signatures: [["gpt", "6", "astra"]],
-    },
-  ],
 } as const satisfies Record<IssueDifficulty, readonly RecommendedModel[]>;
 
 const normalizedModelName = (value: string) =>
