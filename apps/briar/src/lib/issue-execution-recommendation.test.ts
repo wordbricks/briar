@@ -103,6 +103,40 @@ describe("recommendIssueExecution", () => {
     });
   });
 
+  // The claude catalog only exposes alias ids ("opus[1m]"), so the resolved
+  // wire model that parseClaudeInitializeModels folds into the label is what
+  // makes this match. If that label ever stops carrying "claude-opus-5[1m]",
+  // difficulty-based model selection silently stops picking Opus for claude.
+  it("matches the real claude catalog row through its folded label", () => {
+    const current = catalog();
+    current.claude = {
+      models: [{
+        id: "opus[1m]",
+        label: "Opus (1M context) · claude-opus-5[1m]",
+        isDefault: true,
+        defaultEffortId: null,
+        efforts: ["low", "medium", "high", "xhigh", "max"].map((effort) => ({
+          id: effort,
+          label: effort,
+        })),
+      }],
+      defaultEfforts: [],
+      allowCustomModels: true,
+      error: null,
+    };
+
+    expect(recommendIssueExecution("normal", current)).toEqual({
+      provider: "claude",
+      model: "opus[1m]",
+      effort: "high",
+    });
+    expect(recommendIssueExecution("hard", current)).toEqual({
+      provider: "claude",
+      model: "opus[1m]",
+      effort: "high",
+    });
+  });
+
   it("skips a merged capability that no individual Worker can run", () => {
     const current = withModel(
       withModel(catalog(), "codex", "gpt-5.6-luna", ["max"]),

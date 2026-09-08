@@ -22,6 +22,7 @@ import { providerMissingBinaryMessage } from "./provider-usage";
 
 const MAX_MODELS = 500;
 const MAX_EFFORTS = 20;
+const MAX_LABEL = 200;
 const CACHE_MS = 5 * 60_000;
 
 const effort = (
@@ -256,6 +257,17 @@ export function parseClaudeModels(output: string): AgentModelCapability[] {
     .map((id) => ({ id, label: id, isDefault: false, defaultEffortId: null, efforts: [] }));
 }
 
+/**
+ * Display label for a Claude picker row: the menu's display name plus the wire
+ * model it resolves to, so an alias row says which generation runs. Falls back
+ * to the bare display name when the pair would exceed the label field's cap.
+ */
+function claudeModelLabel(row: { id: string; label: string; resolvedModel: string | null }) {
+  if (!row.resolvedModel || row.resolvedModel === row.id) return row.label;
+  const folded = `${row.label} · ${row.resolvedModel}`;
+  return folded.length <= MAX_LABEL ? folded : row.label;
+}
+
 export type ClaudeModelDiscovery = {
   models: AgentModelCapability[];
   defaultEfforts: AgentEffortCapability[];
@@ -311,7 +323,10 @@ export function parseClaudeInitializeModels(response: unknown): ClaudeModelDisco
     .slice(0, MAX_MODELS)
     .map((row) => ({
       id: row.id,
-      label: row.label,
+      // The picker's alias ids ("opus[1m]", "sonnet") hide which generation
+      // actually runs, so carry the resolved wire model in the label. Issue
+      // difficulty routing matches on the label too, so it must stay there.
+      label: claudeModelLabel(row),
       isDefault: defaultIndex >= 0 && row === parsed[defaultIndex],
       defaultEffortId: null,
       efforts: row.efforts,
