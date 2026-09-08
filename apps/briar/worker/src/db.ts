@@ -259,20 +259,20 @@ export { importLinearHuntRuns } from "./linear-import-repository";
 export type { LinearImportRunInput } from "./linear-import-repository";
 
 export {
-  createOrganization,
-  updateOrganization,
-  updateOrganizationLogo,
-  isOrganizationHandleAvailable,
-  createOrganizationInvitation,
-  revokeOrganizationInvitation,
-  acceptOrganizationInvitation,
-  updateOrganizationMemberRole,
-  updateOrganizationMemberProjects,
-  removeOrganizationMember,
+  createWorkspace,
+  updateWorkspace,
+  updateWorkspaceLogo,
+  isWorkspaceHandleAvailable,
+  createWorkspaceInvitation,
+  revokeWorkspaceInvitation,
+  acceptWorkspaceInvitation,
+  updateWorkspaceMemberRole,
+  updateWorkspaceMemberProjects,
+  removeWorkspaceMember,
 } from "./organization-command-repository";
 export type {
-  AcceptOrganizationInvitationOutcome,
-  UpdateOrganizationMemberProjectsOutcome,
+  AcceptWorkspaceInvitationOutcome,
+  UpdateWorkspaceMemberProjectsOutcome,
 } from "./organization-command-repository";
 
 export {

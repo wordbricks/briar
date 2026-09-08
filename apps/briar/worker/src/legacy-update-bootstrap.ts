@@ -1,6 +1,6 @@
 import type { BriarAuth } from "./auth";
 import { json } from "./http-response";
-import { listOrganizationsApplication } from "./organization-application";
+import { listWorkspacesApplication } from "./organization-application";
 import type { OrganizationRow } from "./organization-repository";
 import { teamJson } from "./team-json";
 import { listTeams } from "./team-repository";
@@ -36,7 +36,7 @@ export async function handleLegacyUpdateBootstrapRoute(input: {
     return json({ user: { id, username, name, email, image } });
   }
   if (pathname === "/organizations") {
-    const organizations = await listOrganizationsApplication({
+    const organizations = await listWorkspacesApplication({
       db,
       userId: session.user.id,
     });

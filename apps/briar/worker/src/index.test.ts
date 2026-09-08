@@ -22,7 +22,7 @@ import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
-  decodeOrganizationMemberRoleInput,
+  decodeWorkspaceMemberRoleInput,
 } from "./account-organization-request-contract";
 import {
   decodeExecutionPreferences,
@@ -702,13 +702,13 @@ describe("Worker HTTP contract", () => {
 
   it("accepts only assignable organization member roles", () => {
     for (const role of ["co-owner", "developer", "editor", "viewer"]) {
-      expect(decodeOrganizationMemberRoleInput({ role })).toEqual({ role });
+      expect(decodeWorkspaceMemberRoleInput({ role })).toEqual({ role });
     }
     expect(() =>
-      decodeOrganizationMemberRoleInput({ role: "owner" }),
+      decodeWorkspaceMemberRoleInput({ role: "owner" }),
     ).toThrow();
     expect(() =>
-      decodeOrganizationMemberRoleInput({ role: "admin" }),
+      decodeWorkspaceMemberRoleInput({ role: "admin" }),
     ).toThrow();
   });
 

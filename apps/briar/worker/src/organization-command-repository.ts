@@ -7,12 +7,12 @@ import {
   type OrganizationRow,
 } from "./organization-repository";
 
-export async function createOrganization(
+export async function createWorkspace(
   db: D1Database,
   input: { name: string; handle: string; ownerUserId: string },
 ) {
   const createdAt = new Date().toISOString();
-  const organization: OrganizationRow = {
+  const workspace: OrganizationRow = {
     id: crypto.randomUUID(),
     name: input.name,
     handle: input.handle,
@@ -28,9 +28,9 @@ export async function createOrganization(
        values (?, ?, ?, ?, ?)`,
       )
       .bind(
-        organization.id,
-        organization.name,
-        organization.handle,
+        workspace.id,
+        workspace.name,
+        workspace.handle,
         createdAt,
         createdAt,
       ),
@@ -40,14 +40,14 @@ export async function createOrganization(
          (organization_id, user_id, role, created_at, updated_at)
        values (?, ?, 'owner', ?, ?)`,
       )
-      .bind(organization.id, input.ownerUserId, createdAt, createdAt),
+      .bind(workspace.id, input.ownerUserId, createdAt, createdAt),
   ]);
-  return organization;
+  return workspace;
 }
 
-export async function updateOrganization(
+export async function updateWorkspace(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   name: string,
   role: OrganizationRole,
 ) {
@@ -58,7 +58,7 @@ export async function updateOrganization(
        set name = ?, updated_at = ?
        where id = ?`,
     )
-    .bind(name, updatedAt, organizationId)
+    .bind(name, updatedAt, workspaceId)
     .run();
   if (result.meta.changes === 0) return null;
   return db
@@ -67,14 +67,14 @@ export async function updateOrganization(
        from briar_organizations
        where id = ?`,
     )
-    .bind(organizationId)
+    .bind(workspaceId)
     .first<Omit<OrganizationRow, "role">>()
-    .then((organization) => (organization ? { ...organization, role } : null));
+    .then((workspace) => (workspace ? { ...workspace, role } : null));
 }
 
-export async function updateOrganizationLogo(
+export async function updateWorkspaceLogo(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   logo: string | null,
   role: OrganizationRole,
 ) {
@@ -85,7 +85,7 @@ export async function updateOrganizationLogo(
        set logo_data_url = ?, logo = null, updated_at = ?
        where id = ?`,
     )
-    .bind(logo, updatedAt, organizationId)
+    .bind(logo, updatedAt, workspaceId)
     .run();
   if (result.meta.changes === 0) return null;
   return db
@@ -94,27 +94,27 @@ export async function updateOrganizationLogo(
        from briar_organizations
        where id = ?`,
     )
-    .bind(organizationId)
+    .bind(workspaceId)
     .first<Omit<OrganizationRow, "role">>()
-    .then((organization) => (organization ? { ...organization, role } : null));
+    .then((workspace) => (workspace ? { ...workspace, role } : null));
 }
 
-export async function isOrganizationHandleAvailable(
+export async function isWorkspaceHandleAvailable(
   db: D1Database,
   handle: string,
 ) {
-  const organization = await db
+  const workspace = await db
     .prepare(`select 1 as found from briar_organizations where handle = ?`)
     .bind(handle)
     .first<{ found: number }>();
-  return organization === null;
+  return workspace === null;
 }
 
-export async function createOrganizationInvitation(
+export async function createWorkspaceInvitation(
   db: D1Database,
   input: {
     id: string;
-    organizationId: string;
+    workspaceId: string;
     initialProjectId: string;
     emailNormalized: string;
     role: OrganizationAssignableRole;
@@ -130,7 +130,7 @@ export async function createOrganizationInvitation(
         `select id from briar_projects
          where id = ? and organization_id = ?`,
       )
-      .bind(input.initialProjectId, input.organizationId)
+      .bind(input.initialProjectId, input.workspaceId)
       .first<{ id: string }>(),
     db
       .prepare(
@@ -139,7 +139,7 @@ export async function createOrganizationInvitation(
          join "user" on "user".id = member.user_id
          where member.organization_id = ? and lower("user".email) = ?`,
       )
-      .bind(input.organizationId, input.emailNormalized)
+      .bind(input.workspaceId, input.emailNormalized)
       .first<{ user_id: string }>(),
   ]);
   if (!project) return { outcome: "project_not_found" as const };
@@ -156,7 +156,7 @@ export async function createOrganizationInvitation(
       .bind(
         input.createdAt,
         input.createdAt,
-        input.organizationId,
+        input.workspaceId,
         input.emailNormalized,
       ),
     db
@@ -169,7 +169,7 @@ export async function createOrganizationInvitation(
       )
       .bind(
         input.id,
-        input.organizationId,
+        input.workspaceId,
         input.initialProjectId,
         input.emailNormalized,
         input.role,
@@ -186,9 +186,9 @@ export async function createOrganizationInvitation(
     : { outcome: "project_not_found" as const };
 }
 
-export async function revokeOrganizationInvitation(
+export async function revokeWorkspaceInvitation(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   invitationId: string,
   revokedAt: string,
 ) {
@@ -199,12 +199,12 @@ export async function revokeOrganizationInvitation(
        where id = ? and organization_id = ?
          and accepted_at is null and revoked_at is null`,
     )
-    .bind(revokedAt, revokedAt, invitationId, organizationId)
+    .bind(revokedAt, revokedAt, invitationId, workspaceId)
     .run();
   return result.meta.changes > 0;
 }
 
-export type AcceptOrganizationInvitationOutcome =
+export type AcceptWorkspaceInvitationOutcome =
   | { outcome: "invalid" }
   | { outcome: "expired" }
   | { outcome: "revoked" }
@@ -214,7 +214,7 @@ export type AcceptOrganizationInvitationOutcome =
       invitation: OrganizationInvitationRow;
     };
 
-export async function acceptOrganizationInvitation(
+export async function acceptWorkspaceInvitation(
   db: D1Database,
   input: {
     tokenHash: string;
@@ -222,7 +222,7 @@ export async function acceptOrganizationInvitation(
     emailNormalized: string;
     acceptedAt: string;
   },
-): Promise<AcceptOrganizationInvitationOutcome> {
+): Promise<AcceptWorkspaceInvitationOutcome> {
   const invitation = await getOrganizationInvitationByTokenHash(
     db,
     input.tokenHash,
@@ -302,9 +302,9 @@ export async function acceptOrganizationInvitation(
   return { outcome: "accepted", invitation: accepted };
 }
 
-export async function updateOrganizationMemberRole(
+export async function updateWorkspaceMemberRole(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
   role: OrganizationAssignableRole,
 ) {
@@ -313,7 +313,7 @@ export async function updateOrganizationMemberRole(
     `update briar_organization_members
      set role = ?, updated_at = ?
      where organization_id = ? and user_id = ? and role != 'owner'`,
-  ).bind(role, updatedAt, organizationId, userId);
+  ).bind(role, updatedAt, workspaceId, userId);
   const statements: D1PreparedStatement[] = [];
   if (role !== "co-owner") {
     statements.push(
@@ -329,7 +329,7 @@ export async function updateOrganizationMemberRole(
          where project.organization_id = ?
            and member.role in ('owner', 'co-owner')
          on conflict (project_id, user_id) do nothing`,
-      ).bind(updatedAt, updatedAt, userId, organizationId),
+      ).bind(updatedAt, updatedAt, userId, workspaceId),
     );
   }
   statements.push(updateRoleStatement);
@@ -337,25 +337,25 @@ export async function updateOrganizationMemberRole(
   return (results.at(-1)?.meta.changes ?? 0) > 0;
 }
 
-export type UpdateOrganizationMemberProjectsOutcome =
+export type UpdateWorkspaceMemberProjectsOutcome =
   | "updated"
   | "member_not_found"
   | "role_has_full_access"
   | "project_not_found";
 
-export async function updateOrganizationMemberProjects(
+export async function updateWorkspaceMemberProjects(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
   projectIds: readonly string[],
-): Promise<UpdateOrganizationMemberProjectsOutcome> {
+): Promise<UpdateWorkspaceMemberProjectsOutcome> {
   const uniqueProjectIds = [...new Set(projectIds)];
   const member = await db
     .prepare(
       `select role from briar_organization_members
        where organization_id = ? and user_id = ?`,
     )
-    .bind(organizationId, userId)
+    .bind(workspaceId, userId)
     .first<{ role: OrganizationRole }>();
   if (!member) return "member_not_found";
   if (member.role === "owner" || member.role === "co-owner") {
@@ -370,7 +370,7 @@ export async function updateOrganizationMemberProjects(
          from briar_projects
          where organization_id = ? and id in (${placeholders})`,
       )
-      .bind(organizationId, ...uniqueProjectIds)
+      .bind(workspaceId, ...uniqueProjectIds)
       .first<{ count: number }>();
     if (row?.count !== uniqueProjectIds.length) return "project_not_found";
   }
@@ -380,7 +380,7 @@ export async function updateOrganizationMemberProjects(
       `select project_id from briar_project_members
        where organization_id = ? and user_id = ?`,
     )
-    .bind(organizationId, userId)
+    .bind(workspaceId, userId)
     .all<{ project_id: string }>();
   const currentIds = new Set(current.results.map((row) => row.project_id));
   const requestedIds = new Set(uniqueProjectIds);
@@ -394,7 +394,7 @@ export async function updateOrganizationMemberProjects(
       db.prepare(
         `delete from briar_project_members
          where project_id = ? and organization_id = ? and user_id = ?`,
-      ).bind(projectId, organizationId, userId)
+      ).bind(projectId, workspaceId, userId)
     ),
     ...removedIds.map((projectId) =>
       db.prepare(
@@ -414,15 +414,15 @@ export async function updateOrganizationMemberProjects(
         `insert into briar_project_members (
            project_id, organization_id, user_id, created_at, updated_at
          ) values (?, ?, ?, ?, ?)`,
-      ).bind(projectId, organizationId, userId, updatedAt, updatedAt)
+      ).bind(projectId, workspaceId, userId, updatedAt, updatedAt)
     ),
   ]);
   return "updated";
 }
 
-export async function removeOrganizationMember(
+export async function removeWorkspaceMember(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ) {
   const updatedAt = new Date().toISOString();
@@ -440,7 +440,7 @@ export async function removeOrganizationMember(
              where organization_id = ? and user_id = ? and role != 'owner'
            )`,
       )
-      .bind(updatedAt, userId, organizationId, organizationId, userId),
+      .bind(updatedAt, userId, workspaceId, workspaceId, userId),
     db
       .prepare(
         `delete from briar_project_agent_tokens
@@ -453,13 +453,13 @@ export async function removeOrganizationMember(
              where organization_id = ? and user_id = ? and role != 'owner'
            )`,
       )
-      .bind(userId, organizationId, organizationId, userId),
+      .bind(userId, workspaceId, workspaceId, userId),
     db
       .prepare(
         `delete from briar_organization_members
          where organization_id = ? and user_id = ? and role != 'owner'`,
       )
-      .bind(organizationId, userId),
+      .bind(workspaceId, userId),
   ]);
   return (results[2]?.meta.changes ?? 0) > 0;
 }

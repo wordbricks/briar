@@ -15,7 +15,7 @@ import {
   connectGithubInstallation,
   completeGithubDelivery,
   completeWorkflowStageLifecycle,
-  createOrganization,
+  createWorkspace,
   createTeam,
   disconnectGithubInstallation,
   getHuntRunForProject,
@@ -335,7 +335,7 @@ describe("GitHub pull request D1 integration", () => {
         createdAt,
       )
       .run();
-    const organization = await createOrganization(db, {
+    const organization = await createWorkspace(db, {
       name: "GitHub DB Test Organization",
       handle: "github-db-test",
       ownerUserId: ownerId,
@@ -846,7 +846,7 @@ describe("GitHub pull request D1 integration", () => {
   });
 
   it("restricts a mapped installation to projects in its Briar organization", async () => {
-    const otherOrganization = await createOrganization(db, {
+    const otherOrganization = await createWorkspace(db, {
       name: `Other GitHub organization ${scenarioNumber}`,
       handle: `other-github-${scenarioNumber}`,
       ownerUserId: ownerId,

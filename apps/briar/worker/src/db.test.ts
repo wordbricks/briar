@@ -21,7 +21,7 @@ import {
 } from "./organization-repository";
 import { listTeams } from "./team-repository";
 import {
-  acceptOrganizationInvitation,
+  acceptWorkspaceInvitation,
   reserveIssueCreateProposalApproval,
   acceptIssueUpdateProposal,
   acceptIssueReworkProposal,
@@ -31,8 +31,8 @@ import {
   claimDueTeamAgentScheduleRun,
   completeTeamAgentScheduleRun,
   completeIssueResultReview,
-  createOrganization,
-  createOrganizationInvitation,
+  createWorkspace,
+  createWorkspaceInvitation,
   createIssueActionProposal,
   createIssueMessage,
   createTeamAgentTaskJob,
@@ -84,7 +84,7 @@ import {
   listOrganizationIssueSubscriptionRunIds,
   listOrganizationStatusTrayRuns,
   listOrganizationUsageRuns,
-  isOrganizationHandleAvailable,
+  isWorkspaceHandleAvailable,
   issueProjectAgentToken,
   listTeamAgents,
   listTeamAgentSessionSummaries,
@@ -101,16 +101,16 @@ import {
   recordHuntEvent,
   subscribeIssue,
   resumeWorkflowCheckpoint,
-  removeOrganizationMember,
-  revokeOrganizationInvitation,
+  removeWorkspaceMember,
+  revokeWorkspaceInvitation,
   renewTeamAgentScheduleRunLease,
   completeTeamAgentTask,
   renewTeamAgentTaskLease,
   updateTeamSettings as persistProjectSettings,
   updateTeamAgent,
   updateTeamAgentSchedule,
-  updateOrganizationMemberRole,
-  updateOrganizationMemberProjects,
+  updateWorkspaceMemberRole,
+  updateWorkspaceMemberProjects,
   updateIssue,
   unsubscribeIssue,
   upsertTeamAgentSession,
@@ -1321,7 +1321,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         recentAt,
       )
       .run();
-    const otherOrganization = await createOrganization(db, {
+    const otherOrganization = await createWorkspace(db, {
       name: "Other Usage Organization",
       handle: "other-usage-organization",
       ownerUserId: "owner",
@@ -2462,9 +2462,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
   it("allows duplicate organization names but enforces unique handles", async () => {
     await expect(
-      isOrganizationHandleAvailable(db, "another-example"),
+      isWorkspaceHandleAvailable(db, "another-example"),
     ).resolves.toBe(true);
-    const organization = await createOrganization(db, {
+    const organization = await createWorkspace(db, {
       name: "Example Org",
       handle: "another-example",
       ownerUserId: "owner",
@@ -2473,10 +2473,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     expect(organization.name).toBe("Example Org");
     expect(organization.handle).toBe("another-example");
     await expect(
-      isOrganizationHandleAvailable(db, "another-example"),
+      isWorkspaceHandleAvailable(db, "another-example"),
     ).resolves.toBe(false);
     await expect(
-      createOrganization(db, {
+      createWorkspace(db, {
         name: "A different name",
         handle: "another-example",
         ownerUserId: "owner",
@@ -2569,7 +2569,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       projectId,
     );
     await expect(
-      updateOrganizationMemberProjects(db, projectId, "member", []),
+      updateWorkspaceMemberProjects(db, projectId, "member", []),
     ).resolves.toBe("updated");
     expect(await getDashboardSyncCursor(db, projectId)).toBeGreaterThan(
       cursorBeforeAccessRemoval,
@@ -2577,7 +2577,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(listTeams(db, "member")).resolves.toEqual([]);
     await expect(getTeam(db, projectId, "member")).resolves.toBeNull();
     await expect(
-      updateOrganizationMemberRole(db, projectId, "member", "developer"),
+      updateWorkspaceMemberRole(db, projectId, "member", "developer"),
     ).resolves.toBe(true);
     await expect(getTeam(db, projectId, "member")).resolves.toBeNull();
     await expect(
@@ -2587,15 +2587,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       findProjectIdByAgentTokenHash(db, memberTokenHash),
     ).resolves.toBeNull();
     await expect(
-      updateOrganizationMemberProjects(db, projectId, "member", [projectId]),
+      updateWorkspaceMemberProjects(db, projectId, "member", [projectId]),
     ).resolves.toBe("updated");
     await expect(getTeam(db, projectId, "member")).resolves.not.toBeNull();
 
     await expect(
-      updateOrganizationMemberRole(db, projectId, "member", "co-owner"),
+      updateWorkspaceMemberRole(db, projectId, "member", "co-owner"),
     ).resolves.toBe(true);
     await expect(
-      updateOrganizationMemberProjects(db, projectId, "member", []),
+      updateWorkspaceMemberProjects(db, projectId, "member", []),
     ).resolves.toBe("role_has_full_access");
     const members = await listOrganizationMembers(db, projectId);
     expect(members.map((member) => member.email)).toEqual([
@@ -2606,7 +2606,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       "co-owner",
     );
     await expect(
-      updateOrganizationMemberRole(db, projectId, "owner", "developer"),
+      updateWorkspaceMemberRole(db, projectId, "owner", "developer"),
     ).resolves.toBe(false);
     const assignedRunId = await recordHuntEvent(
       db,
@@ -2617,7 +2617,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       }),
     );
     await expect(
-      removeOrganizationMember(db, projectId, "member"),
+      removeWorkspaceMember(db, projectId, "member"),
     ).resolves.toBe(true);
     await expect(
       getHuntRunForProject(db, projectId, assignedRunId),
@@ -2635,9 +2635,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       agentTokenHash: "6".repeat(64),
     });
     const tokenHash = "1".repeat(64);
-    const invitation = await createOrganizationInvitation(db, {
+    const invitation = await createWorkspaceInvitation(db, {
       id: "invitation-new-member",
-      organizationId: projectId,
+      workspaceId: projectId,
       initialProjectId: projectId,
       emailNormalized: "new-invitee@example.com",
       role: "editor",
@@ -2657,7 +2657,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({ id: "invitation-new-member" }),
     ]);
     await expect(
-      acceptOrganizationInvitation(db, {
+      acceptWorkspaceInvitation(db, {
         tokenHash,
         userId: "owner",
         emailNormalized: "owner@example.com",
@@ -2674,7 +2674,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        );`,
     );
     await expect(
-      acceptOrganizationInvitation(db, {
+      acceptWorkspaceInvitation(db, {
         tokenHash,
         userId: "new-invitee",
         emailNormalized: "new-invitee@example.com",
@@ -2689,7 +2689,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       secondProject.id,
     );
     await expect(
-      acceptOrganizationInvitation(db, {
+      acceptWorkspaceInvitation(db, {
         tokenHash,
         userId: "new-invitee",
         emailNormalized: "new-invitee@example.com",
@@ -2702,9 +2702,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   });
 
   it("supports revoking and safely replacing pending invitation links", async () => {
-    const first = await createOrganizationInvitation(db, {
+    const first = await createWorkspaceInvitation(db, {
       id: "invitation-replaced",
-      organizationId: projectId,
+      workspaceId: projectId,
       initialProjectId: projectId,
       emailNormalized: "replace-invite@example.com",
       role: "viewer",
@@ -2714,9 +2714,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       createdAt: atMinute(40),
     });
     expect(first.outcome).toBe("created");
-    const replacement = await createOrganizationInvitation(db, {
+    const replacement = await createWorkspaceInvitation(db, {
       id: "invitation-replacement",
-      organizationId: projectId,
+      workspaceId: projectId,
       initialProjectId: projectId,
       emailNormalized: "replace-invite@example.com",
       role: "co-owner",
@@ -2733,7 +2733,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       getOrganizationInvitationByTokenHash(db, "2".repeat(64)),
     ).resolves.toMatchObject({ revoked_at: atMinute(41) });
     await expect(
-      revokeOrganizationInvitation(
+      revokeWorkspaceInvitation(
         db,
         projectId,
         "invitation-replacement",
@@ -2741,7 +2741,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ),
     ).resolves.toBe(true);
     await expect(
-      acceptOrganizationInvitation(db, {
+      acceptWorkspaceInvitation(db, {
         tokenHash: "3".repeat(64),
         userId: "owner",
         emailNormalized: "replace-invite@example.com",
@@ -2782,7 +2782,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          '${atMinute(30)}', 'approved'
        );`,
     );
-    const organization = await createOrganization(db, {
+    const organization = await createWorkspace(db, {
       name: "Disposable Organization",
       handle: "account-deletion-personal",
       ownerUserId: userId,
@@ -2862,7 +2862,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          ('${memberId}', 'Race Member', '${memberEmail}', 1,
           '${atMinute(0)}', '${atMinute(0)}');`,
     );
-    const organization = await createOrganization(db, {
+    const organization = await createWorkspace(db, {
       name: "Account Deletion Race Organization",
       handle: "account-deletion-race",
       ownerUserId: ownerId,
@@ -2948,7 +2948,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          '${atMinute(0)}', '${atMinute(0)}'
        );`,
     );
-    const organization = await createOrganization(db, {
+    const organization = await createWorkspace(db, {
       name: "Account Deletion Outbox Organization",
       handle: "account-deletion-outbox",
       ownerUserId: userId,
@@ -3199,7 +3199,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          ('${memberId}', 'Shared Member', '${memberEmail}', 1,
           '${atMinute(0)}', '${atMinute(0)}');`,
     );
-    const organization = await createOrganization(db, {
+    const organization = await createWorkspace(db, {
       name: "Shared Organization",
       handle: "account-deletion-shared",
       ownerUserId: ownerId,
@@ -3228,7 +3228,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     });
     const memberAgentTokenHash = "4".repeat(64);
     await expect(
-      updateOrganizationMemberProjects(
+      updateWorkspaceMemberProjects(
         db,
         organization.id,
         memberId,
@@ -3691,8 +3691,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       (await listIssueSubscriptions(db, projectId, runId)).map((row) => row.user_id),
     ).toEqual(["conversation-member", "owner", "mentioned-member"]);
 
-    await removeOrganizationMember(db, projectId, "conversation-member");
-    await removeOrganizationMember(db, projectId, "mentioned-member");
+    await removeWorkspaceMember(db, projectId, "conversation-member");
+    await removeWorkspaceMember(db, projectId, "mentioned-member");
   });
 
   it("keeps assignees subscribed and supports manual subscription changes", async () => {
@@ -3760,7 +3760,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       (await listIssueSubscriptions(db, projectId, runId)).map((row) => row.user_id),
     ).toEqual(["owner", "subscription-member"]);
 
-    await removeOrganizationMember(db, projectId, "subscription-member");
+    await removeWorkspaceMember(db, projectId, "subscription-member");
   });
 
   it("lists visible channel mentions and replies to a user's root message", async () => {

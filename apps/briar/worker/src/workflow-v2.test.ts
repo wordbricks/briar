@@ -10,7 +10,7 @@ import {
   claimNextQueuedHuntRun,
   completeWorkflowStageLifecycle,
   completeWorkflowStage,
-  createOrganization,
+  createWorkspace,
   createTeam,
   getHuntRunForProject,
   getWorkflowProgress,
@@ -135,7 +135,7 @@ describe("workflow v2 D1 persistence and transitions", () => {
         at(0),
       )
       .run();
-    const organization = await createOrganization(db, {
+    const organization = await createWorkspace(db, {
       name: "Workflow Org",
       handle: "workflow-org",
       ownerUserId: "workflow-owner",
