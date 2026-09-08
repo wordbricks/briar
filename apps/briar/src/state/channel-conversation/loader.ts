@@ -341,11 +341,28 @@ export function createChannelConversationLoader(
     const isStale = () =>
       signal.aborted || version !== requestVersion || !surfaceIsCurrent(context);
     try {
+      const requestedReply =
+        requestedMessage?.channelId === channelId &&
+          requestedMessage.rootMessageId !== requestedMessage.messageId
+          ? api.listChannelMessages(
+              token,
+              organizationId,
+              channelId,
+              requestedMessage.rootMessageId,
+              { signal },
+            ).then(
+              (result) => ({ ok: true as const, result }),
+              (cause: unknown) => ({ ok: false as const, cause }),
+            )
+          : null;
       const result = await api.loadChannel(token, organizationId, channelId, {
         messageLimit,
         signal,
       });
-      if (isStale()) return null;
+      if (isStale()) {
+        abort.abort();
+        return null;
+      }
 
       onChannelLoaded?.(result.channel);
       const stored = registry.get(channelRootMessagesAtom(channelId));
@@ -394,13 +411,19 @@ export function createChannelConversationLoader(
           .get(channelRootMessagesAtom(channelId))
           .some((item) => item.id === target.rootMessageId)
       ) {
-        requestedThreadResult = await api.listChannelMessages(
-          token,
-          organizationId,
-          channelId,
-          target.rootMessageId,
-          { signal },
-        );
+        if (requestedReply) {
+          const outcome = await requestedReply;
+          if (!outcome.ok) throw outcome.cause;
+          requestedThreadResult = outcome.result;
+        } else {
+          requestedThreadResult = await api.listChannelMessages(
+            token,
+            organizationId,
+            channelId,
+            target.rootMessageId,
+            { signal },
+          );
+        }
         if (isStale()) return null;
         const roots = requestedThreadResult.messages.filter(
           (item) => item.parentMessageId === null,
@@ -448,7 +471,9 @@ export function createChannelConversationLoader(
         requestedMessage: target,
       };
     } catch (cause) {
-      if (!isStale()) reportChannelConversationError(registry, cause);
+      const stale = isStale();
+      abort.abort();
+      if (!stale) reportChannelConversationError(registry, cause);
       return null;
     } finally {
       if (abortControllers.get(channelId) === abort) {

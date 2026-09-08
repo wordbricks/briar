@@ -487,8 +487,15 @@ final class ChannelsStore: ObservableObject {
         }
     }
 
-    func openChannel(_ channelID: UUID) async {
+    func openChannel(
+        _ channelID: UUID,
+        refreshIfAlreadyFocused: Bool = true
+    ) async {
         guard let organizationID, token != nil else { return }
+        guard refreshIfAlreadyFocused ||
+            focusedChannelID != channelID ||
+            focusedThreadParentID != nil
+        else { return }
         cacheFocusedThread()
         cacheFocusedConversation()
         if focusedChannelID != channelID || focusedThreadParentID != nil {
@@ -577,7 +584,6 @@ final class ChannelsStore: ObservableObject {
                 startAgentConversationPolling()
             } else {
                 upsertChannel(channel)
-                await markChannelRead(channelID)
             }
             invalidateExecutionProposals(
                 forMessageIDs: previousMessageIDs.subtracting(Set(incomingMessages.map(\.id)))
@@ -598,6 +604,9 @@ final class ChannelsStore: ObservableObject {
             )
             cacheFocusedConversation()
             errorMessage = nil
+            if !channel.readOnly {
+                markChannelRead(channelID)
+            }
         } catch {
             guard
                 !Task.isCancelled,
@@ -2339,7 +2348,7 @@ final class ChannelsStore: ObservableObject {
         cachedThreadOrder.removeAll { removedChannelIDs.contains($0.channelID) }
         if let focusedChannelID,
            nextChannels.contains(where: { $0.id == focusedChannelID && $0.hasUnread == true }) {
-            Task { await markChannelRead(focusedChannelID) }
+            markChannelRead(focusedChannelID)
         }
 
         if let focusedChannelID,
@@ -2630,7 +2639,7 @@ final class ChannelsStore: ObservableObject {
         return (root.map { [$0] } ?? []) + Array(replies.suffix(replyLimit))
     }
 
-    private func markChannelRead(_ channelID: UUID) async {
+    private func markChannelRead(_ channelID: UUID) {
         guard let organizationID, token != nil, let channelService else { return }
         // An Agent-to-Agent conversation is nobody's inbox: it never counts as
         // unread, so opening one must not write a read mark for it either.
@@ -2641,20 +2650,27 @@ final class ChannelsStore: ObservableObject {
             updated.lastReadAt = Date()
             channels[index] = updated
         }
-        do {
-            var request = BriarAPI_MarkChannelReadRequest()
-            request.organizationID = coreUUIDString(organizationID)
-            request.channelID = coreUUIDString(channelID)
-            request.lastReadAt = Google_Protobuf_Timestamp(date: Date())
-            let response = try await channelService.markChannelRead(
-                request: request,
-                headers: [:]
-            ).briarValue()
-            guard response.hasChannel else { throw MobileAPIError.invalidResponse }
-            let channel = try ChannelSummary(connectMessage: response.channel)
-            upsertChannel(channel)
-        } catch {
-            // The next catalog snapshot restores unread if the write failed.
+        let expectedGeneration = generation
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                var request = BriarAPI_MarkChannelReadRequest()
+                request.organizationID = coreUUIDString(organizationID)
+                request.channelID = coreUUIDString(channelID)
+                request.lastReadAt = Google_Protobuf_Timestamp(date: Date())
+                let response = try await channelService.markChannelRead(
+                    request: request,
+                    headers: [:]
+                ).briarValue()
+                guard response.hasChannel else {
+                    throw MobileAPIError.invalidResponse
+                }
+                let channel = try ChannelSummary(connectMessage: response.channel)
+                guard expectedGeneration == self.generation else { return }
+                self.upsertChannel(channel)
+            } catch {
+                // The next catalog snapshot restores unread if the write failed.
+            }
         }
     }
 

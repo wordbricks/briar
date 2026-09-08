@@ -598,7 +598,12 @@ struct ChannelMessagesView: View {
             }
         }
         .toolbarBackground(.hidden, for: .navigationBar)
-        .task(id: channel.id) { await channels.openChannel(channel.id) }
+        .task(id: channel.id) {
+            await channels.openChannel(
+                channel.id,
+                refreshIfAlreadyFocused: false
+            )
+        }
         .sheet(item: $memoryStore) { store in DmMemoryView(store: store, locale: locale) }
         .onChange(of: currentUserID) { _, _ in memoryStore = nil }
         .onChange(of: channel.id) { _, _ in memoryStore = nil }
