@@ -220,11 +220,11 @@ export async function completeIssueAgentReplyOutput(
            or exists (
              select 1
              from briar_hunt_runs run
-             join briar_teams project on project.id = run.project_id
+             join briar_teams team on team.id = run.project_id
              join briar_project_agents agent
                on agent.id = coalesce(job.agent_id, run.agent_id)
               and agent.project_id = run.project_id
-              and agent.organization_id = project.organization_id
+              and agent.organization_id = team.organization_id
              join briar_agent_skills skill
                on skill.id = job.skill_id and skill.agent_id = agent.id
               and job.selected_skill_id_snapshot = skill.id
@@ -415,14 +415,14 @@ export async function completeIssueAgentReplyOutput(
          proposed_by_agent_id, delegated_by_agent_id,
          delegated_by_agent_name, created_at, updated_at
        )
-       select ?, project.organization_id, job.project_id, 'issue', null,
+       select ?, team.organization_id, job.project_id, 'issue', null,
               job.run_id, job.trigger_message_id, job.reply_message_id,
               run.id, run.title, run.updated_at, job.agent_id,
               null, null, ?, ?
        from briar_issue_agent_reply_jobs job
        join briar_hunt_runs run
          on run.id = job.run_id and run.project_id = job.project_id
-       join briar_teams project on project.id = job.project_id
+       join briar_teams team on team.id = job.project_id
        where ${completedClaim("job")}`,
     ).bind(
       executionProposalId,
@@ -444,7 +444,7 @@ export async function completeIssueAgentReplyOutput(
          thread_root_message_id, request, delegated_by_agent_id,
          delegated_by_agent_name, created_at, updated_at
        )
-       select ?, project.organization_id, job.project_id, 'issue', null,
+       select ?, team.organization_id, job.project_id, 'issue', null,
               job.run_id, job.trigger_message_id, job.reply_message_id,
               job.id, null, agent.id, job.selected_agent_name_snapshot,
               job.selected_agent_responsibility_snapshot,
@@ -460,11 +460,11 @@ export async function completeIssueAgentReplyOutput(
        from briar_issue_agent_reply_jobs job
        join briar_hunt_runs run
          on run.id = job.run_id and run.project_id = job.project_id
-       join briar_teams project on project.id = job.project_id
+       join briar_teams team on team.id = job.project_id
        join briar_project_agents agent
          on agent.id = coalesce(job.agent_id, run.agent_id)
         and agent.project_id = run.project_id
-        and agent.organization_id = project.organization_id
+        and agent.organization_id = team.organization_id
        join briar_agent_skills skill
          on skill.id = job.skill_id and skill.agent_id = agent.id
         and job.selected_skill_id_snapshot = skill.id

@@ -248,10 +248,10 @@ export async function acceptIssueCreateProposal(
          )
          and exists (
            select 1
-           from briar_teams project
+           from briar_teams team
            join briar_organization_members membership
-             on membership.organization_id = project.organization_id
-           where project.id = briar_issue_action_proposals.project_id
+             on membership.organization_id = team.organization_id
+           where team.id = briar_issue_action_proposals.project_id
              and membership.user_id = ?
          )
        returning *`,

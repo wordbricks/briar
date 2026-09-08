@@ -207,12 +207,12 @@ export async function upsertSlackInstallation(
 const slackInstallationSelect = `
   select installation.team_id, installation.team_name,
          installation.organization_id, installation.default_project_id,
-         project.name as default_project_name, installation.bot_user_id,
+         team.name as default_project_name, installation.bot_user_id,
          installation.encrypted_bot_token, installation.token_iv,
          installation.installed_by_user_id, installation.created_at,
          installation.updated_at
   from briar_slack_installations installation
-  left join briar_teams project on project.id = installation.default_project_id
+  left join briar_teams team on team.id = installation.default_project_id
 `;
 
 export async function getSlackInstallation(

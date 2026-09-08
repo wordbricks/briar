@@ -46,9 +46,9 @@ const makeHuntEventHistoryQueries = (sql: SqlClient.SqlClient) => {
       select account.id, account.name
       from "user" account
       join briar_organization_members member on member.user_id = account.id
-      join briar_teams project
-        on project.organization_id = member.organization_id
-      where project.id = ${projectId}
+      join briar_teams team
+        on team.organization_id = member.organization_id
+      where team.id = ${projectId}
         and ${sql.in("account.id", userIds)}
     `,
   });

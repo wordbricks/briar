@@ -542,10 +542,10 @@ export async function issueManagedComputerSetupSession(
       "Managed computer enrollment must complete before setup",
     );
   }
-  const project = await db.prepare(
+  const team = await db.prepare(
     `select id, organization_id from briar_teams where id = ?`,
   ).bind(input.projectId).first<{ id: string; organization_id: string }>();
-  if (!project || project.organization_id !== input.organizationId) {
+  if (!team || team.organization_id !== input.organizationId) {
     throw new ManagedComputerServiceError(
       404,
       "MANAGED_COMPUTER_SETUP_PROJECT_NOT_FOUND",
@@ -732,14 +732,14 @@ export async function managedComputerSetupContext(
     ...input,
     requirePending: true,
   });
-  const project = await db.prepare(
+  const team = await db.prepare(
     `select id, name from briar_teams
      where id = ? and organization_id = ?`,
   ).bind(session.project_id, input.organizationId).first<{
     id: string;
     name: string;
   }>();
-  if (!project) {
+  if (!team) {
     throw new ManagedComputerServiceError(
       404,
       "MANAGED_COMPUTER_SETUP_PROJECT_NOT_FOUND",
@@ -752,8 +752,8 @@ export async function managedComputerSetupContext(
       projectId: session.project_id,
       expiresAt: session.expires_at,
     },
-    project,
-    settings: settingsJson(await getTeamSettings(db, project.id)),
+    project: team,
+    settings: settingsJson(await getTeamSettings(db, team.id)),
   };
 }
 

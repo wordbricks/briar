@@ -116,13 +116,13 @@ export async function listOrganizationIssueSubscriptionRunIds(
       `select subscription.run_id
        from briar_issue_subscriptions subscription
        join briar_hunt_runs run on run.id = subscription.run_id
-       join briar_teams project on project.id = run.project_id
+       join briar_teams team on team.id = run.project_id
        join briar_organization_members membership
-         on membership.organization_id = project.organization_id
+         on membership.organization_id = team.organization_id
         and membership.user_id = subscription.user_id
        left join briar_project_members project_membership
-         on project_membership.project_id = project.id
-        and project_membership.organization_id = project.organization_id
+         on project_membership.project_id = team.id
+        and project_membership.organization_id = team.organization_id
         and project_membership.user_id = membership.user_id
        where subscription.organization_id = ? and subscription.user_id = ?
          and (
@@ -148,15 +148,15 @@ export async function subscribeIssue(
       `insert into briar_issue_subscriptions (
          run_id, organization_id, user_id, created_at
        )
-       select run.id, project.organization_id, ?, ?
+       select run.id, team.organization_id, ?, ?
        from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
+       join briar_teams team on team.id = run.project_id
        join briar_organization_members membership
-         on membership.organization_id = project.organization_id
+         on membership.organization_id = team.organization_id
         and membership.user_id = ?
        left join briar_project_members project_membership
-         on project_membership.project_id = project.id
-        and project_membership.organization_id = project.organization_id
+         on project_membership.project_id = team.id
+        and project_membership.organization_id = team.organization_id
         and project_membership.user_id = membership.user_id
        where run.id = ? and run.project_id = ?
          and (

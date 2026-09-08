@@ -224,11 +224,11 @@ export async function claimNextIssueAgentReply(
            job.skill_id = job.selected_skill_id_snapshot
            and exists (
              select 1
-             from briar_teams project
+             from briar_teams team
              join briar_project_agents selected_agent
                on selected_agent.id = coalesce(job.agent_id, run.agent_id)
               and selected_agent.project_id = run.project_id
-              and selected_agent.organization_id = project.organization_id
+              and selected_agent.organization_id = team.organization_id
              join briar_agent_skills selected_skill
                on selected_skill.id = job.selected_skill_id_snapshot
               and selected_skill.agent_id = selected_agent.id
@@ -236,7 +236,7 @@ export async function claimNextIssueAgentReply(
                on trigger.id = job.trigger_message_id
               and trigger.project_id = job.project_id
               and trigger.run_id = job.run_id
-             where project.id = run.project_id
+             where team.id = run.project_id
                and exists (
                  select 1
                  from briar_execution_worker_healthy_providers healthy

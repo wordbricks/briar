@@ -456,20 +456,20 @@ export async function listClaimableTeamAgentScheduleTeamIds(
   const placeholders = uniqueProjectIds.map(() => "?").join(", ");
   const result = await db
     .prepare(
-      `select project.id
-       from briar_teams project
+      `select team.id
+       from briar_teams team
        join briar_organization_members membership
-         on membership.organization_id = project.organization_id
+         on membership.organization_id = team.organization_id
         and membership.user_id = ?
-       where project.id in (${placeholders})
+       where team.id in (${placeholders})
          and (
            membership.role in ('owner', 'co-owner')
            or (
              membership.role = 'developer'
              and exists (
                select 1 from briar_project_members project_membership
-               where project_membership.project_id = project.id
-                 and project_membership.organization_id = project.organization_id
+               where project_membership.project_id = team.id
+                 and project_membership.organization_id = team.organization_id
                  and project_membership.user_id = membership.user_id
              )
            )
@@ -477,13 +477,13 @@ export async function listClaimableTeamAgentScheduleTeamIds(
          and (
            exists (
              select 1 from briar_project_agent_schedule_runs run
-             where run.project_id = project.id and run.status = 'running'
+             where run.project_id = team.id and run.status = 'running'
                and run.lease_expires_at is not null
                and run.lease_expires_at <= ?
            )
            or exists (
              select 1 from briar_project_agent_schedules schedule
-             where schedule.project_id = project.id and schedule.enabled = 1
+             where schedule.project_id = team.id and schedule.enabled = 1
                and (
                  schedule.next_run_at is null or schedule.next_run_at <= ?
                )
@@ -495,7 +495,7 @@ export async function listClaimableTeamAgentScheduleTeamIds(
                )
            )
          )
-       order by project.id`,
+       order by team.id`,
     )
     .bind(
       userId,

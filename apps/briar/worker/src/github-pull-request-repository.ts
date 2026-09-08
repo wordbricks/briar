@@ -108,7 +108,7 @@ async function githubPullRequestLinksForEvent(
        from briar_run_pull_requests link
        join briar_hunt_runs run
          on run.id = link.run_id and run.project_id = link.project_id
-       join briar_teams project on project.id = link.project_id
+       join briar_teams team on team.id = link.project_id
        join briar_github_pull_requests snapshot
          on snapshot.repository_id = link.repository_id
         and snapshot.pull_request_number = link.pull_request_number
@@ -117,7 +117,7 @@ async function githubPullRequestLinksForEvent(
        where unixepoch(snapshot.provider_updated_at) >=
            unixepoch(link.revision_started_at)
          and unixepoch(?) >= unixepoch(link.revision_started_at)
-         and (? is null or project.organization_id = ?)
+         and (? is null or team.organization_id = ?)
          and link.repository_id = ? and link.pull_request_number = ?
          and link.pull_request_id = ? and link.pull_request_node_id = ?
          and (
