@@ -998,20 +998,22 @@ final class ChannelsStore: ObservableObject {
     }
 
     /// A nil `parentMessageID` posts to the channel; otherwise into that thread.
+    @discardableResult
     func send(
         channelID: UUID,
         parentMessageID: UUID?,
         body: String,
         currentUserID: String? = nil,
         mentions: [ChannelMentionTarget],
-        attachments: [PendingIssueAttachment] = []
-    ) async {
-        guard let organizationID, token != nil else { return }
+        attachments: [PendingIssueAttachment] = [],
+        selectedSkill: ChannelSkillCommand? = nil
+    ) async -> Bool {
+        guard let organizationID, token != nil else { return false }
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty || !attachments.isEmpty else { return }
+        guard !trimmed.isEmpty || !attachments.isEmpty else { return false }
         if let message = ChannelDocumentAttachments.validationMessage(for: attachments) {
             errorMessage = message
-            return
+            return false
         }
         let clientMessageID = UUID()
         let uploadAttachmentReferences = attachments.map { _ in attachmentReference() }
@@ -1076,6 +1078,13 @@ final class ChannelsStore: ObservableObject {
             }
             request.mentionedUserIds = mentionedUserIds
             request.mentionedAgentIds = mentionedAgentIds.map(coreUUIDString)
+            if let selectedSkill {
+                request.skillID = coreUUIDString(selectedSkill.skill.id)
+                let agentID = coreUUIDString(selectedSkill.agentID)
+                if !request.mentionedAgentIds.contains(agentID) {
+                    request.mentionedAgentIds.append(agentID)
+                }
+            }
             if !attachments.isEmpty {
                 guard let payload else { throw MobileAPIError.invalidRequest }
                 var prepareRequest = BriarAPI_PrepareChannelMessageAttachmentsRequest()
@@ -1127,6 +1136,7 @@ final class ChannelsStore: ObservableObject {
             mergeAgentReplies(createdAgentReplies)
             optimisticMessageIDs.remove(clientMessageID)
             errorMessage = nil
+            return true
         } catch {
             if optimisticMessageIDs.remove(clientMessageID) != nil {
                 messages.removeAll { $0.id == clientMessageID }
@@ -1135,6 +1145,7 @@ final class ChannelsStore: ObservableObject {
                 cacheFocusedThread()
             }
             errorMessage = CompanionStore.message(for: error)
+            return false
         }
     }
 

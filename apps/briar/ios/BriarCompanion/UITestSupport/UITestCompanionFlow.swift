@@ -1343,6 +1343,19 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         if let description = value.description { message.description_p = description }
         message.responsibility = value.responsibility
         message.createdAt = .init(date: value.createdAt)
+        var skill = BriarAPI_ProjectAgentSkill()
+        skill.id = "51515151-5151-4151-8151-515151515151"
+        skill.agentID = message.agentID
+        skill.name = "Review code"
+        skill.body = "Review mobile changes"
+        skill.description_p = "Check mobile changes"
+        skill.provider = .codex
+        skill.kind = .custom
+        skill.executionMode = .task
+        skill.approvalPolicy = .explicit
+        skill.createdAt = message.createdAt
+        skill.updatedAt = message.createdAt
+        message.skills = [skill]
         return message
     }
 

@@ -1454,19 +1454,21 @@ private struct ChannelConversationView: View {
                     draft: $draft,
                     sending: channels.sending,
                     candidates: mentionCandidates,
+                    skillCommands: channel.isDirectMessage ? ChannelSkillCommand.candidates(agents: channels.agents) : [],
                     placeholder: String(
                         format: L10n.text(.channelMessagePlaceholder, locale: locale),
                         channel.name
                     ),
                     locale: locale,
-                    send: { body, mentions, attachments in
+                    send: { body, mentions, attachments, selectedSkill in
                         await channels.send(
                             channelID: channel.id,
                             parentMessageID: parentMessageID,
                             body: body,
                             currentUserID: currentUserID,
                             mentions: mentions,
-                            attachments: attachments
+                            attachments: attachments,
+                            selectedSkill: selectedSkill
                         )
                     }
                 )
@@ -3346,15 +3348,20 @@ private struct ChannelComposer: View {
     @State private var attachments: [PendingIssueAttachment] = []
     let sending: Bool
     let candidates: [ChannelMentionTarget]
+    var skillCommands: [ChannelSkillCommand] = []
     let placeholder: String
     let locale: CompanionLocale
-    let send: (String, [ChannelMentionTarget], [PendingIssueAttachment]) async -> Void
+    let send: (String, [ChannelMentionTarget], [PendingIssueAttachment], ChannelSkillCommand?) async -> Bool
 
     var body: some View {
         ConversationComposer(
             draft: $draft,
             mentions: $mentions,
             attachments: $attachments,
+            skillCommands: skillCommands,
+            sendSkill: { body, mentions, attachments, skill in
+                await send(body, mentions, attachments, skill)
+            },
             sending: sending,
             candidates: candidates,
             placeholder: placeholder,
@@ -3371,8 +3378,7 @@ private struct ChannelComposer: View {
             ),
             cancelReply: nil,
             send: { body, mentions, attachments in
-                await send(body, mentions, attachments)
-                return true
+                await send(body, mentions, attachments, nil)
             }
         )
     }
