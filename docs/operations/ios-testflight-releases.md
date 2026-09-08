@@ -92,6 +92,44 @@ finds a release blocker, fix the SwiftUI implementation, increment the build
 number, repeat the full gate, and submit the corrected native build. There is no
 Tauri iOS rollback binary or source-retention policy.
 
+## 2026-09-08 — 1.2.216 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.216`
+- App Store Connect build: `1`
+- App Store Connect build ID: `c8528690-4a10-498d-bcfb-7fc4767ffff4`
+- Latest main commit: `dfa75d79f425b1f5c19704c26df19851a4991f5f`
+- Release source commit: `dfa75d79f425b1f5c19704c26df19851a4991f5f`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Internal group: `wordbricks` (`hasAccessToAllBuilds=true`)
+- Automatic tester notification: enabled
+- IPA SHA-256: not recorded
+
+This is the first TestFlight build since 1.2.208. Main did not compile the
+native iOS app since #1756: `CompanionStore.loadEvidence` referenced the
+`runID` property without `self.` inside its `Task.detached` closure, and the
+UI-test fixture did not pass the new `CompanionShellView` pagination
+parameters. The release gate caught both errors immediately; the fix was merged
+into main as #1772 and this exact main commit was released.
+
+The release passed the shared API contract, Swift unit and iPhone UI tests,
+iPad accessibility and largest Dynamic Type layout testing, Production
+analyze/build checks, keychain and bounded download-memory invariant checks,
+and the retained Tauri Android arm64 debug regression build. Archive identity,
+App Store provisioning profile, distribution signature, and production
+entitlements were verified before the exact exported IPA was uploaded. App
+Store Connect processed the build as `VALID` and automatically placed it in
+internal TestFlight testing for the all-builds group; external beta submission
+remains pending (`READY_FOR_BETA_SUBMISSION`).
+
+The workspace host restarted between upload and record-keeping, which removed
+the gitignored release artifacts, so the IPA SHA-256 could not be recorded.
+The App Store Connect delivery UUID equals the build ID above.
+
 ## 2026-09-06 — 1.2.208 (1)
 
 - App: Briar Companion (`app.briar.companion`)
