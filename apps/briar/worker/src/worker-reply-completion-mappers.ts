@@ -266,6 +266,15 @@ const attachmentReferences = (
   return references;
 };
 
+/*
+  A protobuf-es message carries `$typeName`, which the strict completion schema
+  rejects as an excess property, so every wire reference is rebuilt field by
+  field like the rest of this mapper.
+*/
+const memoryReference = (
+  value: { documentId: string; version: number },
+) => ({ documentId: value.documentId, version: value.version });
+
 export type IssueReplyCompletionInput = {
   requestId: string;
   projectId: string;
@@ -490,9 +499,9 @@ export function completeChannelReplyInputFromProto(
       throw new ReplyCompletionMappingError("Channel reply action is unknown");
   }
   const completion = mapping(() => decodeChannelReplyCompletion({
-    memoryCitations: success.memoryCitations,
+    memoryCitations: success.memoryCitations.map(memoryReference),
     memorySaveRequest: success.memorySaveRequest
-      ? { documents: success.memorySaveRequest.documents }
+      ? { documents: success.memorySaveRequest.documents.map(memoryReference) }
       : null,
     body: success.body,
     document,

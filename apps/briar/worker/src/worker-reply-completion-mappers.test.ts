@@ -13,11 +13,13 @@ import {
   type CompleteIssueReplyRequest,
   CompleteChannelReplyRequestSchema,
   CompleteIssueReplyRequestSchema,
+  DmMemorySaveRequestSchema,
   IssueReplyClaimIdentitySchema,
   IssueReplySuccessSchema,
   ReplyIssueDraftSchema,
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { DmMemoryReferenceSchema } from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import { describe, expect, it } from "vitest";
 import {
   completeChannelReplyInputFromProto,
@@ -107,6 +109,48 @@ describe("reply completion protobuf mapping", () => {
         delegation: null,
       },
     });
+  });
+
+  /*
+    A generated message carries `$typeName`, which the strict completion schema
+    counts as an excess property, so passing one through unrebuilt rejected
+    every cited DM reply with `invalid_argument`.
+  */
+  it("rebuilds generated memory references the completion schema would reject", () => {
+    const documentId = "70000000-0000-4000-8000-000000000001";
+    const reference = () =>
+      create(DmMemoryReferenceSchema, { documentId, version: 2 });
+    const mapped = completeChannelReplyInputFromProto(create(
+      CompleteChannelReplyRequestSchema,
+      {
+        requestId,
+        projectId,
+        workerId: "worker-1",
+        work: channelWork(),
+        outcome: {
+          case: "success",
+          value: create(ChannelReplySuccessSchema, {
+            body: "기억하고 있는 내용을 정리했습니다.",
+            memoryCitations: [reference()],
+            memorySaveRequest: create(DmMemorySaveRequestSchema, {
+              documents: [reference()],
+            }),
+          }),
+        },
+      },
+    ));
+
+    expect(mapped.outcome.case).toBe("success");
+    if (mapped.outcome.case !== "success") throw new Error("unreachable");
+    const completion = mapped.outcome.completion;
+    expect(completion.memoryCitations).toEqual([{ documentId, version: 2 }]);
+    expect(completion.memorySaveRequest).toEqual({
+      documents: [{ documentId, version: 2 }],
+    });
+    expect(Object.keys(completion.memoryCitations![0]!)).toEqual([
+      "documentId",
+      "version",
+    ]);
   });
 
   it("retains semantic validation for generated success payloads", () => {

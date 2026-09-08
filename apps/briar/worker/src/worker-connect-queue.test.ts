@@ -3,10 +3,13 @@ import { type HandlerContext } from "@connectrpc/connect";
 import {
   BlockMergeBatchRequestSchema,
   ChannelReplyClaimIdentitySchema,
+  ChannelReplySuccessSchema,
   ClaimWorkRequestSchema,
   CheckpointChannelReplySessionRequestSchema,
+  CompleteChannelReplyRequestSchema,
   CompleteMergeBatchPublicationRequestSchema,
   CompleteProjectAgentTaskRequestSchema,
+  DmMemorySaveRequestSchema,
   HandoffWorkRequestSchema,
   HandoffWorkResponse_Outcome,
   IssueClaimIdentitySchema,
@@ -20,8 +23,10 @@ import {
   RecordMergeBatchCandidateEnqueuedRequestSchema,
   RecordMergeBatchValidationRequestSchema,
   RenewWorkLeaseRequestSchema,
+  ReplyCompletionDisposition,
   WorkClaimIdentitySchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { DmMemoryReferenceSchema } from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import { describe, expect, it, vi } from "vitest";
 import { HttpError } from "./http-response";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
@@ -405,6 +410,63 @@ describe("WorkerQueueService lifecycle semantics", () => {
         conversationId: "conversation-1",
       },
     });
+  });
+
+  /*
+    The completion mapper decodes against a strict schema, so a generated
+    `DmMemoryReference` reaching it unrebuilt turns its `$typeName` into an
+    excess property and the RPC answers 400 — which is how every cited DM reply
+    was lost.
+  */
+  it("carries generated memory references through the channel completion RPC", async () => {
+    const complete = vi.fn<
+      WorkerQueueServices["completeChannelReplyApplication"]
+    >().mockResolvedValue({
+      replayed: false,
+      disposition: "completed",
+      retainedUntil: null,
+    });
+    const service = createWorkerQueueService(input, {
+      requireWorkerProjectBinding: authentication(),
+      sha256: async () => "a".repeat(64),
+      completeChannelReplyApplication: complete,
+    });
+    const documentId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const reference = () =>
+      create(DmMemoryReferenceSchema, { documentId, version: 3 });
+    const request = create(CompleteChannelReplyRequestSchema, {
+      requestId,
+      projectId,
+      workerId,
+      work: create(WorkClaimIdentitySchema, {
+        ...channelReplyIdentity(),
+        claimToken: `briar_channel_claim_${"a".repeat(64)}`,
+      }),
+      outcome: {
+        case: "success",
+        value: create(ChannelReplySuccessSchema, {
+          body: "기억한 내용을 인용해 답했습니다.",
+          memoryCitations: [reference()],
+          memorySaveRequest: create(DmMemorySaveRequestSchema, {
+            documents: [reference()],
+          }),
+        }),
+      },
+    });
+
+    const response = await service.completeChannelReply(request, context);
+    expect(response.disposition).toBe(ReplyCompletionDisposition.COMPLETED);
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({
+      request: expect.objectContaining({
+        outcome: {
+          case: "success",
+          completion: expect.objectContaining({
+            memoryCitations: [{ documentId, version: 3 }],
+            memorySaveRequest: { documents: [{ documentId, version: 3 }] },
+          }),
+        },
+      }),
+    }));
   });
 
   it("returns no-store upload capabilities from the generated prepare RPC", async () => {
