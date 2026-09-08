@@ -13,6 +13,15 @@ that read them.
 
 # D1 Schema Changes
 
+Any approach that could write a million or more D1 rows — a migration, a
+backfill, a rebuild — must be disclosed and explicitly approved before it runs.
+Estimate the row count first (`docs/operations/d1-schema-changes.md` explains
+how), state the figure and what drives it, and wait for a decision. Never settle
+on your own that the cost is acceptable, and never let the number stay unknown
+because the change looked small: the case that produced this rule was a
+one-value enum addition to a 1,011-row table that would have written over three
+million rows.
+
 Never put an enum that can grow into a `CHECK (col in (…))` list. SQLite cannot
 alter a CHECK in place and D1 blocks every shortcut, so adding one value means
 rebuilding the table and parking every row its foreign-key cascade reaches —

@@ -118,6 +118,11 @@ Sort the direct children before writing anything:
 
 ## Measuring the cost before you run it
 
+Measure before you write the migration, not after. A million or more written
+rows needs disclosure and explicit approval before it runs, per `AGENTS.md` —
+which means the estimate has to exist early enough to change the design, and
+that a small-looking change is exactly the kind that hides a large one.
+
 D1's Workers Paid plan includes 50 million rows written per month; overage is
 $1.00 per million. A rebuild writes roughly three times the parked row count
 (park, empty, restore) plus index maintenance, so the parked count is the
