@@ -11,6 +11,22 @@ Gitignored files a fresh checkout needs (currently `.env.keys`) belong in
 `.worktreeinclude`; add new ones there or worktree runs will fail on commands
 that read them.
 
+# D1 Schema Changes
+
+Never put an enum that can grow into a `CHECK (col in (…))` list. SQLite cannot
+alter a CHECK in place and D1 blocks every shortcut, so adding one value means
+rebuilding the table and parking every row its foreign-key cascade reaches —
+1.2 million rows for a 1,011-row table, in the case that produced this rule. Use
+a lookup table and a foreign key instead, as `migrations/0204_agent_provider_lookup.sql`
+did for agent providers; a new value is then one `insert`. Keep CHECK for fixed
+conditions: lengths, ranges, formats, cross-column invariants.
+
+When a rebuild is unavoidable, generate the migration rather than writing it,
+and do not park a descendant that reaches the table through a nullable foreign
+key — null the column and restore it instead. Read
+[docs/operations/d1-schema-changes.md](docs/operations/d1-schema-changes.md)
+before changing any column constraint.
+
 # Mobile App Changes
 
 When modifying the mobile app, make the corresponding changes for both iOS and Android. Do not consider a mobile app change complete if only one platform has been updated.
