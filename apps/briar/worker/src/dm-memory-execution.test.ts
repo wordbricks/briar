@@ -133,7 +133,10 @@ describe("DM memory in active channel claims", () => {
     ).bind(runtimeJson, workerId).run();
   });
 
-  async function fixture(messageBody = "한국어 설명을 선호합니다.") {
+  async function fixture(
+    messageBody = "한국어 설명을 선호합니다.",
+    options: { seedBody?: string; seedFromTrigger?: boolean; seedTitle?: string } = {},
+  ) {
     const channelId = crypto.randomUUID();
     const messageId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -167,13 +170,15 @@ describe("DM memory in active channel claims", () => {
     });
     const saved = await saveDmMemory(db, owner, {
       requestId: crypto.randomUUID(),
-      title: "설명 언어",
-      body: "설명은 한국어로 요청한다.",
+      title: options.seedTitle ?? "설명 언어",
+      body: options.seedBody ?? "설명은 한국어로 요청한다.",
       memoryClass: "profile",
       sourceLanguage: "ko",
       observedAt: now,
       validUntil: null,
-      sourceMessage: { id: messageId, version: 1 },
+      ...(options.seedFromTrigger === false
+        ? {}
+        : { sourceMessage: { id: messageId, version: 1 } }),
     });
     const jobs = await enqueueChannelAgentReplies(db, {
       organizationId,
@@ -486,8 +491,16 @@ describe("DM memory in active channel claims", () => {
     ).toBe(1);
   });
 
-  it("M27 carries an explicit DM request through outbox, verification, storage and a fresh reply brief", async () => {
-    const f = await fixture("앞으로 기술 설명은 결론부터 해 주세요. 기억해 주세요.");
+  it("M27 persists, edits and forgets an explicit DM-scoped preference across fresh reply briefs", async () => {
+    const f = await fixture(
+      "In this DM, answer in Korean unless I request another language. Remember this.",
+      {
+        seedBody: "The synthetic project codename is Cedar.",
+        seedFromTrigger: false,
+        seedTitle: "Project codename",
+      },
+    );
+    const original = await getDmMemory(db, f.owner, f.documentId);
     const reply = await claim();
     await brief(reply);
     const job = (await getChannelAgentReplyJob(db, organizationId, reply!.workId))!;
@@ -550,9 +563,9 @@ describe("DM memory in active channel claims", () => {
     const proposal = {
       explicitRequest: true,
       changes: [syntheticDmLearningChange(learning.snapshot, {
-        title: "응답 형식",
-        content: "사용자는 설명을 결론부터 받기를 원한다.",
-        sourceLanguage: "ko",
+        title: "Response language",
+        content: "In this DM, answer in Korean unless the owner requests another language.",
+        sourceLanguage: "en",
         sourceRefs: [learning.snapshot.requestSource!],
       })],
     };
@@ -567,7 +580,7 @@ describe("DM memory in active channel claims", () => {
     if (!("proposalId" in proposed)) throw new Error("Synthetic proposal was not accepted");
     const verifyCall = crypto.randomUUID();
     await reserveDmLearningModelCall(db, { ...common, callId: verifyCall, stage: "verifying" });
-    await submitDmLearningVerification(db, {
+    const committed = await submitDmLearningVerification(db, {
       ...common,
       callId: verifyCall,
       proposalId: proposed.proposalId,
@@ -579,6 +592,12 @@ describe("DM memory in active channel claims", () => {
         decisions: [{ changeId: "change-1", verdict: "supported" }],
       },
     });
+    expect(committed).toMatchObject({
+      status: "succeeded",
+      documents: [{ action: "create", version: 1 }],
+    });
+    const preference = committed.documents[0]!;
+    expect(preference.documentId).not.toBe(f.documentId);
 
     for (let index = 0; index < 12; index++) {
       await createChannelMessage(db, {
@@ -620,8 +639,94 @@ describe("DM memory in active channel claims", () => {
     });
     await stopTyping(followUp[0]!.id);
     const fresh = await claim();
-    expect((await brief(fresh)).brief?.profile.some((item) => item.body.includes("결론부터")))
-      .toBe(true);
+    const persistedBrief = await brief(fresh);
+    expect(persistedBrief.brief?.profile).toContainEqual(expect.objectContaining({
+      documentId: preference.documentId,
+      version: 1,
+      body: "In this DM, answer in Korean unless the owner requests another language.",
+    }));
+
+    const learned = await getDmMemory(db, f.owner, preference.documentId);
+    await saveDmMemory(db, f.owner, {
+      requestId: crypto.randomUUID(),
+      expectedVersion: learned.version,
+      memorySpaceId: learned.memorySpaceId,
+      title: "Response language",
+      body: "In this DM, answer in English unless the owner requests another language.",
+      memoryClass: "profile",
+      sourceLanguage: "en",
+      observedAt: learned.observedAt,
+      validUntil: learned.validUntil,
+    }, learned.id);
+    await expect(brief(fresh)).rejects.toMatchObject({ code: "memory_scope_revoked" });
+
+    const editedReply = await claim();
+    expect(editedReply!.workId).toBe(fresh!.workId);
+    const editedBrief = await brief(editedReply);
+    expect(editedBrief.brief?.profile).toContainEqual(expect.objectContaining({
+      documentId: preference.documentId,
+      version: 2,
+      body: "In this DM, answer in English unless the owner requests another language.",
+    }));
+    expect(editedBrief.brief?.profile.some((item) =>
+      item.documentId === preference.documentId && item.body.includes("Korean"),
+    )).toBe(false);
+
+    const editedJob = (await getChannelAgentReplyJob(db, organizationId, editedReply!.workId))!;
+    expect(await completeChannelReply(db, editedJob, {
+      jobId: editedReply!.workId,
+      deviceId,
+      workerId,
+      claimTokenHash: await sha256(editedReply!.claimToken),
+      body: "Synthetic answer using the edited preference",
+      document: null,
+      issueProposal: null,
+      executionProposal: null,
+      agentName: "Synthetic Agent",
+      agentProvider: "claude",
+      completedAt: new Date().toISOString(),
+      memoryCitations: [{ documentId: preference.documentId, version: 2 }],
+    })).not.toBeNull();
+    expect((await getChannelMessage(db, editedReply!.channelId, editedJob.reply_message_id))?.memoryCitations)
+      .toEqual([{ documentId: preference.documentId, version: 2 }]);
+
+    await deleteDmMemory(db, f.owner, preference.documentId);
+    expect((await getChannelMessage(db, editedReply!.channelId, editedJob.reply_message_id))?.memoryCitations)
+      .toEqual([]);
+
+    const afterDeleteTrigger = crypto.randomUUID();
+    const afterDeleteAt = new Date().toISOString();
+    await createChannelMessage(db, {
+      id: afterDeleteTrigger,
+      channelId: f.channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "Which language should you use now?",
+      mentionedUserIds: [],
+      mentionedAgentIds: [agentId],
+      createdAt: afterDeleteAt,
+    });
+    const afterDeleteJobs = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId: f.channelId,
+      triggerMessageId: afterDeleteTrigger,
+      parentMessageId: afterDeleteTrigger,
+      agents: [{ id: agentId, projectId: null, provider: "claude" }],
+      createdAt: afterDeleteAt,
+    });
+    await stopTyping(afterDeleteJobs[0]!.id);
+    const afterDeleteReply = await claim();
+    expect((await brief(afterDeleteReply)).brief?.profile.some((item) =>
+      item.documentId === preference.documentId,
+    )).toBe(false);
+    expect(await getDmMemory(db, f.owner, f.documentId)).toMatchObject({
+      id: original.id,
+      version: original.version,
+      body: original.body,
+    });
   });
 
   it("M07 retains an activity revocation until its old attempt is actually cleared", async () => {
