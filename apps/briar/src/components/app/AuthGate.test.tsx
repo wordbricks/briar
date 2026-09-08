@@ -10,6 +10,7 @@ import { organizationsAtom } from "../../state/organization/atoms";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import {
   restoringSessionAtom,
+  sessionErrorAtom,
   userAtom,
 } from "../../state/session/atoms";
 import { teamsAtom } from "../../state/team/atoms";
@@ -126,6 +127,21 @@ describe("AuthGate", () => {
     expect(view.container.querySelector("[data-testid=shell]")).toBeNull();
     // The restore screen wins even over a signed-in user arriving late.
     expect(view.container.textContent).not.toContain("shell");
+    await view.cleanup();
+  });
+
+  it("offers a retry instead of leaving a failed restore as a blank spinner", async () => {
+    const registry = createTestRegistry([
+      [restoringSessionAtom, true],
+      [sessionErrorAtom, "Checking sign-in timed out."],
+    ]);
+    const view = await mount(registry);
+
+    expect(view.container.textContent).toContain(
+      "We couldn't check your sign-in",
+    );
+    expect(view.container.textContent).toContain("Try again");
+    expect(view.container.querySelector("button")).not.toBeNull();
     await view.cleanup();
   });
 

@@ -141,10 +141,11 @@ const invitationPreviewFromMessage = (
 
 export async function loadOrganizations(
   token: string,
+  signal?: AbortSignal,
 ): Promise<Organization[]> {
   const response = await requireOrganizationClient().listOrganizations(
     {},
-    appCallOptions(token),
+    appCallOptions(token, signal),
   );
   return response.organizations.map(organizationFromMessage);
 }

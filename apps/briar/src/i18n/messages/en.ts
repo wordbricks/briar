@@ -640,6 +640,8 @@ export const en = {
   "onboarding.noAdditionalTools": "No additional project-specific tools need to be checked.",
   "onboarding.missingToolsWarning": "Some automation may not run until every required tool is installed. You can confirm now and install them later.",
   "session.restoring": "Checking your sign-in…",
+  "session.restoreFailed": "We couldn't check your sign-in",
+  "session.retry": "Try again",
   "sidebar.addOrganization": "Add organization",
   "sidebar.expandProject": "Expand {name} team",
   "sidebar.collapseProject": "Collapse {name} team",

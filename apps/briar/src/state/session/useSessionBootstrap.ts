@@ -2,7 +2,6 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 import { useEffect } from "react";
 
 import { browserAuthClient } from "../../lib/browser-auth-client";
-import type { LocalProjectInventoryObservation } from "../../lib/local-team-connection";
 import { resolveActiveAccountSelection } from "../../lib/active-organization";
 import { restoreStoredSession } from "../../lib/session-restore";
 import { clearSessionToken, readSessionToken } from "../../lib/token-store";
@@ -127,16 +126,6 @@ export function startSessionBootstrap(registry: AtomRegistry): () => void {
       return;
     }
 
-    /*
-      The local inventory is inspected before anything is committed: the
-      readiness views derive from the account and the inventory together, and
-      committing the account first would render one team as disconnected for as
-      long as the inspection takes.
-    */
-    const inventory: LocalProjectInventoryObservation = remoteMode
-      ? { status: "loaded", connectedTeamIds: null, error: null }
-      : await getReadinessCoordinator(registry).inspectInventory();
-    if (cancelled) return;
     await waitForHydration();
     if (cancelled) return;
     const hydrated = registry.get(hydratedAccountAtom);
@@ -173,7 +162,6 @@ export function startSessionBootstrap(registry: AtomRegistry): () => void {
       registry.set(userAtom, result.user);
       registry.set(teamsAtom, result.projects);
       registry.set(organizationsAtom, result.organizations);
-      applyInventoryObservation(registry, inventory);
       registry.set(activeOrganizationIdAtom, selection.activeOrganizationId);
       registry.set(
         activeTeamIdAtom,
@@ -182,6 +170,24 @@ export function startSessionBootstrap(registry: AtomRegistry): () => void {
       registry.set(sessionErrorAtom, null);
       registry.set(restoringSessionAtom, false);
       registry.set(loadingAtom, false);
+    });
+
+    /*
+      Repository inventory is local UI enrichment, not authentication. A slow
+      filesystem or Tauri command must not hold the whole signed-in shell behind
+      the restore gate. Apply it when it arrives, provided this session is still
+      current.
+    */
+    const inventory = remoteMode
+      ? Promise.resolve({
+          status: "loaded" as const,
+          connectedTeamIds: null,
+          error: null,
+        })
+      : getReadinessCoordinator(registry).inspectInventory();
+    void inventory.then((observation) => {
+      if (cancelled || registry.get(tokenAtom) !== result.token) return;
+      applyInventoryObservation(registry, observation);
     });
   };
 

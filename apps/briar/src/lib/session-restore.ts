@@ -3,11 +3,42 @@ import type { Organization, Project, SessionUser } from "../types";
 
 type SessionRestoreDependencies = {
   clearToken: () => Promise<void>;
-  loadOrganizations: (token: string) => Promise<Organization[]>;
-  loadTeams: (token: string) => Promise<Project[]>;
-  loadSession: (token: string) => Promise<SessionUser>;
+  loadOrganizations: (
+    token: string,
+    signal?: AbortSignal,
+  ) => Promise<Organization[]>;
+  loadTeams: (token: string, signal?: AbortSignal) => Promise<Project[]>;
+  loadSession: (token: string, signal?: AbortSignal) => Promise<SessionUser>;
   readToken: () => Promise<string | null>;
 };
+
+/** A cold restore either authenticates or exposes its retry path within 4s. */
+export const SESSION_RESTORE_TIMEOUT_MS = 4_000;
+
+export class SessionRestoreTimeoutError extends Error {
+  constructor() {
+    super("로그인 확인 시간이 초과되었습니다.");
+    this.name = "SessionRestoreTimeoutError";
+  }
+}
+
+function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
 
 export type SessionRestoreResult =
   | { status: "missing" }
@@ -28,34 +59,48 @@ export async function restoreStoredSession({
   loadSession,
   readToken,
 }: SessionRestoreDependencies): Promise<SessionRestoreResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(new SessionRestoreTimeoutError()),
+    SESSION_RESTORE_TIMEOUT_MS,
+  );
+  const { signal } = controller;
   let token: string | null;
   try {
-    token = await readToken();
+    token = await abortable(readToken(), signal);
   } catch (error) {
+    clearTimeout(timeout);
     return { status: "retry", error };
   }
-  if (!token) return { status: "missing" };
+  if (!token) {
+    clearTimeout(timeout);
+    return { status: "missing" };
+  }
 
   let user: SessionUser;
   try {
-    user = await loadSession(token);
+    user = await abortable(loadSession(token, signal), signal);
   } catch (error) {
     if (!isApiErrorStatus(error, 401)) {
+      clearTimeout(timeout);
       return { status: "retry", error };
     }
     try {
-      await clearToken();
+      await abortable(clearToken(), signal);
     } catch (clearError) {
+      clearTimeout(timeout);
       return { status: "retry", error: clearError };
     }
+    clearTimeout(timeout);
     return { status: "unauthorized" };
   }
 
   try {
     const [projects, organizations] = await Promise.all([
-      loadTeams(token),
-      loadOrganizations(token),
+      abortable(loadTeams(token, signal), signal),
+      abortable(loadOrganizations(token, signal), signal),
     ]);
+    clearTimeout(timeout);
     return {
       status: "authenticated",
       token,
@@ -64,6 +109,7 @@ export async function restoreStoredSession({
       organizations,
     };
   } catch (error) {
+    clearTimeout(timeout);
     return { status: "retry", error };
   }
 }

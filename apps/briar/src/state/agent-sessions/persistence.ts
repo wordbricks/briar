@@ -1,14 +1,20 @@
 import type { AutoHuntSession } from "../../types";
+import {
+  decodeCompressedJson,
+  encodeCompressedJson,
+} from "../../lib/compressed-json";
 import { agentSessionEvent } from "./model";
 
 /*
-  Where agent sessions have always lived: one JSON array in `localStorage`.
+  Agent sessions once lived as one uncompressed JSON array in `localStorage`.
+  The current format compresses that bounded array before writing it, which
+  keeps each save atomic while greatly reducing WebKit SQLite WAL traffic.
 
-  The key and the shape are the ones the hook wrote, so an app that upgrades
-  into this module finds the sessions it recorded yesterday. Nothing about them
-  is stored in the IndexedDB `ClientSnapshot`: that record is the server's data
-  for one organization and is discarded when the account or the schema changes,
-  while these are this device's own log of what it ran.
+  The reader still recognizes the original aggregate key, so an upgrade keeps
+  the sessions it recorded yesterday and migrates them on the first write.
+  Nothing about them is stored in the IndexedDB `ClientSnapshot`: that record
+  is the server's data for one organization and is discarded when the account
+  or schema changes, while these are this device's own log of what it ran.
 
   `Atom.kvs` was the other candidate. It wants an Effect runtime with a
   `KeyValueStore` layer and a `Schema` for the value, and it would still not
@@ -19,11 +25,14 @@ import { agentSessionEvent } from "./model";
 
 /** The key the sessions have been written under since the feature shipped. */
 export const AGENT_SESSION_STORAGE_KEY = "briar.auto-hunt-sessions.v1";
+export const AGENT_SESSION_COMPRESSED_STORAGE_KEY =
+  "briar.auto-hunt-sessions.v2";
 
 /** The part of `Storage` this module uses, so a test can hand over a fake. */
 export interface AgentSessionStorage {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
+  removeItem: (key: string) => void;
 }
 
 /** This device's storage, or `null` where there is none (SSR, a test run). */
@@ -52,6 +61,14 @@ function isStoredSession(session: unknown): session is AutoHuntSession {
   );
 }
 
+function readStoredSessionValues(storage: AgentSessionStorage): unknown[] {
+  const compressed = storage.getItem(AGENT_SESSION_COMPRESSED_STORAGE_KEY);
+  const parsed: unknown = compressed === null
+    ? JSON.parse(storage.getItem(AGENT_SESSION_STORAGE_KEY) ?? "[]")
+    : decodeCompressedJson(compressed);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
 /**
  * Reads the stored sessions, filling in the fields older records predate and
  * closing out the ones this device was running when it stopped: a local session
@@ -67,29 +84,27 @@ export function readStoredAgentSessions(
 ): AutoHuntSession[] {
   if (!storage) return [];
   try {
-    const value = JSON.parse(
-      storage.getItem(AGENT_SESSION_STORAGE_KEY) ?? "[]",
-    );
-    if (!Array.isArray(value)) return [];
-    return value.filter(isStoredSession).map((storedSession) => {
-      const session = {
-        ...storedSession,
-        workers: storedSession.workers ?? [],
-        dispatchEvents: storedSession.dispatchEvents ?? [],
-        localOwner: storedSession.localOwner ?? true,
-        followUps: storedSession.followUps ?? [],
-      };
-      return session.status === "running" && session.localOwner
-        ? {
-            ...session,
-            status: "interrupted" as const,
-            completedAt: now,
-            updatedAt: now,
-            error: null,
-            events: [...session.events, agentSessionEvent("interrupted", now)],
-          }
-        : session;
-    });
+    return readStoredSessionValues(storage)
+      .filter(isStoredSession)
+      .map((storedSession) => {
+        const session = {
+          ...storedSession,
+          workers: storedSession.workers ?? [],
+          dispatchEvents: storedSession.dispatchEvents ?? [],
+          localOwner: storedSession.localOwner ?? true,
+          followUps: storedSession.followUps ?? [],
+        };
+        return session.status === "running" && session.localOwner
+          ? {
+              ...session,
+              status: "interrupted" as const,
+              completedAt: now,
+              updatedAt: now,
+              error: null,
+              events: [...session.events, agentSessionEvent("interrupted", now)],
+            }
+          : session;
+      });
   } catch {
     return [];
   }
@@ -102,7 +117,11 @@ export function writeStoredAgentSessions(
 ): void {
   if (!storage) return;
   try {
-    storage.setItem(AGENT_SESSION_STORAGE_KEY, JSON.stringify(sessions));
+    const encoded = encodeCompressedJson(sessions);
+    if (storage.getItem(AGENT_SESSION_COMPRESSED_STORAGE_KEY) !== encoded) {
+      storage.setItem(AGENT_SESSION_COMPRESSED_STORAGE_KEY, encoded);
+    }
+    storage.removeItem(AGENT_SESSION_STORAGE_KEY);
   } catch {
     // Session tracking remains available in memory when storage is full or
     // unavailable.

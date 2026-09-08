@@ -35,9 +35,12 @@ async function decodeSessionUser(
   }
 }
 
-export async function loadSession(token: string): Promise<SessionUser> {
+export async function loadSession(
+  token: string,
+  signal?: AbortSignal,
+): Promise<SessionUser> {
   return decodeSessionUser(
-    await getCurrentUser(token),
+    await getCurrentUser(token, signal),
     "/briar.app.v1.AccountService/GetCurrentUser",
   );
 }

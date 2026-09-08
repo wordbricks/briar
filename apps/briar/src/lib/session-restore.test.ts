@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { Organization, Project, SessionUser } from "../types";
 import { ApiError } from "./api";
-import { restoreStoredSession } from "./session-restore";
+import {
+  restoreStoredSession,
+  SESSION_RESTORE_TIMEOUT_MS,
+  SessionRestoreTimeoutError,
+} from "./session-restore";
 
 const user: SessionUser = {
   id: "user-1",
@@ -128,5 +132,26 @@ describe("restoreStoredSession", () => {
       organizations,
     });
     expect(dependencies.clearToken).not.toHaveBeenCalled();
+  });
+
+  it("returns a retry result when the complete restore exceeds four seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      const dependencies = createDependencies();
+      dependencies.loadSession.mockImplementation(
+        () => new Promise<SessionUser>(() => undefined),
+      );
+      const restoring = restoreStoredSession(dependencies);
+
+      await vi.advanceTimersByTimeAsync(SESSION_RESTORE_TIMEOUT_MS);
+
+      await expect(restoring).resolves.toMatchObject({
+        status: "retry",
+        error: expect.any(SessionRestoreTimeoutError),
+      });
+      expect(dependencies.clearToken).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

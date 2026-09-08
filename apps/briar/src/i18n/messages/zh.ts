@@ -542,6 +542,8 @@ export const zh = {
   "onboarding.noAdditionalTools": "无需检查其他项目专用工具。",
   "onboarding.missingToolsWarning": "如果未安装全部所需工具，部分自动化可能无法运行。您可以先确认，稍后再安装。",
   "session.restoring": "正在检查登录信息…",
+  "session.restoreFailed": "无法检查您的登录信息",
+  "session.retry": "重试",
   "run.pullRequest": "拉取请求",
   "run.openPullRequest": "打开 {label}",
   "sidebar.addOrganization": "添加组织",

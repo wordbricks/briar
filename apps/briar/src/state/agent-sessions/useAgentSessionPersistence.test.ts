@@ -16,16 +16,19 @@ import {
 } from "./useAgentSessionPersistence";
 
 const recordingStorage = (): AgentSessionStorage & {
-  readonly writes: string[];
+  readonly writes: { key: string; value: string }[];
 } => {
   const items = new Map<string, string>();
-  const writes: string[] = [];
+  const writes: { key: string; value: string }[] = [];
   return {
     writes,
     getItem: (key) => items.get(key) ?? null,
     setItem: (key, value) => {
       items.set(key, value);
-      writes.push(value);
+      writes.push({ key, value });
+    },
+    removeItem: (key) => {
+      items.delete(key);
     },
   };
 };
