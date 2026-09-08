@@ -345,6 +345,26 @@ describe("DM memory in the actual channel reply runner", () => {
     await expect(stat(privateDirectory)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("hands the reply job id, but never the claim token, to the provider", async () => {
+    const environments: Array<NodeJS.ProcessEnv | undefined> = [];
+    const observed = await exercise({
+      provider: async (turn) => {
+        environments.push(turn.environment);
+        return result(final);
+      },
+    });
+
+    expect(observed.failure).toBeUndefined();
+    // The identifier the Agent needs so `briar channel messages` can read the
+    // channel it is replying in under this session's own claim.
+    expect(environments[0]?.BRIAR_CHANNEL_REPLY_WORK_ID).toBe(workId);
+    // The claim token also authorizes submitting the reply, so widening it to
+    // the Agent process is out of scope.
+    expect(JSON.stringify(environments[0])).not.toContain(
+      "briar_channel_claim_",
+    );
+  });
+
   it("M13 keeps private provider errors out of the durable failure payload", async () => {
     const observed = await exercise({
       provider: async () => ({

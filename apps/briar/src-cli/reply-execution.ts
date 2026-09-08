@@ -920,6 +920,12 @@ async function runClaimedChannelReply(
           BRIAR_CLI: workerCliPath(),
           BRIAR_WORKER_TOKEN: workerToken,
           BRIAR_TEAM_ID: project.id,
+          // Identifier only. It lets `briar channel messages` read this
+          // channel's history under the claim the session already holds, so
+          // the Agent never needs a member's Project Agent token. The claim
+          // token stays out of the provider environment because it also
+          // authorizes submitting the reply.
+          BRIAR_CHANNEL_REPLY_WORK_ID: reply.workId,
         }),
         signal: invocationSignal,
         diagnosticContext: {
