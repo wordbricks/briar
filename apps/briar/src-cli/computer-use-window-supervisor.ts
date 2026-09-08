@@ -65,17 +65,87 @@ const defaultCommandRunner: ComputerUseSystemCommandRunner = {
   }),
 };
 
-const defaultPortProbe: ComputerUsePortProbe = {
+const rfbProbeTimeoutMs = 500;
+const rfbBannerBytes = 12;
+const rfbSecurityTypeNone = 1;
+
+/**
+ * A readiness probe that speaks RFB instead of hanging up on connect.
+ *
+ * TigerVNC counts every connection that closes before it authenticates and
+ * black-lists the peer once `BlacklistThreshold` of them accumulate, doubling
+ * the lockout on each further attempt. The previous probe opened a socket and
+ * destroyed it the moment it connected, so `ensureWindow`'s per-turn poll
+ * quietly poisoned long-lived agent displays: 127.0.0.1 ended up permanently
+ * black-listed and every client — the app's own remote display included — was
+ * answered with "Too many security failures". Completing the handshake makes
+ * each probe an authenticated session, which clears the peer instead of
+ * marking it.
+ */
+export const defaultPortProbe: ComputerUsePortProbe = {
   isListening: (host, port) => new Promise((resolve) => {
     const socket = createConnection({ host, port });
+    let pending = Buffer.alloc(0);
+    let stage: "banner" | "securityTypes" | "securityResult" = "banner";
+    let minorVersion = 0;
+    let settled = false;
+
     const finish = (listening: boolean) => {
-      socket.removeAllListeners();
-      socket.destroy();
+      if (settled) return;
+      settled = true;
+      socket.removeAllListeners("data");
+      // A FIN rather than an abort, so the server sees the disconnection it
+      // would get from any well-behaved viewer.
+      socket.end();
       resolve(listening);
     };
-    socket.setTimeout(500, () => finish(false));
-    socket.once("connect", () => finish(true));
-    socket.once("error", () => finish(false));
+    /** Consume `count` bytes, or nothing at all while the reply is short. */
+    const take = (count: number): Buffer | undefined => {
+      if (pending.length < count) return undefined;
+      const head = pending.subarray(0, count);
+      pending = pending.subarray(count);
+      return head;
+    };
+
+    socket.on("error", () => finish(false));
+    socket.setTimeout(rfbProbeTimeoutMs, () => {
+      // Once settled the timer is only a backstop against a peer that never
+      // answers our FIN; before that it is the probe's own deadline.
+      if (settled) socket.destroy();
+      else finish(false);
+    });
+    socket.on("data", (chunk) => {
+      pending = Buffer.concat([pending, chunk]);
+      for (;;) {
+        if (stage === "banner") {
+          const banner = take(rfbBannerBytes);
+          if (!banner) return;
+          const version = /^RFB (\d{3})\.(\d{3})\n$/u.exec(banner.toString("ascii"));
+          if (!version) return finish(false);
+          minorVersion = Number(version[2]);
+          socket.write(banner);
+          // The banner alone proves the display is serving RFB, so every exit
+          // below reports success; the rest of the handshake only decides
+          // whether TigerVNC scores this connection as authenticated.
+          if (minorVersion < 7) return finish(true);
+          stage = "securityTypes";
+          continue;
+        }
+        if (stage === "securityTypes") {
+          if (pending.length < 1) return;
+          const offered = take(1 + pending[0]!);
+          if (!offered) return;
+          if (!offered.includes(rfbSecurityTypeNone, 1)) return finish(true);
+          socket.write(Buffer.of(rfbSecurityTypeNone));
+          // RFB 3.7 sends no SecurityResult for the None type.
+          if (minorVersion < 8) return finish(true);
+          stage = "securityResult";
+          continue;
+        }
+        if (!take(4)) return;
+        return finish(true);
+      }
+    });
   }),
 };
 

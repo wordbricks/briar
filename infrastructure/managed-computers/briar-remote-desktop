@@ -39,10 +39,18 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 rm -f "/tmp/.X${display_number}-lock" "/tmp/.X11-unix/X${display_number}"
+# The display is loopback-only and takes no password, so host black-listing
+# protects nothing here and only breaks the remote display: TigerVNC counts
+# every connection that closes before authenticating, and any local probe that
+# hangs up early eventually locks 127.0.0.1 out of its own screen with "Too
+# many security failures". The threshold is set past anything a long-lived
+# display can reach, and the lockout to nothing.
 /usr/bin/Xtigervnc "$display" \
   -localhost \
   -geometry "$geometry" \
   -SecurityTypes None \
+  -BlacklistThreshold 1000000 \
+  -BlacklistTimeout 0 \
   -rfbport "$rfb_port" \
   -desktop "$desktop_name" &
 vnc_pid=$!

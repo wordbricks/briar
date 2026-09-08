@@ -1,8 +1,10 @@
+import { type AddressInfo, createServer, type Server, type Socket } from "node:net";
 import { expect, it, vi } from "vitest";
 import {
   computerUseBrowserProfileDirectory,
   computerUseRfbPort,
   computerUseWindowUnit,
+  defaultPortProbe,
   ProcessComputerUseWindowSupervisor,
   SystemdComputerUseWindowSupervisor,
 } from "./computer-use-window-supervisor";
@@ -195,4 +197,102 @@ it("keeps display 1 outside the Agent window supervisor", () => {
   expect(computerUseBrowserProfileDirectory(2)).toBe(
     "/var/lib/briar-computer-use/profiles/display-2",
   );
+});
+
+interface FakeRfbConnection {
+  /** Everything the client wrote, in order. */
+  readonly received: Buffer[];
+  /** True once the client selected a security type and read SecurityResult. */
+  authenticated: boolean;
+  /** True when the socket died with a reset instead of a FIN. */
+  aborted: boolean;
+  /** Resolves when the connection is fully closed. */
+  readonly closed: Promise<void>;
+}
+
+/**
+ * A TigerVNC stand-in speaking the `SecurityTypes None` handshake, recording
+ * whether the client saw it through. TigerVNC black-lists a peer that keeps
+ * disconnecting before this point, which is exactly the regression under test.
+ */
+const fakeRfbServer = async (
+  behaviour: "handshake" | "silent" = "handshake",
+): Promise<{
+  readonly port: number;
+  readonly connection: () => FakeRfbConnection | undefined;
+  readonly close: () => Promise<void>;
+}> => {
+  let connection: FakeRfbConnection | undefined;
+  const server: Server = createServer((socket: Socket) => {
+    let resolveClosed: () => void = () => {};
+    const record: FakeRfbConnection = {
+      received: [],
+      authenticated: false,
+      aborted: false,
+      closed: new Promise<void>((resolve) => {
+        resolveClosed = resolve;
+      }),
+    };
+    connection = record;
+    socket.on("error", () => {
+      record.aborted = true;
+    });
+    socket.on("close", () => resolveClosed());
+    if (behaviour === "silent") return;
+    socket.write("RFB 003.008\n");
+    socket.on("data", (chunk) => {
+      record.received.push(chunk);
+      const seen = Buffer.concat(record.received);
+      if (seen.length === 12) socket.write(Buffer.of(1, 1));
+      if (seen.length === 13) {
+        // SecurityResult OK: past here TigerVNC has authenticated the peer.
+        socket.write(Buffer.of(0, 0, 0, 0));
+        record.authenticated = true;
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return {
+    port: (server.address() as AddressInfo).port,
+    connection: () => connection,
+    close: () => new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    }),
+  };
+};
+
+it("completes the RFB handshake instead of aborting the probe connection", async () => {
+  const server = await fakeRfbServer();
+
+  const listening = await defaultPortProbe.isListening("127.0.0.1", server.port);
+
+  const connection = server.connection();
+  expect(listening).toBe(true);
+  expect(connection).toBeDefined();
+  await connection?.closed;
+  expect(Buffer.concat(connection!.received)).toEqual(
+    Buffer.concat([Buffer.from("RFB 003.008\n"), Buffer.of(1)]),
+  );
+  expect(connection?.authenticated).toBe(true);
+  expect(connection?.aborted).toBe(false);
+  await server.close();
+});
+
+it("reports a port with nothing listening as not ready", async () => {
+  const server = await fakeRfbServer();
+  const { port } = server;
+  await server.close();
+
+  expect(await defaultPortProbe.isListening("127.0.0.1", port)).toBe(false);
+});
+
+it("gives up on a socket that accepts without sending an RFB banner", async () => {
+  const server = await fakeRfbServer("silent");
+
+  const started = performance.now();
+  const listening = await defaultPortProbe.isListening("127.0.0.1", server.port);
+
+  expect(listening).toBe(false);
+  expect(performance.now() - started).toBeLessThan(5_000);
+  await server.close();
 });
