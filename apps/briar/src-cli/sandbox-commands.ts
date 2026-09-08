@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import * as Schema from "effect/Schema";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,6 +34,7 @@ import {
   ensureDockerContext,
   ensureSandbox,
   getSandboxStatus,
+  inspectSandboxContainer,
   removeSandbox,
   restartSandbox,
   sandboxContainerName,
@@ -54,6 +57,87 @@ import {
   type SandboxHostEntry,
   upsertSandboxHostEntry,
 } from "./sandbox-host-config";
+import {
+  readSandboxJson, sandboxActivation, SandboxUpdateJournal, SandboxUpdateProvider,
+  sandboxUpdateRoot, submitSandboxUpdate, sandboxUpdateFinished,
+} from "./sandbox-update-state";
+import { resolveSandboxUpdatePlan } from "./sandbox-update-install";
+import { createWorkerControlClient } from "./worker-control-client";
+import { protoAgentProvider } from "../src/lib/agent-provider-proto";
+
+export async function sandboxUpdateCommand() {
+  const name = requestedName();
+  const { docker } = await resolveDocker(name, await registryEntry(name));
+  const container = await inspectSandboxContainer(docker, name);
+  if (!container.owned || !container.running) throw new Error("The owned sandbox must be running to update it");
+  const args = ["exec", sandboxContainerName(name), SANDBOX_CLI_PATH, "sandbox", "update-runtime"];
+  for (const flag of ["check", "status", "rollback"]) if (has(`--${flag}`)) args.push(`--${flag}`);
+  const provider = value("--provider");
+  if (provider) args.push("--provider", provider);
+  if (value("--request-id")) args.push("--request-id", value("--request-id")!);
+  const result = await docker(args);
+  if (!result.ok) throw new Error(`Sandbox update could not start. This image must support sandbox runtime updates.\n${result.output}`);
+  console.log(result.output);
+  if (has("--check") || has("--status") || has("--no-wait")) return;
+  const accepted = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.String }))(JSON.parse(result.output));
+  const deadline = Date.now() + 20 * 60_000;
+  let previousPhase = "";
+  while (Date.now() < deadline) {
+    await Bun.sleep(2_000);
+    const status = await docker(["exec", sandboxContainerName(name), SANDBOX_CLI_PATH, "sandbox", "update-runtime", "--status", "--request-id", accepted.id]);
+    if (!status.ok) throw new Error("Lost the sandbox connection; the supervisor continues the update. Reconnect with --status");
+    const journal = Schema.decodeUnknownSync(Schema.NullOr(SandboxUpdateJournal))(JSON.parse(status.output));
+    if (!journal || journal.request.id !== accepted.id) continue;
+    if (journal.phase !== previousPhase) {
+      console.error(`Sandbox ${name}: ${journal.phase}`);
+      previousPhase = journal.phase;
+    }
+    if (sandboxUpdateFinished(journal.phase)) {
+      console.log(JSON.stringify(journal, null, 2));
+      if (journal.phase !== "completed" && !(has("--rollback") && journal.phase === "rolled_back")) {
+        throw new Error(journal.error ?? "Sandbox update failed");
+      }
+      return;
+    }
+  }
+  throw new Error("The sandbox supervisor still owns this update. Inspect progress with --status");
+}
+
+export async function sandboxUpdateRuntimeCommand() {
+  if (process.env.BRIAR_SANDBOX_UPDATER !== "1") throw new Error("This sandbox image does not have the runtime updater");
+  if (has("--status")) {
+    const requestId = value("--request-id");
+    if (requestId && !/^[0-9a-f-]{36}$/u.test(requestId)) throw new Error("Invalid update request ID");
+    const journal = requestId ? join(sandboxUpdateRoot(), "journals", `${requestId}.json`)
+      : join(sandboxUpdateRoot(), "journal.json");
+    console.log(JSON.stringify(await readSandboxJson(journal, SandboxUpdateJournal)));
+    return;
+  }
+  if (value("--request-id")) throw new Error("--request-id is only valid with --status");
+  const provider = value("--provider") ? Schema.decodeUnknownSync(SandboxUpdateProvider)(value("--provider")) : undefined;
+  const request = { id: randomUUID(), rollback: has("--rollback"), ...(provider ? { provider } : {}) };
+  if (request.rollback && provider) throw new Error("--rollback cannot be combined with --provider");
+  if (has("--check")) {
+    const before = await sandboxActivation();
+    if (request.rollback) { console.log(JSON.stringify({ current: before.runtime, target: before.previous }, null, 2)); return; }
+    const config = await loadConfig();
+    const binding = config.teams.find((team) => team.executionWorker?.token)?.executionWorker;
+    if (!binding?.token) throw new Error("No sandbox Worker credential");
+    const status = await createWorkerControlClient(config.apiUrl, binding.token).getUpdateHandoff(binding.workerId);
+    const installed = (["codex", "claude", "opencode", "grok"] as const).filter((name) => status.runtimes.some(({ runtime }) =>
+      runtime?.providerHealth.some((health) => health.provider === protoAgentProvider[name] && health.installed)));
+    console.log(JSON.stringify(await resolveSandboxUpdatePlan({ request, before, apiUrl: config.apiUrl, installed }), null, 2));
+    return;
+  }
+  console.log(JSON.stringify(await submitSandboxUpdate(request)));
+}
+
+export async function sandboxRequestUpdateCommand() {
+  if (process.env.BRIAR_SANDBOX_UPDATER !== "1") throw new Error("Sandbox updater is unavailable");
+  console.log(JSON.stringify(await submitSandboxUpdate({
+    id: value("--request-id") ?? "", targetVersion: value("--target-version"), rollback: false,
+  })));
+}
 
 /**
  * `briar sandbox` command handlers.

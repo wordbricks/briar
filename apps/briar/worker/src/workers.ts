@@ -140,6 +140,7 @@ export type OrganizationExecutionWorker = {
   createdAt: string;
   versions: Record<string, string>;
   remoteUpdateSupported: boolean;
+  sandboxUpdateSupported?: boolean;
   updateRequest: WorkerUpdateRequest | null;
   bindings: Array<{
     id: string;
@@ -195,10 +196,16 @@ export async function requestExecutionWorkerUpdate(
     requestedByUserId: string;
     targetVersion: string;
     requestedAt: string;
+    requiresRuntimeAck?: boolean;
+    deferHandoff?: boolean;
   },
 ): Promise<WorkerUpdateRequest> {
   const pending = await pendingExecutionWorkerUpdate(db, input.deviceId);
   if (pending) {
+    if (input.requiresRuntimeAck && !pending.requiresRuntimeAck) {
+      throw new WorkerConflictError("A different Worker update is already pending");
+    }
+    if (input.deferHandoff) return pending;
     await beginExecutionWorkerUpdate(db, {
       requestId: pending.id,
       deviceId: input.deviceId,
@@ -211,8 +218,8 @@ export async function requestExecutionWorkerUpdate(
       `insert into briar_execution_worker_update_requests (
          id, organization_id, device_id, requested_by_user_id,
          target_version, status, requested_at, updated_at,
-         handoff_state, handoff_started_at
-       ) values (?, ?, ?, ?, ?, 'requested', ?, ?, 'draining', ?)
+         handoff_state, handoff_started_at, requires_runtime_ack
+       ) values (?, ?, ?, ?, ?, 'requested', ?, ?, ?, ?, ?)
        on conflict do nothing`,
     )
     .bind(
@@ -223,12 +230,15 @@ export async function requestExecutionWorkerUpdate(
       input.targetVersion,
       input.requestedAt,
       input.requestedAt,
-      input.requestedAt,
+      input.deferHandoff ? "idle" : "draining",
+      input.deferHandoff ? null : input.requestedAt,
+      input.requiresRuntimeAck ? 1 : 0,
     )
     .run();
   if (inserted.meta.changes < 1) {
     const concurrent = await pendingExecutionWorkerUpdate(db, input.deviceId);
     if (concurrent) {
+      if (input.deferHandoff) return concurrent;
       await beginExecutionWorkerUpdate(db, {
         requestId: concurrent.id,
         deviceId: input.deviceId,
@@ -238,11 +248,13 @@ export async function requestExecutionWorkerUpdate(
     }
     throw new WorkerConflictError("Worker update request changed");
   }
-  await beginExecutionWorkerUpdate(db, {
-    requestId: input.id,
-    deviceId: input.deviceId,
-    observedAt: input.requestedAt,
-  });
+  if (!input.deferHandoff) {
+    await beginExecutionWorkerUpdate(db, {
+      requestId: input.id,
+      deviceId: input.deviceId,
+      observedAt: input.requestedAt,
+    });
+  }
   const requested = await pendingExecutionWorkerUpdate(db, input.deviceId);
   if (!requested) throw new WorkerConflictError("Worker update request disappeared");
   return requested;
@@ -312,6 +324,7 @@ export async function completeExecutionWorkerUpdates(
     : knownPending;
   if (
     !pending ||
+    pending.requiresRuntimeAck ||
     !currentVersion ||
     !isSemanticVersion(currentVersion) ||
     compareSemanticVersions(currentVersion, pending.targetVersion) < 0
@@ -517,7 +530,19 @@ export async function handoffExecutionWorkerClaim(
       input.workId,
       input.observedAt,
     );
-  const [updated, inserted] = await db.batch([update, audit]);
+  const reservation = db.prepare(
+    `insert into briar_worker_update_reservations (work_type, work_id, device_id, request_id)
+     select ?, ?, ?, ? where exists (
+       select 1 from ${table}
+       where id = ? and status = 'queued' and planned_update_resume = 1 and updated_at = ?
+     )
+     on conflict (work_type, work_id) do update
+       set device_id = excluded.device_id, request_id = excluded.request_id`,
+  ).bind(
+    input.workType, input.workId, input.deviceId, input.requestId,
+    input.workId, input.observedAt,
+  );
+  const [updated, inserted] = await db.batch([update, audit, reservation]);
   if ((updated.results?.length ?? 0) < 1) {
     const existing = await executionWorkerHandoffExists(db, {
       requestId: input.requestId,
@@ -785,8 +810,8 @@ export function projectExecutionWorkerCapabilityCatalog(
 }
 
 /**
- * Channel mentions are interactive, so only a Worker that can claim the reply
- * immediately counts as available. Project Agents require an exact project
+ * Channel mentions route to a live Worker or wait for its planned update.
+ * Project Agents require an exact project
  * binding; Organization Agents may use any live binding in the organization.
  */
 export type ChannelReplyWorkerAvailability =
@@ -816,7 +841,10 @@ export async function channelReplyWorkerAvailability(
               worker.accepting_work, worker.readiness_state,
               worker.last_heartbeat_at as worker_last_heartbeat_at,
               device.state as device_state,
-              device.last_heartbeat_at as device_last_heartbeat_at
+              device.last_heartbeat_at as device_last_heartbeat_at,
+              exists (select 1 from briar_execution_worker_update_requests updating
+                where updating.device_id = device.id and updating.status = 'requested'
+                  and updating.handoff_state <> 'failed') as planned_update
        from briar_execution_workers worker
        join briar_execution_worker_devices device on device.id = worker.device_id
        join briar_execution_worker_credentials credential
@@ -867,10 +895,12 @@ export async function channelReplyWorkerAvailability(
       worker_last_heartbeat_at: string;
       device_state: ExecutionWorkerState;
       device_last_heartbeat_at: string;
+      planned_update: number;
     }>();
 
   const liveWorkers = result.results.filter((worker) =>
-    workerStateAt(
+    worker.worker_state !== "disabled" && worker.device_state !== "disabled" &&
+    (worker.planned_update === 1 || (workerStateAt(
       worker.device_last_heartbeat_at,
       input.observedAt,
       worker.device_state,
@@ -879,10 +909,10 @@ export async function channelReplyWorkerAvailability(
       worker.worker_last_heartbeat_at,
       input.observedAt,
       worker.worker_state,
-    ) === "online"
+    ) === "online"))
   );
   if (liveWorkers.some((worker) =>
-    worker.accepting_work === 1 &&
+    (worker.accepting_work === 1 || worker.planned_update === 1) &&
     // Reply work is independent of regular execution slots. `busy` means
     // those slots are occupied, while `needs_attention` remains a hard stop.
     worker.readiness_state !== "needs_attention" &&
@@ -2117,7 +2147,9 @@ export async function listOrganizationExecutionWorkers(
         createdAt: row.created_at,
         versions: {},
         remoteUpdateSupported: false,
-        updateRequest: await pendingExecutionWorkerUpdate(db, row.device_id),
+        updateRequest: await executionWorkerUpdateRequest(db, { deviceId: row.device_id }).then((update) =>
+          update?.status === "requested" || (update?.status === "cancelled" && update.handoffError)
+            ? update : null),
         bindings: [],
       } satisfies OrganizationExecutionWorker);
     workers.set(row.device_id, device);
@@ -2140,7 +2172,10 @@ export async function listOrganizationExecutionWorkers(
     }
     const remoteUpdates = runtime.proto.capabilities?.remoteUpdates;
     device.remoteUpdateSupported ||=
-      remoteUpdates?.supported === true && remoteUpdates.protocol === 1;
+      remoteUpdates?.supported === true &&
+      (remoteUpdates.protocol === 1 || remoteUpdates.protocol === 2);
+    device.sandboxUpdateSupported ||= remoteUpdates?.supported === true &&
+      remoteUpdates.protocol === 2;
     const state = workerStateAt(
       row.worker_heartbeat_at,
       observedAt,

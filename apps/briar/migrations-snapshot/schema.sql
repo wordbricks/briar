@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: effca123b74d73052e13ea71820c69a935072374a065028d5bb228cf257a25c1
--- snapshot-digest: 9a33e1cd4a635f2416702047fe5bb2dd519647d10091925ef27268a180aab56a
+-- migrations-digest: 19a91c63214596698282a5a7ed7b655b0baa2bee350931cd85fd0cb2013e1d61
+-- snapshot-digest: 3888e6515ee60eabff4eeb7f8e3df0ea0a62b10d0eb5b07b95788f328cb7f8ab
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -527,7 +527,8 @@ CREATE TABLE briar_execution_worker_update_requests (
   updated_at text not null,
   completed_at text
 , handoff_state text not null default 'idle'
-  check (handoff_state in ('idle', 'draining', 'ready', 'failed')), handoff_started_at text, handoff_completed_at text, handoff_error text);
+  check (handoff_state in ('idle', 'draining', 'ready', 'failed')), handoff_started_at text, handoff_completed_at text, handoff_error text, requires_runtime_ack integer not null default 0
+  check (requires_runtime_ack in (0, 1)));
 -- @statement
 CREATE TABLE briar_project_agent_session_context_membership (
   project_id text not null
@@ -3716,6 +3717,14 @@ CREATE TABLE briar_channel_message_reactions (
   check ((user_id is not null) + (agent_id is not null) = 1)
 );
 -- @statement
+CREATE TABLE briar_worker_update_reservations (
+  work_type text not null check (work_type in ('issue', 'projectAgentTask', 'issueReply', 'channelReply', 'mergeBatch', 'dmMemory')),
+  work_id text not null,
+  device_id text not null references briar_execution_worker_devices(id) on delete cascade,
+  request_id text not null references briar_execution_worker_update_requests(id) on delete cascade,
+  primary key (work_type, work_id)
+);
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -5007,6 +5016,13 @@ CREATE UNIQUE INDEX briar_channel_message_reactions_agent_idx
 -- @statement
 CREATE INDEX briar_channel_message_reactions_message_idx
   on briar_channel_message_reactions (message_id, created_at, emoji);
+-- @statement
+CREATE INDEX idx_worker_handoff_resume
+  on briar_execution_worker_update_handoffs(work_type, work_id, updated_at desc, id desc)
+  where status = 'handed_off';
+-- @statement
+CREATE INDEX idx_worker_update_reservations_device
+  on briar_worker_update_reservations(device_id);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN
@@ -13552,3 +13568,199 @@ after delete on briar_channel_message_reactions BEGIN
     ),
     updated_at = excluded.updated_at;
 END;
+-- @statement
+CREATE TRIGGER briar_merge_batches_update_claim_fence
+before update of claim_token_hash on briar_merge_batches
+when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
+begin
+  select raise(ignore) where exists (
+    select 1 from briar_execution_worker_update_requests request
+    join briar_execution_workers worker on worker.device_id = request.device_id
+    where worker.id = new.claimed_worker_id and request.status = 'requested'
+      and request.handoff_state <> 'idle'
+  );
+  select raise(ignore) where exists (
+    select 1 from briar_worker_update_reservations reservation
+    where reservation.work_type = 'mergeBatch' and reservation.work_id = new.id
+      and reservation.device_id is not (
+        select device_id from briar_execution_workers where id = new.claimed_worker_id
+      )
+  );
+  select raise(ignore) where not exists (
+    select 1 from briar_worker_update_reservations where work_type = 'mergeBatch' and work_id = new.id
+  ) and exists (
+    select 1 from briar_worker_update_reservations reservation
+    join briar_execution_workers worker on worker.device_id = reservation.device_id
+    where worker.id = new.claimed_worker_id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_merge_batches_update_reservation_release
+after update of state, claim_token_hash on briar_merge_batches
+when (new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash)
+  or new.state in ('completed', 'failed', 'blocked')
+begin
+  delete from briar_worker_update_reservations where work_type = 'mergeBatch' and work_id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_jobs_update_claim_fence
+before update of lease_token_hash on briar_dm_memory_jobs
+when new.lease_token_hash is not null and new.lease_token_hash is not old.lease_token_hash
+begin
+  select raise(ignore) where exists (
+    select 1 from briar_execution_worker_update_requests request
+    join briar_execution_workers worker on worker.device_id = request.device_id
+    where worker.id = new.claimed_worker_id and request.status = 'requested'
+      and request.handoff_state <> 'idle'
+  );
+  select raise(ignore) where exists (
+    select 1 from briar_worker_update_reservations reservation
+    where reservation.work_type = 'dmMemory' and reservation.work_id = new.id
+      and reservation.device_id is not (
+        select device_id from briar_execution_workers where id = new.claimed_worker_id
+      )
+  );
+  select raise(ignore) where not exists (
+    select 1 from briar_worker_update_reservations where work_type = 'dmMemory' and work_id = new.id
+  ) and exists (
+    select 1 from briar_worker_update_reservations reservation
+    join briar_execution_workers worker on worker.device_id = reservation.device_id
+    where worker.id = new.claimed_worker_id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_jobs_update_reservation_release
+after update of status, lease_token_hash on briar_dm_memory_jobs
+when (new.lease_token_hash is not null and new.lease_token_hash is not old.lease_token_hash)
+  or new.status in ('succeeded', 'no_change', 'failed', 'cancelled')
+begin
+  delete from briar_worker_update_reservations where work_type = 'dmMemory' and work_id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_update_claim_fence
+before update of claim_token_hash on briar_hunt_runs
+when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
+begin
+  select raise(ignore) where exists (
+    select 1 from briar_execution_worker_update_requests request
+    join briar_execution_workers worker on worker.device_id = request.device_id
+    where worker.id = new.worker_id and request.status = 'requested'
+      and request.handoff_state <> 'idle'
+  );
+  select raise(ignore) where exists (
+    select 1 from briar_worker_update_reservations reservation
+    where reservation.work_type = 'issue' and reservation.work_id = new.id
+      and reservation.device_id is not (
+        select device_id from briar_execution_workers where id = new.worker_id
+      )
+  );
+  select raise(ignore) where old.planned_update_resume = 0 and exists (
+    select 1 from briar_worker_update_reservations reservation
+    join briar_execution_workers worker on worker.device_id = reservation.device_id
+    where worker.id = new.worker_id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_update_reservation_release
+after update of status, planned_update_resume on briar_hunt_runs
+when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
+begin
+  delete from briar_worker_update_reservations
+    where work_type = 'issue' and work_id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_project_agent_task_jobs_update_claim_fence
+before update of claim_token_hash on briar_project_agent_task_jobs
+when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
+begin
+  select raise(ignore) where exists (
+    select 1 from briar_execution_worker_update_requests request
+    join briar_execution_workers worker on worker.device_id = request.device_id
+    where worker.id = new.claimed_worker_id and request.status = 'requested'
+      and request.handoff_state <> 'idle'
+  );
+  select raise(ignore) where exists (
+    select 1 from briar_worker_update_reservations reservation
+    where reservation.work_type = 'projectAgentTask' and reservation.work_id = new.id
+      and reservation.device_id is not (
+        select device_id from briar_execution_workers where id = new.claimed_worker_id
+      )
+  );
+  select raise(ignore) where old.planned_update_resume = 0 and exists (
+    select 1 from briar_worker_update_reservations reservation
+    join briar_execution_workers worker on worker.device_id = reservation.device_id
+    where worker.id = new.claimed_worker_id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_project_agent_task_jobs_update_reservation_release
+after update of status, planned_update_resume on briar_project_agent_task_jobs
+when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
+begin
+  delete from briar_worker_update_reservations
+    where work_type = 'projectAgentTask' and work_id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_issue_agent_reply_jobs_update_claim_fence
+before update of claim_token_hash on briar_issue_agent_reply_jobs
+when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
+begin
+  select raise(ignore) where exists (
+    select 1 from briar_execution_worker_update_requests request
+    join briar_execution_workers worker on worker.device_id = request.device_id
+    where worker.id = new.claimed_worker_id and request.status = 'requested'
+      and request.handoff_state <> 'idle'
+  );
+  select raise(ignore) where exists (
+    select 1 from briar_worker_update_reservations reservation
+    where reservation.work_type = 'issueReply' and reservation.work_id = new.id
+      and reservation.device_id is not (
+        select device_id from briar_execution_workers where id = new.claimed_worker_id
+      )
+  );
+  select raise(ignore) where old.planned_update_resume = 0 and exists (
+    select 1 from briar_worker_update_reservations reservation
+    join briar_execution_workers worker on worker.device_id = reservation.device_id
+    where worker.id = new.claimed_worker_id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_issue_agent_reply_jobs_update_reservation_release
+after update of status, planned_update_resume on briar_issue_agent_reply_jobs
+when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
+begin
+  delete from briar_worker_update_reservations
+    where work_type = 'issueReply' and work_id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_channel_agent_reply_jobs_update_claim_fence
+before update of claim_token_hash on briar_channel_agent_reply_jobs
+when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
+begin
+  select raise(ignore) where exists (
+    select 1 from briar_execution_worker_update_requests request
+    join briar_execution_workers worker on worker.device_id = request.device_id
+    where worker.id = new.claimed_worker_id and request.status = 'requested'
+      and request.handoff_state <> 'idle'
+  );
+  select raise(ignore) where exists (
+    select 1 from briar_worker_update_reservations reservation
+    where reservation.work_type = 'channelReply' and reservation.work_id = new.id
+      and reservation.device_id is not (
+        select device_id from briar_execution_workers where id = new.claimed_worker_id
+      )
+  );
+  select raise(ignore) where old.planned_update_resume = 0 and exists (
+    select 1 from briar_worker_update_reservations reservation
+    join briar_execution_workers worker on worker.device_id = reservation.device_id
+    where worker.id = new.claimed_worker_id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_channel_agent_reply_jobs_update_reservation_release
+after update of status, planned_update_resume on briar_channel_agent_reply_jobs
+when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
+begin
+  delete from briar_worker_update_reservations
+    where work_type = 'channelReply' and work_id = new.id;
+end;

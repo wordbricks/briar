@@ -293,6 +293,9 @@ export async function claimNextIssueAgentReply(
          join briar_hunt_runs run
            on run.id = job.run_id and run.project_id = job.project_id
          where job.project_id = ?
+           and not exists (select 1 from briar_worker_update_reservations reservation
+             where reservation.work_type = 'issueReply' and reservation.work_id = job.id
+               and reservation.device_id is not (select device_id from briar_execution_workers where id = ?))
            and job.attempts < 3
            and (
              job.status = 'queued'
@@ -347,7 +350,7 @@ export async function claimNextIssueAgentReply(
              )
            )
            ${selectedSkillGuard}
-         order by job.created_at, job.id
+         order by job.planned_update_resume desc, job.created_at, job.id
          limit 1
        )
        returning *`,
@@ -361,6 +364,7 @@ export async function claimNextIssueAgentReply(
       input.leaseExpiresAt,
       input.claimedAt,
       projectId,
+      input.workerId,
       input.claimedAt,
       input.workerId,
       input.workerId,

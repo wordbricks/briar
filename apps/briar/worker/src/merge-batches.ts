@@ -1007,7 +1007,9 @@ export async function claimNextMergeBatch(
     `update briar_merge_batches
      set claim_token_hash = ?, claimed_worker_id = ?, claimed_by = ?,
          claimed_at = ?, lease_expires_at = ?,
-         claim_attempts = claim_attempts + 1,
+         claim_attempts = claim_attempts + case when exists (
+           select 1 from briar_worker_update_reservations where work_type = 'mergeBatch' and work_id = briar_merge_batches.id
+         ) then 0 else 1 end,
          state = case when state = 'frozen' then 'enqueueing' else state end,
          updated_at = ?
      where id = (
@@ -1020,6 +1022,9 @@ export async function claimNextMergeBatch(
            join briar_execution_worker_devices selected_device
              on selected_device.id = selected_worker.device_id
            where selected_worker.id = ? and selected_worker.device_id = ?
+             and not exists (select 1 from briar_worker_update_reservations reservation
+               where reservation.work_type = 'mergeBatch' and reservation.work_id = batch.id
+                 and reservation.device_id <> selected_device.id)
              and selected_worker.project_id = batch.project_id
              and (
                (select count(*)
@@ -1057,7 +1062,10 @@ export async function claimNextMergeBatch(
                       and learning.lease_expires_at > ?)
              ) < selected_device.max_concurrent_sessions
          )
-       order by case state
+       order by case when exists (
+                  select 1 from briar_worker_update_reservations where work_type = 'mergeBatch' and work_id = batch.id
+                ) then 0 else 1 end,
+                case state
                   when 'validating' then 0 when 'publishing' then 1
                   when 'frozen' then 2 when 'enqueueing' then 3
                   when 'waiting_tail' then 4 else 5 end,

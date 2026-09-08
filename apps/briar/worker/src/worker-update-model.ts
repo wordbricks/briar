@@ -18,6 +18,7 @@ export type WorkerUpdateRequest = {
   handoffStartedAt: string | null;
   handoffCompletedAt: string | null;
   handoffError: string | null;
+  requiresRuntimeAck?: boolean;
 };
 
 export type WorkerUpdateHandoffContext = {

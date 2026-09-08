@@ -30,6 +30,7 @@ import { providerAuthenticated } from "./managed-computer-setup-agent";
 import { computerUsePrimaryBrowserProfileDirectory } from "./computer-use-browser-login-store";
 import { configuredComputerUseAssignmentPath } from "./computer-use-desktop-manager";
 import { runWorkerSupervisor } from "./managed-computer-supervisor";
+import { createSandboxUpdater } from "./sandbox-update-supervisor";
 import {
   ensureRepository,
   runSimpleCommand,
@@ -879,12 +880,15 @@ export async function runSandboxSupervisor(directory = configDirectory) {
     keepChildAlive("remote_agent", cliCommand("sandbox", "remote-agent"), stop.signal),
   ]);
   try {
+    const updater = createSandboxUpdater();
     await runWorkerSupervisor({
       // The state file is re-read on every reconcile so a later bootstrap
       // can add or drop projects without restarting the container.
       desiredProjectIds: async (config) =>
         sandboxWorkerTeamIds(config, await readSandboxState(directory)),
-      childEnvironment: () => ({}),
+      beforeReconcile: updater.reconcile,
+      workerCommand: updater.command,
+      childEnvironment: updater.environment,
       eventPrefix: "sandbox_worker",
     });
   } finally {

@@ -90,6 +90,9 @@ import {
   sandboxSuperviseCommand,
   sandboxUnregisterCommand,
   sandboxUpCommand,
+  sandboxUpdateCommand,
+  sandboxUpdateRuntimeCommand,
+  sandboxRequestUpdateCommand,
   sandboxVerifyCommand,
   sandboxViewCommand,
 } from "./sandbox-commands";
@@ -902,6 +905,7 @@ const providerCommand = Command.make("provider").pipe(
 );
 
 const sandboxTargetFlags = optionalStrings("name", "context", "host");
+const sandboxUpdateFlags = { ...optionalStrings("provider", "request-id"), ...switches("check", "status", "rollback") };
 
 const sandboxCommand = Command.make("sandbox").pipe(
   Command.withDescription(
@@ -926,6 +930,8 @@ const sandboxCommand = Command.make("sandbox").pipe(
       "Show whether the sandbox exists, runs, and is ready",
     ),
     leaf("stop", sandboxTargetFlags, sandboxStopCommand, "Stop the sandbox"),
+    leaf("update", { ...sandboxTargetFlags, ...sandboxUpdateFlags, ...switches("no-wait") },
+      sandboxUpdateCommand, "Stage runtime updates, interrupt and preserve active work, then resume it"),
     leaf(
       "recreate",
       sandboxTargetFlags,
@@ -979,6 +985,10 @@ const sandboxCommand = Command.make("sandbox").pipe(
     leaf("report", {}, sandboxReportCommand, "Report sandbox readiness as JSON")
       .pipe(Command.unlisted),
     leaf("supervise", {}, sandboxSuperviseCommand, "Supervise sandbox workers")
+      .pipe(Command.unlisted),
+    leaf("update-runtime", sandboxUpdateFlags, sandboxUpdateRuntimeCommand, "Queue or inspect an in-container runtime update")
+      .pipe(Command.unlisted),
+    leaf("request-update", requiredStrings("request-id", "target-version"), sandboxRequestUpdateCommand, "Forward a remote runtime update to the sandbox supervisor")
       .pipe(Command.unlisted),
     leaf("unregister", {}, sandboxUnregisterCommand, "Unbind this sandbox's workers")
       .pipe(Command.unlisted),

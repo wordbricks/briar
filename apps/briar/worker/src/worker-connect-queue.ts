@@ -1,4 +1,5 @@
 import { acknowledgeDmReplySteer } from "./dm-reply-steer";
+import { handoffAuxiliaryWorkerUpdate } from "./worker-update-auxiliary";
 import {
   providerBlockFromProto,
   providerBlockReplyMessage,
@@ -188,6 +189,7 @@ export type WorkerQueueServices = {
   readonly auditExecutionEvent: typeof auditExecutionEvent;
   readonly releaseMergeBatchLease: typeof releaseMergeBatchLease;
   readonly handoffExecutionWorkerClaim: typeof handoffExecutionWorkerClaim;
+  readonly handoffAuxiliaryWorkerUpdate: typeof handoffAuxiliaryWorkerUpdate;
   readonly failExecutionWorkerUpdateHandoff: typeof failExecutionWorkerUpdateHandoff;
   readonly executionWorkerUpdateStatus: typeof executionWorkerUpdateStatus;
   readonly recordMergeBatchCandidateEnqueuedWork:
@@ -236,6 +238,7 @@ const workerQueueServices: WorkerQueueServices = {
   auditExecutionEvent,
   releaseMergeBatchLease,
   handoffExecutionWorkerClaim,
+  handoffAuxiliaryWorkerUpdate,
   failExecutionWorkerUpdateHandoff,
   executionWorkerUpdateStatus,
   recordMergeBatchCandidateEnqueuedWork,
@@ -742,6 +745,13 @@ async function handoffWork(
   }
 
   if (identity.work.case === "mergeBatch") {
+    if (await services.handoffAuxiliaryWorkerUpdate(input.db, {
+      requestId: request.requestId, deviceId: worker.principal.deviceId, workerId: worker.binding.id,
+      workType: "mergeBatch", workId: identity.workId, claimTokenHash, observedAt,
+    })) return {
+      outcome: HandoffWorkResponse_Outcome.RELEASED, requestId: request.requestId,
+      state: HandoffWorkResponse_State.DRAINING, activeWorkCount: 0, ready: false,
+    };
     const released = await services.releaseMergeBatchLease(input.db, {
       batchId: identity.workId,
       projectId: request.projectId,

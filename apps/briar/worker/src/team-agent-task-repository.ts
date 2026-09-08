@@ -277,7 +277,7 @@ export async function claimNextTeamAgentTask(
              job.status = 'queued'
              or (job.status = 'running' and job.lease_expires_at <= ?)
            )
-         order by job.created_at, job.id
+         order by job.planned_update_resume desc, job.created_at, job.id
          limit 1
        )
        returning *`,

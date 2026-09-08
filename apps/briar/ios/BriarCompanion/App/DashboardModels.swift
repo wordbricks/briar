@@ -313,7 +313,16 @@ struct ResultReview: Codable, Equatable, Identifiable, Sendable {
 
 struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     struct Capabilities: Codable, Equatable, Sendable {
+        struct RemoteUpdates: Codable, Equatable, Sendable {
+            let supported: Bool
+            let protocolVersion: Int
+            enum CodingKeys: String, CodingKey {
+                case supported
+                case protocolVersion = "protocol"
+            }
+        }
         let providerCapabilities: [String: AgentProviderCapability]?
+        var remoteUpdates: RemoteUpdates? = nil
     }
     struct Icon: Codable, Equatable, Sendable {
         enum Kind: String, Codable, Sendable {
@@ -336,6 +345,12 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
     let readinessDetail: String?
     let activeSessions: Int
     let availableSessions: Int
+    let deviceId: String?
+    let versions: [String: String]?
+
+    var supportsSandboxUpdate: Bool {
+        capabilities?.remoteUpdates?.supported == true && capabilities?.remoteUpdates?.protocolVersion == 2
+    }
 
     init(
         id: String,
@@ -348,7 +363,9 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
         acceptingWork: Bool,
         readinessDetail: String?,
         activeSessions: Int,
-        availableSessions: Int
+        availableSessions: Int,
+        deviceId: String? = nil,
+        versions: [String: String]? = nil
     ) {
         self.id = id
         self.label = label
@@ -361,6 +378,8 @@ struct DashboardWorker: Codable, Equatable, Identifiable, Sendable {
         self.readinessDetail = readinessDetail
         self.activeSessions = activeSessions
         self.availableSessions = availableSessions
+        self.deviceId = deviceId
+        self.versions = versions
     }
 }
 

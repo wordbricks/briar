@@ -169,6 +169,7 @@ enum L10n {
         "팀에 연결된 Agent가 여기에 표시됩니다.": "Agents connected to this team appear here.",
         "아직 동기화된 세션이 없습니다.": "No sessions have synced yet.",
         "실행 Worker": "Execution workers",
+        "샌드박스 %@ 업데이트": "Update sandbox %@",
         "실행 가능": "Available",
         "Agent를 불러오는 중…": "Loading agents…",
         "Agent 실행": "Run agent",

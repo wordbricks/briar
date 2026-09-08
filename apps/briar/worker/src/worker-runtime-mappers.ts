@@ -206,6 +206,9 @@ export const workerRuntimeMetadataFromProto = (
 ) => {
   if (!runtime) return invalid("Worker runtime advertisement is required");
   const agentProvider = workerAgentProviderFromProto(runtime.agentProvider);
+  if (runtime.updateRequestId !== undefined && !/^[0-9a-f-]{36}$/iu.test(runtime.updateRequestId)) {
+    invalid("Worker runtime update request ID is invalid");
+  }
   const versions = { ...runtime.versions };
   for (const [key, value] of Object.entries(versions)) {
     if (key.length > 64 || value.length > 64) {

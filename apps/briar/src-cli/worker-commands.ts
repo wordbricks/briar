@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
 import { join } from "node:path";
 import { unlink } from "node:fs/promises";
+import { sandboxWorkerRuntimeMetadata } from "./sandbox-update-state";
+import { recordSandboxWorkerDrained } from "./sandbox-update-supervisor";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import { buildComputerUseArgs } from "@briar/agent-exec";
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -133,10 +135,11 @@ const workerRuntime = (input: {
   computerUse?: WorkerRuntimeInput["computerUse"];
 }): WorkerRuntimeInput => ({
   ...input,
-  versions: { briar: cliVersion },
+  updateRequestId: sandboxWorkerRuntimeMetadata().updateRequestId,
+  versions: { ...sandboxWorkerRuntimeMetadata().versions, briar: cliVersion },
   remoteUpdates: {
     supported: supportsRemoteWorkerUpdates(platform()),
-    protocol: 1,
+    protocol: process.env.BRIAR_SANDBOX_UPDATER === "1" ? 2 : 1,
   },
 });
 
@@ -866,7 +869,8 @@ async function workerCommand() {
         if (refreshMaintenance) lastServerMaintenanceAt = Date.now();
         let effectiveAcceptingWork = acceptingWork;
         if (heartbeat.updateDirective) {
-          effectiveAcceptingWork = false;
+          effectiveAcceptingWork = heartbeat.updateDirective.handoffState === "idle"
+            ? acceptingWork : false;
           if (heartbeat.updateDirective.handoffState === "failed") {
             // A failed request is retried with the same server request ID.
             // Re-arm the local launcher once the server moves it back to draining.
@@ -939,6 +943,9 @@ async function workerCommand() {
           updateDirective: heartbeat.updateDirective,
         });
       },
+      drained: process.env.BRIAR_SANDBOX_UPDATER === "1"
+        ? (requestId) => recordSandboxWorkerDrained(workerId, requestId)
+        : undefined,
       handoff: async (issue, requestId, checkpoint) => {
         await workerQueue.handoffWork({
           requestId,

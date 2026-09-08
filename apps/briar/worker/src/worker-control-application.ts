@@ -1,10 +1,10 @@
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
-import { isSemanticVersion } from "../../src/lib/semantic-version";
+import { compareSemanticVersions, isSemanticVersion } from "../../src/lib/semantic-version";
 import { getTeamSettings } from "./team-settings-repository";
 import { pendingExecutionWorkerUpdate } from "./worker-update-repository";
 import { recordPreservedWorkerBinding } from "./worker-lifecycle-repository";
 import type { AuthenticatedWorkerPrincipal } from "./worker-route-auth";
-import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
+import { workerRuntimeMetadataFromStoredProtoJson, type WorkerRuntimeMetadata } from "./worker-runtime-mappers";
 import {
   auditExecutionEvent,
   completeExecutionWorkerUpdates,
@@ -62,19 +62,25 @@ export async function prepareWorkerUpdateHandoffApplication(input: {
   principal: AuthenticatedWorkerPrincipal;
   workerId: string;
   targetVersion: string;
+  requiresRuntimeAck?: boolean;
+  requestId?: string;
   observedAt: string;
 }) {
   await enabledBinding(input);
   if (!isSemanticVersion(input.targetVersion)) {
     invalid("Worker update target must be a semantic version");
   }
+  if (input.requestId && !/^[0-9a-f-]{36}$/iu.test(input.requestId)) invalid("Invalid update request ID");
+  const existing = await pendingExecutionWorkerUpdate(input.db, input.principal.deviceId);
+  if (input.requestId && existing && existing.id !== input.requestId) invalid("A different update is already pending");
   const update = await requestExecutionWorkerUpdate(input.db, {
-    id: crypto.randomUUID(),
+    id: input.requestId ?? crypto.randomUUID(),
     organizationId: input.principal.organizationId,
     deviceId: input.principal.deviceId,
     requestedByUserId: input.principal.ownerUserId,
     targetVersion: input.targetVersion,
     requestedAt: input.observedAt,
+    requiresRuntimeAck: input.requiresRuntimeAck,
   });
   const status = await executionWorkerUpdateStatus(input.db, {
     deviceId: input.principal.deviceId,
@@ -104,7 +110,69 @@ export async function getWorkerUpdateHandoffApplication(input: {
     requestId: input.requestId,
     observedAt: input.observedAt,
   });
-  return status ?? { request: null, activeWorkCount: 0, ready: true };
+  return {
+    ...(status ?? { request: null, activeWorkCount: 0, ready: true }),
+    runtimes: await workerUpdateRuntimes(input.db, input.principal.deviceId),
+  };
+}
+
+async function workerUpdateRuntimes(db: D1Database, deviceId: string) {
+  const rows = await db.prepare(
+    `select id, runtime_proto_json, last_heartbeat_at
+     from briar_execution_workers where device_id = ? and state <> 'disabled'`,
+  ).bind(deviceId).all<{
+    id: string; runtime_proto_json: string; last_heartbeat_at: string;
+  }>();
+  return rows.results.map((row) => ({
+    workerId: row.id,
+    runtime: workerRuntimeMetadataFromStoredProtoJson(row.runtime_proto_json).proto,
+    lastHeartbeatAt: row.last_heartbeat_at,
+  }));
+}
+
+export async function finishWorkerUpdateApplication(input: {
+  db: D1Database;
+  principal: AuthenticatedWorkerPrincipal;
+  workerId: string;
+  requestId: string;
+  cancel: boolean;
+  error?: string;
+  observedAt: string;
+}) {
+  await enabledBinding(input);
+  if (!/^[0-9a-f-]{36}$/iu.test(input.requestId)) invalid("Invalid update request ID");
+  if ((input.error?.length ?? 0) > 2_000) invalid("Update error is too long");
+  const status = await executionWorkerUpdateStatus(input.db, {
+    deviceId: input.principal.deviceId,
+    requestId: input.requestId,
+    observedAt: input.observedAt,
+  });
+  if (!status?.request.requiresRuntimeAck) return invalid("Not a sandbox runtime update");
+  const terminalStatus = input.cancel ? "cancelled" : "completed";
+  if (status.request.status === terminalStatus) return {};
+  if (status.request.status !== "requested") invalid("Update is already finished");
+  if (!input.cancel) {
+    if (!status.ready || status.activeWorkCount !== 0) invalid("Update handoff is not ready");
+    const runtimes = await workerUpdateRuntimes(input.db, input.principal.deviceId);
+    if (runtimes.length === 0 || runtimes.some(({ runtime, lastHeartbeatAt }) => {
+      const version = runtime.versions.briar;
+      return runtime.updateRequestId !== input.requestId ||
+        lastHeartbeatAt < (status.request.handoffCompletedAt ?? status.request.requestedAt) ||
+        !version || !isSemanticVersion(version) ||
+        compareSemanticVersions(version, status.request.targetVersion) < 0 ||
+        !runtime.providerHealth.some((provider) => provider.healthy);
+    })) invalid("Every sandbox worker must report the new healthy runtime first");
+  }
+  await input.db.prepare(
+    `update briar_execution_worker_update_requests
+     set status = ?, handoff_error = ?, completed_at = ?, updated_at = ?,
+         handoff_state = case when ? then 'failed' else handoff_state end
+     where id = ? and device_id = ? and status = 'requested'`,
+  ).bind(
+    terminalStatus, input.error ?? null, input.observedAt, input.observedAt, input.cancel && Boolean(input.error) ? 1 : 0,
+    input.requestId, input.principal.deviceId,
+  ).run();
+  return {};
 }
 
 export async function failWorkerUpdateHandoffApplication(input: {
@@ -186,7 +254,7 @@ export async function heartbeatWorkerApplication(input: {
     input.observedAt,
     pendingBeforeHeartbeat,
   );
-  const updateIsPending = updateDirective !== null;
+  const updateIsPending = updateDirective !== null && updateDirective.handoffState !== "idle";
   const updateFailed = updateDirective?.handoffState === "failed";
   const worker = await recordWorkerHeartbeat(input.db, binding.project_id, {
     workerId: input.workerId,

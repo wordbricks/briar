@@ -77,6 +77,7 @@ const desktopFiles = Object.fromEntries(
 );
 
 const assets = {
+  runtimePublicKey: await readFile(resolve(managedDirectory, "runtime-updater.pub"), "utf8"),
   bunVersion: requiredLock("BUN_VERSION"),
   nodeVersion: requiredLock("NODE_VERSION"),
   /**

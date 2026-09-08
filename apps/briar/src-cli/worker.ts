@@ -138,6 +138,7 @@ export type WorkerLoopDependencies<Issue extends ClaimedIssue = ClaimedIssue> = 
     requestId: string,
     checkpoint: WorkerExecutionCheckpoint,
   ) => Promise<void>;
+  drained?: (requestId: string) => Promise<void>;
   /**
    * Wait, returning early when `signal` aborts. The lease-renewal wait must be
    * interruptible: otherwise a finished issue still holds the loop for a full
@@ -356,6 +357,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     Promise<{ issue: Issue; error: unknown | null; handedOff: boolean; steered?: boolean }>
   >();
   const activeControllers = new Map<string, AbortController>();
+  const atomicLearningControllers = new Set<AbortController>();
   let activeSlotCount = 0;
   let updateDirective: WorkerLoopUpdateDirective | null = null;
   const serialTails = new Map<string, Promise<void>>();
@@ -390,9 +392,14 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     if (heartbeat && heartbeat.updateDirective !== undefined) {
       updateDirective = heartbeat.updateDirective;
     }
+    if (updateDirective?.handoffState === "idle") updateDirective = null;
     if (updateDirective) {
       acceptingWork = false;
       for (const controller of activeControllers.values()) {
+        // Memory learning commits a budgeted proposer/verifier transaction. It has
+        // no resumable provider conversation; finish this bounded system job instead
+        // of replaying a charged call. The updater cancels if draining exceeds 120s.
+        if (atomicLearningControllers.has(controller)) continue;
         if (!controller.signal.aborted) {
           controller.abort(new WorkerUpdateDrainError());
         }
@@ -473,6 +480,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     const execution = new AbortController();
     const key = executionKey(issue);
     activeControllers.set(key, execution);
+    if (issue.workType === "dmMemory") atomicLearningControllers.add(execution);
     let checkpoint: WorkerExecutionCheckpoint = {};
     const leaseRenewal: LeaseRenewalState = { failure: null };
     const renewalLoop = (async () => {
@@ -578,6 +586,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       execution.abort();
       await renewalLoop;
       activeControllers.delete(key);
+      atomicLearningControllers.delete(execution);
     }
   };
 
@@ -604,6 +613,11 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     active.set(executionKey(issue), execution);
   };
 
+  const acknowledgeDrained = async () => {
+    if (updateDirective && updateDirective.handoffState !== "failed") {
+      await dependencies.drained?.(updateDirective.id);
+    }
+  };
   while (processed < maxIssues) {
     let queueWasEmpty = false;
     let emptyQueueDelayMs = idleDelayMs;
@@ -646,6 +660,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         await reportState();
       }
       if (!acceptingWork && active.size === 0) {
+        await acknowledgeDrained();
         queueWasEmpty = true;
         consecutiveEmptyClaims += 1;
         emptyQueueDelayMs = idleDelayWithBackoffMs(

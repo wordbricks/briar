@@ -16,6 +16,7 @@ export function supportsRemoteWorkerUpdates(
   environment: NodeJS.ProcessEnv = process.env,
 ): boolean {
   if (operatingSystem === "darwin") return true;
+  if (operatingSystem === "linux" && environment.BRIAR_SANDBOX_UPDATER === "1") return true;
   const updater = environment.BRIAR_MANAGED_RUNTIME_UPDATER?.trim() ?? "";
   return operatingSystem === "linux" && isAbsolute(updater);
 }
@@ -45,6 +46,14 @@ export function workerUpdateLaunch(
     return {
       command: "/usr/bin/open",
       args: [workerUpdateDeepLink(directive)],
+    };
+  }
+  if (operatingSystem === "linux" && environment.BRIAR_SANDBOX_UPDATER === "1" &&
+    isAbsolute(environment.BRIAR_CLI ?? "") && updateRequestIdPattern.test(directive.id) &&
+    versionPattern.test(directive.targetVersion)) {
+    return {
+      command: environment.BRIAR_CLI!,
+      args: ["sandbox", "request-update", "--request-id", directive.id, "--target-version", directive.targetVersion],
     };
   }
   const updater = environment.BRIAR_MANAGED_RUNTIME_UPDATER?.trim() ?? "";

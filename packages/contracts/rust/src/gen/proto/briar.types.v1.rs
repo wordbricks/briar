@@ -8494,6 +8494,8 @@ pub struct RemoteUpdateCapability {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub supported: bool,
+    /// 1: desktop/managed release. 2: sandbox runtime and provider updates.
+    ///
     /// Field 2: `protocol`
     #[serde(
         rename = "protocol",
@@ -9775,6 +9777,15 @@ pub struct WorkerRuntimeAdvertisement {
         ::buffa::alloc::string::String,
         ::buffa::alloc::string::String,
     >,
+    /// Set only by a worker started from a staged sandbox runtime.
+    ///
+    /// Field 6: `update_request_id`
+    #[serde(
+        rename = "updateRequestId",
+        alias = "update_request_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub update_request_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9786,6 +9797,7 @@ impl ::core::fmt::Debug for WorkerRuntimeAdvertisement {
             .field("provider_health", &self.provider_health)
             .field("capabilities", &self.capabilities)
             .field("versions", &self.versions)
+            .field("update_request_id", &self.update_request_id)
             .finish()
     }
 }
@@ -9795,6 +9807,18 @@ impl WorkerRuntimeAdvertisement {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.types.v1.WorkerRuntimeAdvertisement";
+}
+impl WorkerRuntimeAdvertisement {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::update_request_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_update_request_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.update_request_id = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(WorkerRuntimeAdvertisement);
 impl ::buffa::MessageName for WorkerRuntimeAdvertisement {
@@ -9844,6 +9868,9 @@ impl ::buffa::Message for WorkerRuntimeAdvertisement {
                 ::buffa::map_codec::Str,
                 _,
             >(&self.versions, 1u64);
+        if let Some(ref v) = self.update_request_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -9881,6 +9908,9 @@ impl ::buffa::Message for WorkerRuntimeAdvertisement {
             ::buffa::map_codec::Str,
             _,
         >(&self.versions, 5u32, buf);
+        if let Some(ref v) = self.update_request_id {
+            ::buffa::types::put_string_field(6u32, v, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -9937,6 +9967,18 @@ impl ::buffa::Message for WorkerRuntimeAdvertisement {
                     _,
                 >(&mut self.versions, buf, ctx)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .update_request_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9949,6 +9991,7 @@ impl ::buffa::Message for WorkerRuntimeAdvertisement {
         self.provider_health.clear();
         self.capabilities = ::buffa::MessageField::none();
         self.versions.clear();
+        self.update_request_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -24584,6 +24627,8 @@ pub mod __buffa {
         pub struct RemoteUpdateCapabilityView<'a> {
             /// Field 1: `supported`
             pub supported: bool,
+            /// 1: desktop/managed release. 2: sandbox runtime and provider updates.
+            ///
             /// Field 2: `protocol`
             pub protocol: ::core::option::Option<u32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -24833,6 +24878,8 @@ pub mod __buffa {
             pub fn supported(&self) -> bool {
                 self.0.reborrow().supported
             }
+            /// 1: desktop/managed release. 2: sandbox runtime and provider updates.
+            ///
             /// Field 2: `protocol`
             #[must_use]
             pub fn protocol(&self) -> ::core::option::Option<u32> {
@@ -26702,6 +26749,10 @@ pub mod __buffa {
             >,
             /// Field 5: `versions` (map)
             pub versions: ::buffa::MapView<'a, &'a str, &'a str>,
+            /// Set only by a worker started from a staged sandbox runtime.
+            ///
+            /// Field 6: `update_request_id`
+            pub update_request_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for WorkerRuntimeAdvertisementView<'a> {
@@ -26769,6 +26820,15 @@ pub mod __buffa {
                                 );
                             }
                         }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.update_request_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -26882,6 +26942,7 @@ pub mod __buffa {
                         .iter()
                         .map(|(k, v)| (k.to_string(), v.to_string()))
                         .collect(),
+                    update_request_id: self.update_request_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -26926,6 +26987,9 @@ pub mod __buffa {
                     size
                         += 1u64 + ::buffa::encoding::varint_len(entry_size) as u64
                             + entry_size;
+                }
+                if let Some(ref v) = self.update_request_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
@@ -26983,6 +27047,9 @@ pub mod __buffa {
                         .encode(buf);
                     ::buffa::types::encode_string(v, buf);
                 }
+                if let Some(ref v) = self.update_request_id {
+                    ::buffa::types::put_string_field(6u32, v, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -27039,6 +27106,9 @@ pub mod __buffa {
                         }
                     }
                     __map.serialize_entry("versions", &_WM(&self.versions))?;
+                }
+                if let ::core::option::Option::Some(__v) = self.update_request_id {
+                    __map.serialize_entry("updateRequestId", __v)?;
                 }
                 __map.end()
             }
@@ -27169,6 +27239,13 @@ pub mod __buffa {
             #[must_use]
             pub fn versions(&self) -> &::buffa::MapView<'_, &'_ str, &'_ str> {
                 &self.0.reborrow().versions
+            }
+            /// Set only by a worker started from a staged sandbox runtime.
+            ///
+            /// Field 6: `update_request_id`
+            #[must_use]
+            pub fn update_request_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().update_request_id
             }
         }
         impl ::core::convert::From<

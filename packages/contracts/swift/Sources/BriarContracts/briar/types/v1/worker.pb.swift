@@ -128,6 +128,7 @@ public nonisolated struct BriarTypes_RemoteUpdateCapability: Sendable {
 
   public var supported: Bool = false
 
+  /// 1: desktop/managed release. 2: sandbox runtime and provider updates.
   public var `protocol`: UInt32 {
     get {_protocol ?? 0}
     set {_protocol = newValue}
@@ -320,11 +321,22 @@ public nonisolated struct BriarTypes_WorkerRuntimeAdvertisement: Sendable {
 
   public var versions: Dictionary<String,String> = [:]
 
+  /// Set only by a worker started from a staged sandbox runtime.
+  public var updateRequestID: String {
+    get {_updateRequestID ?? String()}
+    set {_updateRequestID = newValue}
+  }
+  /// Returns true if `updateRequestID` has been explicitly set.
+  public var hasUpdateRequestID: Bool {self._updateRequestID != nil}
+  /// Clears the value of `updateRequestID`. Subsequent reads from it will return its default value.
+  public mutating func clearUpdateRequestID() {self._updateRequestID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _capabilities: BriarTypes_WorkerCapabilities? = nil
+  fileprivate var _updateRequestID: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -801,7 +813,7 @@ nonisolated extension BriarTypes_DmMemoryLearningCapability: SwiftProtobuf.Messa
 
 nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WorkerRuntimeAdvertisement"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_provider\0\u{4}\u{2}provider_health\0\u{1}capabilities\0\u{1}versions\0\u{b}providers\0\u{c}\u{2}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_provider\0\u{4}\u{2}provider_health\0\u{1}capabilities\0\u{1}versions\0\u{3}update_request_id\0\u{b}providers\0\u{c}\u{2}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -813,6 +825,7 @@ nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Messa
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.providerHealth) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._capabilities) }()
       case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.versions) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._updateRequestID) }()
       default: break
       }
     }
@@ -835,6 +848,9 @@ nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Messa
     if !self.versions.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.versions, fieldNumber: 5)
     }
+    try { if let v = self._updateRequestID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -843,6 +859,7 @@ nonisolated extension BriarTypes_WorkerRuntimeAdvertisement: SwiftProtobuf.Messa
     if lhs.providerHealth != rhs.providerHealth {return false}
     if lhs._capabilities != rhs._capabilities {return false}
     if lhs.versions != rhs.versions {return false}
+    if lhs._updateRequestID != rhs._updateRequestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

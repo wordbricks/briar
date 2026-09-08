@@ -91,6 +91,7 @@ export type SandboxCliRelease = {
 };
 
 export type SandboxRuntimeAssets = {
+  readonly runtimePublicKey: string;
   readonly bunVersion: string;
   readonly nodeVersion: string;
   readonly opencodeCli: SandboxCliRelease;
@@ -151,7 +152,7 @@ RUN if [ "$DEBIAN_MIRROR" != "deb.debian.org" ]; then \\
   && apt-get update \\
   && apt-get install -y --no-install-recommends \\
     build-essential ca-certificates curl git jq libssl-dev openssh-client \\
-    pkg-config procps python3 unzip xz-utils \\
+    minisign pkg-config procps python3 unzip xz-utils \\
   && rm -rf /var/lib/apt/lists/*
 RUN set -eu; \\
   case "$TARGETARCH" in \\
@@ -253,6 +254,7 @@ ENV HOME=${SANDBOX_HOME} \\
   BRIAR_CLI=${SANDBOX_CLI_PATH} \\
   BRIAR_CONFIG_HOME=${SANDBOX_CONFIG_HOME} \\
   BRIAR_SANDBOX=1 \\
+  BRIAR_SANDBOX_UPDATER=1 \\
   BRIAR_COMPUTER_USE_WINDOW_SUPERVISOR=process \\
   GH_BROWSER=${SANDBOX_RUNTIME_ROOT}/bin/briar-open-browser \\
   PATH=${SANDBOX_RUNTIME_ROOT}/bin:${SANDBOX_HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin

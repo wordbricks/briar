@@ -16,6 +16,7 @@ export type WorkerRuntimeInput = {
   }>>;
   readonly providerCapabilities: AgentProviderCapabilityCatalog;
   readonly versions: Readonly<Record<string, string>>;
+  readonly updateRequestId?: string;
   readonly worktrees: boolean;
   readonly remoteUpdates?: {
     readonly supported: boolean;
@@ -44,6 +45,7 @@ export type WorkerRuntimeInput = {
 
 export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
   create(WorkerRuntimeAdvertisementSchema, {
+    updateRequestId: input.updateRequestId,
     agentProvider: protoAgentProvider[input.agentProvider],
     providerHealth: agentProviders.map((provider) => ({
       provider: protoAgentProvider[provider],

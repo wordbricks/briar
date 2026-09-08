@@ -57,8 +57,13 @@ export function workerRemoteUpdateSupported(worker: ExecutionWorker): boolean {
   };
   return (
     capabilities.remoteUpdates?.supported === true &&
-    capabilities.remoteUpdates.protocol === 1
+    (capabilities.remoteUpdates.protocol === 1 || capabilities.remoteUpdates.protocol === 2)
   );
+}
+
+export function workerSandboxUpdateSupported(worker: ExecutionWorker): boolean {
+  const capabilities = worker.capabilities as { remoteUpdates?: { supported?: unknown; protocol?: unknown } };
+  return capabilities.remoteUpdates?.supported === true && capabilities.remoteUpdates.protocol === 2;
 }
 
 export function workerUpdateAvailable({
@@ -388,7 +393,7 @@ export function WorkerStatusBar({
                 workerRemoteUpdateSupported(worker);
               const updateRequest = deviceState?.updateRequest ?? null;
               const updateFailed = updateRequest?.handoffState === "failed";
-              const updateAvailable = workerUpdateAvailable({
+              const updateAvailable = workerSandboxUpdateSupported(worker) || workerUpdateAvailable({
                 currentVersion,
                 latestVersion,
               });

@@ -51,6 +51,7 @@ struct AuthenticatedMobileServices: Sendable {
     let agent: any BriarAPI_AgentServiceClientInterface
     let realtime: any BriarAPI_RealtimeServiceClientInterface
     let preparedUploadClient: any PreparedUploadClientProtocol
+    let fleet: (any BriarAPI_FleetServiceClientInterface)?
 
     init(
         account: any BriarAPI_AccountServiceClientInterface,
@@ -62,7 +63,8 @@ struct AuthenticatedMobileServices: Sendable {
         dmMemory: any BriarAPI_DmMemoryServiceClientInterface,
         agent: any BriarAPI_AgentServiceClientInterface,
         realtime: any BriarAPI_RealtimeServiceClientInterface,
-        preparedUploadClient: any PreparedUploadClientProtocol
+        preparedUploadClient: any PreparedUploadClientProtocol,
+        fleet: (any BriarAPI_FleetServiceClientInterface)? = nil
     ) {
         self.account = account
         self.team = team
@@ -74,6 +76,7 @@ struct AuthenticatedMobileServices: Sendable {
         self.agent = agent
         self.realtime = realtime
         self.preparedUploadClient = preparedUploadClient
+        self.fleet = fleet
     }
 
     init(baseURL: URL, session: URLSession, token: String) {
@@ -96,6 +99,7 @@ struct AuthenticatedMobileServices: Sendable {
         dmMemory = BriarAPI_DmMemoryServiceClient(client: protocolClient)
         agent = BriarAPI_AgentServiceClient(client: protocolClient)
         realtime = BriarAPI_RealtimeServiceClient(client: protocolClient)
+        fleet = BriarAPI_FleetServiceClient(client: protocolClient)
         preparedUploadClient = PreparedUploadHTTPClient(baseURL: baseURL, session: session)
     }
 }
@@ -572,12 +576,20 @@ extension DashboardWorker {
                 ? nil
                 : try coreProvider(message.agentProvider),
             providers: try message.providers.map(coreProvider),
-            capabilities: .init(providerCapabilities: providerCapabilities),
+            capabilities: .init(
+                providerCapabilities: providerCapabilities,
+                remoteUpdates: message.capabilities.hasRemoteUpdates ? .init(
+                    supported: message.capabilities.remoteUpdates.supported,
+                    protocolVersion: Int(message.capabilities.remoteUpdates.protocol)
+                ) : nil
+            ),
             readiness: try coreWorkerReadiness(message.readiness),
             acceptingWork: message.acceptingWork,
             readinessDetail: message.hasReadinessDetail ? message.readinessDetail : nil,
             activeSessions: try coreSafeInt(message.activeSessions),
-            availableSessions: try coreSafeInt(message.availableSessions)
+            availableSessions: try coreSafeInt(message.availableSessions),
+            deviceId: message.deviceID,
+            versions: message.versions
         )
     }
 }

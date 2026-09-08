@@ -60,6 +60,9 @@ export async function claimNextQueuedHuntRun(
        where id = (
          select id from briar_hunt_runs
          where project_id = ?
+           and not exists (select 1 from briar_worker_update_reservations reservation
+             where reservation.work_type = 'issue' and reservation.work_id = briar_hunt_runs.id
+               and reservation.device_id is not ?)
            and (
              status = 'queued'
              or (
@@ -178,6 +181,7 @@ export async function claimNextQueuedHuntRun(
              ), 0)
            )
          order by
+           planned_update_resume desc,
            case when resume_requested_at is not null then 0 else 1 end,
            case when priority is null then 1 else 0 end,
            priority asc,
@@ -196,6 +200,7 @@ export async function claimNextQueuedHuntRun(
       input.workerId ?? null,
       input.claimedAt,
       projectId,
+      input.workerDeviceId ?? null,
       input.claimedAt,
       input.runId ?? null,
       input.runId ?? null,
