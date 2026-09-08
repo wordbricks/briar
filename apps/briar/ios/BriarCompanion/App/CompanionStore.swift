@@ -892,7 +892,7 @@ final class RunDetailStore: ObservableObject {
                 guard expectedLifecycleRevision == self.lifecycleRevision else { return }
                 let evidence = try await Task.detached(priority: .userInitiated) {
                     let message = try response.briarValue()
-                    guard try issueUUID(message.runID) == runID else {
+                    guard try issueUUID(message.runID) == self.runID else {
                         throw MobileAPIError.invalidResponse
                     }
                     _ = try issueSafeInt(message.attempt)
