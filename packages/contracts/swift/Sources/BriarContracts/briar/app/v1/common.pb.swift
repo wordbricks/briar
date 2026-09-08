@@ -139,6 +139,7 @@ public nonisolated enum BriarAPI_IssueDifficulty: SwiftProtobuf.Enum, Swift.Case
   case easy // = 1
   case normal // = 2
   case hard // = 3
+  case expert // = 4
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -151,6 +152,7 @@ public nonisolated enum BriarAPI_IssueDifficulty: SwiftProtobuf.Enum, Swift.Case
     case 1: self = .easy
     case 2: self = .normal
     case 3: self = .hard
+    case 4: self = .expert
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -161,6 +163,7 @@ public nonisolated enum BriarAPI_IssueDifficulty: SwiftProtobuf.Enum, Swift.Case
     case .easy: return 1
     case .normal: return 2
     case .hard: return 3
+    case .expert: return 4
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -171,6 +174,7 @@ public nonisolated enum BriarAPI_IssueDifficulty: SwiftProtobuf.Enum, Swift.Case
     .easy,
     .normal,
     .hard,
+    .expert,
   ]
 
 }
@@ -1457,7 +1461,7 @@ nonisolated extension BriarAPI_RunStatus: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension BriarAPI_IssueDifficulty: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ISSUE_DIFFICULTY_UNSPECIFIED\0\u{1}ISSUE_DIFFICULTY_EASY\0\u{1}ISSUE_DIFFICULTY_NORMAL\0\u{1}ISSUE_DIFFICULTY_HARD\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ISSUE_DIFFICULTY_UNSPECIFIED\0\u{1}ISSUE_DIFFICULTY_EASY\0\u{1}ISSUE_DIFFICULTY_NORMAL\0\u{1}ISSUE_DIFFICULTY_HARD\0\u{1}ISSUE_DIFFICULTY_EXPERT\0")
 }
 
 nonisolated extension BriarAPI_ProposalStatus: SwiftProtobuf._ProtoNameProviding {
