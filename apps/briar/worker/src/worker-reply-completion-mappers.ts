@@ -387,6 +387,7 @@ export type ChannelReplyCompletionInput = {
   claim: ReplyWireClaim & { replyKind: "channel"; organizationId: string };
   attachmentIds: string[];
   conversationId: string | null;
+  publishedFinalBatchId?: string | null;
   outcome:
     | { case: "failure"; error: string; block: ProviderBlock | null }
     | { case: "success"; completion: ChannelReplyCompletion };
@@ -409,6 +410,7 @@ export function completeChannelReplyInputFromProto(
       claim,
       attachmentIds: [],
       conversationId: null,
+      publishedFinalBatchId: null,
       outcome: {
         case: "failure",
         error: requiredText(failure.error, "Channel reply error", 4_000),
@@ -526,6 +528,12 @@ export function completeChannelReplyInputFromProto(
       "Channel reply conversation ID",
       1_024,
     ),
+    publishedFinalBatchId: success.publishedFinalBatchId
+      ? mapping(
+          () => canonicalUuid(success.publishedFinalBatchId!).toLowerCase(),
+          "Published final DM batch ID is invalid",
+        )
+      : null,
     outcome: { case: "success", completion },
   };
 }

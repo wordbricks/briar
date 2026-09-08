@@ -189,6 +189,177 @@ impl ::buffa::Enumeration for ReplyCompletionDisposition {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
+pub enum DmMessagePublicationKind {
+    DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED = 0i32,
+    DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE = 1i32,
+    DM_MESSAGE_PUBLICATION_KIND_FINAL = 2i32,
+}
+impl DmMessagePublicationKind {
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Intermediate: Self = Self::DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE;
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PUBLICATION_KIND_FINAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Final: Self = Self::DM_MESSAGE_PUBLICATION_KIND_FINAL;
+}
+impl ::core::default::Default for DmMessagePublicationKind {
+    fn default() -> Self {
+        Self::DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DmMessagePublicationKind {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DmMessagePublicationKind {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DmMessagePublicationKind;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(DmMessagePublicationKind)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DmMessagePublicationKind, E> {
+                <DmMessagePublicationKind as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DmMessagePublicationKind, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMessagePublicationKind as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DmMessagePublicationKind, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMessagePublicationKind as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DmMessagePublicationKind, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMessagePublicationKind {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DmMessagePublicationKind {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(
+                    Self::DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE,
+                )
+            }
+            2i32 => ::core::option::Option::Some(Self::DM_MESSAGE_PUBLICATION_KIND_FINAL),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED => {
+                "DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED"
+            }
+            Self::DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE => {
+                "DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE"
+            }
+            Self::DM_MESSAGE_PUBLICATION_KIND_FINAL => {
+                "DM_MESSAGE_PUBLICATION_KIND_FINAL"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED,
+                )
+            }
+            "DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE" => {
+                ::core::option::Option::Some(
+                    Self::DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE,
+                )
+            }
+            "DM_MESSAGE_PUBLICATION_KIND_FINAL" => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PUBLICATION_KIND_FINAL)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED,
+            Self::DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE,
+            Self::DM_MESSAGE_PUBLICATION_KIND_FINAL,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
 pub enum DmMemoryLearningStage {
     DM_MEMORY_LEARNING_STAGE_UNSPECIFIED = 0i32,
     DM_MEMORY_LEARNING_STAGE_PROPOSING = 1i32,
@@ -17595,6 +17766,16 @@ pub struct ChannelReplySuccess {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub acknowledgement_reaction: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The FINAL batch already published for this reply. Completion verifies the
+    /// receipt and does not create a duplicate message.
+    ///
+    /// Field 7: `published_final_batch_id`
+    #[serde(
+        rename = "publishedFinalBatchId",
+        alias = "published_final_batch_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub published_final_batch_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(flatten)]
     pub action: ::core::option::Option<__buffa::oneof::channel_reply_success::Action>,
     #[serde(skip)]
@@ -17610,6 +17791,7 @@ impl ::core::fmt::Debug for ChannelReplySuccess {
             .field("memory_citations", &self.memory_citations)
             .field("memory_save_request", &self.memory_save_request)
             .field("acknowledgement_reaction", &self.acknowledgement_reaction)
+            .field("published_final_batch_id", &self.published_final_batch_id)
             .field("action", &self.action)
             .finish()
     }
@@ -17640,6 +17822,16 @@ impl ChannelReplySuccess {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.acknowledgement_reaction = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::published_final_batch_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_published_final_batch_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.published_final_batch_id = Some(value.into());
         self
     }
 }
@@ -17694,6 +17886,9 @@ impl ::buffa::Message for ChannelReplySuccess {
                     + inner_size as u64;
         }
         if let Some(ref v) = self.acknowledgement_reaction {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.published_final_batch_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         if let ::core::option::Option::Some(ref v) = self.action {
@@ -17774,6 +17969,9 @@ impl ::buffa::Message for ChannelReplySuccess {
         }
         if let Some(ref v) = self.acknowledgement_reaction {
             ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        if let Some(ref v) = self.published_final_batch_id {
+            ::buffa::types::put_string_field(7u32, v, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.action {
             match v {
@@ -17890,6 +18088,18 @@ impl ::buffa::Message for ChannelReplySuccess {
                     buf,
                 )?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .published_final_batch_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -17992,6 +18202,7 @@ impl ::buffa::Message for ChannelReplySuccess {
         self.memory_citations.clear();
         self.memory_save_request = ::buffa::MessageField::none();
         self.acknowledgement_reaction = ::core::option::Option::None;
+        self.published_final_batch_id = ::core::option::Option::None;
         self.action = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -18039,6 +18250,9 @@ impl<'de> serde::Deserialize<'de> for ChannelReplySuccess {
                     >,
                 > = None;
                 let mut __f_acknowledgement_reaction: ::core::option::Option<
+                    ::core::option::Option<::buffa::alloc::string::String>,
+                > = None;
+                let mut __f_published_final_batch_id: ::core::option::Option<
                     ::core::option::Option<::buffa::alloc::string::String>,
                 > = None;
                 let mut __oneof_action: ::core::option::Option<
@@ -18129,6 +18343,14 @@ impl<'de> serde::Deserialize<'de> for ChannelReplySuccess {
                         }
                         "acknowledgementReaction" | "acknowledgement_reaction" => {
                             __f_acknowledgement_reaction = Some(
+                                map
+                                    .next_value::<
+                                        ::core::option::Option<::buffa::alloc::string::String>,
+                                    >()?,
+                            );
+                        }
+                        "publishedFinalBatchId" | "published_final_batch_id" => {
+                            __f_published_final_batch_id = Some(
                                 map
                                     .next_value::<
                                         ::core::option::Option<::buffa::alloc::string::String>,
@@ -18260,6 +18482,9 @@ impl<'de> serde::Deserialize<'de> for ChannelReplySuccess {
                 }
                 if let ::core::option::Option::Some(v) = __f_acknowledgement_reaction {
                     __r.acknowledgement_reaction = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_published_final_batch_id {
+                    __r.published_final_batch_id = v;
                 }
                 __r.action = __oneof_action;
                 Ok(__r)
@@ -18953,6 +19178,20 @@ pub struct CompleteChannelReplyResponse {
         ::buffa_types::google::protobuf::Timestamp,
         ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
     >,
+    /// Field 4: `final_batch_id`
+    #[serde(
+        rename = "finalBatchId",
+        alias = "final_batch_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub final_batch_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `final_message_id`
+    #[serde(
+        rename = "finalMessageId",
+        alias = "final_message_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub final_message_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -18963,6 +19202,8 @@ impl ::core::fmt::Debug for CompleteChannelReplyResponse {
             .field("replayed", &self.replayed)
             .field("disposition", &self.disposition)
             .field("retained_until", &self.retained_until)
+            .field("final_batch_id", &self.final_batch_id)
+            .field("final_message_id", &self.final_message_id)
             .finish()
     }
 }
@@ -18972,6 +19213,28 @@ impl CompleteChannelReplyResponse {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.CompleteChannelReplyResponse";
+}
+impl CompleteChannelReplyResponse {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::final_batch_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_final_batch_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.final_batch_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::final_message_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_final_message_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.final_message_id = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(CompleteChannelReplyResponse);
 impl ::buffa::MessageName for CompleteChannelReplyResponse {
@@ -19010,6 +19273,12 @@ impl ::buffa::Message for CompleteChannelReplyResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.final_batch_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.final_message_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -19036,6 +19305,12 @@ impl ::buffa::Message for CompleteChannelReplyResponse {
                 buf,
             );
             self.retained_until.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.final_batch_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.final_message_id {
+            ::buffa::types::put_string_field(5u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -19077,6 +19352,30 @@ impl ::buffa::Message for CompleteChannelReplyResponse {
                     ctx,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .final_batch_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .final_message_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -19088,6 +19387,8 @@ impl ::buffa::Message for CompleteChannelReplyResponse {
         self.replayed = false;
         self.disposition = ::buffa::EnumValue::from(0);
         self.retained_until = ::buffa::MessageField::none();
+        self.final_batch_id = ::core::option::Option::None;
+        self.final_message_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -19118,6 +19419,690 @@ pub const __COMPLETE_CHANNEL_REPLY_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
     type_url: "type.googleapis.com/briar.worker.v1.CompleteChannelReplyResponse",
     to_json: ::buffa::type_registry::any_to_json::<CompleteChannelReplyResponse>,
     from_json: ::buffa::type_registry::any_from_json::<CompleteChannelReplyResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DmPublicMessagePart {
+    /// Field 1: `body`
+    #[serde(
+        rename = "body",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub body: ::buffa::alloc::string::String,
+    /// Field 2: `purpose`
+    #[serde(
+        rename = "purpose",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub purpose: ::buffa::EnumValue<super::super::app::v1::DmMessagePurpose>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DmPublicMessagePart {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DmPublicMessagePart")
+            .field("body", &self.body)
+            .field("purpose", &self.purpose)
+            .finish()
+    }
+}
+impl DmPublicMessagePart {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.DmPublicMessagePart";
+}
+::buffa::impl_default_instance!(DmPublicMessagePart);
+impl ::buffa::MessageName for DmPublicMessagePart {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "DmPublicMessagePart";
+    const FULL_NAME: &'static str = "briar.worker.v1.DmPublicMessagePart";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.DmPublicMessagePart";
+}
+impl ::buffa::Message for DmPublicMessagePart {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.body.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.body) as u64;
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.body.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.body, buf);
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.body, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.purpose = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.body.clear();
+        self.purpose = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DmPublicMessagePart {
+    const PROTO_FQN: &'static str = "briar.worker.v1.DmPublicMessagePart";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmPublicMessagePart {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DM_PUBLIC_MESSAGE_PART_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.DmPublicMessagePart",
+    to_json: ::buffa::type_registry::any_to_json::<DmPublicMessagePart>,
+    from_json: ::buffa::type_registry::any_from_json::<DmPublicMessagePart>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PublishDmMessageBatchRequest {
+    /// Field 1: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Field 2: `project_id`
+    #[serde(
+        rename = "projectId",
+        alias = "project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub project_id: ::buffa::alloc::string::String,
+    /// Field 3: `worker_id`
+    #[serde(
+        rename = "workerId",
+        alias = "worker_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub worker_id: ::buffa::alloc::string::String,
+    /// Field 4: `work`
+    #[serde(
+        rename = "work",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub work: ::buffa::MessageField<
+        WorkClaimIdentity,
+        ::buffa::Inline<WorkClaimIdentity>,
+    >,
+    /// Field 5: `expected_input_revision`
+    #[serde(
+        rename = "expectedInputRevision",
+        alias = "expected_input_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub expected_input_revision: u64,
+    /// Field 6: `publication_kind`
+    #[serde(
+        rename = "publicationKind",
+        alias = "publication_kind",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub publication_kind: ::buffa::EnumValue<DmMessagePublicationKind>,
+    /// Field 7: `parts`
+    #[serde(
+        rename = "parts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub parts: ::buffa::alloc::vec::Vec<DmPublicMessagePart>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PublishDmMessageBatchRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PublishDmMessageBatchRequest")
+            .field("request_id", &self.request_id)
+            .field("project_id", &self.project_id)
+            .field("worker_id", &self.worker_id)
+            .field("work", &self.work)
+            .field("expected_input_revision", &self.expected_input_revision)
+            .field("publication_kind", &self.publication_kind)
+            .field("parts", &self.parts)
+            .finish()
+    }
+}
+impl PublishDmMessageBatchRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishDmMessageBatchRequest";
+}
+::buffa::impl_default_instance!(PublishDmMessageBatchRequest);
+impl ::buffa::MessageName for PublishDmMessageBatchRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "PublishDmMessageBatchRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.PublishDmMessageBatchRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishDmMessageBatchRequest";
+}
+impl ::buffa::Message for PublishDmMessageBatchRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.request_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.request_id) as u64;
+        }
+        if !self.project_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        }
+        if !self.worker_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+        }
+        if self.work.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.work.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.expected_input_revision != 0u64 {
+            size
+                += 1u64
+                    + ::buffa::types::uint64_encoded_len(self.expected_input_revision)
+                        as u64;
+        }
+        {
+            let val = self.publication_kind.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        for v in &self.parts {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        if !self.project_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.project_id, buf);
+        }
+        if !self.worker_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.worker_id, buf);
+        }
+        if self.work.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                4u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.work.write_to(__cache, buf);
+        }
+        if self.expected_input_revision != 0u64 {
+            ::buffa::types::put_uint64_field(5u32, self.expected_input_revision, buf);
+        }
+        {
+            let val = self.publication_kind.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(6u32, val, buf);
+            }
+        }
+        for v in &self.parts {
+            ::buffa::types::put_len_delimited_header(
+                7u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.worker_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.work.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.expected_input_revision = ::buffa::types::decode_uint64(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.publication_kind = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.parts.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.request_id.clear();
+        self.project_id.clear();
+        self.worker_id.clear();
+        self.work = ::buffa::MessageField::none();
+        self.expected_input_revision = 0u64;
+        self.publication_kind = ::buffa::EnumValue::from(0);
+        self.parts.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PublishDmMessageBatchRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.PublishDmMessageBatchRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PublishDmMessageBatchRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PUBLISH_DM_MESSAGE_BATCH_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.PublishDmMessageBatchRequest",
+    to_json: ::buffa::type_registry::any_to_json::<PublishDmMessageBatchRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<PublishDmMessageBatchRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PublishDmMessageBatchResponse {
+    /// Field 1: `batch_id`
+    #[serde(
+        rename = "batchId",
+        alias = "batch_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub batch_id: ::buffa::alloc::string::String,
+    /// Field 2: `message_ids`
+    #[serde(
+        rename = "messageIds",
+        alias = "message_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub message_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 3: `first_sequence`
+    #[serde(
+        rename = "firstSequence",
+        alias = "first_sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub first_sequence: u64,
+    /// Field 4: `last_sequence`
+    #[serde(
+        rename = "lastSequence",
+        alias = "last_sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub last_sequence: u64,
+    /// Field 5: `replayed`
+    #[serde(
+        rename = "replayed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub replayed: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PublishDmMessageBatchResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PublishDmMessageBatchResponse")
+            .field("batch_id", &self.batch_id)
+            .field("message_ids", &self.message_ids)
+            .field("first_sequence", &self.first_sequence)
+            .field("last_sequence", &self.last_sequence)
+            .field("replayed", &self.replayed)
+            .finish()
+    }
+}
+impl PublishDmMessageBatchResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishDmMessageBatchResponse";
+}
+::buffa::impl_default_instance!(PublishDmMessageBatchResponse);
+impl ::buffa::MessageName for PublishDmMessageBatchResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "PublishDmMessageBatchResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.PublishDmMessageBatchResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishDmMessageBatchResponse";
+}
+impl ::buffa::Message for PublishDmMessageBatchResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.batch_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.batch_id) as u64;
+        }
+        for v in &self.message_ids {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.first_sequence != 0u64 {
+            size
+                += 1u64 + ::buffa::types::uint64_encoded_len(self.first_sequence) as u64;
+        }
+        if self.last_sequence != 0u64 {
+            size += 1u64 + ::buffa::types::uint64_encoded_len(self.last_sequence) as u64;
+        }
+        if self.replayed {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.batch_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.batch_id, buf);
+        }
+        for v in &self.message_ids {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if self.first_sequence != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.first_sequence, buf);
+        }
+        if self.last_sequence != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.last_sequence, buf);
+        }
+        if self.replayed {
+            ::buffa::types::put_bool_field(5u32, self.replayed, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.batch_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.message_ids.push(__elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.first_sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.last_sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.replayed = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.batch_id.clear();
+        self.message_ids.clear();
+        self.first_sequence = 0u64;
+        self.last_sequence = 0u64;
+        self.replayed = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PublishDmMessageBatchResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.PublishDmMessageBatchResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PublishDmMessageBatchResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PUBLISH_DM_MESSAGE_BATCH_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.PublishDmMessageBatchResponse",
+    to_json: ::buffa::type_registry::any_to_json::<PublishDmMessageBatchResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<PublishDmMessageBatchResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -37825,6 +38810,38 @@ pub struct ClaimedChannelReply {
     pub pending_trigger_message_ids: ::buffa::alloc::vec::Vec<
         ::buffa::alloc::string::String,
     >,
+    /// The steer revision applied by this exact claim.
+    ///
+    /// Field 32: `input_revision`
+    #[serde(
+        rename = "inputRevision",
+        alias = "input_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub input_revision: u64,
+    /// Durable public output already committed by this job, including an earlier
+    /// claim attempt. Ordered by conversation sequence for recovery.
+    ///
+    /// Field 33: `published_message_batches`
+    #[serde(
+        rename = "publishedMessageBatches",
+        alias = "published_message_batches",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub published_message_batches: ::buffa::alloc::vec::Vec<PublishedDmMessageBatch>,
+    /// Explicit claim-scoped negotiation. Input revision zero is valid and cannot
+    /// distinguish an eligible initial DM from an ineligible channel reply.
+    ///
+    /// Field 34: `dm_public_message_protocol`
+    #[serde(
+        rename = "dmPublicMessageProtocol",
+        alias = "dm_public_message_protocol",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub dm_public_message_protocol: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -37866,6 +38883,9 @@ impl ::core::fmt::Debug for ClaimedChannelReply {
             .field("inbound_agent_message", &self.inbound_agent_message)
             .field("agent_message_hop", &self.agent_message_hop)
             .field("pending_trigger_message_ids", &self.pending_trigger_message_ids)
+            .field("input_revision", &self.input_revision)
+            .field("published_message_batches", &self.published_message_batches)
+            .field("dm_public_message_protocol", &self.dm_public_message_protocol)
             .finish()
     }
 }
@@ -38106,6 +39126,24 @@ impl ::buffa::Message for ClaimedChannelReply {
         for v in &self.pending_trigger_message_ids {
             size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if self.input_revision != 0u64 {
+            size
+                += 2u64 + ::buffa::types::uint64_encoded_len(self.input_revision) as u64;
+        }
+        for v in &self.published_message_batches {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.dm_public_message_protocol != 0u32 {
+            size
+                += 2u64
+                    + ::buffa::types::uint32_encoded_len(self.dm_public_message_protocol)
+                        as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -38296,6 +39334,24 @@ impl ::buffa::Message for ClaimedChannelReply {
         }
         for v in &self.pending_trigger_message_ids {
             ::buffa::types::put_string_field(31u32, v, buf);
+        }
+        if self.input_revision != 0u64 {
+            ::buffa::types::put_uint64_field(32u32, self.input_revision, buf);
+        }
+        for v in &self.published_message_batches {
+            ::buffa::types::put_len_delimited_header(
+                33u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if self.dm_public_message_protocol != 0u32 {
+            ::buffa::types::put_uint32_field(
+                34u32,
+                self.dm_public_message_protocol,
+                buf,
+            );
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -38610,6 +39666,32 @@ impl ::buffa::Message for ClaimedChannelReply {
                 )?;
                 self.pending_trigger_message_ids.push(__elem);
             }
+            32u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.input_revision = ::buffa::types::decode_uint64(buf)?;
+            }
+            33u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.published_message_batches.push(elem);
+            }
+            34u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.dm_public_message_protocol = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -38649,6 +39731,9 @@ impl ::buffa::Message for ClaimedChannelReply {
         self.inbound_agent_message = ::buffa::MessageField::none();
         self.agent_message_hop = 0u32;
         self.pending_trigger_message_ids.clear();
+        self.input_revision = 0u64;
+        self.published_message_batches.clear();
+        self.dm_public_message_protocol = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -38679,6 +39764,277 @@ pub const __CLAIMED_CHANNEL_REPLY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     type_url: "type.googleapis.com/briar.worker.v1.ClaimedChannelReply",
     to_json: ::buffa::type_registry::any_to_json::<ClaimedChannelReply>,
     from_json: ::buffa::type_registry::any_from_json::<ClaimedChannelReply>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PublishedDmMessageBatch {
+    /// Field 1: `batch_id`
+    #[serde(
+        rename = "batchId",
+        alias = "batch_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub batch_id: ::buffa::alloc::string::String,
+    /// Field 2: `message_ids`
+    #[serde(
+        rename = "messageIds",
+        alias = "message_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub message_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 3: `first_sequence`
+    #[serde(
+        rename = "firstSequence",
+        alias = "first_sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub first_sequence: u64,
+    /// Field 4: `last_sequence`
+    #[serde(
+        rename = "lastSequence",
+        alias = "last_sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub last_sequence: u64,
+    /// Field 5: `publication_kind`
+    #[serde(
+        rename = "publicationKind",
+        alias = "publication_kind",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub publication_kind: ::buffa::EnumValue<DmMessagePublicationKind>,
+    /// Field 6: `created_at`
+    #[serde(
+        rename = "createdAt",
+        alias = "created_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub created_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PublishedDmMessageBatch {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PublishedDmMessageBatch")
+            .field("batch_id", &self.batch_id)
+            .field("message_ids", &self.message_ids)
+            .field("first_sequence", &self.first_sequence)
+            .field("last_sequence", &self.last_sequence)
+            .field("publication_kind", &self.publication_kind)
+            .field("created_at", &self.created_at)
+            .finish()
+    }
+}
+impl PublishedDmMessageBatch {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishedDmMessageBatch";
+}
+::buffa::impl_default_instance!(PublishedDmMessageBatch);
+impl ::buffa::MessageName for PublishedDmMessageBatch {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "PublishedDmMessageBatch";
+    const FULL_NAME: &'static str = "briar.worker.v1.PublishedDmMessageBatch";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishedDmMessageBatch";
+}
+impl ::buffa::Message for PublishedDmMessageBatch {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.batch_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.batch_id) as u64;
+        }
+        for v in &self.message_ids {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.first_sequence != 0u64 {
+            size
+                += 1u64 + ::buffa::types::uint64_encoded_len(self.first_sequence) as u64;
+        }
+        if self.last_sequence != 0u64 {
+            size += 1u64 + ::buffa::types::uint64_encoded_len(self.last_sequence) as u64;
+        }
+        {
+            let val = self.publication_kind.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.created_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.created_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.batch_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.batch_id, buf);
+        }
+        for v in &self.message_ids {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if self.first_sequence != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.first_sequence, buf);
+        }
+        if self.last_sequence != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.last_sequence, buf);
+        }
+        {
+            let val = self.publication_kind.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
+        }
+        if self.created_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.created_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.batch_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.message_ids.push(__elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.first_sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.last_sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.publication_kind = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.created_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.batch_id.clear();
+        self.message_ids.clear();
+        self.first_sequence = 0u64;
+        self.last_sequence = 0u64;
+        self.publication_kind = ::buffa::EnumValue::from(0);
+        self.created_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PublishedDmMessageBatch {
+    const PROTO_FQN: &'static str = "briar.worker.v1.PublishedDmMessageBatch";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PublishedDmMessageBatch {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PUBLISHED_DM_MESSAGE_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.PublishedDmMessageBatch",
+    to_json: ::buffa::type_registry::any_to_json::<PublishedDmMessageBatch>,
+    from_json: ::buffa::type_registry::any_from_json::<PublishedDmMessageBatch>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -73863,6 +75219,11 @@ pub mod __buffa {
             ///
             /// Field 6: `acknowledgement_reaction`
             pub acknowledgement_reaction: ::core::option::Option<&'a str>,
+            /// The FINAL batch already published for this reply. Completion verifies the
+            /// receipt and does not create a duplicate message.
+            ///
+            /// Field 7: `published_final_batch_id`
+            pub published_final_batch_id: ::core::option::Option<&'a str>,
             pub action: ::core::option::Option<
                 super::super::__buffa::view::oneof::channel_reply_success::Action<'a>,
             >,
@@ -73947,6 +75308,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.acknowledgement_reaction = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.published_final_batch_id = Some(
                             ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
@@ -74167,6 +75537,9 @@ pub mod __buffa {
                     acknowledgement_reaction: self
                         .acknowledgement_reaction
                         .map(|s| s.to_string()),
+                    published_final_batch_id: self
+                        .published_final_batch_id
+                        .map(|s| s.to_string()),
                     action: match self.action.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
@@ -74259,6 +75632,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.acknowledgement_reaction {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if let Some(ref v) = self.published_final_batch_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 if let ::core::option::Option::Some(ref v) = self.action {
                     match v {
                         super::super::__buffa::view::oneof::channel_reply_success::Action::Artifacts(
@@ -74346,6 +75722,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.acknowledgement_reaction {
                     ::buffa::types::put_string_field(6u32, v, buf);
+                }
+                if let Some(ref v) = self.published_final_batch_id {
+                    ::buffa::types::put_string_field(7u32, v, buf);
                 }
                 if let ::core::option::Option::Some(ref v) = self.action {
                     match v {
@@ -74435,6 +75814,10 @@ pub mod __buffa {
                 if let ::core::option::Option::Some(__v) = self.acknowledgement_reaction
                 {
                     __map.serialize_entry("acknowledgementReaction", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.published_final_batch_id
+                {
+                    __map.serialize_entry("publishedFinalBatchId", __v)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.action {
                     match __ov {
@@ -74604,6 +75987,14 @@ pub mod __buffa {
             #[must_use]
             pub fn acknowledgement_reaction(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().acknowledgement_reaction
+            }
+            /// The FINAL batch already published for this reply. Completion verifies the
+            /// receipt and does not create a duplicate message.
+            ///
+            /// Field 7: `published_final_batch_id`
+            #[must_use]
+            pub fn published_final_batch_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().published_final_batch_id
             }
             /// Oneof `action`.
             #[must_use]
@@ -75533,6 +76924,10 @@ pub mod __buffa {
             pub retained_until: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Field 4: `final_batch_id`
+            pub final_batch_id: ::core::option::Option<&'a str>,
+            /// Field 5: `final_message_id`
+            pub final_message_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CompleteChannelReplyResponseView<'a> {
@@ -75608,6 +77003,24 @@ pub mod __buffa {
                             }
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.final_batch_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.final_message_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -75648,6 +77061,8 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    final_batch_id: self.final_batch_id.map(|s| s.to_string()),
+                    final_message_id: self.final_message_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -75679,6 +77094,12 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(ref v) = self.final_batch_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.final_message_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -75706,6 +77127,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.retained_until.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.final_batch_id {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                if let Some(ref v) = self.final_message_id {
+                    ::buffa::types::put_string_field(5u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -75743,6 +77170,12 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("retainedUntil", __v)?;
                     }
+                }
+                if let ::core::option::Option::Some(__v) = self.final_batch_id {
+                    __map.serialize_entry("finalBatchId", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.final_message_id {
+                    __map.serialize_entry("finalMessageId", __v)?;
                 }
                 __map.end()
             }
@@ -75868,6 +77301,16 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().retained_until
             }
+            /// Field 4: `final_batch_id`
+            #[must_use]
+            pub fn final_batch_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().final_batch_id
+            }
+            /// Field 5: `final_message_id`
+            #[must_use]
+            pub fn final_message_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().final_message_id
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<CompleteChannelReplyResponseView<'static>>,
@@ -75898,6 +77341,1238 @@ pub mod __buffa {
             type ViewHandle = CompleteChannelReplyResponseOwnedView;
         }
         impl ::serde::Serialize for CompleteChannelReplyResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct DmPublicMessagePartView<'a> {
+            /// Field 1: `body`
+            pub body: &'a str,
+            /// Field 2: `purpose`
+            pub purpose: ::buffa::EnumValue<
+                super::super::super::super::app::v1::DmMessagePurpose,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DmPublicMessagePartView<'a> {
+            type Owned = super::super::DmPublicMessagePart;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.body = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.purpose = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DmPublicMessagePart,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DmPublicMessagePart,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DmPublicMessagePart {
+                    body: self.body.to_string(),
+                    purpose: self.purpose,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DmPublicMessagePartView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.body.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.body) as u64;
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.body.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.body, buf);
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DmPublicMessagePartView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.body) {
+                    __map.serialize_entry("body", self.body)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.purpose,
+                ) {
+                    __map.serialize_entry("purpose", &self.purpose)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DmPublicMessagePartView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "DmPublicMessagePart";
+            const FULL_NAME: &'static str = "briar.worker.v1.DmPublicMessagePart";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.DmPublicMessagePart";
+        }
+        ::buffa::impl_default_view_instance!(DmPublicMessagePartView);
+        ::buffa::impl_view_reborrow!(DmPublicMessagePartView);
+        /** Self-contained, `'static` owned view of a `DmPublicMessagePart` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DmPublicMessagePartView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DmPublicMessagePartView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DmPublicMessagePartOwnedView(
+            ::buffa::OwnedView<DmPublicMessagePartView<'static>>,
+        );
+        impl DmPublicMessagePartOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmPublicMessagePartOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmPublicMessagePartOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DmPublicMessagePart,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmPublicMessagePartOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DmPublicMessagePartView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DmPublicMessagePartView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::DmPublicMessagePart {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `body`
+            #[must_use]
+            pub fn body(&self) -> &'_ str {
+                self.0.reborrow().body
+            }
+            /// Field 2: `purpose`
+            #[must_use]
+            pub fn purpose(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::app::v1::DmMessagePurpose,
+            > {
+                self.0.reborrow().purpose
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DmPublicMessagePartView<'static>>>
+        for DmPublicMessagePartOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DmPublicMessagePartView<'static>>,
+            ) -> Self {
+                DmPublicMessagePartOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DmPublicMessagePartOwnedView>
+        for ::buffa::OwnedView<DmPublicMessagePartView<'static>> {
+            fn from(wrapper: DmPublicMessagePartOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DmPublicMessagePartView<'static>>>
+        for DmPublicMessagePartOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DmPublicMessagePartView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DmPublicMessagePart {
+            type View<'a> = DmPublicMessagePartView<'a>;
+            type ViewHandle = DmPublicMessagePartOwnedView;
+        }
+        impl ::serde::Serialize for DmPublicMessagePartOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct PublishDmMessageBatchRequestView<'a> {
+            /// Field 1: `request_id`
+            pub request_id: &'a str,
+            /// Field 2: `project_id`
+            pub project_id: &'a str,
+            /// Field 3: `worker_id`
+            pub worker_id: &'a str,
+            /// Field 4: `work`
+            pub work: ::buffa::MessageFieldView<
+                super::super::__buffa::view::WorkClaimIdentityView<'a>,
+            >,
+            /// Field 5: `expected_input_revision`
+            pub expected_input_revision: u64,
+            /// Field 6: `publication_kind`
+            pub publication_kind: ::buffa::EnumValue<
+                super::super::DmMessagePublicationKind,
+            >,
+            /// Field 7: `parts`
+            pub parts: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DmPublicMessagePartView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PublishDmMessageBatchRequestView<'a> {
+            type Owned = super::super::PublishDmMessageBatchRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.worker_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.work.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.work = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::WorkClaimIdentityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.expected_input_revision = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.publication_kind = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::DmPublicMessagePartView,
+                            >(),
+                        )?;
+                        view.parts
+                            .push(
+                                <super::super::__buffa::view::DmPublicMessagePartView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PublishDmMessageBatchRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PublishDmMessageBatchRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PublishDmMessageBatchRequest {
+                    request_id: self.request_id.to_string(),
+                    project_id: self.project_id.to_string(),
+                    worker_id: self.worker_id.to_string(),
+                    work: match self.work.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::WorkClaimIdentity,
+                                ::buffa::Inline<super::super::WorkClaimIdentity>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    expected_input_revision: self.expected_input_revision,
+                    publication_kind: self.publication_kind,
+                    parts: self
+                        .parts
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PublishDmMessageBatchRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u64;
+                }
+                if !self.project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.project_id)
+                                as u64;
+                }
+                if !self.worker_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+                }
+                if self.work.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.work.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.expected_input_revision != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(
+                                self.expected_input_revision,
+                            ) as u64;
+                }
+                {
+                    let val = self.publication_kind.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                for v in &self.parts {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                if !self.project_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.project_id, buf);
+                }
+                if !self.worker_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.worker_id, buf);
+                }
+                if self.work.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.work.write_to(__cache, buf);
+                }
+                if self.expected_input_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        5u32,
+                        self.expected_input_revision,
+                        buf,
+                    );
+                }
+                {
+                    let val = self.publication_kind.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(6u32, val, buf);
+                    }
+                }
+                for v in &self.parts {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PublishDmMessageBatchRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
+                    __map.serialize_entry("projectId", self.project_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.worker_id) {
+                    __map.serialize_entry("workerId", self.worker_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.work.as_option() {
+                        __map.serialize_entry("work", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.expected_input_revision,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "expectedInputRevision",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.expected_input_revision,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.publication_kind,
+                ) {
+                    __map.serialize_entry("publicationKind", &self.publication_kind)?;
+                }
+                if !self.parts.is_empty() {
+                    __map.serialize_entry("parts", &*self.parts)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PublishDmMessageBatchRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "PublishDmMessageBatchRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.PublishDmMessageBatchRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishDmMessageBatchRequest";
+        }
+        ::buffa::impl_default_view_instance!(PublishDmMessageBatchRequestView);
+        ::buffa::impl_view_reborrow!(PublishDmMessageBatchRequestView);
+        /** Self-contained, `'static` owned view of a `PublishDmMessageBatchRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PublishDmMessageBatchRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PublishDmMessageBatchRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PublishDmMessageBatchRequestOwnedView(
+            ::buffa::OwnedView<PublishDmMessageBatchRequestView<'static>>,
+        );
+        impl PublishDmMessageBatchRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishDmMessageBatchRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishDmMessageBatchRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PublishDmMessageBatchRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishDmMessageBatchRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PublishDmMessageBatchRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PublishDmMessageBatchRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::PublishDmMessageBatchRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Field 2: `project_id`
+            #[must_use]
+            pub fn project_id(&self) -> &'_ str {
+                self.0.reborrow().project_id
+            }
+            /// Field 3: `worker_id`
+            #[must_use]
+            pub fn worker_id(&self) -> &'_ str {
+                self.0.reborrow().worker_id
+            }
+            /// Field 4: `work`
+            #[must_use]
+            pub fn work(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::WorkClaimIdentityView<'_>,
+            > {
+                &self.0.reborrow().work
+            }
+            /// Field 5: `expected_input_revision`
+            #[must_use]
+            pub fn expected_input_revision(&self) -> u64 {
+                self.0.reborrow().expected_input_revision
+            }
+            /// Field 6: `publication_kind`
+            #[must_use]
+            pub fn publication_kind(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::DmMessagePublicationKind> {
+                self.0.reborrow().publication_kind
+            }
+            /// Field 7: `parts`
+            #[must_use]
+            pub fn parts(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DmPublicMessagePartView<'_>,
+            > {
+                &self.0.reborrow().parts
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PublishDmMessageBatchRequestView<'static>>,
+        > for PublishDmMessageBatchRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PublishDmMessageBatchRequestView<'static>>,
+            ) -> Self {
+                PublishDmMessageBatchRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PublishDmMessageBatchRequestOwnedView>
+        for ::buffa::OwnedView<PublishDmMessageBatchRequestView<'static>> {
+            fn from(wrapper: PublishDmMessageBatchRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PublishDmMessageBatchRequestView<'static>>,
+        > for PublishDmMessageBatchRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PublishDmMessageBatchRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PublishDmMessageBatchRequest {
+            type View<'a> = PublishDmMessageBatchRequestView<'a>;
+            type ViewHandle = PublishDmMessageBatchRequestOwnedView;
+        }
+        impl ::serde::Serialize for PublishDmMessageBatchRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct PublishDmMessageBatchResponseView<'a> {
+            /// Field 1: `batch_id`
+            pub batch_id: &'a str,
+            /// Field 2: `message_ids`
+            pub message_ids: ::buffa::RepeatedView<'a, &'a str>,
+            /// Field 3: `first_sequence`
+            pub first_sequence: u64,
+            /// Field 4: `last_sequence`
+            pub last_sequence: u64,
+            /// Field 5: `replayed`
+            pub replayed: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PublishDmMessageBatchResponseView<'a> {
+            type Owned = super::super::PublishDmMessageBatchResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.batch_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.first_sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.last_sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.replayed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.message_ids.push(__elem);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PublishDmMessageBatchResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PublishDmMessageBatchResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PublishDmMessageBatchResponse {
+                    batch_id: self.batch_id.to_string(),
+                    message_ids: self
+                        .message_ids
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    first_sequence: self.first_sequence,
+                    last_sequence: self.last_sequence,
+                    replayed: self.replayed,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PublishDmMessageBatchResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.batch_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.batch_id) as u64;
+                }
+                for v in &self.message_ids {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.first_sequence != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.first_sequence)
+                                as u64;
+                }
+                if self.last_sequence != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.last_sequence)
+                                as u64;
+                }
+                if self.replayed {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.batch_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.batch_id, buf);
+                }
+                for v in &self.message_ids {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if self.first_sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.first_sequence, buf);
+                }
+                if self.last_sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.last_sequence, buf);
+                }
+                if self.replayed {
+                    ::buffa::types::put_bool_field(5u32, self.replayed, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PublishDmMessageBatchResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.batch_id) {
+                    __map.serialize_entry("batchId", self.batch_id)?;
+                }
+                if !self.message_ids.is_empty() {
+                    __map.serialize_entry("messageIds", &*self.message_ids)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.first_sequence) {
+                    __map
+                        .serialize_entry(
+                            "firstSequence",
+                            &::buffa::json_helpers::ProtoJson(&self.first_sequence),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.last_sequence) {
+                    __map
+                        .serialize_entry(
+                            "lastSequence",
+                            &::buffa::json_helpers::ProtoJson(&self.last_sequence),
+                        )?;
+                }
+                if self.replayed {
+                    __map.serialize_entry("replayed", &self.replayed)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PublishDmMessageBatchResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "PublishDmMessageBatchResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.PublishDmMessageBatchResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishDmMessageBatchResponse";
+        }
+        ::buffa::impl_default_view_instance!(PublishDmMessageBatchResponseView);
+        ::buffa::impl_view_reborrow!(PublishDmMessageBatchResponseView);
+        /** Self-contained, `'static` owned view of a `PublishDmMessageBatchResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PublishDmMessageBatchResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PublishDmMessageBatchResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PublishDmMessageBatchResponseOwnedView(
+            ::buffa::OwnedView<PublishDmMessageBatchResponseView<'static>>,
+        );
+        impl PublishDmMessageBatchResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishDmMessageBatchResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishDmMessageBatchResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PublishDmMessageBatchResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishDmMessageBatchResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PublishDmMessageBatchResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PublishDmMessageBatchResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::PublishDmMessageBatchResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `batch_id`
+            #[must_use]
+            pub fn batch_id(&self) -> &'_ str {
+                self.0.reborrow().batch_id
+            }
+            /// Field 2: `message_ids`
+            #[must_use]
+            pub fn message_ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().message_ids
+            }
+            /// Field 3: `first_sequence`
+            #[must_use]
+            pub fn first_sequence(&self) -> u64 {
+                self.0.reborrow().first_sequence
+            }
+            /// Field 4: `last_sequence`
+            #[must_use]
+            pub fn last_sequence(&self) -> u64 {
+                self.0.reborrow().last_sequence
+            }
+            /// Field 5: `replayed`
+            #[must_use]
+            pub fn replayed(&self) -> bool {
+                self.0.reborrow().replayed
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PublishDmMessageBatchResponseView<'static>>,
+        > for PublishDmMessageBatchResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PublishDmMessageBatchResponseView<'static>>,
+            ) -> Self {
+                PublishDmMessageBatchResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PublishDmMessageBatchResponseOwnedView>
+        for ::buffa::OwnedView<PublishDmMessageBatchResponseView<'static>> {
+            fn from(wrapper: PublishDmMessageBatchResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PublishDmMessageBatchResponseView<'static>>,
+        > for PublishDmMessageBatchResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PublishDmMessageBatchResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PublishDmMessageBatchResponse {
+            type View<'a> = PublishDmMessageBatchResponseView<'a>;
+            type ViewHandle = PublishDmMessageBatchResponseOwnedView;
+        }
+        impl ::serde::Serialize for PublishDmMessageBatchResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -108280,6 +110955,23 @@ pub mod __buffa {
             ///
             /// Field 31: `pending_trigger_message_ids`
             pub pending_trigger_message_ids: ::buffa::RepeatedView<'a, &'a str>,
+            /// The steer revision applied by this exact claim.
+            ///
+            /// Field 32: `input_revision`
+            pub input_revision: u64,
+            /// Durable public output already committed by this job, including an earlier
+            /// claim attempt. Ordered by conversation sequence for recovery.
+            ///
+            /// Field 33: `published_message_batches`
+            pub published_message_batches: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::PublishedDmMessageBatchView<'a>,
+            >,
+            /// Explicit claim-scoped negotiation. Input revision zero is valid and cannot
+            /// distinguish an eligible initial DM from an ineligible channel reply.
+            ///
+            /// Field 34: `dm_public_message_protocol`
+            pub dm_public_message_protocol: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ClaimedChannelReplyView<'a> {
@@ -108761,6 +111453,22 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    32u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.input_revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    34u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.dm_public_message_protocol = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
                     21u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -108831,6 +111539,26 @@ pub mod __buffa {
                             ::buffa::__private::element_footprint(&__elem),
                         )?;
                         view.pending_trigger_message_ids.push(__elem);
+                    }
+                    33u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::PublishedDmMessageBatchView,
+                            >(),
+                        )?;
+                        view.published_message_batches
+                            .push(
+                                <super::super::__buffa::view::PublishedDmMessageBatchView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -109028,6 +111756,13 @@ pub mod __buffa {
                         .iter()
                         .map(|s| s.to_string())
                         .collect(),
+                    input_revision: self.input_revision,
+                    published_message_batches: self
+                        .published_message_batches
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    dm_public_message_protocol: self.dm_public_message_protocol,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -109249,6 +111984,27 @@ pub mod __buffa {
                 for v in &self.pending_trigger_message_ids {
                     size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if self.input_revision != 0u64 {
+                    size
+                        += 2u64
+                            + ::buffa::types::uint64_encoded_len(self.input_revision)
+                                as u64;
+                }
+                for v in &self.published_message_batches {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.dm_public_message_protocol != 0u32 {
+                    size
+                        += 2u64
+                            + ::buffa::types::uint32_encoded_len(
+                                self.dm_public_message_protocol,
+                            ) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -109449,6 +112205,24 @@ pub mod __buffa {
                 for v in &self.pending_trigger_message_ids {
                     ::buffa::types::put_string_field(31u32, v, buf);
                 }
+                if self.input_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(32u32, self.input_revision, buf);
+                }
+                for v in &self.published_message_batches {
+                    ::buffa::types::put_len_delimited_header(
+                        33u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.dm_public_message_protocol != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        34u32,
+                        self.dm_public_message_protocol,
+                        buf,
+                    );
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -109647,6 +112421,31 @@ pub mod __buffa {
                         .serialize_entry(
                             "pendingTriggerMessageIds",
                             &*self.pending_trigger_message_ids,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.input_revision) {
+                    __map
+                        .serialize_entry(
+                            "inputRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.input_revision),
+                        )?;
+                }
+                if !self.published_message_batches.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "publishedMessageBatches",
+                            &*self.published_message_batches,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.dm_public_message_protocol,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "dmPublicMessageProtocol",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.dm_public_message_protocol,
+                            ),
                         )?;
                 }
                 __map.end()
@@ -109992,6 +112791,34 @@ pub mod __buffa {
             ) -> &::buffa::RepeatedView<'_, &'_ str> {
                 &self.0.reborrow().pending_trigger_message_ids
             }
+            /// The steer revision applied by this exact claim.
+            ///
+            /// Field 32: `input_revision`
+            #[must_use]
+            pub fn input_revision(&self) -> u64 {
+                self.0.reborrow().input_revision
+            }
+            /// Durable public output already committed by this job, including an earlier
+            /// claim attempt. Ordered by conversation sequence for recovery.
+            ///
+            /// Field 33: `published_message_batches`
+            #[must_use]
+            pub fn published_message_batches(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::PublishedDmMessageBatchView<'_>,
+            > {
+                &self.0.reborrow().published_message_batches
+            }
+            /// Explicit claim-scoped negotiation. Input revision zero is valid and cannot
+            /// distinguish an eligible initial DM from an ineligible channel reply.
+            ///
+            /// Field 34: `dm_public_message_protocol`
+            #[must_use]
+            pub fn dm_public_message_protocol(&self) -> u32 {
+                self.0.reborrow().dm_public_message_protocol
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<ClaimedChannelReplyView<'static>>>
         for ClaimedChannelReplyOwnedView {
@@ -110018,6 +112845,480 @@ pub mod __buffa {
             type ViewHandle = ClaimedChannelReplyOwnedView;
         }
         impl ::serde::Serialize for ClaimedChannelReplyOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct PublishedDmMessageBatchView<'a> {
+            /// Field 1: `batch_id`
+            pub batch_id: &'a str,
+            /// Field 2: `message_ids`
+            pub message_ids: ::buffa::RepeatedView<'a, &'a str>,
+            /// Field 3: `first_sequence`
+            pub first_sequence: u64,
+            /// Field 4: `last_sequence`
+            pub last_sequence: u64,
+            /// Field 5: `publication_kind`
+            pub publication_kind: ::buffa::EnumValue<
+                super::super::DmMessagePublicationKind,
+            >,
+            /// Field 6: `created_at`
+            pub created_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PublishedDmMessageBatchView<'a> {
+            type Owned = super::super::PublishedDmMessageBatch;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.batch_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.first_sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.last_sequence = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.publication_kind = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.created_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.created_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.message_ids.push(__elem);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PublishedDmMessageBatch,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PublishedDmMessageBatch,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PublishedDmMessageBatch {
+                    batch_id: self.batch_id.to_string(),
+                    message_ids: self
+                        .message_ids
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    first_sequence: self.first_sequence,
+                    last_sequence: self.last_sequence,
+                    publication_kind: self.publication_kind,
+                    created_at: match self.created_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PublishedDmMessageBatchView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.batch_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.batch_id) as u64;
+                }
+                for v in &self.message_ids {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.first_sequence != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.first_sequence)
+                                as u64;
+                }
+                if self.last_sequence != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(self.last_sequence)
+                                as u64;
+                }
+                {
+                    let val = self.publication_kind.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                if self.created_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.created_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.batch_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.batch_id, buf);
+                }
+                for v in &self.message_ids {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if self.first_sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.first_sequence, buf);
+                }
+                if self.last_sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.last_sequence, buf);
+                }
+                {
+                    let val = self.publication_kind.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
+                }
+                if self.created_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.created_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PublishedDmMessageBatchView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.batch_id) {
+                    __map.serialize_entry("batchId", self.batch_id)?;
+                }
+                if !self.message_ids.is_empty() {
+                    __map.serialize_entry("messageIds", &*self.message_ids)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.first_sequence) {
+                    __map
+                        .serialize_entry(
+                            "firstSequence",
+                            &::buffa::json_helpers::ProtoJson(&self.first_sequence),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.last_sequence) {
+                    __map
+                        .serialize_entry(
+                            "lastSequence",
+                            &::buffa::json_helpers::ProtoJson(&self.last_sequence),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.publication_kind,
+                ) {
+                    __map.serialize_entry("publicationKind", &self.publication_kind)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .created_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("createdAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PublishedDmMessageBatchView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "PublishedDmMessageBatch";
+            const FULL_NAME: &'static str = "briar.worker.v1.PublishedDmMessageBatch";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PublishedDmMessageBatch";
+        }
+        ::buffa::impl_default_view_instance!(PublishedDmMessageBatchView);
+        ::buffa::impl_view_reborrow!(PublishedDmMessageBatchView);
+        /** Self-contained, `'static` owned view of a `PublishedDmMessageBatch` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PublishedDmMessageBatchView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PublishedDmMessageBatchView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PublishedDmMessageBatchOwnedView(
+            ::buffa::OwnedView<PublishedDmMessageBatchView<'static>>,
+        );
+        impl PublishedDmMessageBatchOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishedDmMessageBatchOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishedDmMessageBatchOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PublishedDmMessageBatch,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PublishedDmMessageBatchOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PublishedDmMessageBatchView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PublishedDmMessageBatchView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::PublishedDmMessageBatch {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `batch_id`
+            #[must_use]
+            pub fn batch_id(&self) -> &'_ str {
+                self.0.reborrow().batch_id
+            }
+            /// Field 2: `message_ids`
+            #[must_use]
+            pub fn message_ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().message_ids
+            }
+            /// Field 3: `first_sequence`
+            #[must_use]
+            pub fn first_sequence(&self) -> u64 {
+                self.0.reborrow().first_sequence
+            }
+            /// Field 4: `last_sequence`
+            #[must_use]
+            pub fn last_sequence(&self) -> u64 {
+                self.0.reborrow().last_sequence
+            }
+            /// Field 5: `publication_kind`
+            #[must_use]
+            pub fn publication_kind(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::DmMessagePublicationKind> {
+                self.0.reborrow().publication_kind
+            }
+            /// Field 6: `created_at`
+            #[must_use]
+            pub fn created_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().created_at
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PublishedDmMessageBatchView<'static>>,
+        > for PublishedDmMessageBatchOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PublishedDmMessageBatchView<'static>>,
+            ) -> Self {
+                PublishedDmMessageBatchOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PublishedDmMessageBatchOwnedView>
+        for ::buffa::OwnedView<PublishedDmMessageBatchView<'static>> {
+            fn from(wrapper: PublishedDmMessageBatchOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PublishedDmMessageBatchView<'static>>,
+        > for PublishedDmMessageBatchOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PublishedDmMessageBatchView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PublishedDmMessageBatch {
+            type View<'a> = PublishedDmMessageBatchView<'a>;
+            type ViewHandle = PublishedDmMessageBatchOwnedView;
+        }
+        impl ::serde::Serialize for PublishedDmMessageBatchOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -130325,6 +133626,9 @@ pub mod __buffa {
         reg.register_json_any(super::__DM_MEMORY_SAVE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__COMPLETE_CHANNEL_REPLY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__COMPLETE_CHANNEL_REPLY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DM_PUBLIC_MESSAGE_PART_JSON_ANY);
+        reg.register_json_any(super::__PUBLISH_DM_MESSAGE_BATCH_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__PUBLISH_DM_MESSAGE_BATCH_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DM_MEMORY_CLAIM_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__CHECK_DM_MEMORY_CLAIM_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CHECK_DM_MEMORY_CLAIM_RESPONSE_JSON_ANY);
@@ -130424,6 +133728,7 @@ pub mod __buffa {
         reg.register_json_any(super::__CLAIMED_INBOUND_AGENT_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_REPLY_SESSION_JSON_ANY);
         reg.register_json_any(super::__CLAIMED_CHANNEL_REPLY_JSON_ANY);
+        reg.register_json_any(super::__PUBLISHED_DM_MESSAGE_BATCH_JSON_ANY);
         reg.register_json_any(super::__MERGE_BATCH_VALIDATION_RESULT_JSON_ANY);
         reg.register_json_any(super::__MERGE_BATCH_VALIDATION_RESULTS_JSON_ANY);
         reg.register_json_any(super::__MERGE_BATCH_JSON_ANY);
@@ -130752,6 +134057,18 @@ pub use self::__buffa::view::CompleteChannelReplyResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CompleteChannelReplyResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::DmPublicMessagePartView;
+#[doc(inline)]
+pub use self::__buffa::view::DmPublicMessagePartOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishDmMessageBatchRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishDmMessageBatchRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishDmMessageBatchResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishDmMessageBatchResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::DmMemoryClaimIdentityView;
 #[doc(inline)]
 pub use self::__buffa::view::DmMemoryClaimIdentityOwnedView;
@@ -131055,6 +134372,10 @@ pub use self::__buffa::view::ChannelReplySessionOwnedView;
 pub use self::__buffa::view::ClaimedChannelReplyView;
 #[doc(inline)]
 pub use self::__buffa::view::ClaimedChannelReplyOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishedDmMessageBatchView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishedDmMessageBatchOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::MergeBatchValidationResultView;
 #[doc(inline)]

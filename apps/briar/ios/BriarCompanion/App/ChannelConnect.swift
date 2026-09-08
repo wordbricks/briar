@@ -240,8 +240,40 @@ extension ChannelMessage {
                 : nil,
             subscribers: try message.subscribers.map { try IssueSubscriber(connectMessage: $0) },
             relay: message.hasRelay ? try Relay(connectMessage: message.relay) : nil,
+            dmMetadata: message.hasDmMetadata
+                ? try DmMetadata(connectMessage: message.dmMetadata)
+                : nil,
             createdAt: try channelDate(message.createdAt),
             deletedAt: try channelOptionalDate(message.deletedAt, present: message.hasDeletedAt)
+        )
+    }
+}
+
+extension ChannelMessage.DmMetadata {
+    init(connectMessage message: BriarAPI_DmMessageMetadata) throws {
+        guard !message.batchID.isEmpty,
+              let conversationSequence = Int(exactly: message.conversationSequence),
+              conversationSequence > 0,
+              message.partIndex < 8,
+              let partIndex = Int(exactly: message.partIndex)
+        else { throw MobileAPIError.invalidResponse }
+
+        let purpose: Purpose
+        switch message.purpose {
+        case .acknowledgement: purpose = .acknowledgement
+        case .progress: purpose = .progress
+        case .discovery: purpose = .discovery
+        case .question: purpose = .question
+        case .result: purpose = .result
+        case .conversation: purpose = .conversation
+        case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
+        }
+
+        self.init(
+            batchId: message.batchID,
+            partIndex: partIndex,
+            conversationSequence: conversationSequence,
+            purpose: purpose
         )
     }
 }

@@ -6,6 +6,7 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { sizeDelimitedDecodeStream } from "@bufbuild/protobuf/wire";
 import {
   type ComputerUseChildBinding,
+  type DmMessagePublicationBinding,
   ComputerUseChildBindingSchema,
   RunnerToParentSchema,
   SandboxMode,
@@ -101,6 +102,8 @@ export type DetachedProviderTurnInput = {
   runKind?: "parent" | "computerUse";
   computerUseBinding?: ComputerUseChildBinding;
   computerUseMcpServerPath?: string | null;
+  dmMessagePublicationBinding?: DmMessagePublicationBinding;
+  dmMessageMcpServerPath?: string | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   diagnosticContext?: DetachedProviderTurnDiagnosticContext;
@@ -370,6 +373,8 @@ async function executeDetachedProviderTurn(
     runKind: input.runKind,
     computerUseBinding: input.computerUseBinding,
     computerUseMcpServerPath: input.computerUseMcpServerPath,
+    dmMessagePublicationBinding: input.dmMessagePublicationBinding,
+    dmMessageMcpServerPath: input.dmMessageMcpServerPath,
     agentBinary,
   }).request;
   const requestFrame = encodeSidecarRunRequest(runnerRequest);

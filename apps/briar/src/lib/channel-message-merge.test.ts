@@ -7,6 +7,7 @@ import type { AgentSkillExecutionProposal } from "../types";
 import {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
+  sortChannelMessagesForDisplay,
 } from "./channel-message-merge";
 
 const execution = (
@@ -93,6 +94,76 @@ const skillExecution = (
 });
 
 describe("mergeChannelMessages", () => {
+  it("uses the server conversation sequence inside a durable DM span", () => {
+    const author = {
+      type: "agent",
+      id: "agent-1",
+      name: "Builder",
+      provider: "codex",
+      image: null,
+    } as const;
+    const second = {
+      ...message(null, null, "message-2"),
+      author,
+      createdAt: "2026-08-11T00:00:01.000Z",
+      dmMetadata: {
+        batchId: "batch-1",
+        partIndex: 1,
+        conversationSequence: 2,
+        purpose: "progress",
+      } as const,
+    };
+    const first = {
+      ...message(null, null, "message-1"),
+      author,
+      createdAt: "2026-08-11T00:00:02.000Z",
+      dmMetadata: {
+        batchId: "batch-1",
+        partIndex: 0,
+        conversationSequence: 1,
+        purpose: "acknowledgement",
+      } as const,
+    };
+
+    expect(sortChannelMessagesForDisplay([second, first]).map(({ id }) => id))
+      .toEqual(["message-1", "message-2"]);
+  });
+
+  it("does not move durable DM parts across a legacy message", () => {
+    const durable = (id: string, sequence: number, createdAt: string) => ({
+      ...message(null, null, id),
+      createdAt,
+      dmMetadata: {
+        batchId: "batch-1",
+        partIndex: sequence - 1,
+        conversationSequence: sequence,
+        purpose: "progress",
+      } as const,
+    });
+    const laterSequence = durable(
+      "durable-2",
+      2,
+      "2026-08-11T00:00:01.000Z",
+    );
+    const legacy = {
+      ...message(null, null, "legacy"),
+      createdAt: "2026-08-11T00:00:02.000Z",
+    };
+    const earlierSequence = durable(
+      "durable-1",
+      1,
+      "2026-08-11T00:00:03.000Z",
+    );
+
+    expect(
+      sortChannelMessagesForDisplay([
+        earlierSequence,
+        legacy,
+        laterSequence,
+      ]).map(({ id }) => id),
+    ).toEqual(["durable-2", "legacy", "durable-1"]);
+  });
+
   it("keeps a pending local message until the snapshot includes it", () => {
     const optimistic = { ...message(null), optimistic: true };
 

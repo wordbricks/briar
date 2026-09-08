@@ -5523,6 +5523,18 @@ button.issue-message-state { width:100%; cursor:pointer; }
   font-size: 14px;
   line-height: 1.55;
 }
+.channel-message.is-dm-batch-part { padding-bottom:3px; }
+.channel-message.is-dm-batch-middle,
+.channel-message.is-dm-batch-last { padding-top:2px; }
+.channel-message.is-dm-batch-last { padding-bottom:8px; }
+.channel-message.is-dm-batch-part .channel-message-body {
+  border-inline-start:2px solid color-mix(in srgb,var(--primary,#5943a4) 24%,transparent);
+  padding-inline-start:10px;
+}
+.channel-message.is-dm-batch-middle .channel-message-avatar,
+.channel-message.is-dm-batch-last .channel-message-avatar { visibility:hidden; }
+.channel-message.is-dm-batch-middle .channel-message-body > header,
+.channel-message.is-dm-batch-last .channel-message-body > header { display:none; }
 .channel-message:hover { background: color-mix(in srgb, var(--muted, #f7f4ef) 70%, transparent); }
 .issue-message.is-inbox-target,
 .channel-message.is-inbox-target,
@@ -6380,6 +6392,18 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .companion-channel-message-button { display: block; width: 100%; border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-align: left; }
 .companion-channel-message-button:active { background:var(--muted,#f2efe9); }
 .companion-channel-message { position: relative; min-width: 0; display:grid; grid-template-columns:42px minmax(0,1fr); align-items:start; gap:11px; padding: 11px max(16px,env(safe-area-inset-right)) 11px max(16px,env(safe-area-inset-left)); }
+.companion-channel-message.is-dm-batch-part { padding-bottom:3px; }
+.companion-channel-message.is-dm-batch-middle,
+.companion-channel-message.is-dm-batch-last { padding-top:2px; }
+.companion-channel-message.is-dm-batch-last { padding-bottom:11px; }
+.companion-channel-message.is-dm-batch-part .companion-channel-message-copy {
+  border-inline-start:2px solid color-mix(in srgb,var(--primary,#5943a4) 24%,transparent);
+  padding-inline-start:10px;
+}
+.companion-channel-message.is-dm-batch-middle > .companion-channel-avatar,
+.companion-channel-message.is-dm-batch-last > .companion-channel-avatar { visibility:hidden; }
+.companion-channel-message.is-dm-batch-middle .companion-channel-message-copy > header,
+.companion-channel-message.is-dm-batch-last .companion-channel-message-copy > header { display:none; }
 .companion-channel-message:hover .channel-message-actions,
 .companion-channel-message:focus-within .channel-message-actions,
 .companion-channel-message.is-reacting .channel-message-actions {

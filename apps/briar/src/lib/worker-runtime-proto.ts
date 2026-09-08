@@ -32,6 +32,10 @@ export type WorkerRuntimeInput = {
     readonly transports: ReadonlyArray<"agent" | "openrouter">;
     readonly providers: ReadonlyArray<AgentProvider>;
   };
+  readonly dmPublicMessages?: {
+    readonly protocol: 1;
+    readonly providers: ReadonlyArray<AgentProvider>;
+  };
   readonly computerUse?: {
     readonly protocol: 1;
     readonly transport: "connectrpc-resource-exec";
@@ -114,6 +118,14 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
             sharedDesktop: input.computerUse.sharedDesktop,
             humanTakeover: input.computerUse.humanTakeover,
             schemaDigest: input.computerUse.schemaDigest,
+          }
+        : undefined,
+      dmPublicMessages: input.dmPublicMessages
+        ? {
+            protocol: input.dmPublicMessages.protocol,
+            providers: input.dmPublicMessages.providers.map(
+              (provider) => protoAgentProvider[provider],
+            ),
           }
         : undefined,
     },

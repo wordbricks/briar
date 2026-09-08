@@ -831,6 +831,21 @@ export type ChannelMessageRelay = {
   status: "pending" | "completed" | "failed";
 };
 
+export type DmMessagePurpose =
+  | "acknowledgement"
+  | "progress"
+  | "discovery"
+  | "question"
+  | "result"
+  | "conversation";
+
+export type DmMessageMetadata = {
+  batchId: string;
+  partIndex: number;
+  conversationSequence: number;
+  purpose: DmMessagePurpose;
+};
+
 export type ChannelMessage = {
   id: string;
   channelId: string;
@@ -854,6 +869,8 @@ export type ChannelMessage = {
   skillExecutionProposal: ChannelSkillExecutionProposal | null;
   /** Set only on the two thread-side messages of an Agent-to-Agent round trip. */
   relay: ChannelMessageRelay | null;
+  /** Ordering and visual-group metadata for a durable public DM batch. */
+  dmMetadata?: DmMessageMetadata | null;
   /** Owner-authorized immutable memory revisions used by this answer. */
   memoryCitations?: DmMemoryReference[];
   /** Client-only state while a newly sent message awaits its server response. */

@@ -4,21 +4,23 @@
 
 import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { DmMessagePurpose } from "../../app/v1/channel_pb";
+import { file_briar_app_v1_channel } from "../../app/v1/channel_pb";
 import type { AgentEventDirection, NormalizedAgentEvent } from "../../types/v1/agent_event_pb";
 import { file_briar_types_v1_agent_event } from "../../types/v1/agent_event_pb";
 import type { AgentProvider } from "../../types/v1/provider_pb";
 import { file_briar_types_v1_provider } from "../../types/v1/provider_pb";
 import type { ProviderBlock } from "../../types/v1/provider_block_pb";
 import { file_briar_types_v1_provider_block } from "../../types/v1/provider_block_pb";
-import type { Value } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
+import type { Timestamp, Value } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file briar/sidecar/v1/agent_runner.proto.
  */
 export const file_briar_sidecar_v1_agent_runner: GenFile = /*@__PURE__*/
-  fileDesc("CiNicmlhci9zaWRlY2FyL3YxL2FnZW50X3J1bm5lci5wcm90bxIQYnJpYXIuc2lkZWNhci52MSLSAQoXQ29tcHV0ZXJVc2VDaGlsZEJpbmRpbmcSFQoNcGFyZW50X3J1bl9pZBgBIAEoCRIUCgxjaGlsZF9ydW5faWQYAiABKAkSEAoIYWdlbnRfaWQYAyABKAkSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgEIAEoCRIVCg1kaXNwbGF5X2luZGV4GAUgASgFEhMKC293bmVyX3Rva2VuGAYgASgJEi8KCHByb3ZpZGVyGAcgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlciKJAQoOUGFyZW50VG9SdW5uZXISKwoDcnVuGAEgASgLMhwuYnJpYXIuc2lkZWNhci52MS5SdW5SZXF1ZXN0SAASPwoRYXBwcm92YWxfcmVzcG9uc2UYAiABKAsyIi5icmlhci5zaWRlY2FyLnYxLkFwcHJvdmFsUmVzcG9uc2VIAEIJCgdwYXlsb2FkIs4CCg5SdW5uZXJUb1BhcmVudBI7Cg9zZXNzaW9uX3N0YXJ0ZWQYASABKAsyIC5icmlhci5zaWRlY2FyLnYxLlNlc3Npb25TdGFydGVkSAASMAoFZXZlbnQYAiABKAsyHy5icmlhci5zaWRlY2FyLnYxLlByb3ZpZGVyRXZlbnRIABI1CghhcHByb3ZhbBgDIAEoCzIhLmJyaWFyLnNpZGVjYXIudjEuQXBwcm92YWxSZXF1ZXN0SAASLQoGcmVzdWx0GAQgASgLMhsuYnJpYXIuc2lkZWNhci52MS5SdW5SZXN1bHRIABIvCgdibG9ja2VkGAUgASgLMhwuYnJpYXIuc2lkZWNhci52MS5SdW5CbG9ja2VkSAASKwoFZXJyb3IYBiABKAsyGi5icmlhci5zaWRlY2FyLnYxLlJ1bkVycm9ySABCCQoHcGF5bG9hZCLOBgoKUnVuUmVxdWVzdBIPCgdtZXNzYWdlGAEgASgJEhYKDndvcmtzcGFjZV9yb290GAIgASgJEhwKD2NvbnZlcnNhdGlvbl9pZBgDIAEoCUgAiAEBEhkKDGluc3RydWN0aW9ucxgEIAEoCUgBiAEBEjgKDW91dHB1dF9zY2hlbWEYBSABKAsyHC5icmlhci5zaWRlY2FyLnYxLkpzb25TY2hlbWFIAogBARISCgVtb2RlbBgGIAEoCUgDiAEBEhMKBmVmZm9ydBgHIAEoCUgEiAEBEjkKD2FwcHJvdmFsX3BvbGljeRgIIAEoDjIgLmJyaWFyLnNpZGVjYXIudjEuQXBwcm92YWxQb2xpY3kSMwoMc2FuZGJveF9tb2RlGAkgASgOMh0uYnJpYXIuc2lkZWNhci52MS5TYW5kYm94TW9kZRIWCg5uZXR3b3JrX2FjY2VzcxgKIAEoCBI2CgthdHRhY2htZW50cxgLIAMoCzIhLmJyaWFyLnNpZGVjYXIudjEuSW1hZ2VBdHRhY2htZW50Eh4KFmFkZGl0aW9uYWxfZGlyZWN0b3JpZXMYDCADKAkSGwoOZXh0ZXJuYWxfdG9vbHMYDSABKAhIBYgBARIcChRwcm92aWRlcl9iaW5hcnlfcGF0aBgOIAEoCRIcChRwcm90b2NvbF9maW5nZXJwcmludBgPIAEoDBIwCghydW5fa2luZBgQIAEoDjIeLmJyaWFyLnNpZGVjYXIudjEuQWdlbnRSdW5LaW5kEkwKFGNvbXB1dGVyX3VzZV9iaW5kaW5nGBEgASgLMikuYnJpYXIuc2lkZWNhci52MS5Db21wdXRlclVzZUNoaWxkQmluZGluZ0gGiAEBEikKHGNvbXB1dGVyX3VzZV9tY3Bfc2VydmVyX3BhdGgYEiABKAlIB4gBAUISChBfY29udmVyc2F0aW9uX2lkQg8KDV9pbnN0cnVjdGlvbnNCEAoOX291dHB1dF9zY2hlbWFCCAoGX21vZGVsQgkKB19lZmZvcnRCEQoPX2V4dGVybmFsX3Rvb2xzQhcKFV9jb21wdXRlcl91c2VfYmluZGluZ0IfCh1fY29tcHV0ZXJfdXNlX21jcF9zZXJ2ZXJfcGF0aCJTCgpKc29uU2NoZW1hEikKBm9iamVjdBgBIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RIABIRCgdib29sZWFuGAIgASgISABCBwoFdmFsdWUiQAoPSW1hZ2VBdHRhY2htZW50EgwKBHBhdGgYASABKAkSDAoEbmFtZRgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkiMAoQQXBwcm92YWxSZXNwb25zZRIKCgJpZBgBIAEoCRIQCghhcHByb3ZlZBgCIAEoCCIkCg5TZXNzaW9uU3RhcnRlZBISCgpzZXNzaW9uX2lkGAEgASgJIroBCg1Qcm92aWRlckV2ZW50EiMKA3JhdxgBIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZRI9Cgpub3JtYWxpemVkGAIgASgLMiQuYnJpYXIudHlwZXMudjEuTm9ybWFsaXplZEFnZW50RXZlbnRIAIgBARI2CglkaXJlY3Rpb24YAyABKA4yIy5icmlhci50eXBlcy52MS5BZ2VudEV2ZW50RGlyZWN0aW9uQg0KC19ub3JtYWxpemVkInYKD0FwcHJvdmFsUmVxdWVzdBIKCgJpZBgBIAEoCRIRCgl0b29sX25hbWUYAiABKAkSJgoFaW5wdXQYAyABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhIKBXRpdGxlGAQgASgJSACIAQFCCAoGX3RpdGxlIjAKCVJ1blJlc3VsdBISCgpzZXNzaW9uX2lkGAEgASgJEg8KB21lc3NhZ2UYAiABKAkiOgoKUnVuQmxvY2tlZBIsCgVibG9jaxgBIAEoCzIdLmJyaWFyLnR5cGVzLnYxLlByb3ZpZGVyQmxvY2siSQoIUnVuRXJyb3ISLAoEY29kZRgBIAEoDjIeLmJyaWFyLnNpZGVjYXIudjEuUnVuRXJyb3JDb2RlEg8KB21lc3NhZ2UYAiABKAkqiwEKDkFwcHJvdmFsUG9saWN5Eh8KG0FQUFJPVkFMX1BPTElDWV9VTlNQRUNJRklFRBAAEh0KGUFQUFJPVkFMX1BPTElDWV9VTlRSVVNURUQQARIeChpBUFBST1ZBTF9QT0xJQ1lfT05fUkVRVUVTVBACEhkKFUFQUFJPVkFMX1BPTElDWV9ORVZFUhADKo4BCgtTYW5kYm94TW9kZRIcChhTQU5EQk9YX01PREVfVU5TUEVDSUZJRUQQABIaChZTQU5EQk9YX01PREVfUkVBRF9PTkxZEAESIAocU0FOREJPWF9NT0RFX1dPUktTUEFDRV9XUklURRACEiMKH1NBTkRCT1hfTU9ERV9EQU5HRVJfRlVMTF9BQ0NFU1MQAyrpAQoMUnVuRXJyb3JDb2RlEh4KGlJVTl9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASIgoeUlVOX0VSUk9SX0NPREVfSU5WQUxJRF9SRVFVRVNUEAESKAokUlVOX0VSUk9SX0NPREVfUFJPVklERVJfU1RBUlRfRkFJTEVEEAISKgomUlVOX0VSUk9SX0NPREVfUFJPVklERVJfUFJPVE9DT0xfRVJST1IQAxIiCh5SVU5fRVJST1JfQ09ERV9QUk9WSURFUl9GQUlMRUQQBBIbChdSVU5fRVJST1JfQ09ERV9JTlRFUk5BTBAFKmoKDEFnZW50UnVuS2luZBIeChpBR0VOVF9SVU5fS0lORF9VTlNQRUNJRklFRBAAEhkKFUFHRU5UX1JVTl9LSU5EX1BBUkVOVBABEh8KG0FHRU5UX1JVTl9LSU5EX0NPTVBVVEVSX1VTRRACYgZwcm90bzM", [file_briar_types_v1_agent_event, file_briar_types_v1_provider, file_briar_types_v1_provider_block, file_google_protobuf_struct]);
+  fileDesc("CiNicmlhci9zaWRlY2FyL3YxL2FnZW50X3J1bm5lci5wcm90bxIQYnJpYXIuc2lkZWNhci52MSLSAQoXQ29tcHV0ZXJVc2VDaGlsZEJpbmRpbmcSFQoNcGFyZW50X3J1bl9pZBgBIAEoCRIUCgxjaGlsZF9ydW5faWQYAiABKAkSEAoIYWdlbnRfaWQYAyABKAkSGwoTbWFuYWdlZF9jb21wdXRlcl9pZBgEIAEoCRIVCg1kaXNwbGF5X2luZGV4GAUgASgFEhMKC293bmVyX3Rva2VuGAYgASgJEi8KCHByb3ZpZGVyGAcgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlciKfAQobRG1NZXNzYWdlUHVibGljYXRpb25CaW5kaW5nEhUKDWludm9jYXRpb25faWQYASABKAkSEwoLc29ja2V0X3BhdGgYAiABKAkSEgoKY2FwYWJpbGl0eRgDIAEoDBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIQCghwcm90b2NvbBgFIAEoDSJsChhEbU1lc3NhZ2VQdWJsaWNhdGlvblBhcnQSEQoJY2xpZW50X2lkGAEgASgJEgwKBGJvZHkYAiABKAkSLwoHcHVycG9zZRgDIAEoDjIeLmJyaWFyLmFwcC52MS5EbU1lc3NhZ2VQdXJwb3NlIpoBChtEbU1lc3NhZ2VQdWJsaWNhdGlvblJlcXVlc3QSFQoNaW52b2NhdGlvbl9pZBgBIAEoCRISCgpjYXBhYmlsaXR5GAIgASgMEhUKDW9wZXJhdGlvbl9rZXkYAyABKAkSOQoFcGFydHMYBCADKAsyKi5icmlhci5zaWRlY2FyLnYxLkRtTWVzc2FnZVB1YmxpY2F0aW9uUGFydCKFAQobRG1NZXNzYWdlUHVibGljYXRpb25SZWNlaXB0EhAKCGJhdGNoX2lkGAEgASgJEhMKC21lc3NhZ2VfaWRzGAIgAygJEhYKDmZpcnN0X3NlcXVlbmNlGAMgASgEEhUKDWxhc3Rfc2VxdWVuY2UYBCABKAQSEAoIcmVwbGF5ZWQYBSABKAgiagoZRG1NZXNzYWdlUHVibGljYXRpb25FcnJvchI9CgRjb2RlGAEgASgOMi8uYnJpYXIuc2lkZWNhci52MS5EbU1lc3NhZ2VQdWJsaWNhdGlvbkVycm9yQ29kZRIOCgZyZWFzb24YAiABKAkiqAEKHERtTWVzc2FnZVB1YmxpY2F0aW9uUmVzcG9uc2USQAoHcmVjZWlwdBgBIAEoCzItLmJyaWFyLnNpZGVjYXIudjEuRG1NZXNzYWdlUHVibGljYXRpb25SZWNlaXB0SAASPAoFZXJyb3IYAiABKAsyKy5icmlhci5zaWRlY2FyLnYxLkRtTWVzc2FnZVB1YmxpY2F0aW9uRXJyb3JIAEIICgZyZXN1bHQiiQEKDlBhcmVudFRvUnVubmVyEisKA3J1bhgBIAEoCzIcLmJyaWFyLnNpZGVjYXIudjEuUnVuUmVxdWVzdEgAEj8KEWFwcHJvdmFsX3Jlc3BvbnNlGAIgASgLMiIuYnJpYXIuc2lkZWNhci52MS5BcHByb3ZhbFJlc3BvbnNlSABCCQoHcGF5bG9hZCLOAgoOUnVubmVyVG9QYXJlbnQSOwoPc2Vzc2lvbl9zdGFydGVkGAEgASgLMiAuYnJpYXIuc2lkZWNhci52MS5TZXNzaW9uU3RhcnRlZEgAEjAKBWV2ZW50GAIgASgLMh8uYnJpYXIuc2lkZWNhci52MS5Qcm92aWRlckV2ZW50SAASNQoIYXBwcm92YWwYAyABKAsyIS5icmlhci5zaWRlY2FyLnYxLkFwcHJvdmFsUmVxdWVzdEgAEi0KBnJlc3VsdBgEIAEoCzIbLmJyaWFyLnNpZGVjYXIudjEuUnVuUmVzdWx0SAASLwoHYmxvY2tlZBgFIAEoCzIcLmJyaWFyLnNpZGVjYXIudjEuUnVuQmxvY2tlZEgAEisKBWVycm9yGAYgASgLMhouYnJpYXIuc2lkZWNhci52MS5SdW5FcnJvckgAQgkKB3BheWxvYWQilQgKClJ1blJlcXVlc3QSDwoHbWVzc2FnZRgBIAEoCRIWCg53b3Jrc3BhY2Vfcm9vdBgCIAEoCRIcCg9jb252ZXJzYXRpb25faWQYAyABKAlIAIgBARIZCgxpbnN0cnVjdGlvbnMYBCABKAlIAYgBARI4Cg1vdXRwdXRfc2NoZW1hGAUgASgLMhwuYnJpYXIuc2lkZWNhci52MS5Kc29uU2NoZW1hSAKIAQESEgoFbW9kZWwYBiABKAlIA4gBARITCgZlZmZvcnQYByABKAlIBIgBARI5Cg9hcHByb3ZhbF9wb2xpY3kYCCABKA4yIC5icmlhci5zaWRlY2FyLnYxLkFwcHJvdmFsUG9saWN5EjMKDHNhbmRib3hfbW9kZRgJIAEoDjIdLmJyaWFyLnNpZGVjYXIudjEuU2FuZGJveE1vZGUSFgoObmV0d29ya19hY2Nlc3MYCiABKAgSNgoLYXR0YWNobWVudHMYCyADKAsyIS5icmlhci5zaWRlY2FyLnYxLkltYWdlQXR0YWNobWVudBIeChZhZGRpdGlvbmFsX2RpcmVjdG9yaWVzGAwgAygJEhsKDmV4dGVybmFsX3Rvb2xzGA0gASgISAWIAQESHAoUcHJvdmlkZXJfYmluYXJ5X3BhdGgYDiABKAkSHAoUcHJvdG9jb2xfZmluZ2VycHJpbnQYDyABKAwSMAoIcnVuX2tpbmQYECABKA4yHi5icmlhci5zaWRlY2FyLnYxLkFnZW50UnVuS2luZBJMChRjb21wdXRlcl91c2VfYmluZGluZxgRIAEoCzIpLmJyaWFyLnNpZGVjYXIudjEuQ29tcHV0ZXJVc2VDaGlsZEJpbmRpbmdIBogBARIpChxjb21wdXRlcl91c2VfbWNwX3NlcnZlcl9wYXRoGBIgASgJSAeIAQESWgoeZG1fbWVzc2FnZV9wdWJsaWNhdGlvbl9iaW5kaW5nGBMgASgLMi0uYnJpYXIuc2lkZWNhci52MS5EbU1lc3NhZ2VQdWJsaWNhdGlvbkJpbmRpbmdICIgBARInChpkbV9tZXNzYWdlX21jcF9zZXJ2ZXJfcGF0aBgUIAEoCUgJiAEBQhIKEF9jb252ZXJzYXRpb25faWRCDwoNX2luc3RydWN0aW9uc0IQCg5fb3V0cHV0X3NjaGVtYUIICgZfbW9kZWxCCQoHX2VmZm9ydEIRCg9fZXh0ZXJuYWxfdG9vbHNCFwoVX2NvbXB1dGVyX3VzZV9iaW5kaW5nQh8KHV9jb21wdXRlcl91c2VfbWNwX3NlcnZlcl9wYXRoQiEKH19kbV9tZXNzYWdlX3B1YmxpY2F0aW9uX2JpbmRpbmdCHQobX2RtX21lc3NhZ2VfbWNwX3NlcnZlcl9wYXRoIlMKCkpzb25TY2hlbWESKQoGb2JqZWN0GAEgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEgAEhEKB2Jvb2xlYW4YAiABKAhIAEIHCgV2YWx1ZSJACg9JbWFnZUF0dGFjaG1lbnQSDAoEcGF0aBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKCW1pbWVfdHlwZRgDIAEoCSIwChBBcHByb3ZhbFJlc3BvbnNlEgoKAmlkGAEgASgJEhAKCGFwcHJvdmVkGAIgASgIIiQKDlNlc3Npb25TdGFydGVkEhIKCnNlc3Npb25faWQYASABKAkiugEKDVByb3ZpZGVyRXZlbnQSIwoDcmF3GAEgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlEj0KCm5vcm1hbGl6ZWQYAiABKAsyJC5icmlhci50eXBlcy52MS5Ob3JtYWxpemVkQWdlbnRFdmVudEgAiAEBEjYKCWRpcmVjdGlvbhgDIAEoDjIjLmJyaWFyLnR5cGVzLnYxLkFnZW50RXZlbnREaXJlY3Rpb25CDQoLX25vcm1hbGl6ZWQidgoPQXBwcm92YWxSZXF1ZXN0EgoKAmlkGAEgASgJEhEKCXRvb2xfbmFtZRgCIAEoCRImCgVpbnB1dBgDIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSEgoFdGl0bGUYBCABKAlIAIgBAUIICgZfdGl0bGUiMAoJUnVuUmVzdWx0EhIKCnNlc3Npb25faWQYASABKAkSDwoHbWVzc2FnZRgCIAEoCSI6CgpSdW5CbG9ja2VkEiwKBWJsb2NrGAEgASgLMh0uYnJpYXIudHlwZXMudjEuUHJvdmlkZXJCbG9jayJJCghSdW5FcnJvchIsCgRjb2RlGAEgASgOMh4uYnJpYXIuc2lkZWNhci52MS5SdW5FcnJvckNvZGUSDwoHbWVzc2FnZRgCIAEoCSqLAQoOQXBwcm92YWxQb2xpY3kSHwobQVBQUk9WQUxfUE9MSUNZX1VOU1BFQ0lGSUVEEAASHQoZQVBQUk9WQUxfUE9MSUNZX1VOVFJVU1RFRBABEh4KGkFQUFJPVkFMX1BPTElDWV9PTl9SRVFVRVNUEAISGQoVQVBQUk9WQUxfUE9MSUNZX05FVkVSEAMqjgEKC1NhbmRib3hNb2RlEhwKGFNBTkRCT1hfTU9ERV9VTlNQRUNJRklFRBAAEhoKFlNBTkRCT1hfTU9ERV9SRUFEX09OTFkQARIgChxTQU5EQk9YX01PREVfV09SS1NQQUNFX1dSSVRFEAISIwofU0FOREJPWF9NT0RFX0RBTkdFUl9GVUxMX0FDQ0VTUxADKukBCgxSdW5FcnJvckNvZGUSHgoaUlVOX0VSUk9SX0NPREVfVU5TUEVDSUZJRUQQABIiCh5SVU5fRVJST1JfQ09ERV9JTlZBTElEX1JFUVVFU1QQARIoCiRSVU5fRVJST1JfQ09ERV9QUk9WSURFUl9TVEFSVF9GQUlMRUQQAhIqCiZSVU5fRVJST1JfQ09ERV9QUk9WSURFUl9QUk9UT0NPTF9FUlJPUhADEiIKHlJVTl9FUlJPUl9DT0RFX1BST1ZJREVSX0ZBSUxFRBAEEhsKF1JVTl9FUlJPUl9DT0RFX0lOVEVSTkFMEAUqagoMQWdlbnRSdW5LaW5kEh4KGkFHRU5UX1JVTl9LSU5EX1VOU1BFQ0lGSUVEEAASGQoVQUdFTlRfUlVOX0tJTkRfUEFSRU5UEAESHwobQUdFTlRfUlVOX0tJTkRfQ09NUFVURVJfVVNFEAIqqQMKHURtTWVzc2FnZVB1YmxpY2F0aW9uRXJyb3JDb2RlEjEKLURNX01FU1NBR0VfUFVCTElDQVRJT05fRVJST1JfQ09ERV9VTlNQRUNJRklFRBAAEjUKMURNX01FU1NBR0VfUFVCTElDQVRJT05fRVJST1JfQ09ERV9JTlZBTElEX1JFUVVFU1QQARI4CjRETV9NRVNTQUdFX1BVQkxJQ0FUSU9OX0VSUk9SX0NPREVfQ0FQQUJJTElUWV9JTlZBTElEEAISNwozRE1fTUVTU0FHRV9QVUJMSUNBVElPTl9FUlJPUl9DT0RFX0lOVk9DQVRJT05fQ0xPU0VEEAMSNgoyRE1fTUVTU0FHRV9QVUJMSUNBVElPTl9FUlJPUl9DT0RFX1JFUVVFU1RfQ09ORkxJQ1QQBBI5CjVETV9NRVNTQUdFX1BVQkxJQ0FUSU9OX0VSUk9SX0NPREVfUFVCTElDQVRJT05fVU5LTk9XThAFEjgKNERNX01FU1NBR0VfUFVCTElDQVRJT05fRVJST1JfQ09ERV9QVUJMSUNBVElPTl9GQUlMRUQQBmIGcHJvdG8z", [file_briar_app_v1_channel, file_briar_types_v1_agent_event, file_briar_types_v1_provider, file_briar_types_v1_provider_block, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message briar.sidecar.v1.ComputerUseChildBinding
@@ -68,6 +70,196 @@ export const ComputerUseChildBindingSchema: GenMessage<ComputerUseChildBinding> 
   messageDesc(file_briar_sidecar_v1_agent_runner, 0);
 
 /**
+ * A short-lived route from the provider MCP process back to the parent
+ * Worker. It carries no Worker credential and is valid only while the parent
+ * owns the matching local socket.
+ *
+ * @generated from message briar.sidecar.v1.DmMessagePublicationBinding
+ */
+export type DmMessagePublicationBinding = Message<"briar.sidecar.v1.DmMessagePublicationBinding"> & {
+  /**
+   * @generated from field: string invocation_id = 1;
+   */
+  invocationId: string;
+
+  /**
+   * @generated from field: string socket_path = 2;
+   */
+  socketPath: string;
+
+  /**
+   * @generated from field: bytes capability = 3;
+   */
+  capability: Uint8Array;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 4;
+   */
+  expiresAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: uint32 protocol = 5;
+   */
+  protocol: number;
+};
+
+/**
+ * Describes the message briar.sidecar.v1.DmMessagePublicationBinding.
+ * Use `create(DmMessagePublicationBindingSchema)` to create a new message.
+ */
+export const DmMessagePublicationBindingSchema: GenMessage<DmMessagePublicationBinding> = /*@__PURE__*/
+  messageDesc(file_briar_sidecar_v1_agent_runner, 1);
+
+/**
+ * @generated from message briar.sidecar.v1.DmMessagePublicationPart
+ */
+export type DmMessagePublicationPart = Message<"briar.sidecar.v1.DmMessagePublicationPart"> & {
+  /**
+   * Stable within the invocation so a retry can recover the same ordered part.
+   *
+   * @generated from field: string client_id = 1;
+   */
+  clientId: string;
+
+  /**
+   * @generated from field: string body = 2;
+   */
+  body: string;
+
+  /**
+   * @generated from field: briar.app.v1.DmMessagePurpose purpose = 3;
+   */
+  purpose: DmMessagePurpose;
+};
+
+/**
+ * Describes the message briar.sidecar.v1.DmMessagePublicationPart.
+ * Use `create(DmMessagePublicationPartSchema)` to create a new message.
+ */
+export const DmMessagePublicationPartSchema: GenMessage<DmMessagePublicationPart> = /*@__PURE__*/
+  messageDesc(file_briar_sidecar_v1_agent_runner, 2);
+
+/**
+ * @generated from message briar.sidecar.v1.DmMessagePublicationRequest
+ */
+export type DmMessagePublicationRequest = Message<"briar.sidecar.v1.DmMessagePublicationRequest"> & {
+  /**
+   * @generated from field: string invocation_id = 1;
+   */
+  invocationId: string;
+
+  /**
+   * @generated from field: bytes capability = 2;
+   */
+  capability: Uint8Array;
+
+  /**
+   * @generated from field: string operation_key = 3;
+   */
+  operationKey: string;
+
+  /**
+   * @generated from field: repeated briar.sidecar.v1.DmMessagePublicationPart parts = 4;
+   */
+  parts: DmMessagePublicationPart[];
+};
+
+/**
+ * Describes the message briar.sidecar.v1.DmMessagePublicationRequest.
+ * Use `create(DmMessagePublicationRequestSchema)` to create a new message.
+ */
+export const DmMessagePublicationRequestSchema: GenMessage<DmMessagePublicationRequest> = /*@__PURE__*/
+  messageDesc(file_briar_sidecar_v1_agent_runner, 3);
+
+/**
+ * @generated from message briar.sidecar.v1.DmMessagePublicationReceipt
+ */
+export type DmMessagePublicationReceipt = Message<"briar.sidecar.v1.DmMessagePublicationReceipt"> & {
+  /**
+   * @generated from field: string batch_id = 1;
+   */
+  batchId: string;
+
+  /**
+   * @generated from field: repeated string message_ids = 2;
+   */
+  messageIds: string[];
+
+  /**
+   * @generated from field: uint64 first_sequence = 3;
+   */
+  firstSequence: bigint;
+
+  /**
+   * @generated from field: uint64 last_sequence = 4;
+   */
+  lastSequence: bigint;
+
+  /**
+   * @generated from field: bool replayed = 5;
+   */
+  replayed: boolean;
+};
+
+/**
+ * Describes the message briar.sidecar.v1.DmMessagePublicationReceipt.
+ * Use `create(DmMessagePublicationReceiptSchema)` to create a new message.
+ */
+export const DmMessagePublicationReceiptSchema: GenMessage<DmMessagePublicationReceipt> = /*@__PURE__*/
+  messageDesc(file_briar_sidecar_v1_agent_runner, 4);
+
+/**
+ * @generated from message briar.sidecar.v1.DmMessagePublicationError
+ */
+export type DmMessagePublicationError = Message<"briar.sidecar.v1.DmMessagePublicationError"> & {
+  /**
+   * @generated from field: briar.sidecar.v1.DmMessagePublicationErrorCode code = 1;
+   */
+  code: DmMessagePublicationErrorCode;
+
+  /**
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message briar.sidecar.v1.DmMessagePublicationError.
+ * Use `create(DmMessagePublicationErrorSchema)` to create a new message.
+ */
+export const DmMessagePublicationErrorSchema: GenMessage<DmMessagePublicationError> = /*@__PURE__*/
+  messageDesc(file_briar_sidecar_v1_agent_runner, 5);
+
+/**
+ * @generated from message briar.sidecar.v1.DmMessagePublicationResponse
+ */
+export type DmMessagePublicationResponse = Message<"briar.sidecar.v1.DmMessagePublicationResponse"> & {
+  /**
+   * @generated from oneof briar.sidecar.v1.DmMessagePublicationResponse.result
+   */
+  result: {
+    /**
+     * @generated from field: briar.sidecar.v1.DmMessagePublicationReceipt receipt = 1;
+     */
+    value: DmMessagePublicationReceipt;
+    case: "receipt";
+  } | {
+    /**
+     * @generated from field: briar.sidecar.v1.DmMessagePublicationError error = 2;
+     */
+    value: DmMessagePublicationError;
+    case: "error";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message briar.sidecar.v1.DmMessagePublicationResponse.
+ * Use `create(DmMessagePublicationResponseSchema)` to create a new message.
+ */
+export const DmMessagePublicationResponseSchema: GenMessage<DmMessagePublicationResponse> = /*@__PURE__*/
+  messageDesc(file_briar_sidecar_v1_agent_runner, 6);
+
+/**
  * @generated from message briar.sidecar.v1.ParentToRunner
  */
 export type ParentToRunner = Message<"briar.sidecar.v1.ParentToRunner"> & {
@@ -94,7 +286,7 @@ export type ParentToRunner = Message<"briar.sidecar.v1.ParentToRunner"> & {
  * Use `create(ParentToRunnerSchema)` to create a new message.
  */
 export const ParentToRunnerSchema: GenMessage<ParentToRunner> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 1);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 7);
 
 /**
  * @generated from message briar.sidecar.v1.RunnerToParent
@@ -147,7 +339,7 @@ export type RunnerToParent = Message<"briar.sidecar.v1.RunnerToParent"> & {
  * Use `create(RunnerToParentSchema)` to create a new message.
  */
 export const RunnerToParentSchema: GenMessage<RunnerToParent> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 2);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 8);
 
 /**
  * @generated from message briar.sidecar.v1.RunRequest
@@ -251,6 +443,16 @@ export type RunRequest = Message<"briar.sidecar.v1.RunRequest"> & {
    * @generated from field: optional string computer_use_mcp_server_path = 18;
    */
   computerUseMcpServerPath?: string | undefined;
+
+  /**
+   * @generated from field: optional briar.sidecar.v1.DmMessagePublicationBinding dm_message_publication_binding = 19;
+   */
+  dmMessagePublicationBinding?: DmMessagePublicationBinding | undefined;
+
+  /**
+   * @generated from field: optional string dm_message_mcp_server_path = 20;
+   */
+  dmMessageMcpServerPath?: string | undefined;
 };
 
 /**
@@ -258,7 +460,7 @@ export type RunRequest = Message<"briar.sidecar.v1.RunRequest"> & {
  * Use `create(RunRequestSchema)` to create a new message.
  */
 export const RunRequestSchema: GenMessage<RunRequest> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 3);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 9);
 
 /**
  * @generated from message briar.sidecar.v1.JsonSchema
@@ -287,7 +489,7 @@ export type JsonSchema = Message<"briar.sidecar.v1.JsonSchema"> & {
  * Use `create(JsonSchemaSchema)` to create a new message.
  */
 export const JsonSchemaSchema: GenMessage<JsonSchema> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 4);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 10);
 
 /**
  * @generated from message briar.sidecar.v1.ImageAttachment
@@ -314,7 +516,7 @@ export type ImageAttachment = Message<"briar.sidecar.v1.ImageAttachment"> & {
  * Use `create(ImageAttachmentSchema)` to create a new message.
  */
 export const ImageAttachmentSchema: GenMessage<ImageAttachment> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 5);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 11);
 
 /**
  * @generated from message briar.sidecar.v1.ApprovalResponse
@@ -336,7 +538,7 @@ export type ApprovalResponse = Message<"briar.sidecar.v1.ApprovalResponse"> & {
  * Use `create(ApprovalResponseSchema)` to create a new message.
  */
 export const ApprovalResponseSchema: GenMessage<ApprovalResponse> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 6);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 12);
 
 /**
  * @generated from message briar.sidecar.v1.SessionStarted
@@ -353,7 +555,7 @@ export type SessionStarted = Message<"briar.sidecar.v1.SessionStarted"> & {
  * Use `create(SessionStartedSchema)` to create a new message.
  */
 export const SessionStartedSchema: GenMessage<SessionStarted> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 7);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 13);
 
 /**
  * @generated from message briar.sidecar.v1.ProviderEvent
@@ -383,7 +585,7 @@ export type ProviderEvent = Message<"briar.sidecar.v1.ProviderEvent"> & {
  * Use `create(ProviderEventSchema)` to create a new message.
  */
 export const ProviderEventSchema: GenMessage<ProviderEvent> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 8);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 14);
 
 /**
  * @generated from message briar.sidecar.v1.ApprovalRequest
@@ -415,7 +617,7 @@ export type ApprovalRequest = Message<"briar.sidecar.v1.ApprovalRequest"> & {
  * Use `create(ApprovalRequestSchema)` to create a new message.
  */
 export const ApprovalRequestSchema: GenMessage<ApprovalRequest> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 9);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 15);
 
 /**
  * @generated from message briar.sidecar.v1.RunResult
@@ -437,7 +639,7 @@ export type RunResult = Message<"briar.sidecar.v1.RunResult"> & {
  * Use `create(RunResultSchema)` to create a new message.
  */
 export const RunResultSchema: GenMessage<RunResult> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 10);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 16);
 
 /**
  * @generated from message briar.sidecar.v1.RunBlocked
@@ -454,7 +656,7 @@ export type RunBlocked = Message<"briar.sidecar.v1.RunBlocked"> & {
  * Use `create(RunBlockedSchema)` to create a new message.
  */
 export const RunBlockedSchema: GenMessage<RunBlocked> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 11);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 17);
 
 /**
  * @generated from message briar.sidecar.v1.RunError
@@ -476,7 +678,7 @@ export type RunError = Message<"briar.sidecar.v1.RunError"> & {
  * Use `create(RunErrorSchema)` to create a new message.
  */
 export const RunErrorSchema: GenMessage<RunError> = /*@__PURE__*/
-  messageDesc(file_briar_sidecar_v1_agent_runner, 12);
+  messageDesc(file_briar_sidecar_v1_agent_runner, 18);
 
 /**
  * @generated from enum briar.sidecar.v1.ApprovalPolicy
@@ -606,4 +808,50 @@ export enum AgentRunKind {
  */
 export const AgentRunKindSchema: GenEnum<AgentRunKind> = /*@__PURE__*/
   enumDesc(file_briar_sidecar_v1_agent_runner, 3);
+
+/**
+ * @generated from enum briar.sidecar.v1.DmMessagePublicationErrorCode
+ */
+export enum DmMessagePublicationErrorCode {
+  /**
+   * @generated from enum value: DM_MESSAGE_PUBLICATION_ERROR_CODE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: DM_MESSAGE_PUBLICATION_ERROR_CODE_INVALID_REQUEST = 1;
+   */
+  INVALID_REQUEST = 1,
+
+  /**
+   * @generated from enum value: DM_MESSAGE_PUBLICATION_ERROR_CODE_CAPABILITY_INVALID = 2;
+   */
+  CAPABILITY_INVALID = 2,
+
+  /**
+   * @generated from enum value: DM_MESSAGE_PUBLICATION_ERROR_CODE_INVOCATION_CLOSED = 3;
+   */
+  INVOCATION_CLOSED = 3,
+
+  /**
+   * @generated from enum value: DM_MESSAGE_PUBLICATION_ERROR_CODE_REQUEST_CONFLICT = 4;
+   */
+  REQUEST_CONFLICT = 4,
+
+  /**
+   * @generated from enum value: DM_MESSAGE_PUBLICATION_ERROR_CODE_PUBLICATION_UNKNOWN = 5;
+   */
+  PUBLICATION_UNKNOWN = 5,
+
+  /**
+   * @generated from enum value: DM_MESSAGE_PUBLICATION_ERROR_CODE_PUBLICATION_FAILED = 6;
+   */
+  PUBLICATION_FAILED = 6,
+}
+
+/**
+ * Describes the enum briar.sidecar.v1.DmMessagePublicationErrorCode.
+ */
+export const DmMessagePublicationErrorCodeSchema: GenEnum<DmMessagePublicationErrorCode> = /*@__PURE__*/
+  enumDesc(file_briar_sidecar_v1_agent_runner, 4);
 

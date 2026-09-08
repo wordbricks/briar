@@ -120,6 +120,10 @@ import { useChannelConversationActions } from "../state/channel-conversation/act
 import { useChannelConversationLoader } from "../state/channel-conversation/loader";
 import { useChannelConversationSync } from "../state/channel-conversation/useChannelConversationSync";
 import { ChannelActivityPublisher } from "../state/channel-conversation/activity";
+import {
+  channelMessageBatchPosition,
+  type ChannelMessageBatchPosition,
+} from "../state/channel-conversation/model";
 import { ChannelMessageTypingPlaceholder } from "./ChannelTypingPlaceholder";
 import {
   ChannelMessageTypingStrip,
@@ -664,12 +668,13 @@ export function CompanionChannels({
             {threadLoading && (thread?.length ?? 0) === 0
               ? <CompanionChannelLoadingSpinner />
               : null}
-            {(thread ?? []).map((item) => (
+            {(thread ?? []).map((item, index) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
               decliningProposal={decliningProposalId === item.proposal?.id}
               agents={agents}
               busy={busy}
+              batchPosition={channelMessageBatchPosition(thread ?? [], index)}
               channel={channel}
               currentUserId={currentUserId}
               highlighted={item.id === activeHighlightedMessageId}
@@ -767,12 +772,13 @@ export function CompanionChannels({
           >
             {loadingEarlierMessages ? <CompanionChannelLoadingSpinner /> : null}
             {loading && messages.length === 0 ? <CompanionChannelLoadingSpinner /> : null}
-            {messages.map((item) => (
+            {messages.map((item, index) => (
             <MessageRow
               acceptingProposal={acceptingProposalId === item.proposal?.id}
               decliningProposal={decliningProposalId === item.proposal?.id}
               agents={agents}
               busy={busy}
+              batchPosition={channelMessageBatchPosition(messages, index)}
               channel={channel}
               currentUserId={currentUserId}
               highlighted={item.id === activeHighlightedMessageId}
@@ -1006,6 +1012,7 @@ function MessageRow({
   decliningProposal,
   agents,
   busy,
+  batchPosition = "single",
   channel,
   currentUserId,
   highlighted = false,
@@ -1035,6 +1042,7 @@ function MessageRow({
   decliningProposal: boolean;
   agents: ChannelAgentSummary[];
   busy: boolean;
+  batchPosition?: ChannelMessageBatchPosition;
   channel: ChannelSummary;
   currentUserId: string | null;
   highlighted?: boolean;
@@ -1117,7 +1125,8 @@ function MessageRow({
     <>
     <article
       aria-current={highlighted ? "true" : undefined}
-      className={`companion-channel-message${reacting ? " is-reacting" : ""}${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`}
+      className={`companion-channel-message${reacting ? " is-reacting" : ""}${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}${batchPosition !== "single" ? ` is-dm-batch-part is-dm-batch-${batchPosition}` : ""}`}
+      data-dm-batch-position={batchPosition !== "single" ? batchPosition : undefined}
       data-companion-channel-message-id={message.id}
       data-inbox-highlighted={highlighted ? "true" : undefined}
       tabIndex={highlighted ? -1 : undefined}
@@ -1664,3 +1673,5 @@ function CompanionChannelLoadingSpinner() {
     </p>
   );
 }
+
+export { MessageRow as CompanionChannelMessageRow };

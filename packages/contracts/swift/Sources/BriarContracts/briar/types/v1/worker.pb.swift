@@ -276,11 +276,37 @@ public nonisolated struct BriarTypes_WorkerCapabilities: @unchecked Sendable {
   /// Clears the value of `computerUse`. Subsequent reads from it will return its default value.
   public mutating func clearComputerUse() {_uniqueStorage()._computerUse = nil}
 
+  public var dmPublicMessages: BriarTypes_DmPublicMessageCapability {
+    get {_storage._dmPublicMessages ?? BriarTypes_DmPublicMessageCapability()}
+    set {_uniqueStorage()._dmPublicMessages = newValue}
+  }
+  /// Returns true if `dmPublicMessages` has been explicitly set.
+  public var hasDmPublicMessages: Bool {_storage._dmPublicMessages != nil}
+  /// Clears the value of `dmPublicMessages`. Subsequent reads from it will return its default value.
+  public mutating func clearDmPublicMessages() {_uniqueStorage()._dmPublicMessages = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+/// Public DM output is negotiated independently from memory and computer use.
+/// Absence and protocol zero mean that the Worker must use the legacy single
+/// completion message.
+public nonisolated struct BriarTypes_DmPublicMessageCapability: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var `protocol`: UInt32 = 0
+
+  public var providers: [BriarTypes_AgentProvider] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
 }
 
 public nonisolated struct BriarTypes_DmMemoryLearningCapability: Sendable {
@@ -649,7 +675,7 @@ nonisolated extension BriarTypes_WorkflowRequirementHealth: SwiftProtobuf.Messag
 
 nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WorkerCapabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{3}dm_memory_protocol\0\u{3}dm_memory_learning_requests\0\u{3}dm_memory_learning\0\u{3}computer_use\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{3}dm_memory_protocol\0\u{3}dm_memory_learning_requests\0\u{3}dm_memory_learning\0\u{3}computer_use\0\u{3}dm_public_messages\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
 
   fileprivate class _StorageClass {
     var _providerCapabilities: [BriarTypes_AgentProviderCapability] = []
@@ -660,6 +686,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
     var _dmMemoryLearningRequests: UInt32? = nil
     var _dmMemoryLearning: BriarTypes_DmMemoryLearningCapability? = nil
     var _computerUse: BriarTypes_ComputerUseCapability? = nil
+    var _dmPublicMessages: BriarTypes_DmPublicMessageCapability? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -678,6 +705,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
       _dmMemoryLearningRequests = source._dmMemoryLearningRequests
       _dmMemoryLearning = source._dmMemoryLearning
       _computerUse = source._computerUse
+      _dmPublicMessages = source._dmPublicMessages
     }
   }
 
@@ -704,6 +732,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
         case 7: try { try decoder.decodeSingularUInt32Field(value: &_storage._dmMemoryLearningRequests) }()
         case 8: try { try decoder.decodeSingularMessageField(value: &_storage._dmMemoryLearning) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._computerUse) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._dmPublicMessages) }()
         default: break
         }
       }
@@ -740,6 +769,9 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
       try { if let v = _storage._computerUse {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
+      try { if let v = _storage._dmPublicMessages {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -757,10 +789,46 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
         if _storage._dmMemoryLearningRequests != rhs_storage._dmMemoryLearningRequests {return false}
         if _storage._dmMemoryLearning != rhs_storage._dmMemoryLearning {return false}
         if _storage._computerUse != rhs_storage._computerUse {return false}
+        if _storage._dmPublicMessages != rhs_storage._dmPublicMessages {return false}
         return true
       }
       if !storagesAreEqual {return false}
     }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarTypes_DmPublicMessageCapability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmPublicMessageCapability"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}protocol\0\u{1}providers\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.`protocol`) }()
+      case 2: try { try decoder.decodeRepeatedEnumField(value: &self.providers) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.`protocol` != 0 {
+      try visitor.visitSingularUInt32Field(value: self.`protocol`, fieldNumber: 1)
+    }
+    if !self.providers.isEmpty {
+      try visitor.visitPackedEnumField(value: self.providers, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarTypes_DmPublicMessageCapability, rhs: BriarTypes_DmPublicMessageCapability) -> Bool {
+    if lhs.`protocol` != rhs.`protocol` {return false}
+    if lhs.providers != rhs.providers {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -21,6 +21,7 @@ import { decodeJsonRpcMessageJsonResult } from "./json-rpc-message";
 import { createRunnerIo } from "./runner-io";
 import type { RunnerRequest } from "./runner-request";
 import { prepareComputerUseMcp } from "./computer-use-mcp-config";
+import { prepareDmMessageMcp } from "./dm-message-mcp-config";
 import { codexComputerUseArgs } from "./computer-use-provider-adapters";
 import { ProviderBlockedError } from "./provider-block";
 
@@ -205,7 +206,17 @@ async function main() {
   }
 
   const computerUseMcp = await prepareComputerUseMcp(request);
-  const computerUseArguments = codexComputerUseArgs(computerUseMcp.servers);
+  let dmMessageMcp;
+  try {
+    dmMessageMcp = await prepareDmMessageMcp(request);
+  } catch (error) {
+    await computerUseMcp.cleanup();
+    throw error;
+  }
+  const computerUseArguments = codexComputerUseArgs([
+    ...computerUseMcp.servers,
+    ...dmMessageMcp.servers,
+  ]);
   try {
     const emittedSessions = new Set<string>();
     let isolation: CodexMcpIsolation = {
@@ -270,7 +281,10 @@ async function main() {
       };
     }
   } finally {
-    await computerUseMcp.cleanup();
+    await Promise.allSettled([
+      computerUseMcp.cleanup(),
+      dmMessageMcp.cleanup(),
+    ]);
   }
 }
 

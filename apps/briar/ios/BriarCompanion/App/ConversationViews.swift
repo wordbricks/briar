@@ -402,6 +402,7 @@ struct ConversationMessageLayout<Content: View>: View {
     let authorAccessorySystemImage: String?
     let timestamp: Date
     let accessibilityIdentifier: String
+    let batchPosition: ChannelMessageBatchPosition
     let content: Content
 
     init(
@@ -412,6 +413,7 @@ struct ConversationMessageLayout<Content: View>: View {
         authorAccessorySystemImage: String? = nil,
         timestamp: Date,
         accessibilityIdentifier: String,
+        batchPosition: ChannelMessageBatchPosition = .single,
         @ViewBuilder content: () -> Content
     ) {
         self.authorImage = authorImage
@@ -421,38 +423,72 @@ struct ConversationMessageLayout<Content: View>: View {
         self.authorAccessorySystemImage = authorAccessorySystemImage
         self.timestamp = timestamp
         self.accessibilityIdentifier = accessibilityIdentifier
+        self.batchPosition = batchPosition
         self.content = content()
     }
 
+    private var showsAuthorChrome: Bool {
+        batchPosition == .single || batchPosition == .first
+    }
+
+    private var topPadding: CGFloat {
+        batchPosition == .middle || batchPosition == .last ? 4 : 11
+    }
+
+    private var bottomPadding: CGFloat {
+        batchPosition == .first || batchPosition == .middle ? 4 : 11
+    }
+
+    private var belongsToBatch: Bool { batchPosition != .single }
+
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
-            ProfileImageView(
-                image: authorImage,
-                name: profileName,
-                systemImage: authorSystemImage,
-                size: 40,
-                cornerRadius: 10
-            )
+            if showsAuthorChrome {
+                ProfileImageView(
+                    image: authorImage,
+                    name: profileName,
+                    systemImage: authorSystemImage,
+                    size: 40,
+                    cornerRadius: 10
+                )
+            } else {
+                Color.clear
+                    .frame(width: 40, height: 1)
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Text(authorName)
-                        .font(.subheadline.weight(.bold))
-                        .lineLimit(1)
-                    if let authorAccessorySystemImage {
-                        Image(systemName: authorAccessorySystemImage)
-                            .font(.caption2)
+                if showsAuthorChrome {
+                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                        Text(authorName)
+                            .font(.subheadline.weight(.bold))
+                            .lineLimit(1)
+                        if let authorAccessorySystemImage {
+                            Image(systemName: authorAccessorySystemImage)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(timestamp, style: .time)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Text(timestamp, style: .time)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 11)
+        .padding(.top, topPadding)
+        .padding(.bottom, bottomPadding)
+        .overlay(alignment: .leading) {
+            if belongsToBatch {
+                Capsule()
+                    .fill(Color.accentColor.opacity(0.28))
+                    .frame(width: 2)
+                    .padding(.leading, 21)
+                    .padding(.vertical, 2)
+                    .accessibilityHidden(true)
+            }
+        }
         .contentShape(Rectangle())
         .accessibilityIdentifier(accessibilityIdentifier)
     }

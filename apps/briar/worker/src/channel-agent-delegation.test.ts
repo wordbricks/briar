@@ -321,6 +321,7 @@ describe("Organization Agent channel delegation", () => {
             claimToken: call.input.claimToken,
           },
           attachmentIds: [],
+          publishedFinalBatchId: null,
           conversationId: call.input.conversationId ?? null,
           outcome,
         },

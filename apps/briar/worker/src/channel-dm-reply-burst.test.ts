@@ -17,6 +17,7 @@ import {
   loadChannelDelta,
   toggleChannelMessageReaction,
   createChannel,
+  createChannelMessage,
   getChannelAgentReplyJob,
   getChannelMessage,
   getClaimedChannelReply,
@@ -827,6 +828,35 @@ describe("direct message reply bursts", () => {
     expect((await claimThroughQueue()).work?.channelReply?.workId).toBe(
       first.job.id,
     );
+  });
+
+  it("includes the latest twenty DM messages in a new reply claim", async () => {
+    const channelId = await freshConversation("dm");
+    const base = Date.now() - 60_000;
+    for (let index = 0; index < 21; index += 1) {
+      await createChannelMessage(db, {
+        id: crypto.randomUUID(),
+        channelId,
+        parentMessageId: null,
+        authorUserId: ownerId,
+        authorAgentId: null,
+        authorAgentName: null,
+        authorAgentProvider: null,
+        body: `history ${index}`,
+        mentionedUserIds: [],
+        mentionedAgentIds: [],
+        createdAt: new Date(base + index * 1_000).toISOString(),
+      });
+    }
+    const trigger = await send(channelId, "current request");
+    await stopTyping(trigger.job.id);
+
+    const claimed = (await claim())!;
+    expect(claimed.snapshot.messages).toHaveLength(20);
+    expect(claimed.snapshot.messages.map((message) => message.body)).toEqual([
+      ...Array.from({ length: 19 }, (_, index) => `history ${index + 2}`),
+      "current request",
+    ]);
   });
 
   it("leaves a channel thread on its own root, with no settle and no folding", async () => {

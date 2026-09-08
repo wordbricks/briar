@@ -236,6 +236,7 @@ describe("Agent-to-Agent messaging", () => {
               claimToken: input.claimToken,
             },
             attachmentIds: [],
+            publishedFinalBatchId: null,
             conversationId: null,
             outcome: {
               case: "success",

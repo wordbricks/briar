@@ -177,11 +177,13 @@ describe("channel message body length migration", () => {
     expect(await objects("index")).toEqual([
       "briar_channel_messages_channel_idx",
       "briar_channel_messages_deleted_idx",
+      "briar_channel_messages_dm_batch_part_idx",
+      "briar_channel_messages_dm_sequence_idx",
       "briar_channel_messages_root_idx",
       "briar_channel_messages_thread_idx",
       "briar_channel_messages_webhook_event_idx",
     ]);
-    expect((await objects("trigger")).length).toBe(14);
+    expect((await objects("trigger")).length).toBe(16);
   });
 
   it("stores a message the old bound rejected and still rejects a longer one", async () => {

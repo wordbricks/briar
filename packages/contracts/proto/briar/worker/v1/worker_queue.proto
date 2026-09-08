@@ -33,6 +33,7 @@ service WorkerQueueService {
   rpc PrepareReplyAttachmentUploads(PrepareReplyAttachmentUploadsRequest) returns (PrepareReplyAttachmentUploadsResponse);
   rpc CompleteIssueReply(CompleteIssueReplyRequest) returns (CompleteIssueReplyResponse);
   rpc CompleteChannelReply(CompleteChannelReplyRequest) returns (CompleteChannelReplyResponse);
+  rpc PublishDmMessageBatch(PublishDmMessageBatchRequest) returns (PublishDmMessageBatchResponse);
   rpc HandoffWork(HandoffWorkRequest) returns (HandoffWorkResponse);
   rpc CompleteProjectAgentTask(CompleteProjectAgentTaskRequest) returns (CompleteProjectAgentTaskResponse);
   rpc RecordMergeBatchCandidateEnqueued(RecordMergeBatchCandidateEnqueuedRequest) returns (RecordMergeBatchCandidateEnqueuedResponse);
@@ -559,6 +560,9 @@ message ChannelReplySuccess {
   optional DmMemorySaveRequest memory_save_request = 5;
   // Optional DM reaction selected with the reply; invalid values retain the acknowledgement.
   optional string acknowledgement_reaction = 6;
+  // The FINAL batch already published for this reply. Completion verifies the
+  // receipt and does not create a duplicate message.
+  optional string published_final_batch_id = 7;
 
   // A document may accompany at most one proposal. Skill execution,
   // delegation and an Agent-to-Agent message each remain exclusive from every
@@ -597,6 +601,37 @@ message CompleteChannelReplyResponse {
   // Implementations reject unspecified and unknown values on read.
   ReplyCompletionDisposition disposition = 2;
   optional google.protobuf.Timestamp retained_until = 3;
+  optional string final_batch_id = 4;
+  optional string final_message_id = 5;
+}
+
+enum DmMessagePublicationKind {
+  DM_MESSAGE_PUBLICATION_KIND_UNSPECIFIED = 0;
+  DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE = 1;
+  DM_MESSAGE_PUBLICATION_KIND_FINAL = 2;
+}
+
+message DmPublicMessagePart {
+  string body = 1;
+  briar.app.v1.DmMessagePurpose purpose = 2;
+}
+
+message PublishDmMessageBatchRequest {
+  string request_id = 1;
+  string project_id = 2;
+  string worker_id = 3;
+  WorkClaimIdentity work = 4;
+  uint64 expected_input_revision = 5;
+  DmMessagePublicationKind publication_kind = 6;
+  repeated DmPublicMessagePart parts = 7;
+}
+
+message PublishDmMessageBatchResponse {
+  string batch_id = 1;
+  repeated string message_ids = 2;
+  uint64 first_sequence = 3;
+  uint64 last_sequence = 4;
+  bool replayed = 5;
 }
 
 message DmMemoryClaimIdentity {
@@ -1293,6 +1328,23 @@ message ClaimedChannelReply {
   // job's own trigger plus the triggers of the queued turns it took over when a
   // person sent several short messages in a row. Always at least one element.
   repeated string pending_trigger_message_ids = 31;
+  // The steer revision applied by this exact claim.
+  uint64 input_revision = 32;
+  // Durable public output already committed by this job, including an earlier
+  // claim attempt. Ordered by conversation sequence for recovery.
+  repeated PublishedDmMessageBatch published_message_batches = 33;
+  // Explicit claim-scoped negotiation. Input revision zero is valid and cannot
+  // distinguish an eligible initial DM from an ineligible channel reply.
+  uint32 dm_public_message_protocol = 34;
+}
+
+message PublishedDmMessageBatch {
+  string batch_id = 1;
+  repeated string message_ids = 2;
+  uint64 first_sequence = 3;
+  uint64 last_sequence = 4;
+  DmMessagePublicationKind publication_kind = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 enum MergeBatchPhase {

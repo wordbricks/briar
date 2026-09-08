@@ -65037,6 +65037,202 @@ impl ::buffa::Enumeration for ChannelMemberRole {
         ]
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DmMessagePurpose {
+    DM_MESSAGE_PURPOSE_UNSPECIFIED = 0i32,
+    DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT = 1i32,
+    DM_MESSAGE_PURPOSE_PROGRESS = 2i32,
+    DM_MESSAGE_PURPOSE_DISCOVERY = 3i32,
+    DM_MESSAGE_PURPOSE_QUESTION = 4i32,
+    DM_MESSAGE_PURPOSE_RESULT = 5i32,
+    DM_MESSAGE_PURPOSE_CONVERSATION = 6i32,
+}
+impl DmMessagePurpose {
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PURPOSE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::DM_MESSAGE_PURPOSE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Acknowledgement: Self = Self::DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT;
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PURPOSE_PROGRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Progress: Self = Self::DM_MESSAGE_PURPOSE_PROGRESS;
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PURPOSE_DISCOVERY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Discovery: Self = Self::DM_MESSAGE_PURPOSE_DISCOVERY;
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PURPOSE_QUESTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Question: Self = Self::DM_MESSAGE_PURPOSE_QUESTION;
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PURPOSE_RESULT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Result: Self = Self::DM_MESSAGE_PURPOSE_RESULT;
+    ///Idiomatic alias for [`Self::DM_MESSAGE_PURPOSE_CONVERSATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Conversation: Self = Self::DM_MESSAGE_PURPOSE_CONVERSATION;
+}
+impl ::core::default::Default for DmMessagePurpose {
+    fn default() -> Self {
+        Self::DM_MESSAGE_PURPOSE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DmMessagePurpose {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DmMessagePurpose {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DmMessagePurpose;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(DmMessagePurpose)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DmMessagePurpose, E> {
+                <DmMessagePurpose as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DmMessagePurpose, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMessagePurpose as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DmMessagePurpose, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DmMessagePurpose as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DmMessagePurpose, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMessagePurpose {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DmMessagePurpose {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_UNSPECIFIED),
+            1i32 => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT)
+            }
+            2i32 => ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_PROGRESS),
+            3i32 => ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_DISCOVERY),
+            4i32 => ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_QUESTION),
+            5i32 => ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_RESULT),
+            6i32 => ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_CONVERSATION),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DM_MESSAGE_PURPOSE_UNSPECIFIED => "DM_MESSAGE_PURPOSE_UNSPECIFIED",
+            Self::DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT => {
+                "DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT"
+            }
+            Self::DM_MESSAGE_PURPOSE_PROGRESS => "DM_MESSAGE_PURPOSE_PROGRESS",
+            Self::DM_MESSAGE_PURPOSE_DISCOVERY => "DM_MESSAGE_PURPOSE_DISCOVERY",
+            Self::DM_MESSAGE_PURPOSE_QUESTION => "DM_MESSAGE_PURPOSE_QUESTION",
+            Self::DM_MESSAGE_PURPOSE_RESULT => "DM_MESSAGE_PURPOSE_RESULT",
+            Self::DM_MESSAGE_PURPOSE_CONVERSATION => "DM_MESSAGE_PURPOSE_CONVERSATION",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DM_MESSAGE_PURPOSE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_UNSPECIFIED)
+            }
+            "DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT" => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT)
+            }
+            "DM_MESSAGE_PURPOSE_PROGRESS" => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_PROGRESS)
+            }
+            "DM_MESSAGE_PURPOSE_DISCOVERY" => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_DISCOVERY)
+            }
+            "DM_MESSAGE_PURPOSE_QUESTION" => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_QUESTION)
+            }
+            "DM_MESSAGE_PURPOSE_RESULT" => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_RESULT)
+            }
+            "DM_MESSAGE_PURPOSE_CONVERSATION" => {
+                ::core::option::Option::Some(Self::DM_MESSAGE_PURPOSE_CONVERSATION)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DM_MESSAGE_PURPOSE_UNSPECIFIED,
+            Self::DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT,
+            Self::DM_MESSAGE_PURPOSE_PROGRESS,
+            Self::DM_MESSAGE_PURPOSE_DISCOVERY,
+            Self::DM_MESSAGE_PURPOSE_QUESTION,
+            Self::DM_MESSAGE_PURPOSE_RESULT,
+            Self::DM_MESSAGE_PURPOSE_CONVERSATION,
+        ]
+    }
+}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -84576,6 +84772,214 @@ pub mod channel_message_relay {
         }
     }
 }
+/// Additive metadata for one part of an atomic public DM batch. Older messages
+/// have no value and remain valid on every client.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DmMessageMetadata {
+    /// Field 1: `batch_id`
+    #[serde(
+        rename = "batchId",
+        alias = "batch_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub batch_id: ::buffa::alloc::string::String,
+    /// Field 2: `part_index`
+    #[serde(
+        rename = "partIndex",
+        alias = "part_index",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub part_index: u32,
+    /// Field 3: `conversation_sequence`
+    #[serde(
+        rename = "conversationSequence",
+        alias = "conversation_sequence",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub conversation_sequence: u64,
+    /// Field 4: `purpose`
+    #[serde(
+        rename = "purpose",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub purpose: ::buffa::EnumValue<DmMessagePurpose>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DmMessageMetadata {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DmMessageMetadata")
+            .field("batch_id", &self.batch_id)
+            .field("part_index", &self.part_index)
+            .field("conversation_sequence", &self.conversation_sequence)
+            .field("purpose", &self.purpose)
+            .finish()
+    }
+}
+impl DmMessageMetadata {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMessageMetadata";
+}
+::buffa::impl_default_instance!(DmMessageMetadata);
+impl ::buffa::MessageName for DmMessageMetadata {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "DmMessageMetadata";
+    const FULL_NAME: &'static str = "briar.app.v1.DmMessageMetadata";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMessageMetadata";
+}
+impl ::buffa::Message for DmMessageMetadata {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.batch_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.batch_id) as u64;
+        }
+        if self.part_index != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.part_index) as u64;
+        }
+        if self.conversation_sequence != 0u64 {
+            size
+                += 1u64
+                    + ::buffa::types::uint64_encoded_len(self.conversation_sequence)
+                        as u64;
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.batch_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.batch_id, buf);
+        }
+        if self.part_index != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.part_index, buf);
+        }
+        if self.conversation_sequence != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.conversation_sequence, buf);
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.batch_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.part_index = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.conversation_sequence = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.purpose = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.batch_id.clear();
+        self.part_index = 0u32;
+        self.conversation_sequence = 0u64;
+        self.purpose = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DmMessageMetadata {
+    const PROTO_FQN: &'static str = "briar.app.v1.DmMessageMetadata";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DmMessageMetadata {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DM_MESSAGE_METADATA_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DmMessageMetadata",
+    to_json: ::buffa::type_registry::any_to_json::<DmMessageMetadata>,
+    from_json: ::buffa::type_registry::any_from_json::<DmMessageMetadata>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -84763,6 +85167,16 @@ pub struct ChannelMessage {
         ChannelMessageRelay,
         ::buffa::Inline<ChannelMessageRelay>,
     >,
+    /// Field 23: `dm_metadata`
+    #[serde(
+        rename = "dmMetadata",
+        alias = "dm_metadata",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub dm_metadata: ::buffa::MessageField<
+        DmMessageMetadata,
+        ::buffa::Inline<DmMessageMetadata>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -84792,6 +85206,7 @@ impl ::core::fmt::Debug for ChannelMessage {
             .field("deleted_at", &self.deleted_at)
             .field("memory_citations", &self.memory_citations)
             .field("relay", &self.relay)
+            .field("dm_metadata", &self.dm_metadata)
             .finish()
     }
 }
@@ -84975,6 +85390,14 @@ impl ::buffa::Message for ChannelMessage {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.dm_metadata.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.dm_metadata.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -85125,6 +85548,14 @@ impl ::buffa::Message for ChannelMessage {
                 buf,
             );
             self.relay.write_to(__cache, buf);
+        }
+        if self.dm_metadata.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                23u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.dm_metadata.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -85372,6 +85803,17 @@ impl ::buffa::Message for ChannelMessage {
                     ctx,
                 )?;
             }
+            23u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.dm_metadata.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -85402,6 +85844,7 @@ impl ::buffa::Message for ChannelMessage {
         self.deleted_at = ::buffa::MessageField::none();
         self.memory_citations.clear();
         self.relay = ::buffa::MessageField::none();
+        self.dm_metadata = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -274093,6 +274536,377 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// Additive metadata for one part of an atomic public DM batch. Older messages
+        /// have no value and remain valid on every client.
+        #[derive(Clone, Debug, Default)]
+        pub struct DmMessageMetadataView<'a> {
+            /// Field 1: `batch_id`
+            pub batch_id: &'a str,
+            /// Field 2: `part_index`
+            pub part_index: u32,
+            /// Field 3: `conversation_sequence`
+            pub conversation_sequence: u64,
+            /// Field 4: `purpose`
+            pub purpose: ::buffa::EnumValue<super::super::DmMessagePurpose>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DmMessageMetadataView<'a> {
+            type Owned = super::super::DmMessageMetadata;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.batch_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.part_index = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.conversation_sequence = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.purpose = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DmMessageMetadata,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DmMessageMetadata,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DmMessageMetadata {
+                    batch_id: self.batch_id.to_string(),
+                    part_index: self.part_index,
+                    conversation_sequence: self.conversation_sequence,
+                    purpose: self.purpose,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DmMessageMetadataView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.batch_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.batch_id) as u64;
+                }
+                if self.part_index != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.part_index) as u64;
+                }
+                if self.conversation_sequence != 0u64 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint64_encoded_len(
+                                self.conversation_sequence,
+                            ) as u64;
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.batch_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.batch_id, buf);
+                }
+                if self.part_index != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.part_index, buf);
+                }
+                if self.conversation_sequence != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        3u32,
+                        self.conversation_sequence,
+                        buf,
+                    );
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DmMessageMetadataView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.batch_id) {
+                    __map.serialize_entry("batchId", self.batch_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.part_index) {
+                    __map
+                        .serialize_entry(
+                            "partIndex",
+                            &::buffa::json_helpers::ProtoJson(&self.part_index),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.conversation_sequence,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "conversationSequence",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.conversation_sequence,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.purpose,
+                ) {
+                    __map.serialize_entry("purpose", &self.purpose)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DmMessageMetadataView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "DmMessageMetadata";
+            const FULL_NAME: &'static str = "briar.app.v1.DmMessageMetadata";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DmMessageMetadata";
+        }
+        ::buffa::impl_default_view_instance!(DmMessageMetadataView);
+        ::buffa::impl_view_reborrow!(DmMessageMetadataView);
+        /** Self-contained, `'static` owned view of a `DmMessageMetadata` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DmMessageMetadataView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DmMessageMetadataView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DmMessageMetadataOwnedView(
+            ::buffa::OwnedView<DmMessageMetadataView<'static>>,
+        );
+        impl DmMessageMetadataOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMessageMetadataOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMessageMetadataOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DmMessageMetadata,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DmMessageMetadataOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DmMessageMetadataView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DmMessageMetadataView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::DmMessageMetadata {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `batch_id`
+            #[must_use]
+            pub fn batch_id(&self) -> &'_ str {
+                self.0.reborrow().batch_id
+            }
+            /// Field 2: `part_index`
+            #[must_use]
+            pub fn part_index(&self) -> u32 {
+                self.0.reborrow().part_index
+            }
+            /// Field 3: `conversation_sequence`
+            #[must_use]
+            pub fn conversation_sequence(&self) -> u64 {
+                self.0.reborrow().conversation_sequence
+            }
+            /// Field 4: `purpose`
+            #[must_use]
+            pub fn purpose(&self) -> ::buffa::EnumValue<super::super::DmMessagePurpose> {
+                self.0.reborrow().purpose
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DmMessageMetadataView<'static>>>
+        for DmMessageMetadataOwnedView {
+            fn from(inner: ::buffa::OwnedView<DmMessageMetadataView<'static>>) -> Self {
+                DmMessageMetadataOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DmMessageMetadataOwnedView>
+        for ::buffa::OwnedView<DmMessageMetadataView<'static>> {
+            fn from(wrapper: DmMessageMetadataOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DmMessageMetadataView<'static>>>
+        for DmMessageMetadataOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DmMessageMetadataView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DmMessageMetadata {
+            type View<'a> = DmMessageMetadataView<'a>;
+            type ViewHandle = DmMessageMetadataOwnedView;
+        }
+        impl ::serde::Serialize for DmMessageMetadataOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         #[derive(Clone, Debug, Default)]
         pub struct ChannelMessageView<'a> {
             /// Field 1: `id`
@@ -274174,6 +274988,10 @@ pub mod __buffa {
             /// Field 22: `relay`
             pub relay: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ChannelMessageRelayView<'a>,
+            >,
+            /// Field 23: `dm_metadata`
+            pub dm_metadata: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMessageMetadataView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -274464,6 +275282,31 @@ pub mod __buffa {
                             None => {
                                 view.relay = ::buffa::MessageFieldView::set(
                                     <super::super::__buffa::view::ChannelMessageRelayView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    23u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.dm_metadata.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.dm_metadata = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DmMessageMetadataView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -274771,6 +275614,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    dm_metadata: match self.dm_metadata.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DmMessageMetadata,
+                                ::buffa::Inline<super::super::DmMessageMetadata>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -274932,6 +275784,14 @@ pub mod __buffa {
                         += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.dm_metadata.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.dm_metadata.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -275084,6 +275944,14 @@ pub mod __buffa {
                     );
                     self.relay.write_to(__cache, buf);
                 }
+                if self.dm_metadata.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        23u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.dm_metadata.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -275213,6 +276081,14 @@ pub mod __buffa {
                 {
                     if let ::core::option::Option::Some(__v) = self.relay.as_option() {
                         __map.serialize_entry("relay", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .dm_metadata
+                        .as_option()
+                    {
+                        __map.serialize_entry("dmMetadata", __v)?;
                     }
                 }
                 __map.end()
@@ -275485,6 +276361,15 @@ pub mod __buffa {
                 super::super::__buffa::view::ChannelMessageRelayView<'_>,
             > {
                 &self.0.reborrow().relay
+            }
+            /// Field 23: `dm_metadata`
+            #[must_use]
+            pub fn dm_metadata(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DmMessageMetadataView<'_>,
+            > {
+                &self.0.reborrow().dm_metadata
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChannelMessageView<'static>>>
@@ -379387,6 +380272,7 @@ pub mod __buffa {
         reg.register_json_any(super::__CHANNEL_LINK_PREVIEW_JSON_ANY);
         reg.register_json_any(super::__GET_CHANNEL_LINK_PREVIEW_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_MESSAGE_RELAY_JSON_ANY);
+        reg.register_json_any(super::__DM_MESSAGE_METADATA_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_ISSUE_PROPOSAL_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_ISSUE_PROPOSAL_PAYLOAD_JSON_ANY);
@@ -380839,6 +381725,10 @@ pub use self::__buffa::view::GetChannelLinkPreviewResponseOwnedView;
 pub use self::__buffa::view::ChannelMessageRelayView;
 #[doc(inline)]
 pub use self::__buffa::view::ChannelMessageRelayOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMessageMetadataView;
+#[doc(inline)]
+pub use self::__buffa::view::DmMessageMetadataOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ChannelMessageView;
 #[doc(inline)]

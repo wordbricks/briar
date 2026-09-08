@@ -52,6 +52,7 @@ import {
   MergeBatchPhase,
   MergeBatchState,
   MergeBatchValidationFailureCode,
+  DmMessagePublicationKind,
   type ClaimedIssue,
   type ClaimedWork,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
@@ -553,6 +554,18 @@ const channelReply = (
       triggerMessageId: value.triggerMessageId,
       parentMessageId: value.parentMessageId,
       pendingTriggerMessageIds: value.pendingTriggerMessageIds,
+      inputRevision: BigInt(value.inputRevision ?? 0),
+      publishedMessageBatches: (value.publishedMessageBatches ?? []).map((batch) => ({
+        batchId: batch.batchId,
+        messageIds: batch.messageIds,
+        firstSequence: BigInt(batch.firstSequence),
+        lastSequence: BigInt(batch.lastSequence),
+        publicationKind: batch.publicationKind === "final"
+          ? DmMessagePublicationKind.FINAL
+          : DmMessagePublicationKind.INTERMEDIATE,
+        createdAt: requiredTimestamp(batch.createdAt, "published batch creation"),
+      })),
+      dmPublicMessageProtocol: value.dmPublicMessageProtocol ?? 0,
       provider: provider(value.provider),
       model: value.model ?? undefined,
       effort: value.effort ?? undefined,

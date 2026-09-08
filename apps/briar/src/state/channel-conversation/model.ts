@@ -27,6 +27,7 @@ import { apiErrorIssueMessages, findApiError } from "../../lib/api/errors";
 export {
   mergeChannelMessages,
   mergeChannelMessageSnapshot,
+  sortChannelMessagesForDisplay,
 } from "../../lib/channel-message-merge";
 export { applyChannelMessageDeletion } from "../../lib/channel-message-deletion";
 
@@ -248,6 +249,31 @@ export interface ChannelMessageSummary {
   readonly authorId: string;
   readonly parentMessageId: string | null;
   readonly optimistic: boolean;
+  readonly batchPosition: ChannelMessageBatchPosition;
+}
+
+export type ChannelMessageBatchPosition =
+  | "single"
+  | "first"
+  | "middle"
+  | "last";
+
+export function channelMessageBatchPosition(
+  messages: readonly ChannelMessage[],
+  index: number,
+): ChannelMessageBatchPosition {
+  const message = messages[index];
+  const metadata = message?.dmMetadata;
+  if (!message || !metadata) return "single";
+  const belongsWith = (candidate: ChannelMessage | undefined) =>
+    candidate?.dmMetadata?.batchId === metadata.batchId &&
+    channelAuthorId(candidate.author) === channelAuthorId(message.author);
+  const hasPrevious = belongsWith(messages[index - 1]);
+  const hasNext = belongsWith(messages[index + 1]);
+  if (hasPrevious && hasNext) return "middle";
+  if (hasPrevious) return "last";
+  if (hasNext) return "first";
+  return "single";
 }
 
 const sameChannelMessageSummary = (
@@ -259,7 +285,8 @@ const sameChannelMessageSummary = (
   left.createdAt === right.createdAt &&
   left.authorId === right.authorId &&
   left.parentMessageId === right.parentMessageId &&
-  left.optimistic === right.optimistic;
+  left.optimistic === right.optimistic &&
+  left.batchPosition === right.batchPosition;
 
 /** {@link ChannelMessageSummary} for a whole timeline, reusing every entry. */
 export function summarizeChannelMessages(
@@ -269,7 +296,7 @@ export function summarizeChannelMessages(
   const previousById = new Map(
     previous.map((summary) => [summary.id, summary]),
   );
-  return messages.map((message) => {
+  return messages.map((message, index) => {
     const next: ChannelMessageSummary = {
       id: message.id,
       channelId: message.channelId,
@@ -277,6 +304,7 @@ export function summarizeChannelMessages(
       authorId: channelAuthorId(message.author),
       parentMessageId: message.parentMessageId,
       optimistic: Boolean(message.optimistic),
+      batchPosition: channelMessageBatchPosition(messages, index),
     };
     const stored = previousById.get(next.id);
     return stored && sameChannelMessageSummary(stored, next) ? stored : next;

@@ -338,6 +338,41 @@ final class BriarCompanionUITests: XCTestCase {
         captureScreenshot(named: "companion-channel-attachment-preview")
     }
 
+    func testDurableDirectMessageBatchSharesAuthorChrome() {
+        let app = launchInsideCompanion(
+            additionalArguments: ["--ui-testing-dm-message-batch"]
+        )
+
+        let directMessages = app.tabBars.buttons["DMs"]
+        XCTAssertTrue(directMessages.waitForExistence(timeout: transitionTimeout))
+        directMessages.tap()
+        let conversation = app.buttons[
+            "dm-row-12121212-1212-4212-8212-121212121212"
+        ]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+
+        let messages = [
+            "요청을 확인했습니다.",
+            "웹과 모바일 표시를 함께 점검하고 있습니다.",
+            "세 클라이언트에서 같은 결과를 확인했습니다.",
+        ]
+        for (offset, body) in messages.enumerated() {
+            let identifier = String(
+                format: "channel-message-73737373-7373-4737-8373-%012d",
+                offset + 1
+            )
+            let text = app.textViews.matching(identifier: identifier).firstMatch
+            XCTAssertTrue(text.waitForExistence(timeout: channelTransitionTimeout))
+            XCTAssertEqual(text.value as? String, body)
+            let author = app.staticTexts
+                .matching(identifier: identifier)
+                .matching(NSPredicate(format: "label == %@", "Honey"))
+            XCTAssertEqual(author.count, offset == 0 ? 1 : 0)
+        }
+        captureScreenshot(named: "companion-durable-dm-message-batch")
+    }
+
     func testAcceptedIssueBatchShowsMappingsAndDependencies() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-batch-proposal"]

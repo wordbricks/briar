@@ -701,6 +701,25 @@ message ChannelMessageRelay {
   Status status = 7;
 }
 
+enum DmMessagePurpose {
+  DM_MESSAGE_PURPOSE_UNSPECIFIED = 0;
+  DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT = 1;
+  DM_MESSAGE_PURPOSE_PROGRESS = 2;
+  DM_MESSAGE_PURPOSE_DISCOVERY = 3;
+  DM_MESSAGE_PURPOSE_QUESTION = 4;
+  DM_MESSAGE_PURPOSE_RESULT = 5;
+  DM_MESSAGE_PURPOSE_CONVERSATION = 6;
+}
+
+// Additive metadata for one part of an atomic public DM batch. Older messages
+// have no value and remain valid on every client.
+message DmMessageMetadata {
+  string batch_id = 1;
+  uint32 part_index = 2;
+  uint64 conversation_sequence = 3;
+  DmMessagePurpose purpose = 4;
+}
+
 message ChannelMessage {
   string id = 1;
   string channel_id = 2;
@@ -724,6 +743,7 @@ message ChannelMessage {
   optional google.protobuf.Timestamp deleted_at = 20;
   repeated DmMemoryReference memory_citations = 21;
   optional ChannelMessageRelay relay = 22;
+  optional DmMessageMetadata dm_metadata = 23;
 }
 
 message ChannelIssueProposal {

@@ -1170,6 +1170,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             return batchProposalChannelResponse
         case designChannelID:
             return designChannelResponse
+        case honeyChannelID where ProcessInfo.processInfo.arguments.contains("--ui-testing-dm-message-batch"):
+            return messageBatchChannelResponse
         case honeyChannelID:
             return honeyChannelResponse
         default:
@@ -1376,6 +1378,21 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         }
         message.replyAuthors = value.replyAuthors.map(channelAuthorMessage)
         if let proposal = value.proposal { message.proposal = channelProposalMessage(proposal) }
+        if let metadata = value.dmMetadata {
+            var encoded = BriarAPI_DmMessageMetadata()
+            encoded.batchID = metadata.batchId
+            encoded.partIndex = UInt32(clamping: metadata.partIndex)
+            encoded.conversationSequence = UInt64(clamping: metadata.conversationSequence)
+            switch metadata.purpose {
+            case .acknowledgement: encoded.purpose = .acknowledgement
+            case .progress: encoded.purpose = .progress
+            case .discovery: encoded.purpose = .discovery
+            case .question: encoded.purpose = .question
+            case .result: encoded.purpose = .result
+            case .conversation: encoded.purpose = .conversation
+            }
+            message.dmMetadata = encoded
+        }
         message.createdAt = .init(date: value.createdAt)
         if let deletedAt = value.deletedAt { message.deletedAt = .init(date: deletedAt) }
         return message
@@ -1729,6 +1746,56 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
                 createdAt: Date(timeIntervalSince1970: 1_777_012_400)
             )],
             messages: [root, reply]
+        )
+    }
+
+    private static var messageBatchChannelResponse: BriarAPI_GetChannelResponse {
+        let batchID = "71717171-7171-4717-8171-717171717171"
+        let bodies = [
+            "요청을 확인했습니다.",
+            "웹과 모바일 표시를 함께 점검하고 있습니다.",
+            "세 클라이언트에서 같은 결과를 확인했습니다.",
+        ]
+        let purposes: [ChannelMessage.DmMetadata.Purpose] = [
+            .acknowledgement,
+            .progress,
+            .result,
+        ]
+        let messages = bodies.enumerated().map { index, body in
+            ChannelMessage(
+                id: UUID(
+                    uuidString: String(
+                        format: "73737373-7373-4737-8373-%012d",
+                        index + 1
+                    )
+                )!,
+                channelId: honeyChannelID,
+                parentMessageId: nil,
+                body: body,
+                author: ChannelMessage.Author(
+                    type: .agent,
+                    name: "Honey",
+                    image: nil,
+                    provider: "codex",
+                    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+                ),
+                replyCount: 0,
+                lastReplyAt: nil,
+                document: nil,
+                proposal: nil,
+                dmMetadata: .init(
+                    batchId: batchID,
+                    partIndex: index,
+                    conversationSequence: index + 20,
+                    purpose: purposes[index]
+                ),
+                createdAt: Date(timeIntervalSince1970: 1_778_308_800 + Double(index * 60))
+            )
+        }
+        return getChannelResponse(
+            channel: honeyChannelSummary,
+            agents: [],
+            messages: messages
         )
     }
 

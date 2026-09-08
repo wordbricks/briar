@@ -176,7 +176,10 @@ import {
   channelThreadMessagesAtom,
   channelThreadSubscriptionPendingAtom,
 } from "../state/channel-conversation/atoms";
-import type { ChannelMessageSummary } from "../state/channel-conversation/model";
+import type {
+  ChannelMessageBatchPosition,
+  ChannelMessageSummary,
+} from "../state/channel-conversation/model";
 import {
   useChannelConversationActions,
   type BoundChannelConversationActions,
@@ -1485,6 +1488,7 @@ export function Channels({
                     renderMessage={(summary) => (
                       messageRowContext ? (
                         <ChannelMessageRow
+                          batchPosition={summary.batchPosition}
                           channelId={activeChannel.id}
                           context={messageRowContext}
                           messageId={summary.id}
@@ -3004,10 +3008,12 @@ export interface ChannelMessageRowContext {
  * other row's atom keeps the object it had.
  */
 export const ChannelMessageRow = memo(function ChannelMessageRow({
+  batchPosition = "single",
   channelId,
   context,
   messageId,
 }: {
+  batchPosition?: ChannelMessageBatchPosition;
   channelId: string;
   context: ChannelMessageRowContext;
   messageId: string;
@@ -3025,6 +3031,7 @@ export const ChannelMessageRow = memo(function ChannelMessageRow({
         }
         agents={context.agents}
         busy={context.busy}
+        batchPosition={batchPosition}
         canOpenRelay={context.canOpenRelay}
         canOpenThread={context.canOpenThread}
         channel={context.channel}
@@ -3077,6 +3084,7 @@ export const MessageRow = memo(function MessageRow({
   currentUserId,
   onIssueOpen,
   busy,
+  batchPosition = "single",
   projects,
   selectedProjectId,
   token,
@@ -3103,6 +3111,7 @@ export const MessageRow = memo(function MessageRow({
   currentUserId: string | null;
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   busy: boolean;
+  batchPosition?: ChannelMessageBatchPosition;
   projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
   selectedProjectId: string | null;
   token: string;
@@ -3247,7 +3256,8 @@ export const MessageRow = memo(function MessageRow({
   return (
     <article
       aria-current={highlighted ? "true" : undefined}
-      className={`channel-message ${message.author.type}${reacting ? " is-reacting" : ""}${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}`}
+      className={`channel-message ${message.author.type}${reacting ? " is-reacting" : ""}${highlighted ? " is-inbox-target" : ""}${message.optimistic ? " is-optimistic" : ""}${batchPosition !== "single" ? ` is-dm-batch-part is-dm-batch-${batchPosition}` : ""}`}
+      data-dm-batch-position={batchPosition !== "single" ? batchPosition : undefined}
       data-channel-message-id={message.id}
       data-inbox-highlighted={highlighted ? "true" : undefined}
       tabIndex={highlighted ? -1 : undefined}

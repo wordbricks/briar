@@ -1262,6 +1262,15 @@ private struct ChannelConversationView: View {
         return channels.typingStatuses(messageIDs: messageIDs)
     }
 
+    private var batchPositions: [UUID: ChannelMessageBatchPosition] {
+        Dictionary(uniqueKeysWithValues: messages.indices.map { index in
+            (
+                messages[index].id,
+                ChannelMessageBatchPresentation.position(at: index, in: messages)
+            )
+        })
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if channel.readOnly {
@@ -1295,6 +1304,7 @@ private struct ChannelConversationView: View {
                             isOptimistic: channels.isMessageOptimistic(message.id),
                             members: channels.members,
                             message: message,
+                            batchPosition: batchPositions[message.id] ?? .single,
                             locale: locale,
                             onAcceptProposal: { proposalID, projectID, execution in
                                 await channels.acceptProposal(
@@ -1502,6 +1512,7 @@ private struct ChannelMessageRow: View {
     let isOptimistic: Bool
     let members: [ChannelMember]
     let message: ChannelMessage
+    let batchPosition: ChannelMessageBatchPosition
     let locale: CompanionLocale
     let onAcceptProposal: (
         UUID,
@@ -1621,7 +1632,8 @@ private struct ChannelMessageRow: View {
                     ? "point.3.connected.trianglepath.dotted"
                     : nil,
             timestamp: message.createdAt,
-            accessibilityIdentifier: "channel-message-\(message.id.uuidString.lowercased())"
+            accessibilityIdentifier: "channel-message-\(message.id.uuidString.lowercased())",
+            batchPosition: batchPosition
         ) {
             if let relay = message.relay, relay.direction == .inbound {
                 ChannelRelayFromLabel(

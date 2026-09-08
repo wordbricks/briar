@@ -77,6 +77,9 @@ const channelReply = {
   inboundAgentMessage: null,
   agentMessageHop: 0,
   pendingTriggerMessageIds: ["99999999-9999-4999-8999-999999999999"],
+  dmPublicMessageProtocol: 0,
+  inputRevision: 0,
+  publishedMessageBatches: [],
   snapshot: {
     channel: {
       id: common.runId,

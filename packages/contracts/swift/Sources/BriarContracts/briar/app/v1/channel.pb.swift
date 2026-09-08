@@ -134,6 +134,60 @@ public nonisolated enum BriarAPI_ChannelMemberRole: SwiftProtobuf.Enum, Swift.Ca
 
 }
 
+public nonisolated enum BriarAPI_DmMessagePurpose: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case acknowledgement // = 1
+  case progress // = 2
+  case discovery // = 3
+  case question // = 4
+  case result // = 5
+  case conversation // = 6
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .acknowledgement
+    case 2: self = .progress
+    case 3: self = .discovery
+    case 4: self = .question
+    case 5: self = .result
+    case 6: self = .conversation
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .acknowledgement: return 1
+    case .progress: return 2
+    case .discovery: return 3
+    case .question: return 4
+    case .result: return 5
+    case .conversation: return 6
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [BriarAPI_DmMessagePurpose] = [
+    .unspecified,
+    .acknowledgement,
+    .progress,
+    .discovery,
+    .question,
+    .result,
+    .conversation,
+  ]
+
+}
+
 public nonisolated struct BriarAPI_ListChannelsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2684,6 +2738,26 @@ public nonisolated struct BriarAPI_ChannelMessageRelay: Sendable {
   fileprivate var _peerAgentImage: String? = nil
 }
 
+/// Additive metadata for one part of an atomic public DM batch. Older messages
+/// have no value and remain valid on every client.
+public nonisolated struct BriarAPI_DmMessageMetadata: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var batchID: String = String()
+
+  public var partIndex: UInt32 = 0
+
+  public var conversationSequence: UInt64 = 0
+
+  public var purpose: BriarAPI_DmMessagePurpose = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public nonisolated struct BriarAPI_ChannelMessage: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2838,6 +2912,15 @@ public nonisolated struct BriarAPI_ChannelMessage: @unchecked Sendable {
   public var hasRelay: Bool {_storage._relay != nil}
   /// Clears the value of `relay`. Subsequent reads from it will return its default value.
   public mutating func clearRelay() {_uniqueStorage()._relay = nil}
+
+  public var dmMetadata: BriarAPI_DmMessageMetadata {
+    get {_storage._dmMetadata ?? BriarAPI_DmMessageMetadata()}
+    set {_uniqueStorage()._dmMetadata = newValue}
+  }
+  /// Returns true if `dmMetadata` has been explicitly set.
+  public var hasDmMetadata: Bool {_storage._dmMetadata != nil}
+  /// Clears the value of `dmMetadata`. Subsequent reads from it will return its default value.
+  public mutating func clearDmMetadata() {_uniqueStorage()._dmMetadata = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -3099,6 +3182,10 @@ nonisolated extension BriarAPI_ChannelKind: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension BriarAPI_ChannelMemberRole: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CHANNEL_MEMBER_ROLE_UNSPECIFIED\0\u{1}CHANNEL_MEMBER_ROLE_OWNER\0\u{1}CHANNEL_MEMBER_ROLE_MEMBER\0")
+}
+
+nonisolated extension BriarAPI_DmMessagePurpose: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DM_MESSAGE_PURPOSE_UNSPECIFIED\0\u{1}DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT\0\u{1}DM_MESSAGE_PURPOSE_PROGRESS\0\u{1}DM_MESSAGE_PURPOSE_DISCOVERY\0\u{1}DM_MESSAGE_PURPOSE_QUESTION\0\u{1}DM_MESSAGE_PURPOSE_RESULT\0\u{1}DM_MESSAGE_PURPOSE_CONVERSATION\0")
 }
 
 nonisolated extension BriarAPI_ListChannelsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -7323,9 +7410,54 @@ nonisolated extension BriarAPI_ChannelMessageRelay.Status: SwiftProtobuf._ProtoN
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STATUS_UNSPECIFIED\0\u{1}STATUS_PENDING\0\u{1}STATUS_COMPLETED\0\u{1}STATUS_FAILED\0")
 }
 
+nonisolated extension BriarAPI_DmMessageMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DmMessageMetadata"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}batch_id\0\u{3}part_index\0\u{3}conversation_sequence\0\u{1}purpose\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.batchID) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.partIndex) }()
+      case 3: try { try decoder.decodeSingularUInt64Field(value: &self.conversationSequence) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.purpose) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.batchID.isEmpty {
+      try visitor.visitSingularStringField(value: self.batchID, fieldNumber: 1)
+    }
+    if self.partIndex != 0 {
+      try visitor.visitSingularUInt32Field(value: self.partIndex, fieldNumber: 2)
+    }
+    if self.conversationSequence != 0 {
+      try visitor.visitSingularUInt64Field(value: self.conversationSequence, fieldNumber: 3)
+    }
+    if self.purpose != .unspecified {
+      try visitor.visitSingularEnumField(value: self.purpose, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_DmMessageMetadata, rhs: BriarAPI_DmMessageMetadata) -> Bool {
+    if lhs.batchID != rhs.batchID {return false}
+    if lhs.partIndex != rhs.partIndex {return false}
+    if lhs.conversationSequence != rhs.conversationSequence {return false}
+    if lhs.purpose != rhs.purpose {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelMessage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}body\0\u{1}blocks\0\u{1}author\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{1}attachments\0\u{1}reactions\0\u{3}reply_count\0\u{3}last_reply_at\0\u{3}reply_authors\0\u{1}document\0\u{1}proposal\0\u{3}execution_proposal\0\u{3}skill_execution_proposal\0\u{1}subscribers\0\u{3}created_at\0\u{3}deleted_at\0\u{3}memory_citations\0\u{1}relay\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}body\0\u{1}blocks\0\u{1}author\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{1}attachments\0\u{1}reactions\0\u{3}reply_count\0\u{3}last_reply_at\0\u{3}reply_authors\0\u{1}document\0\u{1}proposal\0\u{3}execution_proposal\0\u{3}skill_execution_proposal\0\u{1}subscribers\0\u{3}created_at\0\u{3}deleted_at\0\u{3}memory_citations\0\u{1}relay\0\u{3}dm_metadata\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -7350,6 +7482,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
     var _deletedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _memoryCitations: [BriarAPI_DmMemoryReference] = []
     var _relay: BriarAPI_ChannelMessageRelay? = nil
+    var _dmMetadata: BriarAPI_DmMessageMetadata? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -7382,6 +7515,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
       _deletedAt = source._deletedAt
       _memoryCitations = source._memoryCitations
       _relay = source._relay
+      _dmMetadata = source._dmMetadata
     }
   }
 
@@ -7422,6 +7556,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._deletedAt) }()
         case 21: try { try decoder.decodeRepeatedMessageField(value: &_storage._memoryCitations) }()
         case 22: try { try decoder.decodeSingularMessageField(value: &_storage._relay) }()
+        case 23: try { try decoder.decodeSingularMessageField(value: &_storage._dmMetadata) }()
         default: break
         }
       }
@@ -7500,6 +7635,9 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
       try { if let v = _storage._relay {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
       } }()
+      try { if let v = _storage._dmMetadata {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -7531,6 +7669,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
         if _storage._deletedAt != rhs_storage._deletedAt {return false}
         if _storage._memoryCitations != rhs_storage._memoryCitations {return false}
         if _storage._relay != rhs_storage._relay {return false}
+        if _storage._dmMetadata != rhs_storage._dmMetadata {return false}
         return true
       }
       if !storagesAreEqual {return false}

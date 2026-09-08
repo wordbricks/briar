@@ -90,6 +90,31 @@ final class ChannelsStoreTests: XCTestCase {
         }
     }
 
+    func testDurableDmMetadataDecoderAcceptsContractRangeAndRejectsOutOfRangePartIndex() throws {
+        var wire = BriarAPI_DmMessageMetadata()
+        wire.batchID = "batch-1"
+        wire.partIndex = 7
+        wire.conversationSequence = 8
+        wire.purpose = .result
+
+        let decoded = try BriarAPI_DmMessageMetadata(
+            serializedBytes: wire.serializedData()
+        )
+        let mapped = try ChannelMessage.DmMetadata(connectMessage: decoded)
+        XCTAssertEqual(mapped.partIndex, 7)
+        XCTAssertEqual(mapped.conversationSequence, 8)
+        XCTAssertEqual(mapped.purpose, .result)
+
+        wire.partIndex = UInt32.max
+        let invalid = try BriarAPI_DmMessageMetadata(
+            serializedBytes: wire.serializedData()
+        )
+        XCTAssertThrowsError(try ChannelMessage.DmMetadata(connectMessage: invalid)) {
+            error in
+            XCTAssertEqual(error as? MobileAPIError, .invalidResponse)
+        }
+    }
+
     func testResetReplacesStateAndKeepsTerminalReplyTombstone() async throws {
         let oldMessageID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
         let replacementMessageID = UUID(

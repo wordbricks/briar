@@ -28,6 +28,7 @@ const agentBundles = [
   "opencode-runner.js",
   "pi-runner.js",
   "computer-use-mcp-server.js",
+  "dm-message-mcp-server.js",
 ];
 
 afterEach(async () => {

@@ -13,6 +13,8 @@ import {
   ChannelDocumentContentSchema,
   ChannelLinkPreviewSchema,
   ChannelMessageSchema,
+  DmMessageMetadataSchema,
+  DmMessagePurpose,
   ChannelProposalSchema,
   ChannelWebhookSchema,
   SyncChannelsResponseSchema,
@@ -291,6 +293,72 @@ describe("Channel Connect DTO mapping", () => {
       },
       createdAt: instant("2026-08-30T01:02:03.000Z"),
     }))).toThrow("Channel message author user id is missing");
+  });
+
+  it("maps durable DM message metadata", () => {
+    const mapped = channelMessageFromMessage(create(ChannelMessageSchema, {
+      id: "message-dm-part",
+      channelId: "channel-1",
+      author: {
+        author: {
+          case: "agent",
+          value: create(ChannelMessageAgentAuthorSchema, {
+            id: "agent-1",
+            name: "Builder",
+          }),
+        },
+      },
+      dmMetadata: create(DmMessageMetadataSchema, {
+        batchId: "batch-1",
+        partIndex: 1,
+        conversationSequence: 42n,
+        purpose: DmMessagePurpose.PROGRESS,
+      }),
+      createdAt: instant("2026-08-30T01:02:03.000Z"),
+    }));
+
+    expect(mapped.dmMetadata).toEqual({
+      batchId: "batch-1",
+      partIndex: 1,
+      conversationSequence: 42,
+      purpose: "progress",
+    });
+  });
+
+  it("rejects malformed durable DM message metadata", () => {
+    const messageWithMetadata = (
+      metadata: Parameters<typeof create<typeof DmMessageMetadataSchema>>[1],
+    ) => create(ChannelMessageSchema, {
+      id: "message-dm-part",
+      channelId: "channel-1",
+      author: {
+        author: {
+          case: "agent",
+          value: create(ChannelMessageAgentAuthorSchema, {
+            id: "agent-1",
+            name: "Builder",
+          }),
+        },
+      },
+      dmMetadata: create(DmMessageMetadataSchema, metadata),
+      createdAt: instant("2026-08-30T01:02:03.000Z"),
+    });
+
+    expect(() => channelMessageFromMessage(messageWithMetadata({
+      batchId: " ",
+      conversationSequence: 1n,
+      purpose: DmMessagePurpose.PROGRESS,
+    }))).toThrow("channelMessage.dmMetadata.batchId is missing");
+    expect(() => channelMessageFromMessage(messageWithMetadata({
+      batchId: "batch-1",
+      conversationSequence: 0n,
+      purpose: DmMessagePurpose.PROGRESS,
+    }))).toThrow("channelMessage.dmMetadata.conversationSequence is invalid");
+    expect(() => channelMessageFromMessage(messageWithMetadata({
+      batchId: "batch-1",
+      conversationSequence: 1n,
+      purpose: DmMessagePurpose.UNSPECIFIED,
+    }))).toThrow("Unknown DM message purpose");
   });
 
   it("preserves reset and rejects a cursor that JavaScript cannot represent", () => {

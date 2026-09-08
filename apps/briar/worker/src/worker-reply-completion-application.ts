@@ -68,6 +68,11 @@ import {
 } from "./workers";
 import { scheduleWhatsAppOutboxFlush } from "./whatsapp-outbox";
 import { wakeOrganizationWorkers } from "./worker-wake-hub";
+import {
+  findDmFinalPublicMessageForReply,
+  getDmFinalPublicMessageBatch,
+  getDmPublicMessageClaim,
+} from "./dm-public-message-repository";
 
 export class ReplyCompletionApplicationError extends Error {
   constructor(
@@ -120,6 +125,10 @@ export type ReplyCompletionApplicationServices = {
   readonly channelReplyWorkerAvailability: typeof channelReplyWorkerAvailability;
   readonly scheduleWhatsAppOutboxFlush: typeof scheduleWhatsAppOutboxFlush;
   readonly wakeOrganizationWorkers: typeof wakeOrganizationWorkers;
+  readonly findDmFinalPublicMessageForReply:
+    typeof findDmFinalPublicMessageForReply;
+  readonly getDmFinalPublicMessageBatch: typeof getDmFinalPublicMessageBatch;
+  readonly getDmPublicMessageClaim: typeof getDmPublicMessageClaim;
 };
 
 const applicationServices: ReplyCompletionApplicationServices = {
@@ -151,6 +160,9 @@ const applicationServices: ReplyCompletionApplicationServices = {
   channelReplyWorkerAvailability,
   scheduleWhatsAppOutboxFlush,
   wakeOrganizationWorkers,
+  findDmFinalPublicMessageForReply,
+  getDmFinalPublicMessageBatch,
+  getDmPublicMessageClaim,
 };
 
 /**
@@ -373,7 +385,11 @@ const completionPayloadHash = (
   attachmentIds: input.attachmentIds,
   outcome: input.outcome,
   ...(input.claim.replyKind === "channel"
-    ? { conversationId: (input as ChannelReplyCompletionInput).conversationId }
+    ? {
+        conversationId: (input as ChannelReplyCompletionInput).conversationId,
+        publishedFinalBatchId:
+          (input as ChannelReplyCompletionInput).publishedFinalBatchId,
+      }
     : {}),
 }));
 
@@ -413,6 +429,25 @@ const completionResult = (receipt: ReplyCompletionReceiptRow, replayed: boolean)
   disposition: receipt.disposition,
   retainedUntil: receipt.retained_until,
 });
+
+const completedDmPublicMessageReference = async (
+  db: D1Database,
+  request: ChannelReplyCompletionInput,
+  services: ReplyCompletionApplicationServices,
+) => {
+  if (!request.publishedFinalBatchId) return {};
+  const batch = await services.findDmFinalPublicMessageForReply(
+    db,
+    request.claim.workId,
+  );
+  if (!batch || batch.batchId !== request.publishedFinalBatchId) {
+    throw new Error("Completed DM reply lost its final public message batch");
+  }
+  return {
+    finalBatchId: batch.batchId,
+    finalMessageId: batch.messageIds.at(-1),
+  };
+};
 
 const completionCommit = (
   scope: ReplyClaimScope,
@@ -824,10 +859,71 @@ export async function completeChannelReplyApplication(
       input.context,
     );
     services.scheduleWhatsAppOutboxFlush(input.env, input.db, input.context);
-    return completionResult(replay, true);
+    return {
+      ...completionResult(replay, true),
+      ...await completedDmPublicMessageReference(
+        input.db,
+        input.request,
+        services,
+      ),
+    };
   }
   const claimed = await activeClaim(input.db, scope, observedAt, services);
   if (!claimed || !("channel_id" in claimed)) throw claimConflict();
+  let publishedFinal: Awaited<
+    ReturnType<typeof getDmFinalPublicMessageBatch>
+  > = null;
+  if (input.request.publishedFinalBatchId) {
+    if (input.request.outcome.case !== "success") {
+      throw new ReplyCompletionApplicationError(
+        "invalid_request",
+        "A failed reply cannot reference a final public message batch",
+      );
+    }
+    const result = input.request.outcome.completion;
+    if (
+      input.request.attachmentIds.length > 0 ||
+      result.memoryCitations?.length || result.memorySaveRequest ||
+      result.document || result.issueProposal || result.issueBatchProposal ||
+      result.executionProposal || result.skillExecutionProposal ||
+      result.delegation || result.agentMessage
+    ) {
+      throw new ReplyCompletionApplicationError(
+        "invalid_request",
+        "A published final DM batch cannot be combined with reply side effects",
+      );
+    }
+    await services.requireDmMemoryReplyFence(input.db, scope.workId);
+    const publicationScope = await services.getDmPublicMessageClaim(input.db, {
+      jobId: scope.workId,
+      organizationId: scope.organizationId,
+      workerId: scope.workerId,
+      deviceId: scope.deviceId,
+      claimTokenHash: scope.claimTokenHash,
+      observedAt,
+    });
+    if (!publicationScope || publicationScope.channel_id !== scope.runId) {
+      throw claimConflict();
+    }
+    publishedFinal = await services.getDmFinalPublicMessageBatch(input.db, {
+      batchId: input.request.publishedFinalBatchId,
+      jobId: publicationScope.job_id,
+      organizationId: publicationScope.organization_id,
+      channelId: publicationScope.channel_id,
+      ownerUserId: publicationScope.owner_user_id,
+      agentId: publicationScope.agent_id,
+      rosterEpoch: publicationScope.roster_epoch,
+      inputRevision: publicationScope.input_revision,
+      triggerMessageId: publicationScope.trigger_message_id,
+      triggerSourceVersion: publicationScope.trigger_source_version,
+    });
+    if (!publishedFinal || publishedFinal.finalMessageId !== claimed.reply_message_id) {
+      throw new ReplyCompletionApplicationError(
+        "claim_conflict",
+        "Final public message batch is outside this reply claim",
+      );
+    }
+  }
   const attachments = await services.resolveReplyCompletionAttachments(
     input.db,
     { ...scope, attachmentIds: input.request.attachmentIds, observedAt },
@@ -1054,7 +1150,7 @@ export async function completeChannelReplyApplication(
         deviceId: scope.deviceId,
         workerId: scope.workerId,
         claimTokenHash: scope.claimTokenHash,
-        body: result.body,
+        body: publishedFinal?.finalBody ?? result.body,
         acknowledgementReaction: result.acknowledgementReaction,
         memoryCitations: result.memoryCitations,
         memorySaveRequest: result.memorySaveRequest,
@@ -1069,6 +1165,7 @@ export async function completeChannelReplyApplication(
         agentProvider: claimed.agent_provider ?? agent.provider,
         completedAt: observedAt,
         conversationId: input.request.conversationId,
+        publishedFinalBatchId: publishedFinal?.batchId,
         whatsappAppOrigin: input.env.WHATSAPP_APP_ORIGIN?.trim() ||
           "https://briar.wordbricks.ai",
         attachments: attachments.map((attachment) => ({
@@ -1101,14 +1198,32 @@ export async function completeChannelReplyApplication(
       "channel_reply_completed",
       input.context,
     );
-    return { replayed: false, disposition, retainedUntil };
+    return {
+      replayed: false,
+      disposition,
+      retainedUntil,
+      ...(publishedFinal
+        ? {
+            finalBatchId: publishedFinal.batchId,
+            finalMessageId: publishedFinal.finalMessageId,
+          }
+        : {}),
+    };
   } catch (cause) {
     if (cause instanceof ReplyCompletionApplicationError) throw cause;
-    return recoverReceiptOrGuardConflict(input.db, {
+    const recovered = await recoverReceiptOrGuardConflict(input.db, {
       ...scope,
       requestId: input.request.requestId,
       payloadHash,
       observedAt,
     }, services, cause);
+    return {
+      ...recovered,
+      ...await completedDmPublicMessageReference(
+        input.db,
+        input.request,
+        services,
+      ),
+    };
   }
 }

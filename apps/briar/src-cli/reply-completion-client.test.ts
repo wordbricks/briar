@@ -255,6 +255,61 @@ describe("generated reply completion client", () => {
     })).rejects.toThrow("Channel reply action variants are mutually exclusive");
   });
 
+  it("completes a memory-rich result without a prepublished final receipt", async () => {
+    const completeChannel = vi.fn().mockResolvedValue({
+      replayed: false,
+      disposition: ReplyCompletionDisposition.COMPLETED,
+      retainedUntil: timestampFromDate(new Date("2026-08-31T16:00:00.000Z")),
+    });
+    const queue = {
+      prepareReplyAttachmentUploads: vi.fn(),
+      completeIssueReply: vi.fn(),
+      completeChannelReply: completeChannel,
+    } as unknown as ReplyCompletionQueueClient;
+    const client = createReplyCompletionClient(
+      "http://127.0.0.1:8787",
+      "worker-token",
+      { queue },
+    );
+
+    await expect(client.completeChannelReply({
+      projectId,
+      workerId,
+      work: channelWork,
+      outcome: {
+        case: "success",
+        conversationId: null,
+        attachments: [],
+        result: {
+          body: "I used and saved the requested memory.",
+          document: null,
+          issueProposal: null,
+          issueBatchProposal: null,
+          executionProposal: null,
+          skillExecutionProposal: null,
+          delegation: null,
+          agentMessage: null,
+          memoryCitations: [{ documentId: "memory-1", version: 2 }],
+          memorySaveRequest: {
+            documents: [{ documentId: "memory-2", version: 1 }],
+          },
+        },
+      },
+    })).resolves.toMatchObject({ disposition: "completed" });
+
+    expect(completeChannel.mock.calls[0]![0].outcome).toMatchObject({
+      case: "success",
+      value: {
+        memoryCitations: [{ documentId: "memory-1", version: 2 }],
+        memorySaveRequest: {
+          documents: [{ documentId: "memory-2", version: 1 }],
+        },
+      },
+    });
+    expect(completeChannel.mock.calls[0]![0].outcome.value)
+      .not.toHaveProperty("publishedFinalBatchId");
+  });
+
   it("uses the default crypto UUID function with its receiver intact", async () => {
     const completeIssue = vi.fn().mockResolvedValue({
       replayed: false,

@@ -197,6 +197,28 @@ const computerUseCapability = (
   };
 };
 
+const dmPublicMessageCapability = (
+  runtime: WorkerRuntimeAdvertisement,
+  healthyProviders: ReadonlySet<AgentProvider>,
+) => {
+  const capability = runtime.capabilities?.dmPublicMessages;
+  if (!capability) return null;
+  if (capability.protocol !== 1) {
+    return invalid("DM public message protocol must be version 1");
+  }
+  if (capability.providers.length === 0) {
+    return invalid("DM public messages must advertise at least one provider");
+  }
+  const providers = capability.providers.map(workerAgentProviderFromProto);
+  if (new Set(providers).size !== providers.length) {
+    return invalid("DM public message providers must be unique");
+  }
+  if (providers.some((provider) => !healthyProviders.has(provider))) {
+    return invalid("DM public message providers must also be healthy");
+  }
+  return { protocol: 1 as const, providers };
+};
+
 export type WorkerRuntimeMetadata = ReturnType<
   typeof workerRuntimeMetadataFromProto
 >;
@@ -223,6 +245,10 @@ export const workerRuntimeMetadataFromProto = (
     health[provider]?.healthy === true
   );
   const computerUse = computerUseCapability(runtime, new Set(providers));
+  const dmPublicMessages = dmPublicMessageCapability(
+    runtime,
+    new Set(providers),
+  );
   const runtimeProtoJson = toJsonString(
     WorkerRuntimeAdvertisementSchema,
     runtime,
@@ -241,6 +267,7 @@ export const workerRuntimeMetadataFromProto = (
     providerHealth: health,
     providerCapabilities: capabilityCatalog,
     computerUse,
+    dmPublicMessages,
     versions,
   };
 };
