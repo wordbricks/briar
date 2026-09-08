@@ -1,8 +1,9 @@
 /** @vitest-environment jsdom */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clearAgentUsageHistory,
+  compressedHistoryStorageKey,
   isProviderUsageExhausted,
   readAgentUsageHistory,
   recordAgentUsageSnapshot,
@@ -31,6 +32,11 @@ const provider: ProviderUsage = {
   updatedAt: 1,
   error: null,
 };
+
+afterEach(() => {
+  window.localStorage.clear();
+  vi.restoreAllMocks();
+});
 
 describe("agent usage presentation", () => {
   it("selects the most consumed window for the thin status bar", () => {
@@ -89,5 +95,61 @@ describe("agent usage presentation", () => {
     expect(readAgentUsageHistory()).toHaveLength(1);
     expect(readAgentUsageHistory()[0]?.updatedAt).toBe(62_000);
     clearAgentUsageHistory();
+  });
+
+  it("migrates the legacy aggregate and removes it", () => {
+    const snapshot = {
+      updatedAt: 61_000,
+      claude: { ...provider, provider: "claude" as const },
+      codex: provider,
+      grok: { ...provider, provider: "grok" as const },
+      agy: { ...provider, provider: "agy" as const },
+      opencode: { ...provider, provider: "opencode" as const },
+      openrouter: { ...provider, provider: "openrouter" as const },
+      vertex: { ...provider, provider: "vertex" as const },
+      pi: { ...provider, provider: "pi" as const },
+      cursor: { ...provider, provider: "cursor" as const },
+    };
+    localStorage.setItem(
+      "briar.agent-usage.history.v1",
+      JSON.stringify([snapshot]),
+    );
+
+    recordAgentUsageSnapshot({ ...snapshot, updatedAt: 121_000 });
+
+    expect(localStorage.getItem("briar.agent-usage.history.v1")).toBeNull();
+    expect(readAgentUsageHistory().map((item) => item.updatedAt)).toEqual([
+      121_000,
+      61_000,
+    ]);
+  });
+
+  it("stores a full history in one compact value", () => {
+    const snapshot = {
+      updatedAt: 61_000,
+      claude: { ...provider, provider: "claude" as const },
+      codex: provider,
+      grok: { ...provider, provider: "grok" as const },
+      agy: { ...provider, provider: "agy" as const },
+      opencode: { ...provider, provider: "opencode" as const },
+      openrouter: { ...provider, provider: "openrouter" as const },
+      vertex: { ...provider, provider: "vertex" as const },
+      pi: { ...provider, provider: "pi" as const },
+      cursor: { ...provider, provider: "cursor" as const },
+    };
+    for (let minute = 1; minute <= 96; minute += 1) {
+      recordAgentUsageSnapshot({ ...snapshot, updatedAt: minute * 60_000 });
+    }
+    const legacyBytes = JSON.stringify(readAgentUsageHistory()).length * 2;
+    const before = localStorage.getItem(compressedHistoryStorageKey);
+
+    recordAgentUsageSnapshot({ ...snapshot, updatedAt: 96 * 60_000 + 1 });
+
+    const compressed = localStorage.getItem(compressedHistoryStorageKey);
+    expect(compressed).not.toBe(before);
+    expect(localStorage).toHaveLength(1);
+    expect(localStorage.getItem("briar.agent-usage.history.v1")).toBeNull();
+    expect(compressed!.length * 2).toBeLessThan(legacyBytes / 15);
+    expect(readAgentUsageHistory()).toHaveLength(96);
   });
 });

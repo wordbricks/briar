@@ -7,6 +7,7 @@ import {
   type AgentUsageWindow,
   type ProviderUsage,
 } from "../generated/tauri";
+import { decodeCompressedJson, encodeCompressedJson } from "./compressed-json";
 
 export const quotaUsageProviders = [
   "claude",
@@ -41,7 +42,16 @@ export function quotaUsageProviderLabel(provider: AgentProviderKind) {
 }
 
 const historyStorageKey = "briar.agent-usage.history.v1";
+export const compressedHistoryStorageKey = "briar.agent-usage.history.v2";
 const historyLimit = 96;
+
+/*
+  Usage was originally one 96-sample JSON array. The status bar refreshes every
+  five minutes, so replacing that aggregate generated hundreds of megabytes of
+  WebKit SQLite WAL traffic per day. The current format compresses the same
+  bounded history before its single atomic localStorage write, avoiding a burst
+  of per-record transactions during an upgrade.
+*/
 
 const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -160,18 +170,25 @@ function parseUsageSnapshot(value: unknown): AgentUsageSnapshot | null {
   };
 }
 
+function parseAgentUsageHistory(parsed: unknown): AgentUsageSnapshot[] {
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map(parseUsageSnapshot)
+    .filter((snapshot): snapshot is AgentUsageSnapshot => snapshot !== null)
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .slice(0, historyLimit);
+}
+
 export function readAgentUsageHistory(): AgentUsageSnapshot[] {
   if (typeof window === "undefined") return [];
   try {
-    const parsed: unknown = JSON.parse(
-      window.localStorage.getItem(historyStorageKey) ?? "[]",
+    const compressed = window.localStorage.getItem(compressedHistoryStorageKey);
+    if (compressed !== null) {
+      return parseAgentUsageHistory(decodeCompressedJson(compressed));
+    }
+    return parseAgentUsageHistory(
+      JSON.parse(window.localStorage.getItem(historyStorageKey) ?? "[]"),
     );
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(parseUsageSnapshot)
-      .filter((snapshot): snapshot is AgentUsageSnapshot => snapshot !== null)
-      .sort((left, right) => right.updatedAt - left.updatedAt)
-      .slice(0, historyLimit);
   } catch {
     return [];
   }
@@ -180,6 +197,7 @@ export function readAgentUsageHistory(): AgentUsageSnapshot[] {
 export function recordAgentUsageSnapshot(
   snapshot: AgentUsageSnapshot,
 ): AgentUsageSnapshot[] {
+  if (typeof window === "undefined") return [snapshot];
   const minute = Math.floor(snapshot.updatedAt / 60_000);
   const history = [
     snapshot,
@@ -188,7 +206,11 @@ export function recordAgentUsageSnapshot(
     ),
   ].slice(0, historyLimit);
   try {
-    window.localStorage.setItem(historyStorageKey, JSON.stringify(history));
+    const encoded = encodeCompressedJson(history);
+    if (window.localStorage.getItem(compressedHistoryStorageKey) !== encoded) {
+      window.localStorage.setItem(compressedHistoryStorageKey, encoded);
+    }
+    window.localStorage.removeItem(historyStorageKey);
   } catch {
     // The current session can still show the newly collected snapshot.
   }
@@ -197,6 +219,7 @@ export function recordAgentUsageSnapshot(
 
 export function clearAgentUsageHistory() {
   try {
+    window.localStorage.removeItem(compressedHistoryStorageKey);
     window.localStorage.removeItem(historyStorageKey);
   } catch {
     // Ignore storage failures; callers still clear their in-memory history.

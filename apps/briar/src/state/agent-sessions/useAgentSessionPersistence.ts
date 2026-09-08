@@ -13,9 +13,9 @@ import {
 
   Only the write side lives here: the read is the lazy body of the atoms, so a
   boot already renders yesterday's sessions before any effect has run. Writes
-  are coalesced, because settling a session touches the list three times in as
-  many ticks and each write serializes the whole log. Leaving the page flushes
-  immediately, since there may be no next tick.
+  are coalesced because settling a session touches the list three times in as
+  many ticks. The storage codec compresses the list before its one atomic write.
+  Leaving the page flushes immediately, since there may be no next tick.
 */
 
 /** How long changes are collected before one record is written. */

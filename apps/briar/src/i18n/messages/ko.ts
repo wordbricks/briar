@@ -181,6 +181,8 @@ export const ko = {
   "image.enlarge": "{name} 크게 보기",
   "image.download": "{name} 다운로드",
   "session.restoring": "로그인 정보를 확인하는 중입니다",
+  "session.restoreFailed": "로그인 정보를 확인하지 못했습니다",
+  "session.retry": "다시 시도",
   "sidebar.close": "왼쪽 패널 닫기",
   "sidebar.open": "왼쪽 패널 열기",
   "sidebar.resizeSidebar": "사이드바 크기 조절",

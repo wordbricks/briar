@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { testAgentSession } from "../../test/agent-sessions";
 import type { AutoHuntSession } from "../../types";
 import {
+  AGENT_SESSION_COMPRESSED_STORAGE_KEY,
   AGENT_SESSION_STORAGE_KEY,
   readStoredAgentSessions,
   writeStoredAgentSessions,
@@ -12,14 +13,21 @@ import {
 /** A `localStorage` stand-in that records what was written to it. */
 const fakeStorage = (initial?: string): AgentSessionStorage & {
   readonly items: Map<string, string>;
+  readonly writes: { key: string; value: string }[];
 } => {
   const items = new Map<string, string>();
+  const writes: { key: string; value: string }[] = [];
   if (initial !== undefined) items.set(AGENT_SESSION_STORAGE_KEY, initial);
   return {
     items,
+    writes,
     getItem: (key) => items.get(key) ?? null,
     setItem: (key, value) => {
       items.set(key, value);
+      writes.push({ key, value });
+    },
+    removeItem: (key) => {
+      items.delete(key);
     },
   };
 };
@@ -30,6 +38,9 @@ const brokenStorage: AgentSessionStorage = {
   },
   setItem: () => {
     throw new Error("storage is full");
+  },
+  removeItem: () => {
+    throw new Error("storage is unavailable");
   },
 };
 
@@ -94,16 +105,36 @@ describe("readStoredAgentSessions", () => {
 });
 
 describe("writeStoredAgentSessions", () => {
-  it("round-trips through the legacy key", () => {
-    const storage = fakeStorage();
+  it("migrates the legacy array to one compressed value", () => {
     const sessions: AutoHuntSession[] = [
       testAgentSession("session-1", { status: "completed" }),
     ];
+    const storage = fakeStorage(JSON.stringify(sessions));
     writeStoredAgentSessions(storage, sessions);
-    expect(storage.items.get(AGENT_SESSION_STORAGE_KEY)).toBe(
-      JSON.stringify(sessions),
-    );
+    expect(storage.items.has(AGENT_SESSION_STORAGE_KEY)).toBe(false);
+    expect(storage.items.has(AGENT_SESSION_COMPRESSED_STORAGE_KEY)).toBe(true);
+    expect(storage.writes).toHaveLength(1);
     expect(readStoredAgentSessions(storage)).toEqual(sessions);
+  });
+
+  it("uses one compact atomic write when a session changes", () => {
+    const storage = fakeStorage();
+    const first = testAgentSession("session-1", { status: "running" });
+    const second = testAgentSession("session-2", { status: "completed" });
+    writeStoredAgentSessions(storage, [first, second]);
+    const writesBeforeUpdate = storage.writes.length;
+
+    writeStoredAgentSessions(storage, [
+      { ...first, status: "completed" },
+      second,
+    ]);
+
+    expect(storage.writes).toHaveLength(writesBeforeUpdate + 1);
+    expect(storage.writes.at(-1)?.key).toBe(
+      AGENT_SESSION_COMPRESSED_STORAGE_KEY,
+    );
+    expect(readStoredAgentSessions(storage).map((session) => session.status))
+      .toEqual(["completed", "completed"]);
   });
 
   it("tolerates a storage that refuses the write", () => {

@@ -122,11 +122,18 @@ class BootServer {
   readonly snapshotRequests: string[] = [];
   readonly deltaRequests: { teamId: string; cursor: number }[] = [];
   private pendingSession: ((value: SessionUser) => void)[] = [];
+  private pendingInventory: ((value: string[]) => void)[] = [];
   /** Answers every delta with an expired cursor, as a server would. */
   expireCursor = false;
+  holdInventory = false;
 
   readonly dataSources: SessionDataSources = {
-    loadConnectedTeamIds: async () => [],
+    loadConnectedTeamIds: () =>
+      this.holdInventory
+        ? new Promise<string[]>((resolve) => {
+            this.pendingInventory.push(resolve);
+          })
+        : Promise.resolve([]),
     loadDashboard: (_token, teamId) => {
       this.snapshotRequests.push(teamId);
       return Promise.resolve(freshPayload);
@@ -164,6 +171,12 @@ class BootServer {
     this.pendingSession = [];
     for (const resolve of pending) resolve(user);
   }
+
+  releaseInventory() {
+    const pending = this.pendingInventory;
+    this.pendingInventory = [];
+    for (const resolve of pending) resolve([]);
+  }
 }
 
 const gateProps: Omit<AuthGateProps, "children"> = {
@@ -198,8 +211,12 @@ const bootGate = () =>
 const board = () =>
   view.container.querySelector("[data-testid=board]")?.textContent ?? null;
 
-const mount = async (record: ClientSnapshot | null) => {
+const mount = async (
+  record: ClientSnapshot | null,
+  options: { readonly holdInventory?: boolean } = {},
+) => {
   server = new BootServer();
+  server.holdInventory = options.holdInventory ?? false;
   registry = createTestRegistry();
   store = createMemorySnapshotStore();
   setSnapshotStore(registry, store);
@@ -280,6 +297,18 @@ describe("cold boot", () => {
     expect([...store.entries().keys()]).toEqual([
       snapshotKey(user.id, organization.id),
     ]);
+  });
+
+  it("opens the shell before a slow local inventory inspection completes", async () => {
+    await mount(null, { holdInventory: true });
+    expect(bootGate()).not.toBeNull();
+
+    server.releaseSession();
+    await flush();
+
+    expect(bootGate()).toBeNull();
+    expect(board()).toBe("Today's run");
+    server.releaseInventory();
   });
 
   it("asks for a snapshot when the stored cursor expired", async () => {

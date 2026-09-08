@@ -95,7 +95,14 @@ export function AuthGate({
   } = useSessionActions();
 
   const signedOutGate = () => {
-    if (restoringSession) return <SessionLoadingScreen />;
+    if (restoringSession) {
+      return (
+        <SessionLoadingScreen
+          error={error}
+          onRetry={() => window.location.reload()}
+        />
+      );
+    }
     if (invitationToken) {
       return (
         <Suspense fallback={lazyViewFallback}>

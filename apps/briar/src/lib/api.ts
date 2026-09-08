@@ -362,8 +362,11 @@ export async function deleteInboxReadState(
   return decodeInboxReadVersions(await deleteInboxReadStateRpc(token, messageId));
 }
 
-export async function loadTeams(token: string): Promise<Project[]> {
-  return listTeams(token);
+export async function loadTeams(
+  token: string,
+  signal?: AbortSignal,
+): Promise<Project[]> {
+  return listTeams(token, signal);
 }
 
 const normalizeDashboardRuns = (runs: DashboardPayload["runs"]) =>
