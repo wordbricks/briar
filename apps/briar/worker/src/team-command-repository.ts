@@ -17,6 +17,7 @@ export type TeamIconUpdate =
 
 import { archiveCleanupQueueUpsertSql } from "./archive-cleanup-repository";
 import { stableJson } from "./hunt-run-codec";
+import { asTeamId, type TeamIdLike } from "../../src/lib/entity-ids";
 import { type TeamAgentRow } from "./team-agent-model";
 
 export async function createTeam(
@@ -31,7 +32,7 @@ export async function createTeam(
 ) {
   const createdAt = new Date().toISOString();
   const team: TeamRow = {
-    id: crypto.randomUUID(),
+    id: asTeamId(crypto.randomUUID()),
     name: input.name,
     issue_key_prefix: "AH",
     schedule_tab_enabled: 1,
@@ -127,9 +128,13 @@ export async function createTeam(
   return team;
 }
 
+// TODO(team-id-brand): tighten to `projectId: TeamId` once the ~30 app-layer
+// call sites that still pass an unbranded string have been threaded through.
+// `TeamIdLike` already rejects a PlanningProjectId here, and the returned
+// `TeamRow.id` is branded, so everything downstream of `getTeam` is covered.
 export async function getTeam(
   db: D1Database,
-  projectId: string,
+  projectId: TeamIdLike,
   userId: string,
 ) {
   const accessibleTeam = () => db.prepare(

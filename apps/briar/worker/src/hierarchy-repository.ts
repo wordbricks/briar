@@ -1,8 +1,13 @@
+import {
+  asPlanningProjectId,
+  type PlanningProjectId,
+  type TeamId,
+} from "../../src/lib/entity-ids";
 import type { OrganizationRole } from "./organization-repository";
 import type { PlanningProjectStatus } from "./hierarchy-request-contract";
 
 export type TeamHierarchyRow = {
-  id: string;
+  id: TeamId;
   workspace_id: string;
   workspace_name: string;
   name: string;
@@ -18,8 +23,8 @@ export type TeamHierarchyRow = {
 };
 
 export type PlanningProjectRow = {
-  id: string;
-  team_id: string;
+  id: PlanningProjectId;
+  team_id: TeamId;
   team_name: string;
   workspace_id: string;
   workspace_name: string;
@@ -43,9 +48,10 @@ export type ProjectIssueRow = {
   id: string;
   run_number: number;
   workspace_id: string;
-  team_id: string;
+  team_id: TeamId;
   team_name: string;
-  project_id: string;
+  /** `briar_planning_projects.id`, not the Team id that `project_id` means elsewhere. */
+  project_id: PlanningProjectId;
   project_name: string;
   issue_key_prefix: string;
   source: string;
@@ -112,7 +118,7 @@ export async function listTeams(db: D1Database, userId: string) {
 
 export async function getTeamForUser(
   db: D1Database,
-  teamId: string,
+  teamId: TeamId,
   userId: string,
 ) {
   return await db.prepare(
@@ -148,7 +154,7 @@ const projectAccessSelect = `
 
 export async function listTeamProjects(
   db: D1Database,
-  teamId: string,
+  teamId: TeamId,
   userId: string,
 ) {
   const rows = await db.prepare(
@@ -165,7 +171,7 @@ export async function listTeamProjects(
 
 export async function getPlanningProjectForUser(
   db: D1Database,
-  projectId: string,
+  projectId: PlanningProjectId,
   userId: string,
 ) {
   return await db.prepare(
@@ -178,7 +184,10 @@ export async function getPlanningProjectForUser(
   ).bind(projectId, userId).first<PlanningProjectRow>();
 }
 
-export async function getPlanningProject(db: D1Database, projectId: string) {
+export async function getPlanningProject(
+  db: D1Database,
+  projectId: PlanningProjectId,
+) {
   return await db.prepare(
     `select project.id, project.team_id, team.name as team_name,
             team.organization_id as workspace_id,
@@ -198,17 +207,17 @@ export async function getPlanningProject(db: D1Database, projectId: string) {
 
 export async function getDefaultProjectForTeam(
   db: D1Database,
-  teamId: string,
+  teamId: TeamId,
 ) {
   return await db.prepare(
     `select id from briar_planning_projects
      where team_id = ? and is_default = 1`,
-  ).bind(teamId).first<{ id: string }>();
+  ).bind(teamId).first<{ id: PlanningProjectId }>();
 }
 
 export async function assignIssueToPlanningProject(
   db: D1Database,
-  input: { runId: string; teamId: string; projectId: string },
+  input: { runId: string; teamId: TeamId; projectId: PlanningProjectId },
 ) {
   const result = await db.prepare(
     `update briar_hunt_runs
@@ -231,7 +240,7 @@ export async function assignIssueToPlanningProject(
 export async function createPlanningProject(
   db: D1Database,
   input: {
-    teamId: string;
+    teamId: TeamId;
     name: string;
     description?: string;
     status?: PlanningProjectStatus;
@@ -243,7 +252,7 @@ export async function createPlanningProject(
     sortOrder?: number;
   },
 ) {
-  const id = crypto.randomUUID();
+  const id = asPlanningProjectId(crypto.randomUUID());
   const observedAt = new Date().toISOString();
   await db.prepare(
     `insert into briar_planning_projects (
@@ -271,7 +280,7 @@ export async function createPlanningProject(
 
 export async function updatePlanningProject(
   db: D1Database,
-  projectId: string,
+  projectId: PlanningProjectId,
   input: {
     name?: string;
     description?: string;
@@ -326,7 +335,7 @@ export async function updatePlanningProject(
 
 export async function archivePlanningProject(
   db: D1Database,
-  projectId: string,
+  projectId: PlanningProjectId,
 ) {
   const result = await db.prepare(
     `update briar_planning_projects
@@ -339,9 +348,9 @@ export async function archivePlanningProject(
 export async function deletePlanningProject(
   db: D1Database,
   input: {
-    projectId: string;
-    teamId: string;
-    defaultProjectId: string;
+    projectId: PlanningProjectId;
+    teamId: TeamId;
+    defaultProjectId: PlanningProjectId;
   },
 ) {
   const observedAt = new Date().toISOString();
@@ -371,7 +380,7 @@ export async function deletePlanningProject(
 
 export async function listProjectIssues(
   db: D1Database,
-  projectId: string,
+  projectId: PlanningProjectId,
   userId: string,
 ) {
   const rows = await db.prepare(
@@ -407,8 +416,8 @@ export async function moveIssueWithinTeam(
   db: D1Database,
   input: {
     runId: string;
-    sourceProjectId: string;
-    targetProjectId: string;
+    sourceProjectId: PlanningProjectId;
+    targetProjectId: PlanningProjectId;
     userId: string;
   },
 ) {
@@ -481,7 +490,7 @@ export async function listTeamAgentsAndSchedules(
 
 export async function resolveIssueHierarchyLocation(
   db: D1Database,
-  input: { sourceTeamId: string; runId: string; userId: string },
+  input: { sourceTeamId: TeamId; runId: string; userId: string },
 ) {
   return db.prepare(
     `select team.organization_id as workspace_id, team.id as team_id,
@@ -517,8 +526,9 @@ export async function resolveIssueHierarchyLocation(
     input.sourceTeamId,
   ).first<{
     workspace_id: string;
-    team_id: string;
-    project_id: string;
+    team_id: TeamId;
+    /** `project.id` here is the planning project, not the Team. */
+    project_id: PlanningProjectId;
     project_name: string;
   }>();
 }

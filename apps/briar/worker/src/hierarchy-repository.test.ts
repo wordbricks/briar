@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { asTeamId } from "../../src/lib/entity-ids";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   createPlanningProject,
@@ -19,8 +20,8 @@ describe("Workspace Team Project Issue hierarchy", () => {
   const ownerId = "22222222-2222-4222-8222-222222222222";
   const memberId = "33333333-3333-4333-8333-333333333333";
   const outsiderId = "44444444-4444-4444-8444-444444444444";
-  const teamAId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-  const teamBId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const teamAId = asTeamId("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  const teamBId = asTeamId("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
   const runId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
   const now = "2026-08-31T00:00:00.000Z";
 

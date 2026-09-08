@@ -17,6 +17,10 @@ import {
   UploadReferenceSchema,
 } from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import {
+  asPlanningProjectId,
+  asTeamId,
+} from "../../src/lib/entity-ids";
+import {
   appAcceptIssueActionProposalResponse,
   appAcceptIssueExecutionProposalResponse,
   appAcceptIssueReworkProposalResponse,
@@ -192,6 +196,14 @@ export const appConnectIssueServices: AppConnectIssueServices = {
 const decodeUuid = decodeRequestSync(UuidString);
 
 const canonicalUuid = (value: string) => decodeUuid(value).toLowerCase();
+/**
+ * System edge: protobuf carries every id as a plain string. The RPC field that
+ * supplied it is what tells the two "project" concepts apart, so re-attach the
+ * brand here instead of casting further down the call chain.
+ */
+const canonicalTeamId = (value: string) => asTeamId(canonicalUuid(value));
+const canonicalPlanningProjectId = (value: string) =>
+  asPlanningProjectId(canonicalUuid(value));
 
 const preparedIssueAttachmentsResponse = (
   input: AppConnectIssueRouteInput,
@@ -268,7 +280,7 @@ export const createAppIssueService = (
     const result = await services.prepareCreateAttachments({
       db: input.db,
       signingSecret: input.env.BETTER_AUTH_SECRET,
-      projectId: canonicalUuid(request.projectId),
+      projectId: canonicalTeamId(request.projectId),
       userId: session.user.id,
       preparationRequestId: canonicalUuid(request.preparationRequestId),
       mutationId: canonicalUuid(request.clientIssueId),
@@ -282,11 +294,11 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.createIssue({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         userId: session.user.id,
         clientIssueId: canonicalUuid(request.clientIssueId),
         planningProjectId: request.planningProjectId
-          ? canonicalUuid(request.planningProjectId)
+          ? canonicalPlanningProjectId(request.planningProjectId)
           : undefined,
         request: createIssueApplicationRequest(request),
         attachmentIds: request.attachments.map((attachment) =>
@@ -303,7 +315,7 @@ export const createAppIssueService = (
     const result = await services.prepareUpdateAttachments({
       db: input.db,
       signingSecret: input.env.BETTER_AUTH_SECRET,
-      projectId: canonicalUuid(request.projectId),
+      projectId: canonicalTeamId(request.projectId),
       runId: canonicalUuid(request.runId),
       userId: session.user.id,
       preparationRequestId: canonicalUuid(request.preparationRequestId),
@@ -318,7 +330,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.updateIssue({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         requestId: canonicalUuid(request.requestId),
@@ -337,7 +349,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.deleteIssue({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         attachmentsBucket: input.env.ATTACHMENTS,
@@ -356,7 +368,7 @@ export const createAppIssueService = (
       [request.projectId, targetProjectId],
       () => services.transferIssue({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: { targetProjectId },
@@ -370,7 +382,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.setSubscription({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         subscribed: request.subscribed,
@@ -384,7 +396,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.updatePreferences({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: {
@@ -404,7 +416,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.updateCheckpoints({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: {
@@ -420,7 +432,7 @@ export const createAppIssueService = (
   },
 
   setIssueDependency: async (request) => {
-    const projectId = canonicalUuid(request.projectId);
+    const projectId = canonicalTeamId(request.projectId);
     const dependentRunId = canonicalUuid(request.runId);
     const prerequisiteRunId = canonicalUuid(request.prerequisiteRunId);
     const session = await services.requireSession(input.auth, input.request);
@@ -438,7 +450,7 @@ export const createAppIssueService = (
   },
 
   setIssueParent: async (request) => {
-    const projectId = canonicalUuid(request.projectId);
+    const projectId = canonicalTeamId(request.projectId);
     const childRunId = canonicalUuid(request.childRunId);
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [projectId], () =>
@@ -460,7 +472,7 @@ export const createAppIssueService = (
   },
 
   setRelatedIssue: async (request) => {
-    const projectId = canonicalUuid(request.projectId);
+    const projectId = canonicalTeamId(request.projectId);
     const session = await services.requireSession(input.auth, input.request);
     const result = await mutated(input, [projectId], () =>
       services.setRelated({
@@ -484,7 +496,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.moveRun({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: {
@@ -502,7 +514,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.recoverRun({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         action: "retry",
@@ -520,7 +532,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.recoverRun({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         action: "cancel",
@@ -538,7 +550,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.resumeRun({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: {
@@ -564,7 +576,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.reworkRun({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: {
@@ -585,7 +597,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.unassignRun({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: { requestId: canonicalUuid(request.requestId) },
@@ -603,7 +615,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.dispatchRun({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         reassign: false,
@@ -632,7 +644,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.dispatchRun({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         reassign: true,
@@ -657,7 +669,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.completeResultReview({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
       })
@@ -670,7 +682,7 @@ export const createAppIssueService = (
     const result = await services.listMessages({
       db: input.db,
       archivesBucket: input.env.ARCHIVES,
-      projectId: canonicalUuid(request.projectId),
+      projectId: canonicalTeamId(request.projectId),
       runId: canonicalUuid(request.runId),
       userId: session.user.id,
     });
@@ -688,7 +700,7 @@ export const createAppIssueService = (
     const applicationInput = {
       db: input.db,
       archivesBucket: input.env.ARCHIVES,
-      projectId: canonicalUuid(request.projectId),
+      projectId: canonicalTeamId(request.projectId),
       runId: canonicalUuid(request.runId),
       userId: session.user.id,
     };
@@ -711,7 +723,7 @@ export const createAppIssueService = (
     const result = await services.prepareMessageAttachments({
       db: input.db,
       signingSecret: input.env.BETTER_AUTH_SECRET,
-      projectId: canonicalUuid(request.projectId),
+      projectId: canonicalTeamId(request.projectId),
       runId: canonicalUuid(request.runId),
       userId: session.user.id,
       preparationRequestId: canonicalUuid(request.preparationRequestId),
@@ -728,7 +740,7 @@ export const createAppIssueService = (
         db: input.db,
         env: input.env,
         context: input.context,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         userId: session.user.id,
         request: createIssueMessageApplicationRequest(request),
@@ -745,7 +757,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.updateMessage({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         messageId: canonicalUuid(request.messageId),
         userId: session.user.id,
@@ -763,7 +775,7 @@ export const createAppIssueService = (
     const result = await mutated(input, [request.projectId], () =>
       services.deleteMessage({
         db: input.db,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         runId: canonicalUuid(request.runId),
         messageId: canonicalUuid(request.messageId),
         userId: session.user.id,
@@ -777,7 +789,7 @@ export const createAppIssueService = (
     const result = await services.getAgentReply({
       db: input.db,
       archivesBucket: input.env.ARCHIVES,
-      projectId: canonicalUuid(request.projectId),
+      projectId: canonicalTeamId(request.projectId),
       runId: canonicalUuid(request.runId),
       triggerMessageId: canonicalUuid(request.triggerMessageId),
       userId: session.user.id,
@@ -790,7 +802,7 @@ export const createAppIssueService = (
     const result = await services.listEvidence({
       db: input.db,
       archivesBucket: input.env.ARCHIVES,
-      projectId: canonicalUuid(request.projectId),
+      projectId: canonicalTeamId(request.projectId),
       runId: canonicalUuid(request.runId),
       userId: session.user.id,
     });
@@ -803,7 +815,7 @@ export const createAppIssueService = (
       services.acceptReworkProposal({
         db: input.db,
         archivesBucket: input.env.ARCHIVES,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         conversationRunId: canonicalUuid(request.runId),
         proposalId: canonicalUuid(request.proposalId),
         userId: session.user.id,
@@ -818,7 +830,7 @@ export const createAppIssueService = (
       services.acceptActionProposal({
         db: input.db,
         archivesBucket: input.env.ARCHIVES,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         conversationRunId: canonicalUuid(request.runId),
         proposalId: canonicalUuid(request.proposalId),
         userId: session.user.id,
@@ -837,7 +849,7 @@ export const createAppIssueService = (
       services.acceptExecutionProposal({
         db: input.db,
         archivesBucket: input.env.ARCHIVES,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         conversationRunId: canonicalUuid(request.conversationRunId),
         proposalId: canonicalUuid(request.proposalId),
         userId: session.user.id,
@@ -858,7 +870,7 @@ export const createAppIssueService = (
       services.acceptSkillExecutionProposal({
         db: input.db,
         archivesBucket: input.env.ARCHIVES,
-        projectId: canonicalUuid(request.projectId),
+        projectId: canonicalTeamId(request.projectId),
         conversationRunId: canonicalUuid(request.conversationRunId),
         proposalId: canonicalUuid(request.proposalId),
         userId: session.user.id,
@@ -869,7 +881,7 @@ export const createAppIssueService = (
       scheduleProjectAgentSessionRealtimePublish(
         input.env,
         input.db,
-        canonicalUuid(request.projectId),
+        canonicalTeamId(request.projectId),
         input.context,
       );
     }

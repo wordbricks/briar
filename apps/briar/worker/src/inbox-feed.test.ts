@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { asTeamId } from "../../src/lib/entity-ids";
 import {
   buildInboxFeedMessages,
   type InboxFeedProjectData,
@@ -51,7 +52,7 @@ function projectData(
   status: "completed" | "blocked",
 ): InboxFeedProjectData {
   return {
-    project: { id, name, issue_key_prefix: "BR" },
+    project: { id: asTeamId(id), name, issue_key_prefix: "BR" },
     runs: [{
       id: runId,
       run_number: 1,

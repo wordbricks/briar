@@ -12,6 +12,7 @@ import type {
   IssueConversationNotificationRow,
   TeamAgentSessionSummaryRow,
 } from "./db";
+import type { PlanningProjectId, TeamId } from "../../src/lib/entity-ids";
 import type { TeamRow } from "./team-repository";
 
 const notifyingRunStatuses = new Set([
@@ -98,11 +99,12 @@ export type InboxFeedProjectData = {
 export type InboxFeedMessage = {
   id: string;
   kind: "issue" | "conversation" | "channel" | "session";
-  projectId: string;
+  /** The owning Team, despite the legacy `project` wording. */
+  projectId: TeamId;
   projectName: string;
   workspaceId?: string;
-  teamId?: string;
-  planningProjectId?: string | null;
+  teamId?: TeamId;
+  planningProjectId?: PlanningProjectId | null;
   planningProjectName?: string | null;
   targetId: string;
   title: string;

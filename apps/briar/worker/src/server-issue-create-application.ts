@@ -13,6 +13,7 @@ import {
   type IssueCreateAttribution,
 } from "./issue-core-routes";
 import { digestRunId } from "./run-identity";
+import type { TeamId } from "../../src/lib/entity-ids";
 
 export type ServerIssueCreateApplicationServices = {
   readonly prepareUploads:
@@ -73,7 +74,8 @@ export async function createIssueFromServerFilesApplication(
     db: D1Database;
     attachmentsBucket: R2Bucket;
     signingSecret: string;
-    projectId: string;
+    /** `briar_teams.id`, despite the legacy `project` wording. */
+    projectId: TeamId;
     userId: string;
     sourceKey: string;
     request: unknown;

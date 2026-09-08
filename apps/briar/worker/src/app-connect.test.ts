@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { asTeamId } from "../../src/lib/entity-ids";
 import type { BriarAuth } from "./auth";
 import { HttpError } from "./http-response";
 import {
@@ -13,7 +14,7 @@ const listTeamsUrl =
   "https://api.example.test/briar.app.v1.TeamService/ListTeams";
 
 const projectRow = {
-  id: "11111111-1111-4111-8111-111111111111",
+  id: asTeamId("11111111-1111-4111-8111-111111111111"),
   name: "Briar",
   issue_key_prefix: "BR",
   schedule_tab_enabled: 1,

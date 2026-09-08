@@ -2,6 +2,7 @@ import {
   type AutoHuntRunStatus,
   type DashboardStage,
 } from "../../src/lib/auto-hunt-contract";
+import type { TeamIdLike } from "../../src/lib/entity-ids";
 
 import { type HuntEventRow } from "./hunt-event-model";
 import { getHuntRunForProject } from "./hunt-run-repository";
@@ -17,7 +18,7 @@ export type HuntRecoveryOutcome =
 
 export async function recoverHuntRun(
   db: D1Database,
-  projectId: string,
+  projectId: TeamIdLike,
   input: {
     runId: string;
     action: HuntRecoveryAction;

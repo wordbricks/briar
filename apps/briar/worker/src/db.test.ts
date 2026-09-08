@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { asTeamId } from "../../src/lib/entity-ids";
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -244,7 +245,7 @@ const checkpointWorkflowSnapshot = (
     },
     completion: workflow.completion,
   });
-const projectId = "11111111-1111-4111-8111-111111111111";
+const projectId = asTeamId("11111111-1111-4111-8111-111111111111");
 const baseTime = Date.parse("2026-07-21T00:00:00Z");
 const atMinute = (minute: number) =>
   new Date(baseTime + minute * 60_000).toISOString();

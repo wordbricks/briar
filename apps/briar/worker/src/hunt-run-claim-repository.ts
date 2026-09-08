@@ -7,10 +7,11 @@ import {
 import { type HuntEventInput } from "./hunt-event-model";
 import { HuntClaimError } from "./hunt-run-errors";
 import { type HuntRunRow } from "./hunt-run-model";
+import type { TeamId, TeamIdLike } from "../../src/lib/entity-ids";
 
 export async function claimNextQueuedHuntRun(
   db: D1Database,
-  projectId: string,
+  projectId: TeamIdLike,
   input: {
     claimTokenHash: string;
     claimedBy: string;
@@ -250,7 +251,7 @@ export async function claimNextQueuedHuntRun(
 
 export async function assertQueuedHuntClaim(
   db: D1Database,
-  projectId: string,
+  projectId: TeamIdLike,
   input: Pick<HuntEventInput, "source" | "sourceKey">,
   claimTokenHash: string | null,
   observedAt: string,
@@ -325,12 +326,13 @@ export async function findProjectIdByAgentTokenHash(
        limit 1`,
     )
     .bind(agentTokenHash, agentTokenHash)
-    .first<string>("project_id");
+    // D1 edge: `briar_project_agent_tokens.project_id` is a Team id.
+    .first<TeamId>("project_id");
 }
 
 export async function issueProjectAgentToken(
   db: D1Database,
-  projectId: string,
+  projectId: TeamIdLike,
   userId: string,
   agentTokenHash: string,
 ) {

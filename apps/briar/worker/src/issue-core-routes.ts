@@ -51,6 +51,10 @@ import { sha256 } from "./crypto-digest";
 import { listProjectMembers } from "./organization-repository";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 import { decodeIssueCheckpointsInput } from "./run-request-contract";
+import type {
+  PlanningProjectId,
+  TeamId,
+} from "../../src/lib/entity-ids";
 import { getPlanningProjectForUser } from "./hierarchy-repository";
 import {
   createIssueParentStatement,
@@ -102,7 +106,8 @@ type UpdateProjectIssueResult = IssueUpdateMutationReceiptResponse;
 
 type IssueCoreApplicationInput = {
   db: D1Database;
-  projectId: string;
+  /** `briar_teams.id`, despite the legacy `project` wording. */
+  projectId: TeamId;
   userId: string;
 };
 
@@ -124,7 +129,7 @@ export async function createProjectIssue(
   input: IssueCoreApplicationInput & {
     request: unknown;
     clientIssueId: string;
-    planningProjectId?: string;
+    planningProjectId?: PlanningProjectId;
     attachmentIds: readonly string[];
     attribution?: IssueCreateAttribution;
   },

@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { asTeamId } from "../../src/lib/entity-ids";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { type HandlerContext } from "@connectrpc/connect";
 import {
@@ -26,7 +27,7 @@ import {
   type WorkerExecutionServices,
 } from "./worker-connect-execution";
 
-const projectId = "11111111-1111-4111-8111-111111111111";
+const projectId = asTeamId("11111111-1111-4111-8111-111111111111");
 const otherProjectId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
 const context = {} as HandlerContext;

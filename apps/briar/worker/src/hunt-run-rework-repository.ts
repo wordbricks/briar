@@ -3,6 +3,7 @@ import {
   type DashboardStage,
   type AutoHuntWorkflowStageId,
 } from "../../src/lib/auto-hunt-contract";
+import type { TeamIdLike } from "../../src/lib/entity-ids";
 
 import { isChannelApprovedIssue } from "./channel-issue-approval-repository";
 import { type HuntEventRow } from "./hunt-event-model";
@@ -17,7 +18,7 @@ export type HuntReworkOutcome =
 
 export async function reworkHuntRun(
   db: D1Database,
-  projectId: string,
+  projectId: TeamIdLike,
   input: {
     runId: string;
     workflowStage: AutoHuntWorkflowStageId;
