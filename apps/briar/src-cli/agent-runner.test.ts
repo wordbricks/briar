@@ -717,6 +717,34 @@ describe("detached Agent runner", () => {
     expect(prompt.length).toBeLessThan(20_000);
   });
 
+  it("points the reply at downloaded attachment files and names the ones it never received", () => {
+    const prompt = detachedChannelReplyPrompt({
+      agent,
+      workspaceAvailable: false,
+      snapshot: {
+        downloadedFilePaths: [".briar-channel-attachments/22222222.md"],
+        unreadableAttachments: [
+          { filename: "diagram.svg", contentType: "image/svg+xml" },
+        ],
+      },
+    });
+
+    expect(prompt).toContain("context.downloadedImagePaths and context.downloadedFilePaths");
+    expect(prompt).toContain("never guess what they contain");
+    expect(prompt).toContain("diagram.svg");
+  });
+
+  it("says nothing about attachments when the trigger carried none", () => {
+    const prompt = detachedChannelReplyPrompt({
+      agent,
+      workspaceAvailable: false,
+      snapshot: { downloadedImagePaths: [], unreadableAttachments: [] },
+    });
+
+    expect(prompt).not.toContain("downloadedFilePaths");
+    expect(prompt).not.toContain("unreadableAttachments");
+  });
+
   it("names every message a burst left unanswered and marks them in the snapshot", () => {
     // Three short messages in a row are one question. Only the newest reply job
     // survives to answer them, so the prompt has to say which messages that one
