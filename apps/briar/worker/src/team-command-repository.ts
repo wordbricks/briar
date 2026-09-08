@@ -17,7 +17,11 @@ export type TeamIconUpdate =
 
 import { archiveCleanupQueueUpsertSql } from "./archive-cleanup-repository";
 import { stableJson } from "./hunt-run-codec";
-import { asTeamId, type TeamIdLike } from "../../src/lib/entity-ids";
+import {
+  asTeamId,
+  asWorkspaceId,
+  type TeamIdLike,
+} from "../../src/lib/entity-ids";
 import { type TeamAgentRow } from "./team-agent-model";
 
 export async function createTeam(
@@ -39,7 +43,8 @@ export async function createTeam(
     icon: null,
     icon_name: null,
     icon_color: null,
-    organization_id: input.organizationId,
+    // Request edge: the caller's Workspace id arrives as a plain string.
+    organization_id: asWorkspaceId(input.organizationId),
     organization_name: "",
     member_role: "owner",
     created_at: createdAt,

@@ -19,8 +19,22 @@
  * D1 change.
  */
 
+declare const workspaceIdBrand: unique symbol;
 declare const teamIdBrand: unique symbol;
 declare const planningProjectIdBrand: unique symbol;
+
+/**
+ * The top of the hierarchy: `briar_organizations.id`. "Organization" is the
+ * old product name for it and still names the table, its columns and the
+ * protobuf service; queries surface the same value aliased as `workspace_id`
+ * (`team.organization_id as workspace_id`), and there is no separate
+ * workspace table. One value, two names — which is exactly why it needs a
+ * type of its own, so a {@link TeamId} cannot stand in for it.
+ *
+ * Not to be confused with a Slack workspace or a GitHub organization; those
+ * are vendor concepts and keep their vendor names.
+ */
+export type WorkspaceId = string & { readonly [workspaceIdBrand]: true };
 
 /** `briar_teams.id` — the execution boundary, a.k.a. the legacy "project". */
 export type TeamId = string & { readonly [teamIdBrand]: true };
@@ -38,6 +52,7 @@ export type PlanningProjectId = string & {
  */
 type NotPlanningProjectId = { readonly [planningProjectIdBrand]?: never };
 type NotTeamId = { readonly [teamIdBrand]?: never };
+type NotWorkspaceId = { readonly [workspaceIdBrand]?: never };
 
 /**
  * A parameter position that means "Team id" but is still reached by plenty of
@@ -49,29 +64,45 @@ type NotTeamId = { readonly [teamIdBrand]?: never };
  * actually causes bugs — a planning Project id landing in a Team slot — is
  * still a compile error.
  */
-export type TeamIdLike = string & NotPlanningProjectId;
+export type TeamIdLike = string & NotPlanningProjectId & NotWorkspaceId;
 
 /** The mirror of {@link TeamIdLike} for planning Project id parameters. */
-export type PlanningProjectIdLike = string & NotTeamId;
+export type PlanningProjectIdLike = string & NotTeamId & NotWorkspaceId;
 
 /**
  * Narrow construction point for a Team id. Call this at a true system edge —
  * a decoded protobuf request field, a D1 row that is not yet typed — rather
  * than scattering `as TeamId` casts.
  */
-export const asTeamId = (value: string & NotPlanningProjectId): TeamId =>
-  value as TeamId;
+export const asTeamId = (
+  value: string & NotPlanningProjectId & NotWorkspaceId,
+): TeamId => value as TeamId;
+
+/** Narrow construction point for a Workspace id. See {@link asTeamId}. */
+export const asWorkspaceId = (
+  value: string & NotTeamId & NotPlanningProjectId,
+): WorkspaceId => value as WorkspaceId;
 
 /** Narrow construction point for a planning Project id. See {@link asTeamId}. */
 export const asPlanningProjectId = (
-  value: string & NotTeamId,
+  value: string & NotTeamId & NotWorkspaceId,
 ): PlanningProjectId => value as PlanningProjectId;
 
 /** Nullable convenience wrappers for D1 columns and optional request fields. */
-export const asTeamIdOrNull = <T extends string & NotPlanningProjectId>(
+export const asWorkspaceIdOrNull = <
+  T extends string & NotTeamId & NotPlanningProjectId,
+>(
+  value: T | null | undefined,
+): WorkspaceId | null => (value == null ? null : asWorkspaceId(value));
+
+export const asTeamIdOrNull = <
+  T extends string & NotPlanningProjectId & NotWorkspaceId,
+>(
   value: T | null | undefined,
 ): TeamId | null => (value == null ? null : asTeamId(value));
 
-export const asPlanningProjectIdOrNull = <T extends string & NotTeamId>(
+export const asPlanningProjectIdOrNull = <
+  T extends string & NotTeamId & NotWorkspaceId,
+>(
   value: T | null | undefined,
 ): PlanningProjectId | null => (value == null ? null : asPlanningProjectId(value));

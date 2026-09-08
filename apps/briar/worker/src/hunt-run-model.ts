@@ -11,7 +11,11 @@ import {
   type TeamAgentProvider,
 } from "./team-agent-model";
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
-import type { PlanningProjectId, TeamId } from "../../src/lib/entity-ids";
+import type {
+  PlanningProjectId,
+  TeamId,
+  WorkspaceId,
+} from "../../src/lib/entity-ids";
 
 /**
  * A `briar_hunt_runs` row produced by a statement that cannot join
@@ -26,7 +30,7 @@ export type HuntRunRow = {
   /** Legacy execution-boundary column; exposed as teamId during cutover. */
   project_id: TeamId;
   planning_project_id: PlanningProjectId;
-  workspace_id?: string;
+  workspace_id?: WorkspaceId;
   team_id?: TeamId;
   planning_project_name?: string;
   run_number: number;

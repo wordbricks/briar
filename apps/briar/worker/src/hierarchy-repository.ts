@@ -2,13 +2,14 @@ import {
   asPlanningProjectId,
   type PlanningProjectId,
   type TeamId,
+  type WorkspaceId,
 } from "../../src/lib/entity-ids";
 import type { OrganizationRole } from "./organization-repository";
 import type { PlanningProjectStatus } from "./hierarchy-request-contract";
 
 export type TeamHierarchyRow = {
   id: TeamId;
-  workspace_id: string;
+  workspace_id: WorkspaceId;
   workspace_name: string;
   name: string;
   issue_key_prefix: string;
@@ -26,7 +27,7 @@ export type PlanningProjectRow = {
   id: PlanningProjectId;
   team_id: TeamId;
   team_name: string;
-  workspace_id: string;
+  workspace_id: WorkspaceId;
   workspace_name: string;
   name: string;
   description: string;
@@ -47,7 +48,7 @@ export type PlanningProjectRow = {
 export type ProjectIssueRow = {
   id: string;
   run_number: number;
-  workspace_id: string;
+  workspace_id: WorkspaceId;
   team_id: TeamId;
   team_name: string;
   /** `briar_planning_projects.id`, not the Team id that `project_id` means elsewhere. */
@@ -525,7 +526,7 @@ export async function resolveIssueHierarchyLocation(
     input.sourceTeamId,
     input.sourceTeamId,
   ).first<{
-    workspace_id: string;
+    workspace_id: WorkspaceId;
     team_id: TeamId;
     /** `project.id` here is the planning project, not the Team. */
     project_id: PlanningProjectId;
