@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.222",
+        date: "2026년 9월 9일",
+        title: "가장 어려운 일에 가장 강한 모델을 붙입니다",
+        summary:
+          "난이도에 \"전문가급\"이 생겼습니다. 정말 복잡한 작업에 이 난이도를 주면 가장 강한 모델이 배정됩니다. DM 답변이 순서대로 게시되고 첫 리액션부터 문맥에 맞는 이모지가 붙습니다.",
+        items: [
+          "난이도 전문가급을 추가했습니다. 쉬움·보통·어려움 위 단계이며, 이슈를 만들거나 처리할 때 선택할 수 있습니다.",
+          "Agent가 답변 중 보내는 메시지를 보낸 순서대로 게시하고, 마지막 메시지가 중복으로 남던 문제를 고쳤습니다.",
+          "DM 리액션이 첫 번째부터 대화 문맥에 맞는 이모지를 고릅니다. 워크로그에 일반 툴의 입출력을 저장하지 않아 기록이 가벼워졌습니다.",
+        ],
+      },
+      {
         version: "1.2.221",
         date: "2026년 9월 8일",
         title: "에이전트가 대화 기록을 직접 읽습니다",
@@ -1955,6 +1967,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.222",
+        date: "September 9, 2026",
+        title: "Put the strongest model on the hardest work",
+        summary:
+          "Issues can now be marked Expert. Give genuinely complex work that difficulty and the strongest available model is assigned to it. DM replies post in order, and reactions pick a fitting emoji from the first one.",
+        items: [
+          "Added an Expert difficulty above Easy, Normal and Hard, selectable when creating or handling an issue.",
+          "Messages an Agent sends mid-reply now post in the order they were sent, and the final message is no longer duplicated.",
+          "DM reactions choose an emoji that fits the conversation from the very first one. Worklogs no longer store ordinary tool input and output, so records stay light.",
+        ],
+      },
       {
         version: "1.2.221",
         date: "September 8, 2026",
