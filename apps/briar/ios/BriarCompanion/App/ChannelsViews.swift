@@ -2188,6 +2188,8 @@ private struct ChannelAttachmentCard: View {
                     accessibilityID: "channel-message-html-\(attachment.id.uuidString.lowercased())",
                     load: { try await load(attachment) }
                 )
+            } else if ChannelDocumentAttachments.contentType(for: attachment.filename) != nil {
+                ChannelDocumentCard(attachment: attachment, load: load)
             } else {
                 AuthenticatedImagePreview(
                     sourceID: attachment.url,
@@ -2216,6 +2218,39 @@ private struct ChannelAttachmentCard: View {
         .accessibilityIdentifier(
             "channel-attachment-card-\(attachment.id.uuidString.lowercased())"
         )
+    }
+}
+
+private struct ChannelDocumentCard: View {
+    let attachment: ChannelMessageAttachment
+    let load: @MainActor (ChannelMessageAttachment) async throws -> URL
+    @State private var fileURL: URL?
+    @State private var loading = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(attachment.filename, systemImage: "doc.text")
+            Text(ByteCountFormatter.string(fromByteCount: Int64(attachment.byteSize), countStyle: .file))
+                .font(.caption).foregroundStyle(.secondary)
+            if let fileURL {
+                ShareLink(item: fileURL) { Image(systemName: "square.and.arrow.up") }
+            } else {
+                Button {
+                    loading = true
+                    error = nil
+                    Task {
+                        defer { loading = false }
+                        do { fileURL = try await load(attachment) }
+                        catch { self.error = error.localizedDescription }
+                    }
+                } label: { Image(systemName: "arrow.down.doc") }
+                .disabled(loading)
+                .accessibilityLabel(attachment.filename)
+            }
+            if loading { ProgressView() }
+            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+        }
     }
 }
 
@@ -3313,6 +3348,7 @@ private struct ChannelComposer: View {
             placeholder: placeholder,
             replyLabel: nil,
             allowsImagePaste: false,
+            allowsChannelDocuments: true,
             locale: locale,
             accessibility: ConversationComposerAccessibility(
                 attachment: "channel-composer-attach",

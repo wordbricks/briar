@@ -1,4 +1,4 @@
-import { CircleAlert, ExternalLink, FileText, X } from "lucide-react";
+import { CircleAlert, Download, ExternalLink, FileText, X } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 import {
   createContext,
@@ -16,6 +16,7 @@ import { formatAttachmentBytes } from "../lib/issue-attachments";
 import {
   channelPdfContentType,
   isChannelPdfAttachment,
+  isChannelTextAttachment,
 } from "../lib/channel-attachments";
 import { isHtmlArtifactAttachment } from "../lib/agent-reply-attachments";
 import { issueAttachmentMarkdown } from "../lib/issue-markdown";
@@ -255,7 +256,8 @@ function ChannelDraftImage({
   image: DraftChannelImage;
   onRemove: () => void;
 }) {
-  const isPdf = isChannelPdfAttachment(image.file.type, image.file.name);
+  const isPdf = isChannelPdfAttachment(image.file.type, image.file.name) ||
+    isChannelTextAttachment(image.file.type, image.file.name);
   const loadImage = useCallback(() => image.file, [image.file]);
   const { source } = useObjectUrl(isPdf ? null : loadImage);
   return (
@@ -320,9 +322,10 @@ function ChannelMessageImage({
       />
     );
   }
-  if (isChannelPdfAttachment(attachment.contentType, attachment.filename)) {
+  if (isChannelPdfAttachment(attachment.contentType, attachment.filename) ||
+    isChannelTextAttachment(attachment.contentType, attachment.filename)) {
     return (
-      <ChannelMessagePdfAttachment
+      <ChannelMessageFileAttachment
         attachment={attachment}
         interactive={interactive}
         token={token}
@@ -338,7 +341,7 @@ function ChannelMessageImage({
   );
 }
 
-function ChannelMessagePdfAttachment({
+function ChannelMessageFileAttachment({
   attachment,
   interactive,
   token,
@@ -348,14 +351,16 @@ function ChannelMessagePdfAttachment({
   token: string;
 }) {
   const { t } = useI18n();
+  const isText = isChannelTextAttachment(attachment.contentType, attachment.filename);
+  const kind = isText ? (attachment.filename.toLowerCase().endsWith(".md") ? "Markdown" : "TXT") : "PDF";
   const localSource = attachment.url.startsWith("blob:") ? attachment.url : null;
   const loadAttachment = useCallback(async () => {
     const blob = await loadChannelMessageAttachment(token, attachment);
-    if (blob.type !== channelPdfContentType) {
+    if (!isText && blob.type !== channelPdfContentType) {
       throw new Error("PDF attachment content type changed during download");
     }
-    return blob;
-  }, [attachment.url, token]);
+    return isText ? new Blob([blob], { type: "text/plain" }) : blob;
+  }, [attachment.url, token, isText]);
   const { failed, source: loadedSource } = useObjectUrl(
     interactive && !localSource ? loadAttachment : null,
   );
@@ -368,7 +373,7 @@ function ChannelMessagePdfAttachment({
       </span>
       <span className="channel-message-file-copy">
         <strong title={attachment.filename}>{attachment.filename}</strong>
-        <small>{formatAttachmentBytes(attachment.byteSize)} · PDF</small>
+        <small>{formatAttachmentBytes(attachment.byteSize)} · {kind}</small>
       </span>
       {interactive
         ? failed
@@ -376,17 +381,18 @@ function ChannelMessagePdfAttachment({
           : source
           ? (
               <a
-                aria-label={`${t("common.open")} ${attachment.filename}`}
+                aria-label={isText ? t("image.download", { name: attachment.filename }) : `${t("common.open")} ${attachment.filename}`}
+                download={isText ? attachment.filename : undefined}
                 href={source}
                 rel="noreferrer"
-                target="_blank"
+                target={isText ? undefined : "_blank"}
               >
-                <ExternalLink aria-hidden="true" size={16} />
-                <span>{t("common.open")}</span>
+                {isText ? <Download aria-hidden="true" size={16} /> : <ExternalLink aria-hidden="true" size={16} />}
+                {!isText && <span>{t("common.open")}</span>}
               </a>
             )
           : <Spinner aria-label={t("loading.churning")} className="size-[18px]" />
-        : <span className="channel-message-file-kind">PDF</span>}
+        : <span className="channel-message-file-kind">{kind}</span>}
     </article>
   );
 }

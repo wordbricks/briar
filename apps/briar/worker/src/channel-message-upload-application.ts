@@ -1,8 +1,7 @@
 import type { UploadFileMetadata } from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import { isIssueAttachmentReference } from "../../src/lib/issue-markdown";
 import {
-  channelAttachmentMimeTypeFromName,
-  isChannelAttachmentTypeSupported,
+  normalizeChannelAttachmentContentType,
   validateChannelAttachments,
 } from "../../src/lib/channel-attachments";
 import { prepareChannelMessageUploadRows } from "./channel-message-upload-repository";
@@ -24,12 +23,9 @@ const applicationServices: ChannelMessageUploadApplicationServices = {
 };
 
 const normalizedContentType = (value: string, filename: string) => {
-  const declared = value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-  const contentType = declared === "" || declared === "application/octet-stream"
-    ? channelAttachmentMimeTypeFromName(filename)
-    : declared;
-  if (!contentType || !isChannelAttachmentTypeSupported(contentType)) {
-    throw new HttpError(400, "Channel attachments must be images or PDFs");
+  const contentType = normalizeChannelAttachmentContentType(value, filename);
+  if (!contentType) {
+    throw new HttpError(400, "Channel attachments must be images, PDFs, Markdown (.md), or text (.txt) files");
   }
   return contentType;
 };

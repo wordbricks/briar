@@ -11,6 +11,7 @@ import {
   listOrganizationChannelMessages,
 } from "./channel-message-routes";
 import { createChannel, getChannelMessageAttachment } from "./channels";
+import { channelAttachmentResponse } from "./channel-attachment-response";
 import { uploadReservedFileApplication } from "./upload-application";
 
 const organizationId = "a9000000-0000-4000-8000-000000000001";
@@ -72,8 +73,10 @@ describe("channel and DM PDF messages", () => {
     targetChannelId: string,
     messageId: string,
     filename: string,
+    contentType = "application/pdf",
+    contents = `%PDF-1.7\n${filename}`,
   ) {
-    const body = new TextEncoder().encode(`%PDF-1.7\n${filename}`).buffer;
+    const body = new TextEncoder().encode(contents).buffer;
     const clientId = crypto.randomUUID();
     const prepared = await prepareChannelMessageAttachmentsApplication({
       db,
@@ -86,7 +89,7 @@ describe("channel and DM PDF messages", () => {
       attachments: [create(UploadFileMetadataSchema, {
         clientId,
         filename,
-        contentType: "application/pdf",
+        contentType,
         byteSize: BigInt(body.byteLength),
         sha256: digest(body),
       })],
@@ -98,7 +101,7 @@ describe("channel and DM PDF messages", () => {
       signingSecret,
       uploadId: upload.uploadId,
       capability: upload.uploadCapability,
-      contentType: "application/pdf",
+      contentType: filename.toLowerCase().endsWith(".md") ? "text/markdown" : filename.toLowerCase().endsWith(".txt") ? "text/plain" : "application/pdf",
       body,
     });
     return upload.uploadId;
@@ -128,6 +131,32 @@ describe("channel and DM PDF messages", () => {
       attachmentIds: [input.uploadId],
     });
   }
+
+  it.each([
+    ["설계.MD", "text/x-markdown", "text/markdown"],
+    ["메모.txt", "", "text/plain"],
+  ])("persists %s bytes and downloads after reopening DM and channel", async (filename, contentType, expectedType) => {
+    const contents = "# 원본\r\n<script>alert('never execute')</script>\n끝\n";
+    for (const targetChannelId of [channelId, publicChannelId]) {
+      const messageId = crypto.randomUUID();
+      const uploadId = await prepareAndUploadPdf(targetChannelId, messageId, filename, contentType, contents);
+      await expect(createPdfMessage({ channelId: otherChannelId, messageId, parentMessageId: null, uploadId, filename })).rejects.toMatchObject({ status: 409 });
+      await createPdfMessage({ channelId: targetChannelId, messageId, parentMessageId: null, uploadId, filename });
+      const reopened = await listOrganizationChannelMessages({ db, organizationId, channelId: targetChannelId, userId: ownerId });
+      expect(reopened.messages).toContainEqual(expect.objectContaining({ id: messageId, attachments: [expect.objectContaining({ filename, contentType: expectedType })] }));
+      const metadata = await getChannelMessageAttachment(db, organizationId, targetChannelId, messageId, uploadId);
+      expect(metadata).not.toBeNull();
+      const object = await bucket.get(metadata!.object_key);
+      expect(object).not.toBeNull();
+      const response = channelAttachmentResponse(metadata!, object!, object!.body);
+      expect(response.headers.get("Content-Type")).toBe(expectedType);
+      expect(response.headers.get("Content-Disposition")).toContain("attachment; filename*=UTF-8''");
+      expect(response.headers.get("Content-Disposition")).toContain(encodeURIComponent(filename));
+      expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+      expect(await response.text()).toBe(contents);
+      await expect(listOrganizationChannelMessages({ db, organizationId, channelId: targetChannelId, userId: "not-a-member" })).rejects.toMatchObject({ status: 404 });
+    }
+  });
 
   it("creates and reads PDFs in a DM, thread reply, and public channel", async () => {
     const rootId = crypto.randomUUID();

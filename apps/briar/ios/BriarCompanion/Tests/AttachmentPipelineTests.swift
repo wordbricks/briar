@@ -6,6 +6,30 @@ import XCTest
 
 @MainActor
 final class AttachmentPipelineTests: XCTestCase {
+    func testChannelDocumentsPreserveNameAndBytesWithoutEnablingIssueDocuments() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let bytes = Data("# 한글\r\n<script>neverExecute()</script>\n".utf8)
+        for (filename, type) in [("설계.MD", "text/markdown"), ("메모.txt", "text/plain")] {
+            let url = directory.appendingPathComponent(filename)
+            try bytes.write(to: url)
+            let imported = try ChannelDocumentAttachments.load([url], appendingTo: [])
+            XCTAssertEqual(imported.first?.filename, filename)
+            XCTAssertEqual(imported.first?.contentType, type)
+            XCTAssertEqual(imported.first?.data, bytes)
+            XCTAssertNil(ChannelDocumentAttachments.validationMessage(for: imported))
+            XCTAssertNotNil(PendingIssueAttachment.validationMessage(for: imported))
+            XCTAssertThrowsError(try ChannelDocumentAttachments.load(Array(repeating: url, count: 6), appendingTo: []))
+        }
+        let unsupported = directory.appendingPathComponent("page.html")
+        try bytes.write(to: unsupported)
+        XCTAssertThrowsError(try ChannelDocumentAttachments.load([unsupported], appendingTo: []))
+        let empty = directory.appendingPathComponent("empty.txt")
+        try Data().write(to: empty)
+        XCTAssertThrowsError(try ChannelDocumentAttachments.load([empty], appendingTo: []))
+    }
+
     func testImagesOnlyImportsSupportedImageWithDeterministicFilename() async throws {
         let selection = PhotoAttachmentSelection(
             supportedContentTypes: [.png],
