@@ -108,6 +108,11 @@ struct UITestCompanionFlow: View {
                 projects: [project, alternateProject],
                 project: selectedProject,
                 snapshot: snapshot,
+                listRuns: [],
+                listHasLoaded: false,
+                listIsLoading: false,
+                listIsLoadingNextPage: false,
+                listHasMore: false,
                 errorMessage: nil,
                 token: "ui-test-token",
                 api: api,
@@ -121,6 +126,8 @@ struct UITestCompanionFlow: View {
                     image: nil
                 ),
                 refresh: { await refreshSnapshot() },
+                setListFilter: { _ in },
+                loadNextListPage: {},
                 ensureIssueAvailable: { projectID, runID in
                     selectedProjectID = projectID
                     await refreshSnapshot()
