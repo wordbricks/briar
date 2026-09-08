@@ -26,7 +26,11 @@ const dmLearningJobProviderSql = (stage: "proposer" | "verifier") =>
 /** Worker eligibility shared by the claim guards and the status probe; `space` and `agent` must be in scope. */
 export const dmLearningWorkerEligibleSql = `device.organization_id = space.organization_id
     and device.state <> 'disabled' and worker.state <> 'disabled'
-    and worker.accepting_work = 1 and worker.readiness_state <> 'needs_attention'
+    and (worker.accepting_work = 1 or exists (
+      select 1 from briar_execution_worker_update_requests updating
+      where updating.device_id = worker.device_id and updating.status = 'requested'
+        and updating.handoff_state in ('draining', 'ready')
+    )) and worker.readiness_state <> 'needs_attention'
     and julianday(worker.last_heartbeat_at) >= julianday(?) - (3.0 / 1440)
     and (agent.project_id is null or agent.project_id = worker.project_id)
     and (agent.project_id is null or not exists (select 1 from briar_project_execution_worker_policies policy

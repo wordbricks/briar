@@ -3798,6 +3798,9 @@ export async function claimNextChannelAgentReply(
          select 1 from briar_execution_workers binding
          where binding.id = ? and binding.device_id = ?
            and binding.state <> 'disabled'
+           and not exists (select 1 from briar_worker_update_reservations reservation
+             where reservation.work_type = 'channelReply' and reservation.work_id = job.id
+               and reservation.device_id <> binding.device_id)
            and (job.project_id is null or binding.project_id = job.project_id)
            and (
              job.project_id is null
@@ -3813,7 +3816,7 @@ export async function claimNextChannelAgentReply(
              )
            )
        )
-     order by job.created_at, job.id`,
+     order by job.planned_update_resume desc, job.created_at, job.id`,
   ).bind(
     organizationId,
     MAX_REPLY_ATTEMPTS,

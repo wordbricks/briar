@@ -21,6 +21,8 @@ import {
   selectAuthoritativeMergeGroupHead,
 } from "./merge-batches";
 import { getMergeQueueStatus } from "./merge-queue-status";
+import { handoffAuxiliaryWorkerUpdate } from "./worker-update-auxiliary";
+import { requestExecutionWorkerUpdate } from "./workers";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 
 const baseTime = Date.parse("2026-08-21T00:00:00.000Z");
@@ -540,6 +542,43 @@ describe("repository merge queue coordinator", () => {
       batch: { state: "frozen" },
       members: [{ run_id: first.runId }, { run_id: second.runId }],
     });
+  });
+
+  it("resumes an update-handoff merge batch without consuming a retry", async () => {
+    const lane = await setupLane(41);
+    const run = await createReadyRun(lane, { readyAt: at(41, 1) });
+    await registerRun(lane, run, at(41, 1));
+    const claimInput = {
+      deviceId: lane.deviceId, workerId: lane.workerId, claimedBy: "update-worker",
+      claimTokenHash: tokenHash("a"), claimedAt: at(41, 3), leaseExpiresAt: at(41, 100),
+    };
+    const first = await claimNextMergeBatch(db, lane.projectId, claimInput);
+    expect(first).not.toBeNull();
+    const request = await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-000000000041", organizationId: "merge-org",
+      deviceId: lane.deviceId, requestedByUserId: "merge-owner", targetVersion: "1.2.216",
+      requestedAt: at(41, 4), requiresRuntimeAck: true,
+    });
+    await expect(handoffAuxiliaryWorkerUpdate(db, {
+      requestId: request.id, deviceId: lane.deviceId, workerId: lane.workerId,
+      workId: first!.batch.id, workType: "mergeBatch", claimTokenHash: tokenHash("a"),
+      observedAt: at(41, 5),
+    })).resolves.toBe(true);
+    await expect(claimNextMergeBatch(db, lane.projectId, {
+      ...claimInput, claimTokenHash: tokenHash("b"), claimedAt: at(41, 6),
+    })).resolves.toBeNull();
+    await db.batch([
+      db.prepare("update briar_execution_worker_update_requests set status = 'completed' where id = ?").bind(request.id),
+      db.prepare("update briar_execution_workers set accepting_work = 1, readiness_state = 'ready' where id = ?").bind(lane.workerId),
+    ]);
+    const resumed = await claimNextMergeBatch(db, lane.projectId, {
+      ...claimInput, claimTokenHash: tokenHash("b"), claimedAt: at(41, 7),
+    });
+    expect(resumed?.batch.id).toBe(first!.batch.id);
+    expect(resumed?.batch.claim_attempts).toBe(first!.batch.claim_attempts);
+    expect(resumed?.batch.state).toBe(first!.batch.state);
+    await expect(db.prepare("select 1 from briar_worker_update_reservations where work_id = ?")
+      .bind(first!.batch.id).first()).resolves.toBeNull();
   });
 
   it("fences renew, release, and enqueue after a lease is reclaimed", async () => {

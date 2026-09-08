@@ -316,23 +316,22 @@ describe("ensureSandbox", () => {
     expect(commands).toContain("start");
   });
 
-  it("replaces a container whose runtime digest is stale", async () => {
+  it("refuses to force-replace a running container with a stale runtime", async () => {
     const { input, fake } = ensureInput(fakeDocker({
       containers: {
         [container]: { running: true, image: "briar-sandbox:old", labels: ownedLabels("b".repeat(64)) },
       },
     }));
-    await ensureSandbox(fake.docker, input);
-    const commands = fake.calls.map((call) => call[0]);
-    expect(commands.indexOf("rm")).toBeLessThan(commands.indexOf("run"));
-    expect(fake.state.containers[container]?.labels[SANDBOX_RUNTIME_LABEL]).toBe(runtimeSha256);
+    await expect(ensureSandbox(fake.docker, input)).rejects.toThrow("will not be force-removed");
+    expect(fake.calls.map((call) => call[0])).not.toContain("rm");
+    expect(fake.calls.map((call) => call[0])).not.toContain("stop");
   });
 
   it("replaces a container built before the current schema version", async () => {
     const { input, fake } = ensureInput(fakeDocker({
       containers: {
         [container]: {
-          running: true,
+          running: false,
           image: "briar-sandbox:x",
           labels: { ...ownedLabels(), [SANDBOX_SCHEMA_LABEL]: "1" },
         },
@@ -348,7 +347,7 @@ describe("ensureSandbox", () => {
   it("replaces a container when the GPU request changes", async () => {
     const { input, fake } = ensureInput(fakeDocker({
       containers: {
-        [container]: { running: true, image: "briar-sandbox:x", labels: ownedLabels(runtimeSha256, "0") },
+        [container]: { running: false, image: "briar-sandbox:x", labels: ownedLabels(runtimeSha256, "0") },
       },
     }), true);
     await ensureSandbox(fake.docker, input);
@@ -359,7 +358,7 @@ describe("ensureSandbox", () => {
   it("replaces a container when the view port changes", async () => {
     const { input, fake } = ensureInput(fakeDocker({
       containers: {
-        [container]: { running: true, image: "briar-sandbox:x", labels: ownedLabels(runtimeSha256, "0", "6080") },
+        [container]: { running: false, image: "briar-sandbox:x", labels: ownedLabels(runtimeSha256, "0", "6080") },
       },
     }));
     await ensureSandbox(fake.docker, { ...input, viewPort: 6091 });

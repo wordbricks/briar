@@ -858,6 +858,8 @@ struct TaskListView: View {
             HostStatusSheet(
                 workers: snapshot?.workers ?? [],
                 generatedAt: snapshot?.generatedAt,
+                organizationID: project.organizationId,
+                fleet: services.fleet,
                 refresh: refresh
             )
             .presentationDetents([.medium, .large])
@@ -892,10 +894,47 @@ func hostReadinessLabel(
 private struct HostStatusSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isRefreshing = false
+    @State private var canManage = false
+    @State private var pendingDevices: Set<String> = []
+    @State private var updateError: String?
 
     let workers: [DashboardWorker]
     let generatedAt: Date?
+    let organizationID: UUID
+    let fleet: (any BriarAPI_FleetServiceClientInterface)?
     let refresh: () async -> Void
+
+    private func refreshUpdates() async {
+        guard let fleet else { return }
+        do {
+            var request = BriarAPI_ListExecutionWorkersRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            let response = try await fleet.listExecutionWorkers(request: request, headers: [:]).briarValue()
+            canManage = response.canManage
+            pendingDevices = Set(response.workers.filter {
+                $0.hasUpdateRequest && $0.updateRequest.status == .requested && $0.updateRequest.handoffState != .failed
+            }.map(\.deviceID))
+            updateError = response.workers.first {
+                $0.hasUpdateRequest && $0.updateRequest.hasHandoffError
+            }?.updateRequest.handoffError
+        } catch { canManage = false }
+    }
+
+    private func update(_ worker: DashboardWorker) async {
+        guard let fleet, let deviceID = worker.deviceId else { return }
+        pendingDevices.insert(deviceID)
+        updateError = nil
+        do {
+            var request = BriarAPI_RequestExecutionWorkerUpdateRequest()
+            request.organizationID = coreUUIDString(organizationID)
+            request.deviceID = deviceID
+            _ = try await fleet.requestExecutionWorkerUpdate(request: request, headers: [:]).briarValue()
+            await refreshUpdates()
+        } catch {
+            pendingDevices.remove(deviceID)
+            updateError = error.localizedDescription
+        }
+    }
 
     private var activeWorkerCount: Int {
         workers.filter {
@@ -935,15 +974,37 @@ private struct HostStatusSheet: View {
 
                         Section(L10n.text("호스트")) {
                             ForEach(sortedWorkers) { worker in
-                                HostStatusRow(worker: worker)
+                                HStack {
+                                    HostStatusRow(worker: worker)
+                                    if canManage && worker.supportsSandboxUpdate, let deviceID = worker.deviceId {
+                                        Button {
+                                            Task { await update(worker) }
+                                        } label: {
+                                            if pendingDevices.contains(deviceID) { ProgressView() }
+                                            else { Image(systemName: "arrow.down.to.line") }
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .frame(minWidth: 44, minHeight: 44)
+                                        .disabled(pendingDevices.contains(deviceID) || worker.readiness == "offline" || worker.readiness == "disabled")
+                                        .accessibilityLabel(L10n.format("샌드박스 %@ 업데이트", worker.label))
+                                        .accessibilityIdentifier("sandbox-update-\(worker.id)")
+                                    }
+                                }
                             }
                         }
+                        if let updateError { Section { Text(updateError).foregroundStyle(.red) } }
                     }
                 }
             }
             .navigationTitle(L10n.text("호스트 상태"))
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("host-status-sheet")
+            .task {
+                while !Task.isCancelled {
+                    await refreshUpdates()
+                    do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.text("닫기")) { dismiss() }
@@ -1013,6 +1074,9 @@ private struct HostStatusRow: View {
                     Text(detail)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                }
+                if let version = worker.versions?["briar"] {
+                    Text("v\(version)").font(.caption.monospaced()).foregroundStyle(.secondary)
                 }
                 ProgressView(
                     value: Double(min(worker.activeSessions, maximumSessions)),

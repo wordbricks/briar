@@ -21,6 +21,7 @@ const UpdateRequestRow = Schema.Struct({
   handoff_started_at: Schema.NullOr(Schema.String),
   handoff_completed_at: Schema.NullOr(Schema.String),
   handoff_error: Schema.NullOr(Schema.String),
+  requires_runtime_ack: Schema.Int,
 });
 
 const HandoffRow = Schema.Struct({
@@ -71,13 +72,14 @@ const updateRequestJson = (
   handoffStartedAt: row.handoff_started_at,
   handoffCompletedAt: row.handoff_completed_at,
   handoffError: row.handoff_error,
+  requiresRuntimeAck: row.requires_runtime_ack === 1,
 });
 
 const makeWorkerUpdateQueries = (sql: SqlClient.SqlClient) => {
   const updateRequestSelection = sql`
     select id, target_version, status, requested_at,
            handoff_state, handoff_started_at, handoff_completed_at,
-           handoff_error
+           handoff_error, requires_runtime_ack
     from briar_execution_worker_update_requests
   `;
 

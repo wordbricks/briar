@@ -27910,6 +27910,21 @@ pub struct PrepareWorkerUpdateHandoffRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub target_version: ::buffa::alloc::string::String,
+    /// Field 3: `requires_runtime_ack`
+    #[serde(
+        rename = "requiresRuntimeAck",
+        alias = "requires_runtime_ack",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub requires_runtime_ack: bool,
+    /// Field 4: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub request_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -27919,6 +27934,8 @@ impl ::core::fmt::Debug for PrepareWorkerUpdateHandoffRequest {
         f.debug_struct("PrepareWorkerUpdateHandoffRequest")
             .field("worker_id", &self.worker_id)
             .field("target_version", &self.target_version)
+            .field("requires_runtime_ack", &self.requires_runtime_ack)
+            .field("request_id", &self.request_id)
             .finish()
     }
 }
@@ -27928,6 +27945,18 @@ impl PrepareWorkerUpdateHandoffRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.PrepareWorkerUpdateHandoffRequest";
+}
+impl PrepareWorkerUpdateHandoffRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::request_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_request_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.request_id = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(PrepareWorkerUpdateHandoffRequest);
 impl ::buffa::MessageName for PrepareWorkerUpdateHandoffRequest {
@@ -27957,6 +27986,12 @@ impl ::buffa::Message for PrepareWorkerUpdateHandoffRequest {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.target_version) as u64;
         }
+        if self.requires_runtime_ack {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(ref v) = self.request_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -27972,6 +28007,12 @@ impl ::buffa::Message for PrepareWorkerUpdateHandoffRequest {
         }
         if !self.target_version.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.target_version, buf);
+        }
+        if self.requires_runtime_ack {
+            ::buffa::types::put_bool_field(3u32, self.requires_runtime_ack, buf);
+        }
+        if let Some(ref v) = self.request_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -28000,6 +28041,25 @@ impl ::buffa::Message for PrepareWorkerUpdateHandoffRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.target_version, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.requires_runtime_ack = ::buffa::types::decode_bool(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .request_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -28010,6 +28070,8 @@ impl ::buffa::Message for PrepareWorkerUpdateHandoffRequest {
     fn clear(&mut self) {
         self.worker_id.clear();
         self.target_version.clear();
+        self.requires_runtime_ack = false;
+        self.request_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -28429,6 +28491,13 @@ pub struct GetWorkerUpdateHandoffResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub ready: bool,
+    /// Field 4: `runtimes`
+    #[serde(
+        rename = "runtimes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub runtimes: ::buffa::alloc::vec::Vec<WorkerUpdateRuntime>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -28439,6 +28508,7 @@ impl ::core::fmt::Debug for GetWorkerUpdateHandoffResponse {
             .field("update", &self.update)
             .field("active_work_count", &self.active_work_count)
             .field("ready", &self.ready)
+            .field("runtimes", &self.runtimes)
             .finish()
     }
 }
@@ -28485,6 +28555,14 @@ impl ::buffa::Message for GetWorkerUpdateHandoffResponse {
         if self.ready {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        for v in &self.runtimes {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -28508,6 +28586,14 @@ impl ::buffa::Message for GetWorkerUpdateHandoffResponse {
         }
         if self.ready {
             ::buffa::types::put_bool_field(3u32, self.ready, buf);
+        }
+        for v in &self.runtimes {
+            ::buffa::types::put_len_delimited_header(
+                4u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -28547,6 +28633,18 @@ impl ::buffa::Message for GetWorkerUpdateHandoffResponse {
                 )?;
                 self.ready = ::buffa::types::decode_bool(buf)?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.runtimes.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -28558,6 +28656,7 @@ impl ::buffa::Message for GetWorkerUpdateHandoffResponse {
         self.update = ::buffa::MessageField::none();
         self.active_work_count = 0u32;
         self.ready = false;
+        self.runtimes.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -28588,6 +28687,196 @@ pub const __GET_WORKER_UPDATE_HANDOFF_RESPONSE_JSON_ANY: ::buffa::type_registry:
     type_url: "type.googleapis.com/briar.worker.v1.GetWorkerUpdateHandoffResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetWorkerUpdateHandoffResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetWorkerUpdateHandoffResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct WorkerUpdateRuntime {
+    /// Field 1: `worker_id`
+    #[serde(
+        rename = "workerId",
+        alias = "worker_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub worker_id: ::buffa::alloc::string::String,
+    /// Field 2: `runtime`
+    #[serde(
+        rename = "runtime",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub runtime: ::buffa::MessageField<
+        super::super::types::v1::WorkerRuntimeAdvertisement,
+        ::buffa::Inline<super::super::types::v1::WorkerRuntimeAdvertisement>,
+    >,
+    /// Field 3: `last_heartbeat_at`
+    #[serde(
+        rename = "lastHeartbeatAt",
+        alias = "last_heartbeat_at",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub last_heartbeat_at: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for WorkerUpdateRuntime {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("WorkerUpdateRuntime")
+            .field("worker_id", &self.worker_id)
+            .field("runtime", &self.runtime)
+            .field("last_heartbeat_at", &self.last_heartbeat_at)
+            .finish()
+    }
+}
+impl WorkerUpdateRuntime {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.WorkerUpdateRuntime";
+}
+::buffa::impl_default_instance!(WorkerUpdateRuntime);
+impl ::buffa::MessageName for WorkerUpdateRuntime {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "WorkerUpdateRuntime";
+    const FULL_NAME: &'static str = "briar.worker.v1.WorkerUpdateRuntime";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.WorkerUpdateRuntime";
+}
+impl ::buffa::Message for WorkerUpdateRuntime {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.worker_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+        }
+        if self.runtime.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.runtime.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.last_heartbeat_at.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.last_heartbeat_at) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.worker_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.worker_id, buf);
+        }
+        if self.runtime.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.runtime.write_to(__cache, buf);
+        }
+        if !self.last_heartbeat_at.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.last_heartbeat_at, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.worker_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.runtime.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.last_heartbeat_at, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.worker_id.clear();
+        self.runtime = ::buffa::MessageField::none();
+        self.last_heartbeat_at.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for WorkerUpdateRuntime {
+    const PROTO_FQN: &'static str = "briar.worker.v1.WorkerUpdateRuntime";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for WorkerUpdateRuntime {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __WORKER_UPDATE_RUNTIME_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.WorkerUpdateRuntime",
+    to_json: ::buffa::type_registry::any_to_json::<WorkerUpdateRuntime>,
+    from_json: ::buffa::type_registry::any_from_json::<WorkerUpdateRuntime>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -28863,6 +29152,316 @@ pub const __FAIL_WORKER_UPDATE_HANDOFF_RESPONSE_JSON_ANY: ::buffa::type_registry
     type_url: "type.googleapis.com/briar.worker.v1.FailWorkerUpdateHandoffResponse",
     to_json: ::buffa::type_registry::any_to_json::<FailWorkerUpdateHandoffResponse>,
     from_json: ::buffa::type_registry::any_from_json::<FailWorkerUpdateHandoffResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct FinishWorkerUpdateRequest {
+    /// Field 1: `worker_id`
+    #[serde(
+        rename = "workerId",
+        alias = "worker_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub worker_id: ::buffa::alloc::string::String,
+    /// Field 2: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Cancelling resumes the previous runtime; it never counts as an update.
+    ///
+    /// Field 3: `cancel`
+    #[serde(
+        rename = "cancel",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub cancel: bool,
+    /// Field 4: `error`
+    #[serde(rename = "error", skip_serializing_if = "::core::option::Option::is_none")]
+    pub error: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for FinishWorkerUpdateRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("FinishWorkerUpdateRequest")
+            .field("worker_id", &self.worker_id)
+            .field("request_id", &self.request_id)
+            .field("cancel", &self.cancel)
+            .field("error", &self.error)
+            .finish()
+    }
+}
+impl FinishWorkerUpdateRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.FinishWorkerUpdateRequest";
+}
+impl FinishWorkerUpdateRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::error`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_error(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.error = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(FinishWorkerUpdateRequest);
+impl ::buffa::MessageName for FinishWorkerUpdateRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "FinishWorkerUpdateRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.FinishWorkerUpdateRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.FinishWorkerUpdateRequest";
+}
+impl ::buffa::Message for FinishWorkerUpdateRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.worker_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+        }
+        if !self.request_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.request_id) as u64;
+        }
+        if self.cancel {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(ref v) = self.error {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.worker_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.worker_id, buf);
+        }
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+        }
+        if self.cancel {
+            ::buffa::types::put_bool_field(3u32, self.cancel, buf);
+        }
+        if let Some(ref v) = self.error {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.worker_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.cancel = ::buffa::types::decode_bool(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.error.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.worker_id.clear();
+        self.request_id.clear();
+        self.cancel = false;
+        self.error = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for FinishWorkerUpdateRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.FinishWorkerUpdateRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for FinishWorkerUpdateRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __FINISH_WORKER_UPDATE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.FinishWorkerUpdateRequest",
+    to_json: ::buffa::type_registry::any_to_json::<FinishWorkerUpdateRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<FinishWorkerUpdateRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct FinishWorkerUpdateResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for FinishWorkerUpdateResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("FinishWorkerUpdateResponse").finish()
+    }
+}
+impl FinishWorkerUpdateResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.FinishWorkerUpdateResponse";
+}
+::buffa::impl_default_instance!(FinishWorkerUpdateResponse);
+impl ::buffa::MessageName for FinishWorkerUpdateResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "FinishWorkerUpdateResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.FinishWorkerUpdateResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.FinishWorkerUpdateResponse";
+}
+impl ::buffa::Message for FinishWorkerUpdateResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for FinishWorkerUpdateResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.FinishWorkerUpdateResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for FinishWorkerUpdateResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __FINISH_WORKER_UPDATE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.FinishWorkerUpdateResponse",
+    to_json: ::buffa::type_registry::any_to_json::<FinishWorkerUpdateResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<FinishWorkerUpdateResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -91151,6 +91750,10 @@ pub mod __buffa {
             pub worker_id: &'a str,
             /// Field 2: `target_version`
             pub target_version: &'a str,
+            /// Field 3: `requires_runtime_ack`
+            pub requires_runtime_ack: bool,
+            /// Field 4: `request_id`
+            pub request_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for PrepareWorkerUpdateHandoffRequestView<'a> {
@@ -91199,6 +91802,22 @@ pub mod __buffa {
                         )?;
                         view.target_version = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.requires_runtime_ack = ::buffa::types::decode_bool(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -91230,6 +91849,8 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::PrepareWorkerUpdateHandoffRequest {
                     worker_id: self.worker_id.to_string(),
                     target_version: self.target_version.to_string(),
+                    requires_runtime_ack: self.requires_runtime_ack,
+                    request_id: self.request_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -91255,6 +91876,12 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.target_version)
                                 as u64;
                 }
+                if self.requires_runtime_ack {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(ref v) = self.request_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -91271,6 +91898,12 @@ pub mod __buffa {
                 }
                 if !self.target_version.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.target_version, buf);
+                }
+                if self.requires_runtime_ack {
+                    ::buffa::types::put_bool_field(3u32, self.requires_runtime_ack, buf);
+                }
+                if let Some(ref v) = self.request_id {
+                    ::buffa::types::put_string_field(4u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -91298,6 +91931,16 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.target_version) {
                     __map.serialize_entry("targetVersion", self.target_version)?;
+                }
+                if self.requires_runtime_ack {
+                    __map
+                        .serialize_entry(
+                            "requiresRuntimeAck",
+                            &self.requires_runtime_ack,
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.request_id {
+                    __map.serialize_entry("requestId", __v)?;
                 }
                 __map.end()
             }
@@ -91409,6 +92052,16 @@ pub mod __buffa {
             #[must_use]
             pub fn target_version(&self) -> &'_ str {
                 self.0.reborrow().target_version
+            }
+            /// Field 3: `requires_runtime_ack`
+            #[must_use]
+            pub fn requires_runtime_ack(&self) -> bool {
+                self.0.reborrow().requires_runtime_ack
+            }
+            /// Field 4: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().request_id
             }
         }
         impl ::core::convert::From<
@@ -92145,6 +92798,11 @@ pub mod __buffa {
             pub active_work_count: u32,
             /// Field 3: `ready`
             pub ready: bool,
+            /// Field 4: `runtimes`
+            pub runtimes: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::WorkerUpdateRuntimeView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetWorkerUpdateHandoffResponseView<'a> {
@@ -92220,6 +92878,26 @@ pub mod __buffa {
                         )?;
                         view.ready = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::WorkerUpdateRuntimeView,
+                            >(),
+                        )?;
+                        view.runtimes
+                            .push(
+                                <super::super::__buffa::view::WorkerUpdateRuntimeView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -92262,6 +92940,11 @@ pub mod __buffa {
                     },
                     active_work_count: self.active_work_count,
                     ready: self.ready,
+                    runtimes: self
+                        .runtimes
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -92293,6 +92976,14 @@ pub mod __buffa {
                 if self.ready {
                     size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
                 }
+                for v in &self.runtimes {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -92317,6 +93008,14 @@ pub mod __buffa {
                 }
                 if self.ready {
                     ::buffa::types::put_bool_field(3u32, self.ready, buf);
+                }
+                for v in &self.runtimes {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -92355,6 +93054,9 @@ pub mod __buffa {
                 }
                 if self.ready {
                     __map.serialize_entry("ready", &self.ready)?;
+                }
+                if !self.runtimes.is_empty() {
+                    __map.serialize_entry("runtimes", &*self.runtimes)?;
                 }
                 __map.end()
             }
@@ -92478,6 +93180,16 @@ pub mod __buffa {
             pub fn ready(&self) -> bool {
                 self.0.reborrow().ready
             }
+            /// Field 4: `runtimes`
+            #[must_use]
+            pub fn runtimes(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::WorkerUpdateRuntimeView<'_>,
+            > {
+                &self.0.reborrow().runtimes
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<GetWorkerUpdateHandoffResponseView<'static>>,
@@ -92508,6 +93220,374 @@ pub mod __buffa {
             type ViewHandle = GetWorkerUpdateHandoffResponseOwnedView;
         }
         impl ::serde::Serialize for GetWorkerUpdateHandoffResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct WorkerUpdateRuntimeView<'a> {
+            /// Field 1: `worker_id`
+            pub worker_id: &'a str,
+            /// Field 2: `runtime`
+            pub runtime: ::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::WorkerRuntimeAdvertisementView<
+                    'a,
+                >,
+            >,
+            /// Field 3: `last_heartbeat_at`
+            pub last_heartbeat_at: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for WorkerUpdateRuntimeView<'a> {
+            type Owned = super::super::WorkerUpdateRuntime;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.worker_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.runtime.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.runtime = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::types::v1::__buffa::view::WorkerRuntimeAdvertisementView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.last_heartbeat_at = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::WorkerUpdateRuntime,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::WorkerUpdateRuntime,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::WorkerUpdateRuntime {
+                    worker_id: self.worker_id.to_string(),
+                    runtime: match self.runtime.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::types::v1::WorkerRuntimeAdvertisement,
+                                ::buffa::Inline<
+                                    super::super::super::super::types::v1::WorkerRuntimeAdvertisement,
+                                >,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    last_heartbeat_at: self.last_heartbeat_at.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for WorkerUpdateRuntimeView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.worker_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+                }
+                if self.runtime.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.runtime.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if !self.last_heartbeat_at.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.last_heartbeat_at)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.worker_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.worker_id, buf);
+                }
+                if self.runtime.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.runtime.write_to(__cache, buf);
+                }
+                if !self.last_heartbeat_at.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.last_heartbeat_at, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for WorkerUpdateRuntimeView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.worker_id) {
+                    __map.serialize_entry("workerId", self.worker_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.runtime.as_option() {
+                        __map.serialize_entry("runtime", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.last_heartbeat_at,
+                ) {
+                    __map.serialize_entry("lastHeartbeatAt", self.last_heartbeat_at)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for WorkerUpdateRuntimeView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "WorkerUpdateRuntime";
+            const FULL_NAME: &'static str = "briar.worker.v1.WorkerUpdateRuntime";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.WorkerUpdateRuntime";
+        }
+        ::buffa::impl_default_view_instance!(WorkerUpdateRuntimeView);
+        ::buffa::impl_view_reborrow!(WorkerUpdateRuntimeView);
+        /** Self-contained, `'static` owned view of a `WorkerUpdateRuntime` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`WorkerUpdateRuntimeView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`WorkerUpdateRuntimeView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct WorkerUpdateRuntimeOwnedView(
+            ::buffa::OwnedView<WorkerUpdateRuntimeView<'static>>,
+        );
+        impl WorkerUpdateRuntimeOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerUpdateRuntimeOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerUpdateRuntimeOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::WorkerUpdateRuntime,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WorkerUpdateRuntimeOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`WorkerUpdateRuntimeView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &WorkerUpdateRuntimeView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::WorkerUpdateRuntime {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `worker_id`
+            #[must_use]
+            pub fn worker_id(&self) -> &'_ str {
+                self.0.reborrow().worker_id
+            }
+            /// Field 2: `runtime`
+            #[must_use]
+            pub fn runtime(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::types::v1::__buffa::view::WorkerRuntimeAdvertisementView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().runtime
+            }
+            /// Field 3: `last_heartbeat_at`
+            #[must_use]
+            pub fn last_heartbeat_at(&self) -> &'_ str {
+                self.0.reborrow().last_heartbeat_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<WorkerUpdateRuntimeView<'static>>>
+        for WorkerUpdateRuntimeOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<WorkerUpdateRuntimeView<'static>>,
+            ) -> Self {
+                WorkerUpdateRuntimeOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<WorkerUpdateRuntimeOwnedView>
+        for ::buffa::OwnedView<WorkerUpdateRuntimeView<'static>> {
+            fn from(wrapper: WorkerUpdateRuntimeOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<WorkerUpdateRuntimeView<'static>>>
+        for WorkerUpdateRuntimeOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<WorkerUpdateRuntimeView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::WorkerUpdateRuntime {
+            type View<'a> = WorkerUpdateRuntimeView<'a>;
+            type ViewHandle = WorkerUpdateRuntimeOwnedView;
+        }
+        impl ::serde::Serialize for WorkerUpdateRuntimeOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -93084,6 +94164,605 @@ pub mod __buffa {
             type ViewHandle = FailWorkerUpdateHandoffResponseOwnedView;
         }
         impl ::serde::Serialize for FailWorkerUpdateHandoffResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct FinishWorkerUpdateRequestView<'a> {
+            /// Field 1: `worker_id`
+            pub worker_id: &'a str,
+            /// Field 2: `request_id`
+            pub request_id: &'a str,
+            /// Cancelling resumes the previous runtime; it never counts as an update.
+            ///
+            /// Field 3: `cancel`
+            pub cancel: bool,
+            /// Field 4: `error`
+            pub error: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for FinishWorkerUpdateRequestView<'a> {
+            type Owned = super::super::FinishWorkerUpdateRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.worker_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.cancel = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.error = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::FinishWorkerUpdateRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::FinishWorkerUpdateRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::FinishWorkerUpdateRequest {
+                    worker_id: self.worker_id.to_string(),
+                    request_id: self.request_id.to_string(),
+                    cancel: self.cancel,
+                    error: self.error.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for FinishWorkerUpdateRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.worker_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+                }
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u64;
+                }
+                if self.cancel {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(ref v) = self.error {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.worker_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.worker_id, buf);
+                }
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+                }
+                if self.cancel {
+                    ::buffa::types::put_bool_field(3u32, self.cancel, buf);
+                }
+                if let Some(ref v) = self.error {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for FinishWorkerUpdateRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.worker_id) {
+                    __map.serialize_entry("workerId", self.worker_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if self.cancel {
+                    __map.serialize_entry("cancel", &self.cancel)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.error {
+                    __map.serialize_entry("error", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for FinishWorkerUpdateRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "FinishWorkerUpdateRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.FinishWorkerUpdateRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.FinishWorkerUpdateRequest";
+        }
+        ::buffa::impl_default_view_instance!(FinishWorkerUpdateRequestView);
+        ::buffa::impl_view_reborrow!(FinishWorkerUpdateRequestView);
+        /** Self-contained, `'static` owned view of a `FinishWorkerUpdateRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`FinishWorkerUpdateRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`FinishWorkerUpdateRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct FinishWorkerUpdateRequestOwnedView(
+            ::buffa::OwnedView<FinishWorkerUpdateRequestView<'static>>,
+        );
+        impl FinishWorkerUpdateRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FinishWorkerUpdateRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FinishWorkerUpdateRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::FinishWorkerUpdateRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FinishWorkerUpdateRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`FinishWorkerUpdateRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &FinishWorkerUpdateRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::FinishWorkerUpdateRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `worker_id`
+            #[must_use]
+            pub fn worker_id(&self) -> &'_ str {
+                self.0.reborrow().worker_id
+            }
+            /// Field 2: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Cancelling resumes the previous runtime; it never counts as an update.
+            ///
+            /// Field 3: `cancel`
+            #[must_use]
+            pub fn cancel(&self) -> bool {
+                self.0.reborrow().cancel
+            }
+            /// Field 4: `error`
+            #[must_use]
+            pub fn error(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().error
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<FinishWorkerUpdateRequestView<'static>>,
+        > for FinishWorkerUpdateRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<FinishWorkerUpdateRequestView<'static>>,
+            ) -> Self {
+                FinishWorkerUpdateRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<FinishWorkerUpdateRequestOwnedView>
+        for ::buffa::OwnedView<FinishWorkerUpdateRequestView<'static>> {
+            fn from(wrapper: FinishWorkerUpdateRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<FinishWorkerUpdateRequestView<'static>>,
+        > for FinishWorkerUpdateRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<FinishWorkerUpdateRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::FinishWorkerUpdateRequest {
+            type View<'a> = FinishWorkerUpdateRequestView<'a>;
+            type ViewHandle = FinishWorkerUpdateRequestOwnedView;
+        }
+        impl ::serde::Serialize for FinishWorkerUpdateRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct FinishWorkerUpdateResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for FinishWorkerUpdateResponseView<'a> {
+            type Owned = super::super::FinishWorkerUpdateResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::FinishWorkerUpdateResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::FinishWorkerUpdateResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::FinishWorkerUpdateResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for FinishWorkerUpdateResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for FinishWorkerUpdateResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for FinishWorkerUpdateResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "FinishWorkerUpdateResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.FinishWorkerUpdateResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.FinishWorkerUpdateResponse";
+        }
+        ::buffa::impl_default_view_instance!(FinishWorkerUpdateResponseView);
+        ::buffa::impl_view_reborrow!(FinishWorkerUpdateResponseView);
+        /** Self-contained, `'static` owned view of a `FinishWorkerUpdateResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`FinishWorkerUpdateResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`FinishWorkerUpdateResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct FinishWorkerUpdateResponseOwnedView(
+            ::buffa::OwnedView<FinishWorkerUpdateResponseView<'static>>,
+        );
+        impl FinishWorkerUpdateResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FinishWorkerUpdateResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FinishWorkerUpdateResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::FinishWorkerUpdateResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FinishWorkerUpdateResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`FinishWorkerUpdateResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &FinishWorkerUpdateResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::FinishWorkerUpdateResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<FinishWorkerUpdateResponseView<'static>>,
+        > for FinishWorkerUpdateResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<FinishWorkerUpdateResponseView<'static>>,
+            ) -> Self {
+                FinishWorkerUpdateResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<FinishWorkerUpdateResponseOwnedView>
+        for ::buffa::OwnedView<FinishWorkerUpdateResponseView<'static>> {
+            fn from(wrapper: FinishWorkerUpdateResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<FinishWorkerUpdateResponseView<'static>>,
+        > for FinishWorkerUpdateResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<FinishWorkerUpdateResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::FinishWorkerUpdateResponse {
+            type View<'a> = FinishWorkerUpdateResponseView<'a>;
+            type ViewHandle = FinishWorkerUpdateResponseOwnedView;
+        }
+        impl ::serde::Serialize for FinishWorkerUpdateResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -127405,8 +129084,11 @@ pub mod __buffa {
         reg.register_json_any(super::__PREPARE_WORKER_UPDATE_HANDOFF_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_WORKER_UPDATE_HANDOFF_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_WORKER_UPDATE_HANDOFF_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__WORKER_UPDATE_RUNTIME_JSON_ANY);
         reg.register_json_any(super::__FAIL_WORKER_UPDATE_HANDOFF_REQUEST_JSON_ANY);
         reg.register_json_any(super::__FAIL_WORKER_UPDATE_HANDOFF_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__FINISH_WORKER_UPDATE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__FINISH_WORKER_UPDATE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CLAIMED_HANDOFF_CONTEXT_JSON_ANY);
         reg.register_json_any(super::__QUEUED_ATTACHMENT_JSON_ANY);
         reg.register_json_any(super::__QUEUED_ISSUE_MESSAGE_JSON_ANY);
@@ -127956,6 +129638,10 @@ pub use self::__buffa::view::GetWorkerUpdateHandoffResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetWorkerUpdateHandoffResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::WorkerUpdateRuntimeView;
+#[doc(inline)]
+pub use self::__buffa::view::WorkerUpdateRuntimeOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::FailWorkerUpdateHandoffRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::FailWorkerUpdateHandoffRequestOwnedView;
@@ -127963,6 +129649,14 @@ pub use self::__buffa::view::FailWorkerUpdateHandoffRequestOwnedView;
 pub use self::__buffa::view::FailWorkerUpdateHandoffResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::FailWorkerUpdateHandoffResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::FinishWorkerUpdateRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::FinishWorkerUpdateRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::FinishWorkerUpdateResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::FinishWorkerUpdateResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ClaimedHandoffContextView;
 #[doc(inline)]

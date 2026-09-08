@@ -740,6 +740,30 @@ describe("detached execution workers", () => {
     expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
   });
 
+  it("keeps same-version sandbox updates fenced until every runtime acknowledges the request", async () => {
+    const credential = "briar_worker_sandbox-update-test";
+    const worker = await register("sandbox-update", 1, createHash("sha256").update(credential).digest("hex"));
+    const env = { DB: db, ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "sandbox-update-secret-sandbox-update-secret",
+      GOOGLE_CLIENT_ID: "test", GOOGLE_CLIENT_SECRET: "test" } as unknown as Env;
+    const control = workerControlClient(env, credential);
+    const requestId = "77777777-7777-4777-8777-777777777775";
+    await control.client.prepareWorkerUpdateHandoff({
+      workerId: worker.worker.id, targetVersion: "1.2.95", requiresRuntimeAck: true, requestId,
+    }, control.options);
+    await completeExecutionWorkerUpdates(db, worker.device.id, "1.2.95", new Date().toISOString());
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toMatchObject({ id: requestId });
+    await expect(control.client.finishWorkerUpdate({ workerId: worker.worker.id, requestId }, control.options))
+      .rejects.toThrow("Every sandbox worker");
+    const runtime = workerRuntime("1.2.95");
+    runtime.updateRequestId = requestId;
+    await control.client.heartbeatWorker({ workerId: worker.worker.id, runtime,
+      acceptingWork: true, readinessState: WorkerReadinessState.READY }, control.options);
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toMatchObject({ id: requestId });
+    await control.client.finishWorkerUpdate({ workerId: worker.worker.id, requestId }, control.options);
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
+  });
+
   it("atomically fences multiple active runs and resumes them without retry attempts", async () => {
     const worker = await register("handoff", 1);
     await updateExecutionWorkerConcurrency(
@@ -802,6 +826,19 @@ describe("detached execution workers", () => {
       "handed_off",
     ]);
     expect(await countExecutionWorkerDeviceSessions(db, worker.device.id, atMinute(4))).toBe(0);
+
+    const other = await register("other-sandbox", 4);
+    const unrelated = await recordHuntEvent(db, projectId, queuedEvent("unrelated", 4));
+    expect(await claimNextQueuedHuntRun(db, projectId, {
+      runId: runIds[0], claimTokenHash: fingerprint("cannot-steal"), claimedBy: other.worker.label,
+      claimedAt: atMinute(4), leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
+      workerId: other.worker.id, workerDeviceId: other.device.id,
+    })).toBeNull();
+    expect(await claimNextQueuedHuntRun(db, projectId, {
+      runId: unrelated, claimTokenHash: fingerprint("other-unrelated"), claimedBy: other.worker.label,
+      claimedAt: atMinute(4), leaseExpiresAt: leaseExpiryFrom(atMinute(4)),
+      workerId: other.worker.id, workerDeviceId: other.device.id,
+    })).not.toBeNull();
 
     const rows = await db
       .prepare(

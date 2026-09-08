@@ -730,6 +730,28 @@ describe("briar worker loop", () => {
     });
   });
 
+  it("finishes the budgeted memory-learning transaction without replaying it during drain", async () => {
+    let heartbeatCount = 0;
+    let completed = false;
+    const test = harness([{ ...issue("memory-update"), workType: "dmMemory" }], {
+      heartbeat: async () => ++heartbeatCount >= 2 ? {
+        acceptingWork: false, updateDirective: { id: "update-request", targetVersion: "2.0.0",
+          status: "requested", requestedAt: new Date(0).toISOString(), handoffState: "draining" },
+      } : { acceptingWork: true },
+      runIssue: async (_claimed, signal) => {
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(signal.aborted).toBe(false);
+        completed = true;
+      },
+      handoff: async () => { throw new Error("Memory transaction must not be replayed"); },
+    });
+    const result = await runWorkerLoop(test.dependencies, { once: true });
+    expect(completed).toBe(true);
+    expect(result.processed).toBe(1);
+    expect(result.failures).toBe(0);
+  });
+
   it("does not wait out the renewal interval after an issue finishes", async () => {
     const test = harness([issue("issue-1"), issue("issue-2")]);
     await runWorkerLoop(test.dependencies, {

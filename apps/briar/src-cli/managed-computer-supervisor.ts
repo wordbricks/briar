@@ -54,6 +54,13 @@ export type WorkerSupervisorOptions = {
   childEnvironment: (config: Config, projectId: string) => NodeJS.ProcessEnv;
   /** Event name prefix so logs distinguish managed and sandbox supervisors. */
   eventPrefix: string;
+  beforeReconcile?: (config: Config, control: WorkerSupervisorControl) => Promise<void>;
+  workerCommand?: (projectId: string) => string[];
+};
+
+export type WorkerSupervisorControl = {
+  workers: { projectId: string; pid: number }[];
+  stopWorkers: () => Promise<void>;
 };
 
 const managedSupervisorOptions: WorkerSupervisorOptions = {
@@ -84,6 +91,27 @@ export async function runWorkerSupervisor(options: WorkerSupervisorOptions) {
     while (!stop.signal.aborted) {
       try {
         const config = await loadConfig();
+        await options.beforeReconcile?.(config, {
+          workers: [...children].flatMap(([projectId, { child }]) =>
+            child.pid ? [{ projectId, pid: child.pid }] : []),
+          stopWorkers: async () => {
+            const exits = [...children.values()].map(({ child }) => new Promise<void>((resolve) => {
+              child.once("close", () => resolve());
+              child.kill("SIGTERM");
+            }));
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            try {
+              await Promise.race([
+                Promise.all(exits),
+                new Promise<never>((_, reject) => {
+                  timer = setTimeout(() => reject(new Error("Drained sandbox workers did not exit; no runtime was replaced")), 30_000);
+                }),
+              ]);
+              restartAfter.clear();
+              restartAttempts.clear();
+            } finally { if (timer) clearTimeout(timer); }
+          },
+        });
         const desired = await options.desiredProjectIds(config);
         const desiredSet = new Set(desired);
         const desiredKey = desired.join(",");
@@ -105,7 +133,7 @@ export async function runWorkerSupervisor(options: WorkerSupervisorOptions) {
         for (const projectId of desired) {
           if (children.has(projectId)) continue;
           if ((restartAfter.get(projectId) ?? 0) > Date.now()) continue;
-          const command = managedWorkerProcessCommand(projectId);
+          const command = options.workerCommand?.(projectId) ?? managedWorkerProcessCommand(projectId);
           const child = spawn(command[0]!, command.slice(1), {
             stdio: "inherit",
             env: {

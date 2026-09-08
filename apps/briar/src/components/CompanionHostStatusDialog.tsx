@@ -12,6 +12,7 @@ import { useI18n } from "../i18n";
 import type { ExecutionWorker } from "../types";
 import { WorkerIcon } from "./WorkerIcon";
 import { WorkerProviderIcons } from "./WorkerProviderIcons";
+import { SandboxWorkerUpdateButton } from "./SandboxWorkerUpdateButton";
 
 function companionWorkerProviders(worker: ExecutionWorker) {
   if (
@@ -135,11 +136,12 @@ export function CompanionHostStatusDialog({
                         {activeSlots}/{maximumSlots}
                       </small>
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center justify-between gap-2">
                       <WorkerProviderIcons
                         providers={companionWorkerProviders(worker)}
                         size={14}
                       />
+                      <SandboxWorkerUpdateButton worker={worker} />
                     </div>
                   </div>
                 </article>

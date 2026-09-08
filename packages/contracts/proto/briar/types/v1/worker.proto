@@ -32,6 +32,7 @@ message AgentProviderCapability {
 
 message RemoteUpdateCapability {
   bool supported = 1;
+  // 1: desktop/managed release. 2: sandbox runtime and provider updates.
   optional uint32 protocol = 2;
 }
 
@@ -78,4 +79,6 @@ message WorkerRuntimeAdvertisement {
   repeated AgentProviderHealth provider_health = 3;
   WorkerCapabilities capabilities = 4;
   map<string, string> versions = 5;
+  // Set only by a worker started from a staged sandbox runtime.
+  optional string update_request_id = 6;
 }

@@ -9,6 +9,7 @@ import { appDashboardWorker } from "./app-connect-mappers";
 import { HttpError } from "./http-response";
 import {
   failWorkerUpdateHandoffApplication,
+  finishWorkerUpdateApplication,
   getWorkerUpdateHandoffApplication,
   heartbeatWorkerApplication,
   prepareWorkerUpdateHandoffApplication,
@@ -123,6 +124,8 @@ export const createWorkerControlService = (
         principal,
         workerId: workerId(input.workerId),
         targetVersion: input.targetVersion,
+        requiresRuntimeAck: input.requiresRuntimeAck,
+        requestId: input.requestId,
         observedAt: new Date().toISOString(),
       }),
     );
@@ -150,6 +153,7 @@ export const createWorkerControlService = (
         : undefined,
       activeWorkCount: result.activeWorkCount,
       ready: result.ready,
+      runtimes: result.runtimes,
     };
   },
 
@@ -160,6 +164,18 @@ export const createWorkerControlService = (
       principal,
       workerId: workerId(input.workerId),
       requestId: input.requestId,
+      error: input.error,
+      observedAt: new Date().toISOString(),
+    }));
+  },
+  finishWorkerUpdate: async (input) => {
+    const principal = await requireWorkerCredential(db, request);
+    return withWorkerControlErrors(finishWorkerUpdateApplication({
+      db,
+      principal,
+      workerId: workerId(input.workerId),
+      requestId: input.requestId,
+      cancel: input.cancel,
       error: input.error,
       observedAt: new Date().toISOString(),
     }));

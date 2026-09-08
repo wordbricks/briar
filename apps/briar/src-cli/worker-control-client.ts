@@ -238,10 +238,12 @@ export function createWorkerControlClient(apiUrl: string, token: string) {
     },
     updateLabel: (workerId: string, label: string) =>
       client.updateWorkerLabel({ workerId, label }),
-    prepareUpdateHandoff: async (workerId: string, targetVersion: string) => {
+    prepareUpdateHandoff: async (workerId: string, targetVersion: string, requiresRuntimeAck = false, requestId?: string) => {
       const response = await client.prepareWorkerUpdateHandoff({
         workerId,
         targetVersion,
+        requiresRuntimeAck,
+        requestId,
       });
       const update = updateDirective(response.update);
       if (!update) throw new Error("Worker handoff did not return a pending update");
@@ -256,9 +258,12 @@ export function createWorkerControlClient(apiUrl: string, token: string) {
         activeWorkCount: response.activeWorkCount,
         ready: response.ready,
         update: updateState(response.update),
+        runtimes: response.runtimes,
       };
     },
     failUpdateHandoff: (workerId: string, requestId: string, error: string) =>
       client.failWorkerUpdateHandoff({ workerId, requestId, error }),
+    finishUpdate: (workerId: string, requestId: string, cancel = false, error?: string) =>
+      client.finishWorkerUpdate({ workerId, requestId, cancel, error }),
   };
 }

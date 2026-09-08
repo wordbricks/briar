@@ -13,7 +13,8 @@
 - **content-addressed 런타임.** Dockerfile, CLI 번들, 에이전트 러너, provider
   manifest와 lockfile을 모두 해시한 SHA-256이 이미지 태그
   (`briar-sandbox:<sha12>`)와 컨테이너 라벨이 된다. CLI가 갱신되어 digest가
-  달라지면 `briar sandbox up`이 컨테이너를 교체한다.
+  달라지면 `briar sandbox up`이 정지된 컨테이너를 교체한다. 실행 중인 컨테이너는
+  강제로 삭제하지 않는다. 일반적인 CLI/provider 갱신은 아래 `sandbox update`를 사용한다.
 - **포트 없음.** Briar 워커의 연결은 전부 outbound HTTPS라서 publish할 포트가
   없다. 자격 증명은 `docker exec` stdin으로만 전달되고 Docker 호스트 디스크에는
   남지 않는다.
@@ -23,7 +24,61 @@
   `briar-sandbox-<name>-computer-use` 볼륨으로, 공유 브라우저 로그인 저장소와
   디스플레이 프로필(`:1` 포함), box 서비스 토큰이 여기 남는다. 둘 다 `rm --purge`에서만
   지워진다.
-- **동일 lifecycle.** `up`, `status`, `stop`, `recreate`, `rm`으로 관리한다.
+- **동일 lifecycle.** `up`, `update`, `status`, `stop`, `recreate`, `rm`으로 관리한다.
+
+## 작업을 보존하는 런타임 업데이트
+
+```sh
+briar sandbox update --name eternity1 --check
+briar sandbox update --name eternity1
+briar sandbox update --name eternity1 --provider codex
+briar sandbox update --name eternity1 --status
+briar sandbox update --name eternity1 --rollback
+```
+
+`--host`/`--context`는 `up`과 같은 호스트 선택 규칙을 따른다. `--provider`는
+`codex`, `claude`, `opencode`, `grok` 중 하나이며 Briar 버전과 독립적으로 갱신한다.
+생략하면 Briar와 설치된 provider를 확인한다. `--check`는 설치하거나 작업을 중단하지
+않는다. `--no-wait`는 요청을 넣은 뒤 바로 반환한다.
+
+1. 공식 stable 버전을 정확한 버전과 artifact 해시로 고정하고 별도 디렉터리에 설치한다.
+   Briar는 서명된 CLI·러너·Skill 번들을 함께 검증한다. Codex/Claude는 npm integrity,
+   OpenCode는 GitHub artifact digest를 검증한다. Grok upstream은 별도 체크섬을
+   제공하지 않으므로 공식 HTTPS artifact를 고정하고 다운로드한 SHA-256을 기록한다.
+   일반 업데이트는 다운그레이드하지 않는다.
+2. 설치가 끝나면 서버에서 새 작업 수락을 막고 실행 중인 사용자 작업을 중단·인계한다.
+   대화 ID, worktree와 checkpoint를 보존하고 인계한 작업은 같은 디바이스에 예약한다.
+   Worker의 인계 응답뿐 아니라 로컬 실행 종료 확인도 기다린다.
+3. 새 런타임 경로를 원자적으로 활성화하고 Worker를 재기동한다. 모든 연결 팀의
+   heartbeat가 요청 ID, 예상 버전, 정상 provider와 모델 목록을 보고해야 완료한다.
+4. 인계한 작업부터 같은 샌드박스에서 이어받은 뒤 새 작업을 받는다. 이는 같은 대화와
+   worktree를 사용하는 다음 실행이지 프로세스 메모리 복원은 아니다. 외부 작업은 저장된
+   결과를 확인한 뒤 이어가야 하며 무조건 재실행하지 않는다.
+
+짧은 내부 DM 메모리 학습은 비용이 기록된 proposer/verifier 처리 단위를 끝낸다.
+재개할 대화가 없어 중간 호출을 재실행하면 비용·검증 결과가 달라질 수 있기 때문이다.
+전체 인계가 120초 안에 끝나지 않으면 업데이트를 취소하며 실행 중인 프로세스를 강제로
+죽이지 않는다. 새 런타임 검증은 180초이며, 실패하면 이전 런타임을 복원·검증한다.
+복원도 실패하면 새 작업 차단을 유지하고 오류를 표시한다.
+
+진행 상태와 활성 경로는 home 볼륨의 `.config/briar/sandbox-runtime/`에 저장한다.
+요청 중복은 합쳐지고, 터미널이나 SSH 연결이 끊겨도 컨테이너의 supervisor가 진행한다.
+`--status`로 결과를 다시 읽는다. `--rollback`은 직전 런타임만 복원하며 인증 정보,
+대화, 저장소, 브라우저 프로필을 과거 상태로 되돌리지 않는다.
+
+데스크톱·웹의 Worker 실행 환경 패널과 iOS·Android 호스트 패널에는 이 프로토콜을
+광고하는 샌드박스에 업데이트 아이콘이 표시된다. Briar가 최신이어도 provider 갱신을
+요청할 수 있고 진행 중에는 중복 클릭이 비활성화된다. 서버의 조직 개발 관리 권한이
+필요하다.
+
+### 배포 순서와 구형 이미지
+
+먼저 `0212_sandbox_runtime_updates.sql`과 Worker API를 배포한 다음 CLI·앱·새
+샌드박스 이미지를 배포한다. 구형 이미지에는 supervisor updater와 로컬 종료 확인
+기능이 없으므로 아이콘을 광고하지 않으며 `sandbox update`도 명시적으로 거절한다.
+최초 이미지 전환은 별도 유지보수에서 작업 인계와 프로세스 종료를 확인한 뒤 수행해야
+한다. 실행 중인 구형 컨테이너를 `up`으로 강제 교체하거나 `rm --force`로 우회하지 않는다.
+이 최초 전환은 일반 런타임 업데이트의 자동 복구 범위에 포함되지 않는다.
 
 ## 디스플레이와 Computer Use
 

@@ -64,6 +64,7 @@ service WorkerControlService {
   rpc PrepareWorkerUpdateHandoff(PrepareWorkerUpdateHandoffRequest) returns (PrepareWorkerUpdateHandoffResponse);
   rpc GetWorkerUpdateHandoff(GetWorkerUpdateHandoffRequest) returns (GetWorkerUpdateHandoffResponse);
   rpc FailWorkerUpdateHandoff(FailWorkerUpdateHandoffRequest) returns (FailWorkerUpdateHandoffResponse);
+  rpc FinishWorkerUpdate(FinishWorkerUpdateRequest) returns (FinishWorkerUpdateResponse);
 }
 
 // Execution-credential operations shared by the interactive CLI and the
@@ -894,6 +895,8 @@ message UpdateWorkerLabelResponse {
 message PrepareWorkerUpdateHandoffRequest {
   string worker_id = 1;
   string target_version = 2;
+  bool requires_runtime_ack = 3;
+  optional string request_id = 4;
 }
 
 message PrepareWorkerUpdateHandoffResponse {
@@ -911,6 +914,13 @@ message GetWorkerUpdateHandoffResponse {
   optional briar.app.v1.ExecutionWorkerUpdateRequestState update = 1;
   uint32 active_work_count = 2;
   bool ready = 3;
+  repeated WorkerUpdateRuntime runtimes = 4;
+}
+
+message WorkerUpdateRuntime {
+  string worker_id = 1;
+  briar.types.v1.WorkerRuntimeAdvertisement runtime = 2;
+  string last_heartbeat_at = 3;
 }
 
 message FailWorkerUpdateHandoffRequest {
@@ -920,6 +930,16 @@ message FailWorkerUpdateHandoffRequest {
 }
 
 message FailWorkerUpdateHandoffResponse {}
+
+message FinishWorkerUpdateRequest {
+  string worker_id = 1;
+  string request_id = 2;
+  // Cancelling resumes the previous runtime; it never counts as an update.
+  bool cancel = 3;
+  optional string error = 4;
+}
+
+message FinishWorkerUpdateResponse {}
 
 message ClaimedHandoffContext {
   enum WorkKind {

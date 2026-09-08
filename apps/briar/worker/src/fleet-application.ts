@@ -293,6 +293,7 @@ export async function requestExecutionWorkerUpdateApplication(input: {
   }
   const currentVersion = device.versions.briar;
   if (
+    !device.sandboxUpdateSupported &&
     currentVersion && isSemanticVersion(currentVersion) &&
     compareSemanticVersions(currentVersion, targetVersion) >= 0
   ) {
@@ -309,6 +310,8 @@ export async function requestExecutionWorkerUpdateApplication(input: {
     requestedByUserId: input.userId,
     targetVersion,
     requestedAt: input.observedAt,
+    requiresRuntimeAck: device.sandboxUpdateSupported,
+    deferHandoff: device.sandboxUpdateSupported,
   });
   return {
     outcome: "requested" as const,

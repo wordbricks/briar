@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExecutionWorker, ManagedComputer } from "../types";
-import { managedComputerShortcutTarget } from "./WorkerStatusBar";
+import { managedComputerShortcutTarget, workerRemoteUpdateSupported, workerSandboxUpdateSupported } from "./WorkerStatusBar";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
+
+it("allows sandbox provider updates independently of the Briar version", () => {
+  const sandbox = { ...worker, capabilities: { remoteUpdates: { supported: true, protocol: 2 } } };
+  expect(workerRemoteUpdateSupported(sandbox)).toBe(true);
+  expect(workerSandboxUpdateSupported(sandbox)).toBe(true);
+  expect(workerSandboxUpdateSupported(worker)).toBe(false);
+  expect(workerRemoteUpdateSupported({ ...worker, capabilities: { remoteUpdates: { supported: true, protocol: 99 } } })).toBe(false);
+});
 const ownerUserId = "managed-computer-owner";
 
 const worker: ExecutionWorker = {

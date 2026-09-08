@@ -408,8 +408,11 @@ export async function ensureSandbox(
     inspected.viewPort !== (input.viewPort ?? DEFAULT_SANDBOX_VIEW_PORT)
   );
   if (stale) {
+    if (inspected.running) {
+      throw new Error(`Sandbox ${input.name} is running. Use \`briar sandbox update --name ${input.name}\` for runtime updates. Image/configuration replacement requires a drained, stopped sandbox; it will not be force-removed.`);
+    }
     input.log?.(`Replacing ${containerName} with runtime ${input.runtimeSha256.slice(0, 12)}`);
-    const removed = await docker(["rm", "--force", containerName]);
+    const removed = await docker(["rm", containerName]);
     if (!removed.ok) {
       throw new Error(
         `Could not replace the sandbox with the current runtime: ${removed.output}`,
