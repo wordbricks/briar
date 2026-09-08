@@ -3783,13 +3783,12 @@ describe("organization channels", () => {
     });
     expect(dmClaimPayload?.workId).toBe(dmReplyJob!.id);
     expect(dmClaimPayload!.snapshot.messages.map((item) => item.id)).toEqual([
-      ...recentDmMessageIds.slice(-9),
+      ...recentDmMessageIds,
       messageBody.message.id,
     ]);
     const excludedDmMessageIds = [
       earlierDmMessageId,
       earlierDmThreadReplyId,
-      ...recentDmMessageIds.slice(0, 2),
     ];
     for (const excludedMessageId of excludedDmMessageIds) {
       expect(dmClaimPayload!.snapshot.messages.map((item) => item.id))
