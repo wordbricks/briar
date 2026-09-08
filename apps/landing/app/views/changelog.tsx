@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.218",
+        date: "2026년 9월 8일",
+        title: "기억을 인용한 DM 답변이 더 이상 사라지지 않습니다",
+        summary:
+          "Agent가 저장된 기억을 근거로 DM에 답하면 답변이 발행되지 않고 \"답변을 생성하지 못했습니다\"로 끝나던 문제를 고쳤습니다. 같은 원인으로 막혀 있던 명시적 기억 저장 요청도 함께 동작합니다.",
+        items: [
+          "기억 인용과 저장 요청이 서버 검증에서 거부되던 원인을 고쳤습니다. 인용이 없는 답변은 늘 성공했기 때문에 그동안 드러나지 않았습니다.",
+          "DM 답변이 실패하면 Worker 로그에 원인의 형태(에러 종류, 통신 코드, 스택)가 남습니다. 대화 내용은 예전처럼 기록하지 않습니다.",
+          "채널 첨부와 링크 프리뷰에서 남아 있던 레이아웃 흔들림을 없애고, 모바일에서 채널 스레드로 이동할 때의 동작을 안정화했습니다.",
+        ],
+      },
+      {
         version: "1.2.217",
         date: "2026년 9월 8일",
         title: "샌드박스를 업데이트하고 작업을 이어서 실행합니다",
@@ -1909,6 +1921,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.218",
+        date: "September 8, 2026",
+        title: "DM replies that cite memory no longer disappear",
+        summary:
+          "A DM reply that grounded its answer in stored memory was never published; the thread ended with \"the reply could not be generated\" instead. That is fixed, and explicit requests to save a memory, blocked by the same cause, work again.",
+        items: [
+          "Memory citations and save requests were rejected by server-side validation. Replies without citations always succeeded, which is why this stayed hidden.",
+          "A failed DM reply now leaves the shape of the failure in the Worker log — error class, transport code, and stack. Conversation content is still never recorded.",
+          "Removed the remaining layout shift from channel attachments and link previews, and stabilized navigation into channel threads on mobile.",
+        ],
+      },
       {
         version: "1.2.217",
         date: "September 8, 2026",
