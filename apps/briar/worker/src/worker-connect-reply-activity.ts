@@ -6,6 +6,7 @@ import {
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 
+import { isWorkerEmoji } from "../../src/lib/worker-icon-validation";
 import { HttpError } from "./http-response";
 import {
   publishReplyActivityApplication,
@@ -40,7 +41,15 @@ const publishReplyActivity = async (
   const token = bearerCapability(input.request);
   let activity;
   try {
-    activity = replyActivityInputFromProto(request);
+    if (request.acknowledgementReaction !== undefined) {
+      const emoji = request.acknowledgementReaction;
+      if (emoji.length > 32 || emoji !== emoji.trim() || !isWorkerEmoji(emoji) || request.activity) {
+        throw new ReplyActivityMappingError("Invalid acknowledgement reaction");
+      }
+      activity = { sequence: 1, activity: null };
+    } else {
+      activity = replyActivityInputFromProto(request);
+    }
   } catch (error) {
     if (error instanceof ReplyActivityMappingError) {
       throw new HttpError(400, error.message);
@@ -55,6 +64,7 @@ const publishReplyActivity = async (
       token,
       replyJobId: request.replyJobId,
       activity,
+      acknowledgementReaction: request.acknowledgementReaction,
     }, services);
   } catch (error) {
     if (error instanceof ReplyActivityApplicationError) {

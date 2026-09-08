@@ -674,6 +674,8 @@ message PublishReplyActivityRequest {
   // Absence clears the visible activity. Implementations reject unspecified or
   // unrecognized AgentActivityKind values instead of treating them as a default.
   optional briar.realtime.v1.AgentActivity activity = 3;
+  // Publish the first DM acknowledgement independently of activity and its sequence.
+  optional string acknowledgement_reaction = 4;
 }
 
 message PublishReplyActivityResponse {}

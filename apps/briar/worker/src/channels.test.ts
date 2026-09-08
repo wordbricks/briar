@@ -3405,7 +3405,7 @@ describe("organization channels", () => {
     expect(again).toHaveLength(2);
   });
 
-  it("acknowledges DM reply jobs once per Agent and leaves regular channels unchanged", async () => {
+  it("enqueues DM replies without a temporary reaction and preserves user reactions", async () => {
     const agentId = "aa000000-0000-4000-8000-000000000130";
     await createOrganizationAgent(db, {
       id: agentId,
@@ -3431,17 +3431,7 @@ describe("organization channels", () => {
       messageInput,
     );
     expect(first.agentReplies).toHaveLength(1);
-    expect(first.message.reactions).toEqual([{
-      emoji: "👀",
-      count: 1,
-      userIds: [],
-      agentIds: [agentId],
-      people: [{
-        agentId,
-        name: "Reaction Assistant",
-        image: null,
-      }],
-    }]);
+    expect(first.message.reactions).toEqual([]);
 
     const replay = await createMessageThroughApplication(
       direct.channel.id,
@@ -3452,7 +3442,7 @@ describe("organization channels", () => {
       `select count(*) as count from briar_channel_message_reactions
        where message_id = ? and agent_id = ? and emoji = '👀'`,
     ).bind(first.message.id, agentId).first<{ count: number }>();
-    expect(reactionCount?.count).toBe(1);
+    expect(reactionCount?.count).toBe(0);
 
     const withUser = await toggleChannelMessageReaction(db, {
       channelId: direct.channel.id,
@@ -3462,9 +3452,8 @@ describe("organization channels", () => {
       createdAt: at(23),
     });
     expect(withUser?.reactions[0]).toMatchObject({
-      count: 2,
+      count: 1,
       userIds: [ownerId],
-      agentIds: [agentId],
     });
     const agentOnly = await toggleChannelMessageReaction(db, {
       channelId: direct.channel.id,
@@ -3473,11 +3462,7 @@ describe("organization channels", () => {
       emoji: "👀",
       createdAt: at(24),
     });
-    expect(agentOnly?.reactions[0]).toMatchObject({
-      count: 1,
-      userIds: [],
-      agentIds: [agentId],
-    });
+    expect(agentOnly?.reactions).toEqual([]);
 
     const channelId = "e0000000-0000-4000-8000-0000000000a2";
     await createChannel(db, {
