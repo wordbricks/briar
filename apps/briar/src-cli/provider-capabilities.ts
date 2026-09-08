@@ -23,6 +23,8 @@ import { providerMissingBinaryMessage } from "./provider-usage";
 const MAX_MODELS = 500;
 const MAX_EFFORTS = 20;
 const MAX_LABEL = 200;
+// A version line is a few words; past this the CLI is printing something else.
+const MAX_VERSION_OUTPUT = 200;
 const CACHE_MS = 5 * 60_000;
 
 const effort = (
@@ -1082,4 +1084,129 @@ function openCodeCachedModels(home: string): AgentModelCapability[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * The version a provider CLI reports about itself.
+ *
+ * Every CLI prints its version differently — bare (`1.18.18`), prefixed
+ * (`codex-cli 0.153.4`), suffixed (`2.1.263 (Claude Code)`) or decorated with
+ * a commit and a channel (`grok 1.0.13 (5e9a58528b76) [stable]`) — and two of
+ * the seven binaries are not installed on any machine Briar has measured. So
+ * this reads the shape every one of them shares instead of a per-CLI grammar:
+ * the first `major.minor.patch` on the first line, with an optional
+ * pre-release or build suffix. Output that carries no such number is not a
+ * version, and the caller omits the key rather than advertising a guess.
+ */
+export function parseProviderCliVersion(output: string): string | null {
+  const [first = ""] = output.split(/\r?\n/u);
+  const match = first
+    .slice(0, MAX_VERSION_OUTPUT)
+    .match(/\d+\.\d+\.\d+(?:[-+][0-9A-Za-z][0-9A-Za-z.+-]*)?/u);
+  return match?.[0] ?? null;
+}
+
+/**
+ * `--version` output, or a rejection. Async so the binaries can be probed
+ * concurrently: `spawnSync` would serialise seven 15s timeouts onto the
+ * worker's event loop.
+ */
+function providerVersionOutput(
+  binary: string,
+  env: NodeJS.ProcessEnv,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, ["--version"], {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let output = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`${binary} --version timed out`));
+    }, 15_000);
+    // A version line is short; anything longer is a CLI printing something
+    // else, and is capped rather than buffered.
+    const append = (chunk: unknown) => {
+      if (output.length <= MAX_VERSION_OUTPUT) output += String(chunk);
+    };
+    child.stdout.on("data", append);
+    child.stderr.on("data", append);
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(output);
+      else reject(new Error(`${binary} --version exited (${code})`));
+    });
+  });
+}
+
+/**
+ * The distinct executables the providers run. Nine providers share seven
+ * binaries — OpenRouter and Vertex AI both drive `opencode` — so versions are
+ * keyed by binary, which is also how the sandbox image stamps its manifest.
+ */
+export const agentProviderBinaryNames: readonly string[] = [
+  ...new Set(agentProviders.map(agentProviderBinaryName)),
+];
+
+let cachedVersions: {
+  expiresAt: number;
+  key: string;
+  value: Record<string, string>;
+} | null = null;
+
+export type ProviderVersionOptions = {
+  refresh?: boolean;
+  which?: (binary: string) => string | null;
+  environment?: NodeJS.ProcessEnv;
+};
+
+/**
+ * Provider CLI versions this machine can report, keyed by binary name.
+ *
+ * Separately cached from {@link discoverWorkerProviderCapabilities} but on the
+ * same lifetime: the advertisement is rebuilt on every heartbeat and must
+ * never spawn a CLI on that path. A binary that is missing, hangs, exits
+ * non-zero or prints no version is simply absent from the map — one provider's
+ * failure never costs the others their entry, and none of them can break the
+ * advertisement.
+ */
+export async function discoverWorkerProviderVersions({
+  refresh = false,
+  which = (binary) => Bun.which(binary),
+  environment = process.env,
+}: ProviderVersionOptions = {}): Promise<Record<string, string>> {
+  // On a sandbox the image build already knows the exact versions and stamps
+  // them into the runtime manifest, which stays authoritative. Probing there
+  // would be both redundant and slower.
+  if (environment.BRIAR_SANDBOX_UPDATER === "1") return {};
+  const cacheKey = environment.PATH ?? "";
+  if (
+    !refresh &&
+    cachedVersions?.key === cacheKey &&
+    cachedVersions.expiresAt > Date.now()
+  ) return cachedVersions.value;
+  const probed = await Promise.all(
+    agentProviderBinaryNames.map(async (binary) => {
+      const resolved = which(binary);
+      if (!resolved) return null;
+      try {
+        const version = parseProviderCliVersion(
+          await providerVersionOutput(resolved, environment),
+        );
+        return version ? ([binary, version] as const) : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const versions = Object.fromEntries(
+    probed.filter((entry) => entry !== null),
+  );
+  cachedVersions = { expiresAt: Date.now() + CACHE_MS, key: cacheKey, value: versions };
+  return versions;
 }

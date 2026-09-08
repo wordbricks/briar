@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
 import { join } from "node:path";
 import { unlink } from "node:fs/promises";
-import { sandboxWorkerRuntimeMetadata } from "./sandbox-update-state";
+import {
+  sandboxWorkerRuntimeMetadata,
+  workerRuntimeVersions,
+} from "./sandbox-update-state";
 import { recordSandboxWorkerDrained } from "./sandbox-update-supervisor";
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import { buildComputerUseArgs } from "@briar/agent-exec";
@@ -43,7 +46,10 @@ import {
   inspectWorkerProviderHealth,
   providerHealthReadinessDetail,
 } from "./provider-health";
-import { discoverWorkerProviderCapabilities } from "./provider-capabilities";
+import {
+  discoverWorkerProviderCapabilities,
+  discoverWorkerProviderVersions,
+} from "./provider-capabilities";
 import {
   createWorkerControlClient,
   createWorkerEnrollmentClient,
@@ -125,10 +131,15 @@ const isRetryableWorkerCompletionError = (error: unknown) =>
 const isMissingWorkerError = (error: unknown) =>
   error instanceof ConnectError && error.code === Code.NotFound;
 
-const workerRuntime = (input: {
+const workerRuntime = ({
+  providerVersions,
+  ...input
+}: {
   agentProvider: WorkerRuntimeInput["agentProvider"];
   providerHealth: WorkerRuntimeInput["providerHealth"];
   providerCapabilities: WorkerRuntimeInput["providerCapabilities"];
+  /** Provider CLI versions probed on this machine, keyed by binary name. */
+  providerVersions?: Readonly<Record<string, string>>;
   worktrees: boolean;
   workflowRequirements?: WorkerRuntimeInput["workflowRequirements"];
   dmMemoryLearning: WorkerRuntimeInput["dmMemoryLearning"];
@@ -136,7 +147,10 @@ const workerRuntime = (input: {
 }): WorkerRuntimeInput => ({
   ...input,
   updateRequestId: sandboxWorkerRuntimeMetadata().updateRequestId,
-  versions: { ...sandboxWorkerRuntimeMetadata().versions, briar: cliVersion },
+  versions: workerRuntimeVersions({
+    briar: cliVersion,
+    probed: providerVersions,
+  }),
   remoteUpdates: {
     supported: supportsRemoteWorkerUpdates(platform()),
     protocol: process.env.BRIAR_SANDBOX_UPDATER === "1" ? 2 : 1,
@@ -294,6 +308,9 @@ export async function registerProjectExecutionWorker(input: {
     enabledAgentProviders(config),
     { refresh: true },
   );
+  const providerVersions = await discoverWorkerProviderVersions({
+    refresh: true,
+  });
   const providers = healthyWorkerProviders(providerHealth);
   const computerUse = await inspectComputerUseCapability(config, providers);
   const provider = providers.includes(configuredProvider)
@@ -303,6 +320,7 @@ export async function registerProjectExecutionWorker(input: {
     agentProvider: provider,
     providerHealth,
     providerCapabilities,
+    providerVersions,
     worktrees: true,
     dmMemoryLearning: dmMemoryLearningCapability(
       providers,
@@ -649,6 +667,7 @@ async function workerCommand() {
     const providerCapabilities = await discoverWorkerProviderCapabilities(
       enabledAgentProviders(config),
     );
+    const providerVersions = await discoverWorkerProviderVersions();
     const providers = healthyWorkerProviders(providerHealth);
     const computerUse = await inspectComputerUseCapability(config, providers);
     const configuredProvider = project.llm?.provider ?? "codex";
@@ -660,6 +679,7 @@ async function workerCommand() {
           : (providers[0] ?? configuredProvider),
         providerHealth,
         providerCapabilities,
+        providerVersions,
         worktrees: true,
         dmMemoryLearning: dmMemoryLearningCapability(
           providers,
@@ -810,6 +830,7 @@ async function workerCommand() {
         const providerCapabilities = await discoverWorkerProviderCapabilities(
           enabledAgentProviders(config),
         );
+        const providerVersions = await discoverWorkerProviderVersions();
         const providers = healthyWorkerProviders(providerHealth);
         const computerUse = await inspectComputerUseCapability(
           config,
@@ -849,6 +870,7 @@ async function workerCommand() {
               : (providers[0] ?? configuredProvider),
             providerHealth,
             providerCapabilities,
+            providerVersions,
             worktrees: worktreesEnabled(project),
             workflowRequirements: requirementHealth.map((item) => ({
               id: item.id,
@@ -914,6 +936,7 @@ async function workerCommand() {
                     : (providers[0] ?? configuredProvider),
                   providerHealth,
                   providerCapabilities,
+                  providerVersions,
                   worktrees: worktreesEnabled(project),
                   workflowRequirements: refreshedHealth.map((item) => ({
                     id: item.id,
