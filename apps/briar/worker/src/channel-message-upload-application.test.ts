@@ -29,13 +29,16 @@ describe("channel message upload policy", () => {
   });
 
   it.each([
+    ["photo.jpg", "image/jpg", "image/jpeg"],
+    ["scan.PNG", "application/x-unknown", "image/png"],
+    ["brief.pdf", "application/x-pdf", "application/pdf"],
     ["한글.MD", "", "text/markdown"],
     ["notes.md", "text/plain", "text/markdown"],
     ["notes.md", "text/x-markdown", "text/markdown"],
     ["notes.md", "application/octet-stream", "text/markdown"],
     ["notes.txt", "", "text/plain"],
     ["notes.TXT", "text/plain; charset=utf-8", "text/plain"],
-  ])("normalizes text metadata for %s (%s)", (filename, contentType, expected) => {
+  ])("normalizes attachment metadata for %s (%s)", (filename, contentType, expected) => {
     expect(channelMessageUploadMetadata([attachment({ filename, contentType })]))
       .toMatchObject([{ filename, contentType: expected, imageWidth: null, imageHeight: null }]);
   });

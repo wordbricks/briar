@@ -29,6 +29,9 @@ describe("channel attachments", () => {
   });
 
   it.each([
+    ["photo.jpg", "image/jpg", "image/jpeg"],
+    ["scan.PNG", "application/x-unknown", "image/png"],
+    ["brief.pdf", "application/x-pdf", "application/pdf"],
     ["설계.MD", "", "text/markdown"],
     ["notes.md", "text/plain", "text/markdown"],
     ["notes.md", "text/x-markdown", "text/markdown"],

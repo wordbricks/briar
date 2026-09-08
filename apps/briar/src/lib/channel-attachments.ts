@@ -48,8 +48,8 @@ export function normalizeChannelAttachmentContentType(value: string, filename: s
   const inferred = channelAttachmentMimeTypeFromName(filename);
   if (inferred === "text/markdown" || inferred === "text/plain") return inferred;
   if (declared === "text/markdown" || declared === "text/plain") return null;
-  if (!declared || declared === "application/octet-stream") return inferred;
-  return allowedMimeTypes.has(declared) ? declared : null;
+  // Preserve the existing image/PDF extension fallback for browser MIME aliases.
+  return allowedMimeTypes.has(declared) ? declared : inferred;
 }
 
 export function isChannelTextAttachment(contentType: string | null | undefined, filename: string) {
