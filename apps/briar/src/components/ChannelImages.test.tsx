@@ -192,6 +192,70 @@ describe("channel message attachments", () => {
     expect(load).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { imageWidth: null, imageHeight: null, expected: "", label: "unknown" },
+    {
+      imageWidth: 1_600,
+      imageHeight: 900,
+      expected: "1600 / 900",
+      label: "recorded",
+    },
+  ])(
+    "keeps the reserved box identical across loading for $label dimensions",
+    async ({ expected, imageHeight, imageWidth }) => {
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        value: vi.fn(() => "blob:loaded-attachment"),
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        configurable: true,
+        value: vi.fn(),
+      });
+      let resolveAttachment: (blob: Blob) => void = () => undefined;
+      vi.spyOn(api, "loadChannelMessageAttachment").mockReturnValue(
+        new Promise<Blob>((resolve) => {
+          resolveAttachment = resolve;
+        }),
+      );
+      await renderReactTestRoot(
+        root,
+        <I18nProvider>
+          <ChannelMessageImages
+            attachments={[{
+              id: "pending-img-1",
+              filename: "pending.png",
+              contentType: "image/png",
+              byteSize: 4_096,
+              url: "/attachments/pending-img-1",
+              imageWidth,
+              imageHeight,
+            }]}
+            token="token"
+          />
+        </I18nProvider>,
+      );
+
+      const preview = () =>
+        container.querySelector<HTMLElement>(".channel-message-image-preview");
+      expect(container.querySelector(".channel-message-image-state"))
+        .not.toBeNull();
+      const reservedWhileLoading = preview()?.style.aspectRatio;
+      expect(reservedWhileLoading).toBe(expected);
+
+      await act(async () => {
+        resolveAttachment(new Blob(["png"], { type: "image/png" }));
+      });
+      await vi.waitFor(() => {
+        expect(container.querySelector("img")).not.toBeNull();
+      });
+
+      // The spinner and the picture share one container, so the row keeps the
+      // height it reserved whether or not the upload recorded its dimensions.
+      expect(preview()?.style.aspectRatio).toBe(reservedWhileLoading);
+      expect(preview()?.querySelector("img")).not.toBeNull();
+    },
+  );
+
   it("normalizes escaped line breaks in message bodies", () => {
     expect(channelBodyWithoutImages("first\\nsecond\\r\\nthird"))
       .toBe("first\nsecond\nthird");

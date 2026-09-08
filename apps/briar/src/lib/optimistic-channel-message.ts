@@ -3,6 +3,7 @@ import type {
   ChannelMessage,
 } from "./channels-contract";
 import type { MentionTarget } from "./channel-mentions";
+import type { ImageDimensions } from "./image-dimensions";
 
 export function createOptimisticChannelMessage(input: {
   id: string;
@@ -16,6 +17,12 @@ export function createOptimisticChannelMessage(input: {
   attachments: readonly File[];
   attachmentReferences: readonly string[];
   attachmentUrls: readonly string[];
+  /*
+    Measured from the local file before the message is echoed, so the reserved
+    height of an attachment row matches what the server will report and the
+    picture appearing never moves the conversation.
+  */
+  attachmentDimensions?: readonly (ImageDimensions | null)[];
   createdAt?: string;
 }): ChannelMessage {
   const member = input.members.find(
@@ -47,8 +54,8 @@ export function createOptimisticChannelMessage(input: {
       contentType: attachment.type,
       byteSize: attachment.size,
       url: input.attachmentUrls[index] ?? "",
-      imageWidth: null,
-      imageHeight: null,
+      imageWidth: input.attachmentDimensions?.[index]?.width ?? null,
+      imageHeight: input.attachmentDimensions?.[index]?.height ?? null,
     })),
     reactions: [],
     replyCount: 0,

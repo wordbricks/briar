@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import UniformTypeIdentifiers
 import XCTest
 @testable import BriarCompanion
@@ -70,6 +71,63 @@ final class AttachmentPipelineTests: XCTestCase {
         )
         XCTAssertEqual(attachments.map(\.filename), ["video-fixed-video.mov"])
         XCTAssertEqual(attachments.map(\.contentType), ["video/quicktime"])
+    }
+
+    func testUploadMetadataReportsImageDimensionsForLayoutReservation() throws {
+        let attachment = PendingIssueAttachment(
+            filename: "photo.png",
+            contentType: "image/png",
+            data: Self.pngData(width: 1_600, height: 900)
+        )
+
+        let metadata = try PreparedUploadPipeline.metadata(
+            attachments: [attachment],
+            clientIDs: ["client-1"]
+        )
+
+        XCTAssertEqual(metadata.first?.hasImageWidth, true)
+        XCTAssertEqual(metadata.first?.imageWidth, 1_600)
+        XCTAssertEqual(metadata.first?.imageHeight, 900)
+    }
+
+    func testUploadMetadataOmitsDimensionsForUndecodableAttachments() throws {
+        let attachments = [
+            PendingIssueAttachment(
+                filename: "clip.mp4",
+                contentType: "video/mp4",
+                data: Data([0, 1, 2, 3])
+            ),
+            PendingIssueAttachment(
+                filename: "broken.png",
+                contentType: "image/png",
+                data: Data([0, 1, 2, 3])
+            ),
+        ]
+
+        let metadata = try PreparedUploadPipeline.metadata(
+            attachments: attachments,
+            clientIDs: ["client-1", "client-2"]
+        )
+
+        XCTAssertEqual(metadata.map(\.hasImageWidth), [false, false])
+        XCTAssertEqual(metadata.map(\.hasImageHeight), [false, false])
+    }
+
+    /// Encodes a solid image so the header carries real pixel dimensions.
+    private static func pngData(width: Int, height: Int) -> Data {
+        let format = UIGraphicsImageRendererFormat.default()
+        // Without a fixed scale the renderer would multiply by the device's,
+        // and the assertion would depend on which simulator ran the test.
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(
+            size: CGSize(width: width, height: height),
+            format: format
+        )
+        let image = renderer.image { context in
+            UIColor.gray.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return image.pngData() ?? Data()
     }
 
     func testMessagePayloadMatchesCanonicalWebMarkdownEscaping() throws {

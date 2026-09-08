@@ -55,6 +55,7 @@ import type {
   OrganizationMember,
 } from "../../types";
 import { briarApiUrl } from "../api-config";
+import { readImageDimensions } from "../image-dimensions";
 import { normalizeIssueAttachmentFile } from "../issue-attachments";
 import { canonicalizeIssueAttachmentReferences } from "../issue-markdown";
 import { uploadPreparedFiles } from "../upload-client";
@@ -1300,27 +1301,6 @@ export async function listChannelMessages(
     messages: response.messages.map(channelMessageFromMessage),
     nextCursor: response.nextCursor ?? null,
   };
-}
-
-function readImageDimensions(
-  file: File,
-): Promise<{ width: number; height: number } | null> {
-  if (!file.type.startsWith("image/")) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img.naturalWidth > 0 && img.naturalHeight > 0
-        ? { width: img.naturalWidth, height: img.naturalHeight }
-        : null);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(null);
-    };
-    img.src = url;
-  });
 }
 
 export async function sendChannelMessage(

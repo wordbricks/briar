@@ -107,6 +107,33 @@ function normalizePreview(
   };
 }
 
+type ChannelLinkPreviewState = {
+  loading: boolean;
+  preview: ChannelLinkPreviewData | null;
+  url: string | null;
+};
+
+/*
+  Resolving the cache during render, instead of inside an effect, keeps a link
+  that was already fetched at its final height from the very first frame. The
+  effect-only version painted an empty row first, which moved every message
+  below it once the cached card appeared.
+*/
+function resolveChannelLinkPreviewState(
+  targetUrl: string | null,
+): ChannelLinkPreviewState {
+  if (!targetUrl) return { loading: false, preview: null, url: null };
+  const cached = readPreviewCache(targetUrl);
+  if (cached && !cached.pending) {
+    return {
+      loading: false,
+      preview: normalizePreview(cached.preview, targetUrl),
+      url: targetUrl,
+    };
+  }
+  return { loading: true, preview: null, url: targetUrl };
+}
+
 export function ChannelLinkPreview({
   channelId,
   message,
@@ -123,38 +150,27 @@ export function ChannelLinkPreview({
     if (message.deletedAt || message.optimistic) return null;
     return channelMessageLinkPreviewUrl(message);
   }, [message.blocks, message.body, message.deletedAt, message.optimistic]);
-  const [state, setState] = useState<{
-    loading: boolean;
-    preview: ChannelLinkPreviewData | null;
-    url: string | null;
-  }>({ loading: false, preview: null, url: null });
+  const [state, setState] = useState(() =>
+    resolveChannelLinkPreviewState(targetUrl)
+  );
   const [faviconFailed, setFaviconFailed] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const current = state.url === targetUrl
+    ? state
+    : resolveChannelLinkPreviewState(targetUrl);
 
   useEffect(() => {
     let active = true;
     setFaviconFailed(false);
     setImageFailed(false);
-    if (!targetUrl) {
-      setState({ loading: false, preview: null, url: null });
+    const resolved = resolveChannelLinkPreviewState(targetUrl);
+    setState(resolved);
+    if (!targetUrl || !resolved.loading) {
       return () => {
         active = false;
       };
     }
 
-    const cached = readPreviewCache(targetUrl);
-    if (cached && !cached.pending) {
-      setState({
-        loading: false,
-        preview: normalizePreview(cached.preview, targetUrl),
-        url: targetUrl,
-      });
-      return () => {
-        active = false;
-      };
-    }
-
-    setState({ loading: true, preview: null, url: targetUrl });
     void loadCachedPreview(token, organizationId, channelId, targetUrl)
       .then((preview) => {
         if (!active) return;
@@ -172,8 +188,8 @@ export function ChannelLinkPreview({
     };
   }, [channelId, organizationId, targetUrl, token]);
 
-  if (!targetUrl || state.url !== targetUrl) return null;
-  if (state.loading) {
+  if (!targetUrl) return null;
+  if (current.loading) {
     return (
       <div
         aria-label={t("channel.linkPreviewLoading")}
@@ -186,7 +202,7 @@ export function ChannelLinkPreview({
       </div>
     );
   }
-  const preview = state.preview;
+  const preview = current.preview;
   if (!preview) return null;
 
   let hostname = preview.url;
@@ -197,7 +213,6 @@ export function ChannelLinkPreview({
   }
   const siteName = preview.siteName ?? hostname;
   const title = preview.title ?? siteName;
-  const imageUrl = imageFailed ? null : preview.imageUrl;
   const faviconUrl = faviconFailed ? null : preview.faviconUrl;
 
   return (
@@ -228,19 +243,30 @@ export function ChannelLinkPreview({
         <strong>{title}</strong>
         {preview.description ? <span>{preview.description}</span> : null}
       </span>
-      {imageUrl ? (
-        <img
-          alt=""
+      {/*
+        The reservation lives on the frame, not the picture, so a banner that
+        never arrives leaves the card exactly as tall as it was. Sites that
+        publish no dimensions keep the 1.91:1 Open Graph default declared in
+        CSS, which the worker replaces once it can read the real size.
+      */}
+      {preview.imageUrl ? (
+        <span
           className="channel-link-preview-image"
-          loading="lazy"
-          onError={() => setImageFailed(true)}
-          src={imageUrl}
           style={
             preview.imageWidth && preview.imageHeight
               ? { aspectRatio: `${preview.imageWidth} / ${preview.imageHeight}` }
               : undefined
           }
-        />
+        >
+          {imageFailed ? null : (
+            <img
+              alt=""
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+              src={preview.imageUrl}
+            />
+          )}
+        </span>
       ) : null}
     </a>
   );
