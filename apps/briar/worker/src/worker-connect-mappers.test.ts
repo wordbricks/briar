@@ -80,6 +80,7 @@ const channelReply = {
   snapshot: {
     channel: {
       id: common.runId,
+      kind: "channel" as const,
       name: "Channel",
       slug: "channel",
       topic: null,

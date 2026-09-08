@@ -582,6 +582,7 @@ export async function claimNextChannelReplyWork(
         snapshot: {
           channel: {
             id: channel.id,
+            kind: channel.kind,
             name: channel.name,
             slug: channel.slug,
             topic: channel.topic,

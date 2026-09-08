@@ -1,3 +1,4 @@
+import { channelAcknowledgementReactionSchema } from "./channel-acknowledgement-reaction";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import { agentReplyAttachmentPathsProviderSchema } from "./agent-reply-contract";
@@ -46,6 +47,7 @@ export type ParsedChannelReplyAgentResult = Omit<
 >;
 
 const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
+  acknowledgementReaction: Schema.optional(channelAcknowledgementReactionSchema),
   body: Schema.NullOr(channelMessageBodySchema),
   attachments: agentReplyAttachmentPathsProviderSchema,
   ...channelReplyCompletionFields,
@@ -204,6 +206,9 @@ export const ChannelAgentReplyProviderOutputSchema =
             case "reply":
               return {
                 body: turn.result.body,
+                ...(turn.result.acknowledgementReaction !== undefined
+                  ? { acknowledgementReaction: turn.result.acknowledgementReaction }
+                  : {}),
                 attachments: turn.attachmentPaths,
                 document: turn.result.document,
                 issueProposal: turn.result.issueProposal,

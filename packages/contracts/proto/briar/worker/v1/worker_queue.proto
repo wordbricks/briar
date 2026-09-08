@@ -557,6 +557,8 @@ message ChannelReplySuccess {
   repeated briar.types.v1.UploadReference attachments = 3;
   repeated briar.app.v1.DmMemoryReference memory_citations = 4;
   optional DmMemorySaveRequest memory_save_request = 5;
+  // Optional DM reaction selected with the reply; invalid values retain the acknowledgement.
+  optional string acknowledgement_reaction = 6;
 
   // A document may accompany at most one proposal. Skill execution,
   // delegation and an Agent-to-Agent message each remain exclusive from every

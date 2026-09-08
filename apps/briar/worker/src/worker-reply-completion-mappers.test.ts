@@ -131,6 +131,7 @@ describe("reply completion protobuf mapping", () => {
           case: "success",
           value: create(ChannelReplySuccessSchema, {
             body: "기억하고 있는 내용을 정리했습니다.",
+            acknowledgementReaction: "🙏",
             memoryCitations: [reference()],
             memorySaveRequest: create(DmMemorySaveRequestSchema, {
               documents: [reference()],
@@ -143,6 +144,7 @@ describe("reply completion protobuf mapping", () => {
     expect(mapped.outcome.case).toBe("success");
     if (mapped.outcome.case !== "success") throw new Error("unreachable");
     const completion = mapped.outcome.completion;
+    expect(completion.acknowledgementReaction).toBe("🙏");
     expect(completion.memoryCitations).toEqual([{ documentId, version: 2 }]);
     expect(completion.memorySaveRequest).toEqual({
       documents: [{ documentId, version: 2 }],

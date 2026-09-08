@@ -1,3 +1,4 @@
+import { normalizeChannelAcknowledgementReaction } from "../src/lib/channel-acknowledgement-reaction";
 import {
   providerBlockHeadline,
   type ProviderBlock,
@@ -834,6 +835,7 @@ async function runClaimedChannelReply(
     const outputContract = providerStructuredOutputContract(
       agent.provider,
       ChannelAgentReplyProviderOutputSchema,
+      normalizeChannelAcknowledgementReaction,
     );
     // A retained channel session resumes the same provider conversation across
     // replies. Keep its Skill catalog at a stable workspace path for that
