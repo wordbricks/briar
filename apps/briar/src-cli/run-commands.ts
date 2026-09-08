@@ -52,6 +52,7 @@ import {
 import type { Config, TeamConfig } from "./config-contract";
 import {
   executionToken,
+  projectAgentToken,
   values,
   value,
   has,
@@ -389,7 +390,7 @@ async function listChannelMessagesCommand() {
   const parentMessageId = value("--parent-message-id");
   const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    executionToken(project),
+    projectAgentToken(project),
   );
   const result = await executionRpc.listProjectChannelMessages({
     projectId: decodeUuid(project.id).toLowerCase(),
@@ -407,8 +408,6 @@ async function addRunEvent(forcedStatus?: string) {
   const config = await loadConfig();
   const project = await currentProject(config);
   const repositoryRoot = await currentRepositoryPath();
-  const agentToken = executionToken(project);
-  if (!agentToken) throw new Error("Briar 실행 토큰이 없습니다.");
   const branch = value("--branch") ?? gitValue(["branch", "--show-current"]);
   const commitSha = value("--commit-sha") ?? gitValue(["rev-parse", "HEAD"]);
   const remote = gitValue(["remote", "get-url", "origin"]);
@@ -514,9 +513,15 @@ async function addRunEvent(forcedStatus?: string) {
           title: title ?? required("--title"),
         }),
       };
+  // Only the `work` target authenticates as the claiming Worker; a
+  // source-identity event opens a run from a source key and the server checks
+  // it against the Project Agent token.
+  const token = target.case === "work"
+    ? executionToken(project)
+    : projectAgentToken(project);
   const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
-    agentToken,
+    token,
   );
   const result = await executionRpc.recordRunEvent(
     workerRunEventRequest({

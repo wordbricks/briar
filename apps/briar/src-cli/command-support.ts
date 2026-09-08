@@ -137,6 +137,25 @@ const executionToken = (project: TeamConfig) => {
   if (!token) throw new Error("Briar execution credential is unavailable");
   return token;
 };
+/**
+ * Routes the server authenticates with `requireAgentProject` — channel history
+ * and source-identity run events — accept the Project Agent token alone. A
+ * Worker execution session exports `BRIAR_WORKER_TOKEN`, which
+ * `executionToken` prefers and that check rejects before it reads the
+ * database, so those commands select the Agent token directly rather than
+ * failing as an expired credential.
+ */
+const projectAgentToken = (project: TeamConfig) => {
+  const token = process.env.BRIAR_AGENT_TOKEN ?? project.agentToken;
+  if (!token) {
+    throw new Error(
+      "이 명령은 Project Agent 토큰이 필요하지만 현재 실행 세션에는 없습니다. " +
+        "토큰 만료가 아니며 저장소 재연결로도 해결되지 않습니다. " +
+        "`briar connect`로 이 저장소를 연결한 환경에서 실행하세요.",
+    );
+  }
+  return token;
+};
 const configuredConfigDirectory = process.env.BRIAR_CONFIG_HOME?.trim();
 if (configuredConfigDirectory && !isAbsolute(configuredConfigDirectory)) {
   throw new Error("BRIAR_CONFIG_HOME must be an absolute path");
@@ -529,6 +548,7 @@ export {
   openCodeUpstreamCredential,
   providerExecutionEnvironment,
   executionToken,
+  projectAgentToken,
   configuredConfigDirectory,
   configDirectory,
   configPath,
