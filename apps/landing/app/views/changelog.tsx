@@ -30,6 +30,17 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.219",
+        date: "2026년 9월 8일",
+        title: "어느 모델이 실제로 실행되는지 보입니다",
+        summary:
+          "Claude 모델 목록이 Sonnet·Opus 같은 별칭만 보여줘서 실제로 어느 세대가 실행되는지 알 수 없었습니다. 이제 별칭 옆에 실행되는 모델을 함께 표시합니다. Worker 목록에도 각 컴퓨터에 설치된 provider CLI 버전이 나옵니다.",
+        items: [
+          "Claude 모델 목록이 \"Sonnet · claude-sonnet-5\"처럼 실제 실행 모델을 함께 보여줍니다. 난이도에 따라 모델을 고를 때 Opus 세대를 건너뛰던 문제도 함께 해결됩니다.",
+          "개발자 컴퓨터에서 도는 Worker도 Codex·Claude·Grok·OpenCode CLI 버전을 알립니다. 그동안 샌드박스만 알려서 컴퓨터마다 다른 버전을 쓰고 있어도 드러나지 않았습니다.",
+        ],
+      },
+      {
         version: "1.2.218",
         date: "2026년 9월 8일",
         title: "기억을 인용한 DM 답변이 더 이상 사라지지 않습니다",
@@ -1921,6 +1932,17 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.219",
+        date: "September 8, 2026",
+        title: "See which model actually runs",
+        summary:
+          "The Claude model list showed only aliases like Sonnet and Opus, so there was no way to tell which generation would run. Each row now names the model behind the alias. Worker lists also show the provider CLI versions installed on each computer.",
+        items: [
+          "Claude model rows now read \"Sonnet · claude-sonnet-5\". This also fixes difficulty-based model selection, which had been skipping the Opus generation entirely.",
+          "Workers running on a developer's computer now report their Codex, Claude, Grok, and OpenCode CLI versions. Only sandboxes did before, so version drift between computers stayed invisible.",
+        ],
+      },
       {
         version: "1.2.218",
         date: "September 8, 2026",
