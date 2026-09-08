@@ -14,12 +14,12 @@ import type { OrganizationAgentRow } from "./organization-agents";
 */
 const agentMessageTargetSelect = `
   select agent.id, agent.organization_id, agent.project_id,
-         project.name as project_name, agent.name, agent.avatar,
+         team.name as project_name, agent.name, agent.avatar,
          agent.provider, agent.model, agent.description, agent.responsibility,
          agent.effort, agent.computer_use_policy, agent.designated_worker_id,
          agent.designated_worker_label, agent.created_at, agent.updated_at
   from briar_project_agents agent
-  left join briar_teams project on project.id = agent.project_id
+  left join briar_teams team on team.id = agent.project_id
   where agent.organization_id = ? and agent.id <> ?
     and (
       agent.project_id is null

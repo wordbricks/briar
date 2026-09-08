@@ -521,7 +521,7 @@ export async function completeTeamAgentTaskWithReceipt(
          outcome_status, summary, conversation_id, error,
          completed_at, created_at
        )
-       select ?, project.organization_id, task.project_id, task.id,
+       select ?, team.organization_id, task.project_id, task.id,
               task.skill_execution_proposal_id, task.claimed_worker_id,
               task.claim_token_hash,
               case when ? is null then 'completed'
@@ -529,7 +529,7 @@ export async function completeTeamAgentTaskWithReceipt(
                   else 'queued' end end,
               ?, ?, ?, ?, ?
        from briar_project_agent_task_jobs task
-       join briar_teams project on project.id = task.project_id
+       join briar_teams team on team.id = task.project_id
        where task.id = ? and task.project_id = ? and task.status = 'running'
          and task.claimed_worker_id = ? and task.claim_token_hash = ?
        on conflict (project_id, task_id, worker_id, claim_token_hash)

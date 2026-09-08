@@ -948,9 +948,9 @@ export async function createManagedComputerSetupSessionRecord(
      select ?, ?, ?, ?, ?, ?, ?, 'pending', ?, null, null, ?, ?
      where exists (
        select 1 from briar_managed_computers computer
-       join briar_teams project on project.id = ?
+       join briar_teams team on team.id = ?
        where computer.id = ? and computer.organization_id = ?
-         and project.organization_id = computer.organization_id
+         and team.organization_id = computer.organization_id
          and computer.state in ('needs_setup', 'ready')
      )
      on conflict (managed_computer_id, request_id) do nothing`,
@@ -1005,7 +1005,7 @@ export async function bindManagedComputerSetupSession(
          on computer.id = setup.managed_computer_id
        join briar_execution_worker_devices device
          on device.id = computer.briar_device_id
-       join briar_teams project on project.id = setup.project_id
+       join briar_teams team on team.id = setup.project_id
        where setup.id = ? and setup.token_hash = ? and setup.status = 'pending'
          and setup.expires_at > ? and setup.managed_computer_id = ?
          and setup.organization_id = ? and computer.organization_id = ?
@@ -1013,7 +1013,7 @@ export async function bindManagedComputerSetupSession(
          and computer.state in ('needs_setup', 'ready')
          and device.organization_id = setup.organization_id
          and device.state != 'disabled'
-         and project.organization_id = setup.organization_id
+         and team.organization_id = setup.organization_id
        on conflict (project_id, device_id) do update set
          runtime_proto_json = excluded.runtime_proto_json,
          state = 'online',

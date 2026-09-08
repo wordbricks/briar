@@ -40,7 +40,7 @@ async function hasBlockedGithubConnectionForRun(
     .prepare(
       `select 1 as blocked
        from briar_run_pull_requests link
-       join briar_teams project on project.id = link.project_id
+       join briar_teams team on team.id = link.project_id
        where link.project_id = ? and link.run_id = ?
          and link.attempt = ? and link.revision = ?
          and link.installation_id is not null
@@ -52,7 +52,7 @@ async function hasBlockedGithubConnectionForRun(
            select 1 from briar_github_connections connection
            where connection.installation_id = link.installation_id
              and connection.status = 'connected'
-             and connection.organization_id = project.organization_id
+             and connection.organization_id = team.organization_id
          )
        limit 1`,
     )
@@ -250,7 +250,7 @@ export async function reconcileGithubMergedRuns(
          and not exists (
            select 1
            from briar_run_pull_requests link
-           join briar_teams project on project.id = link.project_id
+           join briar_teams team on team.id = link.project_id
            where link.project_id = run.project_id and link.run_id = run.id
              and link.attempt = run.current_attempt
              and link.revision = run.current_revision
@@ -263,7 +263,7 @@ export async function reconcileGithubMergedRuns(
                select 1 from briar_github_connections connection
                where connection.installation_id = link.installation_id
                  and connection.status = 'connected'
-                 and connection.organization_id = project.organization_id
+                 and connection.organization_id = team.organization_id
              )
          )
          and not exists (

@@ -17,9 +17,9 @@ export async function planAccountDeletion(
                from briar_organization_members peer
                where peer.organization_id = organization.id) as member_count,
               exists(
-                select 1 from briar_teams project
-                where project.organization_id = organization.id
-                  and project.owner_user_id = ?
+                select 1 from briar_teams team
+                where team.organization_id = organization.id
+                  and team.owner_user_id = ?
               ) as owns_project,
               exists(
                 select 1 from briar_execution_worker_devices device
@@ -63,10 +63,10 @@ export async function planAccountDeletion(
     .map((organization) => organization.id);
   const projectResult = await db
     .prepare(
-      `select distinct project.id
-       from briar_teams project
-       where project.owner_user_id = ?
-          or project.organization_id in (
+      `select distinct team.id
+       from briar_teams team
+       where team.owner_user_id = ?
+          or team.organization_id in (
             select membership.organization_id
             from briar_organization_members membership
             where membership.user_id = ?
@@ -76,14 +76,14 @@ export async function planAccountDeletion(
                 where peer.organization_id = membership.organization_id
               )
           )
-       order by project.id`,
+       order by team.id`,
     )
     .bind(userId, userId)
     .all<{ id: string }>();
   return {
     blockedOrganizations,
     organizationIds,
-    projectIds: (projectResult.results ?? []).map((project) => project.id),
+    projectIds: (projectResult.results ?? []).map((team) => team.id),
   };
 }
 
@@ -134,17 +134,17 @@ export async function deleteAccountData(
                )
            )
            and not exists (
-             select 1 from briar_teams project
-             where project.owner_user_id = account.id
+             select 1 from briar_teams team
+             where team.owner_user_id = account.id
                and not exists (
                  select 1
                  from briar_organization_members membership
-                 where membership.organization_id = project.organization_id
+                 where membership.organization_id = team.organization_id
                    and membership.user_id = account.id
                    and 1 = (
                      select count(*)
                      from briar_organization_members peer
-                     where peer.organization_id = project.organization_id
+                     where peer.organization_id = team.organization_id
                    )
                )
            )

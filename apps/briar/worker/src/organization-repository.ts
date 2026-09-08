@@ -87,7 +87,7 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
     select invitation.id, invitation.organization_id,
            organization.name as organization_name,
            invitation.initial_project_id,
-           project.name as initial_project_name,
+           team.name as initial_project_name,
            invitation.email_normalized, invitation.role,
            invitation.invited_by_user_id, invitation.expires_at,
            invitation.accepted_at, invitation.accepted_by_user_id,
@@ -95,9 +95,9 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
     from briar_organization_invitations invitation
     join briar_organizations organization
       on organization.id = invitation.organization_id
-    join briar_teams project
-      on project.id = invitation.initial_project_id
-     and project.organization_id = invitation.organization_id
+    join briar_teams team
+      on team.id = invitation.initial_project_id
+     and team.organization_id = invitation.organization_id
   `;
 
   const findOrganizations = SqlSchema.findAll({
@@ -163,15 +163,15 @@ const makeOrganizationQueries = (sql: SqlClient.SqlClient) => {
     execute: ({ projectId }) => sql`
       select member.user_id, user.name, user.email, user.image,
              member.role, member.created_at
-      from briar_teams project
+      from briar_teams team
       join briar_organization_members member
-        on member.organization_id = project.organization_id
+        on member.organization_id = team.organization_id
       join "user" on user.id = member.user_id
       left join briar_project_members project_membership
-        on project_membership.project_id = project.id
-       and project_membership.organization_id = project.organization_id
+        on project_membership.project_id = team.id
+       and project_membership.organization_id = team.organization_id
        and project_membership.user_id = member.user_id
-      where project.id = ${projectId}
+      where team.id = ${projectId}
         and (
           member.role in ('owner', 'co-owner')
           or project_membership.user_id is not null

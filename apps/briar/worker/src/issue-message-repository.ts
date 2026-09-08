@@ -157,9 +157,9 @@ export async function createIssueMessage(
              )
              select message.id, membership.user_id, ?
              from briar_issue_messages message
-             join briar_teams project on project.id = message.project_id
+             join briar_teams team on team.id = message.project_id
              join briar_organization_members membership
-               on membership.organization_id = project.organization_id
+               on membership.organization_id = team.organization_id
               and membership.user_id = ?
              where message.id = ?
                and (message.author_user_id is null
@@ -234,9 +234,9 @@ export async function updateIssueMessage(
            )
            select message.id, membership.user_id, ?
            from briar_issue_messages message
-           join briar_teams project on project.id = message.project_id
+           join briar_teams team on team.id = message.project_id
            join briar_organization_members membership
-             on membership.organization_id = project.organization_id
+             on membership.organization_id = team.organization_id
             and membership.user_id = ?
            where message.id = ?
              and (message.author_user_id is null

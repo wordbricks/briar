@@ -1196,16 +1196,16 @@ export async function getProjectAgentChannel(
   return db
     .prepare(
       `${channelSelect}
-       join briar_teams project
-         on project.organization_id = channel.organization_id
-       where project.id = ? and channel.id = ?
+       join briar_teams team
+         on team.organization_id = channel.organization_id
+       where team.id = ? and channel.id = ?
          and exists (
            select 1
            from briar_channel_agents roster
            join briar_project_agents agent on agent.id = roster.agent_id
            where roster.channel_id = channel.id
              and agent.organization_id = channel.organization_id
-             and agent.project_id = project.id
+             and agent.project_id = team.id
          )`,
     )
     .bind(projectId, channelId)
@@ -1221,9 +1221,9 @@ export async function getProjectOrganizationChannel(
   return db
     .prepare(
       `${channelSelect}
-       join briar_teams project
-         on project.organization_id = channel.organization_id
-       where project.id = ? and channel.id = ?`,
+       join briar_teams team
+         on team.organization_id = channel.organization_id
+       where team.id = ? and channel.id = ?`,
     )
     .bind(projectId, channelId)
     .first<ChannelRow>();
@@ -1527,7 +1527,7 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
   const rows = await db
     .prepare(
       `select agent.id, agent.organization_id, agent.project_id,
-              project.name as project_name, agent.name, agent.avatar,
+              team.name as project_name, agent.name, agent.avatar,
               agent.provider, agent.model, agent.description,
               agent.responsibility,
               agent.effort, agent.computer_use_policy,
@@ -1538,9 +1538,9 @@ export async function listChannelAgents(db: D1Database, channelId: string) {
        join briar_channels channel
          on channel.id = roster.channel_id
         and channel.organization_id = agent.organization_id
-       left join briar_teams project
-         on project.id = agent.project_id
-        and project.organization_id = agent.organization_id
+       left join briar_teams team
+         on team.id = agent.project_id
+        and team.organization_id = agent.organization_id
        where roster.channel_id = ?
        order by agent.name, agent.id`,
     )
@@ -6561,19 +6561,19 @@ export async function reserveChannelExecutionProposalApproval(
            join briar_organization_members membership
              on membership.organization_id = channel.organization_id
             and membership.user_id = ?
-           join briar_teams project
-             on project.id = briar_issue_execution_proposals.project_id
-            and project.organization_id = channel.organization_id
+           join briar_teams team
+             on team.id = briar_issue_execution_proposals.project_id
+            and team.organization_id = channel.organization_id
            join briar_hunt_runs run
              on run.id = briar_issue_execution_proposals.target_run_id
-            and run.project_id = project.id
+            and run.project_id = team.id
            join briar_channel_messages reply
              on reply.id = briar_issue_execution_proposals.reply_message_id
             and reply.channel_id = channel.id
            join briar_project_agents agent
              on agent.id = briar_issue_execution_proposals.proposed_by_agent_id
             and agent.id = reply.author_agent_id
-            and agent.project_id = project.id
+            and agent.project_id = team.id
             and agent.organization_id = channel.organization_id
            join briar_channel_agents roster
              on roster.channel_id = channel.id and roster.agent_id = agent.id

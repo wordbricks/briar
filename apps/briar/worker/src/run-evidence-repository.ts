@@ -284,11 +284,11 @@ export async function recordRunEvidence(
             or exists (
               select 1
               from briar_github_connections connection
-              join briar_teams project
-                on project.organization_id = connection.organization_id
+              join briar_teams team
+                on team.organization_id = connection.organization_id
               where connection.installation_id = snapshot.installation_id
                 and connection.status = 'connected'
-                and project.id = run.project_id
+                and team.id = run.project_id
             )
           )
           and (

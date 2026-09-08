@@ -230,11 +230,11 @@ export async function claimNextQueuedHuntRun(
          id, organization_id, project_id, run_id, run_attempt, claim_attempt,
          worker_id, claimed_by, claimed_at, recorded_at
        )
-       select ?, project.organization_id, run.project_id, run.id,
+       select ?, team.organization_id, run.project_id, run.id,
               run.current_attempt, run.claim_attempts, ?,
               run.claimed_by, run.claimed_at, ?
        from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
+       join briar_teams team on team.id = run.project_id
        where run.project_id = ? and run.last_execution_id = ?`,
     )
     .bind(
@@ -305,13 +305,13 @@ export async function findProjectIdByAgentTokenHash(
     .prepare(
       `select token.project_id
        from briar_project_agent_tokens token
-       join briar_teams project on project.id = token.project_id
+       join briar_teams team on team.id = token.project_id
        join briar_organization_members membership
-         on membership.organization_id = project.organization_id
+         on membership.organization_id = team.organization_id
         and membership.user_id = token.issued_to_user_id
        left join briar_project_members project_membership
-         on project_membership.project_id = project.id
-        and project_membership.organization_id = project.organization_id
+         on project_membership.project_id = team.id
+        and project_membership.organization_id = team.organization_id
         and project_membership.user_id = membership.user_id
        where token.token_hash = ?
          and (
@@ -339,16 +339,16 @@ export async function issueProjectAgentToken(
       `insert into briar_project_agent_tokens (
          token_hash, project_id, issued_to_user_id, created_at
        )
-       select ?, project.id, ?, ?
-       from briar_teams project
+       select ?, team.id, ?, ?
+       from briar_teams team
        join briar_organization_members membership
-         on membership.organization_id = project.organization_id
+         on membership.organization_id = team.organization_id
         and membership.user_id = ?
        left join briar_project_members project_membership
-         on project_membership.project_id = project.id
-        and project_membership.organization_id = project.organization_id
+         on project_membership.project_id = team.id
+        and project_membership.organization_id = team.organization_id
         and project_membership.user_id = membership.user_id
-       where project.id = ?
+       where team.id = ?
          and (
            membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null

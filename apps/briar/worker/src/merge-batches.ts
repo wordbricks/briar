@@ -220,15 +220,15 @@ const currentReadyCandidate = (
       and run.commit_sha = ${candidate}.frozen_head_sha
       and exists (
         select 1
-        from briar_teams project
+        from briar_teams team
         join briar_github_connections connection
-          on connection.organization_id = project.organization_id
+          on connection.organization_id = team.organization_id
          and connection.installation_id = link.installation_id
          and connection.status = 'connected'
         join briar_github_connection_repositories connected_repository
           on connected_repository.installation_id = connection.installation_id
          and connected_repository.repository_id = link.repository_id
-        where project.id = run.project_id
+        where team.id = run.project_id
           and unixepoch(progress.finished_at) >=
             unixepoch(connection.connected_at)
           and unixepoch(progress.finished_at) >=
@@ -730,15 +730,15 @@ export async function registerReadyMergeCandidates(
        and run.commit_sha = link.head_sha
        and exists (
          select 1
-         from briar_teams project
+         from briar_teams team
          join briar_github_connections connection
-           on connection.organization_id = project.organization_id
+           on connection.organization_id = team.organization_id
           and connection.installation_id = link.installation_id
           and connection.status = 'connected'
          join briar_github_connection_repositories connected_repository
            on connected_repository.installation_id = connection.installation_id
           and connected_repository.repository_id = link.repository_id
-         where project.id = run.project_id
+         where team.id = run.project_id
            and unixepoch(progress.finished_at) >=
              unixepoch(connection.connected_at)
            and unixepoch(progress.finished_at) >=

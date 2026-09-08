@@ -132,8 +132,8 @@ export async function listOrganizationUsageRuns(
               end as execution_model,
               run.started_at, run.updated_at, run.completed_at
        from briar_hunt_runs run
-       join briar_teams project on project.id = run.project_id
-       where project.organization_id = ?
+       join briar_teams team on team.id = run.project_id
+       where team.organization_id = ?
          and (
            unixepoch(coalesce(
              run.completed_at,
@@ -143,7 +143,7 @@ export async function listOrganizationUsageRuns(
            or exists (
              select 1 from briar_run_execution_attempts attempt
              where attempt.run_id = run.id
-               and attempt.organization_id = project.organization_id
+               and attempt.organization_id = team.organization_id
                and (
                  unixepoch(attempt.claimed_at) >= unixepoch(?)
                  or exists (
@@ -172,7 +172,7 @@ export async function listOrganizationUsageRuns(
            or exists (
              select 1 from briar_run_execution_attempts attempt
              where attempt.run_id = run.id
-               and attempt.organization_id = project.organization_id
+               and attempt.organization_id = team.organization_id
            )
          )
        order by unixepoch(coalesce(
