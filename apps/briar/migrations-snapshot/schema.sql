@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: d470baded0175dea61866ac384b7a3ac2f3d9327315464ffac46f33784aeeba4
--- snapshot-digest: 877e9d82335acd3a9230980c9a6957811c5f42cc5328e9147dda6170d4f56188
+-- migrations-digest: a406d39b808e8e167efc446ef051a047117bdd9f13275143e7a31ddfbb009ca7
+-- snapshot-digest: c31d32242abd30f8e41d158648b2c9b7df909621901ab4eaa4782efc7c60ffb7
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3725,6 +3725,19 @@ CREATE TABLE briar_channel_message_attachments (
   image_height is null or (typeof(image_height) = 'integer' and image_height > 0)
 ));
 -- @statement
+CREATE TABLE briar_issue_difficulties (
+  difficulty text primary key not null,
+  proto_name text not null unique
+    check (proto_name = 'ISSUE_DIFFICULTY_' || upper(difficulty))
+) strict;
+-- @statement
+CREATE TABLE briar_run_difficulties (
+  run_id text primary key not null
+    references briar_hunt_runs (id) on delete cascade,
+  difficulty text not null
+    references briar_issue_difficulties (difficulty)
+) strict;
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -3764,6 +3777,14 @@ INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('openrouter
 INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('vertex','AGENT_PROVIDER_VERTEX');
 -- @statement
 INSERT INTO "briar_agent_providers" ("provider","proto_name") VALUES('pi','AGENT_PROVIDER_PI');
+-- @statement
+INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('easy','ISSUE_DIFFICULTY_EASY');
+-- @statement
+INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('normal','ISSUE_DIFFICULTY_NORMAL');
+-- @statement
+INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('hard','ISSUE_DIFFICULTY_HARD');
+-- @statement
+INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('expert','ISSUE_DIFFICULTY_EXPERT');
 -- @statement
 CREATE VIEW briar_run_child_storage_a_project_mismatches as
 select child.project_id as stale_project_id,
@@ -5023,6 +5044,9 @@ CREATE INDEX briar_channel_message_attachments_message_idx
 -- @statement
 CREATE INDEX briar_channel_message_attachments_channel_idx
   on briar_channel_message_attachments (organization_id, channel_id, message_id);
+-- @statement
+CREATE INDEX briar_run_difficulties_difficulty_idx
+  on briar_run_difficulties (difficulty);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN

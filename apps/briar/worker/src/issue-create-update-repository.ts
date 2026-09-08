@@ -9,6 +9,10 @@ import {
   type IssueCreateMutationReceiptResponse,
   type IssueUpdateMutationReceiptResponse,
 } from "./issue-mutation-receipt-contract";
+import {
+  runDifficultyScalarSql,
+  runDifficultyWriteStatements,
+} from "./run-difficulty-repository";
 import type { ScopedUploadRow } from "./upload-repository";
 
 export function findIssueCreateAggregateId(
@@ -194,7 +198,7 @@ export function updateIssueMutationStatements(
   const update = db
     .prepare(
       `update briar_hunt_runs as run
-       set title = ?, issue_description = ?, priority = ?, difficulty = ?,
+       set title = ?, issue_description = ?, priority = ?,
            assignee_user_id = ?, updated_at = ?
        where run.id = ? and run.project_id = ? and run.updated_at = ?
          and (
@@ -214,7 +218,6 @@ export function updateIssueMutationStatements(
       input.title,
       input.description,
       input.priority,
-      input.difficulty,
       input.assigneeUserId,
       input.updatedAt,
       input.runId,
@@ -291,7 +294,8 @@ export function updateIssueMutationStatements(
            join briar_projects project on project.id = run.project_id
            where run.id = ? and run.project_id = ? and run.updated_at = ?
              and run.title = ? and run.issue_description is ?
-             and run.priority is ? and run.difficulty is ?
+             and run.priority is ?
+             and ${runDifficultyScalarSql("run")} is ?
              and run.assignee_user_id is ?
              and (
                select count(*) from briar_issue_attachments attachment
@@ -328,5 +332,15 @@ export function updateIssueMutationStatements(
       responseJson,
       input.updatedAt,
     );
-  return { update, inserts, cleanup, removals, receipt };
+  // Guarded on the run's *new* updated_at, which only exists if `update`
+  // committed earlier in the same batch -- the same trick `cleanup` and
+  // `removals` use. Must run before `receipt`, whose scalar guard reads the
+  // difficulty back out of the side table.
+  const difficulty = runDifficultyWriteStatements(db, {
+    runId: input.runId,
+    difficulty: input.difficulty,
+    guardSql: "run.project_id = ? and run.updated_at = ?",
+    guardBindings: [input.projectId, input.updatedAt],
+  });
+  return { update, difficulty, inserts, cleanup, removals, receipt };
 }

@@ -37,6 +37,11 @@ import {
   digestRunId,
   scopedRunKey,
 } from "./run-identity";
+import {
+  mergeRunDifficultyStatement,
+  runDifficultyJoinSql,
+  runDifficultySelectSql,
+} from "./run-difficulty-repository";
 import { loadStageRevisionRequirements } from "./run-stage-revision-repository";
 import { assertWorkflowRunCompletion } from "./workflow-completion-repository";
 
@@ -121,8 +126,11 @@ const loadRunForIdentity = async (
   if (input.tracker?.issueId) {
     const byTracker = await db
       .prepare(
-        `select * from briar_hunt_runs
-         where project_id = ? and tracker_provider = ? and tracker_issue_id = ?
+        `select run.*, ${runDifficultySelectSql}
+         from briar_hunt_runs run
+         ${runDifficultyJoinSql("run")}
+         where run.project_id = ? and run.tracker_provider = ?
+           and run.tracker_issue_id = ?
          limit 1`,
       )
       .bind(projectId, input.tracker.provider, input.tracker.issueId)
@@ -131,8 +139,10 @@ const loadRunForIdentity = async (
   }
   return await db
     .prepare(
-      `select * from briar_hunt_runs
-       where project_id = ? and source = ? and source_key = ?
+      `select run.*, ${runDifficultySelectSql}
+       from briar_hunt_runs run
+       ${runDifficultyJoinSql("run")}
+       where run.project_id = ? and run.source = ? and run.source_key = ?
        limit 1`,
     )
     .bind(projectId, input.source, input.sourceKey)
@@ -396,14 +406,13 @@ export async function recordHuntEvent(
     normalizedInput.stage === "production_qa" && qaStatus === "pending"
       ? "pending"
       : null;
-  const storedDifficulty = normalizedInput.difficulty ?? null;
   const results = await db.batch([
     db
       .prepare(
         `insert into briar_hunt_runs (
            id, project_id, source, source_key, title, stage, status,
            workflow_stage, workflow_snapshot_json, issue_checkpoints_json,
-           detail, priority, difficulty,
+           detail, priority,
            assignee_user_id, created_by_user_id,
            repository, branch, commit_sha, tracker_provider,
            tracker_issue_id, tracker_issue_identifier, tracker_issue_url,
@@ -415,7 +424,7 @@ export async function recordHuntEvent(
            requires_claim_token, started_at, completed_at,
            last_event_at, created_at, updated_at,
            preferred_agent_provider, preferred_agent_model, preferred_agent_effort
-         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(project_id, source, source_key) do nothing`,
       )
       .bind(
@@ -431,7 +440,6 @@ export async function recordHuntEvent(
         encodeAutoHuntWorkflowCheckpointsJson(issueCheckpointSnapshot),
         normalizedInput.detail,
         normalizedInput.priority,
-        storedDifficulty,
         normalizedInput.assigneeUserId ?? null,
         normalizedInput.createdByUserId ?? null,
         normalizedInput.repository,
@@ -517,7 +525,6 @@ export async function recordHuntEvent(
              end,
              detail = case when ? >= last_event_at then ? else detail end,
              priority = case when ? >= last_event_at then coalesce(?, priority) else priority end,
-             difficulty = case when ? >= last_event_at then coalesce(?, difficulty) else difficulty end,
              repository = case when ? >= last_event_at then ? else repository end,
              branch = case when ? >= last_event_at then coalesce(?, branch) else branch end,
              commit_sha = case when ? >= last_event_at then coalesce(?, commit_sha) else commit_sha end,
@@ -575,8 +582,6 @@ export async function recordHuntEvent(
         normalizedInput.detail,
         normalizedInput.occurredAt,
         normalizedInput.priority,
-        normalizedInput.occurredAt,
-        normalizedInput.difficulty ?? null,
         normalizedInput.occurredAt,
         normalizedInput.repository,
         normalizedInput.occurredAt,
@@ -642,6 +647,14 @@ export async function recordHuntEvent(
             ),
         ]),
     ...(options.additionalStatements?.({ runId, recordedAt }) ?? []),
+    // Appended rather than spliced in: the statements above are indexed by
+    // position further down, and the merge reads `last_event_at` correctly
+    // either side of the update that advances it.
+    mergeRunDifficultyStatement(db, {
+      runId,
+      difficulty: normalizedInput.difficulty ?? null,
+      occurredAt: normalizedInput.occurredAt,
+    }),
   ]);
 
   if (

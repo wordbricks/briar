@@ -6,7 +6,7 @@ import {
 
 import { type HuntEventInput } from "./hunt-event-model";
 import { HuntClaimError } from "./hunt-run-errors";
-import { type HuntRunRow } from "./hunt-run-model";
+import { type HuntRunRowWithoutDifficulty } from "./hunt-run-model";
 import type { TeamId, TeamIdLike } from "../../src/lib/entity-ids";
 
 export async function claimNextQueuedHuntRun(
@@ -246,7 +246,8 @@ export async function claimNextQueuedHuntRun(
       executionId,
     );
   const [claimResult] = await db.batch([claimStatement, attemptStatement]);
-  return (claimResult.results[0] as HuntRunRow | undefined) ?? null;
+  return (claimResult.results[0] as HuntRunRowWithoutDifficulty | undefined) ??
+    null;
 }
 
 export async function assertQueuedHuntClaim(

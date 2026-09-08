@@ -9,7 +9,12 @@ import type { ResumeUserInput } from "./run-request-contract";
 export async function claimWorkflowContext(
   db: D1Database,
   projectId: string,
-  run: NonNullable<Awaited<ReturnType<typeof getHuntRunForProject>>>,
+  // Narrowed to what this actually reads, so the claim path -- whose
+  // RETURNING clause cannot join briar_run_difficulties -- can pass its row.
+  run: Pick<
+    NonNullable<Awaited<ReturnType<typeof getHuntRunForProject>>>,
+    "id" | "workflow_snapshot_json" | "current_attempt" | "current_revision"
+  >,
 ) {
   const workflow = normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json));
   const terminalStage = workflow.stages.at(-1)?.id ?? null;

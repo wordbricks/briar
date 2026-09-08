@@ -3917,11 +3917,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         assigneeUserId: "owner",
       }),
     );
-    expect(
-      await db.prepare("select difficulty from briar_hunt_runs where id = ?")
+    const sideTableRows = () =>
+      db.prepare(
+        "select difficulty from briar_run_difficulties where run_id = ?",
+      ).bind(runId).all<{ difficulty: string }>();
+    // The difficulty lives in briar_run_difficulties; the legacy column on
+    // briar_hunt_runs is write-once history and must stay untouched.
+    const legacyColumn = () =>
+      db.prepare("select difficulty from briar_hunt_runs where id = ?")
         .bind(runId)
-        .first<{ difficulty: string | null }>(),
-    ).toEqual({ difficulty: null });
+        .first<string | null>("difficulty");
+    expect((await sideTableRows()).results).toEqual([]);
+    expect(await legacyColumn()).toBeNull();
 
     const updated = await updateIssue(db, projectId, runId, {
       title: "Updated title",
@@ -3937,13 +3944,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         title: "Updated title",
         issue_description: null,
         priority: 1,
-        difficulty: "hard",
+        issue_difficulty: "hard",
         assignee_user_id: "owner",
         status: "cancelled",
         workflow_stage: null,
         updated_at: atMinute(19),
       }),
     );
+    expect((await sideTableRows()).results).toEqual([{ difficulty: "hard" }]);
+    expect(await legacyColumn()).toBeNull();
 
     const unassigned = await updateIssue(db, projectId, runId, {
       title: "Updated title",
@@ -3953,6 +3962,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       updatedAt: atMinute(20),
     });
     expect(unassigned?.assignee_user_id).toBeNull();
+    // `difficulty` omitted means "leave it alone", not "clear it".
+    expect(unassigned?.issue_difficulty).toBe("hard");
+
     const cleared = await updateIssue(db, projectId, runId, {
       title: "Updated title",
       description: null,
@@ -3960,12 +3972,130 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       difficulty: null,
       updatedAt: atMinute(21),
     });
-    expect(cleared?.difficulty).toBeNull();
+    expect(cleared?.issue_difficulty).toBeNull();
+    // Cleared means the row is gone, not that it holds a null.
+    expect((await sideTableRows()).results).toEqual([]);
+
+    // 'expert' is now a row in the catalog rather than a CHECK list entry, so
+    // it round-trips, and an unknown value is refused by the foreign key.
+    const expert = await updateIssue(db, projectId, runId, {
+      title: "Updated title",
+      description: null,
+      priority: 1,
+      difficulty: "expert",
+      updatedAt: atMinute(22),
+    });
+    expect(expert?.issue_difficulty).toBe("expert");
     await expect(
-      db.prepare("update briar_hunt_runs set difficulty = ? where id = ?")
-        .bind("extreme", runId)
-        .run(),
+      db.prepare(
+        "insert into briar_run_difficulties (run_id, difficulty) values (?, ?)"
+      ).bind(`${runId}-bogus`, "extreme").run(),
     ).rejects.toThrow();
+    await expect(
+      db.prepare(
+        "update briar_run_difficulties set difficulty = ? where run_id = ?"
+      ).bind("extreme", runId).run(),
+    ).rejects.toThrow();
+    expect(await legacyColumn()).toBeNull();
+  });
+
+  it("round-trips the difficulty through the side table on every read path", async () => {
+    const sourceKey = "difficulty-intake";
+    const runId = await recordHuntEvent(
+      db,
+      projectId,
+      event("queued", 30, {
+        sourceKey,
+        eventKey: `${sourceKey}:queued`,
+        difficulty: "expert",
+      }),
+    );
+    const sideRow = () =>
+      db.prepare(
+        "select difficulty from briar_run_difficulties where run_id = ?",
+      ).bind(runId).first<string>("difficulty");
+    const legacyColumn = () =>
+      db.prepare("select difficulty from briar_hunt_runs where id = ?")
+        .bind(runId)
+        .first<string | null>("difficulty");
+
+    // Intake writes the side table and leaves the legacy column alone; the
+    // value it stores is one the legacy CHECK list could never have held.
+    expect(await sideRow()).toBe("expert");
+    expect(await legacyColumn()).toBeNull();
+
+    // Every read path joins, so all three agree.
+    const detail = await getHuntRunForProject(db, projectId, runId);
+    expect(detail?.issue_difficulty).toBe("expert");
+    expect(
+      (await listDashboardRuns(db, projectId))
+        .find((run) => run.id === runId)?.issue_difficulty,
+    ).toBe("expert");
+    expect(
+      (await listDashboardRunsByIds(db, projectId, [runId]))[0]
+        ?.issue_difficulty,
+    ).toBe("expert");
+    expect(
+      (await listDashboardRunSummaries(
+        db,
+        projectId,
+        { pageSize: 50 },
+        "2027-01-01T00:00:00.000Z",
+      )).rows.find((run) => run.id === runId)?.issue_difficulty,
+    ).toBe("expert");
+
+    // A later event without a difficulty must not clear the one that is set:
+    // the merge keeps the coalesce semantics the legacy column had.
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("analyzing", 31, {
+        sourceKey,
+        eventKey: `${sourceKey}:analyzing`,
+        difficulty: null,
+      }),
+    );
+    expect(await sideRow()).toBe("expert");
+
+    // A newer event replaces it.
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("implementing", 32, {
+        sourceKey,
+        eventKey: `${sourceKey}:implementing`,
+        difficulty: "easy",
+      }),
+    );
+    expect(await sideRow()).toBe("easy");
+
+    // An event that arrives out of order does not.
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("analyzing", 31.5, {
+        sourceKey,
+        eventKey: `${sourceKey}:late`,
+        difficulty: "hard",
+      }),
+    );
+    expect(await sideRow()).toBe("easy");
+    expect(await legacyColumn()).toBeNull();
+
+    // Deleting the run takes the side-table row with it. A running run is not
+    // deletable, so it is cancelled first.
+    await recordHuntEvent(
+      db,
+      projectId,
+      event("cancelled", 33, {
+        sourceKey,
+        eventKey: `${sourceKey}:cancelled`,
+      }),
+    );
+    expect(await deleteIssue(db, projectId, runId, atMinute(34))).toBe(
+      "deleted",
+    );
+    expect(await sideRow()).toBeNull();
   });
 
   it("records one result review per member and publishes a dashboard delta", async () => {
