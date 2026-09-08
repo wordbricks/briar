@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.217",
+        date: "2026년 9월 8일",
+        title: "샌드박스를 업데이트하고 작업을 이어서 실행합니다",
+        summary:
+          "업데이트 기능을 갖춘 샌드박스는 Worker 패널의 버튼이나 briar sandbox update 명령으로 Briar와 Codex·Claude·OpenCode·Grok을 갱신할 수 있습니다. 실행 중인 사용자 작업은 인계한 뒤 같은 샌드박스에서 우선 재개합니다.",
+        items: [
+          "새 버전을 먼저 설치·검증하고 작업 인계와 로컬 실행 종료가 확인되면 활성 경로를 바꿉니다. 재기동 후 버전·provider 상태·모델 목록을 확인하며, 검증에 실패하면 이전 런타임으로 복구합니다.",
+          "웹·데스크톱과 iOS·Android 호스트 패널에 샌드박스 업데이트 버튼을 추가했습니다. Briar가 최신이어도 provider 갱신을 요청할 수 있고, 진행 중에는 중복 클릭을 막습니다.",
+          "구형 이미지는 최초 이미지 전환이 필요합니다. 실행 중인 컨테이너의 강제 교체를 막고, 기존 대화·저장소·인증 정보와 브라우저 데이터는 볼륨에 보존합니다.",
+        ],
+      },
+      {
         version: "1.2.216",
         date: "2026년 9월 8일",
         title: "DM에서 30초 안에 이어 보낸 메시지는 실행 중인 답변에 합쳐집니다",
@@ -1897,6 +1909,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.217",
+        date: "September 8, 2026",
+        title: "Update sandboxes and resume their work",
+        summary:
+          "Sandboxes with the runtime updater can refresh Briar and Codex, Claude, OpenCode, or Grok from the Worker panel or briar sandbox update. Running user tasks are handed off and resume first on the same sandbox.",
+        items: [
+          "The updater installs and verifies releases before interrupting work. It switches runtime paths only after handoff and local execution shutdown, checks versions, provider health, and model catalogs after restart, and restores the previous runtime if verification fails.",
+          "Sandbox update buttons are available in web, desktop, iOS, and Android host panels. Provider updates can be requested even when Briar is current, and pending requests disable duplicate clicks.",
+          "Legacy images require an initial image migration. Running containers cannot be force-replaced, and existing conversations, repositories, credentials, and browser data remain on persistent volumes.",
+        ],
+      },
       {
         version: "1.2.216",
         date: "September 8, 2026",
