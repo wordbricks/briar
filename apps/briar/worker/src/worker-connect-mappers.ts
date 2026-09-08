@@ -566,6 +566,7 @@ const channelReply = (
         createdAt: requiredTimestamp(batch.createdAt, "published batch creation"),
       })),
       dmPublicMessageProtocol: value.dmPublicMessageProtocol ?? 0,
+      routing: value.routing ? { action: value.routing.action, proposedAction: value.routing.proposedAction ?? undefined, targetJobId: value.routing.targetJobId ?? undefined, response: value.routing.response ?? undefined } : undefined,
       provider: provider(value.provider),
       model: value.model ?? undefined,
       effort: value.effort ?? undefined,

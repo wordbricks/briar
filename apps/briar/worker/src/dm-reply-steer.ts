@@ -1,3 +1,5 @@
+import { dmPublicMessageBatchStatements, findDmPublicMessageByRequestId, getDmPublicMessageClaim } from "./dm-public-message-repository";
+import { sha256 } from "./crypto-digest";
 /** The receive-time window slides only while messages belong to this response. */
 export const DM_REPLY_STEER_MS = 30_000;
 
@@ -52,9 +54,59 @@ export function dmReplySteerStatements(db: D1Database, jobId: string) {
 export async function acknowledgeDmReplySteer(db: D1Database, input: {
   jobId: string; organizationId: string; channelId: string;
   deviceId: string; workerId: string; claimTokenHash: string; observedAt: string;
+  stopUnconfirmed?: boolean;
 }) {
+  if (input.stopUnconfirmed) {
+    const scope = await getDmPublicMessageClaim(db, { ...input, control: "stop-unconfirmed" });
+    const body = "실행 중단을 확인하지 못해 이 작업의 후속 실행을 보류했습니다.";
+    const publication = scope ? dmPublicMessageBatchStatements(db, {
+      scope, requestId: `dm-stop-unconfirmed:${input.jobId}:${input.claimTokenHash}`,
+      publicationKind: "intermediate", parts: [{ purpose: "progress", body }],
+      payloadHash: await sha256(body), workerId: input.workerId, deviceId: input.deviceId,
+      claimTokenHash: input.claimTokenHash, createdAt: input.observedAt, control: "stop-unconfirmed",
+    }) : null;
+    await db.batch([
+      db.prepare(`update briar_channel_agent_reply_jobs set error = 'dm_reply_stop_unconfirmed', updated_at = ?
+        where id = ? and organization_id = ? and channel_id = ?
+          and claimed_device_id = ? and claimed_worker_id = ? and claim_token_hash = ?
+          and (status = 'running' or (status = 'completed' and stop_requested_at is not null))
+          and stop_confirmed_at is null`)
+        .bind(input.observedAt, input.jobId, input.organizationId, input.channelId,
+          input.deviceId, input.workerId, input.claimTokenHash),
+      ...(publication?.statements ?? []),
+    ]);
+    return false;
+  }
+  const stopped = await db.prepare(`select id from briar_channel_agent_reply_jobs
+    where id = ? and organization_id = ? and channel_id = ?
+      and claimed_device_id = ? and claimed_worker_id = ? and claim_token_hash = ?
+      and status = 'completed' and stop_requested_at is not null`)
+    .bind(input.jobId, input.organizationId, input.channelId, input.deviceId,
+      input.workerId, input.claimTokenHash).first<{ id: string }>();
+  if (stopped) {
+    const requestId = `dm-stop-confirmed:${input.jobId}`;
+    const existing = await findDmPublicMessageByRequestId(db, requestId);
+    const scope = existing ? null : await getDmPublicMessageClaim(db, { ...input, control: "stop" });
+    const body = "해당 작업의 실행 중단을 확인했습니다. 이미 완료된 변경은 유지됩니다.";
+    const publication = scope ? dmPublicMessageBatchStatements(db, {
+      scope, requestId, publicationKind: "intermediate",
+      parts: [{ purpose: "acknowledgement", body }], payloadHash: await sha256(body),
+      workerId: input.workerId, deviceId: input.deviceId, claimTokenHash: input.claimTokenHash,
+      createdAt: input.observedAt, control: "stop",
+    }) : null;
+    // The stop and its public receipt survive a crash together. Revoked DM
+    // access may still acknowledge cleanup, but cannot publish into that DM.
+    await db.batch([
+      ...(publication?.statements ?? []),
+      db.prepare(`update briar_channel_agent_reply_jobs set stop_confirmed_at = ?, error = null, updated_at = ?
+        where id = ? and claimed_device_id = ? and claimed_worker_id = ? and claim_token_hash = ?
+          and status = 'completed' and stop_requested_at is not null and stop_confirmed_at is null`)
+        .bind(input.observedAt, input.observedAt, input.jobId, input.deviceId, input.workerId, input.claimTokenHash),
+    ]);
+    return true;
+  }
   const result = await db.prepare(`update briar_channel_agent_reply_jobs
-    set status = 'queued', updated_at = ?
+    set status = 'queued', error = null, updated_at = ?
     where id = ? and organization_id = ? and channel_id = ?
       and claimed_device_id = ? and claimed_worker_id = ? and claim_token_hash = ?
       and status in ('running', 'queued') and lease_expires_at > ?

@@ -393,14 +393,13 @@ describe("briar worker loop", () => {
     expect(observedMaximum).toBe(2);
   });
 
-  it("runs issue and channel replies without consuming regular session slots", async () => {
+  it("runs three independent DM sessions and an issue reply while regular slots are full", async () => {
     const regularWork = [issue("issue-1")];
     const replyWork: ClaimedIssue[] = [
-      {
-        ...issue("channel-reply"),
-        workType: "channelReply",
-        workId: "channel-reply",
-      },
+      ...["structure", "logs", "docs"].map((id) => ({
+        ...issue(id), workType: "channelReply" as const, runId: "same-dm",
+        workId: id, session: { id: `session-${id}` }, routing: { action: "new" },
+      })),
       {
         ...issue("issue-reply"),
         workType: "issueReply",
@@ -416,7 +415,7 @@ describe("briar worker loop", () => {
     let observedMaximum = 0;
 
     const maybeRelease = () => {
-      if (allReleased || replyReleases.length < 2 || !releaseRegular) return;
+      if (allReleased || replyReleases.length < 4 || !releaseRegular) return;
       allReleased = true;
       releaseRegular();
       for (const release of replyReleases.splice(0)) release();
@@ -449,13 +448,13 @@ describe("briar worker loop", () => {
     });
 
     const result = await runWorkerLoop(test.dependencies, {
-      maxIssues: 3,
+      maxIssues: 5,
       maxConcurrentSessions: 1,
     });
 
-    expect(result).toMatchObject({ processed: 3, failures: 0 });
-    expect(observedMaximum).toBe(3);
-    expect(claimModes.slice(0, 3)).toEqual([false, true, true]);
+    expect(result).toMatchObject({ processed: 5, failures: 0 });
+    expect(observedMaximum).toBe(5);
+    expect(claimModes.slice(0, 5)).toEqual([false, true, true, true, true]);
     expect(readinessStates).toContain("busy");
     expect(readinessStates.at(-1)).toBe("ready");
   });

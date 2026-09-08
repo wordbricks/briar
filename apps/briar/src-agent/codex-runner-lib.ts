@@ -92,6 +92,27 @@ const MODEL_LIST_REQUEST_ID = 3;
 const THREAD_REQUEST_ID = 4;
 const TURN_REQUEST_ID = 5;
 const APPS_INSTALLED_REQUEST_ID = 6;
+const INTERRUPT_REQUEST_ID = 7;
+
+/** Interrupt the active turn before killing App Server, which owns separate tool process groups. */
+export function codexTurnInterruptRequest(
+  state: Pick<CodexAppServerState, "threadId" | "turnId">,
+): CodexRpcMessage | null {
+  if (!state.threadId || !state.turnId) return null;
+  return { method: "turn/interrupt", id: INTERRUPT_REQUEST_ID,
+    params: { threadId: state.threadId, turnId: state.turnId } };
+}
+
+export function codexActiveTurnStopped(
+  state: Pick<CodexAppServerState, "threadId" | "turnId">,
+  message: CodexRpcMessage,
+): boolean {
+  if (message.method !== "turn/completed" || !state.threadId || !state.turnId) return false;
+  const params = asRecord(message.params);
+  const turn = asRecord(params?.turn);
+  return params?.threadId === state.threadId && turn?.id === state.turnId &&
+    ["completed", "interrupted", "failed"].includes(String(turn?.status));
+}
 
 const approvalMethods = new Set([
   "item/commandExecution/requestApproval",

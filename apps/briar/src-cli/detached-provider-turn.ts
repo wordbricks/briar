@@ -43,6 +43,7 @@ import {
 } from "./agent-skill-discovery";
 import { ComputerUseBoxClient } from "./computer-use-box-client";
 import { findAgentBundle } from "./agent-bundle-path";
+import { runDetachedProviderClassification } from "./detached-provider-no-tools";
 
 export type DetachedProviderTurnResult = {
   exitCode: number | null;
@@ -63,6 +64,14 @@ export class DetachedProviderBlockedError extends Error {
   constructor(readonly block: ProviderBlock) {
     super(providerBlockReplyMessage(block));
     this.name = "DetachedProviderBlockedError";
+  }
+}
+
+/** A cancelled provider exited without confirming that its active work stopped. */
+export class DetachedProviderStopUnconfirmedError extends Error {
+  constructor() {
+    super("provider_stop_unconfirmed");
+    this.name = "DetachedProviderStopUnconfirmedError";
   }
 }
 
@@ -93,6 +102,8 @@ export type DetachedProviderTurnInput = {
   fullAccess: boolean;
   conversationId?: string | null;
   readOnly?: boolean;
+  /** Disable workspace and product tools for classification; unsupported providers fail before starting. */
+  executionTools?: "disabled";
   attachments?: AgentAttachment[];
   organizationContextManifestPath?: string | null;
   delegationTargets?: readonly DetachedDelegationTarget[];
@@ -273,6 +284,7 @@ export const prepareComputerUseTurn = async (
 export async function runDetachedProviderTurn(
   input: DetachedProviderTurnInput,
 ): Promise<DetachedProviderTurnResult> {
+  if (input.executionTools === "disabled") return runDetachedProviderClassification(input);
   const prepared = await prepareComputerUseTurn(input);
   try {
     return await runPreparedDetachedProviderTurn(prepared.input);
@@ -417,6 +429,7 @@ async function executeDetachedProviderTurn(
   let conversationId = input.conversationId ?? null;
   let outputCount = 0;
   let runnerStderrBuffer = "";
+  let providerStopConfirmed = false;
   const signalRunnerTree = (signal: NodeJS.Signals) => {
     if (process.platform !== "win32" && child.pid) {
       try {
@@ -434,10 +447,13 @@ async function executeDetachedProviderTurn(
       runnerPid: child.pid ?? null,
       reason: input.signal.aborted ? "aborted" : "cleanup",
     });
-    signalRunnerTree("SIGTERM");
+    // Codex must interrupt its turn while App Server is still alive. Its tool
+    // shells have separate process groups, so killing this group first orphans them.
+    if (input.agent.provider === "codex") child.kill("SIGTERM");
+    else signalRunnerTree("SIGTERM");
     setTimeout(() => {
-      if (child.exitCode === null) signalRunnerTree("SIGKILL");
-    }, 5_000).unref();
+      if (child.exitCode === null && child.signalCode === null) signalRunnerTree("SIGKILL");
+    }, input.agent.provider === "codex" ? 10_000 : 5_000).unref();
   };
   input.signal.addEventListener("abort", terminate, { once: true });
   child.stderr.setEncoding("utf8");
@@ -455,6 +471,7 @@ async function executeDetachedProviderTurn(
     for (const line of lines) {
       const diagnostic = runnerDiagnosticFromLine(line.trim());
       if (!diagnostic) continue;
+      if (diagnostic.phase === "runner.codex.cancellation_confirmed") providerStopConfirmed = true;
       diagnose(diagnostic.phase, {
         runnerPid: child.pid ?? null,
         ...diagnostic.detail,
@@ -613,6 +630,9 @@ async function executeDetachedProviderTurn(
     input.signal.removeEventListener("abort", terminate);
     terminate();
     await exitPromise.catch(() => null);
+    if (input.signal.aborted && input.agent.provider === "codex" && !providerStopConfirmed) {
+      throw new DetachedProviderStopUnconfirmedError();
+    }
   }
 }
 

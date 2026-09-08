@@ -285,6 +285,15 @@ public nonisolated struct BriarTypes_WorkerCapabilities: @unchecked Sendable {
   /// Clears the value of `dmPublicMessages`. Subsequent reads from it will return its default value.
   public mutating func clearDmPublicMessages() {_uniqueStorage()._dmPublicMessages = nil}
 
+  public var dmReplyRouting: BriarTypes_DmPublicMessageCapability {
+    get {_storage._dmReplyRouting ?? BriarTypes_DmPublicMessageCapability()}
+    set {_uniqueStorage()._dmReplyRouting = newValue}
+  }
+  /// Returns true if `dmReplyRouting` has been explicitly set.
+  public var hasDmReplyRouting: Bool {_storage._dmReplyRouting != nil}
+  /// Clears the value of `dmReplyRouting`. Subsequent reads from it will return its default value.
+  public mutating func clearDmReplyRouting() {_uniqueStorage()._dmReplyRouting = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -675,7 +684,7 @@ nonisolated extension BriarTypes_WorkflowRequirementHealth: SwiftProtobuf.Messag
 
 nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WorkerCapabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{3}dm_memory_protocol\0\u{3}dm_memory_learning_requests\0\u{3}dm_memory_learning\0\u{3}computer_use\0\u{3}dm_public_messages\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}provider_capabilities\0\u{3}remote_updates\0\u{1}worktrees\0\u{4}\u{2}workflow_requirements\0\u{3}dm_memory_protocol\0\u{3}dm_memory_learning_requests\0\u{3}dm_memory_learning\0\u{3}computer_use\0\u{3}dm_public_messages\0\u{3}dm_reply_routing\0\u{b}organization_agent_context_protocol\0\u{c}\u{4}\u{1}")
 
   fileprivate class _StorageClass {
     var _providerCapabilities: [BriarTypes_AgentProviderCapability] = []
@@ -687,6 +696,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
     var _dmMemoryLearning: BriarTypes_DmMemoryLearningCapability? = nil
     var _computerUse: BriarTypes_ComputerUseCapability? = nil
     var _dmPublicMessages: BriarTypes_DmPublicMessageCapability? = nil
+    var _dmReplyRouting: BriarTypes_DmPublicMessageCapability? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -706,6 +716,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
       _dmMemoryLearning = source._dmMemoryLearning
       _computerUse = source._computerUse
       _dmPublicMessages = source._dmPublicMessages
+      _dmReplyRouting = source._dmReplyRouting
     }
   }
 
@@ -733,6 +744,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
         case 8: try { try decoder.decodeSingularMessageField(value: &_storage._dmMemoryLearning) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._computerUse) }()
         case 10: try { try decoder.decodeSingularMessageField(value: &_storage._dmPublicMessages) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._dmReplyRouting) }()
         default: break
         }
       }
@@ -772,6 +784,9 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
       try { if let v = _storage._dmPublicMessages {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
       } }()
+      try { if let v = _storage._dmReplyRouting {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -790,6 +805,7 @@ nonisolated extension BriarTypes_WorkerCapabilities: SwiftProtobuf.Message, Swif
         if _storage._dmMemoryLearning != rhs_storage._dmMemoryLearning {return false}
         if _storage._computerUse != rhs_storage._computerUse {return false}
         if _storage._dmPublicMessages != rhs_storage._dmPublicMessages {return false}
+        if _storage._dmReplyRouting != rhs_storage._dmReplyRouting {return false}
         return true
       }
       if !storagesAreEqual {return false}

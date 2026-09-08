@@ -1,3 +1,6 @@
+import { wakeOrganizationWorkers } from "./worker-wake-hub";
+import { resolveDmReplyRouting } from "./dm-reply-routing";
+import { ResolveDmReplyRoutingResponseSchema, type ResolveDmReplyRoutingRequest } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { acknowledgeDmReplySteer } from "./dm-reply-steer";
 import { handoffAuxiliaryWorkerUpdate } from "./worker-update-auxiliary";
 import {
@@ -869,6 +872,30 @@ const channelReplyConversationId = (value: string | undefined) => {
   return conversationId;
 };
 
+async function resolveDmReplyRoutingRpc(input: WorkerConnectQueueInput,
+  request: ResolveDmReplyRoutingRequest, services: WorkerQueueServices) {
+  const identity = requiredWork(request.work);
+  if (identity.work.case !== "channelReply" || !request.decision) {
+    throw new HttpError(400, "Channel reply routing identity is required");
+  }
+  const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
+  const organizationId = identity.work.value.organizationId;
+  if (organizationId !== worker.principal.organizationId) throw new HttpError(403, "Worker organization mismatch");
+  const decision = await resolveDmReplyRouting(input.db, {
+    jobId: identity.workId, organizationId, channelId: identity.runId,
+    deviceId: worker.principal.deviceId, workerId: worker.binding.id,
+    claimTokenHash: await services.sha256(identity.claimToken), observedAt: new Date().toISOString(),
+    decision: request.decision,
+  });
+  if (decision.action !== "pending") {
+    wakeOrganizationWorkers(input.env, organizationId, "channel_reply_enqueued", input.context);
+    scheduleChannelRealtimePublish(input.env, input.db, organizationId, input.context);
+  }
+  return create(ResolveDmReplyRoutingResponseSchema, { decision: {
+    action: decision.action, proposedAction: decision.proposedAction ?? undefined, targetJobId: decision.targetJobId ?? undefined, response: decision.response ?? undefined,
+  } });
+}
+
 async function acknowledgeChannelReplySteerRpc(
   input: WorkerConnectQueueInput,
   request: AcknowledgeChannelReplySteerRequest,
@@ -891,7 +918,12 @@ async function acknowledgeChannelReplySteerRpc(
     workerId: worker.binding.id,
     claimTokenHash: await services.sha256(identity.claimToken),
     observedAt: new Date().toISOString(),
+    stopUnconfirmed: request.stopUnconfirmed,
   });
+  if (released || request.stopUnconfirmed) {
+    wakeOrganizationWorkers(input.env, organizationId, "channel_reply_completed", input.context);
+    scheduleChannelRealtimePublish(input.env, input.db, organizationId, input.context);
+  }
   return create(AcknowledgeChannelReplySteerResponseSchema, { released });
 }
 
@@ -1614,6 +1646,7 @@ export function createWorkerQueueService(
   return {
     claimWork: (request) => claimWork(input, request, services),
     renewWorkLease: (request) => renewWorkLease(input, request, services),
+    resolveDmReplyRouting: (request) => resolveDmReplyRoutingRpc(input, request, services),
     acknowledgeChannelReplySteer: (request) => acknowledgeChannelReplySteerRpc(input, request, services),
     checkpointChannelReplySession: (request) => checkpointChannelReplySessionRpc(input, request, services),
     handoffWork: (request) => handoffWork(input, request, services),

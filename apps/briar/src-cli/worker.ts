@@ -26,6 +26,7 @@ export type ClaimedIssue = {
     | "mergeBatch";
   workId?: string;
   session?: { id: string } | null;
+  routing?: { action: string } | null;
   /** Immutable identity of one run claim/execution attempt. */
   executionId?: string;
   runId: string;
@@ -493,7 +494,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         try {
           if (observedWakeVersion === leaseWakeVersion) {
             await dependencies.sleep(
-              leaseRenewDelayMs(leaseRenewIntervalMs, dependencies.random),
+              leaseRenewDelayMs(issue.workType === "channelReply" && issue.routing ? Math.min(leaseRenewIntervalMs, 5000) : leaseRenewIntervalMs, dependencies.random),
               leaseWait.signal,
             );
           }

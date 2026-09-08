@@ -1,3 +1,4 @@
+import { dmReplyRoutingContext } from "./dm-reply-routing";
 import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
 import { channelReplyContextMessageJson } from "../../src/lib/channels-contract";
 import { agentReplyDisplayParentMessageId } from "../../src/lib/issue-reply-decision";
@@ -173,7 +174,7 @@ export async function claimNextChannelReplyWork(
         and message.channel_id = pending.channel_id
        where pending.channel_id = ? and pending.agent_id = ?
          and (pending.id = ? or pending.superseded_by_reply_job_id = ?)
-       order by message.created_at, message.id`,
+       order by message.created_at, message.rowid`,
     ).bind(job.channel_id, job.agent_id, job.id, job.id)
       .all<{ id: string }>();
     const pendingTriggerMessageIds = pendingTriggers.results.length > 0
@@ -468,19 +469,10 @@ export async function claimNextChannelReplyWork(
     const currentSession = memoryBinding
       ? await getChannelReplySession(db, job.channel_reply_session.id)
       : job.channel_reply_session;
-    /*
-      A direct message the person simply sent starts its own provider
-      conversation. What accumulates in a resumed one is the Agent's working
-      transcript — every command it ran, every screen it captured — and
-      carrying that into the next message puts a whole day of tool output
-      behind a "hi": one DM thread reached 105 MB and 81.8M input tokens on
-      2026-09-07 and then could not be resumed at all. The next message already
-      gets what it needs, the channel snapshot and DM memory. An explicit reply
-      is the one place the person points at earlier work, so that is where the
-      conversation continues; a channel or issue message always carries a
-      display parent, which leaves this a DM-only rule.
-    */
-    const resumedConversationId = contextParentMessageId || job.steer_revision > 0
+    // Each routed job owns its conversation; only its retries and steering
+    // resume it. Classification never checkpoints a conversation here.
+    // Legacy direct messages resume only for explicit replies or steering.
+    const resumedConversationId = (job.routing_action ? job.attempts > 1 : contextParentMessageId) || job.steer_revision > 0
       ? currentSession?.conversation_id ?? null
       : null;
     await requireDmMemoryReplyFence(db, job.id);
@@ -537,7 +529,10 @@ export async function claimNextChannelReplyWork(
         parentMessageId: job.parent_message_id,
         pendingTriggerMessageIds,
         dmPublicMessageProtocol: publicMessageScope ? 1 as const : null,
-        inputRevision: publicMessageScope?.input_revision ?? 0,
+        inputRevision: publicMessageScope?.input_revision ?? job.applied_steer_revision,
+        routing: job.routing_action ? {
+          action: job.routing_action, proposedAction: job.routing_decision_action ?? null, targetJobId: job.routing_target_job_id ?? null, response: job.routing_response ?? null,
+        } : null,
         publishedMessageBatches,
         provider: job.agent_provider,
         model: replyModel,
@@ -605,6 +600,7 @@ export async function claimNextChannelReplyWork(
           }),
         ),
         snapshot: {
+          dmRoutingContext: job.routing_action ? await dmReplyRoutingContext(db, job) : null,
           channel: {
             id: channel.id,
             kind: channel.kind,

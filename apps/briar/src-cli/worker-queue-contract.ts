@@ -609,6 +609,7 @@ const channelReplyFromProto = (
           claimReason: sessionClaimReason(value.session.claimReason),
         }
       : null,
+    routing: value.routing ? { action: value.routing.action, proposedAction: value.routing.proposedAction ?? null, targetJobId: value.routing.targetJobId ?? null, response: value.routing.response ?? null } : null,
     snapshot: required(value.snapshot, "channelReply.snapshot"),
     triggerAttachments: value.triggerAttachments,
     memory: value.memory ? dmMemoryDescriptorFromProto(value.memory) : null,

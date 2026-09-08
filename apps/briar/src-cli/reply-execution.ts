@@ -1,3 +1,4 @@
+import { classifyDmReply } from "./dm-reply-routing";
 import { dmAcknowledgementPrompt, startDmAcknowledgement } from "./dm-acknowledgement";
 import { normalizeChannelAcknowledgementReaction } from "../src/lib/channel-acknowledgement-reaction";
 import {
@@ -7,6 +8,8 @@ import {
 import {
   mkdtemp,
   mkdir,
+  lstat,
+  writeFile,
   rm,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -42,6 +45,7 @@ import {
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
   DetachedProviderBlockedError,
+  DetachedProviderStopUnconfirmedError,
   assertDetachedProviderTurnSucceeded,
   detachedProviderBlockOf,
   logDetachedProviderTurnDiagnostic,
@@ -61,6 +65,7 @@ import {
 } from "./worker-transcript-client";
 import {
   workerCliPath,
+  interruptibleSleep,
   workerExecutionPath,
   type WorkerExecutionCheckpoint,
 } from "./worker";
@@ -670,11 +675,74 @@ async function runClaimedChannelReply(
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
   assertChannelReplyWorkspaceScope(reply, project.id);
+  let routing = reply.routing;
+  if (routing?.action === "pending") {
+    const decision = routing.proposedAction
+      ? { action: routing.proposedAction, targetJobId: routing.targetJobId, response: routing.response }
+      : await classifyDmReply({
+      reply,
+      agent: detachedReplyAgent({ workId: reply.workId, provider: reply.provider,
+        model: reply.model, effort: reply.effort, agent: reply.agent,
+        activeSkill: null, fallbackName: "Briar DM", scope: reply.scope }),
+      signal, runProviderTurn: runtime.runProviderTurn,
+      environment: providerExecutionEnvironment(config, reply.provider, process.env),
+    });
+    const queue = createWorkerQueueOperations(createWorkerQueueClient(config.apiUrl, workerToken));
+    // An earlier classifier can finish later. Retain this decision while the
+    // server waits for input order rather than asking the model to retarget it.
+    let routingWaitMs = 1000;
+    while (true) {
+      signal.throwIfAborted();
+      const saved = await queue.resolveDmReplyRouting({
+          projectId: project.id, workerId: registered.workerId, work: reply, decision,
+        });
+      if (saved.action !== "pending") {
+        routing = { action: saved.action, proposedAction: saved.proposedAction ?? null, targetJobId: saved.targetJobId ?? null, response: saved.response ?? null };
+        break;
+      }
+      await interruptibleSleep(routingWaitMs, signal);
+      routingWaitMs = Math.min(routingWaitMs * 2, 5000);
+    }
+  }
+  if (routing?.action === "steer" || routing?.action === "cancel") return;
+  if (routing?.action === "answer" || routing?.action === "clarify") {
+    const queue = createWorkerQueueClient(config.apiUrl, workerToken);
+    const completion = createReplyCompletionClient(config.apiUrl, workerToken, { queue });
+    const publication = reply.dmPublicMessageProtocol === 1
+      ? await DmMessageInvocation.create({ queue, projectId: project.id,
+          workerId: registered.workerId, work: reply, signal })
+      : null;
+    let terminal = false;
+    try {
+      const result = { body: routing.response ?? "", document: null, issueProposal: null,
+        issueBatchProposal: null, executionProposal: null, skillExecutionProposal: null,
+        delegation: null, agentMessage: null };
+      const receipt = await publication?.publishFinal(result.body, signal);
+      const completed = await completion.completeChannelReply({ projectId: project.id,
+        workerId: registered.workerId, work: reply,
+        outcome: { case: "success", conversationId: null, result, attachments: [],
+          publishedFinalBatchId: receipt?.batchId }, signal });
+      terminal = completed.disposition === "completed";
+    } finally { await publication?.cleanup({ terminal }); }
+    return;
+  }
+
   const settings = worktreeSettings(project);
   const worktreeRoot = projectWorktreeRoot(settings.root, project.id);
   const sessionWorktreePath = reply.projectId && reply.session
     ? analysisWorktreePath(settings.root, project.id, reply.session.id)
     : null;
+  if (reply.routing && reply.session) {
+    const retainedPath = sessionWorktreePath ?? join(runtime.workspaceRoot,
+      "worker-sessions", `channel-${reply.session.id}`);
+    if (await lstat(join(retainedPath, ".briar-stop-unconfirmed")).catch(() => null)) {
+      throw new DetachedProviderStopUnconfirmedError();
+    }
+    const retained = await lstat(retainedPath).catch(() => null);
+    if (reply.session.conversationId && (!retained?.isDirectory() || retained.isSymbolicLink())) {
+      throw new Error("DM 작업 디렉터리를 복구할 수 없어 이전 작업을 다시 시작하지 않았습니다.");
+    }
+  }
   let sessionWorktree:
     | Awaited<ReturnType<typeof allocateCachedAnalysisWorktree>>
     | null = null;
@@ -1187,7 +1255,12 @@ async function runClaimedChannelReply(
     retainedUntil = completion.retainedUntil;
     publicationTerminal = completion.disposition === "completed";
   } catch (error) {
-    if (!reply.memory || error instanceof DetachedProviderBlockedError) throw error;
+    if (error instanceof DetachedProviderStopUnconfirmedError && reply.routing && reply.session) {
+      // Retain the local stop fence even if the Worker cannot report it to D1.
+      await writeFile(join(workspacePath, ".briar-stop-unconfirmed"), "provider_stop_unconfirmed\n", { flag: "wx" })
+        .catch(() => undefined);
+    }
+    if (!reply.memory || error instanceof DetachedProviderBlockedError || error instanceof DetachedProviderStopUnconfirmedError) throw error;
     throw dmMemoryExecutionError(error);
   } finally {
     stopAcknowledgement?.();

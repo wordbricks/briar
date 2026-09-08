@@ -279,3 +279,7 @@ Worker 테스트에서는 일반 슬롯이 가득 찬 상태와 같은 DM의 세
 새 백그라운드 작업 큐, 자동 작업 분해·위임, 모든 provider의 실시간 토큰 중 steering,
 자동 rollback, 프로젝트 위임/Agent 간 hop을 넘어선 취소 전파, 새 제어 화면, 별도 의도 분류 엔진.
 초기 대상은 현재 steering이 지원하는 일반 1인·1Agent DM reply다. Skill·위임 작업까지 지원한다고 표시하지 않는다.
+
+## 구현 범위
+
+신규 입력 분류·작업별 steering·취소 기능은 macOS/Linux에서 설치된 Codex의 도구 비활성화 및 구조화 출력 지원을 확인한 Worker가 광고한다. 현재 Claude와 이 capability를 광고하지 않는 Worker/provider는 기존 DM 처리 경로를 유지한다. 지원 Worker의 일시적인 오프라인·준비 지연에는 분류 입력을 큐에 보관한다.

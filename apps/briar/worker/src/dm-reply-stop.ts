@@ -43,8 +43,13 @@ export function dmReplyStopStatements(db: D1Database, input: DmReplyStop) {
   return [
     db.prepare(`update briar_channel_agent_reply_jobs
       set status = 'completed', error = ?, completed_at = ?, updated_at = ?,
-          claim_token_hash = null, lease_expires_at = null
-      where organization_id = ? and channel_id = ? and (trigger_message_id = ? or id in (
+          stop_requested_at = ?,
+          stop_confirmed_at = case when status = 'queued' then ? else null end
+      where organization_id = ? and channel_id = ? and (trigger_message_id = ? or reply_message_id = ? or id in (
+          select batch.origin_reply_job_id from briar_channel_messages message
+          join briar_dm_public_message_batches batch on batch.id = message.dm_batch_id
+          where message.id = ? and message.channel_id = ?
+        ) or id in (
           select superseded_by_reply_job_id from briar_channel_agent_reply_jobs absorbed
           where absorbed.channel_id = ? and absorbed.trigger_message_id = ?
         ))
@@ -55,32 +60,26 @@ export function dmReplyStopStatements(db: D1Database, input: DmReplyStop) {
             and roster.agent_id = briar_channel_agent_reply_jobs.agent_id)
         and (
           (json_array_length(?) = 1 and agent_id in (select value from json_each(?)))
-          or (json_array_length(?) = 0 and (
+          or (json_array_length(?) = 0 and ((select count(*) from briar_channel_agents roster
+            where roster.channel_id = briar_channel_agent_reply_jobs.channel_id) = 1 or (
             select count(distinct original.agent_id)
             from briar_channel_agent_reply_jobs original
             where original.organization_id = ? and original.channel_id = ?
               and original.trigger_message_id = ?
-          ) = 1)
+          ) = 1))
         ) and ${authorized}`)
-      .bind(marker, input.createdAt, input.createdAt, input.organizationId,
-        input.channelId, input.rootMessageId, input.channelId, input.rootMessageId, mentioned, mentioned, mentioned,
+      .bind(marker, input.createdAt, input.createdAt, input.createdAt, input.createdAt, input.organizationId,
+        input.channelId, input.rootMessageId, input.rootMessageId, input.rootMessageId, input.channelId, input.channelId, input.rootMessageId, mentioned, mentioned, mentioned,
         input.organizationId, input.channelId, input.rootMessageId, ...authorization),
-    // Drop only the interrupted provider conversation. Queued jobs keep their
-    // session/Worker affinity and start a clean provider turn after the abort.
-    db.prepare(`update briar_channel_reply_sessions
-      set conversation_id = null, updated_at = ?
-      where id in (select session_id from briar_channel_agent_reply_jobs
-        where channel_id = ? and error = ? and status = 'completed')
-        and not exists (select 1 from briar_channel_agent_reply_jobs active
-          where active.session_id = briar_channel_reply_sessions.id
-            and active.status = 'running')`)
-      .bind(input.createdAt, input.channelId, marker),
     db.prepare(`insert into briar_channel_messages (
         id, channel_id, parent_message_id, author_agent_name, body, created_at, updated_at
       ) select ?, ?, ?, 'Briar', case
         when exists (select 1 from briar_channel_agent_reply_jobs
-          where channel_id = ? and error = ?)
+          where channel_id = ? and error = ? and stop_confirmed_at is not null)
           then '요청한 Agent 작업을 중단했습니다.'
+        when exists (select 1 from briar_channel_agent_reply_jobs
+          where channel_id = ? and error = ?)
+          then '해당 작업의 중단을 요청했습니다. 실행 중단 확인을 기다리고 있습니다.'
         when json_array_length(?) > 1 or (json_array_length(?) = 0 and (
           select count(distinct agent_id) from briar_channel_agent_reply_jobs
           where channel_id = ? and trigger_message_id = ?
@@ -88,7 +87,7 @@ export function dmReplyStopStatements(db: D1Database, input: DmReplyStop) {
         else '이 메시지에 연결된 중단 가능한 작업이 없습니다.' end, ?, ?
       where ${authorized}`)
       .bind(crypto.randomUUID(), input.channelId, input.rootMessageId,
-        input.channelId, marker, mentioned, mentioned, input.channelId,
+        input.channelId, marker, input.channelId, marker, mentioned, mentioned, input.channelId,
         input.rootMessageId, input.createdAt, input.createdAt, ...authorization),
   ];
 }
