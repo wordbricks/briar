@@ -17,31 +17,72 @@ type ChannelReplyImageFetcher = (
   init?: RequestInit,
 ) => Promise<Response>;
 
-const supportedChannelReplyAttachmentTypes = new Set<string>(
-  channelAttachmentMimeTypes.filter((contentType) =>
-    contentType === channelPdfContentType ||
-    contentType.startsWith("image/") && contentType !== "image/svg+xml"
-  ),
+type ChannelReplyAttachmentForm = {
+  extension: string;
+  /** `image` is shown to the provider as a picture; `file` is only a workspace path. */
+  kind: "image" | "file";
+};
+
+/**
+ * How each attachment type the composer accepts reaches an Agent.
+ *
+ * The entry keys are the composer's own allowlist, so a type nobody can upload
+ * cannot be listed here, and the coverage test below keeps the reverse true:
+ * every uploadable type either has a form or is named unreadable. That pairing
+ * is the point. This table knew only images and PDF when Markdown and text
+ * became attachable (#1782), and the gap failed whole replies rather than the
+ * single file it could not open.
+ */
+const channelReplyAttachmentFormEntries: readonly (readonly [
+  (typeof channelAttachmentMimeTypes)[number],
+  ChannelReplyAttachmentForm,
+])[] = [
+  ["image/jpeg", { extension: "jpg", kind: "image" }],
+  ["image/png", { extension: "png", kind: "image" }],
+  ["image/gif", { extension: "gif", kind: "image" }],
+  ["image/webp", { extension: "webp", kind: "image" }],
+  ["image/avif", { extension: "avif", kind: "image" }],
+  [channelPdfContentType, { extension: "pdf", kind: "file" }],
+  ["text/markdown", { extension: "md", kind: "file" }],
+  ["text/plain", { extension: "txt", kind: "file" }],
+];
+
+const channelReplyAttachmentForms = new Map<string, ChannelReplyAttachmentForm>(
+  channelReplyAttachmentFormEntries,
 );
 
-const attachmentExtension = (contentType: string) =>
-  contentType === "image/jpeg"
-    ? "jpg"
-    : contentType === channelPdfContentType
-    ? "pdf"
-    : contentType.slice("image/".length);
+/**
+ * SVG is the one uploadable type an Agent is never handed: it carries script,
+ * and nothing behind this download renders it in a sandbox.
+ */
+export const unreadableChannelReplyAttachmentTypes = ["image/svg+xml"] as const;
 
+/** Read by the test holding the two sets to a partition of the upload allowlist. */
+export const channelReplyAttachmentCoverage = {
+  readable: channelReplyAttachmentFormEntries.map(([contentType]) => contentType),
+  unreadable: unreadableChannelReplyAttachmentTypes,
+};
+
+export type ReadableChannelReplyAttachment = {
+  attachment: QueuedAttachment;
+  form: ChannelReplyAttachmentForm;
+};
+
+/**
+ * Splits what this turn can hand the Agent from what it cannot. An attachment
+ * with no form is reported, never thrown: the person still asked a question,
+ * and answering it without that one file beats replying "답변을 생성하지
+ * 못했습니다" to the whole turn.
+ */
 export function channelReplyAttachments(
   triggerAttachments: readonly QueuedAttachment[],
-): QueuedAttachment[] {
-  const unsupported = triggerAttachments.find(
-    (attachment) => !supportedChannelReplyAttachmentTypes.has(attachment.contentType),
-  );
-  if (unsupported) {
-    throw new Error(
-      `Channel reply attachment type is unsupported: ${unsupported.contentType}`,
-    );
-  }
+): {
+  readable: ReadableChannelReplyAttachment[];
+  unreadable: QueuedAttachment[];
+} {
+  // Count and size are the composer's policy, re-checked here against
+  // server-supplied metadata. A violation is corrupt input rather than a file
+  // this turn can simply do without, so it still stops the reply.
   const validationError = validateChannelAttachments(
     triggerAttachments.map((attachment) => ({
       name: attachment.filename,
@@ -50,7 +91,14 @@ export function channelReplyAttachments(
     })),
   );
   if (validationError) throw new Error(validationError);
-  return [...triggerAttachments];
+  const readable: ReadableChannelReplyAttachment[] = [];
+  const unreadable: QueuedAttachment[] = [];
+  for (const attachment of triggerAttachments) {
+    const form = channelReplyAttachmentForms.get(attachment.contentType);
+    if (form) readable.push({ attachment, form });
+    else unreadable.push(attachment);
+  }
+  return { readable, unreadable };
 }
 
 function channelReplyAttachmentUrl(input: {
@@ -85,6 +133,23 @@ export function channelReplyAttachmentDirectory(workspacePath: string) {
   return join(workspacePath, channelReplyAttachmentDirectoryName);
 }
 
+/**
+ * What the Agent is told about a file it was sent but cannot open, so the reply
+ * can say so instead of guessing at contents it never received.
+ */
+export type UnreadableChannelReplyAttachment = {
+  filename: string;
+  contentType: string;
+};
+
+const unreadableSummary = (
+  attachments: readonly QueuedAttachment[],
+): UnreadableChannelReplyAttachment[] =>
+  attachments.map((attachment) => ({
+    filename: attachment.filename,
+    contentType: attachment.contentType,
+  }));
+
 export async function downloadChannelReplyAttachments(input: {
   apiUrl: string;
   workerToken: string;
@@ -95,15 +160,16 @@ export async function downloadChannelReplyAttachments(input: {
   workspacePath: string;
   fetcher?: ChannelReplyImageFetcher;
 }) {
-  const attachments = channelReplyAttachments(input.triggerAttachments);
+  const { readable, unreadable } = channelReplyAttachments(input.triggerAttachments);
   const directory = channelReplyAttachmentDirectory(input.workspacePath);
-  if (attachments.length === 0) {
+  if (readable.length === 0) {
     return {
       directory,
       paths: [] as string[],
       imagePaths: [] as string[],
       filePaths: [] as string[],
       attachments: [] as AgentImageAttachment[],
+      unreadable: unreadableSummary(unreadable),
     };
   }
 
@@ -111,7 +177,7 @@ export async function downloadChannelReplyAttachments(input: {
   const paths: string[] = [];
   await mkdir(directory, { recursive: true, mode: 0o700 });
   try {
-    for (const attachment of attachments) {
+    for (const { attachment, form } of readable) {
       const response = await fetcher(
         channelReplyAttachmentUrl({
           apiUrl: input.apiUrl,
@@ -143,24 +209,21 @@ export async function downloadChannelReplyAttachments(input: {
       if (bytes.byteLength !== attachment.byteSize) {
         throw new Error("Channel reply attachment size changed during download");
       }
-      const path = join(
-        directory,
-        `${attachment.id}.${attachmentExtension(attachment.contentType)}`,
-      );
+      const path = join(directory, `${attachment.id}.${form.extension}`);
       await writeFile(path, bytes, { mode: 0o600 });
       paths.push(path);
     }
     return {
       directory,
       paths,
-      imagePaths: attachments.flatMap((attachment, index) =>
-        attachment.contentType.startsWith("image/") ? [paths[index]!] : []
+      imagePaths: readable.flatMap(({ form }, index) =>
+        form.kind === "image" ? [paths[index]!] : []
       ),
-      filePaths: attachments.flatMap((attachment, index) =>
-        attachment.contentType === channelPdfContentType ? [paths[index]!] : []
+      filePaths: readable.flatMap(({ form }, index) =>
+        form.kind === "file" ? [paths[index]!] : []
       ),
-      attachments: attachments.flatMap((attachment, index) =>
-        attachment.contentType.startsWith("image/")
+      attachments: readable.flatMap(({ attachment, form }, index) =>
+        form.kind === "image"
           ? [{
               type: "image" as const,
               path: paths[index]!,
@@ -169,6 +232,7 @@ export async function downloadChannelReplyAttachments(input: {
             }]
           : []
       ),
+      unreadable: unreadableSummary(unreadable),
     };
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
