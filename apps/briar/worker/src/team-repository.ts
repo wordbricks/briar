@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
-import type { TeamId } from "../../src/lib/entity-ids";
+import type { TeamId, WorkspaceId } from "../../src/lib/entity-ids";
 import { runD1 } from "./d1-runtime";
 import { OrganizationRole } from "./organization-repository";
 import { createSqlQueryCache } from "./sql-query-cache";
@@ -26,7 +26,9 @@ const TeamRow = Schema.Struct({
  * plain string, so the exported row type re-attaches the brand here (a single
  * D1-edge assertion) rather than at every call site.
  */
-export type TeamRow = Omit<typeof TeamRow.Type, "id"> & { id: TeamId };
+export type TeamRow =
+  & Omit<typeof TeamRow.Type, "id" | "organization_id">
+  & { id: TeamId; organization_id: WorkspaceId };
 
 const TeamListRequest = Schema.Struct({ scopeId: Schema.String });
 

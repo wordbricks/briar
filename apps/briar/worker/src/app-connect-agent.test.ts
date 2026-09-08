@@ -1,5 +1,7 @@
 import { createConnectRouter } from "@connectrpc/connect";
-import { asTeamId } from "../../src/lib/entity-ids";
+import { asTeamId,
+  asWorkspaceId,
+} from "../../src/lib/entity-ids";
 import {
   createFetchHandler,
   createMethodUrl,
@@ -77,7 +79,7 @@ describe("app Agent Connect adapter", () => {
       icon: null,
       icon_name: null,
       icon_color: null,
-      organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      organization_id: asWorkspaceId("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
       organization_name: "Briar Org",
       member_role: "owner",
       created_at: "2026-08-30T00:00:00.000Z",
@@ -283,7 +285,7 @@ describe("app Agent Connect adapter", () => {
       icon: null,
       icon_name: null,
       icon_color: null,
-      organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      organization_id: asWorkspaceId("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
       organization_name: "Briar Org",
       member_role: "owner",
       created_at: "2026-08-30T00:00:00.000Z",

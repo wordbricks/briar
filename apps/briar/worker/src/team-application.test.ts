@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { asTeamId } from "../../src/lib/entity-ids";
+import { asTeamId,
+  asWorkspaceId,
+} from "../../src/lib/entity-ids";
 import {
   deleteTeamApplication,
   TeamApplicationError,
@@ -18,7 +20,7 @@ const project = {
   icon: null,
   icon_name: null,
   icon_color: null,
-  organization_id: "33333333-3333-4333-8333-333333333333",
+  organization_id: asWorkspaceId("33333333-3333-4333-8333-333333333333"),
   organization_name: "Wordbricks",
   member_role: "owner",
   created_at: "2026-08-31T00:00:00.000Z",

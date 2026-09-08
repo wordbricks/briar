@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { asTeamId } from "../../src/lib/entity-ids";
+import { asTeamId,
+  asWorkspaceId,
+} from "../../src/lib/entity-ids";
 import type { BriarAuth } from "./auth";
 import { HttpError } from "./http-response";
 import {
@@ -21,7 +23,7 @@ const projectRow = {
   icon: null,
   icon_name: null,
   icon_color: null,
-  organization_id: "22222222-2222-4222-8222-222222222222",
+  organization_id: asWorkspaceId("22222222-2222-4222-8222-222222222222"),
   organization_name: "Wordbricks",
   member_role: "owner",
   created_at: "2026-08-20T00:00:00.000Z",

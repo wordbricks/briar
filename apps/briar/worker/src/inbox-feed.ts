@@ -12,7 +12,11 @@ import type {
   IssueConversationNotificationRow,
   TeamAgentSessionSummaryRow,
 } from "./db";
-import type { PlanningProjectId, TeamId } from "../../src/lib/entity-ids";
+import type {
+  PlanningProjectId,
+  TeamId,
+  WorkspaceId,
+} from "../../src/lib/entity-ids";
 import type { TeamRow } from "./team-repository";
 
 const notifyingRunStatuses = new Set([
@@ -102,7 +106,7 @@ export type InboxFeedMessage = {
   /** The owning Team, despite the legacy `project` wording. */
   projectId: TeamId;
   projectName: string;
-  workspaceId?: string;
+  workspaceId?: WorkspaceId;
   teamId?: TeamId;
   planningProjectId?: PlanningProjectId | null;
   planningProjectName?: string | null;
@@ -226,7 +230,7 @@ export function buildInboxFeedMessages(
         kind: "issue" as const,
         projectId: project.id,
         projectName: project.name,
-        workspaceId: run.workspace_id ?? project.organization_id ?? project.id,
+        workspaceId: run.workspace_id ?? project.organization_id,
         teamId: run.team_id ?? project.id,
         planningProjectId: run.planning_project_id ?? null,
         planningProjectName: run.planning_project_name ?? null,
@@ -254,7 +258,7 @@ export function buildInboxFeedMessages(
         kind: "conversation" as const,
         projectId: project.id,
         projectName: project.name,
-        workspaceId: project.organization_id ?? project.id,
+        workspaceId: project.organization_id,
         teamId: project.id,
         planningProjectId: run?.planning_project_id ?? null,
         planningProjectName: run?.planning_project_name ?? null,
@@ -302,7 +306,7 @@ export function buildInboxFeedMessages(
       kind: "session",
       projectId: session.project.id,
       projectName: session.project.name,
-      workspaceId: session.project.organization_id ?? session.project.id,
+      workspaceId: session.project.organization_id,
       teamId: session.project.id,
       planningProjectId: null,
       planningProjectName: null,
@@ -337,7 +341,7 @@ export function buildInboxFeedMessages(
         kind: "channel",
         projectId: channelProject.id,
         projectName: channelProject.name,
-        workspaceId: channelProject.organization_id ?? channelProject.id,
+        workspaceId: channelProject.organization_id,
         teamId: channelProject.id,
         planningProjectId: null,
         planningProjectName: null,
