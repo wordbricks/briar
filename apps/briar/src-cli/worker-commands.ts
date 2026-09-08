@@ -50,6 +50,7 @@ import {
   discoverWorkerProviderCapabilities,
   discoverWorkerProviderVersions,
 } from "./provider-capabilities";
+import { supportsDmMessagePublicationProvider } from "./dm-message-invocation";
 import {
   createWorkerControlClient,
   createWorkerEnrollmentClient,
@@ -146,6 +147,21 @@ const workerRuntime = ({
   computerUse?: WorkerRuntimeInput["computerUse"];
 }): WorkerRuntimeInput => ({
   ...input,
+  dmPublicMessages: (() => {
+    const bundle = agentBundleCandidates(
+      import.meta.dir,
+      "dm-message-mcp-server.js",
+    ).find((path) => Bun.file(path).size > 0);
+    const providers = Object.entries(input.providerHealth).flatMap(
+      ([provider, health]) => health.healthy &&
+          supportsDmMessagePublicationProvider(provider as WorkerRuntimeInput["agentProvider"])
+        ? [provider as "codex" | "claude"]
+        : [],
+    );
+    return bundle && providers.length > 0
+      ? { protocol: 1 as const, providers }
+      : undefined;
+  })(),
   updateRequestId: sandboxWorkerRuntimeMetadata().updateRequestId,
   versions: workerRuntimeVersions({
     briar: cliVersion,

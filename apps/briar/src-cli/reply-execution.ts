@@ -16,6 +16,11 @@ import {
   dmMemoryExecutionError,
 } from "./dm-memory-invocation";
 import {
+  DmMessageInvocation,
+  supportsDmMessagePublicationProvider,
+} from "./dm-message-invocation";
+import { findAgentBundle } from "./agent-bundle-path";
+import {
   ChannelAgentReplyProviderOutputSchema,
   type ChannelAgentReplyTurn,
   type ParsedChannelReplyAgentResult,
@@ -131,6 +136,31 @@ import {
  */
 const agentMessageHop = (hop: number): 0 | 1 | 2 =>
   hop === 1 || hop === 2 ? hop : 0;
+
+/** Protocol 1 can pre-publish only a plain text final message. */
+export const canPublishPlainDmFinal = (
+  result: ParsedChannelReplyAgentResult["result"],
+  attachments: readonly File[],
+) => attachments.length === 0 &&
+  result.body.trim().length > 0 &&
+  (result.memoryCitations?.length ?? 0) === 0 &&
+  result.memorySaveRequest === null &&
+  result.document === null &&
+  result.issueProposal === null &&
+  result.issueBatchProposal === null &&
+  result.executionProposal === null &&
+  result.skillExecutionProposal === null &&
+  result.delegation === null &&
+  result.agentMessage === null;
+
+export const publishPlainDmFinal = (
+  invocation: Pick<DmMessageInvocation, "publishFinal"> | null,
+  result: ParsedChannelReplyAgentResult["result"],
+  attachments: readonly File[],
+  signal: AbortSignal,
+) => invocation && canPublishPlainDmFinal(result, attachments)
+  ? invocation.publishFinal(result.body, signal)
+  : Promise.resolve(null);
 
 async function runClaimedProjectAgentTask(
   config: Config,
@@ -630,6 +660,7 @@ async function runClaimedChannelReply(
   runtime: {
     runProviderTurn: typeof runDetachedProviderTurn;
     workspaceRoot: string;
+    dmMessageMcpServerPath?: string;
   } = {
     runProviderTurn: runDetachedProviderTurn,
     workspaceRoot: configDirectory,
@@ -704,6 +735,8 @@ async function runClaimedChannelReply(
   const memoryAbort = new AbortController();
   const invocationSignal = AbortSignal.any([signal, memoryAbort.signal]);
   let memoryInvocation: DmMemoryInvocation | null = null;
+  let messageInvocation: DmMessageInvocation | null = null;
+  let publicationTerminal = false;
   let organizationContextCleaned = false;
   let attachmentsCleaned = false;
   let workspaceCleaned = false;
@@ -800,6 +833,23 @@ async function runClaimedChannelReply(
         signal: invocationSignal,
       });
     }
+    const durablePublicMessages = reply.dmPublicMessageProtocol === 1 &&
+      supportsDmMessagePublicationProvider(reply.provider);
+    const dmMessageMcpServerPath = durablePublicMessages
+      ? runtime.dmMessageMcpServerPath ?? await findAgentBundle(
+          import.meta.dir,
+          "dm-message-mcp-server.js",
+        )
+      : null;
+    if (durablePublicMessages) {
+      messageInvocation = await DmMessageInvocation.create({
+        queue: workerQueueClient,
+        projectId: project.id,
+        workerId: registered.workerId,
+        work: reply,
+        signal: invocationSignal,
+      });
+    }
     const organizationContext = reply.scope.kind === "organization"
       ? await downloadOrganizationAgentContextManifest({
           apiUrl: config.apiUrl,
@@ -882,7 +932,7 @@ async function runClaimedChannelReply(
       reply.session?.conversationId && reply.pendingTriggerMessageIds.length > 1
         ? "Continue the interrupted response in this same conversation with the updated user inputs below. Preserve completed work and tool results from the transcript; do not repeat completed actions unless the new input requires it."
         : null,
-      prompt, memoryInvocation?.prompt()]
+      prompt, memoryInvocation?.prompt(), messageInvocation?.prompt()]
       .filter(Boolean)
       .join("\n\n");
     let result: ParsedChannelReplyAgentResult["result"] | null = null;
@@ -895,6 +945,7 @@ async function runClaimedChannelReply(
         turnPrompt = [
           prompt,
           currentMemoryInvocation.prompt(),
+          messageInvocation?.prompt(),
           organizationContext
             ? "Re-read the organization context manifest for previously loaded context."
             : null,
@@ -910,6 +961,8 @@ async function runClaimedChannelReply(
           ? downloadedAttachments.attachments
           : undefined,
         outputSchema: outputContract.jsonSchema,
+        dmMessagePublicationBinding: messageInvocation?.binding(),
+        dmMessageMcpServerPath,
         organizationContextManifestPath:
           organizationContext?.manifestPath ?? null,
         delegationTargets: reply.scope.kind === "organization"
@@ -1053,7 +1106,9 @@ async function runClaimedChannelReply(
       ].join("\n\n");
       turnPrompt = conversationId
         ? continuation
-        : `${prompt}\n\n${continuation}\n${memoryInvocation?.prompt() ?? ""}`;
+        : `${prompt}\n\n${continuation}\n${memoryInvocation?.prompt() ?? ""}\n${
+            messageInvocation?.prompt() ?? ""
+          }`;
     }
     if (!result) throw new Error("Agent returned no channel reply");
     const skillExecutionProposalAllowed =
@@ -1075,7 +1130,14 @@ async function runClaimedChannelReply(
       }),
       ...generatedImages.files(),
     ], "Channel reply");
+    await messageInvocation?.settle();
     await memoryInvocation?.check(false);
+    const finalReceipt = await publishPlainDmFinal(
+      messageInvocation,
+      result,
+      replyAttachments,
+      invocationSignal,
+    );
     await cleanupContext();
     const completion = await replyCompletion.completeChannelReply({
       projectId: project.id,
@@ -1086,14 +1148,17 @@ async function runClaimedChannelReply(
         conversationId,
         result,
         attachments: replyAttachments,
+        publishedFinalBatchId: finalReceipt?.batchId,
       },
       signal,
     });
     retainedUntil = completion.retainedUntil;
+    publicationTerminal = completion.disposition === "completed";
   } catch (error) {
     if (!reply.memory || error instanceof DetachedProviderBlockedError) throw error;
     throw dmMemoryExecutionError(error);
   } finally {
+    await messageInvocation?.cleanup({ terminal: publicationTerminal });
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {
       activeReplyActivityPublishers.delete(reply.workId);

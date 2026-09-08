@@ -2,10 +2,12 @@ syntax = "proto3";
 
 package briar.sidecar.v1;
 
+import "briar/app/v1/channel.proto";
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/provider_block.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
 // This protocol is carried as length-delimited protobuf messages over a
 // runner process's stdin and stdout. Diagnostics belong on stderr.
@@ -54,6 +56,61 @@ message ComputerUseChildBinding {
   briar.types.v1.AgentProvider provider = 7;
 }
 
+// A short-lived route from the provider MCP process back to the parent
+// Worker. It carries no Worker credential and is valid only while the parent
+// owns the matching local socket.
+message DmMessagePublicationBinding {
+  string invocation_id = 1;
+  string socket_path = 2;
+  bytes capability = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  uint32 protocol = 5;
+}
+
+message DmMessagePublicationPart {
+  // Stable within the invocation so a retry can recover the same ordered part.
+  string client_id = 1;
+  string body = 2;
+  briar.app.v1.DmMessagePurpose purpose = 3;
+}
+
+message DmMessagePublicationRequest {
+  string invocation_id = 1;
+  bytes capability = 2;
+  string operation_key = 3;
+  repeated DmMessagePublicationPart parts = 4;
+}
+
+message DmMessagePublicationReceipt {
+  string batch_id = 1;
+  repeated string message_ids = 2;
+  uint64 first_sequence = 3;
+  uint64 last_sequence = 4;
+  bool replayed = 5;
+}
+
+enum DmMessagePublicationErrorCode {
+  DM_MESSAGE_PUBLICATION_ERROR_CODE_UNSPECIFIED = 0;
+  DM_MESSAGE_PUBLICATION_ERROR_CODE_INVALID_REQUEST = 1;
+  DM_MESSAGE_PUBLICATION_ERROR_CODE_CAPABILITY_INVALID = 2;
+  DM_MESSAGE_PUBLICATION_ERROR_CODE_INVOCATION_CLOSED = 3;
+  DM_MESSAGE_PUBLICATION_ERROR_CODE_REQUEST_CONFLICT = 4;
+  DM_MESSAGE_PUBLICATION_ERROR_CODE_PUBLICATION_UNKNOWN = 5;
+  DM_MESSAGE_PUBLICATION_ERROR_CODE_PUBLICATION_FAILED = 6;
+}
+
+message DmMessagePublicationError {
+  DmMessagePublicationErrorCode code = 1;
+  string reason = 2;
+}
+
+message DmMessagePublicationResponse {
+  oneof result {
+    DmMessagePublicationReceipt receipt = 1;
+    DmMessagePublicationError error = 2;
+  }
+}
+
 message ParentToRunner {
   oneof payload {
     RunRequest run = 1;
@@ -100,6 +157,8 @@ message RunRequest {
   AgentRunKind run_kind = 16;
   optional ComputerUseChildBinding computer_use_binding = 17;
   optional string computer_use_mcp_server_path = 18;
+  optional DmMessagePublicationBinding dm_message_publication_binding = 19;
+  optional string dm_message_mcp_server_path = 20;
 }
 
 message JsonSchema {

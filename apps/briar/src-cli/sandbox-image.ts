@@ -62,6 +62,7 @@ const agentBundles = [
   "opencode-runner.js",
   "pi-runner.js",
   "computer-use-mcp-server.js",
+  "dm-message-mcp-server.js",
 ] as const;
 
 export const SANDBOX_DESKTOP_FILES = [

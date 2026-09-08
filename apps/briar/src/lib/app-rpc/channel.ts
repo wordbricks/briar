@@ -21,6 +21,8 @@ import {
   ChannelMessageRelay_Direction as ProtoChannelMessageRelayDirection,
   ChannelMessageRelay_Status as ProtoChannelMessageRelayStatus,
   type ChannelMessageRelay as ChannelMessageRelayMessage,
+  DmMessagePurpose as ProtoDmMessagePurpose,
+  type DmMessageMetadata as DmMessageMetadataMessage,
   type ChannelSidebarSection as ChannelSidebarSectionMessage,
   type ChannelMessageAuthor as ChannelMessageAuthorMessage,
   type ChannelProposal as ChannelProposalMessage,
@@ -651,6 +653,51 @@ const channelMessageRelayFromMessage = (
   };
 };
 
+const dmMessagePurposeFromMessage = (
+  value: ProtoDmMessagePurpose,
+): NonNullable<ChannelMessage["dmMetadata"]>["purpose"] => {
+  switch (value) {
+    case ProtoDmMessagePurpose.ACKNOWLEDGEMENT:
+      return "acknowledgement";
+    case ProtoDmMessagePurpose.PROGRESS:
+      return "progress";
+    case ProtoDmMessagePurpose.DISCOVERY:
+      return "discovery";
+    case ProtoDmMessagePurpose.QUESTION:
+      return "question";
+    case ProtoDmMessagePurpose.RESULT:
+      return "result";
+    case ProtoDmMessagePurpose.CONVERSATION:
+      return "conversation";
+    default:
+      throw new Error(`Unknown DM message purpose: ${value}`);
+  }
+};
+
+const dmMessageMetadataFromMessage = (
+  value: DmMessageMetadataMessage,
+): NonNullable<ChannelMessage["dmMetadata"]> => {
+  if (value.batchId.trim().length === 0) {
+    throw new Error("channelMessage.dmMetadata.batchId is missing");
+  }
+  if (!Number.isSafeInteger(value.partIndex) || value.partIndex < 0) {
+    throw new Error("channelMessage.dmMetadata.partIndex is invalid");
+  }
+  const conversationSequence = safeNumber(
+    value.conversationSequence,
+    "channelMessage.dmMetadata.conversationSequence",
+  );
+  if (conversationSequence < 1) {
+    throw new Error("channelMessage.dmMetadata.conversationSequence is invalid");
+  }
+  return {
+    batchId: value.batchId,
+    partIndex: value.partIndex,
+    conversationSequence,
+    purpose: dmMessagePurposeFromMessage(value.purpose),
+  };
+};
+
 export const channelMessageFromMessage = (
   value: ChannelMessageMessage,
 ): ChannelMessage => ({
@@ -717,6 +764,9 @@ export const channelMessageFromMessage = (
     version: reference.version,
   })),
   relay: value.relay ? channelMessageRelayFromMessage(value.relay) : null,
+  dmMetadata: value.dmMetadata
+    ? dmMessageMetadataFromMessage(value.dmMetadata)
+    : null,
   createdAt: requiredTimestamp(value.createdAt, "channelMessage.createdAt"),
   deletedAt: optionalTimestamp(value.deletedAt),
 });

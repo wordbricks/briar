@@ -30,6 +30,7 @@ import {
   RecordMergeBatchCandidateEnqueuedResponseSchema,
   RecordMergeBatchValidationResponseSchema,
   PrepareReplyAttachmentUploadsResponseSchema,
+  PublishDmMessageBatchResponseSchema,
   ReplyCompletionDisposition,
   RenewWorkLeaseResponseSchema,
   WorkerQueueService,
@@ -48,6 +49,7 @@ import {
   type GetDmMemoryBriefRequest,
   type LookupDmMemoryRequest,
   type PrepareReplyAttachmentUploadsRequest,
+  type PublishDmMessageBatchRequest,
   type ReserveDmMemoryLearningCallRequest,
   type RecordMergeBatchAuthorityRequest,
   type RecordMergeBatchCandidateEnqueuedRequest,
@@ -152,6 +154,11 @@ import {
 } from "./worker-reply-completion-mappers";
 import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
 import {
+  DmPublicMessageError,
+  publishDmPublicMessageBatchApplication,
+} from "./dm-public-message-application";
+import { publishDmPublicMessageBatchInputFromProto } from "./dm-public-message-mappers";
+import {
   checkDmMemoryClaim,
   getDmMemoryClaimBrief,
   lookupDmMemoryClaim,
@@ -203,6 +210,8 @@ export type WorkerQueueServices = {
     typeof prepareReplyAttachmentUploadsApplication;
   readonly completeIssueReplyApplication: typeof completeIssueReplyApplication;
   readonly completeChannelReplyApplication: typeof completeChannelReplyApplication;
+  readonly publishDmPublicMessageBatchApplication:
+    typeof publishDmPublicMessageBatchApplication;
   readonly checkDmMemoryClaim: typeof checkDmMemoryClaim;
   readonly getDmMemoryClaimBrief: typeof getDmMemoryClaimBrief;
   readonly lookupDmMemoryClaim: typeof lookupDmMemoryClaim;
@@ -249,6 +258,7 @@ const workerQueueServices: WorkerQueueServices = {
   prepareReplyAttachmentUploadsApplication,
   completeIssueReplyApplication,
   completeChannelReplyApplication,
+  publishDmPublicMessageBatchApplication,
   checkDmMemoryClaim,
   getDmMemoryClaimBrief,
   lookupDmMemoryClaim,
@@ -1264,7 +1274,51 @@ async function completeChannelReplyRpc(
     retainedUntil: completed.retainedUntil
       ? timestamp(completed.retainedUntil, "channel reply retention")
       : undefined,
+    finalBatchId: completed.finalBatchId,
+    finalMessageId: completed.finalMessageId,
   });
+}
+
+const rethrowDmPublicMessageError = (error: unknown): never => {
+  if (!(error instanceof DmPublicMessageError)) {
+    return rethrowReplyCompletionHttpError(error);
+  }
+  throw new HttpError(
+    error.reason === "invalid_request" ? 400 : 409,
+    "DM public message could not be published",
+    error.reason,
+  );
+};
+
+async function publishDmMessageBatchRpc(
+  input: WorkerConnectQueueInput,
+  request: PublishDmMessageBatchRequest,
+  services: WorkerQueueServices,
+) {
+  const worker = await authenticatedWorker(
+    input,
+    request.projectId,
+    request.workerId,
+    services,
+  );
+  try {
+    const published = await services.publishDmPublicMessageBatchApplication({
+      db: input.db,
+      env: input.env,
+      context: input.context,
+      worker,
+      request: publishDmPublicMessageBatchInputFromProto(request),
+    });
+    return create(PublishDmMessageBatchResponseSchema, {
+      batchId: published.batchId,
+      messageIds: published.messageIds,
+      firstSequence: BigInt(published.firstSequence),
+      lastSequence: BigInt(published.lastSequence),
+      replayed: published.replayed,
+    });
+  } catch (error) {
+    return rethrowDmPublicMessageError(error);
+  }
 }
 
 const dmMemoryDescriptorMessage = (value: {
@@ -1572,6 +1626,8 @@ export function createWorkerQueueService(
     prepareReplyAttachmentUploads: (request, context) => prepareReplyAttachmentUploadsRpc(input, request, context, services),
     completeIssueReply: (request) => completeIssueReplyRpc(input, request, services),
     completeChannelReply: (request) => completeChannelReplyRpc(input, request, services),
+    publishDmMessageBatch: (request) =>
+      publishDmMessageBatchRpc(input, request, services),
     checkDmMemoryClaim: (request) => checkDmMemoryClaimRpc(input, request, services),
     getDmMemoryBrief: (request) => getDmMemoryBriefRpc(input, request, services),
     lookupDmMemory: (request) => lookupDmMemoryRpc(input, request, services),

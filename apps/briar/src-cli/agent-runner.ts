@@ -7,6 +7,7 @@ import {
   RunRequestSchema,
   SandboxMode,
   type ComputerUseChildBinding,
+  type DmMessagePublicationBinding,
   type RunnerToParent,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
@@ -873,6 +874,8 @@ export function detachedProviderRequest(input: {
   runKind?: "parent" | "computerUse";
   computerUseBinding?: ComputerUseChildBinding;
   computerUseMcpServerPath?: string | null;
+  dmMessagePublicationBinding?: DmMessagePublicationBinding;
+  dmMessageMcpServerPath?: string | null;
 }) {
   const computerUseRoleInstructions = input.computerUseBinding === undefined
     ? null
@@ -949,6 +952,8 @@ export function detachedProviderRequest(input: {
         : AgentRunKind.PARENT,
       computerUseBinding: input.computerUseBinding,
       computerUseMcpServerPath: input.computerUseMcpServerPath ?? "",
+      dmMessagePublicationBinding: input.dmMessagePublicationBinding,
+      dmMessageMcpServerPath: input.dmMessageMcpServerPath ?? "",
       protocolFingerprint: CONTRACTS_DESCRIPTOR_FINGERPRINT,
     }),
   };

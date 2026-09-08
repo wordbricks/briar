@@ -10,6 +10,7 @@ import {
   activityForReplies,
   appendReplySummary,
   channelAuthorId,
+  channelMessageBatchPosition,
   channelConversationError,
   channelReplyIsPending,
   channelReplyShouldReplace,
@@ -323,6 +324,47 @@ describe("typing state", () => {
 });
 
 describe("summarizeChannelMessages", () => {
+  it("marks the first, middle and last parts of one adjacent batch", () => {
+    const part = (id: string, partIndex: number) => testChannelMessage(id, {
+      author: agentAuthor,
+      dmMetadata: {
+        batchId: "batch-1",
+        partIndex,
+        conversationSequence: partIndex + 1,
+        purpose: "progress",
+      },
+    });
+    const messages = [part("one", 0), part("two", 1), part("three", 2)];
+
+    expect(messages.map((_, index) =>
+      channelMessageBatchPosition(messages, index)
+    )).toEqual(["first", "middle", "last"]);
+    expect(summarizeChannelMessages([], messages).map(
+      ({ batchPosition }) => batchPosition,
+    )).toEqual(["first", "middle", "last"]);
+  });
+
+  it("keeps another author and a legacy row outside the visual batch", () => {
+    const dmMetadata = {
+      batchId: "batch-1",
+      partIndex: 0,
+      conversationSequence: 1,
+      purpose: "progress",
+    } as const;
+    const messages = [
+      testChannelMessage("agent-part", {
+        author: agentAuthor,
+        dmMetadata,
+      }),
+      testChannelMessage("user-part", { dmMetadata }),
+      testChannelMessage("legacy", { author: agentAuthor }),
+    ];
+
+    expect(summarizeChannelMessages([], messages).map(
+      ({ batchPosition }) => batchPosition,
+    )).toEqual(["single", "single", "single"]);
+  });
+
   it("keeps the entry of a message whose grouping did not change", () => {
     const message = testChannelMessage("message-1");
     const previous = summarizeChannelMessages([], [message]);

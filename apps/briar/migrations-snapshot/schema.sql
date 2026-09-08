@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: a406d39b808e8e167efc446ef051a047117bdd9f13275143e7a31ddfbb009ca7
--- snapshot-digest: c31d32242abd30f8e41d158648b2c9b7df909621901ab4eaa4782efc7c60ffb7
+-- migrations-digest: 93b80f08b32bd972ecd8dfb0c1dd7fd08a4e370a1b426cc896a84e86e562a698
+-- snapshot-digest: 88c0f8a3d72c38303fc1e8703dd521cb037ff3e61dc47d8f4b28a9839f22670f
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3661,7 +3661,11 @@ CREATE TABLE IF NOT EXISTS "briar_channel_messages" (
   updated_at text not null, blocks_json text check (
     blocks_json is null
     or (json_valid(blocks_json) and length(blocks_json) <= 65536)
-  ), deleted_at text, memory_source_version integer not null default 1,
+  ), deleted_at text, memory_source_version integer not null default 1, dm_batch_id text
+  references briar_dm_public_message_batches (id) on delete cascade, dm_part_index integer
+  check (dm_part_index is null or dm_part_index between 0 and 7), dm_sequence integer
+  check (dm_sequence is null or dm_sequence >= 1), dm_purpose text
+  references briar_dm_message_purposes (purpose),
   check (parent_message_id is null or parent_message_id <> id),
   check (
     author_agent_name is not null
@@ -3738,6 +3742,106 @@ CREATE TABLE briar_run_difficulties (
     references briar_issue_difficulties (difficulty)
 ) strict;
 -- @statement
+CREATE TABLE briar_dm_message_purposes (
+  purpose text primary key not null,
+  proto_name text not null unique
+    check (proto_name = 'DM_MESSAGE_PURPOSE_' || upper(purpose))
+) strict;
+-- @statement
+CREATE TABLE briar_dm_message_publication_kinds (
+  publication_kind text primary key not null,
+  proto_name text not null unique
+    check (
+      proto_name = 'DM_MESSAGE_PUBLICATION_KIND_' || upper(publication_kind)
+    )
+) strict;
+-- @statement
+CREATE TABLE briar_dm_public_message_claim_scopes (
+  job_id text primary key not null
+    references briar_channel_agent_reply_jobs (id) on delete cascade,
+  organization_id text not null,
+  channel_id text not null,
+  owner_user_id text not null,
+  agent_id text not null,
+  roster_epoch integer not null check (roster_epoch >= 0),
+  input_revision integer not null check (input_revision >= 0),
+  trigger_message_id text not null,
+  trigger_source_version integer not null check (trigger_source_version >= 1),
+  worker_id text not null,
+  device_id text not null,
+  claim_token_hash text not null check (
+    length(claim_token_hash) = 64
+    and claim_token_hash not glob '*[^0-9a-f]*'
+  ),
+  created_at text not null
+) strict;
+-- @statement
+CREATE TABLE briar_dm_public_message_sequences (
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  channel_id text not null
+    references briar_channels (id) on delete cascade,
+  next_sequence integer not null default 1 check (next_sequence >= 1),
+  updated_at text not null,
+  primary key (organization_id, channel_id)
+) strict;
+-- @statement
+CREATE TABLE briar_dm_public_message_batches (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  channel_id text not null
+    references briar_channels (id) on delete cascade,
+  owner_user_id text not null,
+  agent_id text not null
+    references briar_project_agents (id) on delete cascade,
+  roster_epoch integer not null check (roster_epoch >= 0),
+  origin_reply_job_id text not null
+    references briar_channel_agent_reply_jobs (id) on delete cascade,
+  input_revision integer not null check (input_revision >= 0),
+  trigger_message_id text not null,
+  trigger_source_version integer not null check (trigger_source_version >= 1),
+  publication_kind text not null
+    references briar_dm_message_publication_kinds (publication_kind),
+  payload_hash text not null check (
+    length(payload_hash) = 64
+    and payload_hash not glob '*[^0-9a-f]*'
+  ),
+  first_sequence integer not null check (first_sequence >= 1),
+  last_sequence integer not null check (last_sequence >= first_sequence),
+  part_count integer not null check (
+    part_count between 1 and 8
+    and last_sequence = first_sequence + part_count - 1
+  ),
+  worker_id text not null,
+  device_id text not null,
+  claim_token_hash text not null check (
+    length(claim_token_hash) = 64
+    and claim_token_hash not glob '*[^0-9a-f]*'
+  ),
+  created_at text not null
+) strict;
+-- @statement
+CREATE TABLE briar_dm_public_message_receipts (
+  request_id text primary key not null,
+  organization_id text not null,
+  channel_id text not null,
+  origin_reply_job_id text not null,
+  worker_id text not null,
+  device_id text not null,
+  claim_token_hash text not null check (
+    length(claim_token_hash) = 64
+    and claim_token_hash not glob '*[^0-9a-f]*'
+  ),
+  payload_hash text not null check (
+    length(payload_hash) = 64
+    and payload_hash not glob '*[^0-9a-f]*'
+  ),
+  batch_id text not null unique
+    references briar_dm_public_message_batches (id) on delete cascade,
+  created_at text not null
+) strict;
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -3785,6 +3889,22 @@ INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('norma
 INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('hard','ISSUE_DIFFICULTY_HARD');
 -- @statement
 INSERT INTO "briar_issue_difficulties" ("difficulty","proto_name") VALUES('expert','ISSUE_DIFFICULTY_EXPERT');
+-- @statement
+INSERT INTO "briar_dm_message_purposes" ("purpose","proto_name") VALUES('acknowledgement','DM_MESSAGE_PURPOSE_ACKNOWLEDGEMENT');
+-- @statement
+INSERT INTO "briar_dm_message_purposes" ("purpose","proto_name") VALUES('progress','DM_MESSAGE_PURPOSE_PROGRESS');
+-- @statement
+INSERT INTO "briar_dm_message_purposes" ("purpose","proto_name") VALUES('discovery','DM_MESSAGE_PURPOSE_DISCOVERY');
+-- @statement
+INSERT INTO "briar_dm_message_purposes" ("purpose","proto_name") VALUES('question','DM_MESSAGE_PURPOSE_QUESTION');
+-- @statement
+INSERT INTO "briar_dm_message_purposes" ("purpose","proto_name") VALUES('result','DM_MESSAGE_PURPOSE_RESULT');
+-- @statement
+INSERT INTO "briar_dm_message_purposes" ("purpose","proto_name") VALUES('conversation','DM_MESSAGE_PURPOSE_CONVERSATION');
+-- @statement
+INSERT INTO "briar_dm_message_publication_kinds" ("publication_kind","proto_name") VALUES('intermediate','DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE');
+-- @statement
+INSERT INTO "briar_dm_message_publication_kinds" ("publication_kind","proto_name") VALUES('final','DM_MESSAGE_PUBLICATION_KIND_FINAL');
 -- @statement
 CREATE VIEW briar_run_child_storage_a_project_mismatches as
 select child.project_id as stale_project_id,
@@ -5047,6 +5167,28 @@ CREATE INDEX briar_channel_message_attachments_channel_idx
 -- @statement
 CREATE INDEX briar_run_difficulties_difficulty_idx
   on briar_run_difficulties (difficulty);
+-- @statement
+CREATE INDEX briar_dm_public_message_batches_reply_idx
+  on briar_dm_public_message_batches (
+    origin_reply_job_id, first_sequence, id
+  );
+-- @statement
+CREATE UNIQUE INDEX briar_dm_public_message_batches_final_idx
+  on briar_dm_public_message_batches (origin_reply_job_id)
+  where publication_kind = 'final';
+-- @statement
+CREATE INDEX briar_dm_public_message_receipts_claim_idx
+  on briar_dm_public_message_receipts (
+    origin_reply_job_id, worker_id, device_id, claim_token_hash, request_id
+  );
+-- @statement
+CREATE UNIQUE INDEX briar_channel_messages_dm_batch_part_idx
+  on briar_channel_messages (dm_batch_id, dm_part_index)
+  where dm_batch_id is not null;
+-- @statement
+CREATE UNIQUE INDEX briar_channel_messages_dm_sequence_idx
+  on briar_channel_messages (channel_id, dm_sequence)
+  where dm_sequence is not null;
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN
@@ -13787,4 +13929,28 @@ when new.planned_update_resume = 0 or new.status not in ('queued', 'running')
 begin
   delete from briar_worker_update_reservations
     where work_type = 'channelReply' and work_id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_channel_messages_dm_metadata_insert_guard
+before insert on briar_channel_messages
+when not (
+  (new.dm_batch_id is null and new.dm_part_index is null
+    and new.dm_sequence is null and new.dm_purpose is null)
+  or
+  (new.dm_batch_id is not null and new.dm_part_index is not null
+    and new.dm_sequence is not null and new.dm_purpose is not null)
+)
+begin
+  select raise(abort, 'DM public message metadata must be complete');
+end;
+-- @statement
+CREATE TRIGGER briar_channel_messages_dm_metadata_update_guard
+before update of dm_batch_id, dm_part_index, dm_sequence, dm_purpose
+on briar_channel_messages
+when old.dm_batch_id is not new.dm_batch_id
+  or old.dm_part_index is not new.dm_part_index
+  or old.dm_sequence is not new.dm_sequence
+  or old.dm_purpose is not new.dm_purpose
+begin
+  select raise(abort, 'DM public message metadata is immutable');
 end;

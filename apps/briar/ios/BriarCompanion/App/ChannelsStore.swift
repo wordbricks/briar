@@ -2684,12 +2684,62 @@ final class ChannelsStore: ObservableObject {
         for message in updates where !removedIDs.contains(message.id) {
             byID[message.id] = message
         }
-        return byID.values.sorted { left, right in
+        return sortMessagesForDisplay(Array(byID.values))
+    }
+
+    static func sortMessagesForDisplay(
+        _ values: [ChannelMessage]
+    ) -> [ChannelMessage] {
+        // A batch ID is immutable across partial pages. Using a loaded part ID
+        // would move the group across a legacy row when a gap is recovered.
+        let tieID: (ChannelMessage) -> String = { message in
+            message.dmMetadata?.batchId ?? message.id.uuidString.lowercased()
+        }
+        var ordered = values.sorted { left, right in
             if left.createdAt != right.createdAt {
                 return left.createdAt < right.createdAt
             }
+            let leftTieID = tieID(left)
+            let rightTieID = tieID(right)
+            if leftTieID != rightTieID { return leftTieID < rightTieID }
+            if let leftMetadata = left.dmMetadata,
+               let rightMetadata = right.dmMetadata,
+               leftMetadata.batchId == rightMetadata.batchId {
+                if leftMetadata.partIndex != rightMetadata.partIndex {
+                    return leftMetadata.partIndex < rightMetadata.partIndex
+                }
+                if leftMetadata.conversationSequence != rightMetadata.conversationSequence {
+                    return leftMetadata.conversationSequence < rightMetadata.conversationSequence
+                }
+            }
             return left.id.uuidString < right.id.uuidString
         }
+        var start = 0
+        while start < ordered.count {
+            guard ordered[start].dmMetadata != nil else {
+                start += 1
+                continue
+            }
+            var end = start + 1
+            while end < ordered.count, ordered[end].dmMetadata != nil {
+                end += 1
+            }
+            let sortedSpan = ordered[start..<end].sorted { left, right in
+                guard let leftMetadata = left.dmMetadata,
+                      let rightMetadata = right.dmMetadata
+                else { return left.createdAt == right.createdAt ? left.id.uuidString < right.id.uuidString : left.createdAt < right.createdAt }
+                if leftMetadata.conversationSequence != rightMetadata.conversationSequence {
+                    return leftMetadata.conversationSequence < rightMetadata.conversationSequence
+                }
+                if leftMetadata.partIndex != rightMetadata.partIndex {
+                    return leftMetadata.partIndex < rightMetadata.partIndex
+                }
+                return left.createdAt == right.createdAt ? left.id.uuidString < right.id.uuidString : left.createdAt < right.createdAt
+            }
+            ordered.replaceSubrange(start..<end, with: sortedSpan)
+            start = end
+        }
+        return ordered
     }
 
     private static func agentReplyIsTerminal(_ reply: ChannelAgentReply) -> Bool {

@@ -22,6 +22,7 @@ import {
   MergeBatchPhase,
   MergeBatchState,
   MergeBatchValidationFailureCode,
+  DmMessagePublicationKind,
   type ChannelActivityCredential as ProtoChannelActivityCredential,
   type ClaimedChannelReply as ProtoClaimedChannelReply,
   type ClaimedDmMemoryLearning as ProtoClaimedDmMemoryLearning,
@@ -549,6 +550,20 @@ const channelReplyFromProto = (
     pendingTriggerMessageIds: value.pendingTriggerMessageIds.length > 0
       ? value.pendingTriggerMessageIds
       : [value.triggerMessageId],
+    inputRevision: safeNumber(value.inputRevision, "channelReply.inputRevision"),
+    dmPublicMessageProtocol: value.dmPublicMessageProtocol === 1 ? 1 as const : null,
+    publishedMessageBatches: value.publishedMessageBatches.map((batch) => ({
+      batchId: batch.batchId,
+      messageIds: [...batch.messageIds],
+      firstSequence: batch.firstSequence,
+      lastSequence: batch.lastSequence,
+      publicationKind: batch.publicationKind === DmMessagePublicationKind.INTERMEDIATE
+        ? DmMessagePublicationKind.INTERMEDIATE
+        : batch.publicationKind === DmMessagePublicationKind.FINAL
+        ? DmMessagePublicationKind.FINAL
+        : (() => { throw new Error("Worker claim has invalid DM publication kind"); })(),
+      createdAt: isoTimestamp(batch.createdAt, "channelReply.publishedMessageBatch.createdAt"),
+    })),
     provider: agentProvider(value.provider),
     model: value.model ?? null,
     effort: value.effort ?? null,

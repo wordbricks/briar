@@ -200,6 +200,7 @@ const channelSuccess = (
   result: ChannelReplyResult,
   conversationId: string | null,
   attachmentIds: readonly string[],
+  publishedFinalBatchId?: string,
 ) => {
   const base = {
     body: result.body,
@@ -218,6 +219,7 @@ const channelSuccess = (
           })),
         })
       : undefined,
+    publishedFinalBatchId,
   };
   const artifactProposalCount = [
     result.issueProposal,
@@ -458,6 +460,7 @@ export function createReplyCompletionClient(
             result: ChannelReplyResult;
             conversationId: string | null;
             attachments: readonly File[];
+            publishedFinalBatchId?: string;
           };
         }
       | { outcome: { case: "failure"; error: string; block?: ProviderBlock } }
@@ -480,6 +483,7 @@ export function createReplyCompletionClient(
                 input.outcome.result,
                 input.outcome.conversationId,
                 attachmentIds,
+                input.outcome.publishedFinalBatchId,
               ),
             }
           : {
@@ -503,6 +507,12 @@ export function createReplyCompletionClient(
           input.outcome.case,
         ),
         retainedUntil: requiredTimestamp(response.retainedUntil, "retainedUntil"),
+        ...(response.finalBatchId
+          ? { finalBatchId: response.finalBatchId }
+          : {}),
+        ...(response.finalMessageId
+          ? { finalMessageId: response.finalMessageId }
+          : {}),
       };
     },
   };

@@ -137,6 +137,47 @@ final class ConversationPresentationTests: XCTestCase {
         ))
     }
 
+    func testAdjacentBatchPartsShareChromeWithoutCrossingUserMessage() {
+        let first = message(id: UUID(), authorID: "agent-1", batchID: "batch-1", sequence: 1)
+        let second = message(id: UUID(), authorID: "agent-1", batchID: "batch-1", sequence: 2)
+        XCTAssertEqual(
+            ChannelMessageBatchPresentation.position(at: 0, in: [first, second]),
+            .first
+        )
+        XCTAssertEqual(
+            ChannelMessageBatchPresentation.position(at: 1, in: [first, second]),
+            .last
+        )
+
+        let user = message(id: UUID(), authorID: "user-1", batchID: nil, sequence: 0)
+        XCTAssertEqual(
+            ChannelMessageBatchPresentation.position(at: 0, in: [first, user, second]),
+            .single
+        )
+        XCTAssertEqual(
+            ChannelMessageBatchPresentation.position(at: 2, in: [first, user, second]),
+            .single
+        )
+    }
+
+    @MainActor
+    func testDurableMessagesUseServerSequenceAndKeepLegacyBoundary() {
+        let second = message(id: UUID(), authorID: "agent-1", batchID: "batch-1", sequence: 2)
+        let first = message(id: UUID(), authorID: "agent-1", batchID: "batch-1", sequence: 1)
+        let legacy = message(id: UUID(), authorID: "user-1", batchID: nil, sequence: 0,
+                             createdAt: Date(timeIntervalSince1970: 21))
+        let third = message(id: UUID(), authorID: "agent-1", batchID: "batch-2", sequence: 3,
+                            createdAt: Date(timeIntervalSince1970: 22))
+        XCTAssertEqual(ChannelsStore.sortMessagesForDisplay([third, second, legacy, first]).map(\.id),
+                       [first.id, second.id, legacy.id, third.id])
+
+        let letterBatch = message(id: UUID(), authorID: "agent-1", batchID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", sequence: 1)
+        let letterLegacy = message(id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+                                   authorID: "user-1", batchID: nil, sequence: 0)
+        XCTAssertEqual(ChannelsStore.sortMessagesForDisplay([letterLegacy, letterBatch]).map(\.id),
+                       [letterBatch.id, letterLegacy.id])
+    }
+
     @MainActor
     func testComposerClearsImmediatelyAndRestoresDraftAfterFailedSend() async throws {
         let draft = ConversationComposerDraftBox()
@@ -187,6 +228,42 @@ final class ConversationPresentationTests: XCTestCase {
         XCTAssertEqual(draft.mentions, expectedMentions)
         XCTAssertEqual(draft.attachments, expectedAttachments)
     }
+}
+
+private func message(
+    id: UUID,
+    authorID: String,
+    batchID: String?,
+    sequence: Int,
+    body: String = "Part",
+    createdAt: Date = Date(timeIntervalSince1970: 20)
+) -> ChannelMessage {
+    ChannelMessage(
+        id: id,
+        channelId: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+        parentMessageId: nil,
+        body: body,
+        author: .init(
+            type: authorID.hasPrefix("agent") ? .agent : .user,
+            name: authorID.hasPrefix("agent") ? "Agent" : "User",
+            image: nil,
+            provider: authorID.hasPrefix("agent") ? "codex" : nil,
+            id: authorID
+        ),
+        replyCount: 0,
+        lastReplyAt: nil,
+        document: nil,
+        proposal: nil,
+        dmMetadata: batchID.map {
+            .init(
+                batchId: $0,
+                partIndex: max(sequence - 1, 0),
+                conversationSequence: max(sequence, 1),
+                purpose: .progress
+            )
+        },
+        createdAt: createdAt
+    )
 }
 
 @MainActor

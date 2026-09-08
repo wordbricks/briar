@@ -66,6 +66,8 @@ import {
   ChannelMessageRelay_Status,
   ChannelMessageRelaySchema,
   ChannelMessageSchema,
+  DmMessageMetadataSchema,
+  DmMessagePurpose,
   ChannelMessageUserAuthorSchema,
   ChannelMessageWebhookAuthorSchema,
   ChannelProposalSchema,
@@ -152,6 +154,15 @@ const replyJobStatus = {
   running: ReplyJobStatus.RUNNING,
   completed: ReplyJobStatus.COMPLETED,
   failed: ReplyJobStatus.FAILED,
+} as const;
+
+const dmMessagePurpose = {
+  acknowledgement: DmMessagePurpose.ACKNOWLEDGEMENT,
+  progress: DmMessagePurpose.PROGRESS,
+  discovery: DmMessagePurpose.DISCOVERY,
+  question: DmMessagePurpose.QUESTION,
+  result: DmMessagePurpose.RESULT,
+  conversation: DmMessagePurpose.CONVERSATION,
 } as const;
 
 const channelVisibility = {
@@ -813,6 +824,20 @@ export const appChannelMessage = (message: ChannelMessage) =>
       version: reference.version,
     })),
     relay: message.relay ? appChannelMessageRelay(message.relay) : undefined,
+    dmMetadata: message.dmMetadata
+      ? create(DmMessageMetadataSchema, {
+          batchId: message.dmMetadata.batchId,
+          partIndex: message.dmMetadata.partIndex,
+          conversationSequence: BigInt(
+            message.dmMetadata.conversationSequence,
+          ),
+          purpose: enumValue(
+            dmMessagePurpose,
+            message.dmMetadata.purpose,
+            "DM message purpose",
+          ),
+        })
+      : undefined,
   });
 
 export const appChannelAgentReply = (reply: ChannelAgentReply) =>

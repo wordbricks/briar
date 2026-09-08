@@ -33,6 +33,7 @@ export const workerD1TestFiles = [
   "worker/src/dm-memory-learning-storage.test.ts",
   "worker/src/dm-memory-repository.test.ts",
   "worker/src/dm-memory-retrieval.test.ts",
+  "worker/src/dm-public-message.test.ts",
   "worker/src/github-db.test.ts",
   "worker/src/github-integration-db.test.ts",
   "worker/src/hierarchy-repository.test.ts",

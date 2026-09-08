@@ -176,6 +176,30 @@ describe("ChannelMessageRow", () => {
     await view.cleanup();
   });
 
+  it("exposes durable DM batch positions to layout CSS", async () => {
+    const registry = createTestRegistry();
+    writeChannelTimeline(registry, channelId, [messageOf(1)]);
+    const view = createReactTestRoot();
+    await view.render(
+      <RegistryContext.Provider value={registry}>
+        <I18nProvider>
+          <ChannelMessageRow
+            batchPosition="middle"
+            channelId={channelId}
+            context={rowContext}
+            messageId="message-1"
+          />
+        </I18nProvider>
+      </RegistryContext.Provider>,
+    );
+
+    const row = view.container.querySelector(".channel-message");
+    expect(row?.getAttribute("data-dm-batch-position")).toBe("middle");
+    expect(row?.classList.contains("is-dm-batch-part")).toBe(true);
+    expect(row?.classList.contains("is-dm-batch-middle")).toBe(true);
+    await view.cleanup();
+  });
+
   it("re-renders one row when one message changes, and not the list", async () => {
     const registry = createTestRegistry();
     writeChannelTimeline(registry, channelId, [

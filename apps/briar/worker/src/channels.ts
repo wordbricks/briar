@@ -147,6 +147,17 @@ export type ChannelMessageRow = {
   body: string;
   blocks_json: string | null;
   deleted_at: string | null;
+  dm_batch_id: string | null;
+  dm_part_index: number | null;
+  dm_sequence: number | null;
+  dm_purpose:
+    | "acknowledgement"
+    | "progress"
+    | "discovery"
+    | "question"
+    | "result"
+    | "conversation"
+    | null;
   reply_count: number;
   last_reply_at: string | null;
   document_message_id: string | null;
@@ -396,7 +407,7 @@ export function channelReplySessionRetentionUntil(observedAt: string) {
  * changing either provider revokes that queued/running reply instead of
  * silently falling back to a different configuration.
  */
-const liveChannelReplyRuntime = (job: string) => `coalesce((
+export const liveChannelReplyRuntime = (job: string) => `coalesce((
   (
     ${job}.selected_skill_id_snapshot is null
     and ${job}.skill_id is null
@@ -604,7 +615,8 @@ const messageSelect = `
          message.author_agent_provider, agent.avatar as author_agent_image,
          message.author_webhook_id,
          message.author_webhook_name, message.webhook_event_id, message.body,
-         message.blocks_json, message.deleted_at,
+         message.blocks_json, message.deleted_at, message.dm_batch_id,
+         message.dm_part_index, message.dm_sequence, message.dm_purpose,
          (select count(*) from briar_channel_messages reply
           where reply.parent_message_id = message.id) as reply_count,
          (select max(reply.created_at) from briar_channel_messages reply
@@ -994,6 +1006,14 @@ export const channelMessageJson = (
     ? null
     : channelSkillExecutionProposalJson(row),
   relay: row.deleted_at ? null : relay,
+  dmMetadata: row.deleted_at || row.dm_batch_id === null
+    ? null
+    : {
+        batchId: row.dm_batch_id,
+        partIndex: row.dm_part_index!,
+        conversationSequence: row.dm_sequence!,
+        purpose: row.dm_purpose!,
+      },
   createdAt: row.created_at,
   deletedAt: row.deleted_at,
 });
@@ -2121,7 +2141,8 @@ export async function listChannelRootMessages(
        where message.channel_id = ? and message.parent_message_id is null
          ${options.createdAfter ? "and message.created_at > ?" : ""}
          ${options.createdBefore ? "and message.created_at <= ?" : ""}
-       order by message.created_at desc, message.id desc
+       order by message.created_at desc,
+                coalesce(message.dm_sequence, 0) desc, message.id desc
        limit ?`,
     )
     .bind(
@@ -2145,7 +2166,8 @@ export async function listChannelThreadMessages(
       `${select}
        where message.channel_id = ?
          and (message.id = ? or message.parent_message_id = ?)
-       order by message.created_at, message.id`,
+       order by message.created_at,
+                coalesce(message.dm_sequence, 0), message.id`,
     )
     .bind(channelId, parentMessageId, parentMessageId)
     .all<ChannelMessageRow>();
@@ -2179,7 +2201,7 @@ export async function listChannelMessagePage(
   const cursor = input.cursor
     ? await db
         .prepare(
-          `select created_at
+          `select created_at, coalesce(dm_sequence, 0) as dm_sequence
            from briar_channel_messages
            where channel_id = ? and id = ?
              and ${
@@ -2197,7 +2219,7 @@ export async function listChannelMessagePage(
             ? [input.parentMessageId, input.parentMessageId]
             : []),
         )
-        .first<{ created_at: string }>()
+        .first<{ created_at: string; dm_sequence: number }>()
     : null;
   if (input.cursor && !cursor) return null;
 
@@ -2209,14 +2231,18 @@ export async function listChannelMessagePage(
       : "message.parent_message_id is null";
   const before = cursor
     ? `and (message.created_at < ?
-            or (message.created_at = ? and message.id < ?))`
+            or (message.created_at = ? and (
+              coalesce(message.dm_sequence, 0) < ?
+              or (coalesce(message.dm_sequence, 0) = ? and message.id < ?)
+            )))`
     : "";
   const rows = await db
     .prepare(
       `${select}
        where message.channel_id = ? and ${scope}
          ${before}
-       order by message.created_at desc, message.id desc
+       order by message.created_at desc,
+                coalesce(message.dm_sequence, 0) desc, message.id desc
        limit ?`,
     )
     .bind(
@@ -2224,7 +2250,15 @@ export async function listChannelMessagePage(
       ...(input.parentMessageId
         ? [input.parentMessageId, input.parentMessageId]
         : []),
-      ...(cursor ? [cursor.created_at, cursor.created_at, input.cursor] : []),
+      ...(cursor
+        ? [
+            cursor.created_at,
+            cursor.created_at,
+            cursor.dm_sequence,
+            cursor.dm_sequence,
+            input.cursor,
+          ]
+        : []),
       input.limit + 1,
     )
     .all<ChannelMessageRow>();
@@ -4649,6 +4683,7 @@ export type ChannelReplyCompletionInput = {
   agentProvider: AgentProvider;
   completedAt: string;
   conversationId?: string | null;
+  publishedFinalBatchId?: string | null;
   whatsappAppOrigin?: string;
   attachments?: ChannelMessageAttachmentInput[];
   commit?: ReplyCompletionCommit;
@@ -4683,6 +4718,16 @@ export async function completeChannelReply(
     input.document || input.issueProposal || input.issueBatchProposal ||
       input.executionProposal || input.skillExecutionProposal,
   );
+  if (
+    input.publishedFinalBatchId &&
+    (artifactRequested || delegation || agentMessage ||
+      input.memoryCitations?.length || input.memorySaveRequest ||
+      input.attachments?.length)
+  ) {
+    throw new Error(
+      "A published final DM batch cannot be combined with reply side effects",
+    );
+  }
   if (
     agentMessage && (
       job.agent_message_hop !== 0 ||
@@ -5013,6 +5058,58 @@ export async function completeChannelReply(
                )
            )
            and (
+             ? is null
+             or exists (
+               select 1
+               from briar_dm_public_message_batches public_batch
+               join briar_dm_public_message_claim_scopes public_scope
+                 on public_scope.job_id =
+                    briar_channel_agent_reply_jobs.id
+                and public_scope.organization_id = public_batch.organization_id
+                and public_scope.channel_id = public_batch.channel_id
+                and public_scope.owner_user_id = public_batch.owner_user_id
+                and public_scope.agent_id = public_batch.agent_id
+                and public_scope.roster_epoch = public_batch.roster_epoch
+                and public_scope.input_revision = public_batch.input_revision
+                and public_scope.trigger_message_id =
+                    public_batch.trigger_message_id
+                and public_scope.trigger_source_version =
+                    public_batch.trigger_source_version
+                and public_scope.worker_id =
+                    briar_channel_agent_reply_jobs.claimed_worker_id
+                and public_scope.device_id =
+                    briar_channel_agent_reply_jobs.claimed_device_id
+                and public_scope.claim_token_hash =
+                    briar_channel_agent_reply_jobs.claim_token_hash
+               join briar_channels public_channel
+                 on public_channel.id = public_batch.channel_id
+                and public_channel.kind = 'dm'
+                and public_channel.memory_roster_epoch =
+                    public_batch.roster_epoch
+               join briar_channel_messages public_trigger
+                 on public_trigger.id = public_batch.trigger_message_id
+                and public_trigger.id =
+                    briar_channel_agent_reply_jobs.trigger_message_id
+                and public_trigger.channel_id = public_batch.channel_id
+                and public_trigger.deleted_at is null
+                and public_trigger.memory_source_version =
+                    public_batch.trigger_source_version
+               join briar_channel_messages public_final
+                 on public_final.id =
+                    briar_channel_agent_reply_jobs.reply_message_id
+                and public_final.channel_id = public_batch.channel_id
+                and public_final.dm_batch_id = public_batch.id
+                and public_final.dm_part_index = public_batch.part_count - 1
+                and public_final.body = ?
+               where public_batch.id = ?
+                 and public_batch.origin_reply_job_id =
+                    briar_channel_agent_reply_jobs.id
+                 and public_batch.publication_kind = 'final'
+                 and public_batch.input_revision =
+                    briar_channel_agent_reply_jobs.applied_steer_revision
+             )
+           )
+           and (
              ? = 0
              or (
                briar_channel_agent_reply_jobs.project_id is null
@@ -5065,6 +5162,9 @@ export async function completeChannelReply(
           ...(input.memoryCitations ?? []),
           ...(input.memorySaveRequest?.documents ?? []),
         ]),
+        input.publishedFinalBatchId ?? null,
+        input.body,
+        input.publishedFinalBatchId ?? null,
         ...delegationGuardBindings,
         ...agentMessageGuardBindings,
         ...executionGuardBindings,
@@ -5096,7 +5196,8 @@ export async function completeChannelReply(
          from briar_channel_agent_reply_jobs claim
          where claim.id = ? and claim.claimed_device_id = ?
            and claim.claimed_worker_id = ? and claim.claim_token_hash = ?
-           and claim.status = 'completed' and claim.completed_at = ?`,
+           and claim.status = 'completed' and claim.completed_at = ?
+           and ? is null`,
       )
       .bind(
         job.reply_message_id,
@@ -5113,6 +5214,7 @@ export async function completeChannelReply(
         input.workerId,
         input.claimTokenHash,
         input.completedAt,
+        input.publishedFinalBatchId ?? null,
       ),
   );
   if (input.memoryCitations?.length) {

@@ -16,6 +16,7 @@ import {
 import { ProviderBlockedError } from "./provider-block";
 import { createRunnerIo } from "./runner-io";
 import { prepareComputerUseMcp } from "./computer-use-mcp-config";
+import { prepareDmMessageMcp } from "./dm-message-mcp-config";
 import { claudeComputerUseServers } from "./computer-use-provider-adapters";
 
 const runnerIo = createRunnerIo({
@@ -26,6 +27,13 @@ const { emit, request: requestPromise, waitForApproval } = runnerIo;
 async function main() {
   const request = await requestPromise;
   const computerUseMcp = await prepareComputerUseMcp(request);
+  let dmMessageMcp;
+  try {
+    dmMessageMcp = await prepareDmMessageMcp(request);
+  } catch (error) {
+    await computerUseMcp.cleanup();
+    throw error;
+  }
   let approvalSequence = 0;
   const canUseTool: CanUseTool = async (toolName, input, options) => {
     const id = String(++approvalSequence);
@@ -53,7 +61,10 @@ async function main() {
       options: claudeOptions(
         request,
         canUseTool,
-        claudeComputerUseServers(computerUseMcp.servers),
+        claudeComputerUseServers([
+          ...computerUseMcp.servers,
+          ...dmMessageMcp.servers,
+        ]),
       ),
     })) {
     if (message.type === "system" && message.subtype === "init") {
@@ -94,7 +105,10 @@ async function main() {
           : JSON.stringify(result.structured_output),
     });
   } finally {
-    await computerUseMcp.cleanup();
+    await Promise.allSettled([
+      computerUseMcp.cleanup(),
+      dmMessageMcp.cleanup(),
+    ]);
   }
 }
 

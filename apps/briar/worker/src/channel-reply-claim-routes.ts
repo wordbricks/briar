@@ -7,6 +7,10 @@ import {
 } from "./dm-memory-claim";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
 import {
+  captureDmPublicMessageClaim,
+  listDmPublicMessagesForReply,
+} from "./dm-public-message-repository";
+import {
   agentSkillJson,
   hydrateAgentSkills,
 } from "./agent-skills";
@@ -44,7 +48,7 @@ import {
 import { latestExecutionWorkerUpdateHandoff } from "./worker-update-repository";
 import type { AuthenticatedWorkerTeam } from "./worker-route-auth";
 
-const DM_REPLY_CONTEXT_MESSAGE_LIMIT = 10;
+const DM_REPLY_CONTEXT_MESSAGE_LIMIT = 20;
 const DM_REPLY_CONTEXT_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1_000;
 
 export type AuthenticatedChannelWorkerProject = AuthenticatedWorkerTeam;
@@ -480,6 +484,24 @@ export async function claimNextChannelReplyWork(
       ? currentSession?.conversation_id ?? null
       : null;
     await requireDmMemoryReplyFence(db, job.id);
+    const publicMessageScope = runtime.dmPublicMessages?.providers.includes(
+        job.agent_provider,
+      )
+      ? await captureDmPublicMessageClaim(db, {
+          jobId: job.id,
+          organizationId: job.organization_id,
+          workerId: binding.id,
+          deviceId: principal.deviceId,
+          claimTokenHash,
+          observedAt,
+        })
+      : null;
+    const publishedMessageBatches = publicMessageScope
+      ? await listDmPublicMessagesForReply(db, {
+          jobId: job.id,
+          organizationId: job.organization_id,
+        })
+      : [];
     const activity = env.CHANNEL_ACTIVITY_REALTIME
       ? await channelActivityCredential(env, job, {
           workerId: binding.id,
@@ -514,6 +536,9 @@ export async function claimNextChannelReplyWork(
         triggerMessageId: job.trigger_message_id,
         parentMessageId: job.parent_message_id,
         pendingTriggerMessageIds,
+        dmPublicMessageProtocol: publicMessageScope ? 1 as const : null,
+        inputRevision: publicMessageScope?.input_revision ?? 0,
+        publishedMessageBatches,
         provider: job.agent_provider,
         model: replyModel,
         effort: replyEffort,

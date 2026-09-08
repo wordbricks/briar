@@ -362,6 +362,7 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
     /// Present only on the two ends of an Agent-to-Agent round trip, as they
     /// appear inside the person's own conversation.
     let relay: Relay?
+    let dmMetadata: DmMetadata?
     let createdAt: Date
     let deletedAt: Date?
 
@@ -386,6 +387,7 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
         skillExecutionProposal: AgentSkillExecutionProposal? = nil,
         subscribers: [IssueSubscriber] = [],
         relay: Relay? = nil,
+        dmMetadata: DmMetadata? = nil,
         createdAt: Date,
         deletedAt: Date? = nil
     ) {
@@ -409,8 +411,26 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
         self.skillExecutionProposal = skillExecutionProposal
         self.subscribers = subscribers
         self.relay = relay
+        self.dmMetadata = dmMetadata
         self.createdAt = createdAt
         self.deletedAt = deletedAt
+    }
+
+    struct DmMetadata: Hashable, Sendable {
+        let batchId: String
+        let partIndex: Int
+        let conversationSequence: Int
+        let purpose: Purpose
+
+        enum Purpose: String, Hashable, Sendable {
+            case acknowledgement
+            case progress
+            case discovery
+            case question
+            case result
+            case conversation
+        }
+
     }
 
     /// Links this message to its counterpart inside an Agent-to-Agent
@@ -564,6 +584,48 @@ struct ChannelMessage: Hashable, Identifiable, Sendable {
             case accepted
             case declined
         }
+    }
+}
+
+enum ChannelMessageBatchPosition: Equatable, Sendable {
+    case single
+    case first
+    case middle
+    case last
+}
+
+enum ChannelMessageBatchPresentation {
+    /// Only adjacent durable parts from the same author and publication batch
+    /// share visual chrome. Legacy or intervening messages remain boundaries.
+    static func position(
+        at index: Int,
+        in messages: [ChannelMessage]
+    ) -> ChannelMessageBatchPosition {
+        guard messages.indices.contains(index),
+              let metadata = messages[index].dmMetadata
+        else { return .single }
+        let message = messages[index]
+        let belongsWith: (ChannelMessage?) -> Bool = { candidate in
+            guard let candidate else { return false }
+            return candidate.dmMetadata?.batchId == metadata.batchId &&
+                authorID(candidate.author) == authorID(message.author)
+        }
+        let hasPrevious = belongsWith(
+            messages.indices.contains(index - 1) ? messages[index - 1] : nil
+        )
+        let hasNext = belongsWith(
+            messages.indices.contains(index + 1) ? messages[index + 1] : nil
+        )
+        switch (hasPrevious, hasNext) {
+        case (true, true): return .middle
+        case (true, false): return .last
+        case (false, true): return .first
+        case (false, false): return .single
+        }
+    }
+
+    private static func authorID(_ author: ChannelMessage.Author) -> String {
+        "\(author.type.rawValue):\(author.id ?? author.name)"
     }
 }
 

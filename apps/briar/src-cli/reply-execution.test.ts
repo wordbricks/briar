@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createDetachedTranscriptSequencer,
   detachedProjectAgentPrompt,
@@ -8,8 +8,10 @@ import type { DetachedProviderTurnResult } from "./detached-provider-turn";
 import { dmMemoryExecutionError } from "./dm-memory-invocation";
 import {
   channelReplyFailureReport,
+  publishPlainDmFinal,
   runClaimedProjectAgentTask,
 } from "./reply-execution";
+import type { ParsedChannelReplyAgentResult } from "../src/lib/channel-agent-reply-contract";
 import type {
   ClaimedChannelReply,
   ClaimedProjectAgentTask,
@@ -107,6 +109,72 @@ const handoffContext = (
 
 const continuationPreamble =
   "Briar restarted briefly to install an app update while the previous turn was still running.";
+
+const plainChannelResult = (): ParsedChannelReplyAgentResult["result"] => ({
+  body: "Done",
+  document: null,
+  issueProposal: null,
+  issueBatchProposal: null,
+  executionProposal: null,
+  skillExecutionProposal: null,
+  delegation: null,
+  agentMessage: null,
+  memoryCitations: null,
+  memorySaveRequest: null,
+});
+
+describe("DM final publication", () => {
+  it("prepublishes plain text and leaves rich results to normal completion", async () => {
+    const publishFinal = vi.fn(async () => ({
+      batchId: "batch-final",
+      messageIds: ["message-final"],
+      firstSequence: 1n,
+      lastSequence: 1n,
+      replayed: false,
+    }));
+    const invocation = { publishFinal };
+    const signal = new AbortController().signal;
+
+    await expect(publishPlainDmFinal(
+      invocation,
+      plainChannelResult(),
+      [],
+      signal,
+    )).resolves.toMatchObject({ batchId: "batch-final" });
+    await expect(publishPlainDmFinal(
+      invocation,
+      {
+        ...plainChannelResult(),
+        memoryCitations: [{ documentId: "memory-1", version: 1 }],
+      },
+      [],
+      signal,
+    )).resolves.toBeNull();
+    await expect(publishPlainDmFinal(
+      invocation,
+      {
+        ...plainChannelResult(),
+        memorySaveRequest: {
+          documents: [{ documentId: "memory-1", version: 1 }],
+        },
+      },
+      [],
+      signal,
+    )).resolves.toBeNull();
+    await expect(publishPlainDmFinal(
+      invocation,
+      {
+        ...plainChannelResult(),
+        body: "",
+        acknowledgementReaction: "🙏",
+      },
+      [],
+      signal,
+    )).resolves.toBeNull();
+
+    expect(publishFinal).toHaveBeenCalledTimes(1);
+  });
+});
 
 function successfulTurn(
   overrides: Partial<DetachedProviderTurnResult> = {},
