@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
@@ -20,6 +20,7 @@ import {
   readSandboxState,
   runSandboxBootstrap,
   runSandboxUnregister,
+  sandboxRemoteAgentConfigPath,
   type SandboxBootstrapDependencies,
   type SandboxBootstrapPayload,
   sandboxReport,
@@ -34,6 +35,9 @@ const organizationId = "33333333-3333-4333-8333-333333333333";
 const agentToken = `briar_agent_${"a".repeat(40)}`;
 const userToken = `briar_user_${"b".repeat(40)}`;
 const directories: string[] = [];
+
+const pathExists = (path: string) =>
+  access(path).then(() => true, () => false);
 
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) =>
@@ -703,6 +707,9 @@ describe("remote-desktop relay registration", () => {
   });
 
   it("removes the managed computer before unbinding workers on teardown", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-sandbox-teardown-"));
+    directories.push(directory);
+    await writeFile(join(directory, "remote-agent.json"), "{}\n");
     const config = baseConfig();
     config.userToken = userToken;
     config.teams = [{
@@ -714,6 +721,7 @@ describe("remote-desktop relay registration", () => {
     }];
     const removed: unknown[] = [];
     const result = await runSandboxUnregister({
+      configDirectory: directory,
       loadConfig: async () => config,
       readState: async () => ({
         schemaVersion: SANDBOX_SCHEMA_VERSION,
@@ -748,5 +756,51 @@ describe("remote-desktop relay registration", () => {
     }]);
     expect(result.computerRemoved).toBe(true);
     expect(result.teams).toEqual([{ id: projectId, workerId: "worker-1", state: "unbound" }]);
+    expect(await pathExists(join(directory, "remote-agent.json"))).toBe(false);
+  });
+
+  /*
+    This suite used to delete the relay credential of the machine running it:
+    teardown reached for the process config directory instead of the one it was
+    handed, so `bun run ci:local` inside a sandbox unregistered nothing but
+    still removed `remote-agent.json`, and two sandboxes came back with a
+    permanently offline remote display. The credential is only reissued by
+    `briar sandbox up`, so a test must never be able to reach that path.
+  */
+  it("deletes the relay credential only inside the directory it was given", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-sandbox-teardown-"));
+    directories.push(directory);
+    await writeFile(join(directory, "remote-agent.json"), "{}\n");
+    const defaultPath = sandboxRemoteAgentConfigPath();
+    const defaultExistedBefore = await pathExists(defaultPath);
+    const config = baseConfig();
+    config.userToken = userToken;
+    config.teams = [{
+      id: projectId,
+      repositoryPath: "/repo",
+      apiUrl: "https://briar.example",
+      agentToken,
+      executionWorker: registeredWorker,
+    }];
+    await runSandboxUnregister({
+      configDirectory: directory,
+      loadConfig: async () => config,
+      readState: async () => null,
+      readRemoteAgentConfig: async () => ({
+        credential: registeredWorker.token,
+        deviceId: registeredWorker.deviceId,
+        organizationId,
+        managedComputerId: "44444444-4444-4444-8444-444444444444",
+        apiOrigin: "https://briar.example",
+      }),
+      unregisterComputer: async () => true,
+      unregister: async () => {
+        throw new Error("no team should be unbound");
+      },
+    });
+
+    expect(await pathExists(join(directory, "remote-agent.json"))).toBe(false);
+    expect(defaultPath).not.toBe(join(directory, "remote-agent.json"));
+    expect(await pathExists(defaultPath)).toBe(defaultExistedBefore);
   });
 });

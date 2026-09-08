@@ -28,7 +28,7 @@ import {
   loadOrganizationExecutionWorkers,
   loadProjectAgents,
 } from "../lib/api";
-import { ApiError } from "../lib/api/errors";
+import { findApiError } from "../lib/api/errors";
 import type { ChannelAgentSummary } from "../lib/channels-contract";
 import {
   type DmAgentComputerTarget,
@@ -63,9 +63,13 @@ type ConnectionState = "connecting" | "connected" | "reconnect" | "error";
 */
 const remoteSessionRetryDelaysMs = [400, 1_200, 2_500];
 
+/*
+  Read through the wrapper rather than matching the outer error: Connect
+  re-wraps whatever the transport raises, so an `instanceof ApiError` check saw
+  a `ConnectError` and this retry never fired for the very races it exists for.
+*/
 function remoteSessionInUse(error: unknown) {
-  return error instanceof ApiError &&
-    error.code === "MANAGED_COMPUTER_REMOTE_IN_USE";
+  return findApiError(error)?.code === "MANAGED_COMPUTER_REMOTE_IN_USE";
 }
 
 export type DmComputerRfbConstructor = new (
