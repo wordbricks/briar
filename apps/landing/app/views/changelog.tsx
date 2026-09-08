@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.216",
+        date: "2026년 9월 8일",
+        title: "DM에서 30초 안에 이어 보낸 메시지는 실행 중인 답변에 합쳐집니다",
+        summary:
+          "직전 메시지에서 30초 안에 이어 보낸 입력은 실행 중인 응답에 합쳐져 한 번에 답합니다. 30초가 지나면 현재 답변을 유지하고 이어진 입력은 다음 턴으로 넘깁니다.",
+        items: [
+          "서버가 후속 입력을 실행 중인 답변에 연결하고 입력 revision을 갱신합니다. 최종 답변 저장은 revision과 claim token을 검사해 오래된 실행 결과가 저장되지 않도록 막습니다.",
+          "Worker는 알림을 받으면 실행 권한을 확인하고 provider 종료·정리 후 재개를 승인합니다. 기존 conversationId, 완료된 도구 실행 문맥, 모든 후속 입력과 첨부를 이어받고, 종료 확인 재시도는 멱등이며 Worker 장애는 lease 만료로 복구합니다.",
+          "만료·완료 잡의 임시 메모리 조회 기록을 지우고 유효한 lease로 재개를 기다리는 기록은 남기도록 NULL lease 정리 누락을 고쳤습니다.",
+        ],
+      },
+      {
         version: "1.2.215",
         date: "2026년 9월 8일",
         title: "DM에서 Agent가 메시지를 받으면 눈 반응을 남깁니다",
@@ -1885,6 +1897,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.216",
+        date: "September 8, 2026",
+        title: "DMs sent within 30 seconds join the running reply",
+        summary:
+          "Follow-up messages sent within 30 seconds of the previous one are merged into the running reply and answered together. Past 30 seconds, the current reply keeps running and the follow-up waits for the next turn.",
+        items: [
+          "The server attaches follow-up jobs to the running reply and updates the input revision. Saving the final answer checks the revision and claim token so stale execution results are never stored.",
+          "The Worker verifies execution rights when notified and approves resumption after the provider exits and cleans up. It carries over the existing conversationId, completed tool contexts, and every follow-up input and attachment. Shutdown confirmation retries are idempotent, and Worker failures recover through lease expiry.",
+          "Fixed missed NULL-lease cleanup: temporary memory lookup records of expired or completed jobs are deleted, while records waiting on a valid lease are preserved.",
+        ],
+      },
       {
         version: "1.2.215",
         date: "September 8, 2026",
