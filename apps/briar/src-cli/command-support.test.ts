@@ -2,10 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   DeviceTokenPollResult,
 } from "../src/lib/device-authorization-client";
-import { type Config } from "./config-contract";
+import { type Config, type TeamConfig } from "./config-contract";
 import {
   login,
   openBrowser,
+  projectAgentToken,
   providerExecutionEnvironment,
   type LoginDependencies,
 } from "./command-support";
@@ -229,5 +230,39 @@ describe("login browser launch", () => {
     );
     expect(state.requestedOperations).toContain("pollToken");
     expect(state.saveConfig).toHaveBeenCalledOnce();
+  });
+});
+
+describe("projectAgentToken", () => {
+  const team = (agentToken?: string): TeamConfig => ({
+    id: "4947dcf7-694e-4a0e-b702-ac9ce562b018",
+    repositoryPath: "/repo",
+    apiUrl: "https://briar.example",
+    ...(agentToken === undefined ? {} : { agentToken }),
+  });
+
+  afterEach(() => {
+    delete process.env.BRIAR_AGENT_TOKEN;
+    delete process.env.BRIAR_WORKER_TOKEN;
+  });
+
+  it("prefers the Agent token from the environment", () => {
+    process.env.BRIAR_AGENT_TOKEN = "briar_agent_environment";
+
+    expect(projectAgentToken(team("briar_agent_saved"))).toBe(
+      "briar_agent_environment",
+    );
+  });
+
+  it("falls back to the Agent token saved for the project", () => {
+    expect(projectAgentToken(team("briar_agent_saved"))).toBe(
+      "briar_agent_saved",
+    );
+  });
+
+  it("never substitutes the Worker credential of an execution session", () => {
+    process.env.BRIAR_WORKER_TOKEN = "briar_worker_session";
+
+    expect(() => projectAgentToken(team())).toThrowError(/토큰 만료가 아니며/u);
   });
 });

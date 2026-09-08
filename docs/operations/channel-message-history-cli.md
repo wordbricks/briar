@@ -28,6 +28,15 @@ Each message includes its document reference and attachment metadata, including
 filename, content type, byte size, and server-relative URL. The command does not
 download attachment bodies.
 
+The command sends the Project Agent token even when it runs inside a Worker
+execution session, where `BRIAR_WORKER_TOKEN` is exported for the queue and
+transcript routes. The server authenticates channel history with
+`requireAgentProject`, which rejects a Worker credential outright, so a session
+without a saved Agent token now fails with an explicit message instead of an
+`Invalid agent token` that reads like an expired credential. Issue execution
+sessions clear the Agent token from their runtime config on purpose and cannot
+read channel history.
+
 Project Agent tokens are project-scoped. A project can read a channel only when
 at least one of its saved Project Agents is currently on that channel's roster;
 public channel visibility does not grant Agent access. Removing the last such
