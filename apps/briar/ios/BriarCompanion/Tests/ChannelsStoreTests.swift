@@ -1,5 +1,6 @@
 import BriarContracts
 import BriarContractsMocks
+import Connect
 import Foundation
 import SwiftProtobuf
 import XCTest
@@ -159,6 +160,47 @@ final class ChannelsStoreTests: XCTestCase {
         await store.refreshChanges()
         XCTAssertEqual(store.agentReplies, [completed])
         store.applicationDidEnterBackground()
+    }
+
+    func testOpenChannelPublishesMessagesBeforeReadAcknowledgement() async throws {
+        let messageID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
+        let channel = summary()
+        let api = ChannelHTTPRecorder(channel: channel)
+        let scenario = ChannelConnectScenario(
+            channel: channel,
+            initialMessages: [message(id: messageID, body: "available now")]
+        )
+        let read = ControlledChannelReadScenario()
+        let service = ControlledChannelServiceMock(
+            base: scenario.service(),
+            read: read
+        )
+        let store = ChannelsStore(
+            api: api,
+            preparedUploadClient: api,
+            channelService: service,
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            dmMemoryService: BriarAPI_DmMemoryServiceClientMock(),
+            managesRealtime: false,
+            pollInterval: .seconds(3_600)
+        )
+
+        store.applicationDidEnterBackground()
+        store.select(organizationID: organizationID, token: "token")
+        await store.refresh()
+        await store.openChannel(channelID)
+
+        XCTAssertEqual(store.messages.map(\.id), [messageID])
+        XCTAssertFalse(store.loading)
+        for _ in 0 ..< 100 {
+            if await read.requestCount() == 1 { break }
+            await Task.yield()
+        }
+        let readRequestCount = await read.requestCount()
+        XCTAssertEqual(readRequestCount, 1)
+        try await read.resolveNextFailure()
+        await Task.yield()
+        XCTAssertEqual(store.messages.map(\.id), [messageID])
     }
 
     func testMessageSendPreparesRawUploadAndFinalizesWithGeneratedClient() async throws {
@@ -354,6 +396,69 @@ final class ChannelsStoreTests: XCTestCase {
             await Task.yield()
         }
         XCTAssertTrue(predicate())
+    }
+}
+
+private actor ControlledChannelReadScenario {
+    private var requests = 0
+    private var pending: [
+        CheckedContinuation<ResponseMessage<BriarAPI_MarkChannelReadResponse>, Never>
+    ] = []
+
+    func mark(
+        _ request: BriarAPI_MarkChannelReadRequest
+    ) async -> ResponseMessage<BriarAPI_MarkChannelReadResponse> {
+        requests += 1
+        return await withCheckedContinuation { continuation in
+            pending.append(continuation)
+        }
+    }
+
+    func requestCount() -> Int { requests }
+
+    func resolveNextFailure() throws {
+        guard !pending.isEmpty else { throw MobileAPIError.invalidRequest }
+        pending.removeFirst().resume(returning: .init(result: .failure(.init(
+            code: .internalError,
+            message: "read unavailable"
+        ))))
+    }
+}
+
+private final class ControlledChannelServiceMock: BriarAPI_ChannelServiceClientMock,
+    @unchecked Sendable
+{
+    private let base: BriarAPI_ChannelServiceClientMock
+    private let read: ControlledChannelReadScenario
+
+    init(
+        base: BriarAPI_ChannelServiceClientMock,
+        read: ControlledChannelReadScenario
+    ) {
+        self.base = base
+        self.read = read
+        super.init()
+    }
+
+    override func listChannels(
+        request: BriarAPI_ListChannelsRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_ListChannelsResponse> {
+        await base.listChannels(request: request, headers: headers)
+    }
+
+    override func getChannel(
+        request: BriarAPI_GetChannelRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_GetChannelResponse> {
+        await base.getChannel(request: request, headers: headers)
+    }
+
+    override func markChannelRead(
+        request: BriarAPI_MarkChannelReadRequest,
+        headers: Connect.Headers = [:]
+    ) async -> ResponseMessage<BriarAPI_MarkChannelReadResponse> {
+        await read.mark(request)
     }
 }
 

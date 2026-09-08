@@ -453,6 +453,74 @@ describe("channel conversation loader", () => {
     ).toEqual(["requested-root", "requested-reply"]);
   });
 
+  it("starts a requested reply read without waiting for channel detail", async () => {
+    const pendingDetail = deferred<ChannelDetail>();
+    const pendingThread = deferred<{
+      messages: ChannelMessage[];
+      nextCursor: string | null;
+    }>();
+    let threadStarted = false;
+    const { loader } = harness({
+      loadChannel: () => pendingDetail.promise,
+      listChannelMessages: () => {
+        threadStarted = true;
+        return pendingThread.promise;
+      },
+    });
+
+    const load = loader.loadConversation(channelId, {
+      messageLimit: 20,
+      mergeWithCurrentMessages: false,
+      requestedMessage: {
+        channelId,
+        messageId: "requested-reply",
+        rootMessageId: "requested-root",
+      },
+    });
+
+    expect(threadStarted).toBe(true);
+    pendingDetail.resolve(detail([testChannelMessage("recent")]));
+    pendingThread.resolve({
+      messages: [
+        testChannelMessage("requested-root"),
+        testChannelMessage("requested-reply", {
+          parentMessageId: "requested-root",
+        }),
+      ],
+      nextCursor: null,
+    });
+    expect((await load)?.requestedMessage?.messageId).toBe("requested-reply");
+  });
+
+  it("keeps channel messages when a requested thread read fails", async () => {
+    const { loader, registry } = harness({
+      loadChannel: async () => detail([testChannelMessage("recent")]),
+      listChannelMessages: async () => {
+        throw new Error("thread unavailable");
+      },
+    });
+
+    expect(
+      await loader.loadConversation(channelId, {
+        messageLimit: 20,
+        mergeWithCurrentMessages: false,
+        requestedMessage: {
+          channelId,
+          messageId: "requested-reply",
+          rootMessageId: "requested-root",
+        },
+      }),
+    ).toBeNull();
+    expect(
+      registry
+        .get(channelRootMessagesAtom(channelId))
+        .map((message) => message.id),
+    ).toEqual(["recent"]);
+    expect(registry.get(channelConversationFailureAtom)?.message).toBe(
+      "thread unavailable",
+    );
+  });
+
   it("refetches the thread an approval raced", async () => {
     const { loader, registry } = harness({
       listChannelMessages: async () => ({

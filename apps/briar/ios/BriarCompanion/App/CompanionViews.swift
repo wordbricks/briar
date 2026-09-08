@@ -451,6 +451,14 @@ struct CompanionShellView: View {
             }
             return
         }
+        await channels.openChannel(target.channelID)
+        if target.messageID == target.rootMessageID {
+            _ = await channels.loadRootMessageForNavigation(
+                channelID: target.channelID,
+                messageID: target.rootMessageID
+            )
+        }
+        guard navigation.pathChannelToken == expectedToken else { return }
         if channel.isDirectMessage {
             navigation.selectedTab = .directMessages
             directMessagesPath = NavigationPath()
@@ -460,12 +468,6 @@ struct CompanionShellView: View {
             homePath = NavigationPath()
             homePath.append(channel)
         }
-        await channels.openChannel(target.channelID)
-        _ = await channels.loadRootMessageForNavigation(
-            channelID: target.channelID,
-            messageID: target.rootMessageID
-        )
-        guard navigation.pathChannelToken == expectedToken else { return }
         navigation.pendingChannelThread = ChannelInboxNavigation.threadRoute(
             isDirectMessage: channel.isDirectMessage,
             channelID: target.channelID,
