@@ -29,6 +29,7 @@ import {
   RecordRunEvidenceRequestSchema,
   RecordRunEvidenceResponseSchema,
   RecordRunEventResponseSchema,
+  ListClaimedChannelMessagesResponseSchema,
   ListProjectChannelMessagesResponseSchema,
   RunSourceIdentitySchema,
   TransitionWorkflowStageRequest_Action,
@@ -51,6 +52,7 @@ import {
 } from "./command-contract";
 import type { Config, TeamConfig } from "./config-contract";
 import {
+  claimScopedChannelRead,
   executionToken,
   projectAgentToken,
   values,
@@ -373,7 +375,10 @@ async function changeIssueDependencyCommand(action: "add" | "remove") {
 
 const channelMessagesUsage = `Usage: briar channel messages --channel-id <uuid>
   [--limit <1-100>] [--cursor <message-uuid>]
-  [--parent-message-id <root-message-uuid>]`;
+  [--parent-message-id <root-message-uuid>]
+
+Inside a Worker channel-reply session the channel is taken from the reply job
+being served, so --channel-id is optional there.`;
 
 async function listChannelMessagesCommand() {
   if (has("--help")) {
@@ -381,13 +386,48 @@ async function listChannelMessagesCommand() {
     return;
   }
   const config = await loadConfig();
-  const project = await currentProject(config);
   const limit = value("--limit") === undefined ? 50 : Number(value("--limit"));
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new Error("--limit must be an integer from 1 to 100");
   }
   const cursor = value("--cursor");
   const parentMessageId = value("--parent-message-id");
+  const paging = {
+    cursor: cursor ? decodeUuid(cursor).toLowerCase() : undefined,
+    parentMessageId: parentMessageId
+      ? decodeUuid(parentMessageId).toLowerCase()
+      : undefined,
+    limit,
+  };
+  // A Worker execution session reads the channel it is replying in through its
+  // own claim. It holds no Project Agent token, and the server derives the
+  // channel from the reply job rather than from anything this process passes.
+  // The claim also stands in for the repository lookup: an organization Agent
+  // answering a DM runs outside any connected repository.
+  const claimScoped = claimScopedChannelRead();
+  if (claimScoped) {
+    const requestedChannelId = value("--channel-id");
+    const result = await createAuthenticatedWorkerExecutionClient(
+      config.apiUrl,
+      claimScoped.workerToken,
+    ).listClaimedChannelMessages({
+      workId: decodeUuid(claimScoped.workId).toLowerCase(),
+      ...paging,
+    });
+    if (
+      requestedChannelId &&
+      decodeUuid(requestedChannelId).toLowerCase() !== result.channel?.id
+    ) {
+      throw new Error(
+        "이 실행 세션은 지금 답변 중인 채널만 읽을 수 있습니다. " +
+          `요청한 채널(${requestedChannelId})은 대상이 아닙니다. ` +
+          "--channel-id 없이 실행하면 답변 중인 채널을 읽습니다.",
+      );
+    }
+    console.log(toJsonString(ListClaimedChannelMessagesResponseSchema, result));
+    return;
+  }
+  const project = await currentProject(config);
   const executionRpc = createAuthenticatedWorkerExecutionClient(
     config.apiUrl,
     projectAgentToken(project),
@@ -395,11 +435,7 @@ async function listChannelMessagesCommand() {
   const result = await executionRpc.listProjectChannelMessages({
     projectId: decodeUuid(project.id).toLowerCase(),
     channelId: decodeUuid(required("--channel-id")).toLowerCase(),
-    cursor: cursor ? decodeUuid(cursor).toLowerCase() : undefined,
-    parentMessageId: parentMessageId
-      ? decodeUuid(parentMessageId).toLowerCase()
-      : undefined,
-    limit,
+    ...paging,
   });
   console.log(toJsonString(ListProjectChannelMessagesResponseSchema, result));
 }

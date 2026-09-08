@@ -3368,6 +3368,458 @@ pub const __LIST_PROJECT_CHANNEL_MESSAGES_RESPONSE_JSON_ANY: ::buffa::type_regis
     >,
     is_wkt: false,
 };
+/// Carries no channel id on purpose: the channel is read from the claimed reply
+/// job, so an execution session cannot widen its own read scope by parameter.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListClaimedChannelMessagesRequest {
+    /// Field 1: `work_id`
+    #[serde(
+        rename = "workId",
+        alias = "work_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub work_id: ::buffa::alloc::string::String,
+    /// Field 2: `parent_message_id`
+    #[serde(
+        rename = "parentMessageId",
+        alias = "parent_message_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub parent_message_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 3: `cursor`
+    #[serde(rename = "cursor", skip_serializing_if = "::core::option::Option::is_none")]
+    pub cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub limit: ::core::option::Option<u32>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListClaimedChannelMessagesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListClaimedChannelMessagesRequest")
+            .field("work_id", &self.work_id)
+            .field("parent_message_id", &self.parent_message_id)
+            .field("cursor", &self.cursor)
+            .field("limit", &self.limit)
+            .finish()
+    }
+}
+impl ListClaimedChannelMessagesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ListClaimedChannelMessagesRequest";
+}
+impl ListClaimedChannelMessagesRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::parent_message_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_parent_message_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.parent_message_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::cursor`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_cursor(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::limit`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_limit(mut self, value: u32) -> Self {
+        self.limit = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(ListClaimedChannelMessagesRequest);
+impl ::buffa::MessageName for ListClaimedChannelMessagesRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "ListClaimedChannelMessagesRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.ListClaimedChannelMessagesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ListClaimedChannelMessagesRequest";
+}
+impl ::buffa::Message for ListClaimedChannelMessagesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.work_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.work_id) as u64;
+        }
+        if let Some(ref v) = self.parent_message_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.cursor {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.limit {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.work_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.work_id, buf);
+        }
+        if let Some(ref v) = self.parent_message_id {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if let Some(ref v) = self.cursor {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(v) = self.limit {
+            ::buffa::types::put_uint32_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.work_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .parent_message_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.cursor.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.work_id.clear();
+        self.parent_message_id = ::core::option::Option::None;
+        self.cursor = ::core::option::Option::None;
+        self.limit = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListClaimedChannelMessagesRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.ListClaimedChannelMessagesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListClaimedChannelMessagesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_CLAIMED_CHANNEL_MESSAGES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.ListClaimedChannelMessagesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListClaimedChannelMessagesRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ListClaimedChannelMessagesRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListClaimedChannelMessagesResponse {
+    /// Field 1: `channel`
+    #[serde(
+        rename = "channel",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub channel: ::buffa::MessageField<
+        super::super::app::v1::ChannelSummary,
+        ::buffa::Inline<super::super::app::v1::ChannelSummary>,
+    >,
+    /// Field 2: `messages`
+    #[serde(
+        rename = "messages",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub messages: ::buffa::alloc::vec::Vec<super::super::app::v1::ChannelMessage>,
+    /// Field 3: `next_cursor`
+    #[serde(
+        rename = "nextCursor",
+        alias = "next_cursor",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub next_cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListClaimedChannelMessagesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListClaimedChannelMessagesResponse")
+            .field("channel", &self.channel)
+            .field("messages", &self.messages)
+            .field("next_cursor", &self.next_cursor)
+            .finish()
+    }
+}
+impl ListClaimedChannelMessagesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ListClaimedChannelMessagesResponse";
+}
+impl ListClaimedChannelMessagesResponse {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::next_cursor`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_next_cursor(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.next_cursor = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(ListClaimedChannelMessagesResponse);
+impl ::buffa::MessageName for ListClaimedChannelMessagesResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "ListClaimedChannelMessagesResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.ListClaimedChannelMessagesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ListClaimedChannelMessagesResponse";
+}
+impl ::buffa::Message for ListClaimedChannelMessagesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.channel.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.channel.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.messages {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.next_cursor {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.channel.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.channel.write_to(__cache, buf);
+        }
+        for v in &self.messages {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.next_cursor {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.channel.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.messages.push(elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .next_cursor
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.channel = ::buffa::MessageField::none();
+        self.messages.clear();
+        self.next_cursor = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListClaimedChannelMessagesResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.ListClaimedChannelMessagesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListClaimedChannelMessagesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_CLAIMED_CHANNEL_MESSAGES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.ListClaimedChannelMessagesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListClaimedChannelMessagesResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ListClaimedChannelMessagesResponse,
+    >,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -50896,6 +51348,776 @@ pub mod __buffa {
             type ViewHandle = ListProjectChannelMessagesResponseOwnedView;
         }
         impl ::serde::Serialize for ListProjectChannelMessagesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Carries no channel id on purpose: the channel is read from the claimed reply
+        /// job, so an execution session cannot widen its own read scope by parameter.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListClaimedChannelMessagesRequestView<'a> {
+            /// Field 1: `work_id`
+            pub work_id: &'a str,
+            /// Field 2: `parent_message_id`
+            pub parent_message_id: ::core::option::Option<&'a str>,
+            /// Field 3: `cursor`
+            pub cursor: ::core::option::Option<&'a str>,
+            /// Field 4: `limit`
+            pub limit: ::core::option::Option<u32>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListClaimedChannelMessagesRequestView<'a> {
+            type Owned = super::super::ListClaimedChannelMessagesRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.work_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.parent_message_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.cursor = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = Some(::buffa::types::decode_uint32(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListClaimedChannelMessagesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListClaimedChannelMessagesRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListClaimedChannelMessagesRequest {
+                    work_id: self.work_id.to_string(),
+                    parent_message_id: self.parent_message_id.map(|s| s.to_string()),
+                    cursor: self.cursor.map(|s| s.to_string()),
+                    limit: self.limit,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListClaimedChannelMessagesRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.work_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.work_id) as u64;
+                }
+                if let Some(ref v) = self.parent_message_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.cursor {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(v) = self.limit {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.work_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.work_id, buf);
+                }
+                if let Some(ref v) = self.parent_message_id {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if let Some(ref v) = self.cursor {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if let Some(v) = self.limit {
+                    ::buffa::types::put_uint32_field(4u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListClaimedChannelMessagesRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.work_id) {
+                    __map.serialize_entry("workId", self.work_id)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.parent_message_id {
+                    __map.serialize_entry("parentMessageId", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.cursor {
+                    __map.serialize_entry("cursor", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.limit {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListClaimedChannelMessagesRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "ListClaimedChannelMessagesRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.ListClaimedChannelMessagesRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ListClaimedChannelMessagesRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListClaimedChannelMessagesRequestView);
+        ::buffa::impl_view_reborrow!(ListClaimedChannelMessagesRequestView);
+        /** Self-contained, `'static` owned view of a `ListClaimedChannelMessagesRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListClaimedChannelMessagesRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListClaimedChannelMessagesRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListClaimedChannelMessagesRequestOwnedView(
+            ::buffa::OwnedView<ListClaimedChannelMessagesRequestView<'static>>,
+        );
+        impl ListClaimedChannelMessagesRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListClaimedChannelMessagesRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListClaimedChannelMessagesRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListClaimedChannelMessagesRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListClaimedChannelMessagesRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListClaimedChannelMessagesRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListClaimedChannelMessagesRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListClaimedChannelMessagesRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `work_id`
+            #[must_use]
+            pub fn work_id(&self) -> &'_ str {
+                self.0.reborrow().work_id
+            }
+            /// Field 2: `parent_message_id`
+            #[must_use]
+            pub fn parent_message_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().parent_message_id
+            }
+            /// Field 3: `cursor`
+            #[must_use]
+            pub fn cursor(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().cursor
+            }
+            /// Field 4: `limit`
+            #[must_use]
+            pub fn limit(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().limit
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListClaimedChannelMessagesRequestView<'static>>,
+        > for ListClaimedChannelMessagesRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListClaimedChannelMessagesRequestView<'static>>,
+            ) -> Self {
+                ListClaimedChannelMessagesRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListClaimedChannelMessagesRequestOwnedView>
+        for ::buffa::OwnedView<ListClaimedChannelMessagesRequestView<'static>> {
+            fn from(wrapper: ListClaimedChannelMessagesRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListClaimedChannelMessagesRequestView<'static>>,
+        > for ListClaimedChannelMessagesRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListClaimedChannelMessagesRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ListClaimedChannelMessagesRequest {
+            type View<'a> = ListClaimedChannelMessagesRequestView<'a>;
+            type ViewHandle = ListClaimedChannelMessagesRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListClaimedChannelMessagesRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct ListClaimedChannelMessagesResponseView<'a> {
+            /// Field 1: `channel`
+            pub channel: ::buffa::MessageFieldView<
+                super::super::super::super::app::v1::__buffa::view::ChannelSummaryView<
+                    'a,
+                >,
+            >,
+            /// Field 2: `messages`
+            pub messages: ::buffa::RepeatedView<
+                'a,
+                super::super::super::super::app::v1::__buffa::view::ChannelMessageView<
+                    'a,
+                >,
+            >,
+            /// Field 3: `next_cursor`
+            pub next_cursor: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for ListClaimedChannelMessagesResponseView<'a> {
+            type Owned = super::super::ListClaimedChannelMessagesResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.channel.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.channel = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::app::v1::__buffa::view::ChannelSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_cursor = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::super::super::app::v1::__buffa::view::ChannelMessageView,
+                            >(),
+                        )?;
+                        view.messages
+                            .push(
+                                <super::super::super::super::app::v1::__buffa::view::ChannelMessageView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListClaimedChannelMessagesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListClaimedChannelMessagesResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListClaimedChannelMessagesResponse {
+                    channel: match self.channel.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::app::v1::ChannelSummary,
+                                ::buffa::Inline<
+                                    super::super::super::super::app::v1::ChannelSummary,
+                                >,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    messages: self
+                        .messages
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    next_cursor: self.next_cursor.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListClaimedChannelMessagesResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.channel.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.channel.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                for v in &self.messages {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.next_cursor {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.channel.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.channel.write_to(__cache, buf);
+                }
+                for v in &self.messages {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.next_cursor {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListClaimedChannelMessagesResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.channel.as_option() {
+                        __map.serialize_entry("channel", __v)?;
+                    }
+                }
+                if !self.messages.is_empty() {
+                    __map.serialize_entry("messages", &*self.messages)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.next_cursor {
+                    __map.serialize_entry("nextCursor", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListClaimedChannelMessagesResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "ListClaimedChannelMessagesResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.ListClaimedChannelMessagesResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.ListClaimedChannelMessagesResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListClaimedChannelMessagesResponseView);
+        ::buffa::impl_view_reborrow!(ListClaimedChannelMessagesResponseView);
+        /** Self-contained, `'static` owned view of a `ListClaimedChannelMessagesResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListClaimedChannelMessagesResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListClaimedChannelMessagesResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListClaimedChannelMessagesResponseOwnedView(
+            ::buffa::OwnedView<ListClaimedChannelMessagesResponseView<'static>>,
+        );
+        impl ListClaimedChannelMessagesResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListClaimedChannelMessagesResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListClaimedChannelMessagesResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListClaimedChannelMessagesResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListClaimedChannelMessagesResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListClaimedChannelMessagesResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListClaimedChannelMessagesResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::ListClaimedChannelMessagesResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `channel`
+            #[must_use]
+            pub fn channel(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::app::v1::__buffa::view::ChannelSummaryView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().channel
+            }
+            /// Field 2: `messages`
+            #[must_use]
+            pub fn messages(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::super::super::app::v1::__buffa::view::ChannelMessageView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().messages
+            }
+            /// Field 3: `next_cursor`
+            #[must_use]
+            pub fn next_cursor(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().next_cursor
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListClaimedChannelMessagesResponseView<'static>>,
+        > for ListClaimedChannelMessagesResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    ListClaimedChannelMessagesResponseView<'static>,
+                >,
+            ) -> Self {
+                ListClaimedChannelMessagesResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListClaimedChannelMessagesResponseOwnedView>
+        for ::buffa::OwnedView<ListClaimedChannelMessagesResponseView<'static>> {
+            fn from(wrapper: ListClaimedChannelMessagesResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListClaimedChannelMessagesResponseView<'static>>,
+        > for ListClaimedChannelMessagesResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListClaimedChannelMessagesResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ListClaimedChannelMessagesResponse {
+            type View<'a> = ListClaimedChannelMessagesResponseView<'a>;
+            type ViewHandle = ListClaimedChannelMessagesResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListClaimedChannelMessagesResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -128943,6 +130165,8 @@ pub mod __buffa {
         reg.register_json_any(super::__CLAIM_ISSUE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROJECT_CHANNEL_MESSAGES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROJECT_CHANNEL_MESSAGES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_CLAIMED_CHANNEL_MESSAGES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_CLAIMED_CHANNEL_MESSAGES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__APPEND_TRANSCRIPT_EVENTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__AGENT_TRANSCRIPT_EVENT_JSON_ANY);
         reg.register_json_any(super::__TRANSCRIPT_ARCHIVE_COMPACTION_JSON_ANY);
@@ -129209,6 +130433,14 @@ pub use self::__buffa::view::ListProjectChannelMessagesRequestOwnedView;
 pub use self::__buffa::view::ListProjectChannelMessagesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListProjectChannelMessagesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListClaimedChannelMessagesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListClaimedChannelMessagesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListClaimedChannelMessagesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListClaimedChannelMessagesResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::AppendTranscriptEventsRequestView;
 #[doc(inline)]

@@ -2858,6 +2858,57 @@ export async function getChannelMessageDocument(
 }
 
 /**
+ * Resolve the channel a running reply claim is answering in, so a Worker
+ * execution session can read that channel's history without borrowing a
+ * member's project-wide Project Agent token. The claim is the whole scope:
+ * the caller names a job, never a channel, and the job must still be running
+ * on this exact device under a live lease, with its Agent still on the
+ * channel roster and its Worker binding still enabled.
+ */
+export async function getClaimedChannelReplyChannel(
+  db: D1Database,
+  input: {
+    organizationId: string;
+    jobId: string;
+    deviceId: string;
+    observedAt: string;
+  },
+) {
+  await requireDmMemoryReplyFence(db, input.jobId);
+  return db
+    .prepare(
+      `${channelSelect}
+       join briar_channel_agent_reply_jobs job
+         on job.channel_id = channel.id
+        and job.organization_id = channel.organization_id
+       where job.id = ? and job.organization_id = ?
+         and job.claimed_device_id = ?
+         and job.status = 'running' and job.lease_expires_at > ?
+         and exists (
+           select 1 from briar_channel_agents current_roster
+           where current_roster.channel_id = job.channel_id
+             and current_roster.agent_id = job.agent_id
+         )
+         and ${liveChannelReplyRuntime("job")}
+         and ${dmMemoryReplyFenceCurrent("job")}
+         and exists (
+           select 1 from briar_execution_workers binding
+           where binding.id = job.claimed_worker_id
+             and binding.device_id = job.claimed_device_id
+             and binding.state <> 'disabled'
+             and (job.project_id is null or binding.project_id = job.project_id)
+         )`,
+    )
+    .bind(
+      input.jobId,
+      input.organizationId,
+      input.deviceId,
+      input.observedAt,
+    )
+    .first<ChannelRow>();
+}
+
+/**
  * Resolve an image only when it belongs to the message that triggered the
  * active reply claim on this exact Worker device. This keeps a leaked claim
  * token, another channel image ID, or another enrolled device from widening

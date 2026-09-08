@@ -72,6 +72,10 @@ service WorkerControlService {
 service WorkerExecutionService {
   rpc ClaimIssue(ClaimIssueRequest) returns (ClaimIssueResponse);
   rpc ListProjectChannelMessages(ListProjectChannelMessagesRequest) returns (ListProjectChannelMessagesResponse);
+  // Channel history for the reply job this execution session already holds.
+  // The Worker credential plus the live claim are the whole authorization, so
+  // the session never needs a member's project-wide Project Agent token.
+  rpc ListClaimedChannelMessages(ListClaimedChannelMessagesRequest) returns (ListClaimedChannelMessagesResponse);
   // Shared intentionally with IssueService so evidence has one DTO.
   // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc ListRunEvidence(briar.app.v1.ListRunEvidenceRequest) returns (briar.app.v1.ListRunEvidenceResponse);
@@ -111,6 +115,21 @@ message ListProjectChannelMessagesRequest {
 }
 
 message ListProjectChannelMessagesResponse {
+  briar.app.v1.ChannelSummary channel = 1;
+  repeated briar.app.v1.ChannelMessage messages = 2;
+  optional string next_cursor = 3;
+}
+
+// Carries no channel id on purpose: the channel is read from the claimed reply
+// job, so an execution session cannot widen its own read scope by parameter.
+message ListClaimedChannelMessagesRequest {
+  string work_id = 1;
+  optional string parent_message_id = 2;
+  optional string cursor = 3;
+  optional uint32 limit = 4;
+}
+
+message ListClaimedChannelMessagesResponse {
   briar.app.v1.ChannelSummary channel = 1;
   repeated briar.app.v1.ChannelMessage messages = 2;
   optional string next_cursor = 3;

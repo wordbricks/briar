@@ -4,6 +4,7 @@ import type {
 } from "../src/lib/device-authorization-client";
 import { type Config, type TeamConfig } from "./config-contract";
 import {
+  claimScopedChannelRead,
   login,
   openBrowser,
   projectAgentToken,
@@ -264,5 +265,35 @@ describe("projectAgentToken", () => {
     process.env.BRIAR_WORKER_TOKEN = "briar_worker_session";
 
     expect(() => projectAgentToken(team())).toThrowError(/토큰 만료가 아니며/u);
+  });
+});
+
+describe("claimScopedChannelRead", () => {
+  afterEach(() => {
+    delete process.env.BRIAR_CHANNEL_REPLY_WORK_ID;
+    delete process.env.BRIAR_WORKER_TOKEN;
+  });
+
+  it("selects the claim-scoped read inside a channel reply session", () => {
+    process.env.BRIAR_CHANNEL_REPLY_WORK_ID =
+      " 9d5b6f18-7a1c-4a1b-9a4e-3c2f0d5b7e11 ";
+    process.env.BRIAR_WORKER_TOKEN = "briar_worker_session";
+
+    expect(claimScopedChannelRead()).toEqual({
+      workId: "9d5b6f18-7a1c-4a1b-9a4e-3c2f0d5b7e11",
+      workerToken: "briar_worker_session",
+    });
+  });
+
+  it("stays on the Project Agent path outside a channel reply session", () => {
+    expect(claimScopedChannelRead()).toBeNull();
+
+    process.env.BRIAR_CHANNEL_REPLY_WORK_ID =
+      "9d5b6f18-7a1c-4a1b-9a4e-3c2f0d5b7e11";
+    expect(claimScopedChannelRead()).toBeNull();
+
+    delete process.env.BRIAR_CHANNEL_REPLY_WORK_ID;
+    process.env.BRIAR_WORKER_TOKEN = "briar_worker_session";
+    expect(claimScopedChannelRead()).toBeNull();
   });
 });

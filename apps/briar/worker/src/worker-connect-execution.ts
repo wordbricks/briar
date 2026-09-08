@@ -3,6 +3,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   AppendTranscriptEventsResponseSchema,
   ClaimIssueResponseSchema,
+  ListClaimedChannelMessagesResponseSchema,
   ListProjectChannelMessagesResponseSchema,
   PrepareRunEvidenceImageUploadsResponseSchema,
   RecordRunEventResponseSchema,
@@ -53,6 +54,7 @@ import {
 } from "./run-evidence-request-mapper";
 import { listRunEvidenceForProject } from "./run-evidence-routes";
 import {
+  listClaimedChannelReplyMessagesApplication,
   listTeamAgentChannelMessagesApplication,
   TeamAgentChannelApplicationError,
 } from "./team-agent-channel-application";
@@ -77,6 +79,7 @@ import {
 import {
   type AuthenticatedWorkerTeam,
   requireAgentProject,
+  requireWorkerCredential,
   requireWorkerProjectBinding,
 } from "./worker-route-auth";
 import {
@@ -150,6 +153,9 @@ export type WorkerExecutionServices = {
   readonly claimIssue: typeof claimNextQueueWork;
   readonly listProjectChannelMessages:
     typeof listTeamAgentChannelMessagesApplication;
+  readonly listClaimedChannelMessages:
+    typeof listClaimedChannelReplyMessagesApplication;
+  readonly requireWorkerCredential: typeof requireWorkerCredential;
   readonly listRunEvidence: typeof listRunEvidenceForProject;
   readonly requireWorkerProjectBinding: typeof requireWorkerProjectBinding;
   readonly appendTranscript: typeof appendTranscriptEventsApplication;
@@ -170,6 +176,8 @@ const workerExecutionServices: WorkerExecutionServices = {
   authorizeIssueClaim,
   claimIssue: claimNextQueueWork,
   listProjectChannelMessages: listTeamAgentChannelMessagesApplication,
+  listClaimedChannelMessages: listClaimedChannelReplyMessagesApplication,
+  requireWorkerCredential,
   listRunEvidence: listRunEvidenceForProject,
   requireWorkerProjectBinding,
   appendTranscript: appendTranscriptEventsApplication,
@@ -194,6 +202,7 @@ const projectAgentChannelConnectError = (
     case "thread_parent_not_found":
       throw new ConnectError(error.message, Code.NotFound, undefined, undefined, error);
     case "channel_forbidden":
+    case "claim_not_active":
       throw new ConnectError(
         error.message,
         Code.PermissionDenied,
@@ -365,6 +374,43 @@ export function createWorkerExecutionService(
           limit: query.limit,
         });
         return create(ListProjectChannelMessagesResponseSchema, {
+          channel: appChannelSummaryJson(result.channel),
+          messages: result.messages.map(appChannelMessage),
+          nextCursor: result.nextCursor ?? undefined,
+        });
+      } catch (error) {
+        if (error instanceof TeamAgentChannelApplicationError) {
+          return projectAgentChannelConnectError(error);
+        }
+        throw error;
+      }
+    },
+    listClaimedChannelMessages: async (request, context) => {
+      context.responseHeader.set("Cache-Control", "private, no-store");
+      // Device identity plus the running claim are the whole authorization.
+      // The claim token stays out of this call on purpose: it also authorizes
+      // reply submission, so the provider process never needs to carry it.
+      const principal = await services.requireWorkerCredential(
+        input.db,
+        input.request,
+      );
+      const query = decodeChannelMessageQuery({
+        limit: request.limit,
+        cursor: request.cursor ?? null,
+        parentMessageId: request.parentMessageId ?? null,
+      });
+      try {
+        const result = await services.listClaimedChannelMessages({
+          db: input.db,
+          organizationId: principal.organizationId,
+          deviceId: principal.deviceId,
+          jobId: canonicalUuid(request.workId).toLowerCase(),
+          parentMessageId: query.parentMessageId?.toLowerCase() ?? null,
+          cursor: query.cursor?.toLowerCase() ?? null,
+          limit: query.limit,
+          observedAt: new Date().toISOString(),
+        });
+        return create(ListClaimedChannelMessagesResponseSchema, {
           channel: appChannelSummaryJson(result.channel),
           messages: result.messages.map(appChannelMessage),
           nextCursor: result.nextCursor ?? undefined,

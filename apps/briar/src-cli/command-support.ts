@@ -156,6 +156,19 @@ const projectAgentToken = (project: TeamConfig) => {
   }
   return token;
 };
+/**
+ * A Worker execution session serving a channel reply. Both values come from
+ * the environment the Worker built for the provider process: the credential it
+ * authenticates with, and the reply job whose claim scopes what it may read.
+ * Returns null anywhere else, so an interactive shell keeps using the Project
+ * Agent token instead.
+ */
+const claimScopedChannelRead = () => {
+  const workId = process.env.BRIAR_CHANNEL_REPLY_WORK_ID?.trim();
+  const workerToken = process.env.BRIAR_WORKER_TOKEN?.trim();
+  return workId && workerToken ? { workId, workerToken } : null;
+};
+
 const configuredConfigDirectory = process.env.BRIAR_CONFIG_HOME?.trim();
 if (configuredConfigDirectory && !isAbsolute(configuredConfigDirectory)) {
   throw new Error("BRIAR_CONFIG_HOME must be an absolute path");
@@ -549,6 +562,7 @@ export {
   providerExecutionEnvironment,
   executionToken,
   projectAgentToken,
+  claimScopedChannelRead,
   configuredConfigDirectory,
   configDirectory,
   configPath,
