@@ -6,7 +6,7 @@ import {
   isTeamIconName,
 } from "../../src/lib/team-icon-library";
 import type { TeamIconUpdate } from "./team-command-repository";
-import { createOrganization } from "./organization-command-repository";
+import { createWorkspace } from "./organization-command-repository";
 import { hasOrganizationCapability } from "./organization-access";
 import { listOrganizations } from "./organization-repository";
 import {
@@ -49,7 +49,7 @@ export class TeamApplicationError extends Error {
 }
 
 export type TeamApplicationServices = {
-  readonly createOrganization: typeof createOrganization;
+  readonly createWorkspace: typeof createWorkspace;
   readonly createTeam: typeof createTeam;
   readonly deleteTeam: typeof deleteTeam;
   readonly getTeam: typeof getTeam;
@@ -63,7 +63,7 @@ export type TeamApplicationServices = {
 };
 
 const teamApplicationServices: TeamApplicationServices = {
-  createOrganization,
+  createWorkspace,
   createTeam,
   deleteTeam,
   getTeam,
@@ -78,7 +78,7 @@ const teamApplicationServices: TeamApplicationServices = {
 const teamImagePattern =
   /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/]+={0,2}$/iu;
 const decodeTeamName = decodeRequestSync(trimmedText(1, 100));
-const decodeOrganizationId = decodeRequestSync(UuidString);
+const decodeWorkspaceId = decodeRequestSync(UuidString);
 const decodeTeamIconImage = decodeRequestSync(
   Schema.NullOr(
     Schema.String.check(
@@ -174,12 +174,12 @@ export async function createTeamApplication(
   services: TeamApplicationServices = teamApplicationServices,
 ) {
   const name = decodeTeamName(input.name);
-  const organizationId = input.organizationId === undefined
+  const workspaceId = input.organizationId === undefined
     ? undefined
-    : decodeOrganizationId(input.organizationId);
-  let organizations = await services.listOrganizations(input.db, input.user.id);
-  if (organizations.length === 0) {
-    const organization = await services.createOrganization(input.db, {
+    : decodeWorkspaceId(input.organizationId);
+  let workspaces = await services.listOrganizations(input.db, input.user.id);
+  if (workspaces.length === 0) {
+    const created = await services.createWorkspace(input.db, {
       name:
         input.user.name?.trim() ||
         input.user.email.split("@")[0]?.trim() ||
@@ -187,14 +187,14 @@ export async function createTeamApplication(
       handle: `organization-${crypto.randomUUID().replaceAll("-", "")}`,
       ownerUserId: input.user.id,
     });
-    organizations = [organization];
+    workspaces = [created];
   }
-  const organization =
-    organizations.find((candidate) => candidate.id === organizationId) ??
-    (organizationId ? null : organizations[0]);
+  const workspace =
+    workspaces.find((candidate) => candidate.id === workspaceId) ??
+    (workspaceId ? null : workspaces[0]);
   if (
-    !organization ||
-    !hasOrganizationCapability(organization.role, "projects:manage")
+    !workspace ||
+    !hasOrganizationCapability(workspace.role, "projects:manage")
   ) {
     throw new TeamApplicationError(
       "project_management_required",
@@ -205,13 +205,13 @@ export async function createTeamApplication(
   const agentToken = createAgentToken();
   const project = await services.createTeam(input.db, {
     ownerUserId: input.user.id,
-    organizationId: organization.id,
+    organizationId: workspace.id,
     name,
     agentTokenHash: await sha256(agentToken),
     locale: input.locale,
   });
-  project.organization_name = organization.name;
-  project.member_role = organization.role;
+  project.organization_name = workspace.name;
+  project.member_role = workspace.role;
   return { project, agentToken };
 }
 

@@ -90,21 +90,21 @@ export const AccountDeletionInput = strictSchema(Schema.Struct({
   confirmation: Email,
 }));
 
-export const OrganizationHandle = Schema.Trim.check(
+export const WorkspaceHandle = Schema.Trim.check(
   Schema.isLengthBetween(1, 63),
   Schema.isPattern(/^[a-z0-9-]+$/u),
 );
 
-export const OrganizationInput = Schema.Struct({
+export const WorkspaceInput = Schema.Struct({
   name: trimmedText(1, 100),
-  handle: OrganizationHandle,
+  handle: WorkspaceHandle,
 });
 
-export const OrganizationUpdateInput = Schema.Struct({
+export const WorkspaceUpdateInput = Schema.Struct({
   name: trimmedText(1, 100),
 });
 
-export const OrganizationLogoInput = strictSchema(Schema.Struct({
+export const WorkspaceLogoInput = strictSchema(Schema.Struct({
   logo: Schema.NullOr(
     Schema.String.check(
       Schema.isMaxLength(400_000),
@@ -115,21 +115,21 @@ export const OrganizationLogoInput = strictSchema(Schema.Struct({
   ),
 }));
 
-export const OrganizationInvitationToken = Schema.Trim.check(
+export const WorkspaceInvitationToken = Schema.Trim.check(
   Schema.isPattern(/^briar_invite_[0-9a-f]{64}$/u),
 );
 
-export const OrganizationInvitationInput = strictSchema(Schema.Struct({
+export const WorkspaceInvitationInput = strictSchema(Schema.Struct({
   email: LowercaseEmail,
   role: Schema.Literals(["co-owner", "developer", "editor", "viewer"]),
   initialProjectId: UuidString,
 }));
 
-export const OrganizationMemberRoleInput = strictSchema(Schema.Struct({
+export const WorkspaceMemberRoleInput = strictSchema(Schema.Struct({
   role: Schema.Literals(["co-owner", "developer", "editor", "viewer"]),
 }));
 
-export const OrganizationMemberProjectsInput = strictSchema(Schema.Struct({
+export const WorkspaceMemberProjectsInput = strictSchema(Schema.Struct({
   projectIds: Schema.mutable(Schema.Array(UuidString)).check(
     Schema.isMaxLength(500),
   ),
@@ -149,24 +149,24 @@ export const decodeInboxUnreadStateInput = decodeRequestSync(
 export const decodeAccountDeletionInput = decodeRequestSync(
   AccountDeletionInput,
 );
-export const decodeOrganizationHandle = decodeRequestSync(OrganizationHandle);
-export const decodeOrganizationInput = decodeRequestSync(OrganizationInput);
-export const decodeOrganizationUpdateInput = decodeRequestSync(
-  OrganizationUpdateInput,
+export const decodeWorkspaceHandle = decodeRequestSync(WorkspaceHandle);
+export const decodeWorkspaceInput = decodeRequestSync(WorkspaceInput);
+export const decodeWorkspaceUpdateInput = decodeRequestSync(
+  WorkspaceUpdateInput,
 );
-export const decodeOrganizationLogoInput = decodeRequestSync(
-  OrganizationLogoInput,
+export const decodeWorkspaceLogoInput = decodeRequestSync(
+  WorkspaceLogoInput,
 );
-export const decodeOrganizationInvitationToken = decodeRequestSync(
-  OrganizationInvitationToken,
+export const decodeWorkspaceInvitationToken = decodeRequestSync(
+  WorkspaceInvitationToken,
 );
-export const decodeOrganizationInvitationInput = decodeRequestSync(
-  OrganizationInvitationInput,
+export const decodeWorkspaceInvitationInput = decodeRequestSync(
+  WorkspaceInvitationInput,
 );
-export const decodeOrganizationMemberRoleInput = decodeRequestSync(
-  OrganizationMemberRoleInput,
+export const decodeWorkspaceMemberRoleInput = decodeRequestSync(
+  WorkspaceMemberRoleInput,
 );
-export const decodeOrganizationMemberProjectsInput = decodeRequestSync(
-  OrganizationMemberProjectsInput,
+export const decodeWorkspaceMemberProjectsInput = decodeRequestSync(
+  WorkspaceMemberProjectsInput,
 );
 export const decodeSlackOAuthInput = decodeRequestSync(SlackOAuthInput);

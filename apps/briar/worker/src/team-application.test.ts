@@ -38,8 +38,8 @@ const setup = () => {
       async () => null,
     );
   const services = {
-    createOrganization:
-      vi.fn<TeamApplicationServices["createOrganization"]>(),
+    createWorkspace:
+      vi.fn<TeamApplicationServices["createWorkspace"]>(),
     createTeam: vi.fn<TeamApplicationServices["createTeam"]>(),
     deleteTeam,
     getTeam,

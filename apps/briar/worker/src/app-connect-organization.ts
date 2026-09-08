@@ -18,21 +18,21 @@ import {
 } from "./app-connect-mappers";
 import { HttpError } from "./http-response";
 import {
-  acceptOrganizationInvitationApplication,
-  checkOrganizationHandleAvailabilityApplication,
-  createOrganizationApplication,
-  createOrganizationInvitationApplication,
-  getOrganizationInvitationApplication,
-  listOrganizationInvitationsApplication,
-  listOrganizationMembersApplication,
-  listOrganizationsApplication,
-  OrganizationApplicationError,
-  removeOrganizationMemberApplication,
-  revokeOrganizationInvitationApplication,
-  updateOrganizationApplication,
-  updateOrganizationLogoApplication,
-  updateOrganizationMemberProjectsApplication,
-  updateOrganizationMemberRoleApplication,
+  acceptWorkspaceInvitationApplication,
+  checkWorkspaceHandleAvailabilityApplication,
+  createWorkspaceApplication,
+  createWorkspaceInvitationApplication,
+  getWorkspaceInvitationApplication,
+  listWorkspaceInvitationsApplication,
+  listWorkspaceMembersApplication,
+  listWorkspacesApplication,
+  removeWorkspaceMemberApplication,
+  revokeWorkspaceInvitationApplication,
+  updateWorkspaceApplication,
+  updateWorkspaceLogoApplication,
+  updateWorkspaceMemberProjectsApplication,
+  updateWorkspaceMemberRoleApplication,
+  WorkspaceApplicationError,
 } from "./organization-application";
 import { requireSession } from "./session-auth";
 
@@ -65,19 +65,19 @@ const assignableRoleInput = (role: ProjectRole): string => {
 };
 
 const throwApplicationError = (error: unknown): never => {
-  if (!(error instanceof OrganizationApplicationError)) throw error;
+  if (!(error instanceof WorkspaceApplicationError)) throw error;
   switch (error.reason) {
-    case "organization_not_found":
+    case "workspace_not_found":
     case "invitation_not_found":
     case "member_not_found":
     case "invitation_project_not_found":
       throw new HttpError(404, error.message);
-    case "organization_management_required":
+    case "workspace_management_required":
     case "invitation_management_required":
     case "member_management_required":
     case "owner_role_immutable":
       throw new HttpError(403, error.message);
-    case "organization_handle_conflict":
+    case "workspace_handle_conflict":
     case "already_member":
     case "invitation_email_mismatch":
     case "role_has_full_access":
@@ -85,7 +85,7 @@ const throwApplicationError = (error: unknown): never => {
     case "invitation_expired":
     case "invitation_revoked":
       throw new HttpError(410, error.message);
-    case "project_not_in_organization":
+    case "project_not_in_workspace":
     case "self_role_change":
       throw new HttpError(400, error.message);
   }
@@ -99,13 +99,17 @@ const withApplicationErrors = async <A>(operation: Promise<A>) => {
   }
 };
 
+// Protobuf boundary. `OrganizationService`, its method names and its
+// `organizationId` request fields are wire contract and keep the old product
+// name; everything behind this file is Workspace-named. Each handler therefore
+// hands `input.organizationId` to the application layer as `workspaceId`.
 export const createAppOrganizationService = (
   { request, auth, db }: AppConnectOrganizationInput,
 ): ServiceImpl<typeof OrganizationService> => ({
   listOrganizations: async () => {
     const session = await requireSession(auth, request);
     const organizations = await withApplicationErrors(
-      listOrganizationsApplication({ db, userId: session.user.id }),
+      listWorkspacesApplication({ db, userId: session.user.id }),
     );
     return { organizations: organizations.map(appOrganization) };
   },
@@ -113,7 +117,7 @@ export const createAppOrganizationService = (
   createOrganization: async (input) => {
     const session = await requireSession(auth, request);
     const organization = await withApplicationErrors(
-      createOrganizationApplication({
+      createWorkspaceApplication({
         db,
         userId: session.user.id,
         name: input.name,
@@ -126,7 +130,7 @@ export const createAppOrganizationService = (
   checkOrganizationHandleAvailability: async (input) => {
     await requireSession(auth, request);
     const available = await withApplicationErrors(
-      checkOrganizationHandleAvailabilityApplication({
+      checkWorkspaceHandleAvailabilityApplication({
         db,
         handle: input.handle,
       }),
@@ -137,9 +141,9 @@ export const createAppOrganizationService = (
   updateOrganization: async (input) => {
     const session = await requireSession(auth, request);
     const organization = await withApplicationErrors(
-      updateOrganizationApplication({
+      updateWorkspaceApplication({
         db,
-        organizationId: input.organizationId,
+        workspaceId: input.organizationId,
         userId: session.user.id,
         name: input.name,
       }),
@@ -157,9 +161,9 @@ export const createAppOrganizationService = (
         throw new ConnectError("logo update is required", Code.InvalidArgument);
       })();
     const organization = await withApplicationErrors(
-      updateOrganizationLogoApplication({
+      updateWorkspaceLogoApplication({
         db,
-        organizationId: input.organizationId,
+        workspaceId: input.organizationId,
         userId: session.user.id,
         logo,
       }),
@@ -171,9 +175,9 @@ export const createAppOrganizationService = (
     const session = await requireSession(auth, request);
     const observedAt = new Date().toISOString();
     const invitations = await withApplicationErrors(
-      listOrganizationInvitationsApplication({
+      listWorkspaceInvitationsApplication({
         db,
-        organizationId: input.organizationId,
+        workspaceId: input.organizationId,
         userId: session.user.id,
       }),
     );
@@ -187,9 +191,9 @@ export const createAppOrganizationService = (
   createOrganizationInvitation: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withApplicationErrors(
-      createOrganizationInvitationApplication({
+      createWorkspaceInvitationApplication({
         db,
-        organizationId: input.organizationId,
+        workspaceId: input.organizationId,
         userId: session.user.id,
         email: input.email,
         role: assignableRoleInput(input.role),
@@ -207,9 +211,9 @@ export const createAppOrganizationService = (
 
   revokeOrganizationInvitation: async (input) => {
     const session = await requireSession(auth, request);
-    await withApplicationErrors(revokeOrganizationInvitationApplication({
+    await withApplicationErrors(revokeWorkspaceInvitationApplication({
       db,
-      organizationId: input.organizationId,
+      workspaceId: input.organizationId,
       invitationId: input.invitationId,
       userId: session.user.id,
     }));
@@ -218,7 +222,7 @@ export const createAppOrganizationService = (
 
   getOrganizationInvitation: async (input) => {
     const result = await withApplicationErrors(
-      getOrganizationInvitationApplication({ db, token: input.token }),
+      getWorkspaceInvitationApplication({ db, token: input.token }),
     );
     return {
       invitation: appOrganizationInvitationPreview(
@@ -231,7 +235,7 @@ export const createAppOrganizationService = (
   acceptOrganizationInvitation: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withApplicationErrors(
-      acceptOrganizationInvitationApplication({
+      acceptWorkspaceInvitationApplication({
         db,
         token: input.token,
         user: session.user,
@@ -249,9 +253,9 @@ export const createAppOrganizationService = (
   listOrganizationMembers: async (input) => {
     const session = await requireSession(auth, request);
     const members = await withApplicationErrors(
-      listOrganizationMembersApplication({
+      listWorkspaceMembersApplication({
         db,
-        organizationId: input.organizationId,
+        workspaceId: input.organizationId,
         userId: session.user.id,
       }),
     );
@@ -265,9 +269,9 @@ export const createAppOrganizationService = (
   updateOrganizationMemberRole: async (input) => {
     const session = await requireSession(auth, request);
     const members = await withApplicationErrors(
-      updateOrganizationMemberRoleApplication({
+      updateWorkspaceMemberRoleApplication({
         db,
-        organizationId: input.organizationId,
+        workspaceId: input.organizationId,
         userId: session.user.id,
         memberId: input.userId,
         role: assignableRoleInput(input.role),
@@ -283,9 +287,9 @@ export const createAppOrganizationService = (
   updateOrganizationMemberProjects: async (input) => {
     const session = await requireSession(auth, request);
     const members = await withApplicationErrors(
-      updateOrganizationMemberProjectsApplication({
+      updateWorkspaceMemberProjectsApplication({
         db,
-        organizationId: input.organizationId,
+        workspaceId: input.organizationId,
         userId: session.user.id,
         memberId: input.userId,
         projectIds: input.projectIds,
@@ -300,9 +304,9 @@ export const createAppOrganizationService = (
 
   removeOrganizationMember: async (input) => {
     const session = await requireSession(auth, request);
-    await withApplicationErrors(removeOrganizationMemberApplication({
+    await withApplicationErrors(removeWorkspaceMemberApplication({
       db,
-      organizationId: input.organizationId,
+      workspaceId: input.organizationId,
       userId: session.user.id,
       memberId: input.userId,
     }));

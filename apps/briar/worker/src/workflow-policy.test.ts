@@ -2,7 +2,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { normalizeAutoHuntWorkflow } from "../../src/lib/auto-hunt-contract";
 import {
-  createOrganization,
+  createWorkspace,
   createTeam,
   recordHuntEvent,
   updateIssueCheckpoints,
@@ -64,7 +64,7 @@ describe("workflow checkpoint policy persistence", () => {
         "2026-08-04T00:00:00.000Z",
       )
       .run();
-    const organization = await createOrganization(db, {
+    const organization = await createWorkspace(db, {
       name: "Policy Org",
       handle: "policy-org",
       ownerUserId: "policy-user",
