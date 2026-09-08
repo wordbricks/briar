@@ -1,4 +1,5 @@
 import { create } from "@bufbuild/protobuf";
+import { asTeamId } from "../../src/lib/entity-ids";
 import { UploadFileMetadataSchema } from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import { createHash } from "node:crypto";
 import { env } from "cloudflare:workers";
@@ -29,7 +30,7 @@ import {
 } from "./upload-repository";
 
 const organizationId = "a7100000-0000-4000-8000-000000000001";
-const projectId = "b7100000-0000-4000-8000-000000000001";
+const projectId = asTeamId("b7100000-0000-4000-8000-000000000001");
 const ownerId = "issue-attachment-owner";
 const signingSecret = "issue-attachment-upload-secret".repeat(4);
 

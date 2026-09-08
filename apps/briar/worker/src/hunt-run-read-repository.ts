@@ -2,6 +2,10 @@ import {
   type AutoHuntRunStatus,
   type AutoHuntSource,
 } from "../../src/lib/auto-hunt-contract";
+import type {
+  PlanningProjectId,
+  TeamId,
+} from "../../src/lib/entity-ids";
 import { type HuntRunRow } from "./hunt-run-model";
 
 export type DashboardRunListCursor = {
@@ -17,7 +21,7 @@ export type DashboardRunListFilters = {
   readonly sources?: readonly AutoHuntSource[];
   readonly statuses?: readonly AutoHuntRunStatus[];
   readonly query?: string | null;
-  readonly planningProjectId?: string | null;
+  readonly planningProjectId?: PlanningProjectId | null;
 };
 
 export type DashboardRunSummaryRow = Pick<
@@ -158,7 +162,7 @@ const dashboardSummarySelect = `
      and planning_project.team_id = team.id`;
 
 const buildDashboardRunListQuery = (
-  projectId: string,
+  projectId: TeamId,
   filters: DashboardRunListFilters,
   snapshotAt: string,
 ) => {
@@ -221,7 +225,7 @@ const buildDashboardRunListQuery = (
 
 export async function listDashboardRunSummaries(
   db: D1Database,
-  projectId: string,
+  projectId: TeamId,
   filters: DashboardRunListFilters,
   observedAt = new Date().toISOString(),
 ): Promise<DashboardRunListPage> {
@@ -258,11 +262,12 @@ export type OrganizationStatusTrayRunRow = Pick<
   | "updated_at"
   | "last_event_at"
 > & {
-  project_id: string;
+  /** `team.id` — the Team that owns the run, not a planning project. */
+  project_id: TeamId;
   project_name: string;
 };
 
-export async function listDashboardRuns(db: D1Database, projectId: string) {
+export async function listDashboardRuns(db: D1Database, projectId: TeamId) {
   const runs = await db
     .prepare(
       `select run.*, team.organization_id as workspace_id,
@@ -306,7 +311,7 @@ export async function listDashboardRuns(db: D1Database, projectId: string) {
 
 export async function listDashboardRunsByIds(
   db: D1Database,
-  projectId: string,
+  projectId: TeamId,
   runIds: readonly string[],
 ) {
   if (runIds.length === 0) return [];

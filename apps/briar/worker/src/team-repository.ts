@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
+import type { TeamId } from "../../src/lib/entity-ids";
 import { runD1 } from "./d1-runtime";
 import { OrganizationRole } from "./organization-repository";
 import { createSqlQueryCache } from "./sql-query-cache";
@@ -19,7 +20,13 @@ const TeamRow = Schema.Struct({
   member_role: Schema.mutableKey(OrganizationRole),
   created_at: Schema.mutableKey(Schema.String),
 });
-export type TeamRow = typeof TeamRow.Type;
+/**
+ * `briar_teams.id` is the execution-boundary Team id — the value still stored
+ * in columns literally named `project_id`. The row schema decodes it as a
+ * plain string, so the exported row type re-attaches the brand here (a single
+ * D1-edge assertion) rather than at every call site.
+ */
+export type TeamRow = Omit<typeof TeamRow.Type, "id"> & { id: TeamId };
 
 const TeamListRequest = Schema.Struct({ scopeId: Schema.String });
 
@@ -138,20 +145,30 @@ const listOrganizationInboxTeamsEffect = Effect.fn(
   });
 });
 
+/**
+ * D1 edge: the row schemas above decode ids as plain strings, and every row
+ * these three queries return is a `briar_teams` row, so the Team brand is
+ * re-attached once here instead of at each call site.
+ */
 export const listTeams = (
   db: D1Database,
   userId: string,
-): Promise<Array<TeamRow>> => runD1(db, listTeamsEffect(userId));
+): Promise<Array<TeamRow>> =>
+  runD1(db, listTeamsEffect(userId)) as Promise<Array<TeamRow>>;
 
 export const listOrganizationTeams = (
   db: D1Database,
   organizationId: string,
 ): Promise<Array<TeamRow>> =>
-  runD1(db, listOrganizationTeamsEffect(organizationId));
+  runD1(db, listOrganizationTeamsEffect(organizationId)) as Promise<
+    Array<TeamRow>
+  >;
 
 export const listOrganizationInboxTeams = (
   db: D1Database,
   organizationId: string,
   userId: string,
 ): Promise<Array<Pick<TeamRow, "id" | "name" | "issue_key_prefix">>> =>
-  runD1(db, listOrganizationInboxTeamsEffect(organizationId, userId));
+  runD1(db, listOrganizationInboxTeamsEffect(organizationId, userId)) as Promise<
+    Array<Pick<TeamRow, "id" | "name" | "issue_key_prefix">>
+  >;

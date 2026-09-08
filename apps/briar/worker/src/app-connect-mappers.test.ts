@@ -1,4 +1,5 @@
 import { toJson } from "@bufbuild/protobuf";
+import { asTeamId } from "../../src/lib/entity-ids";
 import {
   InboxFeedMessageSchema,
 } from "@briar/contracts/gen/briar/app/v1/inbox_pb";
@@ -18,7 +19,7 @@ describe("app Connect message mapping", () => {
     const message = {
       id: "issue:11111111-1111-4111-8111-111111111111",
       kind: "issue",
-      projectId: "22222222-2222-4222-8222-222222222222",
+      projectId: asTeamId("22222222-2222-4222-8222-222222222222"),
       projectName: "Briar",
       targetId: "11111111-1111-4111-8111-111111111111",
       title: "Ship Connect",

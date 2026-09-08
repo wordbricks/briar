@@ -21,6 +21,10 @@ import {
   type ConnectRouter,
   type ServiceImpl,
 } from "@connectrpc/connect";
+import {
+  asPlanningProjectId,
+  asTeamId,
+} from "../../src/lib/entity-ids";
 import { normalizeTeamAgentLocale } from "../../src/lib/team-agent";
 import type {
   AutoHuntWorkflowCheckpoint,
@@ -147,6 +151,14 @@ export const appConnectTeamServices: AppConnectTeamServices = {
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
+/**
+ * System edge: protobuf carries every id as a plain string, so the Team /
+ * planning Project distinction has to be re-attached here from the RPC field
+ * that supplied it.
+ */
+const decodeTeamId = (value: string) => asTeamId(decodeUuid(value));
+const decodePlanningProjectId = (value: string) =>
+  asPlanningProjectId(decodeUuid(value));
 const decodeRevision = decodeRequestSync(NonNegativeSafeInteger);
 
 const planningStatus = {
@@ -331,7 +343,7 @@ export const createAppTeamService = (
 
   listTeamPlanningProjects: async (input) => {
     const session = await services.requireSession(auth, request);
-    const team = await services.getTeam(db, decodeUuid(input.teamId), session.user.id);
+    const team = await services.getTeam(db, decodeTeamId(input.teamId), session.user.id);
     if (!team) throw new HttpError(404, "Team not found");
     const projects = await services.listTeamProjects(db, team.id, session.user.id);
     return { projects: projects.map(planningProjectMessage) };
@@ -339,7 +351,7 @@ export const createAppTeamService = (
 
   createPlanningProject: async (input) => {
     const session = await services.requireSession(auth, request);
-    const team = await services.getTeam(db, decodeUuid(input.teamId), session.user.id);
+    const team = await services.getTeam(db, decodeTeamId(input.teamId), session.user.id);
     if (!team) throw new HttpError(404, "Team not found");
     requirePlanningWrite(team.role);
     const body = decodePlanningProjectCreateInput({
@@ -361,7 +373,7 @@ export const createAppTeamService = (
 
   updatePlanningProject: async (input) => {
     const session = await services.requireSession(auth, request);
-    const project = await services.getPlanningProject(db, decodeUuid(input.projectId), session.user.id);
+    const project = await services.getPlanningProject(db, decodePlanningProjectId(input.projectId), session.user.id);
     if (!project) throw new HttpError(404, "Project not found");
     requirePlanningWrite(project.role);
     const body = decodePlanningProjectUpdateInput({
@@ -387,7 +399,7 @@ export const createAppTeamService = (
     const session = await services.requireSession(auth, request);
     const project = await services.getPlanningProject(
       db,
-      decodeUuid(input.projectId),
+      decodePlanningProjectId(input.projectId),
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
@@ -414,10 +426,10 @@ export const createAppTeamService = (
 
   moveIssueToPlanningProject: async (input) => {
     const session = await services.requireSession(auth, request);
-    const source = await services.getPlanningProject(db, decodeUuid(input.sourceProjectId), session.user.id);
+    const source = await services.getPlanningProject(db, decodePlanningProjectId(input.sourceProjectId), session.user.id);
     if (!source) throw new HttpError(404, "Project not found");
     requirePlanningWrite(source.role);
-    const targetProjectId = decodeUuid(input.targetProjectId);
+    const targetProjectId = decodePlanningProjectId(input.targetProjectId);
     const runId = decodeUuid(input.runId);
     const outcome = await services.moveIssueWithinTeam(db, {
       sourceProjectId: source.id,
@@ -446,7 +458,7 @@ export const createAppTeamService = (
     const session = await services.requireSession(auth, request);
     const runId = decodeUuid(input.runId);
     const location = await services.resolveIssueHierarchyLocation(db, {
-      sourceTeamId: decodeUuid(input.sourceTeamId),
+      sourceTeamId: decodeTeamId(input.sourceTeamId),
       runId,
       userId: session.user.id,
     });

@@ -11,14 +11,15 @@ import {
   type TeamAgentProvider,
 } from "./team-agent-model";
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
+import type { PlanningProjectId, TeamId } from "../../src/lib/entity-ids";
 
 export type HuntRunRow = {
   id: string;
   /** Legacy execution-boundary column; exposed as teamId during cutover. */
-  project_id: string;
-  planning_project_id: string;
+  project_id: TeamId;
+  planning_project_id: PlanningProjectId;
   workspace_id?: string;
-  team_id?: string;
+  team_id?: TeamId;
   planning_project_name?: string;
   run_number: number;
   source: AutoHuntSource;

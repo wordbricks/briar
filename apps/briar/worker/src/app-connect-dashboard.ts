@@ -6,6 +6,7 @@ import {
 } from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import * as Schema from "effect/Schema";
+import { asPlanningProjectId } from "../../src/lib/entity-ids";
 import { listArchivedRunEvents } from "./archive";
 import type { BriarAuth } from "./auth";
 import {
@@ -337,10 +338,14 @@ export const createAppDashboardService = (
           }
         })()
       : null;
+    // System edge: protobuf carries the id as a plain string, and the RPC field
+    // name is what identifies it as a planning Project rather than a Team.
     const planningProjectId = rpcRequest.planningProjectId
-      ? decodeRequestSync(Schema.Struct({ planningProjectId: UuidString }))({
-          planningProjectId: rpcRequest.planningProjectId,
-        }).planningProjectId
+      ? asPlanningProjectId(
+          decodeRequestSync(Schema.Struct({ planningProjectId: UuidString }))({
+            planningProjectId: rpcRequest.planningProjectId,
+          }).planningProjectId,
+        )
       : null;
     const observedAt = new Date().toISOString();
     const page = await listDashboardRunSummaries(db, project.id, {

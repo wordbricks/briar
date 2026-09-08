@@ -1,7 +1,9 @@
 import { type AutoHuntSource } from "../../src/lib/auto-hunt-contract";
+import type { TeamIdLike } from "../../src/lib/entity-ids";
 
+/** `projectId` here is the owning Team; run ids are derived per Team. */
 export const digestRunId = async (
-  projectId: string,
+  projectId: TeamIdLike,
   source: AutoHuntSource,
   sourceKey: string,
 ) => {
