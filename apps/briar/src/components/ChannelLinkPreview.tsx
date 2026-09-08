@@ -164,7 +164,16 @@ export function ChannelLinkPreview({
     setFaviconFailed(false);
     setImageFailed(false);
     const resolved = resolveChannelLinkPreviewState(targetUrl);
-    setState(resolved);
+    /*
+      The render pass already resolved this URL, so replacing an equivalent
+      state here would only cost every mounted preview an extra commit while a
+      channel loads.
+    */
+    setState((existing) =>
+      existing.url === resolved.url && existing.loading === resolved.loading
+        ? existing
+        : resolved
+    );
     if (!targetUrl || !resolved.loading) {
       return () => {
         active = false;

@@ -19,6 +19,12 @@ const maxUrlLength = 2_048;
 const maxHtmlBytes = 256 * 1_024;
 const maxRedirects = 3;
 const fetchTimeoutMs = 5_000;
+/*
+  Only the first bytes of the picture are wanted, so the fallback gets a
+  tighter budget than the page fetch: a slow image host should delay the card
+  rather than double the time a reader waits for it.
+*/
+const imageHeaderTimeoutMs = 3_000;
 const redirectStatuses = new Set([300, 301, 302, 303, 307, 308]);
 
 const htmlEntityNames = {
@@ -294,9 +300,10 @@ async function fetchWithTimeout(
   fetcher: Fetcher,
   url: URL,
   headers: Record<string, string> = {},
+  timeoutMs = fetchTimeoutMs,
 ) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetcher(url, {
       headers: {
@@ -324,10 +331,15 @@ async function fetchOgImageDimensions(fetcher: Fetcher, imageUrl: string) {
   if (!target) return null;
 
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
-    const timed = await fetchWithTimeout(fetcher, target, {
-      Accept: "image/*",
-      Range: `bytes=0-${maxImageHeaderBytes - 1}`,
-    });
+    const timed = await fetchWithTimeout(
+      fetcher,
+      target,
+      {
+        Accept: "image/*",
+        Range: `bytes=0-${maxImageHeaderBytes - 1}`,
+      },
+      imageHeaderTimeoutMs,
+    );
     if (!timed) return null;
     const { response } = timed;
     try {
