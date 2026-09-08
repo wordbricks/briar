@@ -273,6 +273,34 @@ final class ChannelsStoreTests: XCTestCase {
         store.applicationDidEnterBackground()
     }
 
+    func testSkillSendIncludesSelectedSkillAndOwner() async throws {
+        let channel = summary(kind: .directMessage)
+        let api = ChannelHTTPRecorder(channel: channel)
+        let scenario = ChannelConnectScenario(channel: channel, initialMessages: [])
+        let store = ChannelsStore(
+            api: api, preparedUploadClient: api, channelService: scenario.service(),
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            dmMemoryService: BriarAPI_DmMemoryServiceClientMock(), managesRealtime: false
+        )
+        store.select(organizationID: organizationID, token: "token")
+        await waitUntil { !store.channels.isEmpty }
+        await store.openChannel(channelID)
+        let skill = ProjectAgent.Skill(
+            id: UUID(), agentId: agentID, name: "Review code", instructions: "Review",
+            provider: .codex, model: nil, effort: nil, kind: .custom,
+            position: 0, createdAt: Date(), updatedAt: Date()
+        )
+        let succeeded = await store.send(
+            channelID: channelID, parentMessageID: nil, body: "/Review code Check auth",
+            mentions: [], selectedSkill: ChannelSkillCommand(agentID: agentID, agentName: "Honey", skill: skill)
+        )
+        XCTAssertTrue(succeeded)
+        XCTAssertEqual(scenario.connectMessageCalls.first?.skillID, skill.id.uuidString.lowercased())
+        XCTAssertEqual(scenario.connectMessageCalls.first?.mentionedAgentIDs, [agentID.uuidString.lowercased()])
+        XCTAssertEqual(scenario.connectMessageCalls.first?.body, "/Review code Check auth")
+        store.applicationDidEnterBackground()
+    }
+
     func testDirectMessageProgressRequiresConcreteActivityAndClearsWithTombstone() async throws {
         let rootID = UUID(uuidString: "88888888-8888-4888-8888-888888888888")!
         let replyID = UUID(uuidString: "99999999-9999-4999-8999-999999999999")!
@@ -526,6 +554,8 @@ private final class ChannelConnectScenario: @unchecked Sendable {
     struct ConnectMessageCall: Sendable {
         let body: String
         let attachmentIDs: [String]
+        let skillID: String?
+        let mentionedAgentIDs: [String]
     }
 
     let uploadID = "77777777-7777-4777-8777-777777777777"
@@ -628,7 +658,9 @@ private final class ChannelConnectScenario: @unchecked Sendable {
         defer { lock.unlock() }
         recordedConnectCalls.append(.init(
             body: request.body,
-            attachmentIDs: request.attachments.map(\.uploadID)
+            attachmentIDs: request.attachments.map(\.uploadID),
+            skillID: request.hasSkillID ? request.skillID : nil,
+            mentionedAgentIDs: request.mentionedAgentIds
         ))
         let message = ChannelMessage(
             id: UUID(uuidString: request.clientMessageID)!,

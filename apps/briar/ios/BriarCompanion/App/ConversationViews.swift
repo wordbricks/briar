@@ -567,6 +567,10 @@ struct ConversationComposer: View {
     // Keep selection dismissal explicit until the author edits the draft again.
     @State private var mentionSuggestionsDismissed = false
 
+    var skillCommands: [ChannelSkillCommand] = []
+    var sendSkill: ((String, [ChannelMentionTarget], [PendingIssueAttachment], ChannelSkillCommand) async -> Bool)? = nil
+    @State private var selectedSkill: ChannelSkillCommand?
+
     let sending: Bool
     let candidates: [ChannelMentionTarget]
     let placeholder: String
@@ -580,6 +584,10 @@ struct ConversationComposer: View {
 
     private var suggestions: [ChannelMentionTarget] {
         Array(ChannelMentions.suggestions(in: draft, candidates: candidates).prefix(6))
+    }
+
+    private var skillSuggestions: [ChannelSkillCommand] {
+        ChannelSkillCommand.suggestions(in: draft, candidates: skillCommands, selected: selectedSkill)
     }
 
     private var canSend: Bool {
@@ -596,6 +604,7 @@ struct ConversationComposer: View {
             get: { draft },
             set: { body in
                 draft = body
+                selectedSkill = ChannelSkillCommand.retained(selectedSkill, in: body, candidates: skillCommands)
                 mentionSuggestionsDismissed = false
                 mentions = ChannelMentions.retained(in: body, mentions: mentions)
             }
@@ -604,7 +613,9 @@ struct ConversationComposer: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !mentionSuggestionsDismissed && !suggestions.isEmpty {
+            if !skillSuggestions.isEmpty {
+                skillSuggestionList
+            } else if !mentionSuggestionsDismissed && !suggestions.isEmpty {
                 suggestionList
             }
             if let replyLabel {
@@ -708,11 +719,53 @@ struct ConversationComposer: View {
             guard !items.isEmpty else { return }
             Task { await importPhotos(items) }
         }
+        .onChange(of: skillCommands) { _, commands in
+            selectedSkill = ChannelSkillCommand.retained(selectedSkill, in: draft, candidates: commands)
+        }
+        .onChange(of: draft) { _, body in
+            selectedSkill = ChannelSkillCommand.retained(selectedSkill, in: body, candidates: skillCommands)
+        }
         .onChange(of: isSending) { _, sending in
             if sending {
                 isComposerFocused = true
             }
         }
+    }
+
+    private var skillSuggestionList: some View {
+        ScrollView {
+            LazyVStack(spacing: 2) {
+                ForEach(skillSuggestions) { target in
+                    Button {
+                        draft = target.invocation
+                        selectedSkill = target
+                        mentions = ChannelMentions.retained(in: draft, mentions: mentions)
+                        isComposerFocused = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "shippingbox")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(target.skill.name).font(.subheadline.weight(.semibold))
+                                Text(target.skill.description ?? target.agentName)
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                Text(target.agentName).font(.caption2).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(target.skill.name), \(target.agentName), \(target.skill.description ?? "")")
+                    .accessibilityIdentifier("channel-skill-\(target.skill.id.uuidString.lowercased())")
+                }
+            }
+        }
+        .frame(maxHeight: 200)
+        .background(.background, in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 12).padding(.bottom, 8)
+        .accessibilityIdentifier("channel-skill-menu")
     }
 
     private var suggestionList: some View {
@@ -844,11 +897,21 @@ struct ConversationComposer: View {
 
     private func submitDraft() {
         isComposerFocused = true
+        let submittedSkill = ChannelSkillCommand.retained(selectedSkill, in: draft, candidates: skillCommands)
         submission.submit(
             draft: $draft,
             mentions: $mentions,
             attachments: $attachments,
-            send: send
+            send: { body, mentions, attachments in
+                let succeeded: Bool
+                if let submittedSkill, let sendSkill {
+                    succeeded = await sendSkill(body, mentions, attachments, submittedSkill)
+                } else {
+                    succeeded = await send(body, mentions, attachments)
+                }
+                if !succeeded && draft.isEmpty { selectedSkill = submittedSkill }
+                return succeeded
+            }
         )
     }
 

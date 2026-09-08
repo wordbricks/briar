@@ -6262,7 +6262,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   left: 16px;
   z-index: 21;
   width: min(520px, calc(100% - 32px));
-  max-height: min(360px, 50vh);
+  max-height: min(200px, 40dvh);
   margin: 0;
   padding: 6px;
   overflow-y: auto;
@@ -6273,6 +6273,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
   box-shadow: 0 16px 42px rgb(20 17 13 / 17%);
 }
 .channel-skill-menu button {
+  min-height: 48px;
   display: grid;
   width: 100%;
   grid-template-columns: 24px minmax(0, 1fr) auto;
