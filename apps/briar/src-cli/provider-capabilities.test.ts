@@ -118,6 +118,11 @@ Available models:
           supportedEffortLevels: ["low", "medium", "high", "xhigh", "max"],
         },
         {
+          value: "claude-fable-5-1[1m]",
+          resolvedModel: "claude-fable-5-1",
+          displayName: "Fable",
+        },
+        {
           value: "sonnet",
           resolvedModel: "claude-sonnet-5",
           displayName: "Sonnet",
@@ -132,7 +137,7 @@ Available models:
       models: [
         {
           id: "opus[1m]",
-          label: "Opus (1M context)",
+          label: "Opus (1M context) · claude-opus-5[1m]",
           isDefault: true,
           defaultEffortId: null,
           efforts: [
@@ -144,13 +149,26 @@ Available models:
           ],
         },
         {
+          id: "claude-fable-5-1[1m]",
+          label: "Fable · claude-fable-5-1",
+          isDefault: false,
+          defaultEffortId: null,
+          efforts: [],
+        },
+        {
           id: "sonnet",
-          label: "Sonnet",
+          label: "Sonnet · claude-sonnet-5",
           isDefault: false,
           defaultEffortId: null,
           efforts: [{ id: "low", label: "low" }, { id: "high", label: "high" }],
         },
-        { id: "haiku", label: "Haiku", isDefault: false, defaultEffortId: null, efforts: [] },
+        {
+          id: "haiku",
+          label: "Haiku · claude-haiku-4-5-20251001",
+          isDefault: false,
+          defaultEffortId: null,
+          efforts: [],
+        },
       ],
       defaultEfforts: [
         { id: "low", label: "low" },
@@ -170,11 +188,54 @@ Available models:
       ],
     })).toEqual({
       models: [
-        { id: "sonnet", label: "Sonnet", isDefault: false, defaultEffortId: null, efforts: [] },
+        {
+          id: "sonnet",
+          label: "Sonnet · claude-sonnet-5",
+          isDefault: false,
+          defaultEffortId: null,
+          efforts: [],
+        },
       ],
       defaultEfforts: [],
     });
     expect(parseClaudeInitializeModels({ models: "nope" })).toEqual({ models: [], defaultEfforts: [] });
+  });
+
+  it("keeps a bare Claude label when the resolved model adds nothing", () => {
+    const long = `claude-${"x".repeat(220)}`;
+    expect(parseClaudeInitializeModels({
+      models: [
+        // Already a concrete wire model: nothing to disambiguate.
+        {
+          value: "claude-haiku-4-5-20251001",
+          resolvedModel: "claude-haiku-4-5-20251001",
+          displayName: "Haiku",
+        },
+        // A picker row that reports no resolved model at all.
+        { value: "sonnet", displayName: "Sonnet" },
+        // A pathological value must not push the label past its 200-char cap.
+        { value: "opus[1m]", resolvedModel: long, displayName: "Opus (1M context)" },
+      ],
+    })).toEqual({
+      models: [
+        {
+          id: "claude-haiku-4-5-20251001",
+          label: "Haiku",
+          isDefault: false,
+          defaultEffortId: null,
+          efforts: [],
+        },
+        { id: "sonnet", label: "Sonnet", isDefault: false, defaultEffortId: null, efforts: [] },
+        {
+          id: "opus[1m]",
+          label: "Opus (1M context)",
+          isDefault: false,
+          defaultEffortId: null,
+          efforts: [],
+        },
+      ],
+      defaultEfforts: [],
+    });
   });
 
   it("discovers Claude models over the stream-json initialize handshake", async () => {
@@ -219,12 +280,18 @@ echo '{"type":"control_response","response":{"subtype":"success","request_id":"b
         models: [
           {
             id: "opus[1m]",
-            label: "Opus (1M context)",
+            label: "Opus (1M context) · claude-opus-5[1m]",
             isDefault: true,
             defaultEffortId: null,
             efforts: [{ id: "low", label: "low" }, { id: "high", label: "high" }],
           },
-          { id: "haiku", label: "Haiku", isDefault: false, defaultEffortId: null, efforts: [] },
+          {
+            id: "haiku",
+            label: "Haiku · claude-haiku-4-5-20251001",
+            isDefault: false,
+            defaultEffortId: null,
+            efforts: [],
+          },
         ],
         defaultEfforts: [{ id: "low", label: "low" }, { id: "high", label: "high" }],
         allowCustomModels: true,
