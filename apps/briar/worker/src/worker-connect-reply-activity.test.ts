@@ -41,6 +41,56 @@ const input = (token: string) => ({
 });
 
 describe("ReplyActivityService capability boundary", () => {
+  it("publishes reactions independently of activity, bound to the active channel claim", async () => {
+    const token = await createChannelActivityPublishToken(secret, {
+      organizationId, channelId, replyJobId, agentId, triggerMessageId, parentMessageId,
+      attempt: 3, workerId: "worker-1", deviceId: "device-1", claimTokenHash: "a".repeat(64),
+      expiresAt: Date.now() + 60_000,
+    });
+    const publish = vi.fn().mockResolvedValue(undefined);
+    const activity = vi.fn();
+    const realtime = vi.fn().mockResolvedValue(undefined);
+    const service = createReplyActivityService(input(token.token), {
+      getClaimedChannelReply: vi.fn().mockResolvedValue({ id: replyJobId }),
+      publishChannelAcknowledgementReaction: publish, publishChannelActivity: activity,
+      getChannelSyncCursor: vi.fn().mockResolvedValue("42"), publishChannelRealtime: realtime,
+    });
+    await service.publishReplyActivity(create(PublishReplyActivityRequestSchema, {
+      replyJobId, acknowledgementReaction: "🎮",
+    }), context);
+    expect(publish).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      jobId: replyJobId, workerId: "worker-1", deviceId: "device-1",
+      claimTokenHash: "a".repeat(64), emoji: "🎮",
+    }));
+    expect(activity).not.toHaveBeenCalled();
+    expect(realtime).toHaveBeenCalledWith(env, organizationId, "42");
+    for (const request of [
+      { replyJobId: runId, acknowledgementReaction: "🙏" },
+      { replyJobId, acknowledgementReaction: "not emoji" },
+    ]) {
+      await expect(Promise.resolve(service.publishReplyActivity(
+        create(PublishReplyActivityRequestSchema, request), context,
+      ))).rejects.toBeInstanceOf(HttpError);
+    }
+    const stale = createReplyActivityService(input(token.token), {
+      getClaimedChannelReply: vi.fn().mockResolvedValue(null),
+      publishChannelAcknowledgementReaction: publish,
+    });
+    await expect(Promise.resolve(stale.publishReplyActivity(create(PublishReplyActivityRequestSchema, {
+      replyJobId, acknowledgementReaction: "🙏",
+    }), context))).rejects.toBeInstanceOf(HttpError);
+    const issue = await createIssueActivityPublishToken(secret, {
+      organizationId, projectId, runId, replyJobId, triggerMessageId, parentMessageId,
+      attempt: 1, workerId: "worker-1", deviceId: "device-1", expiresAt: Date.now() + 60_000,
+    });
+    await expect(Promise.resolve(createReplyActivityService(input(issue.token), {
+      publishChannelAcknowledgementReaction: publish,
+    }).publishReplyActivity(create(PublishReplyActivityRequestSchema, {
+      replyJobId, acknowledgementReaction: "🙏",
+    }), context))).rejects.toBeInstanceOf(HttpError);
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
   it("restores channel and issue scope from signed capabilities", async () => {
     const channelToken = await createChannelActivityPublishToken(secret, {
       organizationId,

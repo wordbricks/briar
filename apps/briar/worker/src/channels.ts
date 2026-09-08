@@ -1,4 +1,4 @@
-import { channelAcknowledgementReactionStatements } from "./channel-acknowledgement-reaction";
+import { channelAcknowledgementFallbackStatement } from "./channel-acknowledgement-reaction";
 import { dmReplySteerStatements } from "./dm-reply-steer";
 import { dmReplyStopStatements, type DmReplyStop } from "./dm-reply-stop";
 import * as Schema from "effect/Schema";
@@ -3245,37 +3245,6 @@ async function channelAgentReplyEnqueueStatements(
           agent.skillId ?? null,
           agent.provider,
         ),
-        ...(input.addAgentAcknowledgementReaction
-          ? [
-              db.prepare(
-                `insert into briar_channel_message_reactions (
-                   message_id, user_id, agent_id, emoji, created_at
-                 )
-                 select ?, null, job.agent_id, '👀', ?
-                 from briar_channel_agent_reply_jobs job
-                 join briar_channels channel on channel.id = job.channel_id
-                 join briar_project_agents agent
-                   on agent.id = job.agent_id
-                  and agent.organization_id = channel.organization_id
-                 where job.channel_id = ?
-                   and job.trigger_message_id = ?
-                   and job.agent_id = ?
-                   and channel.kind = 'dm'
-                   and not exists (
-                     select 1 from briar_channel_message_reactions existing
-                     where existing.message_id = job.trigger_message_id
-                       and existing.agent_id = job.agent_id
-                   )
-                 on conflict do nothing`,
-              ).bind(
-                input.triggerMessageId,
-                input.createdAt,
-                input.channelId,
-                input.triggerMessageId,
-                agent.id,
-              ),
-            ]
-          : []),
         ...dmReplySteerStatements(db, jobId),
         db.prepare(
           `insert into briar_channel_reply_session_events (
@@ -4358,6 +4327,50 @@ export async function getClaimedChannelReply(
   // deployment claim or a binding removed through ON DELETE SET NULL; both
   // must expire and requeue instead of transferring a live claim token.
   return claimed;
+}
+
+/** First automatic reaction wins, including across claim retries. No reaction is removed. */
+export async function publishChannelAcknowledgementReaction(
+  db: D1Database,
+  input: {
+    jobId: string;
+    deviceId: string;
+    workerId: string;
+    claimTokenHash: string;
+    observedAt: string;
+    emoji: string;
+  },
+) {
+  if (input.emoji.length > 32 || input.emoji !== input.emoji.trim() ||
+      !isChannelReactionEmoji(input.emoji)) throw new Error("Invalid acknowledgement emoji");
+  await requireDmMemoryReplyFence(db, input.jobId);
+  // Repeat live authorization inside the INSERT so revocation cannot race a preflight read.
+  await db.prepare(`
+    insert into briar_channel_message_reactions (message_id, user_id, agent_id, emoji, created_at)
+    select job.trigger_message_id, null, job.agent_id, ?, ?
+    from briar_channel_agent_reply_jobs job
+    join briar_channels channel on channel.id = job.channel_id
+    join briar_project_agents agent
+      on agent.id = job.agent_id and agent.organization_id = job.organization_id
+    join briar_channel_messages message
+      on message.id = job.trigger_message_id and message.channel_id = channel.id
+    where job.id = ? and job.claimed_device_id = ? and job.claimed_worker_id = ?
+      and job.claim_token_hash = ? and job.status = 'running' and job.lease_expires_at > ?
+      and channel.organization_id = job.organization_id and channel.kind = 'dm'
+      and message.author_user_id is not null and message.deleted_at is null
+      and exists (select 1 from briar_channel_agents roster
+        where roster.channel_id = job.channel_id and roster.agent_id = job.agent_id)
+      and ${liveChannelReplyRuntime("job")}
+      and ${dmMemoryReplyFenceCurrent("job")}
+      and exists (select 1 from briar_execution_workers binding
+        where binding.id = job.claimed_worker_id and binding.device_id = job.claimed_device_id
+          and binding.state <> 'disabled'
+          and (job.project_id is null or binding.project_id = job.project_id))
+      and not exists (select 1 from briar_channel_message_reactions existing
+        where existing.message_id = job.trigger_message_id and existing.agent_id = job.agent_id)
+    on conflict do nothing
+  `).bind(input.emoji, input.observedAt, input.jobId, input.deviceId,
+    input.workerId, input.claimTokenHash, input.observedAt).run();
 }
 
 export async function renewChannelReplyLease(
@@ -6236,16 +6249,7 @@ export async function completeChannelReply(
       input.completedAt,
       input.completedAt,
     ),
-    ...(input.acknowledgementReaction &&
-        input.acknowledgementReaction !== "👀" &&
-        input.acknowledgementReaction.length <= 32 &&
-        input.acknowledgementReaction === input.acknowledgementReaction.trim() &&
-        isChannelReactionEmoji(input.acknowledgementReaction)
-      ? channelAcknowledgementReactionStatements(db, {
-          ...input,
-          emoji: input.acknowledgementReaction,
-        })
-      : []),
+    channelAcknowledgementFallbackStatement(db, input),
     db
       .prepare(
         `update briar_channel_agent_reply_jobs

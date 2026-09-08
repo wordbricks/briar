@@ -23,6 +23,18 @@ export function createReplyActivityClient(apiUrl: string) {
   );
 
   return {
+    publishAcknowledgementReaction: (input: {
+      replyJobId: string;
+      capability: string;
+      emoji: string;
+      signal: AbortSignal;
+    }) => client.publishReplyActivity(
+      create(PublishReplyActivityRequestSchema, {
+        replyJobId: input.replyJobId,
+        acknowledgementReaction: input.emoji,
+      }),
+      { headers: { Authorization: `Bearer ${input.capability}` }, signal: input.signal },
+    ),
     publishReplyActivity: (input: {
       replyJobId: string;
       capability: string;

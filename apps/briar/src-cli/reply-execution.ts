@@ -1,3 +1,4 @@
+import { dmAcknowledgementPrompt, startDmAcknowledgement } from "./dm-acknowledgement";
 import { normalizeChannelAcknowledgementReaction } from "../src/lib/channel-acknowledgement-reaction";
 import {
   providerBlockHeadline,
@@ -737,6 +738,7 @@ async function runClaimedChannelReply(
   let memoryInvocation: DmMemoryInvocation | null = null;
   let messageInvocation: DmMessageInvocation | null = null;
   let publicationTerminal = false;
+  let stopAcknowledgement: (() => void) | undefined;
   let organizationContextCleaned = false;
   let attachmentsCleaned = false;
   let workspaceCleaned = false;
@@ -823,6 +825,16 @@ async function runClaimedChannelReply(
         : []),
     ]);
   try {
+    const agent = detachedReplyAgent({
+      workId: reply.workId,
+      provider: reply.provider,
+      model: reply.model,
+      effort: reply.effort,
+      agent: reply.agent,
+      activeSkill: reply.activeSkill,
+      fallbackName: "Briar Channel",
+      scope: reply.scope,
+    });
     if (reply.memory) {
       memoryInvocation = await DmMemoryInvocation.create({
         queue: workerQueueClient,
@@ -831,6 +843,36 @@ async function runClaimedChannelReply(
         work: reply,
         memory: reply.memory,
         signal: invocationSignal,
+      });
+    }
+    const acknowledgementPrompt = dmAcknowledgementPrompt(reply.snapshot, reply.triggerMessageId);
+    if (acknowledgementPrompt && reply.activity) {
+      const capability = reply.activity.token;
+      stopAcknowledgement = startDmAcknowledgement({
+        signal: invocationSignal,
+        select: async (selectionSignal) => {
+          const selectionWorkspace = await mkdtemp(join(workspacePath, ".acknowledgement-"));
+          try {
+            const turn = await runtime.runProviderTurn({
+              agent: { ...agent, name: "DM acknowledgement", responsibility: "Choose one contextual acknowledgement emoji only.",
+                skills: [], activeSkill: null, computerUsePolicy: "disabled", effort: "low" },
+              prompt: acknowledgementPrompt,
+              workspacePath: selectionWorkspace,
+              fullAccess: false,
+              readOnly: true,
+              conversationId: null,
+              environment: providerExecutionEnvironment(config, agent.provider, { ...process.env }),
+              signal: selectionSignal,
+            });
+            assertDetachedProviderTurnSucceeded(turn);
+            return turn.resultText;
+          } finally {
+            await rm(selectionWorkspace, { recursive: true, force: true });
+          }
+        },
+        publish: (emoji, publishSignal) => replyActivity.publishAcknowledgementReaction({
+          replyJobId: reply.workId, capability, emoji, signal: publishSignal,
+        }),
       });
     }
     const durablePublicMessages = reply.dmPublicMessageProtocol === 1 &&
@@ -871,16 +913,6 @@ async function runClaimedChannelReply(
       claimToken: reply.claimToken,
       triggerAttachments: reply.triggerAttachments,
       workspacePath,
-    });
-    const agent = detachedReplyAgent({
-      workId: reply.workId,
-      provider: reply.provider,
-      model: reply.model,
-      effort: reply.effort,
-      agent: reply.agent,
-      activeSkill: reply.activeSkill,
-      fallbackName: "Briar Channel",
-      scope: reply.scope,
     });
     const outputContract = providerStructuredOutputContract(
       agent.provider,
@@ -1158,6 +1190,7 @@ async function runClaimedChannelReply(
     if (!reply.memory || error instanceof DetachedProviderBlockedError) throw error;
     throw dmMemoryExecutionError(error);
   } finally {
+    stopAcknowledgement?.();
     await messageInvocation?.cleanup({ terminal: publicationTerminal });
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {

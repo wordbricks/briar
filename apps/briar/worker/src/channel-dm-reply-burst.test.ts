@@ -12,6 +12,7 @@ import {
   DM_REPLY_SETTLE_MIN_RETRY_MS,
   checkpointChannelReplySession,
   completeChannelReply,
+  publishChannelAcknowledgementReaction,
   enqueueChannelAgentReplies,
   getChannelSyncCursor,
   loadChannelDelta,
@@ -305,9 +306,17 @@ describe("direct message reply bursts", () => {
     });
   };
 
-  it.each(["🎉", "❤️", "🙏", "😄"])("replaces the DM receipt with %s and publishes the trigger delta", async (emoji) => {
+  const react = (claimed: NonNullable<Awaited<ReturnType<typeof claim>>>, emoji: string,
+    overrides: Partial<Parameters<typeof publishChannelAcknowledgementReaction>[1]> = {}) =>
+    publishChannelAcknowledgementReaction(db, {
+      jobId: claimed.workId, deviceId, workerId, claimTokenHash: sha256(claimed.claimToken),
+      observedAt: new Date().toISOString(), emoji, ...overrides,
+    });
+
+  it.each(["🎮", "🎉", "❤️", "🙏", "👀"])("first publishes %s before completion, once, preserving others", async (emoji) => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "A message whose tone the Agent reads.");
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
     await toggleChannelMessageReaction(db, {
       channelId, messageId: sent.messageId, userId: ownerId,
       emoji: "👀", createdAt: new Date().toISOString(),
@@ -317,72 +326,110 @@ describe("direct message reply bursts", () => {
       id: otherAgentId, organizationId, name: "Other", provider: "claude",
       model: null, responsibility: "Other", effort: null, createdAt: new Date().toISOString(),
     });
-    await db.prepare(
-      `insert into briar_channel_message_reactions (message_id, agent_id, emoji, created_at)
-       values (?, ?, '👀', ?)`,
-    ).bind(sent.messageId, otherAgentId, new Date().toISOString()).run();
+    await db.prepare(`insert into briar_channel_message_reactions (message_id, agent_id, emoji, created_at)
+      values (?, ?, '👀', ?)`).bind(sent.messageId, otherAgentId, new Date().toISOString()).run();
     await stopTyping(sent.job.id);
-    const claimed = await claim();
-    expect(claimed?.snapshot.channel).toMatchObject({ kind: "dm" });
+    const claimed = (await claim())!;
     const cursor = await getChannelSyncCursor(db, organizationId);
-    expect(await finish(claimed!, { acknowledgementReaction: emoji })).not.toBeNull();
+    await react(claimed, emoji);
     const message = await getChannelMessage(db, channelId, sent.messageId);
-    expect(message?.reactions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ emoji, agentIds: [agentId], count: 1 }),
-      expect.objectContaining({ emoji: "👀", userIds: [ownerId], agentIds: [otherAgentId], count: 2 }),
-    ]));
+    expect(message?.reactions.some((reaction) => reaction.emoji === emoji && reaction.agentIds?.includes(agentId))).toBe(true);
+    expect(message?.reactions.find((reaction) => reaction.emoji === "👀")).toMatchObject({ userIds: [ownerId] });
+    expect(message?.reactions.find((reaction) => reaction.emoji === "👀")?.agentIds).toContain(otherAgentId);
+    expect((await getChannelAgentReplyJob(db, organizationId, claimed.workId))?.status).toBe("running");
     const delta = await loadChannelDelta(db, organizationId, ownerId, cursor);
     expect(delta.messages.find((entry) => entry.id === sent.messageId)?.reactions).toEqual(message?.reactions);
-    await expect(finish(claimed!, { acknowledgementReaction: "🔥" })).rejects.toThrow();
+    await Promise.all([react(claimed, "🔥"), react(claimed, "🙏")]);
+    expect(await finish(claimed, { acknowledgementReaction: "🔥" })).not.toBeNull();
+    await expect(react(claimed, "😄")).rejects.toThrow();
     await enqueueChannelAgentReplies(db, {
       organizationId, channelId, triggerMessageId: sent.messageId,
       parentMessageId: sent.messageId, addAgentAcknowledgementReaction: true,
-      agents: [{ id: agentId, projectId: null, provider: "claude" }],
-      createdAt: new Date().toISOString(),
+      agents: [{ id: agentId, projectId: null, provider: "claude" }], createdAt: new Date().toISOString(),
     });
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual(message?.reactions);
   });
 
-  it.each([null, "", "not emoji", "🎉🙏", " 🎉 "])("keeps the receipt and completes the body for %j", async (emoji) => {
-    const channelId = await freshConversation("dm");
-    const sent = await send(channelId, "hello");
-    await stopTyping(sent.job.id);
-    const claimed = await claim();
-    expect(await finish(claimed!, { acknowledgementReaction: emoji })).not.toBeNull();
-    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions)
-      .toMatchObject([{ emoji: "👀", agentIds: [agentId] }]);
-  });
-
-  it("does not let another worker or stale token replace the receipt", async () => {
+  it("rejects invalid emoji and stale claims without preventing body completion", async () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "thank you");
     await stopTyping(sent.job.id);
-    const claimed = await claim();
-    for (const overrides of [{ workerId: crypto.randomUUID() }, { claimTokenHash: "wrong" }]) {
-      expect(await finish(claimed!, { ...overrides, acknowledgementReaction: "🙏" })).toBeNull();
-      expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions)
-        .toMatchObject([{ emoji: "👀", agentIds: [agentId] }]);
+    const claimed = (await claim())!;
+    for (const emoji of ["", "not emoji", "🎉🙏", " 🎉 "]) {
+      await expect(react(claimed, emoji)).rejects.toThrow();
     }
-    expect(await finish(claimed!, { acknowledgementReaction: "🙏" })).not.toBeNull();
+    for (const overrides of [{ workerId: crypto.randomUUID() }, { deviceId: crypto.randomUUID() },
+      { claimTokenHash: "wrong" }, { observedAt: "2999-01-01T00:00:00.000Z" }]) {
+      await react(claimed, "🙏", overrides);
+    }
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
+    expect(await finish(claimed)).not.toBeNull();
   });
 
-  it("rejects a removed Agent before replacing its reaction", async () => {
+  it("keeps exactly one first write across concurrent selection and a rotated retry token", async () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "thanks");
     await stopTyping(sent.job.id);
-    const claimed = await claim();
-    await db.prepare("delete from briar_channel_agents where channel_id = ? and agent_id = ?")
-      .bind(channelId, agentId).run();
-    await expect(finish(claimed!, { acknowledgementReaction: "🙏" })).rejects.toThrow();
+    const claimed = (await claim())!;
+    await Promise.all([react(claimed, "🎉"), react(claimed, "🙏")]);
+    const first = (await getChannelMessage(db, channelId, sent.messageId))?.reactions;
+    expect(first).toHaveLength(1);
+    const retryHash = sha256("retry-claim");
+    await db.prepare("update briar_channel_agent_reply_jobs set claim_token_hash = ? where id = ?")
+      .bind(retryHash, claimed.workId).run();
+    await react(claimed, "🔥");
+    await react(claimed, "💛", { claimTokenHash: retryHash });
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual(first);
+    await db.prepare("update briar_channel_agent_reply_jobs set claim_token_hash = ? where id = ?")
+      .bind(sha256(claimed.claimToken), claimed.workId).run();
+    expect(await finish(claimed)).not.toBeNull();
+  });
+
+  it.each(["deleted", "agent-authored"])("does not react to a %s trigger", async (kind) => {
+    const channelId = await freshConversation("dm");
+    const sent = await send(channelId, "thanks");
+    await stopTyping(sent.job.id);
+    const claimed = (await claim())!;
+    if (kind === "deleted") {
+      await db.prepare("update briar_channel_messages set deleted_at = ? where id = ?")
+        .bind(new Date().toISOString(), sent.messageId).run();
+    } else {
+      await db.prepare("update briar_channel_messages set author_user_id = null, author_agent_id = ?, author_agent_name = 'Assistant', author_agent_provider = 'claude' where id = ?")
+        .bind(agentId, sent.messageId).run();
+    }
+    await react(claimed, "🙏");
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
+    await finish(claimed);
+  });
+
+  it("uses fallback if the body finishes before selection, without waiting for it", async () => {
+    const channelId = await freshConversation("dm");
+    const sent = await send(channelId, "hello");
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
+    await stopTyping(sent.job.id);
+    const claimed = (await claim())!;
+    expect(await finish(claimed, { acknowledgementReaction: "🙏" })).not.toBeNull();
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions)
       .toMatchObject([{ emoji: "👀", agentIds: [agentId] }]);
+  });
+
+  it("does not publish after an Agent leaves the DM", async () => {
+    const channelId = await freshConversation("dm");
+    const sent = await send(channelId, "thanks");
+    await stopTyping(sent.job.id);
+    const claimed = (await claim())!;
+    await db.prepare("delete from briar_channel_agents where channel_id = ? and agent_id = ?")
+      .bind(channelId, agentId).run();
+    await expect(react(claimed, "🙏")).rejects.toThrow();
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
   });
 
   it("keeps regular channel messages free of automatic reactions", async () => {
     const channelId = await freshConversation("channel");
     const sent = await send(channelId, "thanks", { mentionedAgentIds: [agentId] });
-    const claimed = await claim();
-    expect(await finish(claimed!, { acknowledgementReaction: "🙏" })).not.toBeNull();
+    const claimed = (await claim())!;
+    await react(claimed, "🙏");
+    expect(await finish(claimed)).not.toBeNull();
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
   });
 

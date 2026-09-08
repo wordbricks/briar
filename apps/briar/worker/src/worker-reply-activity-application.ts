@@ -1,3 +1,4 @@
+import { publishChannelRealtime } from "./channel-realtime";
 import type {
   ChannelAgentActivityPublishInput,
 } from "../../src/lib/channel-agent-activity";
@@ -13,7 +14,7 @@ import {
   channelActivityFrame,
   issueActivityFrame,
 } from "./realtime-scheduling";
-import { getClaimedChannelReply } from "./channels";
+import { getChannelSyncCursor, getClaimedChannelReply, publishChannelAcknowledgementReaction } from "./channels";
 
 export type ReplyActivityApplicationServices = {
   readonly verifyChannelActivityPublishToken:
@@ -24,6 +25,9 @@ export type ReplyActivityApplicationServices = {
   readonly issueActivityFrame: typeof issueActivityFrame;
   readonly publishChannelActivity: typeof publishChannelActivity;
   readonly publishIssueActivity: typeof publishIssueActivity;
+  readonly publishChannelAcknowledgementReaction: typeof publishChannelAcknowledgementReaction;
+  readonly publishChannelRealtime: typeof publishChannelRealtime;
+  readonly getChannelSyncCursor: typeof getChannelSyncCursor;
   readonly getClaimedChannelReply: typeof getClaimedChannelReply;
 };
 
@@ -35,6 +39,9 @@ const replyActivityApplicationServices: ReplyActivityApplicationServices = {
   publishChannelActivity,
   publishIssueActivity,
   getClaimedChannelReply,
+  publishChannelAcknowledgementReaction,
+  publishChannelRealtime,
+  getChannelSyncCursor,
 };
 
 export class ReplyActivityApplicationError extends Error {
@@ -54,6 +61,7 @@ export async function publishReplyActivityApplication(
     token: string;
     replyJobId: string;
     activity: ChannelAgentActivityPublishInput;
+    acknowledgementReaction?: string;
   },
   overrides: Partial<ReplyActivityApplicationServices> = {},
 ) {
@@ -75,6 +83,19 @@ export async function publishReplyActivityApplication(
         "invalid_capability",
         "Reply activity claim is no longer active",
       );
+    }
+    if (input.acknowledgementReaction !== undefined) {
+      await services.publishChannelAcknowledgementReaction(input.db, {
+        jobId: channel.replyJobId,
+        deviceId: channel.deviceId,
+        workerId: channel.workerId,
+        claimTokenHash: channel.claimTokenHash,
+        observedAt: new Date().toISOString(),
+        emoji: input.acknowledgementReaction,
+      });
+      await services.publishChannelRealtime(input.env, channel.organizationId,
+        await services.getChannelSyncCursor(input.db, channel.organizationId));
+      return;
     }
     const frame = services.channelActivityFrame({
       id: channel.replyJobId,
@@ -98,7 +119,7 @@ export async function publishReplyActivityApplication(
     input.token,
     input.replyJobId,
   );
-  if (issue !== null) {
+  if (issue !== null && input.acknowledgementReaction === undefined) {
     const frame = services.issueActivityFrame({
       id: issue.replyJobId,
       project_id: issue.projectId,
