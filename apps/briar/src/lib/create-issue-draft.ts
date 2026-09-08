@@ -39,8 +39,7 @@ function isCreateIssueDraft(value: unknown): value is CreateIssueDraft {
       draft.difficulty === null ||
       draft.difficulty === "easy" ||
       draft.difficulty === "normal" ||
-      draft.difficulty === "hard" ||
-      draft.difficulty === "expert") &&
+      draft.difficulty === "hard") &&
     typeof draft.projectId === "string" &&
     (draft.fullAuto === undefined || typeof draft.fullAuto === "boolean") &&
     (draft.checkpoints === undefined ||

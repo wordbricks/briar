@@ -447,7 +447,6 @@ private func issueDifficulty(_ value: BriarAPI_IssueDifficulty) throws -> IssueD
     case .easy: .easy
     case .normal: .normal
     case .hard: .hard
-    case .expert: .expert
     case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
     }
 }
@@ -457,7 +456,6 @@ private func issueDifficultyMessage(_ value: IssueDifficulty) -> BriarAPI_IssueD
     case .easy: .easy
     case .normal: .normal
     case .hard: .hard
-    case .expert: .expert
     }
 }
 

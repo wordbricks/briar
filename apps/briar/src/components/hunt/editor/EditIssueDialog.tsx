@@ -199,9 +199,6 @@ export function EditIssueDialog({
           }, {
             label: t("issue.difficulty.hard"),
             value: "hard"
-          }, {
-            label: t("issue.difficulty.expert"),
-            value: "expert"
           }]} value={difficulty ?? ""} />
             <label className="issue-attachment-trigger">
               <Paperclip size={13} />

@@ -1209,18 +1209,10 @@ private struct IssueDifficultyBadge: View {
         L10n.format("난이도 %@", difficulty.displayName)
     }
 
-    private var tint: Color {
-        switch difficulty {
-        case .easy, .normal: Color.accentColor
-        case .hard: Color.red
-        case .expert: Color.purple
-        }
-    }
-
     var body: some View {
         Image(systemName: difficulty.systemImage)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(tint)
+            .foregroundStyle(difficulty == .hard ? Color.red : Color.accentColor)
             .frame(width: 20, height: 20)
             .background(Color.secondary.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))

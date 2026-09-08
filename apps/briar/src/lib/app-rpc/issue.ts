@@ -141,8 +141,6 @@ const issueDifficultyToProto = (
       return ProtoIssueDifficulty.NORMAL;
     case "hard":
       return ProtoIssueDifficulty.HARD;
-    case "expert":
-      return ProtoIssueDifficulty.EXPERT;
     case null:
       return undefined;
   }

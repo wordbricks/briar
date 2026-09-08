@@ -226,8 +226,6 @@ export const issueDifficultyFromProto = (
       return "normal";
     case ProtoIssueDifficulty.HARD:
       return "hard";
-    case ProtoIssueDifficulty.EXPERT:
-      return "expert";
     case ProtoIssueDifficulty.UNSPECIFIED:
       throw new Error("Issue difficulty is missing");
     default:
