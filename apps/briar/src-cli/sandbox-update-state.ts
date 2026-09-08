@@ -91,6 +91,26 @@ export function sandboxWorkerRuntimeMetadata(environment: NodeJS.ProcessEnv = pr
   return { versions, updateRequestId };
 }
 
+/**
+ * The `versions` map a worker advertises.
+ *
+ * Probed values are what a native worker can learn by asking each provider CLI
+ * for its version; the sandbox manifest is what the image build recorded, and
+ * it wins wherever both know a key because the build measured the exact
+ * artifact it installed. `briar` is always this CLI's own version.
+ */
+export function workerRuntimeVersions(input: {
+  briar: string;
+  probed?: Readonly<Record<string, string>>;
+  environment?: NodeJS.ProcessEnv;
+}) {
+  return {
+    ...input.probed,
+    ...sandboxWorkerRuntimeMetadata(input.environment).versions,
+    briar: input.briar,
+  };
+}
+
 export async function submitSandboxUpdate(request: SandboxUpdateRequest, root = sandboxUpdateRoot()) {
   const decoded = Schema.decodeSync(SandboxUpdateRequest)(request);
   if (decoded.rollback && decoded.provider) throw new Error("--rollback cannot be combined with --provider");

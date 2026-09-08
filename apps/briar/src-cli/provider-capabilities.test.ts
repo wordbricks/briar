@@ -6,6 +6,7 @@ import {
   claudeModels,
   cursorModels,
   discoverWorkerProviderCapabilities,
+  discoverWorkerProviderVersions,
   parseAgyEfforts,
   parseAgyModels,
   parseClaudeEfforts,
@@ -14,8 +15,10 @@ import {
   parseCursorAvailableModelsResponse,
   parseGrokModelList,
   parseOpenCodeVerbose,
+  parseProviderCliVersion,
   selectOpenCodeUpstreamModels,
 } from "./provider-capabilities";
+import { workerRuntimeVersions } from "./sandbox-update-state";
 import { agentProviderCatalog } from "../src/lib/agent-provider";
 
 describe("worker provider capabilities", () => {
@@ -752,5 +755,127 @@ printf '%s\\n' 'openrouter/test-model' '{' '  "name": "Test model"' '}'
     });
     expect(catalog.opencode.error).toContain("OpenCode CLI가 필요합니다");
     expect(catalog.codex.error).toBe("codex is disabled");
+  });
+});
+
+describe("worker provider CLI versions", () => {
+  const installed = async (directory: string, name: string, script: string) => {
+    const binary = join(directory, name);
+    await writeFile(binary, script, { mode: 0o755 });
+    return binary;
+  };
+
+  it("reads the version out of each provider CLI's own format", () => {
+    expect([
+      "2.1.263 (Claude Code)",
+      "codex-cli 0.153.4",
+      "grok 1.0.13 (5e9a58528b76) [stable]",
+      "1.1.27",
+      "1.18.18",
+    ].map(parseProviderCliVersion)).toEqual([
+      "2.1.263",
+      "0.153.4",
+      "1.0.13",
+      "1.1.27",
+      "1.18.18",
+    ]);
+  });
+
+  it("keeps a pre-release suffix and reads only the first line", () => {
+    expect(parseProviderCliVersion("opencode 1.19.0-beta.3\nnightly build\n"))
+      .toBe("1.19.0-beta.3");
+  });
+
+  it("has no version for empty or version-less output", () => {
+    expect(parseProviderCliVersion("")).toBeNull();
+    expect(parseProviderCliVersion("\n1.2.3\n")).toBeNull();
+    expect(parseProviderCliVersion("command not found: pi-acp")).toBeNull();
+    expect(parseProviderCliVersion("opencode dev")).toBeNull();
+  });
+
+  it("keys versions by binary, so the OpenCode upstreams share one entry", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-provider-versions-"));
+    try {
+      await installed(directory, "opencode", "#!/bin/sh\necho 1.18.29\n");
+      await installed(directory, "claude", "#!/bin/sh\necho '2.1.263 (Claude Code)'\n");
+      // Prints its version on stderr, the way several CLIs do.
+      await installed(directory, "agy", "#!/bin/sh\necho 1.1.27 >&2\n");
+      const versions = await discoverWorkerProviderVersions({
+        refresh: true,
+        environment: { PATH: directory },
+        which: (binary) => ["opencode", "claude", "agy"].includes(binary)
+          ? join(directory, binary)
+          : null,
+      });
+      expect(versions).toEqual({
+        opencode: "1.18.29",
+        claude: "2.1.263",
+        agy: "1.1.27",
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps every other version when one binary is missing and one fails", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "briar-provider-versions-"));
+    try {
+      await installed(directory, "opencode", "#!/bin/sh\necho 1.18.29\n");
+      await installed(directory, "codex", "#!/bin/sh\necho boom >&2\nexit 1\n");
+      await installed(directory, "grok", "#!/bin/sh\necho 'grok dev build'\n");
+      const versions = await discoverWorkerProviderVersions({
+        refresh: true,
+        environment: { PATH: directory },
+        // `claude` and the rest resolve nowhere: not installed on this machine.
+        which: (binary) => ["opencode", "codex", "grok"].includes(binary)
+          ? join(directory, binary)
+          : null,
+      });
+      expect(versions).toEqual({ opencode: "1.18.29" });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("does not probe on a sandbox, whose manifest is authoritative", async () => {
+    const asked: string[] = [];
+    expect(await discoverWorkerProviderVersions({
+      refresh: true,
+      environment: { BRIAR_SANDBOX_UPDATER: "1", PATH: "/nonexistent" },
+      which: (binary) => {
+        asked.push(binary);
+        return null;
+      },
+    })).toEqual({});
+    expect(asked).toEqual([]);
+  });
+
+  it("lets the sandbox manifest win over probed versions", () => {
+    expect(workerRuntimeVersions({
+      briar: "1.2.217",
+      probed: { opencode: "1.18.18", claude: "2.1.263", briar: "0.0.0" },
+      environment: {
+        BRIAR_SANDBOX_UPDATER: "1",
+        BRIAR_SANDBOX_RUNTIME_VERSIONS: JSON.stringify({
+          opencode: "1.18.29",
+          codex: "0.153.4",
+        }),
+      },
+    })).toEqual({
+      opencode: "1.18.29",
+      codex: "0.153.4",
+      claude: "2.1.263",
+      briar: "1.2.217",
+    });
+  });
+
+  it("advertises probed versions plus the CLI version off a sandbox", () => {
+    expect(workerRuntimeVersions({
+      briar: "1.2.217",
+      probed: { opencode: "1.18.18" },
+      environment: {},
+    })).toEqual({ opencode: "1.18.18", briar: "1.2.217" });
+    expect(workerRuntimeVersions({ briar: "1.2.217", environment: {} }))
+      .toEqual({ briar: "1.2.217" });
   });
 });
