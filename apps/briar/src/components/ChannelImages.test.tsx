@@ -106,6 +106,27 @@ describe("channel message attachments", () => {
     expect(link?.textContent).toContain("Open");
   });
 
+  it.each(["한글.md", "notes.txt"])("downloads %s without rendering its content", async (filename) => {
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:private-text") });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    const load = vi.spyOn(api, "loadChannelMessageAttachment").mockResolvedValue(
+      new Blob(["<script>alert(1)</script>"], { type: "text/plain" }),
+    );
+    await renderReactTestRoot(root, <I18nProvider><ChannelMessageImages attachments={[{
+      id: "text-1", filename, contentType: filename.endsWith(".md") ? "text/markdown" : "text/plain",
+      byteSize: 25, url: "/attachments/text-1", imageWidth: null, imageHeight: null,
+    }]} token="private-token" /></I18nProvider>);
+    await vi.waitFor(() => expect(container.querySelector("a")).not.toBeNull());
+    expect(load).toHaveBeenCalledWith("private-token", expect.objectContaining({ filename }));
+    expect(container.querySelector("a")?.getAttribute("download")).toBe(filename);
+    expect(container.querySelector("a")?.href).toBe("blob:private-text");
+    expect(container.querySelector("img, iframe, script")).toBeNull();
+    expect(container.textContent).not.toContain("alert(1)");
+    await renderReactTestRoot(root, <ChannelDraftImages images={[draftChannelImage(new File(["notes"], filename, { type: "text/plain" }))]} onRemove={vi.fn()} />);
+    expect(container.textContent).toContain(filename);
+    expect(container.querySelector("img")).toBeNull();
+  });
+
   it("shows a PDF filename and size in the removable draft card", async () => {
     const onRemove = vi.fn();
     const pdf = new File(["%PDF-1.7"], "draft.pdf", {

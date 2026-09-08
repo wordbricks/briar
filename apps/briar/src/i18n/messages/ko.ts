@@ -564,7 +564,7 @@ export const ko = {
   "channel.send": "메시지 보내기",
   "channel.toolMention": "멘션",
   "channel.toolAttach": "첨부",
-  "channel.attachmentTypeUnsupported": "이미지 또는 PDF 파일만 첨부할 수 있습니다.",
+  "channel.attachmentTypeUnsupported": "이미지, PDF, Markdown(.md), 텍스트(.txt) 파일만 첨부할 수 있습니다.",
   "channel.toolFormat": "서식",
   "channel.toolComingSoon": "곧 지원 예정",
   "channel.headerMembers": "멤버 {count}명",

@@ -1009,12 +1009,8 @@ final class ChannelsStore: ObservableObject {
         guard let organizationID, token != nil else { return }
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty || !attachments.isEmpty else { return }
-        if let message = PendingIssueAttachment.validationMessage(for: attachments) {
+        if let message = ChannelDocumentAttachments.validationMessage(for: attachments) {
             errorMessage = message
-            return
-        }
-        guard attachments.allSatisfy({ $0.contentType.hasPrefix("image/") }) else {
-            errorMessage = L10n.text("채널에는 이미지만 첨부할 수 있습니다.")
             return
         }
         let clientMessageID = UUID()
@@ -1304,7 +1300,8 @@ final class ChannelsStore: ObservableObject {
         let safeName = filename.replacingOccurrences(of: "/", with: "-")
         let destination = FileManager.default.temporaryDirectory
             .appending(path: "briar-channel-previews", directoryHint: .isDirectory)
-            .appending(path: "\(UUID().uuidString)-\(safeName)")
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+            .appending(path: safeName)
         return try await api.download(path, token: token, to: destination)
     }
 

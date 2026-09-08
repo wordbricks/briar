@@ -28,10 +28,38 @@ describe("channel message upload policy", () => {
     ])).toMatchObject([{ contentType: "application/pdf" }]);
   });
 
+  it.each([
+    ["한글.MD", "", "text/markdown"],
+    ["notes.md", "text/plain", "text/markdown"],
+    ["notes.md", "text/x-markdown", "text/markdown"],
+    ["notes.md", "application/octet-stream", "text/markdown"],
+    ["notes.txt", "", "text/plain"],
+    ["notes.TXT", "text/plain; charset=utf-8", "text/plain"],
+  ])("normalizes text metadata for %s (%s)", (filename, contentType, expected) => {
+    expect(channelMessageUploadMetadata([attachment({ filename, contentType })]))
+      .toMatchObject([{ filename, contentType: expected, imageWidth: null, imageHeight: null }]);
+  });
+
+  it("retains text count and byte limits", () => {
+    expect(() => channelMessageUploadMetadata(Array.from({ length: 6 }, () =>
+      attachment({ filename: "notes.md", contentType: "text/plain" })
+    ))).toThrow("최대 5개");
+    for (const filename of ["notes.md", "notes.txt"]) {
+      for (const [byteSize, error] of [[0n, "빈 파일"], [20n * 1024n * 1024n + 1n, "20MB"]] as const) {
+        expect(() => channelMessageUploadMetadata([attachment({ filename, contentType: "", byteSize })])).toThrow(error);
+      }
+    }
+    expect(() => channelMessageUploadMetadata([
+      attachment({ filename: "part.md", contentType: "", byteSize: 13n * 1024n * 1024n }),
+      attachment({ filename: "part.txt", contentType: "", byteSize: 13n * 1024n * 1024n }),
+    ])).toThrow("25MB");
+    expect(() => channelMessageUploadMetadata([attachment({ filename: "page.html", contentType: "text/plain" })])).toThrow("Channel attachments");
+  });
+
   it("rejects unsupported, empty, and oversized files before reservation", () => {
     expect(() => channelMessageUploadMetadata([
-      attachment({ filename: "notes.txt", contentType: "text/plain" }),
-    ])).toThrow("images or PDFs");
+      attachment({ filename: "notes.zip", contentType: "application/zip" }),
+    ])).toThrow("images, PDFs, Markdown");
     expect(() => channelMessageUploadMetadata([
       attachment({ byteSize: 0n }),
     ])).toThrow("빈 파일");

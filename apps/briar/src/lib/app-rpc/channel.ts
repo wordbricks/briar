@@ -56,7 +56,7 @@ import type {
 } from "../../types";
 import { briarApiUrl } from "../api-config";
 import { readImageDimensions } from "../image-dimensions";
-import { normalizeIssueAttachmentFile } from "../issue-attachments";
+import { normalizeChannelAttachmentFile } from "../channel-attachments";
 import { canonicalizeIssueAttachmentReferences } from "../issue-markdown";
 import { uploadPreparedFiles } from "../upload-client";
 import type {
@@ -1323,7 +1323,7 @@ export async function sendChannelMessage(
   const clientMessageId = (input.clientMessageId ?? crypto.randomUUID())
     .toLowerCase();
   const attachments = (input.attachments ?? []).map(
-    normalizeIssueAttachmentFile,
+    normalizeChannelAttachmentFile,
   );
   const attachmentReferences = input.attachmentReferences ?? [];
   if (

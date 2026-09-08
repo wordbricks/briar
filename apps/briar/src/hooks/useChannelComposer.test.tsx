@@ -420,12 +420,36 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await cleanup();
   });
 
+  it.each(["drop", "paste", "change"])("sends Markdown and text through %s", async (kind) => {
+    const onSend = vi.fn<OnSend>();
+    const { cleanup, container } = await renderHarness({ onSend });
+    const files = [new File(["# 한글"], "설계.MD", { type: "text/x-markdown" }), new File(["notes"], "notes.txt")];
+    const event = new Event(kind, { bubbles: true, cancelable: true });
+    if (kind === "change") {
+      const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+      Object.defineProperty(input, "files", { value: files });
+      await act(async () => input.dispatchEvent(event));
+    } else {
+      Object.defineProperty(event, kind === "paste" ? "clipboardData" : "dataTransfer", { value: {
+        files, items: files.map(file => ({ kind: "file", getAsFile: () => file })), types: ["Files"], getData: () => "",
+      } });
+      await act(async () => (kind === "paste" ? container.querySelector('[data-testid="composer"]')! : container.querySelector("form")!).dispatchEvent(event));
+    }
+    expect(container.querySelector('[data-testid="images"]')?.textContent).toBe("2");
+    await act(async () => container.querySelector("form")?.requestSubmit());
+    const sent = onSend.mock.calls[0]![2];
+    expect(sent.map(file => [file.name, file.type, file.size])).toEqual([
+      ["설계.MD", "text/markdown", files[0]!.size], ["notes.txt", "text/plain", files[1]!.size],
+    ]);
+    await cleanup();
+  });
+
   it("shows a localized error and leaves drag mode after a non-image drop", async () => {
     const { cleanup, container } = await renderHarness({
       onSend: vi.fn<OnSend>(),
     });
     const form = container.querySelector("form")!;
-    const file = new File(["notes"], "notes.txt", { type: "text/plain" });
+    const file = new File(["notes"], "notes.zip", { type: "application/zip" });
     const dataTransfer = {
       files: [file],
       items: [{ kind: "file", getAsFile: () => file }],
@@ -444,7 +468,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     expect(drop.defaultPrevented).toBe(true);
     expect(form.className).toBe("");
     expect(container.querySelector('[data-testid="error"]')?.textContent).toBe(
-      "Only images and PDF files can be attached.",
+      "Only images, PDF, Markdown (.md), and text (.txt) files can be attached.",
     );
     await cleanup();
   });

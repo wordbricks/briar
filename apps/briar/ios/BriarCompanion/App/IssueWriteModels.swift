@@ -251,7 +251,10 @@ struct PendingIssueAttachment: Identifiable, Equatable, Sendable {
         self.data = data
     }
 
-    static func validationMessage(for attachments: [Self]) -> String? {
+    static func validationMessage(
+        for attachments: [Self],
+        allowedTypes: Set<String> = allowedContentTypes
+    ) -> String? {
         guard attachments.count <= maximumCount else {
             return L10n.text("첨부 파일은 최대 5개까지 추가할 수 있습니다.")
         }
@@ -262,7 +265,7 @@ struct PendingIssueAttachment: Identifiable, Equatable, Sendable {
             guard !name.isEmpty, name.count <= 255, !name.contains("\0") else {
                 return L10n.text("첨부 파일 이름이 유효하지 않습니다.")
             }
-            guard allowedContentTypes.contains(attachment.contentType) else {
+            guard allowedTypes.contains(attachment.contentType) else {
                 return L10n.format("%@은(는) 지원하지 않는 이미지·영상 형식입니다.", name)
             }
             guard !attachment.data.isEmpty else {

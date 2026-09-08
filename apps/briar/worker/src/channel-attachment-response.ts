@@ -1,3 +1,4 @@
+import { isChannelTextAttachment } from "../../src/lib/channel-attachments";
 import { contentDisposition } from "./attachment-storage";
 import { corsHeaders } from "./http-response";
 import {
@@ -18,7 +19,9 @@ export function channelAttachmentResponse(
 ) {
   const headers = new Headers(corsHeaders);
   headers.set("Cache-Control", "private, max-age=300");
-  headers.set("Content-Disposition", contentDisposition(attachment.filename));
+  headers.set("Content-Disposition", isChannelTextAttachment(attachment.content_type, attachment.filename)
+    ? contentDisposition(attachment.filename).replace(/^inline/u, "attachment")
+    : contentDisposition(attachment.filename));
   headers.set("Content-Length", String(object.size));
   headers.set("Content-Type", attachment.content_type);
   headers.set("ETag", object.httpEtag);

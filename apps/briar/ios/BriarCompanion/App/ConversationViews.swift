@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 enum ConversationDatePresentation {
     static func startsNewDay(
@@ -524,6 +525,7 @@ struct ConversationComposer: View {
     @FocusState private var isComposerFocused: Bool
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
+    @State private var showsDocumentPicker = false
     @State private var attachmentError: String?
     // Agent names can contain spaces, so completed text can still parse as a query.
     // Keep selection dismissal explicit until the author edits the draft again.
@@ -534,6 +536,7 @@ struct ConversationComposer: View {
     let placeholder: String
     let replyLabel: String?
     let allowsImagePaste: Bool
+    var allowsChannelDocuments: Bool = false
     let locale: CompanionLocale
     let accessibility: ConversationComposerAccessibility
     let cancelReply: (() -> Void)?
@@ -653,6 +656,18 @@ struct ConversationComposer: View {
             .padding(.vertical, 10)
         }
         .background(Color(uiColor: .systemBackground))
+        .fileImporter(
+            isPresented: $showsDocumentPicker,
+            allowedContentTypes: [.pdf, .plainText, UTType(filenameExtension: "md") ?? .plainText],
+            allowsMultipleSelection: true
+        ) { result in
+            do {
+                attachments = try ChannelDocumentAttachments.load(result.get(), appendingTo: attachments)
+                attachmentError = nil
+            } catch {
+                attachmentError = error.localizedDescription
+            }
+        }
         .onChange(of: selectedPhotos) { _, items in
             guard !items.isEmpty else { return }
             Task { await importPhotos(items) }
@@ -722,7 +737,7 @@ struct ConversationComposer: View {
 
     @ViewBuilder
     private var attachmentControl: some View {
-        if allowsImagePaste {
+        if allowsImagePaste || allowsChannelDocuments {
             Menu {
                 PhotosPicker(
                     selection: $selectedPhotos,
@@ -735,13 +750,20 @@ struct ConversationComposer: View {
                         systemImage: "photo.on.rectangle"
                     )
                 }
-                Button {
-                    pasteImage()
-                } label: {
-                    Label(
-                        L10n.text("클립보드 이미지 붙여넣기", locale: locale),
-                        systemImage: "doc.on.clipboard"
-                    )
+                if allowsChannelDocuments {
+                    Button { showsDocumentPicker = true } label: {
+                        Label("PDF / Markdown / TXT", systemImage: "doc")
+                    }
+                }
+                if allowsImagePaste {
+                    Button {
+                        pasteImage()
+                    } label: {
+                        Label(
+                            L10n.text("클립보드 이미지 붙여넣기", locale: locale),
+                            systemImage: "doc.on.clipboard"
+                        )
+                    }
                 }
             } label: {
                 Image(systemName: "plus")
@@ -755,7 +777,7 @@ struct ConversationComposer: View {
                 isLoadingPhotos || isSending ||
                     attachments.count >= PendingIssueAttachment.maximumCount
             )
-            .accessibilityLabel(L10n.text("이미지 첨부", locale: locale))
+            .accessibilityLabel(allowsChannelDocuments ? "PDF / Markdown / TXT" : L10n.text("이미지 첨부", locale: locale))
             .accessibilityIdentifier(accessibility.attachment)
         } else {
             PhotosPicker(
@@ -775,7 +797,7 @@ struct ConversationComposer: View {
                 isLoadingPhotos || isSending ||
                     attachments.count >= PendingIssueAttachment.maximumCount
             )
-            .accessibilityLabel(L10n.text("이미지 첨부", locale: locale))
+            .accessibilityLabel(allowsChannelDocuments ? "PDF / Markdown / TXT" : L10n.text("이미지 첨부", locale: locale))
             .accessibilityIdentifier(accessibility.attachment)
         }
     }
@@ -802,11 +824,18 @@ struct ConversationComposer: View {
             selectedPhotos = []
         }
         do {
-            attachments = try await PhotoAttachmentImporter.importItems(
+            let imported = try await PhotoAttachmentImporter.importItems(
                 items,
-                appendingTo: attachments,
+                appendingTo: allowsChannelDocuments ? [] : attachments,
                 policy: .imagesOnly
             )
+            let next = allowsChannelDocuments ? attachments + imported : imported
+            if let message = allowsChannelDocuments
+                ? ChannelDocumentAttachments.validationMessage(for: next)
+                : PendingIssueAttachment.validationMessage(for: next) {
+                throw PhotoAttachmentImportError.validation(message)
+            }
+            attachments = next
             attachmentError = nil
         } catch {
             attachmentError = error.localizedDescription

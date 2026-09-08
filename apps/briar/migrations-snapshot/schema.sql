@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 19a91c63214596698282a5a7ed7b655b0baa2bee350931cd85fd0cb2013e1d61
--- snapshot-digest: 3888e6515ee60eabff4eeb7f8e3df0ea0a62b10d0eb5b07b95788f328cb7f8ab
+-- migrations-digest: d470baded0175dea61866ac384b7a3ac2f3d9327315464ffac46f33784aeeba4
+-- snapshot-digest: 877e9d82335acd3a9230980c9a6957811c5f42cc5328e9147dda6170d4f56188
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2431,30 +2431,6 @@ CREATE TABLE briar_channel_message_agent_mentions (
   primary key (message_id, agent_id)
 );
 -- @statement
-CREATE TABLE briar_channel_message_attachments (
-  id text primary key not null,
-  organization_id text not null
-    references briar_organizations (id) on delete cascade,
-  channel_id text not null references briar_channels (id) on delete cascade,
-  message_id text not null
-    references briar_channel_messages (id) on delete cascade,
-  object_key text not null unique check (
-    object_key = trim(object_key)
-    and length(object_key) between 1 and 500
-  ),
-  filename text not null check (length(trim(filename)) between 1 and 255),
-  content_type text not null check (content_type in (
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
-    'image/svg+xml', 'text/html', 'application/pdf'
-  )),
-  byte_size integer not null check (byte_size between 1 and 20971520),
-  created_at text not null
-, image_width integer check (
-  image_width is null or (typeof(image_width) = 'integer' and image_width > 0)
-), image_height integer check (
-  image_height is null or (typeof(image_height) = 'integer' and image_height > 0)
-));
--- @statement
 CREATE TABLE IF NOT EXISTS "briar_channel_message_documents" (
   message_id text primary key not null
     references briar_channel_messages (id) on delete cascade,
@@ -3725,6 +3701,30 @@ CREATE TABLE briar_worker_update_reservations (
   primary key (work_type, work_id)
 );
 -- @statement
+CREATE TABLE briar_channel_message_attachments (
+  id text primary key not null,
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  channel_id text not null references briar_channels (id) on delete cascade,
+  message_id text not null
+    references briar_channel_messages (id) on delete cascade,
+  object_key text not null unique check (
+    object_key = trim(object_key)
+    and length(object_key) between 1 and 500
+  ),
+  filename text not null check (length(trim(filename)) between 1 and 255),
+  content_type text not null check (content_type in (
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/svg+xml', 'text/html', 'application/pdf', 'text/markdown', 'text/plain'
+  )),
+  byte_size integer not null check (byte_size between 1 and 20971520),
+  created_at text not null
+, image_width integer check (
+  image_width is null or (typeof(image_width) = 'integer' and image_width > 0)
+), image_height integer check (
+  image_height is null or (typeof(image_height) = 'integer' and image_height > 0)
+));
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -4932,12 +4932,6 @@ CREATE INDEX briar_run_evidence_pull_requests_link_idx
     pull_request_id, pull_request_node_id
   );
 -- @statement
-CREATE INDEX briar_channel_message_attachments_message_idx
-  on briar_channel_message_attachments (message_id, created_at, id);
--- @statement
-CREATE INDEX briar_channel_message_attachments_channel_idx
-  on briar_channel_message_attachments (organization_id, channel_id, message_id);
--- @statement
 CREATE INDEX briar_channel_agent_reply_jobs_agent_message_origin_idx
   on briar_channel_agent_reply_jobs (
     origin_reply_job_id, agent_message_hop, status
@@ -5023,6 +5017,12 @@ CREATE INDEX idx_worker_handoff_resume
 -- @statement
 CREATE INDEX idx_worker_update_reservations_device
   on briar_worker_update_reservations(device_id);
+-- @statement
+CREATE INDEX briar_channel_message_attachments_message_idx
+  on briar_channel_message_attachments (message_id, created_at, id);
+-- @statement
+CREATE INDEX briar_channel_message_attachments_channel_idx
+  on briar_channel_message_attachments (organization_id, channel_id, message_id);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN

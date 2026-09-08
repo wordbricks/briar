@@ -334,3 +334,46 @@ struct AttachmentMessagePayload: Sendable {
         return result
     }
 }
+
+// Channel documents use a separate policy so issue uploads keep their media-only types.
+enum ChannelDocumentAttachments {
+    static let allowedContentTypes = Set(
+        PendingIssueAttachment.allowedContentTypes.filter { $0.hasPrefix("image/") }
+    ).union(["application/pdf", "text/markdown", "text/plain"])
+
+    static func contentType(for filename: String) -> String? {
+        switch (filename as NSString).pathExtension.lowercased() {
+        case "md": "text/markdown"
+        case "txt": "text/plain"
+        case "pdf": "application/pdf"
+        default: nil
+        }
+    }
+
+    static func validationMessage(for attachments: [PendingIssueAttachment]) -> String? {
+        PendingIssueAttachment.validationMessage(for: attachments, allowedTypes: allowedContentTypes)
+    }
+
+    static func load(_ urls: [URL], appendingTo attachments: [PendingIssueAttachment]) throws -> [PendingIssueAttachment] {
+        var next = attachments
+        guard next.count + urls.count <= PendingIssueAttachment.maximumCount else {
+            throw PhotoAttachmentImportError.validation(L10n.text("첨부 파일은 최대 5개까지 추가할 수 있습니다."))
+        }
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            guard let type = contentType(for: url.lastPathComponent) else {
+                throw PhotoAttachmentImportError.unsupported("PDF, Markdown (.md), TXT (.txt)")
+            }
+            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+            guard let size, size <= PendingIssueAttachment.maximumFileBytes else {
+                throw PhotoAttachmentImportError.validation(L10n.format("%@은(는) 파일당 20MB 제한을 넘습니다.", url.lastPathComponent))
+            }
+            next.append(PendingIssueAttachment(filename: url.lastPathComponent, contentType: type, data: try Data(contentsOf: url)))
+        }
+        if let message = validationMessage(for: next) {
+            throw PhotoAttachmentImportError.validation(message)
+        }
+        return next
+    }
+}

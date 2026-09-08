@@ -390,9 +390,7 @@ export function useChannelComposer<T extends ComposerInput>({
       insertAtCaret(markdown);
       return;
     }
-    const pasted = filesFromDataTransfer(event.clipboardData).filter((file) =>
-      file.type.startsWith("image/") || file.type === "application/pdf",
-    );
+    const pasted = filesFromDataTransfer(event.clipboardData);
     if (pasted.length === 0) return;
     const plainText = event.clipboardData?.getData?.("text/plain") ?? "";
     if (plainOnly && plainText.trim()) return;

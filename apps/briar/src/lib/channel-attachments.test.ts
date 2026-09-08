@@ -15,7 +15,7 @@ describe("channel attachments", () => {
     ])).toBeNull();
     expect(validateChannelAttachments([
       { name: "clip.mp4", size: 4, type: "video/mp4" },
-    ])).toContain("이미지 또는 PDF");
+    ])).toContain("Markdown(.md)");
   });
 
   it("normalizes a dropped PDF when the browser omits its MIME type", () => {
@@ -28,24 +28,46 @@ describe("channel attachments", () => {
     expect(isChannelAttachmentTypeSupported(normalized.type)).toBe(true);
   });
 
+  it.each([
+    ["설계.MD", "", "text/markdown"],
+    ["notes.md", "text/plain", "text/markdown"],
+    ["notes.md", "text/x-markdown", "text/markdown"],
+    ["notes.md", "application/octet-stream", "text/markdown"],
+    ["notes.txt", "", "text/plain"],
+    ["notes.TXT", "text/plain; charset=utf-8", "text/plain"],
+    ["notes.txt", "application/octet-stream", "text/plain"],
+  ])("preserves bytes and filename while normalizing %s (%s)", async (name, type, expected) => {
+    const file = new File(["# 한글\r\n<script>alert(1)</script>\n"], name, { type, lastModified: 123 });
+    const normalized = normalizeChannelAttachmentFile(file);
+    expect(normalized.name).toBe(name);
+    expect(normalized.lastModified).toBe(123);
+    expect(normalized.type).toBe(expected);
+    expect(await normalized.text()).toBe(await file.text());
+    expect(validateChannelAttachments([normalized])).toBeNull();
+  });
+
+  it.each(["page.html", "archive.zip", "script.js", "notes.md.exe"])("rejects unsupported %s even with text MIME", (name) => {
+    expect(validateChannelAttachments([{ name, size: 3, type: "text/plain" }])).not.toBeNull();
+  });
+
   it("keeps the existing count and byte limits", () => {
     expect(validateChannelAttachments(Array.from(
       { length: 6 },
       (_, index) => ({
-        name: `${index}.pdf`,
+        name: `${index}.md`,
         size: 1,
         type: "application/pdf",
       }),
     ))).toContain("최대 5개");
     expect(validateChannelAttachments([
-      { name: "empty.pdf", size: 0, type: "application/pdf" },
+      { name: "empty.txt", size: 0, type: "application/pdf" },
     ])).toContain("빈 파일");
     expect(validateChannelAttachments([
-      { name: "large.pdf", size: 20 * 1024 * 1024 + 1, type: "application/pdf" },
+      { name: "large.md", size: 20 * 1024 * 1024 + 1, type: "application/pdf" },
     ])).toContain("20MB");
     expect(validateChannelAttachments([
-      { name: "part-1.pdf", size: 13 * 1024 * 1024, type: "application/pdf" },
-      { name: "part-2.pdf", size: 13 * 1024 * 1024, type: "application/pdf" },
+      { name: "part-1.md", size: 13 * 1024 * 1024, type: "application/pdf" },
+      { name: "part-2.txt", size: 13 * 1024 * 1024, type: "application/pdf" },
     ])).toContain("25MB");
   });
 });
