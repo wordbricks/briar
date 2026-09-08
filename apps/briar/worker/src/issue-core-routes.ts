@@ -544,6 +544,7 @@ export async function updateProjectIssue(
   try {
     await input.db.batch([
       statements.update,
+      ...statements.difficulty,
       ...statements.inserts,
       ...statements.cleanup,
       ...statements.removals,

@@ -12,8 +12,9 @@ import {
   runIsFullAuto,
   stableJson,
 } from "./hunt-run-codec";
-import { type HuntRunRow } from "./hunt-run-model";
+import { type HuntRunRowWithoutDifficulty } from "./hunt-run-model";
 import { getHuntRunForProject } from "./hunt-run-repository";
+import { runDifficultyWriteStatements } from "./run-difficulty-repository";
 import {
   type ModelEffort,
   type TeamAgentProvider,
@@ -33,29 +34,41 @@ export async function updateIssue(
     updatedAt: string;
   },
 ) {
-  return db
+  const updated = await db
     .prepare(
       `update briar_hunt_runs
        set title = ?, issue_description = ?, priority = ?,
-           difficulty = case when ? = 1 then ? else difficulty end,
            assignee_user_id = case when ? = 1 then ? else assignee_user_id end,
            updated_at = ?
        where id = ? and project_id = ?
-       returning *`,
+       returning id`,
     )
     .bind(
       input.title,
       input.description,
       input.priority,
-      input.difficulty === undefined ? 0 : 1,
-      input.difficulty ?? null,
       input.assigneeUserId === undefined ? 0 : 1,
       input.assigneeUserId ?? null,
       input.updatedAt,
       runId,
       projectId,
     )
-    .first<HuntRunRow>();
+    .first<{ id: string }>();
+  if (!updated) return null;
+  // `difficulty: undefined` means "leave it alone", so the side-table write
+  // only happens when the caller actually passed a value. RETURNING cannot
+  // join, so the row is re-read rather than returned by the update itself.
+  if (input.difficulty !== undefined) {
+    await db.batch(
+      runDifficultyWriteStatements(db, {
+        runId,
+        difficulty: input.difficulty,
+        guardSql: "run.project_id = ?",
+        guardBindings: [projectId],
+      }),
+    );
+  }
+  return await getHuntRunForProject(db, projectId, runId);
 }
 
 export async function updateIssueExecutionPreferences(
@@ -87,7 +100,7 @@ export async function updateIssueExecutionPreferences(
       runId,
       projectId,
     )
-    .first<HuntRunRow>();
+    .first<HuntRunRowWithoutDifficulty>();
 }
 
 export async function updateIssueCheckpoints(

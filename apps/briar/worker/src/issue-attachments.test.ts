@@ -332,8 +332,23 @@ describe("issue create and update attachment mutations", () => {
     expect(updated).toMatchObject({
       runId: created.runId,
       title: "After update",
+      difficulty: "hard",
       attachments: [{ id: replacementUploadId }],
     });
+    // The mutation batch writes the difficulty into briar_run_difficulties and
+    // the receipt's scalar guard reads it back from there; if either half were
+    // still on the legacy column the whole batch would abort.
+    const storedDifficulty = () =>
+      db.prepare(
+        "select difficulty from briar_run_difficulties where run_id = ?",
+      ).bind(created.runId).first<string>("difficulty");
+    expect(await storedDifficulty()).toBe("hard");
+    expect(
+      await db.prepare("select difficulty from briar_hunt_runs where id = ?")
+        .bind(created.runId).first<string | null>("difficulty"),
+    ).toBeNull();
+    expect((await getHuntRunForProject(db, projectId, created.runId))
+      ?.issue_difficulty).toBe("hard");
     await expect(updateProjectIssue(input)).resolves.toEqual(updated);
     await expect(updateProjectIssue({
       ...input,
@@ -357,6 +372,76 @@ describe("issue create and update attachment mutations", () => {
       attachmentIds: [],
       keptAttachmentIds: [crypto.randomUUID()],
     })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("clears the difficulty by removing its side-table row", async () => {
+    const clientIssueId = crypto.randomUUID();
+    const created = await createProjectIssue({
+      db,
+      projectId,
+      userId: ownerId,
+      clientIssueId,
+      request: decodeIssueInput({
+        title: "Difficulty lifecycle",
+        description: null,
+        status: "queued",
+        checkpoints: [],
+        fullAuto: false,
+        difficulty: "expert",
+      }),
+      attachmentIds: [],
+    });
+    const storedDifficulty = () =>
+      db.prepare(
+        "select difficulty from briar_run_difficulties where run_id = ?",
+      ).bind(created.runId).first<string>("difficulty");
+    expect(await storedDifficulty()).toBe("expert");
+
+    const cleared = await updateProjectIssue({
+      db,
+      projectId,
+      runId: created.runId,
+      userId: ownerId,
+      requestId: crypto.randomUUID(),
+      request: decodeIssueUpdateInput({
+        title: "Difficulty lifecycle",
+        description: null,
+        priority: null,
+        difficulty: null,
+        assigneeUserId: null,
+      }),
+      keptAttachmentIds: [],
+      attachmentIds: [],
+    });
+    // "Unset" is an absent row, and the receipt's scalar guard has to read
+    // that absence back as null or the whole mutation batch aborts.
+    expect(cleared.difficulty).toBeNull();
+    expect(await storedDifficulty()).toBeNull();
+    expect((await getHuntRunForProject(db, projectId, created.runId))
+      ?.issue_difficulty).toBeNull();
+
+    const restored = await updateProjectIssue({
+      db,
+      projectId,
+      runId: created.runId,
+      userId: ownerId,
+      requestId: crypto.randomUUID(),
+      request: decodeIssueUpdateInput({
+        title: "Difficulty lifecycle",
+        description: null,
+        priority: null,
+        difficulty: "easy",
+        assigneeUserId: null,
+      }),
+      keptAttachmentIds: [],
+      attachmentIds: [],
+    });
+    expect(restored.difficulty).toBe("easy");
+    expect(await storedDifficulty()).toBe("easy");
+    expect(
+      await db.prepare("select difficulty from briar_hunt_runs where id = ?")
+        .bind(created.runId).first<string | null>("difficulty"),
+    ).toBeNull();
   });
 
   it("leaves no aggregate when an upload belongs to another mutation", async () => {
@@ -452,6 +537,7 @@ describe("issue create and update attachment mutations", () => {
 
     await expect(db.batch([
       statements.update,
+      ...statements.difficulty,
       ...statements.cleanup,
       ...statements.removals,
       statements.receipt,

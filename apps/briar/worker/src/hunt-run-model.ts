@@ -13,6 +13,14 @@ import {
 import type { IssueDifficulty } from "../../src/lib/issue-difficulty";
 import type { PlanningProjectId, TeamId } from "../../src/lib/entity-ids";
 
+/**
+ * A `briar_hunt_runs` row produced by a statement that cannot join
+ * `briar_run_difficulties` -- a RETURNING clause. Reading the difficulty off
+ * one of these is a type error on purpose; re-read the run through
+ * `getHuntRunForProject` if it is needed.
+ */
+export type HuntRunRowWithoutDifficulty = Omit<HuntRunRow, "issue_difficulty">;
+
 export type HuntRunRow = {
   id: string;
   /** Legacy execution-boundary column; exposed as teamId during cutover. */
@@ -32,7 +40,14 @@ export type HuntRunRow = {
   issue_checkpoints_json: string;
   detail: string | null;
   priority: number | null;
-  difficulty: IssueDifficulty | null;
+  /**
+   * Joined from `briar_run_difficulties`, not read off `briar_hunt_runs`. The
+   * legacy `difficulty` column is still on the table and still arrives with
+   * `select run.*`, so this name is deliberately different: reading `difficulty`
+   * off a run row is now a type error rather than a silently stale value. See
+   * `run-difficulty-repository.ts`.
+   */
+  issue_difficulty: IssueDifficulty | null;
   assignee_user_id: string | null;
   created_by_user_id?: string | null;
   subscribers_json?: string;

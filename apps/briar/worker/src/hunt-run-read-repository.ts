@@ -7,6 +7,10 @@ import type {
   TeamId,
 } from "../../src/lib/entity-ids";
 import { type HuntRunRow } from "./hunt-run-model";
+import {
+  runDifficultyJoinSql,
+  runDifficultySelectSql,
+} from "./run-difficulty-repository";
 
 export type DashboardRunListCursor = {
   readonly snapshotAt: string;
@@ -44,7 +48,7 @@ export type DashboardRunSummaryRow = Pick<
   | "workflow_snapshot_json"
   | "detail"
   | "priority"
-  | "difficulty"
+  | "issue_difficulty"
   | "assignee_user_id"
   | "issue_description"
   | "result_summary"
@@ -125,7 +129,8 @@ const dashboardSummarySelect = `
          run.run_number, run.current_attempt, run.current_revision,
          run.source, run.source_key, run.source_created_at, run.title,
          run.status, run.workflow_stage, run.workflow_snapshot_json,
-         run.detail, run.priority, run.difficulty, run.assignee_user_id,
+         run.detail, run.priority, ${runDifficultySelectSql},
+         run.assignee_user_id,
          run.issue_description, run.result_summary, run.full_auto,
          run.pull_request_urls, run.claimed_by, run.claimed_at,
          run.lease_expires_at, run.preferred_agent_provider,
@@ -159,7 +164,8 @@ const dashboardSummarySelect = `
     join briar_teams team on team.id = run.project_id
     join briar_planning_projects planning_project
       on planning_project.id = run.planning_project_id
-     and planning_project.team_id = team.id`;
+     and planning_project.team_id = team.id
+    ${runDifficultyJoinSql("run")}`;
 
 const buildDashboardRunListQuery = (
   projectId: TeamId,
@@ -270,7 +276,8 @@ export type OrganizationStatusTrayRunRow = Pick<
 export async function listDashboardRuns(db: D1Database, projectId: TeamId) {
   const runs = await db
     .prepare(
-      `select run.*, team.organization_id as workspace_id,
+      `select run.*, ${runDifficultySelectSql},
+              team.organization_id as workspace_id,
               run.project_id as team_id,
               planning_project.name as planning_project_name,
               coalesce((
@@ -297,6 +304,7 @@ export async function listDashboardRuns(db: D1Database, projectId: TeamId) {
        join briar_planning_projects planning_project
          on planning_project.id = run.planning_project_id
         and planning_project.team_id = team.id
+       ${runDifficultyJoinSql("run")}
        where run.project_id = ?
        order by
          case when run.status in ('completed', 'cancelled') then 1 else 0 end,
@@ -317,7 +325,8 @@ export async function listDashboardRunsByIds(
   if (runIds.length === 0) return [];
   const runs = await db
     .prepare(
-      `select run.*, team.organization_id as workspace_id,
+      `select run.*, ${runDifficultySelectSql},
+              team.organization_id as workspace_id,
               run.project_id as team_id,
               planning_project.name as planning_project_name,
               coalesce((
@@ -344,6 +353,7 @@ export async function listDashboardRunsByIds(
        join briar_planning_projects planning_project
          on planning_project.id = run.planning_project_id
         and planning_project.team_id = team.id
+       ${runDifficultyJoinSql("run")}
        where run.project_id = ?
          and run.id in (select value from json_each(?))
        order by run.updated_at desc`,
