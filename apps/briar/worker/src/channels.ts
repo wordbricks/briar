@@ -1,3 +1,4 @@
+import { dmScheduleReplyFenceCurrent } from "./dm-schedule-fence";
 import { dmReplyRoutingAvailable } from "./dm-reply-routing-admission";
 import { dmReplySteerStatements } from "./dm-reply-steer";
 import { workerAgentProviderFromProto } from "./worker-runtime-mappers";
@@ -362,6 +363,7 @@ export type ChannelReplyJobRow = {
   origin_reply_job_id: string | null;
   execution_target_ids_json?: string;
   session_id: string | null;
+  dm_schedule_id?: string | null;
   routing_action?: string | null;
   routing_decision_action?: string | null;
   routing_target_job_id?: string | null;
@@ -450,7 +452,7 @@ export const liveChannelReplyRuntime = (job: string) => `coalesce((
         )
       )
   )
-), 0) = 1`;
+), 0) = 1 and ${dmScheduleReplyFenceCurrent(job)}`;
 
 const channelSelectColumns = `
   select channel.id, channel.organization_id, channel.kind, channel.dm_key,
@@ -2978,6 +2980,15 @@ export async function getClaimedChannelReplyAttachment(
           where absorbed.superseded_by_reply_job_id = job.id
             and absorbed.channel_id = job.channel_id and absorbed.agent_id = job.agent_id
             and absorbed.trigger_message_id = attachment.message_id
+        ) or exists (
+          select 1 from briar_dm_schedules schedule
+          join briar_channel_agent_reply_jobs previous on previous.id = schedule.previous_job_id
+            and previous.organization_id = job.organization_id and previous.channel_id = job.channel_id
+            and previous.agent_id = job.agent_id
+          join briar_channel_messages previous_message on previous_message.id = previous.reply_message_id
+            and previous_message.deleted_at is null
+          where schedule.id = job.dm_schedule_id and schedule.current_job_id = job.id
+            and previous.reply_message_id = attachment.message_id
         ))
        where job.id = ? and job.organization_id = ?
          and job.claimed_device_id = ? and job.claim_token_hash = ?

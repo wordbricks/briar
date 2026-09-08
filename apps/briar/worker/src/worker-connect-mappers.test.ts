@@ -82,7 +82,7 @@ const channelReply = {
   inputRevision: 0,
   publishedMessageBatches: [],
   snapshot: {
-    dmRoutingContext: null,
+    dmRoutingContext: null, dmScheduleContext: null,
     channel: {
       id: common.runId,
       kind: "channel" as const,

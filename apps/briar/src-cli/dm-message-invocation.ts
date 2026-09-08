@@ -77,7 +77,7 @@ type Owner = {
 };
 
 export type DmMessageInvocationInput = {
-  readonly queue: Pick<WorkerQueueClient, "publishDmMessageBatch">;
+  readonly queue: Pick<WorkerQueueClient, "publishDmMessageBatch"> & Partial<Pick<WorkerQueueClient, "executeDmScheduleTool">>;
   readonly projectId: string;
   readonly workerId: string;
   readonly work: ClaimedChannelReply;
@@ -529,6 +529,7 @@ export class DmMessageInvocation {
   private async handleSocket(socket: Socket) {
     const requestAbort = new AbortController();
     let decoded = false;
+    let scheduleRequest = false;
     const deadline = setTimeout(() => {
       if (decoded) requestAbort.abort(new Error("publication_deadline"));
       else socket.destroy();
@@ -566,21 +567,34 @@ export class DmMessageInvocation {
         requestAbort.signal,
         ...(this.input.signal ? [this.input.signal] : []),
       ]);
-      const parts = first.value.parts.map((part) => ({
-        clientId: part.clientId,
-        body: part.body,
-        purpose: part.purpose,
-      }));
-      const receipt = await this.serialize(() => {
-        this.authorize(first.value);
-        return this.publish(
-          first.value.operationKey,
-          DmMessagePublicationKind.INTERMEDIATE,
-          parts,
-          operationSignal,
-        );
-      });
-      response = this.response(receipt);
+      if (first.value.schedule) {
+        scheduleRequest = true;
+        if (!this.scheduleTools() || first.value.parts.length) throw new Error("publication_request_invalid");
+        const result = await this.serialize(() => {
+          this.authorize(first.value);
+          return this.input.queue.executeDmScheduleTool!({
+            projectId: this.input.projectId, workerId: this.input.workerId,
+            work: workClaimIdentityToProto(this.input.work), operation: first.value.schedule!,
+          }, { signal: operationSignal });
+        });
+        response = create(DmMessagePublicationResponseSchema, { result: { case: "schedule", value: result } });
+      } else {
+        const parts = first.value.parts.map((part) => ({
+          clientId: part.clientId,
+          body: part.body,
+          purpose: part.purpose,
+        }));
+        const receipt = await this.serialize(() => {
+          this.authorize(first.value);
+          return this.publish(
+            first.value.operationKey,
+            DmMessagePublicationKind.INTERMEDIATE,
+            parts,
+            operationSignal,
+          );
+        });
+        response = this.response(receipt);
+      }
     } catch (error) {
       const rawReason = requestAbort.signal.aborted && decoded
         ? "publication_unknown"
@@ -593,7 +607,10 @@ export class DmMessageInvocation {
         "publication_invocation_closed",
         "publication_request_invalid",
       ].includes(rawReason) ? rawReason : "publication_failed";
-      response = this.errorResponse(reason);
+      const scheduleReason = scheduleRequest && error instanceof ConnectError &&
+        [Code.InvalidArgument, Code.NotFound, Code.PermissionDenied, Code.FailedPrecondition, Code.Aborted].includes(error.code)
+        ? `schedule_request_failed: ${error.rawMessage.slice(0, 300)}` : null;
+      response = this.errorResponse(scheduleReason ?? reason);
     } finally {
       clearTimeout(deadline);
       this.sockets.delete(socket);
@@ -640,6 +657,8 @@ export class DmMessageInvocation {
     });
   }
 
+  private scheduleTools() { return Boolean(this.input.queue.executeDmScheduleTool && this.input.work.provider === "codex" && this.input.work.routing?.action === "new"); }
+
   binding(): DmMessagePublicationBinding {
     return create(DmMessagePublicationBindingSchema, {
       invocationId: this.invocationId,
@@ -651,6 +670,7 @@ export class DmMessageInvocation {
         nanos: (this.expiresAt.getTime() % 1_000) * 1_000_000,
       },
       protocol: 1,
+      scheduleTools: this.scheduleTools(),
     });
   }
 
@@ -659,6 +679,7 @@ export class DmMessageInvocation {
   prompt() {
     const batches = this.publishedBatchIds();
     return [
+      ...(this.scheduleTools() ? ["For an explicit later or repeating request use create_dm_schedule; inspect with list_dm_schedules and cancel by its returned ID with cancel_dm_schedule. Do not merely promise to remember a timer. Relative delays start at the original user message's server receipt time. Use a confirmed IANA time zone for absolute times; ask only if the time zone or target is unclear. For relative delays an unknown display zone can remain UTC. Repeats are fixed whole minutes (minimum five minutes); daily means every 24 hours, not a calendar appointment. Only confirm after a successful server result, include its nextRunDisplay/timeZone, and say execution may be delayed. Every occurrence reports normally. Preserve the requestKey when retrying the same request. A cancel result with stopState=requested means stop requested, not stopped; never claim past external effects were undone. A previousJobId carries result/artifact references into a new execution, not permission to repeat completed side effects."] : []),
       "This direct-message reply supports durable public progress updates through the publish_dm_message MCP tool.",
       "Skip a starting update for an immediate answer. For longer work, publish a short concrete update before the first long-running tool call, then publish only when there is a real discovery, changed expectation, or required input.",
       "A successful tool result is the only proof that an update was published. Keep the same operationKey and clientId values when retrying the same ordered batch. Use new values only for a new fact or correction.",

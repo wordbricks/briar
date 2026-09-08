@@ -1,3 +1,4 @@
+import { getDmScheduleContext } from "./dm-schedules";
 import { dmReplyRoutingContext } from "./dm-reply-routing";
 import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
 import { channelReplyContextMessageJson } from "../../src/lib/channels-contract";
@@ -463,6 +464,8 @@ export async function claimNextChannelReplyWork(
           enabled: String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
         })
       : null;
+    const scheduleContext = job.dm_schedule_id ? await getDmScheduleContext(db, job.id) : null;
+    if (job.dm_schedule_id && !scheduleContext) throw new HttpError(409, "Scheduled DM authority changed");
     const safeMessages = channel.kind === "dm" && !agentDirectMessage
       ? await excludeForgottenDmSources(db, channel.id, responseMessages)
       : responseMessages;
@@ -585,8 +588,8 @@ export async function claimNextChannelReplyWork(
         agentMessageTargets,
         inboundAgentMessage,
         agentMessageHop: job.agent_message_hop,
-        triggerAttachments: safeMessages.filter((message) => pendingTriggerMessageIds.includes(message.id))
-          .flatMap((message) => message.attachments ?? []).map(
+        triggerAttachments: [...safeMessages.filter((message) => pendingTriggerMessageIds.includes(message.id))
+          .flatMap((message) => message.attachments ?? []), ...(scheduleContext?.artifacts ?? [])].map(
           (attachment) => ({
             id: attachment.id,
             filename: attachment.filename,
@@ -600,6 +603,11 @@ export async function claimNextChannelReplyWork(
           }),
         ),
         snapshot: {
+          dmScheduleContext: scheduleContext ? { ...scheduleContext,
+            artifacts: scheduleContext.artifacts.map((attachment) => ({ ...attachment,
+              url: channelReplyAttachmentPath({ organizationId: job.organization_id, workId: job.id, attachmentId: attachment.id }),
+            })),
+          } : null,
           dmRoutingContext: job.routing_action ? await dmReplyRoutingContext(db, job) : null,
           channel: {
             id: channel.id,

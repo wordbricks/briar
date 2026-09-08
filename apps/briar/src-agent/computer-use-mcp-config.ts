@@ -40,6 +40,7 @@ export type StdioMcpServer = {
   readonly command: string;
   readonly args: string[];
   readonly env: Readonly<Record<string, string>>;
+  readonly approvedTools?: readonly string[];
 };
 
 export type PreparedComputerUseMcp = {

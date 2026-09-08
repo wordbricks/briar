@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: abf263350c3b8f2c9a8e0481e7d75fab73ca74b6b7c6e750879b63ddd5dc3227
--- snapshot-digest: 4ca135a6ea9fb5c809cec5e0f220199e3c063ee10f4ee4fc6ac01b0c63577ab7
+-- migrations-digest: 8a0ebadd47bfa7a2f7c4c10186c755346bf1f3610176892597c5a868c4e0245c
+-- snapshot-digest: 37e0c0cc32f73644e97995311b3b6c125242934dd743ede33c0828b382de8eb4
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2408,7 +2408,7 @@ CREATE TABLE briar_channel_agent_reply_jobs (
   default 0 check (planned_update_resume in (0, 1)), session_id text
   references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0, agent_message_hop integer not null default 0
     check (agent_message_hop between 0 and 2), origin_reply_job_id text
-    references briar_channel_agent_reply_jobs (id) on delete cascade, superseded_by_reply_job_id text, steer_revision integer not null default 0, applied_steer_revision integer not null default 0, last_input_at text, steer_restart_count integer not null default 0, routing_action text, routing_target_job_id text, routing_response text, stop_requested_at text, stop_confirmed_at text, routing_receipt_id text, routing_decision_action text,
+    references briar_channel_agent_reply_jobs (id) on delete cascade, superseded_by_reply_job_id text, steer_revision integer not null default 0, applied_steer_revision integer not null default 0, last_input_at text, steer_restart_count integer not null default 0, routing_action text, routing_target_job_id text, routing_response text, stop_requested_at text, stop_confirmed_at text, routing_receipt_id text, routing_decision_action text, dm_schedule_id text,
   unique (channel_id, trigger_message_id, agent_id),
   foreign key ("agent_provider") references briar_agent_providers (provider)
 );
@@ -3842,6 +3842,31 @@ CREATE TABLE briar_dm_public_message_receipts (
   created_at text not null
 ) strict;
 -- @statement
+CREATE TABLE briar_dm_schedules (
+  id text primary key not null,
+  organization_id text not null references briar_organizations(id) on delete cascade,
+  channel_id text not null references briar_channels(id) on delete cascade,
+  owner_user_id text not null references "user"(id) on delete cascade,
+  agent_id text not null references briar_project_agents(id) on delete cascade,
+  source_message_id text not null references briar_channel_messages(id) on delete cascade,
+  source_version integer not null,
+  roster_epoch integer not null,
+  request_key text not null,
+  payload_hash text not null,
+  instruction text not null check (length(instruction) between 1 and 8000),
+  previous_job_id text,
+  next_run_at text not null,
+  interval_seconds integer check (interval_seconds is null or interval_seconds between 300 and 31536000),
+  time_zone text not null,
+  enabled integer not null default 1 check (enabled in (0, 1)),
+  revision integer not null default 1,
+  current_job_id text,
+  cancelled_at text,
+  created_at text not null,
+  updated_at text not null,
+  unique (channel_id, owner_user_id, agent_id, source_message_id, request_key)
+);
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -5189,6 +5214,10 @@ CREATE UNIQUE INDEX briar_channel_messages_dm_batch_part_idx
 CREATE UNIQUE INDEX briar_channel_messages_dm_sequence_idx
   on briar_channel_messages (channel_id, dm_sequence)
   where dm_sequence is not null;
+-- @statement
+CREATE INDEX briar_dm_schedules_due on briar_dm_schedules(enabled, next_run_at);
+-- @statement
+CREATE INDEX briar_dm_schedules_scope on briar_dm_schedules(channel_id, owner_user_id, agent_id, created_at);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN

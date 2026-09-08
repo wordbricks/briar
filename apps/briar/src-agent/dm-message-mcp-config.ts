@@ -12,6 +12,7 @@ export type DmMessageMcpConfig = {
   readonly socketPath: string;
   readonly capability: string;
   readonly expiresAt: string;
+  readonly scheduleTools?: boolean;
 };
 
 export type PreparedDmMessageMcp = {
@@ -31,7 +32,8 @@ const decodeConfig = (value: unknown): DmMessageMcpConfig => {
   if (config.version !== 1 || typeof config.invocationId !== "string" ||
       typeof config.socketPath !== "string" || typeof config.capability !== "string" ||
       !/^[A-Za-z0-9_-]{22,128}$/u.test(config.capability) ||
-      typeof config.expiresAt !== "string") {
+      typeof config.expiresAt !== "string" ||
+      (config.scheduleTools !== undefined && typeof config.scheduleTools !== "boolean")) {
     throw new Error("DM message MCP config is invalid");
   }
   assertAbsolutePath(config.socketPath, "socketPath");
@@ -63,6 +65,7 @@ export const prepareDmMessageMcp = async (
     socketPath: binding.socketPath,
     capability: Buffer.from(binding.capability).toString("base64url"),
     expiresAt: expiresAt.toISOString(),
+    scheduleTools: binding.scheduleTools,
   });
   const directory = await mkdtemp(join(tmpdir(), "briar-dm-message-"));
   await chmod(directory, 0o700);
@@ -75,6 +78,8 @@ export const prepareDmMessageMcp = async (
   return {
     servers: [{
       name: "briar-dm-message",
+      // These operations already require this invocation capability and a live scoped server claim.
+      approvedTools: config.scheduleTools ? ["create_dm_schedule", "list_dm_schedules", "cancel_dm_schedule"] : [],
       command: process.execPath,
       args: [serverPath, "--config", configPath],
       env: {},

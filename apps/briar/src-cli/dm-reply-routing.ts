@@ -31,6 +31,7 @@ export async function classifyDmReply(input: {
         "Classify this incoming DM. This is a short routing turn, with no tools. Do not perform the requested work.",
         "Return action new, steer, cancel, answer, or clarify, targetJobId, and response. Reply in the user's language.",
         "new means independent work, including questions requiring investigation. Give it its own execution.",
+        "Future scheduling requests (create, list, or cancel a saved schedule) require the main execution schedule tools: choose new, even when the previous job created that schedule. Routing cancel stops an execution job only; it does not cancel a future schedule.",
         "steer changes an existing unfinished job's goal; cancel stops only the clearly selected job. Both require its exact ID.",
         "answer responds briefly using only the supplied conversation and recorded job status, without changing any job.",
         "clarify asks one short question when the target or intent is ambiguous. Never guess a destructive target.",

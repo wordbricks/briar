@@ -55,6 +55,9 @@ export const codexComputerUseArgs = (
     `${prefix}.env=${tomlInlineStringTable(server.env)}`,
     "--config",
     `${prefix}.required=true`,
+    ...(server.approvedTools ?? []).flatMap((tool) => [
+      "--config", `${prefix}.tools.${tomlKey(tool)}.approval_mode="approve"`,
+    ]),
   ];
 });
 

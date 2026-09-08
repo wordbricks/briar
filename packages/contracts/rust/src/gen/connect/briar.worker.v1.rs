@@ -8,6 +8,18 @@ pub type OwnedClaimWorkRequestView = ::buffa::view::OwnedView<
 pub type OwnedClaimWorkResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ExecuteDmScheduleToolRequestView<'static>>`.
+pub type OwnedExecuteDmScheduleToolRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ExecuteDmScheduleToolResponseView<'static>>`.
+pub type OwnedExecuteDmScheduleToolResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ResolveDmReplyRoutingRequestView<'static>>`.
 pub type OwnedResolveDmReplyRoutingRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingRequestView<
@@ -480,6 +492,48 @@ for crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::ClaimWorkResponse>
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -2012,6 +2066,12 @@ pub const WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC: ::connectrpc::Spec = ::connectrp
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ExecuteDmScheduleTool` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_EXECUTE_DM_SCHEDULE_TOOL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/ExecuteDmScheduleTool",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ResolveDmReplyRouting` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const WORKER_QUEUE_SERVICE_RESOLVE_DM_REPLY_ROUTING_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.worker.v1.WorkerQueueService/ResolveDmReplyRouting",
@@ -2217,6 +2277,29 @@ pub trait WorkerQueueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::ClaimWorkResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ExecuteDmScheduleTool RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn execute_dm_schedule_tool<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2787,6 +2870,35 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                 },
             )
             .with_spec(WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "ExecuteDmScheduleTool",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.execute_dm_schedule_tool(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_EXECUTE_DM_SCHEDULE_TOOL_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
                 "ResolveDmReplyRouting",
@@ -3487,6 +3599,12 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .with_spec(WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC),
                 )
             }
+            "ExecuteDmScheduleTool" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_EXECUTE_DM_SCHEDULE_TOOL_SPEC),
+                )
+            }
             "ResolveDmReplyRouting" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -3673,6 +3791,28 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::ClaimWorkResponse,
+                        >(format)
+                })
+            }
+            "ExecuteDmScheduleTool" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+                    >::from_parts(&req, &body);
+                    svc.execute_dm_schedule_tool(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
                         >(format)
                 })
             }
@@ -4329,6 +4469,51 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ExecuteDmScheduleTool RPC. Sends a request to /briar.worker.v1.WorkerQueueService/ExecuteDmScheduleTool.
+    pub async fn execute_dm_schedule_tool(
+        &self,
+        request: crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.execute_dm_schedule_tool_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ExecuteDmScheduleTool RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn execute_dm_schedule_tool_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_EXECUTE_DM_SCHEDULE_TOOL_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

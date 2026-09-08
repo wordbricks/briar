@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { createConnection } from "node:net";
-import { create } from "@bufbuild/protobuf";
+import { create, toJson } from "@bufbuild/protobuf";
+import { ExecuteDmScheduleToolResponseSchema, type DmScheduleToolOperation } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { sizeDelimitedDecodeStream, sizeDelimitedEncode } from "@bufbuild/protobuf/wire";
 import { DmMessagePurpose } from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import {
@@ -34,6 +35,7 @@ const purposeToProto = (purpose: (typeof purposeValues)[number]) => ({
 const exchange = async (
   config: DmMessageMcpConfig,
   input: {
+    schedule?: Omit<DmScheduleToolOperation, "$typeName">;
     operationKey: string;
     parts: Array<{ clientId: string; body: string; purpose: (typeof purposeValues)[number] }>;
   },
@@ -43,6 +45,7 @@ const exchange = async (
     invocationId: config.invocationId,
     capability: Buffer.from(config.capability, "base64url"),
     operationKey: input.operationKey,
+    schedule: input.schedule,
     parts: input.parts.map((part) => create(DmMessagePublicationPartSchema, {
       clientId: part.clientId,
       body: part.body,
@@ -109,6 +112,33 @@ export async function runDmMessageMcpServer(
       content: [{ type: "text" as const, text: error }],
     };
   });
+  if (config.scheduleTools) {
+    const scheduleTool = async (schedule: Omit<DmScheduleToolOperation, "$typeName">) => {
+      const response = await exchange(config, { operationKey: schedule.requestKey || "schedule", parts: [], schedule });
+      return response.result.case === "schedule" ? {
+        content: [{ type: "text" as const, text: JSON.stringify(toJson(ExecuteDmScheduleToolResponseSchema, response.result.value)) }],
+      } : { isError: true, content: [{ type: "text" as const, text: response.result.case === "error" ? response.result.value.reason : "schedule_failed" }] };
+    };
+    server.registerTool("create_dm_schedule", {
+      description: "Save an explicitly requested later/recurring task in this DM. Confirm only after the server succeeds and quote its next time and delay notice. Relative delays use original server receipt time; absolute time requires the user's confirmed IANA zone. Daily means fixed 24 hours. Reuse requestKey for retries.",
+      inputSchema: {
+        requestKey: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u),
+        instruction: z.string().trim().min(1).max(8000),
+        delaySeconds: z.number().int().min(1).max(31536000).optional(),
+        runAt: z.string().optional(),
+        intervalSeconds: z.number().int().min(300).max(31536000).multipleOf(60).optional(),
+        timeZone: z.string().default("UTC"), timeZoneConfirmed: z.boolean().default(false),
+        previousJobId: z.string().optional(),
+      },
+    }, (input) => scheduleTool({ ...input, action: "create", scheduleId: "" }));
+    server.registerTool("list_dm_schedules", {
+      description: "List this owner's schedules in this DM with next times and cancellation state. If truncated, pass the last returned ID as beforeScheduleId for the next page.", inputSchema: { beforeScheduleId: z.string().optional() },
+    }, (input) => scheduleTool({ action: "list", requestKey: "", scheduleId: input.beforeScheduleId ?? "", instruction: "", timeZone: "", timeZoneConfirmed: false }));
+    server.registerTool("cancel_dm_schedule", {
+      description: "Disable the selected schedule and request its queued/running occurrence to stop. A requested stop is not a confirmed stop; completed external effects are not undone.",
+      inputSchema: { scheduleId: z.string().min(1) },
+    }, (input) => scheduleTool({ action: "cancel", requestKey: "", scheduleId: input.scheduleId, instruction: "", timeZone: "", timeZoneConfirmed: false }));
+  }
   await server.connect(new StdioServerTransport());
 }
 

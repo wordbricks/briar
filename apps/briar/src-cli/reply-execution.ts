@@ -1004,6 +1004,7 @@ async function runClaimedChannelReply(
         downloadedFilePaths: downloadedAttachments.filePaths,
       },
       workspaceAvailable: Boolean(analysisWorktree),
+      workspaceRetained: Boolean(reply.routing && reply.session),
       organizationContextAvailable: organizationContext !== null,
       memoryLearningAvailable: reply.memoryLearningEnabled,
       delegationTargets: reply.delegationTargets,
