@@ -158,4 +158,60 @@ describe("DM memory Connect invocation", () => {
       { BRIAR_DM_REPLY_ERROR_DETAIL: "  " },
     )).not.toContain("private recalled text");
   });
+
+  it("describes what the redaction replaced, not the redaction", () => {
+    const wrapped = dmMemoryExecutionError(
+      new ConnectError("private recalled text", Code.FailedPrecondition),
+    );
+    expect(wrapped.message).toBe("memory_reply_failed");
+    const diagnostic = dmMemoryErrorDiagnostic(wrapped, {});
+    expect(diagnostic).toContain("Error <- ConnectError");
+    expect(diagnostic).toContain("connect=FailedPrecondition");
+    expect(diagnostic).not.toContain("private recalled text");
+    expect(dmMemoryErrorDiagnostic(wrapped, { BRIAR_DM_REPLY_ERROR_DETAIL: "1" }))
+      .toContain("message=[failed_precondition] private recalled text");
+  });
+
+  it("keeps the machine codes and frames a wrapped system failure carries", () => {
+    const wrapped = dmMemoryExecutionError((function providerTurnFailed() {
+      return Object.assign(new Error("private recalled text"), {
+        code: "ENOENT",
+        syscall: "open",
+        errno: -2,
+      });
+    })());
+    const diagnostic = dmMemoryErrorDiagnostic(wrapped, {});
+    expect(diagnostic).toContain("code=ENOENT");
+    expect(diagnostic).toContain("syscall=open");
+    expect(diagnostic).toContain("errno=-2");
+    // The log line the redaction used to produce named only itself.
+    expect(diagnostic).toContain("providerTurnFailed");
+    expect(diagnostic).not.toContain("dmMemoryExecutionError");
+    expect(diagnostic).not.toContain("private recalled text");
+  });
+
+  it("bounds a chain that is deep or loops back on itself", () => {
+    const links = (error: unknown) => dmMemoryErrorDiagnostic(error, {}).split(" | ")[0]!.split(" <- ");
+    let deep: Error = new Error("deepest");
+    for (let depth = 0; depth < 8; depth++) deep = new Error(`link-${depth}`, { cause: deep });
+    expect(links(deep)).toHaveLength(5);
+    const first = new Error("first");
+    const second = new Error("second", { cause: first });
+    Object.assign(first, { cause: second });
+    expect(links(second)).toHaveLength(2);
+  });
+
+  it("keeps the field a missing response names", async () => {
+    await expect(DmMemoryInvocation.create({
+      queue: { ...queue(), getDmMemoryBrief: vi.fn(async () => create(GetDmMemoryBriefResponseSchema, {})) },
+      projectId: crypto.randomUUID(),
+      workerId: "worker-1",
+      work,
+      memory: descriptor,
+    })).rejects.toThrow("memory_response_missing_memory");
+    for (const field of ["memory", "response"]) {
+      expect(dmMemoryExecutionError(new Error(`memory_response_missing_${field}`)))
+        .toMatchObject({ message: `memory_response_missing_${field}` });
+    }
+  });
 });
