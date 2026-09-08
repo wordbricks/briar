@@ -5690,9 +5690,16 @@ button.issue-message-state { width:100%; cursor:pointer; }
   border-radius: 12px;
   background: var(--background, #faf9f6);
 }
+/*
+  Messages sent before attachment dimensions were recorded, and clients that
+  still upload without them, fall back to this ratio. The reservation is fixed
+  for the lifetime of the row so the picture arriving never changes its height.
+*/
 .channel-message-image-preview {
   display: grid;
+  aspect-ratio: 4 / 3;
   min-height: 120px;
+  max-height: 420px;
   overflow: hidden;
   background: var(--muted, #f2efe9);
   place-items: center;
@@ -5707,10 +5714,10 @@ button.issue-message-state { width:100%; cursor:pointer; }
   place-items: center;
   overflow: hidden;
 }
-.channel-message-images img {
+.channel-message-image-preview img {
   display: block;
   width: 100%;
-  max-height: 420px;
+  height: 100%;
   object-fit: cover;
 }
 .channel-message-attachment-card figcaption {
@@ -5826,10 +5833,17 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-document-card span,
 .channel-proposal-card span { color: var(--muted-foreground, #777168); font-size: 11px; }
 .channel-document-card-copy strong { color:var(--foreground,#25221f); font-size:13px; }
+/*
+  The skeleton and the finished card share this floor so the swap between them
+  does not move the rows underneath while a channel loads its previews. It is
+  the height of a card with no image: the meta row, a title, and the two
+  description lines the copy block below reserves, plus the border.
+*/
 .channel-link-preview,
 .channel-link-preview-loading {
   display: block;
   width: min(520px, 100%);
+  min-height: 103px;
   margin-top: 7px;
   overflow: hidden;
   border: 1px solid var(--border, #ddd8cf);
@@ -5874,6 +5888,7 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-link-preview-copy {
   display: flex;
   min-width: 0;
+  min-height: 68px;
   flex-direction: column;
   gap: 3px;
   padding: 0 12px 11px;
@@ -5896,16 +5911,30 @@ button.issue-message-state { width:100%; cursor:pointer; }
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
+/*
+  Reserved before the lazy image loads. Sites that publish og:image:width and
+  og:image:height override the ratio inline; everything else keeps the 1.91:1
+  Open Graph default, which the worker only replaces when it can read the real
+  size out of the image header.
+*/
 .channel-link-preview-image {
   display: block;
   width: 100%;
+  aspect-ratio: 1.91 / 1;
   max-height: 260px;
+  overflow: hidden;
   border-top: 1px solid var(--border, #ddd8cf);
   background: var(--muted, #f2efe9);
+}
+.channel-link-preview-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 .channel-link-preview-loading {
   display: grid;
+  align-content: start;
   gap: 7px;
   padding: 13px 12px;
 }

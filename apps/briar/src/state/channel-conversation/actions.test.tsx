@@ -306,6 +306,23 @@ describe("channel conversation actions", () => {
     const fakeBlobUrl = "blob:http://localhost/sent-photo";
     const createObjectURLOriginal = URL.createObjectURL;
     URL.createObjectURL = vi.fn(() => fakeBlobUrl);
+    /*
+      jsdom never decodes an image, so the measurement the optimistic message
+      waits for is stubbed here rather than left to time out.
+    */
+    const ImageOriginal = globalThis.Image;
+    Object.defineProperty(globalThis, "Image", {
+      configurable: true,
+      value: class {
+        naturalWidth = 1_024;
+        naturalHeight = 768;
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        set src(_value: string) {
+          queueMicrotask(() => this.onload?.());
+        }
+      },
+    });
     const imageCache: ChannelMessageImageCache = {
       disposed: false,
       entries: new Map(),
@@ -323,9 +340,19 @@ describe("channel conversation actions", () => {
       request = current().send("photo upload", [], null, [fakeFile], ["ref-1"]);
       await Promise.resolve();
     });
+    await vi.waitFor(() => {
+      expect(storedMessages(registry)).toHaveLength(1);
+    });
 
-    expect(storedMessages(registry)).toHaveLength(1);
     expect(storedMessages(registry)[0]?.attachments[0]?.url).toBe(fakeBlobUrl);
+    /*
+      The reserved height of the attachment row comes from these numbers, so the
+      echo has to carry them before the picture is on screen.
+    */
+    expect(storedMessages(registry)[0]?.attachments[0]).toMatchObject({
+      imageWidth: 1_024,
+      imageHeight: 768,
+    });
     const optimisticId = storedMessages(registry)[0]!.id;
     const serverUrl = `/organizations/org-1/channels/${channelId}/messages/${optimisticId}/attachments/server-upload-1`;
 
@@ -361,5 +388,9 @@ describe("channel conversation actions", () => {
     expect(revokeSpy).not.toHaveBeenCalledWith(fakeBlobUrl);
 
     URL.createObjectURL = createObjectURLOriginal;
+    Object.defineProperty(globalThis, "Image", {
+      configurable: true,
+      value: ImageOriginal,
+    });
   });
 });

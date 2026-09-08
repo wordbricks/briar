@@ -481,6 +481,13 @@ function ChannelMessageMediaAttachment({
     );
   }
 
+  /*
+    Reserved on the container rather than the image, so the spinner, the error
+    glyph, and the loaded picture all occupy the same box. Attachments stored
+    before dimensions were recorded, and clients that upload without them, keep
+    the fixed fallback ratio the stylesheet declares instead of resizing once
+    the picture decodes.
+  */
   const dimensionStyle = attachment.imageWidth && attachment.imageHeight
     ? { aspectRatio: `${attachment.imageWidth} / ${attachment.imageHeight}` }
     : undefined;

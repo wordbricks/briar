@@ -1,6 +1,7 @@
 import BriarContracts
 import CryptoKit
 import Foundation
+import ImageIO
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -22,8 +23,44 @@ enum PreparedUploadPipeline {
             metadata.contentType = attachment.contentType
             metadata.byteSize = UInt64(attachment.data.count)
             metadata.sha256 = Data(SHA256.hash(data: attachment.data))
+            if let dimensions = imageDimensions(for: attachment) {
+                metadata.imageWidth = dimensions.width
+                metadata.imageHeight = dimensions.height
+            }
             return metadata
         }
+    }
+
+    /*
+      Readers reserve an attachment's height from these numbers before the
+      picture downloads. Uploading without them left the row to resize on load,
+      so iOS reports the same size the web uploader already sends.
+    */
+    static func imageDimensions(
+        for attachment: PendingIssueAttachment
+    ) -> (width: Int32, height: Int32)? {
+        guard attachment.contentType.hasPrefix("image/"),
+              let source = CGImageSourceCreateWithData(attachment.data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
+                  as? [CFString: Any],
+              let pixelWidth = properties[kCGImagePropertyPixelWidth] as? Int,
+              let pixelHeight = properties[kCGImagePropertyPixelHeight] as? Int,
+              pixelWidth > 0,
+              pixelHeight > 0,
+              pixelWidth <= Int(Int32.max),
+              pixelHeight <= Int(Int32.max)
+        else { return nil }
+        /*
+          EXIF orientations 5 through 8 turn the picture a quarter turn, so what
+          a reader sees is the transpose of what is stored. Browsers already
+          report the turned size, and every client has to agree on the box.
+        */
+        let orientation = properties[kCGImagePropertyOrientation] as? Int ?? 1
+        let isQuarterTurned = (5...8).contains(orientation)
+        return (
+            width: Int32(isQuarterTurned ? pixelHeight : pixelWidth),
+            height: Int32(isQuarterTurned ? pixelWidth : pixelHeight)
+        )
     }
 
     static func upload(

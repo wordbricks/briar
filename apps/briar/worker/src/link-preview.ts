@@ -1,3 +1,9 @@
+import {
+  maxImageHeaderBytes,
+  parseImageDimensions,
+  readLimitedBytes,
+} from "./image-dimensions";
+
 export type ChannelLinkPreview = {
   readonly url: string;
   readonly title: string | null;
@@ -13,6 +19,12 @@ const maxUrlLength = 2_048;
 const maxHtmlBytes = 256 * 1_024;
 const maxRedirects = 3;
 const fetchTimeoutMs = 5_000;
+/*
+  Only the first bytes of the picture are wanted, so the fallback gets a
+  tighter budget than the page fetch: a slow image host should delay the card
+  rather than double the time a reader waits for it.
+*/
+const imageHeaderTimeoutMs = 3_000;
 const redirectStatuses = new Set([300, 301, 302, 303, 307, 308]);
 
 const htmlEntityNames = {
@@ -284,14 +296,20 @@ async function readLimitedHtml(response: Response) {
   return new TextDecoder().decode(bytes);
 }
 
-async function fetchWithTimeout(fetcher: Fetcher, url: URL) {
+async function fetchWithTimeout(
+  fetcher: Fetcher,
+  url: URL,
+  headers: Record<string, string> = {},
+  timeoutMs = fetchTimeoutMs,
+) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetcher(url, {
       headers: {
         Accept: "text/html, application/xhtml+xml",
         "User-Agent": "BriarLinkPreview/1.0",
+        ...headers,
       },
       redirect: "manual",
       signal: controller.signal,
@@ -303,6 +321,56 @@ async function fetchWithTimeout(fetcher: Fetcher, url: URL) {
   }
 }
 
+/*
+  og:image:width/height are optional and most publishers omit them, so the card
+  would have no height to reserve until the picture finished downloading. A
+  ranged read of the image header answers that without downloading the picture.
+*/
+async function fetchOgImageDimensions(fetcher: Fetcher, imageUrl: string) {
+  let target = safeExternalUrl(imageUrl);
+  if (!target) return null;
+
+  for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
+    const timed = await fetchWithTimeout(
+      fetcher,
+      target,
+      {
+        Accept: "image/*",
+        Range: `bytes=0-${maxImageHeaderBytes - 1}`,
+      },
+      imageHeaderTimeoutMs,
+    );
+    if (!timed) return null;
+    const { response } = timed;
+    try {
+      if (redirectStatuses.has(response.status)) {
+        if (redirectCount === maxRedirects) return null;
+        const location = response.headers.get("location");
+        if (!location) return null;
+        try {
+          const redirectedUrl = safeExternalUrl(new URL(location, target));
+          if (!redirectedUrl) return null;
+          target = redirectedUrl;
+        } catch {
+          return null;
+        }
+        continue;
+      }
+      if (!response.ok) return null;
+      const contentType = response.headers.get("content-type")?.toLowerCase();
+      if (contentType && !contentType.startsWith("image/")) return null;
+      return parseImageDimensions(
+        await readLimitedBytes(response, maxImageHeaderBytes),
+      );
+    } catch {
+      return null;
+    } finally {
+      timed.cancel();
+    }
+  }
+  return null;
+}
+
 /** Fetches and parses a page's Open Graph metadata, returning null on failure. */
 export async function fetchChannelLinkPreview(
   input: string,
@@ -311,6 +379,7 @@ export async function fetchChannelLinkPreview(
   const initialUrl = safeExternalUrl(input);
   if (!initialUrl) return null;
   let pageUrl = initialUrl;
+  let preview: Omit<ChannelLinkPreview, "url"> | null = null;
 
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
     const timed = await fetchWithTimeout(fetcher, pageUrl);
@@ -343,11 +412,22 @@ export async function fetchChannelLinkPreview(
         return null;
       }
       if (!html) return null;
-      const parsed = parseHtmlPreview(html, pageUrl);
-      return parsed ? { url: initialUrl.href, ...parsed } : null;
+      preview = parseHtmlPreview(html, pageUrl);
     } finally {
       timed.cancel();
     }
+    break;
   }
-  return null;
+  if (!preview) return null;
+  if (!preview.imageUrl || (preview.imageWidth && preview.imageHeight)) {
+    return { url: initialUrl.href, ...preview };
+  }
+
+  const dimensions = await fetchOgImageDimensions(fetcher, preview.imageUrl);
+  return {
+    url: initialUrl.href,
+    ...preview,
+    imageWidth: dimensions?.width ?? preview.imageWidth,
+    imageHeight: dimensions?.height ?? preview.imageHeight,
+  };
 }

@@ -19,6 +19,7 @@ import {
   type ChannelSummary,
 } from "../../lib/channels-contract";
 import type { MentionTarget } from "../../lib/channel-mentions";
+import { readAttachmentDimensions } from "../../lib/image-dimensions";
 import { createOptimisticChannelMessage } from "../../lib/optimistic-channel-message";
 import { toggleOptimisticChannelReaction } from "../../lib/optimistic-channel-reaction";
 import { currentExecutionWorkerDeviceId } from "../../lib/execution-worker-device";
@@ -280,6 +281,18 @@ export function createChannelConversationActions(
     }
     const members = registry.get(channelMembersAtom(channelId));
     const agents = registry.get(channelAgentsAtom(channelId));
+    /*
+      Decoding the local files here costs one frame before the message appears,
+      and buys the attachment rows their final height straight away. Echoing
+      first and measuring later would resize the row under the reader twice:
+      once when the picture decodes, once when the server message replaces it.
+    */
+    const attachmentDimensions = await readAttachmentDimensions(
+      attachments.map((attachment, index) => ({
+        contentType: attachment.type,
+        source: attachmentUrls[index] ?? "",
+      })),
+    );
     const optimisticMessage = createOptimisticChannelMessage({
       id: clientMessageId,
       channelId,
@@ -292,6 +305,7 @@ export function createChannelConversationActions(
       attachments,
       attachmentReferences,
       attachmentUrls,
+      attachmentDimensions,
     });
     const parentBeforeSend = parentMessageId
       ? registry
