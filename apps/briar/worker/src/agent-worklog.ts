@@ -101,33 +101,95 @@ const normalizedEvent = (payload: unknown): NormalizedEvent | null => {
 const string = (value: unknown) => typeof value === "string" ? value : null;
 
 /**
- * Older Workers may still send one provider envelope per streaming delta.
- * Project those into the recoverable D1 work log without creating R2 objects.
- * New Workers annotate coalesced deltas, which remain useful for replaying an
- * interrupted turn and are retained with every meaningful boundary/snapshot.
+ * The persistence boundary, after the worker has consumed provider usage,
+ * status and session data. Only explicit worklog fields cross it: a provider
+ * envelope can contain tool input/output even alongside an assistant message.
+ * Unknown/raw-only events fail closed. Provider session history is independent.
  */
-export const retainedRawTranscriptEvents = (events: TranscriptEventInput[]) =>
-  events.filter((item) => {
+const workLogTranscriptEvents = (events: TranscriptEventInput[]) =>
+  events.flatMap((item): TranscriptEventInput[] => {
     const envelope = record(item.payload);
     const event = normalizedEvent(item.payload);
-    if (event?.type === "messageDelta" || event?.type === "activityDelta") {
-      return record(envelope?.archiveCompaction)?.kind === "delta";
+    let retained: NormalizedEvent;
+    switch (event?.type) {
+      case "messageStarted":
+      case "messageCompleted":
+        retained = {
+          type: event.type, id: event.id, phase: event.phase, text: event.text,
+        };
+        break;
+      case "messageDelta":
+        retained = { type: event.type, id: event.id, delta: event.delta };
+        break;
+      case "conversationStarted":
+        retained = { type: event.type, conversationId: event.conversationId };
+        break;
+      case "turnCompleted":
+        retained = {
+          type: event.type,
+          status: ["completed", "failed", "cancelled", "interrupted"].includes(
+              string(event.status) ?? "",
+            ) ? event.status : "failed",
+        };
+        break;
+      case "userMessage":
+        retained = { type: event.type, text: event.text };
+        break;
+      default: {
+        // Both the current protobuf JSON envelope and legacy terminal frames.
+        // Never copy free-form provider errors: they can echo entire tool calls.
+        const raw = record(envelope?.raw) ?? envelope;
+        const terminalFrame = raw && Object.keys(raw).length === 1 ? raw : null;
+        const result = record(terminalFrame?.result) ?? (raw?.type === "result" ? raw : null);
+        const error = record(terminalFrame?.error) ?? (raw?.type === "error" ? raw : null);
+        const blocked = record(record(terminalFrame?.blocked)?.block) ??
+          (raw?.type === "blocked" ? record(raw.block) : null);
+        if (event?.type.startsWith("activity")) return [];
+        if (result) {
+          retained = { type: "result", message: string(result.message) ?? "" };
+        } else if (blocked) {
+          const reason = string(blocked.reason) ?? "";
+          retained = {
+            type: "blocked",
+            reason: /^PROVIDER_BLOCK_REASON_(MCP_AUTH_REQUIRED|USAGE_EXHAUSTED|UPSTREAM_OVERLOADED|FREE_TIER_LIMIT|AUTH_REQUIRED|CONTEXT_WINDOW_EXCEEDED|BILLING_REQUIRED|MODEL_UNAVAILABLE)$/u.test(reason)
+              ? reason : "PROVIDER_BLOCK_REASON_UNSPECIFIED",
+          };
+        } else if (error) {
+          const code = string(error.code) ?? "";
+          retained = {
+            type: "error",
+            code: /^RUN_ERROR_CODE_(INVALID_REQUEST|PROVIDER_START_FAILED|PROVIDER_PROTOCOL_ERROR|PROVIDER_FAILED|INTERNAL)$/u.test(code)
+              ? code : "RUN_ERROR_CODE_UNSPECIFIED",
+          };
+        } else {
+          return [];
+        }
+      }
     }
-    const raw = record(envelope?.raw);
-    const update = record(raw?.update);
-    const sessionUpdate = string(update?.sessionUpdate);
-    if (sessionUpdate?.endsWith("_chunk")) return false;
-    const streamEvent = record(raw?.event);
-    if (
-      raw?.type === "stream_event" &&
-      streamEvent?.type === "content_block_delta"
-    ) {
-      return false;
-    }
-    if (raw?.type === "message.part.delta") return false;
-    const method = string(raw?.method) ?? "";
-    return !/(?:delta|progress)$/iu.test(method);
+    const compaction = record(envelope?.archiveCompaction);
+    return [{
+      sequence: item.sequence,
+      direction: item.direction,
+      payload: {
+        type: "event",
+        event: retained,
+        ...(event?.type === "messageDelta" && compaction?.kind === "delta"
+          ? { archiveCompaction: {
+              kind: "delta",
+              firstSequence: compaction.firstSequence,
+              representedEventCount: compaction.representedEventCount ?? compaction.eventCount,
+            } }
+          : {}),
+      },
+    }];
   });
+
+/** Old per-token deltas are projected in D1; only coalesced deltas enter R2. */
+export const retainedRawTranscriptEvents = (events: TranscriptEventInput[]) =>
+  workLogTranscriptEvents(events).filter((item) =>
+    normalizedEvent(item.payload)?.type !== "messageDelta" ||
+    record(record(item.payload)?.archiveCompaction)?.kind === "delta"
+  );
 
 const boundedWorkLogText = (value: string) => {
   const bytes = utf8Bytes(value);
@@ -138,21 +200,6 @@ const boundedWorkLogText = (value: string) => {
         { stream: true },
       );
 };
-
-const activityKind = (
-  value: unknown,
-): AgentWorkLogEntryRow["activity_kind"] =>
-  value === "command" || value === "fileChange" || value === "webSearch" ||
-    value === "tool"
-    ? value
-    : "tool";
-
-const completedActivityStatus = (value: unknown): AgentWorkLogEntryStatus =>
-  value === "failed"
-    ? "failed"
-    : value === "cancelled"
-      ? "cancelled"
-      : "completed";
 
 const validateEvents = (events: TranscriptEventInput[]) => {
   if (events.length < 1) {
@@ -388,7 +435,7 @@ async function storeRawSegment(
         firstSequence: String(firstSequence),
         lastSequence: String(lastSequence),
         sha256: digest,
-        archivePolicy: "meaningful-events-coalesced-deltas-v1",
+        archivePolicy: "messages-without-tool-payloads-v2",
       },
     });
     compressedBytes = compressed.byteLength;
@@ -465,30 +512,6 @@ const newMessageEntry = (
   completed_at: event.type === "messageCompleted" ? observedAt : null,
 });
 
-const newActivityEntry = (
-  sessionId: string,
-  entryId: string,
-  sequence: number,
-  observedAt: string,
-  event: NormalizedEvent,
-): AgentWorkLogEntryRow => ({
-  session_id: sessionId,
-  entry_id: entryId,
-  sequence,
-  updated_sequence: sequence,
-  entry_type: "activity",
-  activity_kind: activityKind(event.kind),
-  phase: null,
-  title: string(event.title),
-  body: boundedWorkLogText(string(event.text) ?? ""),
-  status: event.type === "activityCompleted"
-    ? completedActivityStatus(event.status)
-    : "writing",
-  started_at: observedAt,
-  updated_at: observedAt,
-  completed_at: event.type === "activityCompleted" ? observedAt : null,
-});
-
 async function projectWorkLog(
   db: D1Database,
   sessionId: string,
@@ -518,7 +541,7 @@ async function projectWorkLog(
     );
     bindings.push(...entryIds);
   }
-  if (closesTurn) existingFilters.push("status = 'writing'");
+  if (closesTurn) existingFilters.push("status = 'writing' and entry_type = 'message'");
   const existingRows = await db
     .prepare(
       `select * from briar_agent_worklog_entries
@@ -570,48 +593,6 @@ async function projectWorkLog(
         item.sequence,
         observedAt,
         { ...event, type: "messageStarted", text: "" },
-      );
-      if (next.status === "writing") {
-        next = {
-          ...next,
-          body: boundedWorkLogText(
-            `${next.body}${string(event.delta) ?? ""}`,
-          ),
-          updated_sequence: item.sequence,
-          updated_at: observedAt,
-        };
-      }
-    } else if (
-      event.type === "activityStarted" || event.type === "activityCompleted"
-    ) {
-      next = existing ?? newActivityEntry(
-        sessionId,
-        entryId,
-        item.sequence,
-        observedAt,
-        event,
-      );
-      next = {
-        ...next,
-        activity_kind: activityKind(event.kind ?? next.activity_kind),
-        title: string(event.title) ?? next.title,
-        body: boundedWorkLogText(string(event.text) ?? next.body),
-        status: event.type === "activityCompleted"
-          ? completedActivityStatus(event.status)
-          : next.status,
-        updated_sequence: item.sequence,
-        updated_at: observedAt,
-        completed_at: event.type === "activityCompleted"
-          ? observedAt
-          : next.completed_at,
-      };
-    } else if (event.type === "activityDelta") {
-      next = existing ?? newActivityEntry(
-        sessionId,
-        entryId,
-        item.sequence,
-        observedAt,
-        { ...event, type: "activityStarted", text: "" },
       );
       if (next.status === "writing") {
         next = {
@@ -702,6 +683,14 @@ export async function ingestAgentTranscript(
   },
 ) {
   validateEvents(input.events);
+  const workLogEvents = workLogTranscriptEvents(input.events);
+  if (workLogEvents.length === 0) {
+    return {
+      sessionId: input.sessionId,
+      stored: 0, storedBytes: 0, compressedBytes: 0, projected: 0,
+      pruned: [] as string[],
+    };
+  }
   await ensureTranscriptSession(db, projectId, input);
   const retainedEvents = retainedRawTranscriptEvents(input.events);
   const segment = retainedEvents.length > 0
@@ -717,7 +706,7 @@ export async function ingestAgentTranscript(
   const projected = await projectWorkLog(
     db,
     input.sessionId,
-    input.events,
+    workLogEvents,
     input.observedAt,
   );
   return {

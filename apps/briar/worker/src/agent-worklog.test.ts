@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ingestAgentTranscript,
   listAgentTranscriptSegments,
@@ -68,6 +68,91 @@ describe("provider-independent agent work log", () => {
     expect(totals?.byte_count).toBe(totals?.summed_byte_count);
     return totals!;
   };
+
+  it.each(["codex", "claude", "cursor", "grok", "agy", "opencode", "openrouter", "vertex", "pi"] as const)(
+    "%s drops tool-only batches before any D1 or R2 access, including retries",
+    async (agentProvider) => {
+      const prepare = vi.fn(() => { throw new Error("unexpected D1 access"); });
+      const put = vi.fn(() => { throw new Error("unexpected R2 write"); });
+      const events = [
+        ...["command", "fileChange", "webSearch", "tool"].flatMap((kind) => [
+          { type: "activityStarted", id: kind, kind, title: "TOOL_INPUT" },
+          { type: "activityDelta", id: kind, delta: "TOOL_OUTPUT" },
+          { type: "activityCompleted", id: kind, kind, text: "TOOL_ERROR", status: "failed" },
+        ]),
+      ].map((event, index) => ({
+        sequence: index + 1, direction: "server" as const,
+        payload: { type: "event", event, raw: { secret: "TOOL_RAW" } },
+      }));
+      events.push({
+        sequence: 20, direction: "server",
+        payload: { type: "event", raw: { secret: "TOOL_RAW" } } as typeof events[number]["payload"],
+      });
+      const input = { sessionId: "tools", runId: null, workerId: null, agentProvider, events, observedAt };
+      for (let retry = 0; retry < 2; retry += 1) {
+        expect(await ingestAgentTranscript(
+          { prepare } as unknown as D1Database, { put } as unknown as R2Bucket, projectId, input,
+        )).toMatchObject({ stored: 0, storedBytes: 0, compressedBytes: 0, projected: 0 });
+      }
+      expect(prepare).not.toHaveBeenCalled();
+      expect(put).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps message cursors across tool gaps and strips raw data from the actual R2 object", async () => {
+    const sessionId = "tool-gaps";
+    const input = { sessionId, runId: null, workerId: null, agentProvider: "codex" as const, observedAt };
+    const event = (sequence: number, normalized: Record<string, unknown>) => ({
+      sequence, direction: "server" as const,
+      payload: { type: "event", event: normalized, raw: { toolOutput: "DO_NOT_STORE" } },
+    });
+    const first = [event(1, { type: "messageStarted", id: "m", text: "Checking" })];
+    await ingestAgentTranscript(db, bucket, projectId, { ...input, events: first });
+    const tool = [event(2, { type: "activityCompleted", id: "t", kind: "command", text: "DO_NOT_STORE", status: "failed" })];
+    await ingestAgentTranscript(db, bucket, projectId, { ...input, events: tool, observedAt: "2026-08-14T00:00:00.000Z" });
+    expect((await readAgentWorkLog(db, projectId, sessionId))?.session.last_event_at).toBe(observedAt);
+    const mixed = [
+      ...tool,
+      event(5, { type: "messageDelta", id: "m", delta: " tests" }),
+      event(8, { type: "messageCompleted", id: "m", phase: "final", text: "Tests passed" }),
+      event(10, { type: "turnCompleted", status: "completed" }),
+    ];
+    await ingestAgentTranscript(db, bucket, projectId, { ...input, events: mixed });
+    expect(await ingestAgentTranscript(db, bucket, projectId, { ...input, events: mixed }))
+      .toMatchObject({ stored: 0, projected: 0 });
+    await ingestAgentTranscript(db, bucket, projectId, { ...input, events: first });
+    const log = await readAgentWorkLog(db, projectId, sessionId);
+    expect(log?.entries).toHaveLength(1);
+    expect(log?.entries[0]).toMatchObject({ sequence: 1, updated_sequence: 8, body: "Tests passed", status: "completed" });
+    const segments = await listAgentTranscriptSegments(db, projectId, sessionId);
+    for (const segment of segments!) {
+      const object = await bucket.get(segment.object_key);
+      const text = await new Response(object!.body.pipeThrough(new DecompressionStream("gzip"))).text();
+      expect(text).not.toContain("DO_NOT_STORE");
+      expect(text).not.toContain('"raw"');
+    }
+    expect(segments?.map((segment) => [segment.first_sequence, segment.last_sequence])).toEqual([[1, 1], [8, 10]]);
+  });
+
+  it("retains terminal classifications and answers without echoed tool errors or approval inputs", () => {
+    const raw = [
+      { error: { code: "RUN_ERROR_CODE_PROVIDER_FAILED", message: "TOOL_SECRET" } },
+      { blocked: { block: { reason: "PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED", message: "TOOL_SECRET", providerCode: "TOOL_SECRET" } } },
+      { result: { message: "Finished the change", extra: "TOOL_SECRET" } },
+      { approval: { input: "TOOL_SECRET" } },
+      { jsonrpc: "2.0", id: 1, result: { message: "TOOL_SECRET" } },
+      { type: "truncated", preview: "TOOL_SECRET" },
+    ];
+    const retained = retainedRawTranscriptEvents(raw.map((value, index) => ({
+      sequence: index + 1, direction: "server", payload: { type: "event", raw: value },
+    })));
+    expect(retained).toHaveLength(3);
+    const serialized = JSON.stringify(retained);
+    expect(serialized).not.toContain("TOOL_SECRET");
+    expect(serialized).toContain("RUN_ERROR_CODE_PROVIDER_FAILED");
+    expect(serialized).toContain("PROVIDER_BLOCK_REASON_USAGE_EXHAUSTED");
+    expect(serialized).toContain("Finished the change");
+  });
 
   it(
     "projects provider events into the compact schema",
@@ -189,9 +274,8 @@ describe("provider-independent agent work log", () => {
       projectId,
       sessionId,
     );
-    expect(segments).toEqual([]);
-    expect((await readAgentWorkLog(db, projectId, sessionId))?.entries)
-      .toEqual([]);
+    expect(segments).toBeNull();
+    expect(await readAgentWorkLog(db, projectId, sessionId)).toBeNull();
     expect(
       await db.prepare(
         `select count(*) as count from briar_agent_transcripts
@@ -294,7 +378,7 @@ describe("provider-independent agent work log", () => {
     ];
 
     expect(retainedRawTranscriptEvents(events).map((event) => event.sequence))
-      .toEqual([1, 3, 5, 6]);
+      .toEqual([1, 6]);
   });
 
   it("closes unfinished entries when a provider turn terminates", async () => {
@@ -408,7 +492,7 @@ describe("provider-independent agent work log", () => {
     )).toHaveLength(1);
   });
 
-  it("replays user messages, compacted tool output, and the final result", async () => {
+  it("replays user messages and the final result without compacted tool output", async () => {
     const sessionId = "representative-compact-session";
     const events: Parameters<typeof ingestAgentTranscript>[3]["events"] = [
       {
@@ -515,13 +599,6 @@ describe("provider-independent agent work log", () => {
         status: "completed",
       }),
       expect.objectContaining({
-        entry_id: "tool-1",
-        entry_type: "activity",
-        activity_kind: "command",
-        body: "deployment-a\ndeployment-b",
-        status: "completed",
-      }),
-      expect.objectContaining({
         entry_id: "assistant-1",
         entry_type: "message",
         body: "Deployment is healthy",
@@ -533,7 +610,7 @@ describe("provider-independent agent work log", () => {
         expect.objectContaining({
           first_sequence: 1,
           last_sequence: 7,
-          event_count: 6,
+          event_count: 3,
         }),
       ]);
   });
@@ -581,7 +658,7 @@ describe("provider-independent agent work log", () => {
       .toBe(1);
     await expect(bucket.head(firstSegment.object_key)).resolves.toMatchObject({
       customMetadata: {
-        archivePolicy: "meaningful-events-coalesced-deltas-v1",
+        archivePolicy: "messages-without-tool-payloads-v2",
       },
     });
   });
