@@ -392,6 +392,7 @@ pub enum IssueDifficulty {
     ISSUE_DIFFICULTY_EASY = 1i32,
     ISSUE_DIFFICULTY_NORMAL = 2i32,
     ISSUE_DIFFICULTY_HARD = 3i32,
+    ISSUE_DIFFICULTY_EXPERT = 4i32,
 }
 impl IssueDifficulty {
     ///Idiomatic alias for [`Self::ISSUE_DIFFICULTY_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -406,6 +407,9 @@ impl IssueDifficulty {
     ///Idiomatic alias for [`Self::ISSUE_DIFFICULTY_HARD`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Hard: Self = Self::ISSUE_DIFFICULTY_HARD;
+    ///Idiomatic alias for [`Self::ISSUE_DIFFICULTY_EXPERT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Expert: Self = Self::ISSUE_DIFFICULTY_EXPERT;
 }
 impl ::core::default::Default for IssueDifficulty {
     fn default() -> Self {
@@ -507,6 +511,7 @@ impl ::buffa::Enumeration for IssueDifficulty {
             1i32 => ::core::option::Option::Some(Self::ISSUE_DIFFICULTY_EASY),
             2i32 => ::core::option::Option::Some(Self::ISSUE_DIFFICULTY_NORMAL),
             3i32 => ::core::option::Option::Some(Self::ISSUE_DIFFICULTY_HARD),
+            4i32 => ::core::option::Option::Some(Self::ISSUE_DIFFICULTY_EXPERT),
             _ => ::core::option::Option::None,
         }
     }
@@ -519,6 +524,7 @@ impl ::buffa::Enumeration for IssueDifficulty {
             Self::ISSUE_DIFFICULTY_EASY => "ISSUE_DIFFICULTY_EASY",
             Self::ISSUE_DIFFICULTY_NORMAL => "ISSUE_DIFFICULTY_NORMAL",
             Self::ISSUE_DIFFICULTY_HARD => "ISSUE_DIFFICULTY_HARD",
+            Self::ISSUE_DIFFICULTY_EXPERT => "ISSUE_DIFFICULTY_EXPERT",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -535,6 +541,9 @@ impl ::buffa::Enumeration for IssueDifficulty {
             "ISSUE_DIFFICULTY_HARD" => {
                 ::core::option::Option::Some(Self::ISSUE_DIFFICULTY_HARD)
             }
+            "ISSUE_DIFFICULTY_EXPERT" => {
+                ::core::option::Option::Some(Self::ISSUE_DIFFICULTY_EXPERT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -544,6 +553,7 @@ impl ::buffa::Enumeration for IssueDifficulty {
             Self::ISSUE_DIFFICULTY_EASY,
             Self::ISSUE_DIFFICULTY_NORMAL,
             Self::ISSUE_DIFFICULTY_HARD,
+            Self::ISSUE_DIFFICULTY_EXPERT,
         ]
     }
 }
