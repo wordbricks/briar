@@ -5,6 +5,7 @@ import {
 } from "./agent-runner";
 import type { Config, TeamConfig } from "./config-contract";
 import type { DetachedProviderTurnResult } from "./detached-provider-turn";
+import { dmMemoryExecutionError } from "./dm-memory-invocation";
 import {
   channelReplyFailureReport,
   runClaimedProjectAgentTask,
@@ -429,5 +430,16 @@ describe("reporting a failed channel reply", () => {
       new Error("memory_scope_revoked"),
       reply(true),
     ).reported).toBe("memory_scope_revoked");
+  });
+
+  // The reply already throws the redaction, so the report only ever sees the wrapper.
+  it("describes the failure the reply redacted before throwing it", () => {
+    const report = channelReplyFailureReport(
+      dmMemoryExecutionError(new TypeError("private recalled text")),
+      reply(true),
+    );
+    expect(report.reported).toBe("memory_reply_failed");
+    expect(report.diagnostic).toContain("TypeError");
+    expect(report.diagnostic).not.toContain("private recalled text");
   });
 });

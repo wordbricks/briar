@@ -228,16 +228,18 @@ export async function cleanupAbandonedDmMemoryFiles(root = realpathSync(tmpdir()
   }
 }
 
+/** `required()` names the field it missed, so every field it can name is listed too: the set stays enumerated rather than prefix-matched, or a message could pass by merely starting like a code. */
 const executionErrorCodes = new Set([
   "memory_scope_revoked", "memory_snapshot_changed", "memory_unavailable", "memory_request_invalid",
-  "memory_response_invalid", "memory_response_missing", "memory_response_too_large", "memory_transport_failed",
+  "memory_response_invalid", "memory_response_missing", "memory_response_missing_memory",
+  "memory_response_missing_response", "memory_response_too_large", "memory_transport_failed",
   "memory_invocation_aborted", "memory_invocation_closed", "lookup_budget_exhausted", "lookup_request_conflict",
   "lookup_in_progress", "lookup_failed",
 ]);
-/** Provider stderr and schema failures can include private context; retain only known codes. */
+/** Provider stderr and schema failures can include private context; retain only known codes. The original stays as the cause, which only `dmMemoryErrorDiagnostic` reads and never leaves this Worker. */
 export function dmMemoryExecutionError(error: unknown): Error {
   const code = error instanceof Error ? error.message : "";
-  return new Error(executionErrorCodes.has(code) ? code : "memory_reply_failed");
+  return new Error(executionErrorCodes.has(code) ? code : "memory_reply_failed", { cause: error });
 }
 
 const machineCodeKeys = ["code", "syscall", "errno"] as const;
@@ -250,6 +252,44 @@ const stackFrames = (error: unknown) => {
     .map((line) => line.trim())
     .filter((line) => line.startsWith("at "))
     .slice(0, 8);
+};
+
+/** Bounded and cycle-safe: a cause may be re-thrown into its own chain. */
+const errorChain = (error: unknown) => {
+  const chain: unknown[] = [];
+  const seen = new Set<unknown>();
+  let link = error;
+  while (chain.length < 5 && !seen.has(link)) {
+    seen.add(link);
+    chain.push(link);
+    const cause = link instanceof Error ? (link as { cause?: unknown }).cause : undefined;
+    if (cause === undefined || cause === null) break;
+    link = cause;
+  }
+  return chain;
+};
+
+const errorFacts = (error: unknown, detail: boolean) => {
+  const parts = [
+    error instanceof Error
+      ? error.constructor?.name || "Error"
+      : `non-error:${typeof error}`,
+  ];
+  if (error instanceof ConnectError) parts.push(`connect=${Code[error.code]}`);
+  const applicationCode = applicationErrorCode(error);
+  if (applicationCode) parts.push(`application=${applicationCode}`);
+  for (const key of machineCodeKeys) {
+    const value = error instanceof Error && key in error
+      ? (error as unknown as Record<string, unknown>)[key]
+      : undefined;
+    if (typeof value === "string" || typeof value === "number") {
+      parts.push(`${key}=${value}`);
+    }
+  }
+  if (detail) {
+    parts.push(`message=${error instanceof Error ? error.message : String(error)}`);
+  }
+  return parts.join(" ");
 };
 
 /*
@@ -268,31 +308,24 @@ const stackFrames = (error: unknown) => {
   position — so this is safe in the Worker log next to the redacted code. The
   message stays out unless an operator asks for it by setting
   BRIAR_DM_REPLY_ERROR_DETAIL, which never reaches the server either way.
+
+  It follows `cause` because the redaction is what the failing path throws: read
+  on that wrapper alone it said `Error` at `dmMemoryExecutionError` and nothing
+  more, which is exactly what the first outage it was meant to explain produced
+  (2026-09-08). Links are joined outward-in by ` <- ` and the deepest stack wins,
+  so the frames name what broke rather than the redactor.
 */
 export function dmMemoryErrorDiagnostic(
   error: unknown,
   environment: Record<string, string | undefined> = process.env,
 ): string {
-  const parts = [
-    error instanceof Error
-      ? error.constructor?.name || "Error"
-      : `non-error:${typeof error}`,
-  ];
-  if (error instanceof ConnectError) parts.push(`connect=${Code[error.code]}`);
-  const applicationCode = applicationErrorCode(error);
-  if (applicationCode) parts.push(`application=${applicationCode}`);
-  for (const key of machineCodeKeys) {
-    const value = error instanceof Error && key in error
-      ? (error as unknown as Record<string, unknown>)[key]
-      : undefined;
-    if (typeof value === "string" || typeof value === "number") {
-      parts.push(`${key}=${value}`);
-    }
-  }
-  if (environment.BRIAR_DM_REPLY_ERROR_DETAIL?.trim()) {
-    parts.push(`message=${error instanceof Error ? error.message : String(error)}`);
-  }
-  const frames = stackFrames(error);
-  return [parts.join(" "), ...(frames.length ? [frames.join(" < ")] : [])]
-    .join(" | ");
+  const detail = Boolean(environment.BRIAR_DM_REPLY_ERROR_DETAIL?.trim());
+  const chain = errorChain(error);
+  // The redaction has no frames of its own worth keeping once the cause has any.
+  const frames = chain.map(stackFrames)
+    .reduce((deepest, links) => links.length ? links : deepest, [] as string[]);
+  return [
+    chain.map((link) => errorFacts(link, detail)).join(" <- "),
+    ...(frames.length ? [frames.join(" < ")] : []),
+  ].join(" | ");
 }
