@@ -30,6 +30,17 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.220",
+        date: "2026년 9월 8일",
+        title: "샌드박스 화면 보기가 다시 켜집니다",
+        summary:
+          "에이전트가 일하는 샌드박스의 화면 보기가 \"원격 디스플레이 에이전트가 오프라인\"이라며 열리지 않는 일이 있었습니다. 샌드박스 안에서 프로젝트 테스트를 돌리면 화면 연결에 쓰는 인증 파일이 지워지던 것이 원인입니다.",
+        items: [
+          "샌드박스 안에서 테스트를 실행해도 화면 보기가 끊기지 않습니다. 한 번 끊기면 샌드박스를 다시 만들기 전까지는 되돌아오지 않았습니다.",
+          "화면 연결이 실패할 때 무엇이 문제인지 알려주는 안내 문구가 나옵니다. 다른 사람이 제어 중일 때 잠시 기다렸다 다시 잡는 동작도 되살아납니다.",
+        ],
+      },
+      {
         version: "1.2.219",
         date: "2026년 9월 8일",
         title: "어느 모델이 실제로 실행되는지 보입니다",
@@ -1932,6 +1943,17 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.220",
+        date: "September 8, 2026",
+        title: "Sandbox screen sharing comes back",
+        summary:
+          "Opening an agent sandbox's screen could fail with \"remote display agent is offline\". Running the project's tests inside a sandbox deleted the credential its screen connection depends on.",
+        items: [
+          "Running tests inside a sandbox no longer takes its screen offline. Once it broke, the screen stayed dark until the sandbox was rebuilt.",
+          "A failed screen connection now explains what went wrong instead of showing a raw error, and the retry that waits out another viewer works again.",
+        ],
+      },
       {
         version: "1.2.219",
         date: "September 8, 2026",
