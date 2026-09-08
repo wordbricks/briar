@@ -579,4 +579,42 @@ describe("DmComputerPanel", () => {
     expect(container.textContent).not.toContain("already being controlled");
     await cleanup();
   });
+
+  /*
+    Connect re-wraps whatever the transport raises, so the handover retry above
+    only ever fired for a bare `ApiError` and was dead for the real rejection
+    the RPC layer delivers.
+  */
+  it("waits it out when Connect wraps the in-use rejection", async () => {
+    createRemoteSession.mockRejectedValueOnce(
+      new Error("[unknown] Managed computer is already being controlled", {
+        cause: new ApiError(
+          409,
+          "Managed computer is already being controlled",
+          "MANAGED_COMPUTER_REMOTE_IN_USE",
+        ),
+      }),
+    );
+    const { cleanup, container, root } = createReactTestRoot({
+      attachToDocument: true,
+    });
+    await renderReactTestRoot(
+      root,
+      <I18nProvider>
+        <DmComputerPanel
+          agents={[dmAgent()]}
+          organizationId="organization-1"
+          services={services}
+          token="session-token"
+        />
+      </I18nProvider>,
+    );
+
+    await vi.waitFor(() => expect(noVncState.instances).toHaveLength(1), {
+      timeout: 4_000,
+    });
+    expect(createRemoteSession).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain("already being controlled");
+    await cleanup();
+  });
 });

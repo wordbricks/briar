@@ -16,7 +16,7 @@ import {
   createManagedComputerRemoteSession,
   endManagedComputerRemoteSession,
 } from "../lib/api";
-import { ApiError } from "../lib/api/errors";
+import { findApiError } from "../lib/api/errors";
 import { setRemoteDesktopKeyboardCapture } from "../lib/remote-desktop-focus";
 import {
   createRemoteDesktopPasteController,
@@ -64,9 +64,20 @@ const errorMessages = {
     "managedComputer.remote.error.limit",
 } as const;
 
+/*
+  Connect never hands the API's own error to the call site: `runUnaryCall`
+  attaches its rejection handler outside the interceptor chain, so the
+  `ApiError` the transport raised is re-wrapped by `ConnectError.from` under the
+  `unknown` code. Matching on the outer error skipped this map entirely, and an
+  unreachable sandbox surfaced as the raw
+  "[unknown] Managed computer remote display agent is offline" instead of the
+  localized sentence that tells the owner what to do about it. `findApiError`
+  walks the cause chain the same way channel conversations do.
+*/
 export function managedComputerRemoteErrorMessage(error: unknown) {
-  if (!(error instanceof ApiError) || !error.code) return null;
-  return errorMessages[error.code as keyof typeof errorMessages] ?? null;
+  const code = findApiError(error)?.code;
+  if (!code) return null;
+  return errorMessages[code as keyof typeof errorMessages] ?? null;
 }
 
 export function ManagedComputerRemoteDesktop({

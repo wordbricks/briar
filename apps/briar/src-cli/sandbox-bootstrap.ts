@@ -667,6 +667,17 @@ export async function runSandboxUnregister(overrides: {
   readonly unregister?: typeof unregisterTeamExecutionWorker;
   readonly readRemoteAgentConfig?: () => Promise<SandboxRemoteAgentConfig | null>;
   readonly unregisterComputer?: typeof unregisterSandboxComputer;
+  /*
+    Deleting `remote-agent.json` is the one irreversible step here, and it used
+    to reach for the module-level config directory no matter who called it —
+    while every other dependency above was already injectable. So the teardown
+    unit test wiped the relay credential of whatever machine ran the suite: an
+    agent running `bun run ci:local` inside the sandboxes did exactly that and
+    left two of them with a permanently offline remote display, since the
+    credential only ever comes back from a fresh `briar sandbox up`. Callers in
+    the container still pass nothing and get the real directory.
+  */
+  readonly configDirectory?: string;
 } = {}): Promise<SandboxUnregisterResult> {
   const config = await (overrides.loadConfig ?? loadConfig)();
   const state = await (overrides.readState ?? readSandboxState)();
@@ -692,7 +703,7 @@ export async function runSandboxUnregister(overrides: {
         computerRemoved = false;
       }
     }
-    await rm(sandboxRemoteAgentConfigPath(), { force: true });
+    await rm(sandboxRemoteAgentConfigPath(overrides.configDirectory), { force: true });
   }
   for (const id of state?.teamIds ?? []) {
     const team = config.teams.find((candidate) => candidate.id === id);
