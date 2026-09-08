@@ -407,6 +407,7 @@ const issueDifficulty = {
   easy: IssueDifficulty.EASY,
   normal: IssueDifficulty.NORMAL,
   hard: IssueDifficulty.HARD,
+  expert: IssueDifficulty.EXPERT,
 } as const;
 
 const checkpointPosition = {

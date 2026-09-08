@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.221",
+        date: "2026년 9월 8일",
+        title: "에이전트가 대화 기록을 직접 읽습니다",
+        summary:
+          "에이전트가 답변 중인 대화의 이전 메시지를 확인하려다 \"토큰이 만료됐다\"며 실패하고, 저장소 재연결이나 로그인을 요구하는 일이 있었습니다. 실제로는 만료가 아니라 필요한 권한의 종류가 달랐던 것입니다. 이제 에이전트가 지금 맡은 대화의 기록을 스스로 읽습니다.",
+        items: [
+          "에이전트가 답변 중인 채널의 이전 메시지와 첨부 정보를 직접 확인합니다. 지금 맡고 있는 대화에만 열리고, 그 답변이 끝나면 접근도 함께 닫힙니다.",
+          "권한이 부족할 때 \"토큰 만료\"라고 잘못 안내하던 문구를 없앴습니다. 무엇이 문제인지, 재연결이 필요한지 아닌지를 정확히 알려줍니다.",
+          "에이전트 화면 보기가 잠깐씩 \"연결 끊김\"으로 막히던 문제를 고쳤습니다. 화면이 살아 있는지 확인하는 점검이 화면 서버에 차단당하던 것이 원인입니다.",
+        ],
+      },
+      {
         version: "1.2.220",
         date: "2026년 9월 8일",
         title: "샌드박스 화면 보기가 다시 켜집니다",
@@ -1943,6 +1955,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.221",
+        date: "September 8, 2026",
+        title: "Agents read their own conversation history",
+        summary:
+          "An agent trying to look back at the conversation it was answering could fail with an expired-token message and ask you to reconnect the repository or sign in. Nothing had expired — the session simply held the wrong kind of credential. Agents now read the history of the conversation they are handling.",
+        items: [
+          "An agent can read earlier messages and attachment details in the channel it is replying to. Access covers only the conversation it currently holds, and ends when that reply does.",
+          "Permission failures no longer claim a token expired. The message says what is actually wrong and whether reconnecting would help.",
+          "Fixed agent screens intermittently refusing to open with a lost-connection error, caused by the readiness check being blocked by the screen server.",
+        ],
+      },
       {
         version: "1.2.220",
         date: "September 8, 2026",

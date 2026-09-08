@@ -1938,6 +1938,7 @@ export const ko = {
   "issue.difficulty.easy": "쉬움",
   "issue.difficulty.normal": "보통",
   "issue.difficulty.hard": "어려움",
+  "issue.difficulty.expert": "전문가급",
   "issue.difficultyLabel": "난이도: {difficulty}",
   "issue.checkpoints": "체크포인트",
   "issue.checkpointsDescription": "이 이슈에서 검토를 위해 추가로 멈출 지점을 선택하세요.",

@@ -34,6 +34,7 @@ enum IssueDifficulty {
   ISSUE_DIFFICULTY_EASY = 1;
   ISSUE_DIFFICULTY_NORMAL = 2;
   ISSUE_DIFFICULTY_HARD = 3;
+  ISSUE_DIFFICULTY_EXPERT = 4;
 }
 
 enum ProposalStatus {

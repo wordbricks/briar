@@ -77,7 +77,7 @@ Measured on the `briar_hunt_runs` rebuild (2026-09-08):
 | --- | --- |
 | `briar_hunt_runs` itself | 1,011 |
 | naive closure (36 tables) | 1,215,850 |
-| after null-and-restore on nullable links | ~155,000 |
+| after null-and-restore on nullable links | 59,589 |
 
 A single nullable column, `briar_agent_transcript_sessions.run_id` with 1,153
 rows, gated 1,051,187 descendant rows — 86% of the closure — through

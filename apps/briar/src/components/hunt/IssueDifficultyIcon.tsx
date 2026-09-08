@@ -1,13 +1,17 @@
-import { Gauge, Mountain, Sprout } from "lucide-react";
+import { Gauge, Mountain, MountainSnow, Sprout } from "lucide-react";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import type { IssueDifficulty } from "@/lib/issue-difficulty";
 
+// The series climbs: a seedling, a dial, a peak, and then the same peak with
+// its summit under snow — one step past `hard` while staying the same shape,
+// so the two read as neighbours rather than as unrelated glyphs.
 const difficultyIcons = {
   easy: Sprout,
   normal: Gauge,
   hard: Mountain,
-} as const;
+  expert: MountainSnow,
+} as const satisfies Record<IssueDifficulty, unknown>;
 
 export function IssueDifficultyIcon({
   className = "",
