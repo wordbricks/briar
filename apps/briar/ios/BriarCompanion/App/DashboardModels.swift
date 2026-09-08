@@ -4,12 +4,14 @@ enum IssueDifficulty: String, Codable, CaseIterable, Sendable {
     case easy
     case normal
     case hard
+    case expert
 
     var displayName: String {
         switch self {
         case .easy: L10n.text("쉬움")
         case .normal: L10n.text("보통")
         case .hard: L10n.text("어려움")
+        case .expert: L10n.text("전문가급")
         }
     }
 
@@ -18,6 +20,9 @@ enum IssueDifficulty: String, Codable, CaseIterable, Sendable {
         case .easy: "leaf"
         case .normal: "gauge.with.dots.needle.50percent"
         case .hard: "mountain.2"
+        // The same peak as `hard`, filled in: one step further along the same
+        // shape rather than an unrelated glyph.
+        case .expert: "mountain.2.fill"
         }
     }
 }
