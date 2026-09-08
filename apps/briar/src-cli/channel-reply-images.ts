@@ -68,6 +68,12 @@ export type ReadableChannelReplyAttachment = {
   form: ChannelReplyAttachmentForm;
 };
 
+/** What a trigger's attachments become once this turn decides what it can use. */
+export type ChannelReplyAttachmentSplit = {
+  readable: ReadableChannelReplyAttachment[];
+  unreadable: QueuedAttachment[];
+};
+
 /**
  * Splits what this turn can hand the Agent from what it cannot. An attachment
  * with no form is reported, never thrown: the person still asked a question,
@@ -76,10 +82,7 @@ export type ReadableChannelReplyAttachment = {
  */
 export function channelReplyAttachments(
   triggerAttachments: readonly QueuedAttachment[],
-): {
-  readable: ReadableChannelReplyAttachment[];
-  unreadable: QueuedAttachment[];
-} {
+): ChannelReplyAttachmentSplit {
   // Count and size are the composer's policy, re-checked here against
   // server-supplied metadata. A violation is corrupt input rather than a file
   // this turn can simply do without, so it still stops the reply.
