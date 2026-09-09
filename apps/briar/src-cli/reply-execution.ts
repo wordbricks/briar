@@ -784,6 +784,52 @@ async function runClaimedChannelReply(
   }
 }
 
+/**
+ * The setup a claimed channel reply owes before its first provider turn, in
+ * the order the sequential version ran them: it is also the order a failure is
+ * reported in, so a parallel setup blames the same step the old one did.
+ */
+const channelReplySetupSteps = [
+  "workspace",
+  "memory",
+  "message",
+  "organizationContext",
+  "attachments",
+  "skills",
+] as const;
+type ChannelReplySetupStep = (typeof channelReplySetupSteps)[number];
+
+/**
+ * The value of a step the caller has already proven did not reject. The throw
+ * is unreachable and only keeps the reason from being swallowed if it ever is.
+ */
+function settledSetupValue<T>(result: PromiseSettledResult<T>): T {
+  if (result.status === "rejected") throw result.reason;
+  return result.value;
+}
+
+/*
+  One line per reply, printed once the setup is ready and before the provider
+  runs, because the gap this measures is invisible from either end: the claim
+  log and `turn.started` were 15–30 seconds apart with nothing between them.
+  A step this claim never needed is absent rather than zero.
+*/
+function logChannelReplySetup(
+  workId: string,
+  durations: ReadonlyMap<ChannelReplySetupStep, number>,
+  totalMs: number,
+) {
+  console.log(`channel reply setup: ${JSON.stringify({
+    workId,
+    ...Object.fromEntries(channelReplySetupSteps.flatMap((step) => {
+      const elapsed = durations.get(step);
+      return elapsed === undefined ? [] : [[step, elapsed] as const];
+    })),
+    total: Math.round(totalMs),
+    parallel: true,
+  })}`);
+}
+
 async function runClaimedChannelReplyTurn(
   config: Config,
   project: TeamConfig,
@@ -794,6 +840,7 @@ async function runClaimedChannelReplyTurn(
   reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
   runtime: ChannelReplyRuntime = defaultChannelReplyRuntime(),
 ) {
+  const claimedAt = performance.now();
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
   // Absent means the real one: both sides are the same git runner.
@@ -871,91 +918,6 @@ async function runClaimedChannelReplyTurn(
   // with no checkout: the fetch and `git worktree add` used to sit on the
   // critical path of every "hi".
   const startsWithoutWorktree = channelReplyStartsWithoutWorktree(reply);
-  // One exception inside the gate: a session that already has a checkout on
-  // this disk keeps it, because the conversation may already be talking about
-  // files in it.
-  const sessionWorktreeCached = sessionWorktreePath !== null &&
-      startsWithoutWorktree && reply.session
-    ? (await listCachedAnalysisWorktrees(worktreeRoot)).some(
-      (candidate) => candidate.runId === reply.session!.id,
-    )
-    : false;
-  let sessionWorktree:
-    | Awaited<ReturnType<typeof allocateCachedAnalysisWorktree>>
-    | null = null;
-  if (sessionWorktreePath && (!startsWithoutWorktree || sessionWorktreeCached)) {
-    retainCachedAnalysisWorktree(sessionWorktreePath);
-    try {
-      sessionWorktree = await allocateCachedAnalysisWorktree({
-        repositoryPath: project.repositoryPath,
-        projectId: project.id,
-        runId: reply.session!.id,
-        settings,
-        git,
-        retainedUntil: reply.session!.retainedUntil,
-      });
-    } catch (error) {
-      releaseCachedAnalysisWorktree(sessionWorktreePath);
-      throw error;
-    }
-  }
-  let analysisWorktree = reply.projectId && !startsWithoutWorktree
-    ? sessionWorktree ?? await allocateAnalysisWorktree({
-        repositoryPath: project.repositoryPath,
-        projectId: project.id,
-        workId: reply.workId,
-        settings,
-        git,
-      })
-    : sessionWorktree;
-  let retainedUntil = reply.session?.retainedUntil ?? null;
-  // The repository-less workspace an Organization Agent already uses. It stays
-  // addressable after a mid-turn checkout because the downloaded attachments
-  // and the retained Skill catalog live under it.
-  const detachedWorkspacePath = join(
-    runtime.workspaceRoot,
-    "worker-sessions",
-    `channel-${reply.session?.id ?? reply.workId}`,
-  );
-  let workspacePath = analysisWorktree?.path ?? detachedWorkspacePath;
-  // Only a project reply has a repository at all, and only one that started
-  // without a checkout has one left to ask for.
-  const repositoryRequestAvailable = startsWithoutWorktree &&
-    reply.projectId !== null && analysisWorktree === null;
-  const logSessionWorkspace = (workspace: ChannelReplyWorkspaceKind) => {
-    if (!reply.session) return;
-    console.log(`channel reply session: ${JSON.stringify({
-      sessionId: reply.session.id,
-      channelId: reply.channelId,
-      threadId: reply.session.threadId,
-      agentId: reply.agent.id,
-      claimReason: reply.session.claimReason,
-      workspaceReused: sessionWorktree?.reused ?? false,
-      workspace,
-      acknowledgement: acknowledgement.mode,
-      retainedUntil,
-    })}`);
-  };
-  logSessionWorkspace(
-    analysisWorktree === null
-      ? "none"
-      : sessionWorktree?.reused
-      ? "reused"
-      : "created",
-  );
-  reportCheckpoint?.({ workspacePath });
-  let detachedWorkspacePrepared = false;
-  if (!analysisWorktree) {
-    // A prior hard-killed attempt may have left a path behind. Recreate the
-    // exact claim workspace so stale files or a planted symlink cannot become
-    // trusted Workspace Agent context.
-    await prepareWorkspaceAgentWorkspace(workspacePath, process.pid, {
-      reuse: Boolean(reply.session),
-      retainedUntil: retainedUntil ?? undefined,
-    });
-    detachedWorkspacePrepared = true;
-  }
-  const attachmentDirectory = channelReplyAttachmentDirectory(workspacePath);
   const memoryAbort = new AbortController();
   const invocationSignal = AbortSignal.any([signal, memoryAbort.signal]);
   let memoryInvocation: DmMemoryInvocation | null = null;
@@ -974,6 +936,194 @@ async function runClaimedChannelReplyTurn(
     workerToken,
     { queue: workerQueueClient },
   );
+  const setupDurations = new Map<ChannelReplySetupStep, number>();
+  const measureSetup = <T>(
+    step: ChannelReplySetupStep,
+    run: () => Promise<T>,
+  ): Promise<T> => {
+    const startedAt = performance.now();
+    const pending = run().then((value) => {
+      setupDurations.set(step, Math.round(performance.now() - startedAt));
+      return value;
+    });
+    /*
+      Nothing awaits a claim-scoped step until the workspace is ready, so a
+      step that fails inside that window would reach the runtime as an
+      unhandled rejection — fatal under Bun. The settle below still sees the
+      rejection; this only says it has an owner.
+    */
+    pending.catch(() => undefined);
+    return pending;
+  };
+  /*
+    The memory brief and the message relay need nothing but the claim: the
+    brief writes into a private temporary directory of its own and the relay
+    into a Unix socket beside it. Starting them here runs both against the
+    workspace decision below rather than after it, and their results are
+    collected with the workspace-bound steps in one settle.
+  */
+  const memoryDescriptor = reply.memory;
+  const memoryPending = memoryDescriptor
+    ? measureSetup("memory", async () => {
+      const invocation = await DmMemoryInvocation.create({
+        queue: workerQueueClient,
+        projectId: project.id,
+        workerId: registered.workerId,
+        work: reply,
+        memory: memoryDescriptor,
+        signal: invocationSignal,
+      });
+      try {
+        /*
+          The turn loop used to open every round with this check, including the
+          first, where it re-asked for a descriptor the brief had just accepted.
+          It cannot move to a later round: M07 requires a scope revoked between
+          the brief and the first turn to stop the reply before the provider is
+          handed memory that was fetched while the claim still held. Here it
+          keeps that fence and stops paying for it serially, because it now runs
+          against the workspace-bound setup instead of after it.
+        */
+        return { invocation, changed: await invocation.check() };
+      } catch (error) {
+        await invocation.cleanup();
+        throw error;
+      }
+    })
+    : null;
+  const durablePublicMessages = reply.dmPublicMessageProtocol === 1 &&
+    supportsDmMessagePublicationProvider(reply.provider);
+  const messagePending = durablePublicMessages
+    ? measureSetup("message", async () => {
+      // A test supplies the bundle; the Worker finds the one it shipped. The
+      // lookup stays ahead of the listener so a missing bundle cannot strand
+      // an open relay socket.
+      const serverPath = runtime.dmMessageMcpServerPath ?? await findAgentBundle(
+        import.meta.dir,
+        "dm-message-mcp-server.js",
+      );
+      const invocation = await DmMessageInvocation.create({
+        queue: workerQueueClient,
+        projectId: project.id,
+        workerId: registered.workerId,
+        work: reply,
+        signal: invocationSignal,
+      });
+      return { invocation, serverPath };
+    })
+    : null;
+  /** A workspace failure must not strand a relay socket or a memory directory. */
+  const discardStartedInvocations = async () => {
+    const [memory, message] = await Promise.allSettled([
+      memoryPending,
+      messagePending,
+    ]);
+    if (memory.status === "fulfilled" && memory.value) {
+      await memory.value.invocation.cleanup().catch(() => undefined);
+    }
+    if (message.status === "fulfilled" && message.value) {
+      await message.value.invocation.cleanup().catch(() => undefined);
+    }
+  };
+  let sessionWorktree:
+    | Awaited<ReturnType<typeof allocateCachedAnalysisWorktree>>
+    | null = null;
+  let analysisWorktree:
+    | Awaited<ReturnType<typeof allocateAnalysisWorktree>>
+    | Awaited<ReturnType<typeof allocateCachedAnalysisWorktree>>
+    | null = null;
+  let retainedUntil = reply.session?.retainedUntil ?? null;
+  // The repository-less workspace an Organization Agent already uses. It stays
+  // addressable after a mid-turn checkout because the downloaded attachments
+  // and the retained Skill catalog live under it.
+  const detachedWorkspacePath = join(
+    runtime.workspaceRoot,
+    "worker-sessions",
+    `channel-${reply.session?.id ?? reply.workId}`,
+  );
+  let workspacePath = detachedWorkspacePath;
+  let detachedWorkspacePrepared = false;
+  const logSessionWorkspace = (workspace: ChannelReplyWorkspaceKind) => {
+    if (!reply.session) return;
+    console.log(`channel reply session: ${JSON.stringify({
+      sessionId: reply.session.id,
+      channelId: reply.channelId,
+      threadId: reply.session.threadId,
+      agentId: reply.agent.id,
+      claimReason: reply.session.claimReason,
+      workspaceReused: sessionWorktree?.reused ?? false,
+      workspace,
+      acknowledgement: acknowledgement.mode,
+      retainedUntil,
+    })}`);
+  };
+  const workspaceStartedAt = performance.now();
+  try {
+    // One exception inside the gate: a session that already has a checkout on
+    // this disk keeps it, because the conversation may already be talking about
+    // files in it.
+    const sessionWorktreeCached = sessionWorktreePath !== null &&
+        startsWithoutWorktree && reply.session
+      ? (await listCachedAnalysisWorktrees(worktreeRoot)).some(
+        (candidate) => candidate.runId === reply.session!.id,
+      )
+      : false;
+    if (sessionWorktreePath && (!startsWithoutWorktree || sessionWorktreeCached)) {
+      retainCachedAnalysisWorktree(sessionWorktreePath);
+      try {
+        sessionWorktree = await allocateCachedAnalysisWorktree({
+          repositoryPath: project.repositoryPath,
+          projectId: project.id,
+          runId: reply.session!.id,
+          settings,
+          git,
+          retainedUntil: reply.session!.retainedUntil,
+        });
+      } catch (error) {
+        releaseCachedAnalysisWorktree(sessionWorktreePath);
+        throw error;
+      }
+    }
+    analysisWorktree = reply.projectId && !startsWithoutWorktree
+      ? sessionWorktree ?? await allocateAnalysisWorktree({
+          repositoryPath: project.repositoryPath,
+          projectId: project.id,
+          workId: reply.workId,
+          settings,
+          git,
+        })
+      : sessionWorktree;
+    if (analysisWorktree) workspacePath = analysisWorktree.path;
+    logSessionWorkspace(
+      analysisWorktree === null
+        ? "none"
+        : sessionWorktree?.reused
+        ? "reused"
+        : "created",
+    );
+    reportCheckpoint?.({ workspacePath });
+    if (!analysisWorktree) {
+      // A prior hard-killed attempt may have left a path behind. Recreate the
+      // exact claim workspace so stale files or a planted symlink cannot become
+      // trusted Workspace Agent context.
+      await prepareWorkspaceAgentWorkspace(workspacePath, process.pid, {
+        reuse: Boolean(reply.session),
+        retainedUntil: retainedUntil ?? undefined,
+      });
+      detachedWorkspacePrepared = true;
+    }
+  } catch (error) {
+    await discardStartedInvocations();
+    throw error;
+  }
+  setupDurations.set(
+    "workspace",
+    Math.round(performance.now() - workspaceStartedAt),
+  );
+  // Only a project reply has a repository at all, and only one that started
+  // without a checkout has one left to ask for.
+  const repositoryRequestAvailable = startsWithoutWorktree &&
+    reply.projectId !== null && analysisWorktree === null;
+  const attachmentDirectory = channelReplyAttachmentDirectory(workspacePath);
   const activityPublisher = new ChannelActivityPublisher({
     credential: reply.activity,
     send: async (credential, activity) => {
@@ -1063,35 +1213,17 @@ async function runClaimedChannelReplyTurn(
       fallbackName: "Briar Channel",
       scope: reply.scope,
     });
-    if (reply.memory) {
-      memoryInvocation = await DmMemoryInvocation.create({
-        queue: workerQueueClient,
-        projectId: project.id,
-        workerId: registered.workerId,
-        work: reply,
-        memory: reply.memory,
-        signal: invocationSignal,
-      });
-    }
-    const durablePublicMessages = reply.dmPublicMessageProtocol === 1 &&
-      supportsDmMessagePublicationProvider(reply.provider);
-    const dmMessageMcpServerPath = durablePublicMessages
-      ? runtime.dmMessageMcpServerPath ?? await findAgentBundle(
-          import.meta.dir,
-          "dm-message-mcp-server.js",
-        )
-      : null;
-    if (durablePublicMessages) {
-      messageInvocation = await DmMessageInvocation.create({
-        queue: workerQueueClient,
-        projectId: project.id,
-        workerId: registered.workerId,
-        work: reply,
-        signal: invocationSignal,
-      });
-    }
-    const organizationContext = reply.scope.kind === "workspace"
-      ? await downloadWorkspaceAgentContextManifest({
+    /*
+      Everything left needs the prepared workspace and nothing from the other
+      steps, so the manifest download, the attachment downloads and the Skill
+      catalog start together and settle beside the two that started with the
+      claim. Serialized, these were the 15–30 seconds a DM spent between its
+      claim and the first provider turn.
+    */
+    const organizationContextPending = reply.scope.kind === "workspace"
+      ? measureSetup(
+        "organizationContext",
+        () => downloadWorkspaceAgentContextManifest({
           apiUrl: config.apiUrl,
           workerToken,
           workspaceId: reply.workspaceId,
@@ -1101,31 +1233,74 @@ async function runClaimedChannelReplyTurn(
           snapshotAt: reply.organizationContext!.snapshotAt,
           workspacePath,
           signal: invocationSignal,
-        })
+        }),
+      )
       : null;
-    const downloadedAttachments = await downloadChannelReplyAttachments({
-      apiUrl: config.apiUrl,
-      workerToken,
-      workspaceId: reply.workspaceId,
-      workId: reply.workId,
-      claimToken: reply.claimToken,
-      triggerAttachments: reply.triggerAttachments,
-      workspacePath,
-    });
+    const attachmentsPending = measureSetup(
+      "attachments",
+      () => downloadChannelReplyAttachments({
+        apiUrl: config.apiUrl,
+        workerToken,
+        workspaceId: reply.workspaceId,
+        workId: reply.workId,
+        claimToken: reply.claimToken,
+        triggerAttachments: reply.triggerAttachments,
+        workspacePath,
+      }),
+    );
+    // A retained channel session resumes the same provider conversation across
+    // replies. Keep its Skill catalog at a stable workspace path for that
+    // conversation; workspace/session TTL cleanup owns its eventual removal.
+    const skillCatalogPending = reply.session
+      ? measureSetup(
+        "skills",
+        () => materializeDetachedAgentSkillCatalog(agent, {
+          temporaryParentPath: workspacePath,
+          lifetime: "retained-conversation",
+        }),
+      )
+      : null;
+    const [
+      memorySettled,
+      messageSettled,
+      organizationContextSettled,
+      attachmentsSettled,
+      skillCatalogSettled,
+    ] = await Promise.allSettled([
+      memoryPending,
+      messagePending,
+      organizationContextPending,
+      attachmentsPending,
+      skillCatalogPending,
+    ]);
+    // Assigned before anything can be thrown: the `finally` block below owns
+    // every resource a settled step produced, including on the failure path.
+    if (memorySettled.status === "fulfilled" && memorySettled.value) {
+      memoryInvocation = memorySettled.value.invocation;
+    }
+    if (messageSettled.status === "fulfilled" && messageSettled.value) {
+      messageInvocation = messageSettled.value.invocation;
+    }
+    // Step order, so a reply reports the same failure the sequential setup did.
+    const setupFailure = [
+      memorySettled,
+      messageSettled,
+      organizationContextSettled,
+      attachmentsSettled,
+      skillCatalogSettled,
+    ].find((step) => step.status === "rejected");
+    if (setupFailure?.status === "rejected") throw setupFailure.reason;
+    const memorySetup = settledSetupValue(memorySettled);
+    const publication = settledSetupValue(messageSettled);
+    const dmMessageMcpServerPath = publication ? publication.serverPath : null;
+    const organizationContext = settledSetupValue(organizationContextSettled);
+    const downloadedAttachments = settledSetupValue(attachmentsSettled);
+    const retainedSkillCatalog = settledSetupValue(skillCatalogSettled);
     const outputContract = providerStructuredOutputContract(
       agent.provider,
       ChannelAgentReplyProviderOutputSchema,
       normalizeChannelAcknowledgementReaction,
     );
-    // A retained channel session resumes the same provider conversation across
-    // replies. Keep its Skill catalog at a stable workspace path for that
-    // conversation; workspace/session TTL cleanup owns its eventual removal.
-    const retainedSkillCatalog = reply.session
-      ? await materializeDetachedAgentSkillCatalog(agent, {
-          temporaryParentPath: workspacePath,
-          lifetime: "retained-conversation",
-        })
-      : null;
     // Rebuilt when a mid-turn checkout changes what the Agent may do, so the
     // continuation never repeats "you have no repository".
     const buildPrompt = () => detachedChannelReplyPrompt({
@@ -1212,9 +1387,24 @@ async function runClaimedChannelReplyTurn(
     let result: ParsedChannelReplyAgentResult["result"] | null = null;
     let attachmentPaths: string[] = [];
     const generatedImages = new ReplyGeneratedImageCollector();
+    logChannelReplySetup(
+      reply.workId,
+      setupDurations,
+      performance.now() - claimedAt,
+    );
     while (!result) {
       const currentMemoryInvocation = memoryInvocation;
-      if (currentMemoryInvocation && await currentMemoryInvocation.check()) {
+      // Every continuation bumps one of the three round counters, so this is
+      // the claim's first provider turn — the round whose check already ran
+      // inside the parallel setup, with the same result and the same fence.
+      const firstRound = lookupRounds === 0 && repairRounds === 0 &&
+        repositoryRounds === 0;
+      const memoryChanged = currentMemoryInvocation
+        ? firstRound
+          ? Boolean(memorySetup?.changed)
+          : await currentMemoryInvocation.check()
+        : false;
+      if (currentMemoryInvocation && memoryChanged) {
         conversationId = null;
         turnPrompt = [
           prompt,
