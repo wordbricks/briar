@@ -76,6 +76,12 @@ export function startDmAcknowledgement(input: {
   signal: AbortSignal;
   timeoutMs?: number;
   onRefined?: (emoji: string) => void;
+  /**
+   * The placeholder reached the server. This is the reply's only account of
+   * when the person actually saw that Briar had read the message, so the
+   * timeline can report it rather than the moment the publish was started.
+   */
+  onPlaceholderPublished?: () => void;
   onError?: (error: unknown) => void;
 }) {
   const selection = new AbortController();
@@ -85,9 +91,13 @@ export function startDmAcknowledgement(input: {
   const publishSignal = () => AbortSignal.any([
     input.signal, publication.signal, AbortSignal.timeout(3000),
   ]);
+  // Settles either way: the refinement below chains on it for ordering only.
   const placeholder = Promise.resolve()
     .then(() => input.publish(DM_ACKNOWLEDGEMENT_PLACEHOLDER, publishSignal()))
-    .catch((error: unknown) => { input.onError?.(error); });
+    .then(
+      () => { input.onPlaceholderPublished?.(); },
+      (error: unknown) => { input.onError?.(error); },
+    );
   const finish = (text: string | null) => {
     if (settled || input.signal.aborted) return;
     settled = true;
