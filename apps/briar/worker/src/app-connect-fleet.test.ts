@@ -260,7 +260,7 @@ describe("FleetService", () => {
   it("creates one managed computer application across an exact request replay", async () => {
     const fleet = client();
     const requestId = "22222222-2222-4222-8222-222222222222";
-    const application = { organizationId, code: "  getbriar ", requestId };
+    const application = { workspaceId: organizationId, code: "  getbriar ", requestId };
     const first = await fleet.applyForManagedComputer(
       application,
       options(ownerToken),
@@ -359,7 +359,7 @@ describe("FleetService", () => {
       "<TerminateInstancesResponse/>",
       { status: 200 },
     ));
-    const request = { organizationId, managedComputerId: computerId };
+    const request = { workspaceId: organizationId, managedComputerId: computerId };
     await expect(fleet.terminateManagedComputer(request, options(memberToken))).resolves.toMatchObject({
       duplicate: false,
       computer: { id: computerId, state: ManagedComputerState.TERMINATED },
@@ -424,7 +424,7 @@ describe("FleetService", () => {
       "<Response><Errors><Error><Code>ServiceUnavailable</Code><Message>Try again</Message></Error></Errors></Response>",
       { status: 503 },
     ));
-    const request = { organizationId, managedComputerId: computerId };
+    const request = { workspaceId: organizationId, managedComputerId: computerId };
     await expect(fleet.terminateManagedComputer(request, options(ownerToken))).rejects.toBeInstanceOf(ConnectError);
     const listed = await fleet.listManagedComputers({ workspaceId: organizationId }, options(ownerToken));
     expect(listed.computers.find((computer) => computer.id === computerId)?.state).toBe(ManagedComputerState.STOPPED);

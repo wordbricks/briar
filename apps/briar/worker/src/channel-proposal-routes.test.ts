@@ -682,7 +682,7 @@ describe("channel issue proposal approval route", () => {
       .toMatchObject({
         issueDescription: "Create it, but do not execute it.",
         relatedMessage: {
-          organizationId,
+          workspaceId: organizationId,
           channelId,
           messageId: "60000000-0000-4000-8000-000000000002",
           rootMessageId: "50000000-0000-4000-8000-000000000002",

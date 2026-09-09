@@ -121,7 +121,7 @@ export const createManagedComputerSetupService = (
     );
     return {
       managedComputerId,
-      organizationId: principal.organizationId,
+      workspaceId: principal.organizationId,
       teamId: result.session.project_id,
       deviceId: principal.deviceId,
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),

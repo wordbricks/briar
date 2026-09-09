@@ -160,7 +160,7 @@ describe("OrganizationService", () => {
       options(tokens.owner),
     );
     expect(created.invitation).toMatchObject({
-      organizationId,
+      workspaceId: organizationId,
       email: "invitee@example.com",
       role: ProjectRole.EDITOR,
     });
@@ -171,7 +171,7 @@ describe("OrganizationService", () => {
       token: invitationToken!,
     });
     expect(preview.invitation).toMatchObject({
-      organizationId,
+      workspaceId: organizationId,
       emailHint: "i***@example.com",
     });
     expect(preview.invitation).not.toHaveProperty("email");

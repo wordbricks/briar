@@ -601,7 +601,12 @@ export const appDashboardRun = (run: DashboardRunJson) =>
     ),
     issueDescription: run.issueDescription ?? undefined,
     relatedMessage: run.relatedMessage
-      ? create(RelatedMessageReferenceSchema, run.relatedMessage)
+      ? create(RelatedMessageReferenceSchema, {
+        workspaceId: run.relatedMessage.organizationId,
+        channelId: run.relatedMessage.channelId,
+        messageId: run.relatedMessage.messageId,
+        rootMessageId: run.relatedMessage.rootMessageId,
+      })
       : undefined,
     attachments: run.attachments.map((attachment) =>
       create(IssueAttachmentSchema, {

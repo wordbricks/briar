@@ -222,7 +222,7 @@ export const createAppFleetService = (
     );
     context.responseHeader.set("Cache-Control", "no-store");
     return {
-      organizationId: result.organizationId,
+      workspaceId: result.organizationId,
       deviceId: result.device.id,
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),
       workerToken: result.workerToken,
@@ -241,7 +241,7 @@ export const createAppFleetService = (
       observedAt,
     }));
     return {
-      organizationId: result.organizationId,
+      workspaceId: result.organizationId,
       deviceId: result.device.id,
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),
     };

@@ -222,7 +222,7 @@ export async function requireActiveOrganizationContextClaim(
 const manifestMessage = (
   manifest: Awaited<ReturnType<typeof organizationAgentContextManifest>>,
 ) => ({
-  organizationId: manifest.organizationId,
+  workspaceId: manifest.organizationId,
   workId: manifest.workId,
   snapshotAt: timestamp(manifest.snapshotAt, "manifest.snapshot_at"),
   revision: manifest.revision,
@@ -320,7 +320,7 @@ const service = (
         result: {
           case: "unchanged",
           value: {
-            organizationId: claim.organizationId,
+            workspaceId: claim.organizationId,
             workId: claim.workId,
             snapshotAt: timestamp(claim.snapshotAt, "claim.snapshot_at"),
             revision: manifest.revision,
