@@ -56,28 +56,54 @@ export function acknowledgementEmoji(text: string | null): string {
   }
 }
 
-/** Selection and publication never gate the body. Timeout settles once; late output is ignored. */
+/**
+ * What the person sees a second after sending the message. The model's own
+ * choice takes several seconds, so it replaces this one rather than delaying
+ * every acknowledgement to the speed of a provider turn.
+ */
+export const DM_ACKNOWLEDGEMENT_PLACEHOLDER = "👀";
+
+/**
+ * Publishes the placeholder immediately and the model's contextual emoji as a
+ * replacement whenever it says something the placeholder does not. Neither
+ * publication gates the body: the timeout settles once, late output after the
+ * reply finished is ignored, and a selection that fails or returns the
+ * placeholder simply leaves what is already on the message.
+ */
 export function startDmAcknowledgement(input: {
   select: (signal: AbortSignal) => Promise<string | null>;
   publish: (emoji: string, signal: AbortSignal) => Promise<unknown>;
   signal: AbortSignal;
   timeoutMs?: number;
+  onRefined?: (emoji: string) => void;
+  onError?: (error: unknown) => void;
 }) {
   const selection = new AbortController();
   const publication = new AbortController();
   const signal = AbortSignal.any([input.signal, selection.signal]);
   let settled = false;
+  const publishSignal = () => AbortSignal.any([
+    input.signal, publication.signal, AbortSignal.timeout(3000),
+  ]);
+  const placeholder = Promise.resolve()
+    .then(() => input.publish(DM_ACKNOWLEDGEMENT_PLACEHOLDER, publishSignal()))
+    .catch((error: unknown) => { input.onError?.(error); });
   const finish = (text: string | null) => {
     if (settled || input.signal.aborted) return;
     settled = true;
     clearTimeout(timer);
     selection.abort();
-    const publishSignal = AbortSignal.any([
-      input.signal, publication.signal, AbortSignal.timeout(3000),
-    ]);
-    // A lost response may replay the same selection; the server preserves the first write.
-    void Promise.resolve().then(() => input.publish(acknowledgementEmoji(text), publishSignal))
-      .catch(() => undefined);
+    const emoji = acknowledgementEmoji(text);
+    // A timeout and a failed selection both land on the placeholder, which is
+    // already on the message; publishing it again would say nothing new.
+    if (emoji === DM_ACKNOWLEDGEMENT_PLACEHOLDER) return;
+    // Ordering, not success: a slow placeholder publication must never arrive
+    // after this one and overwrite the emoji the model chose.
+    void placeholder.then(async () => {
+      if (publication.signal.aborted || input.signal.aborted) return;
+      await input.publish(emoji, publishSignal());
+      input.onRefined?.(emoji);
+    }).catch((error: unknown) => { input.onError?.(error); });
   };
   const timer = setTimeout(() => finish(null), input.timeoutMs ?? 15_000);
   void Promise.resolve().then(() => input.select(signal)).then(finish, () => finish(null));

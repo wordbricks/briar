@@ -4413,7 +4413,33 @@ export async function getClaimedChannelReply(
   return claimed;
 }
 
-/** First automatic reaction wins, including across claim retries. No reaction is removed. */
+/*
+  The live authorization every acknowledgement statement repeats inside its own
+  query, so revocation cannot race a preflight read. The bind order it expects
+  is jobId, deviceId, workerId, claimTokenHash, observedAt.
+*/
+const liveAcknowledgementClaim = `
+  job.id = ? and job.claimed_device_id = ? and job.claimed_worker_id = ?
+    and job.claim_token_hash = ? and job.status = 'running' and job.lease_expires_at > ?
+    and channel.organization_id = job.organization_id and channel.kind = 'dm'
+    and message.author_user_id is not null and message.deleted_at is null
+    and exists (select 1 from briar_channel_agents roster
+      where roster.channel_id = job.channel_id and roster.agent_id = job.agent_id)
+    and ${liveChannelReplyRuntime("job")}
+    and ${dmMemoryReplyFenceCurrent("job")}
+    and exists (select 1 from briar_execution_workers binding
+      where binding.id = job.claimed_worker_id and binding.device_id = job.claimed_device_id
+        and binding.state <> 'disabled'
+        and (job.project_id is null or binding.project_id = job.project_id))`;
+
+/**
+ * The Agent's acknowledgement is one slot on the trigger message, not a first
+ * write: the placeholder published the moment the reply is claimed is replaced
+ * by the contextual emoji the model picks a few seconds later. Setting the slot
+ * only ever touches this Agent's own reaction — a person's reaction is never
+ * removed, and an Agent somehow holding several reactions on the message is
+ * left exactly as it is rather than being reduced to one.
+ */
 export async function publishChannelAcknowledgementReaction(
   db: D1Database,
   input: {
@@ -4428,33 +4454,48 @@ export async function publishChannelAcknowledgementReaction(
   if (input.emoji.length > 32 || input.emoji !== input.emoji.trim() ||
       !isChannelReactionEmoji(input.emoji)) throw new Error("Invalid acknowledgement emoji");
   await requireDmMemoryReplyFence(db, input.jobId);
-  // Repeat live authorization inside the INSERT so revocation cannot race a preflight read.
-  await db.prepare(`
-    insert into briar_channel_message_reactions (message_id, user_id, agent_id, emoji, created_at)
-    select job.trigger_message_id, null, job.agent_id, ?, ?
-    from briar_channel_agent_reply_jobs job
-    join briar_channels channel on channel.id = job.channel_id
-    join briar_project_agents agent
-      on agent.id = job.agent_id and agent.organization_id = job.organization_id
-    join briar_channel_messages message
-      on message.id = job.trigger_message_id and message.channel_id = channel.id
-    where job.id = ? and job.claimed_device_id = ? and job.claimed_worker_id = ?
-      and job.claim_token_hash = ? and job.status = 'running' and job.lease_expires_at > ?
-      and channel.organization_id = job.organization_id and channel.kind = 'dm'
-      and message.author_user_id is not null and message.deleted_at is null
-      and exists (select 1 from briar_channel_agents roster
-        where roster.channel_id = job.channel_id and roster.agent_id = job.agent_id)
-      and ${liveChannelReplyRuntime("job")}
-      and ${dmMemoryReplyFenceCurrent("job")}
-      and exists (select 1 from briar_execution_workers binding
-        where binding.id = job.claimed_worker_id and binding.device_id = job.claimed_device_id
-          and binding.state <> 'disabled'
-          and (job.project_id is null or binding.project_id = job.project_id))
-      and not exists (select 1 from briar_channel_message_reactions existing
-        where existing.message_id = job.trigger_message_id and existing.agent_id = job.agent_id)
-    on conflict do nothing
-  `).bind(input.emoji, input.observedAt, input.jobId, input.deviceId,
-    input.workerId, input.claimTokenHash, input.observedAt).run();
+  const claim = [input.jobId, input.deviceId, input.workerId,
+    input.claimTokenHash, input.observedAt];
+  // One batch, so the INSERT reads the row the DELETE removed and both the
+  // reaction triggers and the realtime publish see a single settled state.
+  await db.batch([
+    db.prepare(`
+      delete from briar_channel_message_reactions
+      where rowid in (
+        select current.rowid
+        from briar_channel_message_reactions current
+        join briar_channel_agent_reply_jobs job
+          on job.trigger_message_id = current.message_id
+         and job.agent_id = current.agent_id
+        join briar_channels channel on channel.id = job.channel_id
+        join briar_project_agents agent
+          on agent.id = job.agent_id and agent.organization_id = job.organization_id
+        join briar_channel_messages message
+          on message.id = job.trigger_message_id and message.channel_id = channel.id
+        where current.user_id is null and current.emoji <> ?
+          and ${liveAcknowledgementClaim}
+          and (select count(*) from briar_channel_message_reactions held
+            where held.message_id = job.trigger_message_id
+              and held.agent_id = job.agent_id) = 1
+      )
+    `).bind(input.emoji, ...claim),
+    // Requesting the emoji the Agent already holds leaves the row untouched,
+    // and so does a message this Agent has several reactions on.
+    db.prepare(`
+      insert into briar_channel_message_reactions (message_id, user_id, agent_id, emoji, created_at)
+      select job.trigger_message_id, null, job.agent_id, ?, ?
+      from briar_channel_agent_reply_jobs job
+      join briar_channels channel on channel.id = job.channel_id
+      join briar_project_agents agent
+        on agent.id = job.agent_id and agent.organization_id = job.organization_id
+      join briar_channel_messages message
+        on message.id = job.trigger_message_id and message.channel_id = channel.id
+      where ${liveAcknowledgementClaim}
+        and not exists (select 1 from briar_channel_message_reactions existing
+          where existing.message_id = job.trigger_message_id and existing.agent_id = job.agent_id)
+      on conflict do nothing
+    `).bind(input.emoji, input.observedAt, ...claim),
+  ]);
 }
 
 export async function renewChannelReplyLease(

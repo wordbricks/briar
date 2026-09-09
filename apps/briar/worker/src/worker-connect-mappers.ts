@@ -576,6 +576,7 @@ const channelReply = (
       claimedAt: requiredTimestamp(value.claimedAt, "claimedAt"),
       leaseExpiresAt: requiredTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
       activity: activity(value.activity),
+      acknowledgementReaction: value.acknowledgementReaction ?? undefined,
       workspaceContextSnapshotAt: value.organizationContext
         ? requiredTimestamp(
             value.organizationContext.snapshotAt,

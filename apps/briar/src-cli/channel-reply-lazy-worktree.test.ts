@@ -8,14 +8,17 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
+import { DmMemoryBriefState, DmMemoryDescriptorSchema } from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
   ChannelReplyScopeSchema,
   ChannelReplyScope_ProjectSchema,
   ChannelReplySessionSchema,
   ChannelReplySessionClaimReason,
   ClaimedWorkSchema,
+  CheckDmMemoryClaimResponseSchema,
   CheckpointChannelReplySessionResponseSchema,
   CompleteChannelReplyResponseSchema,
+  GetDmMemoryBriefResponseSchema,
   DetachedAgentClaimSchema,
   PublishReplyActivityResponseSchema,
   ReplyActivityService,
@@ -122,6 +125,19 @@ type Exercise = {
   /** Claim the same retained session again, the way a follow-up message does. */
   sessionId?: string;
   agentMessageHop?: number;
+  /** The reaction the claim says this Agent already holds on the trigger. */
+  acknowledgementReaction?: string;
+  /** Bind a private DM memory space, so the claim owes a memory brief RPC. */
+  memory?: boolean;
+  /** What the acknowledgement selection turn answers, and when. */
+  selectAcknowledgement?: () => Promise<DetachedProviderTurnResult>;
+  /**
+   * Reactions to wait for before the server closes: the acknowledgement is
+   * deliberately off the reply's critical path, so nothing else waits for it.
+   */
+  expectReactions?: number;
+  /** Runs once the reply has returned, while the server is still listening. */
+  afterRun?: () => Promise<void>;
   provider: (
     turn: DetachedProviderTurnInput,
     number: number,
@@ -167,8 +183,19 @@ describe("DM reply worktree allocation", () => {
     const sessionId = input.sessionId ?? crypto.randomUUID();
     const triggerMessageId = crypto.randomUUID();
     const activities: string[] = [];
+    // Every server call this reply makes, in the order the server saw it.
+    const calls: string[] = [];
+    const reactions: string[] = [];
     let completed = "";
     let turns = 0;
+    const memory = {
+      protocol: 1,
+      memorySpaceId: crypto.randomUUID(),
+      memoryRevision: 1n,
+      revocationEpoch: 1n,
+      searchEnabled: false,
+      briefState: DmMemoryBriefState.DISABLED,
+    };
 
     const adapter = connectNodeAdapter({
       routes: (router) => {
@@ -179,7 +206,14 @@ describe("DM reply worktree allocation", () => {
                 new Date("2099-01-01T00:00:00Z"),
               ),
             }),
+          getDmMemoryBrief: () => {
+            calls.push("memory-brief");
+            return create(GetDmMemoryBriefResponseSchema, { memory });
+          },
+          checkDmMemoryClaim: () =>
+            create(CheckDmMemoryClaimResponseSchema, { memory }),
           completeChannelReply: (request) => {
+            calls.push("complete");
             completed = JSON.stringify(request);
             return create(CompleteChannelReplyResponseSchema, {
               replayed: false,
@@ -193,6 +227,10 @@ describe("DM reply worktree allocation", () => {
         router.service(ReplyActivityService, {
           publishReplyActivity: (request) => {
             if (request.activity) activities.push(request.activity.headline);
+            if (request.acknowledgementReaction !== undefined) {
+              calls.push(`reaction:${request.acknowledgementReaction}`);
+              reactions.push(request.acknowledgementReaction);
+            }
             return create(PublishReplyActivityResponseSchema, {});
           },
         });
@@ -274,6 +312,8 @@ describe("DM reply worktree allocation", () => {
           claimToken: `briar_channel_claim_${"a".repeat(64)}`,
           claimedAt: timestampFromDate(new Date("2026-09-09T00:00:00Z")),
           leaseExpiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
+          acknowledgementReaction: input.acknowledgementReaction,
+          memory: input.memory ? create(DmMemoryDescriptorSchema, memory) : undefined,
           snapshot: dmSnapshot(triggerMessageId),
         },
       },
@@ -281,6 +321,7 @@ describe("DM reply worktree allocation", () => {
 
     let failure: unknown;
     const workspacePaths: string[] = [];
+    const acknowledgementWorkspaces: string[] = [];
     const prompts: string[] = [];
     try {
       await runClaimedChannelReply(
@@ -297,8 +338,12 @@ describe("DM reply worktree allocation", () => {
             // Briar picks the acknowledgement emoji on its own track; it is
             // not one of this reply's rounds.
             if (turn.agent.name === "DM acknowledgement") {
-              return Promise.resolve(turnResult({ emoji: "👀" }));
+              acknowledgementWorkspaces.push(turn.workspacePath);
+              return input.selectAcknowledgement
+                ? input.selectAcknowledgement()
+                : Promise.resolve(turnResult({ emoji: "👀" }));
             }
+            calls.push(`turn:${turns + 1}`);
             workspacePaths.push(turn.workspacePath);
             prompts.push(turn.prompt);
             return input.provider(turn, ++turns);
@@ -308,6 +353,11 @@ describe("DM reply worktree allocation", () => {
     } catch (error) {
       failure = error;
     } finally {
+      const deadline = Date.now() + 5_000;
+      while (reactions.length < (input.expectReactions ?? 0) && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await input.afterRun?.();
       await new Promise<void>((resolve, reject) =>
         server.close((error) => error ? reject(error) : resolve())
       );
@@ -317,7 +367,10 @@ describe("DM reply worktree allocation", () => {
       turns,
       completed,
       activities,
+      calls,
+      reactions,
       workspacePaths,
+      acknowledgementWorkspaces,
       prompts,
       sessionId,
       workId,
@@ -436,6 +489,82 @@ describe("DM reply worktree allocation", () => {
       "A disposable project worktree is available",
     );
     expect(observed.failure).toMatchObject({ message: "repository_unavailable" });
+  });
+
+  /*
+    The reaction used to wait for routing, the worktree, the memory brief and a
+    whole provider turn of its own, so it reached the person about 48 seconds
+    after they sent the message. It is now published from the claim itself.
+  */
+  it("publishes the placeholder before the reply asks the server for anything else", async () => {
+    const observed = await exercise({
+      memory: true,
+      expectReactions: 1,
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.reactions).toEqual(["👀"]);
+    expect(observed.calls.indexOf("reaction:👀")).toBeLessThan(
+      observed.calls.indexOf("memory-brief"),
+    );
+    // The selection has no workspace of its own to run in yet, so it never
+    // borrows the reply's.
+    expect(observed.acknowledgementWorkspaces[0]).not.toContain("worker-sessions");
+    expect(observed.workspacePaths).not.toContain(observed.acknowledgementWorkspaces[0]);
+    await expect(stat(observed.acknowledgementWorkspaces[0]!)).rejects.toThrow();
+  });
+
+  it("replaces the placeholder with the emoji the model chose", async () => {
+    const observed = await exercise({
+      selectAcknowledgement: async () => turnResult({ emoji: "🎉" }),
+      expectReactions: 2,
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    // Order, not just membership: the placeholder can never land on top.
+    expect(observed.reactions).toEqual(["👀", "🎉"]);
+    expect(observed.completed).toContain("A synthetic answer");
+  });
+
+  it("publishes nothing beyond the placeholder when selection fails", async () => {
+    const observed = await exercise({
+      selectAcknowledgement: () => Promise.reject(new Error("provider offline")),
+      expectReactions: 1,
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.reactions).toEqual(["👀"]);
+  });
+
+  it("ignores a selection that only lands after the reply finished", async () => {
+    let selected!: (value: DetachedProviderTurnResult) => void;
+    const observed = await exercise({
+      selectAcknowledgement: () => new Promise((resolve) => { selected = resolve; }),
+      expectReactions: 1,
+      afterRun: async () => {
+        selected(turnResult({ emoji: "🎉" }));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      },
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.reactions).toEqual(["👀"]);
+  });
+
+  it("neither reacts nor runs a selection when the claim already carries one", async () => {
+    const observed = await exercise({
+      acknowledgementReaction: "🎉",
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.reactions).toEqual([]);
+    expect(observed.acknowledgementWorkspaces).toEqual([]);
+    expect(observed.completed).toContain("A synthetic answer");
   });
 
 });

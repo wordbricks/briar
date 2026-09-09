@@ -1345,6 +1345,11 @@ message ClaimedChannelReply {
   // distinguish an eligible initial DM from an ineligible channel reply.
   uint32 dm_public_message_protocol = 34;
   optional DmReplyRouting routing = 35;
+  // The acknowledgement reaction this Agent already holds on the trigger
+  // message. Present only when an earlier attempt of this same job published
+  // one, so a steer restart or a lease-expiry retry neither re-publishes the
+  // placeholder nor spends a provider turn choosing the emoji again.
+  optional string acknowledgement_reaction = 36;
 }
 
 message PublishedDmMessageBatch {

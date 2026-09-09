@@ -317,7 +317,12 @@ describe("direct message reply bursts", () => {
       observedAt: new Date().toISOString(), emoji, ...overrides,
     });
 
-  it.each(["🎮", "🎉", "❤️", "🙏", "👀"])("first publishes %s before completion, once, preserving others", async (emoji) => {
+  const agentReactions = async (channelId: string, messageId: string) =>
+    ((await getChannelMessage(db, channelId, messageId))?.reactions ?? [])
+      .filter((reaction) => reaction.agentIds?.includes(agentId))
+      .map((reaction) => reaction.emoji);
+
+  it.each(["🎮", "🎉", "❤️", "🙏", "👀"])("replaces its own placeholder with %s before completion, preserving others", async (emoji) => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "A message whose tone the Agent reads.");
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
@@ -335,23 +340,53 @@ describe("direct message reply bursts", () => {
     await stopTyping(sent.job.id);
     const claimed = (await claim())!;
     const cursor = await getChannelSyncCursor(db, workspaceId);
+    // The claim publishes the placeholder; the selection replaces it later.
+    await react(claimed, "👀");
     await react(claimed, emoji);
     const message = await getChannelMessage(db, channelId, sent.messageId);
-    expect(message?.reactions.some((reaction) => reaction.emoji === emoji && reaction.agentIds?.includes(agentId))).toBe(true);
+    // The slot holds exactly what was asked for last, and nothing else of ours.
+    expect(await agentReactions(channelId, sent.messageId)).toEqual([emoji]);
     expect(message?.reactions.find((reaction) => reaction.emoji === "👀")).toMatchObject({ userIds: [ownerId] });
     expect(message?.reactions.find((reaction) => reaction.emoji === "👀")?.agentIds).toContain(otherAgentId);
     expect((await getChannelAgentReplyJob(db, workspaceId, claimed.workId))?.status).toBe("running");
     const delta = await loadChannelDelta(db, workspaceId, ownerId, cursor);
     expect(delta.messages.find((entry) => entry.id === sent.messageId)?.reactions).toEqual(message?.reactions);
+    // Two publications racing each other still settle on a single reaction.
     await Promise.all([react(claimed, "🔥"), react(claimed, "🙏")]);
+    expect(await agentReactions(channelId, sent.messageId)).toHaveLength(1);
     expect(await finish(claimed, { acknowledgementReaction: "🔥" })).not.toBeNull();
     await expect(react(claimed, "😄")).rejects.toThrow();
+    const completed = (await getChannelMessage(db, channelId, sent.messageId))?.reactions;
     await enqueueChannelAgentReplies(db, {
       workspaceId, channelId, triggerMessageId: sent.messageId,
       parentMessageId: sent.messageId, addAgentAcknowledgementReaction: true,
       agents: [{ id: agentId, projectId: null, provider: "claude" }], createdAt: new Date().toISOString(),
     });
-    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual(message?.reactions);
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual(completed);
+  });
+
+  it("leaves the row alone when the selection lands on the placeholder again", async () => {
+    const channelId = await freshConversation("dm");
+    const sent = await send(channelId, "hello");
+    await stopTyping(sent.job.id);
+    const claimed = (await claim())!;
+    const rows = () => db.prepare(
+      `select emoji, created_at from briar_channel_message_reactions
+       where message_id = ? and agent_id = ? order by emoji`,
+    ).bind(sent.messageId, agentId).all<{ emoji: string; created_at: string }>();
+    await react(claimed, "👀");
+    const published = (await rows()).results;
+    expect(published).toHaveLength(1);
+    // Same emoji, later clock: neither a rewrite nor a delete-and-insert.
+    await react(claimed, "👀", { observedAt: new Date(Date.now() + 60_000).toISOString() });
+    expect((await rows()).results).toEqual(published);
+    // An Agent that somehow holds two reactions is left exactly as it is.
+    await db.prepare(`insert into briar_channel_message_reactions (message_id, agent_id, emoji, created_at)
+      values (?, ?, '🎉', ?)`).bind(sent.messageId, agentId, new Date().toISOString()).run();
+    const both = (await rows()).results;
+    await react(claimed, "🔥");
+    expect((await rows()).results).toEqual(both);
+    expect(await finish(claimed)).not.toBeNull();
   });
 
   it("rejects invalid emoji and stale claims without preventing body completion", async () => {
@@ -367,10 +402,17 @@ describe("direct message reply bursts", () => {
       await react(claimed, "🙏", overrides);
     }
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
+    // Nor may a dead claim remove the reaction a live one published.
+    await react(claimed, "👀");
+    for (const overrides of [{ workerId: crypto.randomUUID() }, { deviceId: crypto.randomUUID() },
+      { claimTokenHash: "wrong" }, { observedAt: "2999-01-01T00:00:00.000Z" }]) {
+      await react(claimed, "🙏", overrides);
+    }
+    expect(await agentReactions(channelId, sent.messageId)).toEqual(["👀"]);
     expect(await finish(claimed)).not.toBeNull();
   });
 
-  it("keeps exactly one first write across concurrent selection and a rotated retry token", async () => {
+  it("sets the slot only from the claim token the job currently holds", async () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "thanks");
     await stopTyping(sent.job.id);
@@ -381,12 +423,32 @@ describe("direct message reply bursts", () => {
     const retryHash = sha256("retry-claim");
     await db.prepare("update briar_channel_agent_reply_jobs set claim_token_hash = ? where id = ?")
       .bind(retryHash, claimed.workId).run();
+    // The superseded token can neither set the slot nor clear it.
     await react(claimed, "🔥");
-    await react(claimed, "💛", { claimTokenHash: retryHash });
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual(first);
+    // The claim that holds the job replaces what is there.
+    await react(claimed, "💛", { claimTokenHash: retryHash });
+    expect(await agentReactions(channelId, sent.messageId)).toEqual(["💛"]);
     await db.prepare("update briar_channel_agent_reply_jobs set claim_token_hash = ? where id = ?")
       .bind(sha256(claimed.claimToken), claimed.workId).run();
     expect(await finish(claimed)).not.toBeNull();
+  });
+
+  it("tells a re-claim which acknowledgement the Agent already holds", async () => {
+    const channelId = await freshConversation("dm");
+    const sent = await send(channelId, "hi");
+    await stopTyping(sent.job.id);
+    const claimed = (await claim())!;
+    // A first attempt has nothing on the message, so the runner publishes.
+    expect(claimed.acknowledgementReaction).toBeNull();
+    await react(claimed, "🎉");
+    await db.prepare("update briar_channel_agent_reply_jobs set lease_expires_at = ? where id = ?")
+      .bind(new Date(Date.now() - 1_000).toISOString(), claimed.workId).run();
+    const recovered = (await claim())!;
+    expect(recovered.workId).toBe(claimed.workId);
+    // The retry skips both the placeholder and the whole selection turn.
+    expect(recovered.acknowledgementReaction).toBe("🎉");
+    expect(await finish(recovered)).not.toBeNull();
   });
 
   it.each(["deleted", "agent-authored"])("does not react to a %s trigger", async (kind) => {
