@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises";
@@ -7,6 +8,7 @@ import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { DmMemoryBriefState, DmMemoryDescriptorSchema } from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
@@ -31,6 +33,7 @@ import type {
   DetachedProviderTurnInput,
   DetachedProviderTurnResult,
 } from "./detached-provider-turn";
+import { channelReplyAttachmentPath } from "../src/lib/channel-reply-attachment-path";
 import { runClaimedChannelReply } from "./reply-execution";
 import {
   claimedWorkFromProto,
@@ -121,6 +124,18 @@ const git: GitRunner = (args, options = {}) => {
   };
 };
 
+/** The setup steps this harness can observe from the server side. */
+type HeldSetupStep = "memory-brief" | "memory-check" | "attachment";
+
+/** Where `DmMessageInvocation` keeps the journal it owns for a work item. */
+const publicationJournalDirectory = (workId: string) => join(
+  "/tmp",
+  "briar-dm-publication-journals",
+  createHash("sha256").update(workId).digest("hex").slice(0, 32),
+);
+
+const attachmentBody = "synthetic channel attachment\n";
+
 type Exercise = {
   /** Claim the same retained session again, the way a follow-up message does. */
   sessionId?: string;
@@ -129,6 +144,21 @@ type Exercise = {
   acknowledgementReaction?: string;
   /** Bind a private DM memory space, so the claim owes a memory brief RPC. */
   memory?: boolean;
+  /** Attach one text file to the trigger, so the claim owes a download. */
+  attachment?: boolean;
+  /**
+   * Durable public messages, so the claim owes a message invocation: a journal
+   * owner under /tmp and a relay socket in a private directory beside it.
+   */
+  publicMessages?: boolean;
+  /**
+   * Setup steps to hold: each one reports that it started and then waits until
+   * every held step has started too. A setup that runs them one after the next
+   * can never open that barrier, so it fails on the order it produced instead.
+   */
+  hold?: readonly HeldSetupStep[];
+  /** The memory brief answers with a transport failure instead of a brief. */
+  memoryBriefFails?: boolean;
   /** What the acknowledgement selection turn answers, and when. */
   selectAcknowledgement?: () => Promise<DetachedProviderTurnResult>;
   /**
@@ -185,7 +215,31 @@ describe("DM reply worktree allocation", () => {
     const activities: string[] = [];
     // Every server call this reply makes, in the order the server saw it.
     const calls: string[] = [];
+    // Where each observable setup step started and ended, so a test can tell
+    // steps that overlap from steps that merely both happened.
+    const events: string[] = [];
     const reactions: string[] = [];
+    const attachmentId = crypto.randomUUID();
+    const attachmentUrl = channelReplyAttachmentPath({
+      workspaceId: organizationId,
+      workId,
+      attachmentId,
+    });
+    const startedHeldSteps = new Set<HeldSetupStep>();
+    let openBarrier = () => {};
+    const barrier = new Promise<void>((resolve) => { openBarrier = resolve; });
+    const holdStep = async (step: HeldSetupStep) => {
+      events.push(`${step}:start`);
+      if (!input.hold?.includes(step)) return;
+      startedHeldSteps.add(step);
+      if (input.hold.every((held) => startedHeldSteps.has(held))) openBarrier();
+      // A serial setup never opens the barrier. Give up rather than hang, so
+      // the failure is the recorded order and not a timeout.
+      await Promise.race([
+        barrier,
+        new Promise((resolve) => setTimeout(resolve, 2_000)),
+      ]);
+    };
     let completed = "";
     let turns = 0;
     const memory = {
@@ -206,12 +260,24 @@ describe("DM reply worktree allocation", () => {
                 new Date("2099-01-01T00:00:00Z"),
               ),
             }),
-          getDmMemoryBrief: () => {
+          getDmMemoryBrief: async () => {
             calls.push("memory-brief");
+            await holdStep("memory-brief");
+            events.push("memory-brief:end");
+            if (input.memoryBriefFails) {
+              throw new ConnectError(
+                "synthetic memory brief outage",
+                Code.Unavailable,
+              );
+            }
             return create(GetDmMemoryBriefResponseSchema, { memory });
           },
-          checkDmMemoryClaim: () =>
-            create(CheckDmMemoryClaimResponseSchema, { memory }),
+          checkDmMemoryClaim: async () => {
+            calls.push("memory-check");
+            await holdStep("memory-check");
+            events.push("memory-check:end");
+            return create(CheckDmMemoryClaimResponseSchema, { memory });
+          },
           completeChannelReply: (request) => {
             calls.push("complete");
             completed = JSON.stringify(request);
@@ -236,7 +302,25 @@ describe("DM reply worktree allocation", () => {
         });
       },
     });
-    const server = createServer((request, reply) => void adapter(request, reply));
+    const server = createServer((request, reply) => {
+      // The attachment download is plain HTTP against the same origin, so it
+      // is held and observed here rather than through the Connect router.
+      if (request.url === attachmentUrl) {
+        void (async () => {
+          calls.push("attachment");
+          await holdStep("attachment");
+          events.push("attachment:end");
+          const body = Buffer.from(attachmentBody, "utf8");
+          reply.writeHead(200, {
+            "Content-Type": "text/plain",
+            "Content-Length": String(body.byteLength),
+          });
+          reply.end(body);
+        })();
+        return;
+      }
+      void adapter(request, reply);
+    });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") {
@@ -314,6 +398,16 @@ describe("DM reply worktree allocation", () => {
           leaseExpiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
           acknowledgementReaction: input.acknowledgementReaction,
           memory: input.memory ? create(DmMemoryDescriptorSchema, memory) : undefined,
+          dmPublicMessageProtocol: input.publicMessages ? 1 : 0,
+          triggerAttachments: input.attachment
+            ? [{
+                id: attachmentId,
+                filename: "note.txt",
+                contentType: "text/plain",
+                byteSize: Buffer.byteLength(attachmentBody, "utf8"),
+                url: attachmentUrl,
+              }]
+            : [],
           snapshot: dmSnapshot(triggerMessageId),
         },
       },
@@ -334,6 +428,8 @@ describe("DM reply worktree allocation", () => {
         {
           workspaceRoot: root,
           git,
+          // `findAgentBundle` reads `import.meta.dir`, which only Bun defines.
+          dmMessageMcpServerPath: join(root, "dm-message-mcp-server.js"),
           runProviderTurn: ((turn: DetachedProviderTurnInput) => {
             // Briar picks the acknowledgement emoji on its own track; it is
             // not one of this reply's rounds.
@@ -344,6 +440,7 @@ describe("DM reply worktree allocation", () => {
                 : Promise.resolve(turnResult({ emoji: "👀" }));
             }
             calls.push(`turn:${turns + 1}`);
+            events.push(`turn:${turns + 1}`);
             workspacePaths.push(turn.workspacePath);
             prompts.push(turn.prompt);
             return input.provider(turn, ++turns);
@@ -368,6 +465,7 @@ describe("DM reply worktree allocation", () => {
       completed,
       activities,
       calls,
+      events,
       reactions,
       workspacePaths,
       acknowledgementWorkspaces,
@@ -553,6 +651,116 @@ describe("DM reply worktree allocation", () => {
 
     expect(observed.failure).toBeUndefined();
     expect(observed.reactions).toEqual(["👀"]);
+  });
+
+  /*
+    Even with no checkout to make, a DM used to spend 15–30 seconds between its
+    claim and `turn.started` because every setup step waited for the one before
+    it. These tests hold the shape that fixed it: the steps that do not depend
+    on each other are in flight together, and the turn still waits for all of
+    them.
+  */
+  it("runs the memory brief and the attachment download against each other", async () => {
+    const observed = await exercise({
+      memory: true,
+      attachment: true,
+      hold: ["memory-brief", "attachment"],
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    // Each one started before the other could finish: serialized, the second
+    // start could only follow the first end.
+    expect(observed.events.indexOf("memory-brief:start")).toBeLessThan(
+      observed.events.indexOf("attachment:end"),
+    );
+    expect(observed.events.indexOf("attachment:start")).toBeLessThan(
+      observed.events.indexOf("memory-brief:end"),
+    );
+    // Both results are still owed before the model runs.
+    expect(observed.events.indexOf("memory-brief:end")).toBeLessThan(
+      observed.events.indexOf("turn:1"),
+    );
+    expect(observed.events.indexOf("attachment:end")).toBeLessThan(
+      observed.events.indexOf("turn:1"),
+    );
+    // The downloaded file reached the prompt, so the parallel step really ran.
+    expect(observed.prompts[0]).toContain(".briar-channel-attachments");
+  });
+
+  /*
+    The memory claim check that used to open round one is the same fence, moved:
+    it now runs inside the setup, beside the steps that do not need it, instead
+    of costing a serial round trip once they are all finished. M07 needs it
+    before the first provider turn either way.
+  */
+  it("checks the memory claim before the first turn, beside the other setup", async () => {
+    const observed = await exercise({
+      memory: true,
+      attachment: true,
+      hold: ["memory-check", "attachment"],
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    // The attachment download was already in flight when the check ran, which
+    // it could not be if the check waited for the whole setup to finish.
+    expect(observed.events.indexOf("attachment:start")).toBeLessThan(
+      observed.events.indexOf("memory-check:end"),
+    );
+    expect(observed.calls.indexOf("memory-check")).toBeLessThan(
+      observed.calls.indexOf("turn:1"),
+    );
+    // Round one asks nothing further; a later round still checks in the loop.
+    const beforeFirstTurn = observed.calls.slice(
+      0,
+      observed.calls.indexOf("turn:1"),
+    );
+    expect(beforeFirstTurn.filter((call) => call === "memory-check")).toHaveLength(1);
+  });
+
+  it("checks the memory claim again on a continuation round", async () => {
+    const observed = await exercise({
+      memory: true,
+      // Unparseable output, so round two is a repair continuation rather than
+      // anything that would publish activity of its own.
+      provider: async (_turn, number) =>
+        number === 1 ? turnResult("not a channel reply") : turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(2);
+    const between = observed.calls.slice(
+      observed.calls.indexOf("turn:1") + 1,
+      observed.calls.indexOf("turn:2"),
+    );
+    expect(between).toEqual(["memory-check"]);
+  });
+
+  it("cleans a created message invocation up when the memory brief fails", async () => {
+    const observed = await exercise({
+      memory: true,
+      publicMessages: true,
+      memoryBriefFails: true,
+      provider: async () => turnResult(answer),
+    });
+
+    // The redacted memory code the reply reported before the steps ran
+    // together, and the model was never asked to answer.
+    expect(observed.failure).toMatchObject({
+      message: "memory_transport_failed",
+    });
+    expect(observed.turns).toBe(0);
+    // The message invocation was created beside the failing brief. Its journal
+    // owner is released only by `cleanup()`, so its absence is the proof that
+    // the relay socket and its private directory went with it.
+    expect(observed.calls).toContain("memory-brief");
+    await expect(
+      stat(join(publicationJournalDirectory(observed.workId), "owner.json")),
+    ).rejects.toThrow();
+    await expect(
+      stat(publicationJournalDirectory(observed.workId)),
+    ).resolves.toBeDefined();
   });
 
   it("neither reacts nor runs a selection when the claim already carries one", async () => {
