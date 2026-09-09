@@ -327,7 +327,6 @@ export const ko = {
   "dm.relay.sentTo": "메시지 보냄 → {name}",
   "dm.relay.pending": "{name}가 확인 중",
   "dm.relay.failed": "{name}에게 메시지를 전달하지 못했습니다.",
-  "dm.relay.from": "보낸 사람 {name}",
   "dm.relay.open": "{name}와의 에이전트 간 대화 열기",
   "dm.agentConversation.readOnly": "에이전트 간 대화 · 읽기 전용",
   "dm.agentConversation.back": "돌아가기",

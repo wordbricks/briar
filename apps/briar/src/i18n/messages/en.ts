@@ -266,7 +266,6 @@ export const en = {
   "dm.relay.sentTo": "Message sent → {name}",
   "dm.relay.pending": "{name} is checking",
   "dm.relay.failed": "The message to {name} could not be delivered.",
-  "dm.relay.from": "From {name}",
   "dm.relay.open": "Open the agent conversation with {name}",
   "dm.agentConversation.readOnly": "Agent conversation · Read only",
   "dm.agentConversation.back": "Back",

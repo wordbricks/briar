@@ -4635,14 +4635,11 @@ button.issue-message-state { width:100%; cursor:pointer; }
   white-space: nowrap;
 }
 /*
-  The two ends of a relay, as a thumb reaches them. Both are links into the
-  read-only conversation, and both are small: the notice is a line of grey text
-  and the label above an answer is smaller still. They grow to a finger rather
-  than borrowing the space around them, which on the answer's label belongs to
-  the answer itself.
+  The relay notice, as a thumb reaches it. It is a link into the read-only
+  Agent-to-Agent conversation and it is small — a line of grey text — so it
+  grows to a finger rather than borrowing the space around it.
 */
-.companion-shell .channel-relay-open,
-.companion-shell .channel-relay-from { min-height: 44px; }
+.companion-shell .channel-relay-open { min-height: 44px; }
 .channel-header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; }
 .channel-header-icon {
   display: inline-flex;

@@ -134,11 +134,17 @@ export async function claimNextChannelReplyWork(
         parentMessageId: sourceMessage?.parentMessageId ?? null,
       },
     );
+    /*
+      Answers copied back by an older round trip stay in the Agent's own
+      context: a relaying turn queued before the copying stopped is still
+      triggered by one, and losing it would strand that turn.
+    */
     const messages = contextParentMessageId
       ? await listChannelThreadMessages(
           db,
           job.channel_id,
           contextParentMessageId,
+          { includeAgentAnswerCopies: true },
         )
       : await listChannelRootMessages(
           db,
@@ -151,8 +157,9 @@ export async function claimNextChannelReplyWork(
                   Date.parse(job.claimed_at ?? observedAt) -
                     DM_REPLY_CONTEXT_MAX_AGE_MS,
                 ).toISOString(),
+                includeAgentAnswerCopies: true,
               }
-            : {},
+            : { includeAgentAnswerCopies: true },
         );
     if (job.project_id !== liveAgent.project_id) {
       throw new HttpError(409, "Reply job no longer matches its Agent scope");
@@ -405,31 +412,45 @@ export async function claimNextChannelReplyWork(
         originReplyJobId: originJob.id,
       };
     }
+    /*
+      The answer is read where it was written, in the Agent-to-Agent
+      conversation, rather than from a copy in the person's own: the person
+      reads the summary this turn is about to write, not the raw answer, so
+      nothing is copied across.
+    */
     if (originJob && job.agent_message_hop === 2) {
       const answer = await db.prepare(
-        `select answer.agent_id, answer.channel_id, agent.name as agent_name
+        `select answer.agent_id, answer.channel_id, answer.reply_message_id,
+                agent.name as agent_name
          from briar_channel_agent_reply_jobs answer
          join briar_project_agents agent on agent.id = answer.agent_id
          where answer.origin_reply_job_id = ? and answer.agent_message_hop = 1
+           and answer.status = 'completed'
          order by answer.created_at, answer.id limit 1`,
       ).bind(originJob.id).first<{
         agent_id: string;
         channel_id: string;
+        reply_message_id: string;
         agent_name: string;
       }>();
-      const peerChannel = answer
-        ? await getChannelById(db, job.organization_id, answer.channel_id)
-        : null;
+      const [peerChannel, answerMessage] = await Promise.all([
+        answer
+          ? getChannelById(db, job.organization_id, answer.channel_id)
+          : Promise.resolve(null),
+        answer
+          ? getChannelMessage(db, answer.channel_id, answer.reply_message_id)
+          : Promise.resolve(null),
+      ]);
       if (
         job.channel_id !== originJob.channel_id || !answer || !peerChannel ||
-        !isAgentDirectMessage(peerChannel) || !triggerMessage
+        !isAgentDirectMessage(peerChannel) || !triggerMessage || !answerMessage
       ) {
         throw new HttpError(409, "Agent message lost its answer");
       }
       inboundAgentMessage = {
         senderAgentId: answer.agent_id,
         senderAgentName: answer.agent_name,
-        body: triggerMessage.body,
+        body: answerMessage.body,
         originReplyJobId: originJob.id,
       };
     }

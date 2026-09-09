@@ -17,6 +17,7 @@ import {
   getChannelMessage,
   listAgentDirectMessages,
   listChannelAgentReplies,
+  listChannelMessagePage,
   listChannels,
   loadChannelDelta,
 } from "./channels";
@@ -506,28 +507,36 @@ describe("Agent-to-Agent messaging", () => {
       author: { type: "agent", id: peerAgent.id, name: "Ticker" },
       body: "Nothing new since this morning.",
     });
-    const copyId = await relayMessageId(turn.job.id, "inbound");
-    await expect(
-      getChannelMessage(db, ownerDirectMessageId, copyId!),
-    ).resolves.toMatchObject({
-      author: { type: "agent", id: peerAgent.id, name: "Ticker" },
-      body: "Nothing new since this morning.",
-      relay: {
-        direction: "inbound",
-        peerChannelId: conversation!.id,
-        peerMessageId: answerJob.reply_message_id,
-        peerAgentId: peerAgent.id,
-        status: "completed",
-      },
-    });
     await expect(
       getChannelMessage(db, ownerDirectMessageId, noticeId!),
     ).resolves.toMatchObject({ relay: { status: "completed" } });
+    /*
+      The answer stays the one message it was, in the Agent-to-Agent
+      conversation: nothing of it is copied into the person's own, so their
+      timeline and the conversation preview are untouched by it and the
+      relaying turn hangs off the notice that was already there.
+    */
+    expect(await relayMessageId(turn.job.id, "inbound")).toBeNull();
+    const personTimeline = await listChannelMessagePage(db, {
+      channelId: ownerDirectMessageId,
+      parentMessageId: null,
+      cursor: null,
+      limit: 50,
+      includeRepliesInTimeline: true,
+    });
+    expect(personTimeline?.messages.map((message) => message.id))
+      .toContain(noticeId);
+    expect(personTimeline?.messages.map((message) => message.body))
+      .not.toContain("Nothing new since this morning.");
+    const [ownerDirectMessage] = (await listChannels(db, organizationId, ownerId))
+      .filter((channel) => channel.id === ownerDirectMessageId);
+    expect(ownerDirectMessage?.last_message_preview)
+      .not.toBe("Nothing new since this morning.");
 
     const relayJob = (await listChannelAgentReplies(
       db,
       ownerDirectMessageId,
-      copyId!,
+      noticeId!,
     ))[0]!;
     expect(relayJob).toMatchObject({
       agent_id: senderAgent.id,
