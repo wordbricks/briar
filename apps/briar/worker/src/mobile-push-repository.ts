@@ -137,18 +137,18 @@ export async function listMobilePushOutbox(
 
 export async function acknowledgeMobilePushOutbox(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   version: number,
 ) {
   await db.prepare(
     `delete from briar_mobile_push_outbox
      where organization_id = ? and version <= ?`,
-  ).bind(organizationId, version).run();
+  ).bind(workspaceId, version).run();
 }
 
 export async function listMobilePushRegistrations(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const result = await db.prepare(
     `select registration.id, registration.user_id, registration.platform,
@@ -166,14 +166,14 @@ export async function listMobilePushRegistrations(
        on scope.registration_id = registration.id
       and scope.organization_id = membership.organization_id
      order by registration.updated_at, registration.id`,
-  ).bind(organizationId).all<MobilePushRegistrationRow>();
+  ).bind(workspaceId).all<MobilePushRegistrationRow>();
   return result.results;
 }
 
 export async function establishMobilePushScope(
   db: D1Database,
   registrationId: string,
-  organizationId: string,
+  workspaceId: string,
   version: number,
   observedAt: string,
 ) {
@@ -185,7 +185,7 @@ export async function establishMobilePushScope(
      on conflict(registration_id, organization_id) do nothing`,
   ).bind(
     registrationId,
-    organizationId,
+    workspaceId,
     version,
     observedAt,
     observedAt,
@@ -195,7 +195,7 @@ export async function establishMobilePushScope(
 export async function advanceMobilePushScope(
   db: D1Database,
   registrationId: string,
-  organizationId: string,
+  workspaceId: string,
   version: number,
   observedAt: string,
 ) {
@@ -203,7 +203,7 @@ export async function advanceMobilePushScope(
     `update briar_mobile_push_registration_scopes
      set baseline_version = max(baseline_version, ?), updated_at = ?
      where registration_id = ? and organization_id = ?`,
-  ).bind(version, observedAt, registrationId, organizationId).run();
+  ).bind(version, observedAt, registrationId, workspaceId).run();
 }
 
 export async function listMobilePushDeliveries(

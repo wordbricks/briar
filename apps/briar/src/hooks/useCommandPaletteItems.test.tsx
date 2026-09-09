@@ -12,10 +12,7 @@ import { loadKeybindings } from "../lib/keybindings";
 import { channelCatalogCursorAtom } from "../state/channels/atoms";
 import { isCommandPaletteOpenAtom } from "../state/dialogs/atoms";
 import type { InboxMessage } from "../state/inbox/model";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../state/workspace/atoms";
 import { lockedTeamIdAtom } from "../state/platform";
 import { createNavigationActions } from "../state/navigation/actions";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
@@ -24,7 +21,7 @@ import { applySyncEvent } from "../state/sync/apply";
 import { activeTeamIdAtom, teamsAtom } from "../state/team/atoms";
 import { seedInboxMessages } from "../test/inbox";
 import { createReactTestRoot } from "../test/react";
-import type { Organization, Project, SessionUser } from "../types";
+import type { Workspace, Project, SessionUser } from "../types";
 import {
   useCommandPaletteItems,
   type CommandPaletteItemsInput,
@@ -43,7 +40,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -56,13 +53,13 @@ const team: Project = {
   ...demoDashboard.team,
   id: "team-a",
   name: "Team A",
-  organizationId: organization.id,
+  workspaceId: workspace.id,
   issueKeyPrefix: "TA",
 };
 
 const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   id: "channel-1",
-  organizationId: organization.id,
+  workspaceId: workspace.id,
   kind: "channel",
   slug: "general",
   name: "General",
@@ -147,8 +144,8 @@ const harness = (open = true): AtomRegistry => {
   const registry = createTestRegistry([
     [userAtom, user],
     [tokenAtom, "token-1"],
-    [organizationsAtom, [organization]],
-    [activeOrganizationIdAtom, organization.id],
+    [workspacesAtom, [workspace]],
+    [activeWorkspaceIdAtom, workspace.id],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
     [lockedTeamIdAtom, null],
@@ -169,7 +166,7 @@ const harness = (open = true): AtomRegistry => {
   });
   applySyncEvent(registry, {
     kind: "channel-catalog-snapshot",
-    organizationId: organization.id,
+    workspaceId: workspace.id,
     channels: [channel(), channel({ id: "dm-1", kind: "dm", name: "DM" })],
   });
   registry.set(channelCatalogCursorAtom, 1);
@@ -264,7 +261,7 @@ describe("useCommandPaletteItems", () => {
     const items = await build(registry);
     const built = ids(items);
     expect(built).not.toContain("direct-message:dm-1");
-    expect(built).not.toContain(`navigation:dms:${organization.id}`);
+    expect(built).not.toContain(`navigation:dms:${workspace.id}`);
     expect(built).not.toContain("action:add-project");
   });
 });

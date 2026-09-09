@@ -28,7 +28,7 @@ import {
 
 const requestId = "10000000-0000-4000-8000-000000000001";
 const projectId = "20000000-0000-4000-8000-000000000001";
-const organizationId = "30000000-0000-4000-8000-000000000001";
+const workspaceId = "30000000-0000-4000-8000-000000000001";
 const workId = "40000000-0000-4000-8000-000000000001";
 const runId = "50000000-0000-4000-8000-000000000001";
 
@@ -48,7 +48,7 @@ const channelWork = () => create(WorkClaimIdentitySchema, {
   claimToken: "briar_channel_claim_generated",
   work: {
     case: "channelReply",
-    value: create(ChannelReplyClaimIdentitySchema, { workspaceId: organizationId }),
+    value: create(ChannelReplyClaimIdentitySchema, { workspaceId: workspaceId }),
   },
 });
 

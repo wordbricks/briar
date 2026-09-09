@@ -85,7 +85,7 @@ const exactCountGuard = (
 export async function commitIssueMessageMutation(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     runId: string;
     userId: string;
@@ -120,7 +120,7 @@ export async function commitIssueMessageMutation(
   );
   decodeIssueMessageMutationReceiptRow({
     message_id: input.messageId,
-    organization_id: input.organizationId,
+    organization_id: input.workspaceId,
     project_id: input.projectId,
     run_id: input.runId,
     user_id: input.userId,
@@ -131,7 +131,7 @@ export async function commitIssueMessageMutation(
   });
   const uploadScope = {
     purpose: "issue_message" as const,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     projectId: input.projectId,
     userId: input.userId,
     mutationId: input.messageId,
@@ -216,7 +216,7 @@ export async function commitIssueMessageMutation(
         input.parentMessageId,
         input.runId,
         input.projectId,
-        input.organizationId,
+        input.workspaceId,
         input.parentMessageId,
         input.userId,
         ...memberGuard.bindings,
@@ -298,7 +298,7 @@ export async function commitIssueMessageMutation(
       )
       .bind(
         input.messageId,
-        input.organizationId,
+        input.workspaceId,
         input.projectId,
         input.runId,
         input.userId,

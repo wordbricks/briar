@@ -12,7 +12,7 @@ import {
   completeWhatsAppEvent,
   enqueueWhatsAppReplyStatements,
   enqueueWhatsAppSystemMessage,
-  getWhatsAppConnectionForOrganization,
+  getWhatsAppConnectionForWorkspace,
   releaseWhatsAppEvent,
   upsertWhatsAppConnection,
   upsertWhatsAppUserLink,
@@ -24,7 +24,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
     WHATSAPP_APP_SECRET: string;
     WHATSAPP_TOKEN_ENCRYPTION_KEY: string;
   };
-  const organizationId = "11111111-1111-4111-8111-111111111111";
+  const workspaceId = "11111111-1111-4111-8111-111111111111";
   const organizationAgentId = "22222222-2222-4222-8222-222222222222";
   const projectId = "33333333-3333-4333-8333-333333333333";
   const projectAgentId = "44444444-4444-4444-8444-444444444444";
@@ -49,32 +49,32 @@ describe("WhatsApp DM bridge D1 integration", () => {
         'whatsapp-owner-session-token', '${now}', '${now}', '${ownerId}'
       );
       insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values ('${organizationId}', 'WhatsApp Org', 'whatsapp-org', '${now}', '${now}');
+      values ('${workspaceId}', 'WhatsApp Org', 'whatsapp-org', '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${ownerId}', 'owner', '${now}', '${now}');
+      ) values ('${workspaceId}', '${ownerId}', 'owner', '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${linkedUserId}', 'developer', '${now}', '${now}');
+      ) values ('${workspaceId}', '${linkedUserId}', 'developer', '${now}', '${now}');
       insert into briar_teams (
         id, owner_user_id, organization_id, name, agent_token_hash,
         created_at, updated_at
       ) values (
-        '${projectId}', '${ownerId}', '${organizationId}', 'WhatsApp Project',
+        '${projectId}', '${ownerId}', '${workspaceId}', 'WhatsApp Project',
         '${"a".repeat(64)}', '${now}', '${now}'
       );
       insert into briar_project_agents (
         id, organization_id, project_id, handle, name, provider,
         responsibility, created_at, updated_at
       ) values (
-        '${organizationAgentId}', '${organizationId}', null, 'representative',
-        'Representative', 'codex', 'Represent the organization', '${now}', '${now}'
+        '${organizationAgentId}', '${workspaceId}', null, 'representative',
+        'Representative', 'codex', 'Represent the workspace', '${now}', '${now}'
       );
       insert into briar_project_agents (
         id, organization_id, project_id, handle, name, provider,
         responsibility, created_at, updated_at
       ) values (
-        '${projectAgentId}', '${organizationId}', '${projectId}', 'project-agent',
+        '${projectAgentId}', '${workspaceId}', '${projectId}', 'project-agent',
         'Project Agent', 'codex', 'Work on the project', '${now}', '${now}'
       );
     `);
@@ -83,7 +83,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
       whatsappTestEnv.WHATSAPP_TOKEN_ENCRYPTION_KEY,
     );
     await upsertWhatsAppConnection(db, {
-      organizationId,
+      workspaceId,
       agentId: organizationAgentId,
       phoneNumberId,
       wabaId: "202020202020",
@@ -94,7 +94,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
       observedAt: now,
     });
     await upsertWhatsAppUserLink(db, {
-      organizationId,
+      workspaceId,
       userId: linkedUserId,
       phoneNumber: linkedPhone,
       createdByUserId: ownerId,
@@ -143,7 +143,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
   };
 
   it("stores encrypted credentials and rejects a project Agent representative", async () => {
-    const connection = await getWhatsAppConnectionForOrganization(db, organizationId);
+    const connection = await getWhatsAppConnectionForWorkspace(db, workspaceId);
     expect(connection?.encrypted_access_token).not.toBe(accessToken);
     expect(connection?.verify_token_hash).toBe(await sha256(verifyToken));
     const encrypted = await encryptWhatsAppToken(
@@ -151,7 +151,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
       whatsappTestEnv.WHATSAPP_TOKEN_ENCRYPTION_KEY,
     );
     await expect(upsertWhatsAppConnection(db, {
-      organizationId,
+      workspaceId,
       agentId: projectAgentId,
       phoneNumberId,
       wabaId: "202020202020",
@@ -160,13 +160,13 @@ describe("WhatsApp DM bridge D1 integration", () => {
       verifyTokenHash: await sha256("replacement-verify-token"),
       connectedByUserId: ownerId,
       observedAt: "2026-09-06T00:01:00.000Z",
-    })).rejects.toThrow("Organization Agent");
-    await expect(getWhatsAppConnectionForOrganization(db, organizationId))
+    })).rejects.toThrow("Workspace Agent");
+    await expect(getWhatsAppConnectionForWorkspace(db, workspaceId))
       .resolves.toMatchObject({ agent_id: organizationAgentId });
   });
 
   it("claims each wamid once while allowing released work to retry", async () => {
-    const connection = await getWhatsAppConnectionForOrganization(db, organizationId);
+    const connection = await getWhatsAppConnectionForWorkspace(db, workspaceId);
     expect(connection).not.toBeNull();
     const input = {
       connectionId: connection!.id,
@@ -226,7 +226,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
     const channel = await db.prepare(
       `select id, dm_key from briar_channels
        where organization_id = ? and kind = 'dm'`,
-    ).bind(organizationId).first<{ id: string; dm_key: string }>();
+    ).bind(workspaceId).first<{ id: string; dm_key: string }>();
     expect(channel?.dm_key).toBe(
       `agent:${JSON.stringify([linkedUserId, organizationAgentId])}`,
     );
@@ -250,7 +250,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
     Left off it, the poke would run as a dangling promise the runtime is free to
     cancel once the response is sent.
   */
-  it("wakes the organization's Workers under waitUntil for an inbound DM", async () => {
+  it("wakes the workspace's Workers under waitUntil for an inbound DM", async () => {
     // A reply is only claimable — and so only worth a wake — while some live
     // Worker can run the representative Agent.
     const wakeDeviceId = "99999999-9999-4999-8999-999999999999";
@@ -262,7 +262,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
            id, organization_id, owner_user_id, label, device_identity_hash,
            state, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'Wake Device', ?, 'online', ?, ?, ?)`,
-      ).bind(wakeDeviceId, organizationId, ownerId, "e".repeat(64), live, live, live),
+      ).bind(wakeDeviceId, workspaceId, ownerId, "e".repeat(64), live, live, live),
       db.prepare(
         `insert into briar_execution_worker_credentials (
            device_id, token_hash, created_at
@@ -317,7 +317,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
     expect(wakes).toEqual([]);
 
     await Promise.all(pending.splice(0));
-    expect(wakes).toEqual([organizationId]);
+    expect(wakes).toEqual([workspaceId]);
     // The message path registers nothing else on the context, so this lone
     // remaining task is the wake itself rather than a dangling promise.
     expect(pending.length).toBe(1);
@@ -353,7 +353,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
   it("queues ordered 4096-character parts and sends them with the decrypted token", async () => {
     const channel = await db.prepare(
       `select id from briar_channels where organization_id = ? and kind = 'dm'`,
-    ).bind(organizationId).first<{ id: string }>();
+    ).bind(workspaceId).first<{ id: string }>();
     const job = await db.prepare(
       `select id, reply_message_id from briar_channel_agent_reply_jobs
        where channel_id = ? and agent_id = ? limit 1`,
@@ -370,7 +370,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
            id, organization_id, owner_user_id, label, device_identity_hash,
            state, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'WhatsApp Device', ?, 'online', ?, ?, ?)`,
-      ).bind(deviceId, organizationId, ownerId, "c".repeat(64), now, now, now),
+      ).bind(deviceId, workspaceId, ownerId, "c".repeat(64), now, now, now),
       db.prepare(
         `insert into briar_execution_workers (
            id, project_id, label, host_fingerprint, runtime_proto_json, state,
@@ -408,7 +408,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
       workerId,
       claimTokenHash: claimHash,
       completedAt: now,
-      organizationId,
+      workspaceId,
       channelId: channel!.id,
       channelMessageId: job!.reply_message_id,
       body: `# 답변\n${"가".repeat(8_300)}`,
@@ -447,7 +447,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
   });
 
   it("retries transient failures and dead-letters expired customer windows", async () => {
-    const connection = await getWhatsAppConnectionForOrganization(db, organizationId);
+    const connection = await getWhatsAppConnectionForWorkspace(db, workspaceId);
     await enqueueWhatsAppSystemMessage(db, {
       connectionId: connection!.id,
       wamid: "wamid.retry",
@@ -504,7 +504,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
       "content-type": "application/json",
     };
     const fetched = await worker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/integrations/whatsapp`,
+      `https://briar-api.example/workspaces/${workspaceId}/integrations/whatsapp`,
       { headers },
     ), env);
     expect(fetched.status).toBe(200);
@@ -524,7 +524,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
     expect(JSON.stringify(fetchedBody)).not.toContain("verify_token_hash");
 
     const updated = await worker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/integrations/whatsapp`,
+      `https://briar-api.example/workspaces/${workspaceId}/integrations/whatsapp`,
       {
         method: "PUT",
         headers,
@@ -543,7 +543,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
     );
 
     const linked = await worker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/integrations/whatsapp/links`,
+      `https://briar-api.example/workspaces/${workspaceId}/integrations/whatsapp/links`,
       {
         method: "PUT",
         headers,
@@ -560,7 +560,7 @@ describe("WhatsApp DM bridge D1 integration", () => {
     });
     const linkId = (linkedBody as { link: { id: string } }).link.id;
     const deleted = await worker.fetch(new Request(
-      `https://briar-api.example/organizations/${organizationId}/integrations/whatsapp/links/${linkId}`,
+      `https://briar-api.example/workspaces/${workspaceId}/integrations/whatsapp/links/${linkId}`,
       { method: "DELETE", headers },
     ), env);
     expect(deleted.status).toBe(200);

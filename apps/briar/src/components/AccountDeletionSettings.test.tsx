@@ -43,10 +43,10 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await cleanup();
   });
 
-  it("explains when shared organization resources block deletion", async () => {
+  it("explains when shared workspace resources block deletion", async () => {
     const onDelete = vi.fn(async () => {
       throw new Error(
-        "Account deletion is blocked by shared organization resources",
+        "Account deletion is blocked by shared workspace resources",
       );
     });
     const { cleanup, container, root } = createReactTestRoot({

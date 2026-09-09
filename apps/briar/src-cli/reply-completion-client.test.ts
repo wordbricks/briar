@@ -30,7 +30,7 @@ const channelWork = {
   workType: "channelReply",
   workId,
   runId,
-  organizationId: "55555555-5555-4555-8555-555555555555",
+  workspaceId: "55555555-5555-4555-8555-555555555555",
   claimToken: `briar_channel_claim_${"b".repeat(64)}`,
 } as ClaimedChannelReply;
 

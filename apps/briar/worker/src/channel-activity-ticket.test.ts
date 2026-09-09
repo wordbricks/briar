@@ -16,7 +16,7 @@ import {
 describe("channel activity credentials", () => {
   const now = Date.UTC(2026, 7, 15, 0, 0, 0);
   const identity = {
-    organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    workspaceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     channelId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     replyJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     agentId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
@@ -89,7 +89,7 @@ describe("channel activity credentials", () => {
 
   it("scopes subscriber tickets to one channel and a bounded authorization", async () => {
     const issued = await createChannelActivitySocketTicket("secret", {
-      organizationId: identity.organizationId,
+      workspaceId: identity.workspaceId,
       channelId: identity.channelId,
       userId: "user-a",
       now,
@@ -98,7 +98,7 @@ describe("channel activity credentials", () => {
       verifyChannelActivitySocketTicket(
         "secret",
         issued.ticket,
-        identity.organizationId,
+        identity.workspaceId,
         identity.channelId,
         now + 1,
       ),
@@ -112,7 +112,7 @@ describe("channel activity credentials", () => {
       verifyChannelActivitySocketTicket(
         "secret",
         issued.ticket,
-        identity.organizationId,
+        identity.workspaceId,
         "11111111-1111-4111-8111-111111111111",
         now + 1,
       ),
@@ -121,7 +121,7 @@ describe("channel activity credentials", () => {
 
   it("scopes issue activity credentials to one project run and reply", async () => {
     const issueIdentity = {
-      organizationId: identity.organizationId,
+      workspaceId: identity.workspaceId,
       projectId: "11111111-1111-4111-8111-111111111111",
       runId: "22222222-2222-4222-8222-222222222222",
       replyJobId: identity.replyJobId,
@@ -145,7 +145,7 @@ describe("channel activity credentials", () => {
     ).resolves.toMatchObject(issueIdentity);
 
     const subscription = await createIssueActivitySocketTicket("secret", {
-      organizationId: issueIdentity.organizationId,
+      workspaceId: issueIdentity.workspaceId,
       projectId: issueIdentity.projectId,
       runId: issueIdentity.runId,
       userId: "user-a",
@@ -159,7 +159,7 @@ describe("channel activity credentials", () => {
         issueIdentity.runId,
         now + 1,
       ),
-    ).resolves.toMatchObject({ organizationId: issueIdentity.organizationId });
+    ).resolves.toMatchObject({ workspaceId: issueIdentity.workspaceId });
     await expect(
       verifyIssueActivitySocketTicket(
         "secret",

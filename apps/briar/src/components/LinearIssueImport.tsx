@@ -314,7 +314,7 @@ export function LinearIssueImport({
             <p className="rounded-lg bg-accent px-2.5 py-2 text-2xs font-semibold text-accent-foreground">
               {t("settings.linearImportConnectedAs", {
                 name: viewer.name,
-                org: viewer.organizationName,
+                org: viewer.workspaceName,
               })}
             </p>
           ) : null}

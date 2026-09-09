@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createReactTestRoot } from "../../test/react";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
@@ -107,7 +107,7 @@ const mountAll = (registry: AtomRegistry) =>
 const harness = (server: TrayServer, overrides: Partial<StatusTrayApi> = {}) =>
   createTestRegistry([
     [tokenAtom, "token-1"],
-    [activeOrganizationIdAtom, "org-a"],
+    [activeWorkspaceIdAtom, "org-a"],
     [lockedTeamIdAtom, null],
     [statusTrayApiAtom, server.api(overrides)],
   ]);

@@ -20,7 +20,7 @@ import {
   type MobilePushLocale,
   type MobilePushRegistrationRow,
 } from "./mobile-push-repository";
-import { loadOrganizationInboxFeed } from "./organization-inbox-feed";
+import { loadWorkspaceInboxFeed } from "./workspace-inbox-feed";
 
 type InboxCategory = "urgent" | "action_required" | "important" | "activity";
 
@@ -51,7 +51,7 @@ export function classifyMobilePushInboxMessage(
   if (
     result?.importance === "important" ||
     result?.impact === "project" ||
-    result?.impact === "organization" ||
+    result?.impact === "workspace" ||
     (message.status === "completed" &&
       message.priority !== null && message.priority !== undefined &&
       message.priority <= 2)
@@ -219,7 +219,7 @@ type UserInboxState = {
 async function deliverRegistration(
   env: Env,
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   version: number,
   registration: MobilePushRegistrationRow,
   state: UserInboxState,
@@ -229,7 +229,7 @@ async function deliverRegistration(
     await establishMobilePushScope(
       db,
       registration.id,
-      organizationId,
+      workspaceId,
       version,
       observedAt,
     );
@@ -271,7 +271,7 @@ async function deliverRegistration(
           message: "Mobile push delivery deferred",
           registrationId: registration.id,
           platform: registration.platform,
-          organizationId,
+          workspaceId,
           reason: result.reason,
         }));
         return false;
@@ -290,7 +290,7 @@ async function deliverRegistration(
   await advanceMobilePushScope(
     db,
     registration.id,
-    organizationId,
+    workspaceId,
     version,
     observedAt,
   );
@@ -309,7 +309,7 @@ export async function flushMobilePushOutbox(env: Env, db: D1Database) {
       const existing = userStates.get(userId);
       if (existing) return existing;
       const loaded = Promise.all([
-        loadOrganizationInboxFeed(db, row.organization_id, userId),
+        loadWorkspaceInboxFeed(db, row.organization_id, userId),
         listInboxReadStates(db, userId),
       ]).then(([feed, readStates]) => ({
         messages: feed.messages,
@@ -337,7 +337,7 @@ export async function flushMobilePushOutbox(env: Env, db: D1Database) {
         completed = false;
         console.error(JSON.stringify({
           message: "Mobile push registration delivery failed",
-          organizationId: row.organization_id,
+          workspaceId: row.organization_id,
           registrationId: registration.id,
           platform: registration.platform,
           error: error instanceof Error ? error.message : String(error),

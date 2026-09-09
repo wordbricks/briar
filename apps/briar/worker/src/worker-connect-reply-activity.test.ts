@@ -20,7 +20,7 @@ import type {
   ReplyActivityApplicationServices,
 } from "./worker-reply-activity-application";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const channelId = "22222222-2222-4222-8222-222222222222";
 const agentId = "33333333-3333-4333-8333-333333333333";
 const replyJobId = "44444444-4444-4444-8444-444444444444";
@@ -43,7 +43,7 @@ const input = (token: string) => ({
 describe("ReplyActivityService capability boundary", () => {
   it("publishes reactions independently of activity, bound to the active channel claim", async () => {
     const token = await createChannelActivityPublishToken(secret, {
-      organizationId, channelId, replyJobId, agentId, triggerMessageId, parentMessageId,
+      workspaceId, channelId, replyJobId, agentId, triggerMessageId, parentMessageId,
       attempt: 3, workerId: "worker-1", deviceId: "device-1", claimTokenHash: "a".repeat(64),
       expiresAt: Date.now() + 60_000,
     });
@@ -63,7 +63,7 @@ describe("ReplyActivityService capability boundary", () => {
       claimTokenHash: "a".repeat(64), emoji: "🎮",
     }));
     expect(activity).not.toHaveBeenCalled();
-    expect(realtime).toHaveBeenCalledWith(env, organizationId, "42");
+    expect(realtime).toHaveBeenCalledWith(env, workspaceId, "42");
     for (const request of [
       { replyJobId: runId, acknowledgementReaction: "🙏" },
       { replyJobId, acknowledgementReaction: "not emoji" },
@@ -80,7 +80,7 @@ describe("ReplyActivityService capability boundary", () => {
       replyJobId, acknowledgementReaction: "🙏",
     }), context))).rejects.toBeInstanceOf(HttpError);
     const issue = await createIssueActivityPublishToken(secret, {
-      organizationId, projectId, runId, replyJobId, triggerMessageId, parentMessageId,
+      workspaceId, projectId, runId, replyJobId, triggerMessageId, parentMessageId,
       attempt: 1, workerId: "worker-1", deviceId: "device-1", expiresAt: Date.now() + 60_000,
     });
     await expect(Promise.resolve(createReplyActivityService(input(issue.token), {
@@ -93,7 +93,7 @@ describe("ReplyActivityService capability boundary", () => {
 
   it("restores channel and issue scope from signed capabilities", async () => {
     const channelToken = await createChannelActivityPublishToken(secret, {
-      organizationId,
+      workspaceId,
       channelId,
       replyJobId,
       agentId,
@@ -127,7 +127,7 @@ describe("ReplyActivityService capability boundary", () => {
     ), context);
     expect(publishChannel).toHaveBeenCalledWith(
       env,
-      organizationId,
+      workspaceId,
       expect.objectContaining({
         replyJobId,
         attempt: 3,
@@ -141,7 +141,7 @@ describe("ReplyActivityService capability boundary", () => {
     );
 
     const issueToken = await createIssueActivityPublishToken(secret, {
-      organizationId,
+      workspaceId,
       projectId,
       runId,
       replyJobId,
@@ -164,7 +164,7 @@ describe("ReplyActivityService capability boundary", () => {
     ), context);
     expect(publishIssue).toHaveBeenCalledWith(
       env,
-      organizationId,
+      workspaceId,
       expect.objectContaining({
         replyJobId,
         attempt: 4,

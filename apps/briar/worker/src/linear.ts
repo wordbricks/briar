@@ -7,7 +7,7 @@ export const LINEAR_IMPORT_ISSUE_LIMIT = 2_000;
 export type LinearViewer = {
   name: string;
   email: string | null;
-  organizationName: string;
+  workspaceName: string;
 };
 
 export type LinearTeam = {
@@ -119,7 +119,7 @@ export async function fetchLinearViewerAndTeams(apiKey: string): Promise<{
       name: string;
       displayName?: string | null;
       email?: string | null;
-      organization: { name: string };
+      workspace: { name: string };
     };
     teams: {
       nodes: Array<{ id: string; name: string; key: string }>;
@@ -139,7 +139,7 @@ export async function fetchLinearViewerAndTeams(apiKey: string): Promise<{
           name
           displayName
           email
-          organization { name }
+          workspace { name }
         }
         teams(first: $first, after: $after) {
           nodes { id name key }
@@ -153,7 +153,7 @@ export async function fetchLinearViewerAndTeams(apiKey: string): Promise<{
       viewer = {
         name: page.viewer.displayName?.trim() || page.viewer.name,
         email: page.viewer.email ?? null,
-        organizationName: page.viewer.organization.name,
+        workspaceName: page.viewer.workspace.name,
       };
     }
     teams.push(

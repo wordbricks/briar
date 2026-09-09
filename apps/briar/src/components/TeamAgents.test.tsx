@@ -19,8 +19,8 @@ const project: Project = {
   icon: null,
   iconName: null,
   iconColor: null,
-  organizationId: "org-1",
-  organizationName: "Briar Org",
+  workspaceId: "org-1",
+  workspaceName: "Briar Org",
   role: "owner",
   createdAt: "2026-07-28T00:00:00.000Z",
 };

@@ -9,7 +9,7 @@ import {
   testChannelMessage,
   testChannelSummary,
 } from "../../test/channel-conversation";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import {
@@ -60,7 +60,7 @@ const detail = (
 function signedInRegistry(): AtomRegistry {
   return createTestRegistry([
     [tokenAtom, "token"],
-    [activeOrganizationIdAtom, "org-1"],
+    [activeWorkspaceIdAtom, "org-1"],
   ]);
 }
 

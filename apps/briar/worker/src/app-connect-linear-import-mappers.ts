@@ -41,7 +41,7 @@ export const appLinearImportConnection = (result: {
   viewer: create(LinearImportViewerSchema, {
     name: result.viewer.name,
     email: result.viewer.email ?? undefined,
-    organizationName: result.viewer.organizationName,
+    organizationName: result.viewer.workspaceName,
   }),
   teams: result.teams.map(appLinearTeam),
 });

@@ -28,7 +28,7 @@ describe("DM schedules", () => {
     expect((await executeDmScheduleTool(db, { ...f, operation: op("list") })).schedules.map((row) => row.id)).toContain(schedule.id);
     await runDueDmSchedules(db, schedule.nextRunAt);
     const occurrence = (await jobs(schedule.id))[0]!;
-    const job = await getChannelAgentReplyJob(db, f.organizationId, occurrence.id);
+    const job = await getChannelAgentReplyJob(db, f.workspaceId, occurrence.id);
     expect(job?.agent_provider).toBe(provider);
     expect((await getDmScheduleContext(db, occurrence.id))?.instruction).toBe(f.operation.instruction);
     const identity = await markRunning(f, occurrence.id);
@@ -132,29 +132,29 @@ describe("DM schedules", () => {
         .bind(triggerId, f.channelId, target.trigger_message_id, f.ownerId, observedAt, observedAt),
       db.prepare(`insert into briar_channel_reply_sessions (id, organization_id, channel_id, thread_root_message_id, agent_id,
         provider, last_activity_at, retained_until, created_at, updated_at) values (?, ?, ?, ?, ?, 'codex', ?, ?, ?, ?)`)
-        .bind(sessionId, f.organizationId, f.channelId, triggerId, f.agentId, observedAt, plus(observedAt, 86400), observedAt, observedAt),
+        .bind(sessionId, f.workspaceId, f.channelId, triggerId, f.agentId, observedAt, plus(observedAt, 86400), observedAt, observedAt),
       db.prepare(`insert into briar_channel_agent_reply_jobs (id, organization_id, channel_id, agent_id, session_id, trigger_message_id,
         parent_message_id, reply_message_id, agent_provider, status, routing_action, claimed_device_id, claimed_worker_id,
         claim_token_hash, claimed_at, lease_expires_at, created_at, updated_at)
         values (?, ?, ?, ?, ?, ?, ?, ?, 'codex', 'running', 'pending', ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(jobId, f.organizationId, f.channelId, f.agentId, sessionId, triggerId, target.trigger_message_id, crypto.randomUUID(),
+        .bind(jobId, f.workspaceId, f.channelId, f.agentId, sessionId, triggerId, target.trigger_message_id, crypto.randomUUID(),
           f.deviceId, f.workerId, f.claimTokenHash, observedAt, plus(observedAt, 86400), observedAt, observedAt),
     ]);
     const identity = { ...f, jobId, observedAt };
     expect(await captureDmPublicMessageClaim(db, identity)).not.toBeNull();
-    const incoming = (await getChannelAgentReplyJob(db, f.organizationId, jobId))!;
+    const incoming = (await getChannelAgentReplyJob(db, f.workspaceId, jobId))!;
     expect((await dmReplyRoutingContext(db, incoming)).candidates.some((candidate) => candidate.id === target.id)).toBe(true);
     const decision = await resolveDmReplyRouting(db, { ...identity, decision: { action: "steer", targetJobId: target.id } });
     expect(decision.action).toBe("steer");
-    expect((await getChannelAgentReplyJob(db, f.organizationId, target.id))?.steer_revision).toBe(1);
-    expect((await getChannelAgentReplyJob(db, f.organizationId, jobId))?.superseded_by_reply_job_id).toBe(target.id);
+    expect((await getChannelAgentReplyJob(db, f.workspaceId, target.id))?.steer_revision).toBe(1);
+    expect((await getChannelAgentReplyJob(db, f.workspaceId, jobId))?.superseded_by_reply_job_id).toBe(target.id);
   });
   it("rechecks owner rights and original source at tool access, claim and publication", async () => {
     const f = await dmScheduleFixture(db); f.operation.intervalSeconds = 300;
     const schedule = (await executeDmScheduleTool(db, f)).schedules[0]!;
     await runDueDmSchedules(db, schedule.nextRunAt);
     const identity = await markRunning(f, (await jobs(schedule.id))[0]!.id);
-    await db.prepare(`delete from briar_organization_members where organization_id = ? and user_id = ?`).bind(f.organizationId, f.ownerId).run();
+    await db.prepare(`delete from briar_organization_members where organization_id = ? and user_id = ?`).bind(f.workspaceId, f.ownerId).run();
     await expect(executeDmScheduleTool(db, { ...f, operation: op("list") })).rejects.toThrow();
     expect(await getDmPublicMessageClaim(db, identity)).toBeNull();
     expect(await db.prepare(`select id from briar_channel_agent_reply_jobs job where id = ? and ${liveChannelReplyRuntime("job")}`).bind(identity.jobId).first()).toBeNull();

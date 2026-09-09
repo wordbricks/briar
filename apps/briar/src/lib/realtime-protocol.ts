@@ -24,7 +24,7 @@ export type RealtimeNotification =
       readonly version: number;
     };
 
-const decodeOrganizationNotification = Option.liftThrowable(
+const decodeWorkspaceNotification = Option.liftThrowable(
   (bytes: Uint8Array) => fromBinary(WorkspaceNotificationSchema, bytes),
 );
 
@@ -75,4 +75,4 @@ const toRealtimeNotification = (
 };
 
 export const decodeRealtimeNotificationBinary = (bytes: Uint8Array) =>
-  Option.flatMap(decodeOrganizationNotification(bytes), toRealtimeNotification);
+  Option.flatMap(decodeWorkspaceNotification(bytes), toRealtimeNotification);

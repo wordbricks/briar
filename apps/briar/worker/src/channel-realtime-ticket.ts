@@ -10,10 +10,10 @@ const channelRealtimeTokenDomain = "briar-channel-realtime";
 
 export async function createChannelRealtimeTicket(
   secret: string,
-  input: { organizationId: string; userId: string; now?: number },
+  input: { workspaceId: string; userId: string; now?: number },
 ) {
   const payload: ChannelRealtimeTicketPayload = {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     userId: input.userId,
     expiresAt: (input.now ?? Date.now()) + CHANNEL_REALTIME_TICKET_TTL_MS,
     nonce: crypto.randomUUID(),
@@ -27,7 +27,7 @@ export async function createChannelRealtimeTicket(
 export async function verifyChannelRealtimeTicket(
   secret: string,
   ticket: string,
-  organizationId: string,
+  workspaceId: string,
   now = Date.now(),
 ): Promise<ChannelRealtimeTicketPayload | null> {
   const encodedPayload = Option.getOrNull(
@@ -39,7 +39,7 @@ export async function verifyChannelRealtimeTicket(
   );
   if (
     !payload ||
-    payload.organizationId !== organizationId ||
+    payload.workspaceId !== workspaceId ||
     payload.expiresAt <= now ||
     payload.expiresAt > now + CHANNEL_REALTIME_TICKET_TTL_MS
   ) {

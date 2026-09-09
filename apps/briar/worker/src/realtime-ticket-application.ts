@@ -5,14 +5,14 @@ import {
 import { createChannelRealtimeTicket } from "./channel-realtime-ticket";
 import { getChannel } from "./channels";
 import { getHuntRunForProject } from "./hunt-run-repository";
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceRole } from "./workspace-repository";
 import { getTeam } from "./team-command-repository";
 
 export type RealtimeTicketScope =
   | {
     readonly type: "workspaceNotifications";
-    readonly organizationId: string;
+    readonly workspaceId: string;
   }
   | {
     readonly type: "issueActivity";
@@ -21,7 +21,7 @@ export type RealtimeTicketScope =
   }
   | {
     readonly type: "channelActivity";
-    readonly organizationId: string;
+    readonly workspaceId: string;
     readonly channelId: string;
   };
 
@@ -50,9 +50,9 @@ export class RealtimeTicketApplicationError extends Error {
 export type RealtimeTicketApplicationServices = {
   readonly createChannelActivityTicket: typeof createChannelActivitySocketTicket;
   readonly createIssueActivityTicket: typeof createIssueActivitySocketTicket;
-  readonly createOrganizationTicket: typeof createChannelRealtimeTicket;
+  readonly createWorkspaceTicket: typeof createChannelRealtimeTicket;
   readonly getChannel: typeof getChannel;
-  readonly getOrganizationRole: typeof getOrganizationRole;
+  readonly getWorkspaceRole: typeof getWorkspaceRole;
   readonly getTeam: typeof getTeam;
   readonly getRun: typeof getHuntRunForProject;
 };
@@ -60,9 +60,9 @@ export type RealtimeTicketApplicationServices = {
 const realtimeTicketApplicationServices: RealtimeTicketApplicationServices = {
   createChannelActivityTicket: createChannelActivitySocketTicket,
   createIssueActivityTicket: createIssueActivitySocketTicket,
-  createOrganizationTicket: createChannelRealtimeTicket,
+  createWorkspaceTicket: createChannelRealtimeTicket,
   getChannel,
-  getOrganizationRole,
+  getWorkspaceRole,
   getTeam,
   getRun: getHuntRunForProject,
 };
@@ -86,20 +86,20 @@ export async function createRealtimeTicketApplication(
   const { db, scope, signingSecret, userId } = input;
   switch (scope.type) {
     case "workspaceNotifications": {
-      const role = await services.getOrganizationRole(
+      const role = await services.getWorkspaceRole(
         db,
-        scope.organizationId,
+        scope.workspaceId,
         userId,
       );
-      if (!hasOrganizationCapability(role, "organization:read")) {
-        return inaccessible("organization_not_found", "Organization not found");
+      if (!hasWorkspaceCapability(role, "workspace:read")) {
+        return inaccessible("organization_not_found", "Workspace not found");
       }
-      const issued = await services.createOrganizationTicket(signingSecret, {
-        organizationId: scope.organizationId,
+      const issued = await services.createWorkspaceTicket(signingSecret, {
+        workspaceId: scope.workspaceId,
         userId,
       });
       return {
-        socketPath: `/organizations/${scope.organizationId}/channel-events`,
+        socketPath: `/workspaces/${scope.workspaceId}/channel-events`,
         ticket: issued.ticket,
       };
     }
@@ -110,7 +110,7 @@ export async function createRealtimeTicketApplication(
       const run = await services.getRun(db, scope.projectId, scope.runId);
       if (!run) return inaccessible("run_not_found", "Run not found");
       const issued = await services.createIssueActivityTicket(signingSecret, {
-        organizationId: project.organization_id,
+        workspaceId: project.organization_id,
         projectId: scope.projectId,
         runId: scope.runId,
         userId,
@@ -123,29 +123,29 @@ export async function createRealtimeTicketApplication(
     }
 
     case "channelActivity": {
-      const role = await services.getOrganizationRole(
+      const role = await services.getWorkspaceRole(
         db,
-        scope.organizationId,
+        scope.workspaceId,
         userId,
       );
-      if (!hasOrganizationCapability(role, "organization:read")) {
-        return inaccessible("organization_not_found", "Organization not found");
+      if (!hasWorkspaceCapability(role, "workspace:read")) {
+        return inaccessible("organization_not_found", "Workspace not found");
       }
       const channel = await services.getChannel(
         db,
-        scope.organizationId,
+        scope.workspaceId,
         scope.channelId,
         userId,
       );
       if (!channel) return inaccessible("channel_not_found", "Channel not found");
       const issued = await services.createChannelActivityTicket(signingSecret, {
-        organizationId: scope.organizationId,
+        workspaceId: scope.workspaceId,
         channelId: scope.channelId,
         userId,
       });
       return {
         socketPath:
-          `/organizations/${scope.organizationId}/channels/${scope.channelId}/agent-activity-events`,
+          `/workspaces/${scope.workspaceId}/channels/${scope.channelId}/agent-activity-events`,
         ticket: issued.ticket,
       };
     }

@@ -4,7 +4,7 @@ import { channelAttachmentResponse } from "./channel-attachment-response";
 import { getClaimedChannelReplyAttachment } from "./channels";
 import { sha256 } from "./crypto-digest";
 import { HttpError } from "./http-response";
-import { requireWorkerOrganization } from "./worker-route-auth";
+import { requireWorkerWorkspace } from "./worker-route-auth";
 
 export type ChannelReplyResultRouteInput = {
   request: Request;
@@ -23,10 +23,10 @@ export async function handleChannelReplyResultRoute(
   ) {
     return undefined;
   }
-  const principal = await requireWorkerOrganization(
+  const principal = await requireWorkerWorkspace(
     input.db,
     input.request,
-    match.organizationId,
+    match.workspaceId,
   );
   const claimToken = input.request.headers
     .get(channelReplyClaimTokenHeader)
@@ -38,7 +38,7 @@ export async function handleChannelReplyResultRoute(
     throw new HttpError(401, "Channel reply claim token required");
   }
   const attachment = await getClaimedChannelReplyAttachment(input.db, {
-    organizationId: match.organizationId,
+    workspaceId: match.workspaceId,
     jobId: match.workId,
     deviceId: principal.deviceId,
     claimTokenHash: await sha256(claimToken),

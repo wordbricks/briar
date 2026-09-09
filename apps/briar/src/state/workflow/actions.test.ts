@@ -10,8 +10,8 @@ import {
   workspaceApiAtom,
   workspaceModesAtom,
   type WorkspaceApi,
-} from "../workspace/api";
-import { connectedTeamIdsAtom, healthAtom } from "../workspace/atoms";
+} from "../local-workspace/api";
+import { connectedTeamIdsAtom, healthAtom } from "../local-workspace/atoms";
 import { createWorkflowActions } from "./actions";
 
 const teamOf = (id: string): Project => ({ ...demoDashboard.team, id, name: id });

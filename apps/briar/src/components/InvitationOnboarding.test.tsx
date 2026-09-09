@@ -3,13 +3,13 @@
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { createReactTestRoot, renderReactTestRoot } from "../test/react";
-import type { OrganizationInvitationPreview } from "../types";
+import type { WorkspaceInvitationPreview } from "../types";
 import { InvitationOnboarding } from "./InvitationOnboarding";
 
 const invitation = {
   id: "invitation-1",
-  organizationId: "organization-1",
-  organizationName: "Wordbricks",
+  workspaceId: "workspace-1",
+  workspaceName: "Wordbricks",
   initialProjectId: "project-1",
   initialProjectName: "Briar",
   emailHint: "n***@wordbricks.ai",
@@ -18,7 +18,7 @@ const invitation = {
   expiresAt: "2026-09-07T00:00:00.000Z",
   acceptedAt: null,
   createdAt: "2026-08-31T00:00:00.000Z",
-} satisfies OrganizationInvitationPreview;
+} satisfies WorkspaceInvitationPreview;
 
 const user = {
   id: "user-1",
@@ -27,7 +27,7 @@ const user = {
 };
 
 function invitationScreen(
-  invitationValue: OrganizationInvitationPreview,
+  invitationValue: WorkspaceInvitationPreview,
   onAccept = vi.fn().mockResolvedValue(undefined),
 ) {
   return (

@@ -2,7 +2,7 @@ import { Activity, Bot, Check, ChevronDown, ChevronRight, ListFilter, Pencil, Si
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { type ReactElement } from "react";
 import { autoHuntRunStatuses, autoHuntSources } from "@/lib/auto-hunt-contract";
-import type { OrganizationMember, ProjectAgent } from "@/types";
+import type { WorkspaceMember, ProjectAgent } from "@/types";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { IssuePropertyFilterKey, IssuePropertyFilters, emptyIssuePropertyFilters, selectedIssuePropertyFilterCount, toggleIssuePropertyFilterValue, unsetIssuePropertyFilterValue } from "@/state/board/filters";
@@ -14,7 +14,7 @@ export function IssuePropertyFilterMenu({
 }: {
   agents: ProjectAgent[];
   filters: IssuePropertyFilters;
-  members: OrganizationMember[];
+  members: WorkspaceMember[];
   onChange: (filters: IssuePropertyFilters) => void;
 }) {
   const {

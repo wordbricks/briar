@@ -39,7 +39,7 @@ import {
   enqueueChannelAgentReplies,
   failChannelReply,
   getChannelById,
-  getActiveOrganizationChannelReplyContextClaim,
+  getActiveWorkspaceChannelReplyContextClaim,
   getClaimedChannelReply,
   getClaimedChannelReplyAttachment,
   getChannelActionProposal,
@@ -79,19 +79,19 @@ import {
   rotateChannelWebhookApplication,
 } from "./channel-webhook-application";
 import {
-  createOrganizationChannelMessage,
-  deleteOrganizationChannelMessage,
+  createWorkspaceChannelMessage,
+  deleteWorkspaceChannelMessage,
 } from "./channel-message-routes";
 import { decodeChannelMessageApplicationInput } from "./app-mutation-request-mappers";
 import {
-  createOrganizationAgent,
-  listOrganizationAgents,
-} from "./organization-agents";
+  createWorkspaceAgent,
+  listWorkspaceAgents,
+} from "./workspace-agents";
 import {
-  createOrganizationDirectMessage,
-  getOrganizationChannelDetail,
-  listOrganizationChannels,
-} from "./organization-channel-routes";
+  createWorkspaceDirectMessage,
+  getWorkspaceChannelDetail,
+  listWorkspaceChannels,
+} from "./workspace-channel-routes";
 import {
   channelReplyWorkerAvailability,
   requestExecutionWorkerUpdate,
@@ -102,8 +102,8 @@ import {
 } from "./test-helpers/worker-runtime";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
 
-const organizationId = "a0000000-0000-4000-8000-000000000001";
-const otherOrganizationId = "a0000000-0000-4000-8000-000000000002";
+const workspaceId = "a0000000-0000-4000-8000-000000000001";
+const otherWorkspaceId = "a0000000-0000-4000-8000-000000000002";
 const projectId = "b0000000-0000-4000-8000-000000000001";
 const deviceId = "c0000000-0000-4000-8000-000000000001";
 const boundWorkerId = "d0000000-0000-4000-8000-000000000001";
@@ -119,7 +119,7 @@ const sha256Hex = (value: string) =>
 const at = (minute: number) =>
   new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString();
 
-describe("organization channels", () => {
+describe("workspace channels", () => {
   const db = cloudflareEnv.DB;
   const archives = cloudflareEnv.ARCHIVES;
 
@@ -146,7 +146,7 @@ describe("organization channels", () => {
          id, expiresAt, token, createdAt, updatedAt, userId
        ) values ('channels-outsider-session', '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`,
     ).bind(outsiderSessionToken, at(0), at(0), outsiderId).run();
-    for (const id of [organizationId, otherOrganizationId]) {
+    for (const id of [workspaceId, otherWorkspaceId]) {
       await db
         .prepare(
           `insert into briar_organizations (id, name, handle, created_at, updated_at)
@@ -169,7 +169,7 @@ describe("organization channels", () => {
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'developer', ?, ?)`,
       )
-      .bind(organizationId, outsiderId, at(0), at(0))
+      .bind(workspaceId, outsiderId, at(0), at(0))
       .run();
     await db
       .prepare(
@@ -178,7 +178,7 @@ describe("organization channels", () => {
            created_at, updated_at
          ) values (?, ?, 'Project', ?, ?, ?, ?)`,
       )
-      .bind(projectId, ownerId, "f".repeat(64), organizationId, at(0), at(0))
+      .bind(projectId, ownerId, "f".repeat(64), workspaceId, at(0), at(0))
       .run();
     await db
       .prepare(
@@ -187,7 +187,7 @@ describe("organization channels", () => {
            state, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'Device', ?, 'online', ?, ?, ?)`,
       )
-      .bind(deviceId, organizationId, ownerId, "a".repeat(64), at(0), at(0), at(0))
+      .bind(deviceId, workspaceId, ownerId, "a".repeat(64), at(0), at(0), at(0))
       .run();
     await db.prepare(
       `insert into briar_execution_worker_credentials (
@@ -204,7 +204,7 @@ describe("organization channels", () => {
         otherProjectId,
         ownerId,
         "e".repeat(64),
-        organizationId,
+        workspaceId,
         at(0),
         at(0),
       ),
@@ -232,14 +232,14 @@ describe("organization channels", () => {
   const createDirectMessageThroughApplication = (
     request: { memberIds: string[]; agentIds: string[] },
     userId = ownerId,
-  ) => createOrganizationDirectMessage({
+  ) => createWorkspaceDirectMessage({
     db,
-    organizationId,
+    workspaceId,
     userId,
     request,
   });
 
-  // Organization ids the mutation poked the wake hub with. The binding is
+  // Workspace ids the mutation poked the wake hub with. The binding is
   // resolved synchronously inside the fire-and-forget publish, so the record is
   // complete by the time the mutation resolves.
   const workerWakes: string[] = [];
@@ -258,10 +258,10 @@ describe("organization channels", () => {
     userId = ownerId,
   ) => {
     const decoded = decodeChannelMessageApplicationInput(request);
-    return createOrganizationChannelMessage({
+    return createWorkspaceChannelMessage({
       db,
       env: wakeEnv,
-      organizationId,
+      workspaceId,
       channelId,
       userId,
       request: {
@@ -301,7 +301,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000001";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "private-room",
@@ -314,10 +314,10 @@ describe("organization channels", () => {
     });
 
     expect(
-      (await listChannels(db, organizationId, ownerId)).map((row) => row.id),
+      (await listChannels(db, workspaceId, ownerId)).map((row) => row.id),
     ).toContain(channelId);
     expect(
-      (await listChannels(db, organizationId, outsiderId)).map((row) => row.id),
+      (await listChannels(db, workspaceId, outsiderId)).map((row) => row.id),
     ).not.toContain(channelId);
 
     await addChannelMember(db, {
@@ -327,7 +327,7 @@ describe("organization channels", () => {
       createdAt: at(2),
     });
     expect(
-      (await listChannels(db, organizationId, outsiderId)).map((row) => row.id),
+      (await listChannels(db, workspaceId, outsiderId)).map((row) => row.id),
     ).toContain(channelId);
   });
 
@@ -335,7 +335,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-0000000000b1";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "alerts",
@@ -346,7 +346,7 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(70),
     });
-    const before = await loadChannelDelta(db, organizationId, outsiderId, 0);
+    const before = await loadChannelDelta(db, workspaceId, outsiderId, 0);
     await createChannelMessage(db, {
       id: "f0000000-0000-4000-8000-0000000000b1",
       channelId,
@@ -361,7 +361,7 @@ describe("organization channels", () => {
       createdAt: at(71),
     });
 
-    const listed = await listChannels(db, organizationId, outsiderId);
+    const listed = await listChannels(db, workspaceId, outsiderId);
     expect(listed.find((row) => row.id === channelId)).toMatchObject({
       last_message_at: at(71),
       last_unread_message_at: at(71),
@@ -371,13 +371,13 @@ describe("organization channels", () => {
       listed.find((row) => row.id === channelId),
     ).toEqual(expect.objectContaining({ last_unread_message_at: at(71) }));
 
-    const ownerListed = await listChannels(db, organizationId, ownerId);
+    const ownerListed = await listChannels(db, workspaceId, ownerId);
     expect(ownerListed.find((row) => row.id === channelId)?.last_unread_message_at)
       .toBeNull();
 
     const delta = await loadChannelDelta(
       db,
-      organizationId,
+      workspaceId,
       outsiderId,
       before.cursor,
     );
@@ -392,7 +392,7 @@ describe("organization channels", () => {
       channelId,
       lastReadAt: at(72),
     });
-    const afterRead = await listChannels(db, organizationId, outsiderId);
+    const afterRead = await listChannels(db, workspaceId, outsiderId);
     expect(afterRead.find((row) => row.id === channelId)).toMatchObject({
       last_read_at: at(72),
       last_unread_message_at: at(71),
@@ -409,7 +409,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000002";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "general",
@@ -434,7 +434,7 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       createdAt: at(4),
     });
-    const cursorBeforeReply = await getChannelSyncCursor(db, organizationId);
+    const cursorBeforeReply = await getChannelSyncCursor(db, workspaceId);
     const replyId = "f0000000-0000-4000-8000-000000000002";
     await createChannelMessage(db, {
       id: replyId,
@@ -465,7 +465,7 @@ describe("organization channels", () => {
 
     const delta = await loadChannelDelta(
       db,
-      organizationId,
+      workspaceId,
       ownerId,
       cursorBeforeReply,
     );
@@ -493,7 +493,7 @@ describe("organization channels", () => {
       "e2000000-0000-4000-8000-000000000013";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "thread-subscribe",
@@ -537,7 +537,7 @@ describe("organization channels", () => {
       expect.objectContaining({ userId: outsiderId }),
     ]);
     await expect(
-      listChannelConversationNotifications(db, organizationId, ownerId),
+      listChannelConversationNotifications(db, workspaceId, ownerId),
     ).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: replyId,
@@ -567,7 +567,7 @@ describe("organization channels", () => {
       createdAt: at(44),
     });
     await expect(
-      listChannelConversationNotifications(db, organizationId, ownerId),
+      listChannelConversationNotifications(db, workspaceId, ownerId),
     ).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: laterReplyId,
@@ -575,7 +575,7 @@ describe("organization channels", () => {
       }),
     ]));
     await expect(
-      listChannelConversationNotifications(db, organizationId, outsiderId),
+      listChannelConversationNotifications(db, workspaceId, outsiderId),
     ).resolves.not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: laterReplyId }),
     ]));
@@ -594,7 +594,7 @@ describe("organization channels", () => {
       createdAt: at(45),
     });
     await expect(
-      listChannelConversationNotifications(db, organizationId, outsiderId),
+      listChannelConversationNotifications(db, workspaceId, outsiderId),
     ).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: participantNotificationId,
@@ -607,7 +607,7 @@ describe("organization channels", () => {
     const channelId = "e1000000-0000-4000-8000-000000000001";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "paged-history",
@@ -667,7 +667,7 @@ describe("organization channels", () => {
     const secondRootId = "f3000000-0000-4000-8000-000000000003";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "dm",
       dmKey: null,
       slug: "paged-dm-history",
@@ -733,7 +733,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000060";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "incoming-webhooks",
@@ -746,13 +746,13 @@ describe("organization channels", () => {
     });
     await expect(listChannelWebhooksApplication({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: outsiderId,
     })).rejects.toMatchObject({ status: 403 });
     const createdWebhook = await createChannelWebhookApplication({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: ownerId,
       name: "Deploy notifier",
@@ -919,7 +919,7 @@ describe("organization channels", () => {
 
     const rotatedWebhook = await rotateChannelWebhookApplication({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       webhookId,
       userId: ownerId,
@@ -932,7 +932,7 @@ describe("organization channels", () => {
 
     await revokeChannelWebhookApplication({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       webhookId,
       userId: ownerId,
@@ -947,7 +947,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000003";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "other-room",
@@ -981,7 +981,7 @@ describe("organization channels", () => {
     const attachmentId = "fa000000-0000-4000-8000-000000000013";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "image-room",
@@ -1006,8 +1006,8 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       attachments: [{
         id: attachmentId,
-        organization_id: organizationId,
-        object_key: `channel-attachments/${organizationId}/${channelId}/${messageId}/${attachmentId}`,
+        organization_id: workspaceId,
+        object_key: `channel-attachments/${workspaceId}/${channelId}/${messageId}/${attachmentId}`,
         filename: "screen.png",
         content_type: "image/png",
         byte_size: 5,
@@ -1022,12 +1022,12 @@ describe("organization channels", () => {
       byteSize: 5,
       imageWidth: null,
       imageHeight: null,
-      url: `/organizations/${organizationId}/channels/${channelId}/messages/${messageId}/attachments/${attachmentId}`,
+      url: `/workspaces/${workspaceId}/channels/${channelId}/messages/${messageId}/attachments/${attachmentId}`,
     }]);
     await expect(
       getChannelMessageAttachment(
         db,
-        organizationId,
+        workspaceId,
         channelId,
         messageId,
         attachmentId,
@@ -1040,7 +1040,7 @@ describe("organization channels", () => {
     const messageId = "f0000000-0000-4000-8000-000000000150";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "document-room",
@@ -1086,7 +1086,7 @@ describe("organization channels", () => {
           "connect-protocol-version": "1",
           "content-type": "application/json",
         },
-        body: JSON.stringify({ workspaceId: organizationId, channelId, messageId }),
+        body: JSON.stringify({ workspaceId: workspaceId, channelId, messageId }),
       },
     ), apiEnv);
 
@@ -1105,10 +1105,10 @@ describe("organization channels", () => {
     const messageId = "f0000000-0000-4000-8000-000000000016";
     const attachmentId = "fa000000-0000-4000-8000-000000000016";
     const objectKey =
-      `channel-attachments/${organizationId}/${channelId}/${messageId}/${attachmentId}`;
+      `channel-attachments/${workspaceId}/${channelId}/${messageId}/${attachmentId}`;
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "delete-image-room",
@@ -1132,7 +1132,7 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       attachments: [{
         id: attachmentId,
-        organization_id: organizationId,
+        organization_id: workspaceId,
         object_key: objectKey,
         filename: "delete.png",
         content_type: "image/png",
@@ -1143,7 +1143,7 @@ describe("organization channels", () => {
     await archives.put(objectKey, "image");
 
     await expect(
-      deleteChannel(db, organizationId, channelId, ownerId, at(9)),
+      deleteChannel(db, workspaceId, channelId, ownerId, at(9)),
     ).resolves.toBe(true);
     await expect(
       db
@@ -1166,18 +1166,18 @@ describe("organization channels", () => {
     const messageId = "f0000000-0000-4000-8000-000000000017";
     const attachmentId = "fa000000-0000-4000-8000-000000000017";
     const objectKey =
-      `channel-attachments/${organizationId}/${channelId}/${messageId}/${attachmentId}`;
+      `channel-attachments/${workspaceId}/${channelId}/${messageId}/${attachmentId}`;
     await db
       .prepare(
         `update briar_organization_members
          set role = 'co-owner', updated_at = ?
          where organization_id = ? and user_id = ?`,
       )
-      .bind(at(8), organizationId, outsiderId)
+      .bind(at(8), workspaceId, outsiderId)
       .run();
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "role-race-room",
@@ -1201,7 +1201,7 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       attachments: [{
         id: attachmentId,
-        organization_id: organizationId,
+        organization_id: workspaceId,
         object_key: objectKey,
         filename: "keep.png",
         content_type: "image/png",
@@ -1216,32 +1216,32 @@ describe("organization channels", () => {
          set role = 'viewer', updated_at = ?
          where organization_id = ? and user_id = ?`,
       )
-      .bind(at(9), organizationId, outsiderId)
+      .bind(at(9), workspaceId, outsiderId)
       .run();
 
     await expect(deleteChannelApplication({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: outsiderId,
     })).rejects.toMatchObject({ status: 403 });
 
     await expect(
-      deleteChannel(db, organizationId, channelId, outsiderId, at(8)),
+      deleteChannel(db, workspaceId, channelId, outsiderId, at(8)),
     ).resolves.toBe(false);
-    await expect(getChannelById(db, organizationId, channelId))
+    await expect(getChannelById(db, workspaceId, channelId))
       .resolves.toMatchObject({ id: channelId });
 
     await expect(
-      deleteChannel(db, organizationId, channelId, outsiderId, at(9)),
+      deleteChannel(db, workspaceId, channelId, outsiderId, at(9)),
     ).resolves.toBe(false);
     await expect(
-      getChannelById(db, organizationId, channelId),
+      getChannelById(db, workspaceId, channelId),
     ).resolves.toMatchObject({ id: channelId });
     await expect(
       getChannelMessageAttachment(
         db,
-        organizationId,
+        workspaceId,
         channelId,
         messageId,
         attachmentId,
@@ -1262,7 +1262,7 @@ describe("organization channels", () => {
          set role = 'developer', updated_at = ?
          where organization_id = ? and user_id = ?`,
       )
-      .bind(at(10), organizationId, outsiderId)
+      .bind(at(10), workspaceId, outsiderId)
       .run();
   });
 
@@ -1270,7 +1270,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000019";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "creator-api-delete-room",
@@ -1283,11 +1283,11 @@ describe("organization channels", () => {
     });
     await expect(deleteChannelApplication({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: outsiderId,
     })).resolves.toMatchObject({ channelId });
-    await expect(getChannelById(db, organizationId, channelId)).resolves.toBeNull();
+    await expect(getChannelById(db, workspaceId, channelId)).resolves.toBeNull();
   });
 
   it("limits a claimed reply image to its device, token, and trigger message", async () => {
@@ -1299,7 +1299,7 @@ describe("organization channels", () => {
     const claimTokenHash = "4".repeat(64);
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "vision-room",
@@ -1310,9 +1310,9 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(8),
     });
-    const agent = await createOrganizationAgent(db, {
+    const agent = await createWorkspaceAgent(db, {
       id: "aa000000-0000-4000-8000-000000000014",
-      organizationId,
+      workspaceId,
       name: "Vision",
       provider: "grok",
       model: null,
@@ -1339,8 +1339,8 @@ describe("organization channels", () => {
       mentionedAgentIds: [agent!.id],
       attachments: [{
         id: attachmentId,
-        organization_id: organizationId,
-        object_key: `channel-attachments/${organizationId}/${channelId}/${triggerId}/${attachmentId}`,
+        organization_id: workspaceId,
+        object_key: `channel-attachments/${workspaceId}/${channelId}/${triggerId}/${attachmentId}`,
         filename: "trigger.png",
         content_type: "image/png",
         byte_size: 5,
@@ -1360,8 +1360,8 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       attachments: [{
         id: otherAttachmentId,
-        organization_id: organizationId,
-        object_key: `channel-attachments/${organizationId}/${channelId}/${otherMessageId}/${otherAttachmentId}`,
+        organization_id: workspaceId,
+        object_key: `channel-attachments/${workspaceId}/${channelId}/${otherMessageId}/${otherAttachmentId}`,
         filename: "other.png",
         content_type: "image/png",
         byte_size: 5,
@@ -1369,7 +1369,7 @@ describe("organization channels", () => {
       createdAt: at(8),
     });
     await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -1388,7 +1388,7 @@ describe("organization channels", () => {
       claimRequestedAt,
       otherWorkerId,
     ).run();
-    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+    const claimed = await claimNextChannelAgentReply(db, workspaceId, {
       deviceId,
       workerId: otherWorkerId,
       ...workerClaimRuntimeFixture({
@@ -1403,7 +1403,7 @@ describe("organization channels", () => {
 
     const lookup = (overrides: Partial<Parameters<typeof getClaimedChannelReplyAttachment>[1]> = {}) =>
       getClaimedChannelReplyAttachment(db, {
-        organizationId,
+        workspaceId,
         jobId: claimed!.id,
         deviceId,
         claimTokenHash,
@@ -1442,11 +1442,11 @@ describe("organization channels", () => {
     });
   });
 
-  it("keeps a claimed organization Agent reply in the trigger thread", async () => {
+  it("keeps a claimed workspace Agent reply in the trigger thread", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000004";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "ideation",
@@ -1457,9 +1457,9 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(8),
     });
-    const agent = await createOrganizationAgent(db, {
+    const agent = await createWorkspaceAgent(db, {
       id: "aa000000-0000-4000-8000-000000000001",
-      organizationId,
+      workspaceId,
       name: "Honey",
       provider: "claude",
       model: null,
@@ -1528,9 +1528,9 @@ describe("organization channels", () => {
       mentionedAgentIds: [agent!.id],
       attachments: [{
         id: triggerAttachmentId,
-        organization_id: organizationId,
+        organization_id: workspaceId,
         object_key:
-          `channel-attachments/${organizationId}/${channelId}/${triggerId}/${triggerAttachmentId}`,
+          `channel-attachments/${workspaceId}/${channelId}/${triggerId}/${triggerAttachmentId}`,
         filename: "private-plan.png",
         content_type: "image/png",
         byte_size: 42,
@@ -1552,7 +1552,7 @@ describe("organization channels", () => {
       createdAt: at(9),
     });
     const jobs = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -1566,13 +1566,13 @@ describe("organization channels", () => {
     });
     expect(jobs).toHaveLength(1);
 
-    // Organization work still requires the exact host binding to be enabled at
+    // Workspace work still requires the exact host binding to be enabled at
     // the atomic claim boundary.
     await db.prepare(
       `update briar_execution_workers set state = 'disabled' where id = ?`,
     ).bind(otherWorkerId).run();
     await expect(
-      claimNextChannelAgentReply(db, organizationId, {
+      claimNextChannelAgentReply(db, workspaceId, {
         deviceId,
         workerId: otherWorkerId,
         ...workerClaimRuntimeFixture({
@@ -1622,7 +1622,7 @@ describe("organization channels", () => {
       otherWorkerId,
     );
     const claimPayload = await claimNextChannelReplyWork({
-      input: { organizationId, workerId: otherWorkerId },
+      input: { workspaceId, workerId: otherWorkerId },
       db,
       env: apiEnv,
       authenticatedWorker,
@@ -1638,7 +1638,7 @@ describe("organization channels", () => {
         contentType: "image/png",
         byteSize: 42,
         url: channelReplyAttachmentPath({
-          organizationId,
+          workspaceId,
           workId: jobs[0].id,
           attachmentId: triggerAttachmentId,
         }),
@@ -1664,7 +1664,7 @@ describe("organization channels", () => {
     expect(serializedReplyContext).not.toContain("blocks");
     const claimed = await getChannelAgentReplyJob(
       db,
-      organizationId,
+      workspaceId,
       claimPayload!.workId,
     );
     expect(claimed).toMatchObject({
@@ -1675,10 +1675,10 @@ describe("organization channels", () => {
     });
 
     const contextClaim = (overrides: Partial<Parameters<
-      typeof getActiveOrganizationChannelReplyContextClaim
+      typeof getActiveWorkspaceChannelReplyContextClaim
     >[1]> = {}) =>
-      getActiveOrganizationChannelReplyContextClaim(db, {
-        organizationId,
+      getActiveWorkspaceChannelReplyContextClaim(db, {
+        workspaceId,
         jobId: claimed!.id,
         deviceId,
         workerId: otherWorkerId,
@@ -1688,7 +1688,7 @@ describe("organization channels", () => {
       });
     await expect(contextClaim()).resolves.toMatchObject({ id: claimed!.id });
     await expect(contextClaim({
-      organizationId: otherOrganizationId,
+      workspaceId: otherWorkspaceId,
     })).resolves.toBeNull();
     await expect(contextClaim({
       claimTokenHash: "9".repeat(64),
@@ -1698,7 +1698,7 @@ describe("organization channels", () => {
     })).resolves.toBeNull();
 
     const claim = {
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       workId: claimed!.id,
       workerId: otherWorkerId,
       claimToken: claimPayload!.claimToken,
@@ -1734,7 +1734,7 @@ describe("organization channels", () => {
     expect(manifest.result.case).toBe("manifest");
     if (manifest.result.case !== "manifest") return;
     expect(manifest.result.value).toMatchObject({
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       workId: claimed!.id,
       projects: expect.arrayContaining([expect.objectContaining({
         id: projectId,
@@ -1766,7 +1766,7 @@ describe("organization channels", () => {
       await unchangedManifest.json(),
     ).result).toMatchObject({
       case: "unchanged",
-      value: { workspaceId: organizationId, workId: claimed!.id },
+      value: { workspaceId: workspaceId, workId: claimed!.id },
     });
 
     const lookupRequest = create(
@@ -1853,7 +1853,7 @@ describe("organization channels", () => {
     expect(
       (await listChannelRootMessages(db, channelId)).map((message) => message.id),
     ).not.toContain(claimed!.reply_message_id);
-    // A plan document with no project stays organization-wide until a member
+    // A plan document with no project stays workspace-wide until a member
     // decides where the work belongs.
     expect(reply?.document).toMatchObject({
       messageId: claimed!.reply_message_id,
@@ -1868,7 +1868,7 @@ describe("organization channels", () => {
       getChannelActionProposal(db, channelId, reply!.proposal!.id),
     ).resolves.toMatchObject({
       reply_author_agent_id: agent!.id,
-      reply_author_agent_organization_id: organizationId,
+      reply_author_agent_organization_id: workspaceId,
       reply_author_agent_project_id: null,
     });
 
@@ -1890,7 +1890,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000070";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "reply-images",
@@ -1901,9 +1901,9 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(70),
     });
-    const agent = await createOrganizationAgent(db, {
+    const agent = await createWorkspaceAgent(db, {
       id: "aa000000-0000-4000-8000-000000000070",
-      organizationId,
+      workspaceId,
       name: "Screenshoter",
       provider: "claude",
       model: null,
@@ -1946,7 +1946,7 @@ describe("organization channels", () => {
       createdAt: at(71),
     });
     await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: threadRootId,
@@ -1964,7 +1964,7 @@ describe("organization channels", () => {
       at(72),
       otherWorkerId,
     ).run();
-    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+    const claimed = await claimNextChannelAgentReply(db, workspaceId, {
       deviceId,
       workerId: otherWorkerId,
       ...workerClaimRuntimeFixture({
@@ -1978,7 +1978,7 @@ describe("organization channels", () => {
     expect(claimed).not.toBeNull();
     const attachmentId = "fa000000-0000-4000-8000-000000000070";
     const objectKey =
-      `channel-attachments/${organizationId}/${channelId}/${claimed!.reply_message_id}/${attachmentId}`;
+      `channel-attachments/${workspaceId}/${channelId}/${claimed!.reply_message_id}/${attachmentId}`;
     const completed = await completeChannelReply(db, claimed!, {
       jobId: claimed!.id,
       deviceId,
@@ -1993,7 +1993,7 @@ describe("organization channels", () => {
       completedAt: at(73),
       attachments: [{
         id: attachmentId,
-        organization_id: organizationId,
+        organization_id: workspaceId,
         object_key: objectKey,
         filename: "screenshot.png",
         content_type: "image/png",
@@ -2023,7 +2023,7 @@ describe("organization channels", () => {
       imageWidth: null,
       imageHeight: null,
       url:
-        `/organizations/${organizationId}/channels/${channelId}/messages/${claimed!.reply_message_id}/attachments/${attachmentId}`,
+        `/workspaces/${workspaceId}/channels/${channelId}/messages/${claimed!.reply_message_id}/attachments/${attachmentId}`,
     }]);
   });
 
@@ -2031,7 +2031,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000005";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "project-room",
@@ -2052,7 +2052,7 @@ describe("organization channels", () => {
       )
       .bind(
         agentId,
-        organizationId,
+        workspaceId,
         projectId,
         "data:image/png;base64,cHJvamVjdC1hdmF0YXI=",
         at(12),
@@ -2066,7 +2066,7 @@ describe("organization channels", () => {
       createdAt: at(12),
     });
     expect(
-      await listOrganizationAgents(db, organizationId, { projectId }),
+      await listWorkspaceAgents(db, workspaceId, { projectId }),
     ).toEqual([
       expect.objectContaining({
         id: agentId,
@@ -2090,7 +2090,7 @@ describe("organization channels", () => {
       createdAt: at(13),
     });
     await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -2099,7 +2099,7 @@ describe("organization channels", () => {
     });
 
     expect(
-      await claimNextChannelAgentReply(db, organizationId, {
+      await claimNextChannelAgentReply(db, workspaceId, {
         deviceId,
         workerId: otherWorkerId,
         ...workerClaimRuntimeFixture({
@@ -2113,7 +2113,7 @@ describe("organization channels", () => {
     ).toBeNull();
 
     await bindWorkerToProject();
-    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+    const claimed = await claimNextChannelAgentReply(db, workspaceId, {
       deviceId,
       workerId: boundWorkerId,
       ...workerClaimRuntimeFixture({
@@ -2351,7 +2351,7 @@ describe("organization channels", () => {
     ).bind(observedAt, observedAt, projectId).run();
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "project-local-preference",
@@ -2369,7 +2369,7 @@ describe("organization channels", () => {
            responsibility, effort, created_at, updated_at
          ) values (?, ?, ?, 'Local Project Agent', 'claude',
                    'claude-sonnet-local', 'Use the project Worker', 'high', ?, ?)`,
-      ).bind(agentId, organizationId, projectId, observedAt, observedAt),
+      ).bind(agentId, workspaceId, projectId, observedAt, observedAt),
       db.prepare(
         `insert into briar_execution_worker_devices (
            id, organization_id, owner_user_id, label, device_identity_hash,
@@ -2377,7 +2377,7 @@ describe("organization channels", () => {
          ) values (?, ?, ?, 'Fallback device', ?, 'online', ?, ?, ?)`,
       ).bind(
         fallbackDeviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         sha256Hex(fallbackDeviceId),
         observedAt,
@@ -2438,7 +2438,7 @@ describe("organization channels", () => {
       createdAt: observedAt,
     });
     const [job] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -2452,7 +2452,7 @@ describe("organization channels", () => {
       deviceId?: string;
       workerId?: string;
       claimTokenHash?: string;
-    } = {}) => claimNextChannelAgentReply(db, organizationId, {
+    } = {}) => claimNextChannelAgentReply(db, workspaceId, {
       deviceId: overrides.deviceId ?? fallbackDeviceId,
       workerId: overrides.workerId ?? fallbackWorkerId,
       ...claimRuntime,
@@ -2493,7 +2493,7 @@ describe("organization channels", () => {
     expect(retryClaim).toBeNull();
     await expect(getChannelAgentReplyJob(
       db,
-      organizationId,
+      workspaceId,
       job.id,
     )).resolves.toMatchObject({
       status: "failed",
@@ -2515,7 +2515,7 @@ describe("organization channels", () => {
       createdAt: observedAt,
     });
     const [policyJob] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: policyTriggerId,
       parentMessageId: policyTriggerId,
@@ -2609,7 +2609,7 @@ describe("organization channels", () => {
            last_heartbeat_at = excluded.last_heartbeat_at`,
       ).bind(
         fallbackDeviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         "7".repeat(64),
         startedAt,
@@ -2679,11 +2679,11 @@ describe("organization channels", () => {
            responsibility, effort, created_at, updated_at
          ) values (?, ?, ?, 'Session Agent', 'claude', null,
                    'Continue one thread', null, ?, ?)`,
-      ).bind(agentId, organizationId, projectId, startedAt, startedAt),
+      ).bind(agentId, workspaceId, projectId, startedAt, startedAt),
     ]);
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "thread-session-lifecycle",
@@ -2716,7 +2716,7 @@ describe("organization channels", () => {
       });
     await message(rootId, null, startedAt);
     const [firstJob] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: rootId,
       parentMessageId: rootId,
@@ -2728,7 +2728,7 @@ describe("organization channels", () => {
       device: string,
       claimTokenHash: string,
       claimedAt: string,
-    ) => claimNextChannelAgentReply(db, organizationId, {
+    ) => claimNextChannelAgentReply(db, workspaceId, {
       deviceId: device,
       workerId,
       ...claimRuntime,
@@ -2766,7 +2766,7 @@ describe("organization channels", () => {
 
     await message(followupId, rootId, time(3));
     const [followupJob] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: followupId,
       parentMessageId: rootId,
@@ -2820,7 +2820,7 @@ describe("organization channels", () => {
       conversation_id: "provider-conversation-201",
     });
     await expect(channelReplyWorkerAvailability(db, {
-      organizationId,
+      workspaceId,
       projectId,
       preferredDeviceId: deviceId,
       preferredWorkerId: boundWorkerId,
@@ -2872,7 +2872,7 @@ describe("organization channels", () => {
 
     await message(leaseFailoverId, rootId, time(8));
     const [leaseFailoverJob] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: leaseFailoverId,
       parentMessageId: rootId,
@@ -2938,7 +2938,7 @@ describe("organization channels", () => {
 
     await message(unavailableFailoverId, rootId, time(27));
     const [failoverJob] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: unavailableFailoverId,
       parentMessageId: rootId,
@@ -2957,7 +2957,7 @@ describe("organization channels", () => {
     expect(rejectedUnavailableFailover).toBeNull();
     await expect(getChannelAgentReplyJob(
       db,
-      organizationId,
+      workspaceId,
       failoverJob.id,
     )).resolves.toMatchObject({
       status: "failed",
@@ -2980,7 +2980,7 @@ describe("organization channels", () => {
     ]);
     await message(designatedRootId, null, time(30));
     const [designatedJob] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: designatedRootId,
       parentMessageId: designatedRootId,
@@ -3039,7 +3039,7 @@ describe("organization channels", () => {
                  'Keep Agent state isolated', null, ?, ?)`,
     ).bind(
       isolatedAgentId,
-      organizationId,
+      workspaceId,
       projectId,
       time(30),
       time(30),
@@ -3064,7 +3064,7 @@ describe("organization channels", () => {
       createdAt: time(30),
     });
     const isolatedJobs = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: isolatedRootId,
       parentMessageId: isolatedRootId,
@@ -3127,7 +3127,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000006";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "codex-room",
@@ -3138,9 +3138,9 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(17),
     });
-    const agent = await createOrganizationAgent(db, {
+    const agent = await createWorkspaceAgent(db, {
       id: "aa000000-0000-4000-8000-000000000003",
-      organizationId,
+      workspaceId,
       name: "Fizz",
       provider: "codex",
       model: null,
@@ -3169,7 +3169,7 @@ describe("organization channels", () => {
       createdAt: at(18),
     });
     const jobs = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -3179,7 +3179,7 @@ describe("organization channels", () => {
     expect(jobs).toHaveLength(1);
 
     expect(
-      await claimNextChannelAgentReply(db, organizationId, {
+      await claimNextChannelAgentReply(db, workspaceId, {
         deviceId,
         workerId: otherWorkerId,
         ...workerClaimRuntimeFixture({
@@ -3193,7 +3193,7 @@ describe("organization channels", () => {
     ).toBeNull();
   });
 
-  it("keeps an organization reply on an available preferred device", async () => {
+  it("keeps an workspace reply on an available preferred device", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000111";
     const agentId = "aa000000-0000-4000-8000-000000000111";
     const triggerId = "f0000000-0000-4000-8000-000000000111";
@@ -3207,24 +3207,24 @@ describe("organization channels", () => {
     const runtimeProtoJson = claimRuntime.runtimeProtoJson;
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
-      slug: "organization-context-fallback",
-      name: "Organization context fallback",
+      slug: "workspace-context-fallback",
+      name: "Workspace context fallback",
       topic: null,
       visibility: "public",
       defaultProjectId: null,
       createdByUserId: ownerId,
       createdAt: observedAt,
     });
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: agentId,
-      organizationId,
-      name: "Organization Fallback",
+      workspaceId,
+      name: "Workspace Fallback",
       provider: "claude",
       model: null,
-      responsibility: "Use organization context",
+      responsibility: "Use workspace context",
       effort: null,
       createdAt: observedAt,
     });
@@ -3254,10 +3254,10 @@ describe("organization channels", () => {
         `insert into briar_execution_worker_devices (
            id, organization_id, owner_user_id, label, device_identity_hash,
            state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Organization fallback', ?, 'online', ?, ?, ?)`,
+         ) values (?, ?, ?, 'Workspace fallback', ?, 'online', ?, ?, ?)`,
       ).bind(
         fallbackDeviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         "a1".repeat(32),
         observedAt,
@@ -3274,7 +3274,7 @@ describe("organization channels", () => {
            id, project_id, device_id, label, host_fingerprint,
            runtime_proto_json, state, accepting_work,
            readiness_state, last_heartbeat_at, created_at, updated_at
-         ) values (?, ?, ?, 'Organization fallback binding', ?, ?,
+         ) values (?, ?, ?, 'Workspace fallback binding', ?, ?,
                    'online', 1, 'ready', ?, ?, ?)`,
       ).bind(
         fallbackWorkerId,
@@ -3295,13 +3295,13 @@ describe("organization channels", () => {
       authorAgentId: null,
       authorAgentName: null,
       authorAgentProvider: null,
-      body: "@Organization-Fallback answer",
+      body: "@Workspace-Fallback answer",
       mentionedUserIds: [],
       mentionedAgentIds: [agentId],
       createdAt: observedAt,
     });
     const [job] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -3309,7 +3309,7 @@ describe("organization channels", () => {
       preferredDeviceId: deviceId,
       createdAt: observedAt,
     });
-    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+    const claimed = await claimNextChannelAgentReply(db, workspaceId, {
       deviceId: fallbackDeviceId,
       workerId: fallbackWorkerId,
       ...claimRuntime,
@@ -3344,7 +3344,7 @@ describe("organization channels", () => {
          ) values (?, ?, ?, ?, ?, 'online', ?, ?, ?)`,
       ).bind(
         ownerDeviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         `Planned update device ${suffix}`,
         suffix.padEnd(64, "0"),
@@ -3377,7 +3377,7 @@ describe("organization channels", () => {
     ]);
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: `planned-update-${suffix}`,
@@ -3388,9 +3388,9 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: observedAt,
     });
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: agentId,
-      organizationId,
+      workspaceId,
       name: `Planned Update ${suffix}`,
       provider: "claude",
       model: null,
@@ -3418,7 +3418,7 @@ describe("organization channels", () => {
       createdAt: observedAt,
     });
     const [job] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -3441,7 +3441,7 @@ describe("organization channels", () => {
       worker: { deviceId: string; workerId: string },
       claimTokenHash: string,
       claimedAt: string,
-    ) => claimNextChannelAgentReply(db, organizationId, {
+    ) => claimNextChannelAgentReply(db, workspaceId, {
       deviceId: worker.deviceId,
       workerId: worker.workerId,
       ...claimRuntime,
@@ -3477,7 +3477,7 @@ describe("organization channels", () => {
     ).bind(at(301), seeded.job.id).run();
     await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777301",
-      organizationId,
+      workspaceId,
       deviceId: seeded.owner.deviceId,
       requestedByUserId: ownerId,
       targetVersion: "1.2.226",
@@ -3493,7 +3493,7 @@ describe("organization channels", () => {
     await completePlannedUpdate("77777777-7777-4777-8777-777777777301", at(302));
 
     await seeded.claim(seeded.sweeper, "a3".repeat(32), at(302));
-    await expect(getChannelAgentReplyJob(db, organizationId, seeded.job.id))
+    await expect(getChannelAgentReplyJob(db, workspaceId, seeded.job.id))
       .resolves.toMatchObject({
         status: "queued",
         planned_update_resume: 1,
@@ -3516,7 +3516,7 @@ describe("organization channels", () => {
     ).bind(at(301), seeded.job.id).run();
     await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777302",
-      organizationId,
+      workspaceId,
       deviceId: seeded.owner.deviceId,
       requestedByUserId: ownerId,
       targetVersion: "1.2.226",
@@ -3526,7 +3526,7 @@ describe("organization channels", () => {
 
     // The Worker never came back, so the sweep applies as it always has.
     await seeded.claim(seeded.sweeper, "c3".repeat(32), at(310));
-    await expect(getChannelAgentReplyJob(db, organizationId, seeded.job.id))
+    await expect(getChannelAgentReplyJob(db, workspaceId, seeded.job.id))
       .resolves.toMatchObject({
         status: "failed",
         error: channelReplyAssignedWorkerUnavailableError(
@@ -3539,7 +3539,7 @@ describe("organization channels", () => {
     const seeded = await seedPlannedUpdateReply("303", at(300));
     await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777303",
-      organizationId,
+      workspaceId,
       deviceId: seeded.owner.deviceId,
       requestedByUserId: ownerId,
       targetVersion: "1.2.226",
@@ -3548,7 +3548,7 @@ describe("organization channels", () => {
     await completePlannedUpdate("77777777-7777-4777-8777-777777777303", at(302));
 
     await seeded.claim(seeded.sweeper, "d3".repeat(32), at(303));
-    await expect(getChannelAgentReplyJob(db, organizationId, seeded.job.id))
+    await expect(getChannelAgentReplyJob(db, workspaceId, seeded.job.id))
       .resolves.toMatchObject({
         status: "failed",
         planned_update_resume: 0,
@@ -3562,7 +3562,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000007";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "intro",
@@ -3573,9 +3573,9 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(20),
     });
-    const first = await createOrganizationAgent(db, {
+    const first = await createWorkspaceAgent(db, {
       id: "aa000000-0000-4000-8000-000000000004",
-      organizationId,
+      workspaceId,
       name: "Nectar",
       provider: "claude",
       model: null,
@@ -3583,9 +3583,9 @@ describe("organization channels", () => {
       effort: null,
       createdAt: at(20),
     });
-    const second = await createOrganizationAgent(db, {
+    const second = await createWorkspaceAgent(db, {
       id: "aa000000-0000-4000-8000-000000000005",
-      organizationId,
+      workspaceId,
       name: "Pollen",
       provider: "claude",
       model: null,
@@ -3620,7 +3620,7 @@ describe("organization channels", () => {
       createdAt: at(21),
     });
     const jobs = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -3636,7 +3636,7 @@ describe("organization channels", () => {
 
     // Re-sending the same trigger must not duplicate work.
     const again = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -3648,9 +3648,9 @@ describe("organization channels", () => {
 
   it("enqueues DM replies without a temporary reaction and preserves user reactions", async () => {
     const agentId = "aa000000-0000-4000-8000-000000000130";
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: agentId,
-      organizationId,
+      workspaceId,
       name: "Reaction Assistant",
       provider: "claude",
       model: null,
@@ -3708,7 +3708,7 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-0000000000a2";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "reaction-channel",
@@ -3758,9 +3758,9 @@ describe("organization channels", () => {
     const repeated = await createSelf();
     expect(repeated.channel.id).toBe(createdBody.channel.id);
 
-    const listed = await listOrganizationChannels({
+    const listed = await listWorkspaceChannels({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
     });
     expect(listed.channels).toEqual(expect.arrayContaining([
@@ -3780,9 +3780,9 @@ describe("organization channels", () => {
       author: { type: "user", id: ownerId },
     });
 
-    const timeline = await getOrganizationChannelDetail({
+    const timeline = await getWorkspaceChannelDetail({
       db,
-      organizationId,
+      workspaceId,
       channelId: createdBody.channel.id,
       userId: ownerId,
       messageLimit: 20,
@@ -3791,9 +3791,9 @@ describe("organization channels", () => {
       expect.objectContaining({ body: "A private note to myself" }),
     ]));
 
-    await expect(getOrganizationChannelDetail({
+    await expect(getWorkspaceChannelDetail({
       db,
-      organizationId,
+      workspaceId,
       channelId: createdBody.channel.id,
       userId: outsiderId,
       messageLimit: 20,
@@ -3801,7 +3801,7 @@ describe("organization channels", () => {
 
     await setChannelMemberApplication({
       db,
-      organizationId,
+      workspaceId,
       channelId: createdBody.channel.id,
       userId: ownerId,
       targetUserId: outsiderId,
@@ -3818,9 +3818,9 @@ describe("organization channels", () => {
 
   it("creates idempotent DMs and lets a busy preferred Worker answer", async () => {
     const agentId = "aa000000-0000-4000-8000-000000000120";
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: agentId,
-      organizationId,
+      workspaceId,
       name: "Direct Falcon",
       provider: "claude",
       model: null,
@@ -3939,9 +3939,9 @@ describe("organization channels", () => {
         ).toISOString(),
       });
     }
-    const dmTimeline = await getOrganizationChannelDetail({
+    const dmTimeline = await getWorkspaceChannelDetail({
       db,
-      organizationId,
+      workspaceId,
       channelId: createdBody.channel.id,
       userId: ownerId,
       messageLimit: 20,
@@ -3972,11 +3972,11 @@ describe("organization channels", () => {
       error: null,
     });
     // Queued reply work is claimable now, so the mutation pushes the
-    // organization's Workers instead of leaving them on their idle poll.
-    expect(workerWakes).toEqual([organizationId]);
+    // workspace's Workers instead of leaving them on their idle poll.
+    expect(workerWakes).toEqual([workspaceId]);
     const dmReplyJob = await getChannelAgentReplyJob(
       db,
-      organizationId,
+      workspaceId,
       messageBody.agentReplies[0]!.id,
     );
     expect(dmReplyJob).toMatchObject({
@@ -4002,7 +4002,7 @@ describe("organization channels", () => {
       otherWorkerId,
     );
     const dmClaimPayload = await claimNextChannelReplyWork({
-      input: { organizationId, workerId: otherWorkerId },
+      input: { workspaceId, workerId: otherWorkerId },
       db,
       env: apiEnv,
       authenticatedWorker,
@@ -4088,7 +4088,7 @@ describe("organization channels", () => {
     });
     await expect(getChannelAgentReplyJob(
       db,
-      organizationId,
+      workspaceId,
       selectedSkillBody.agentReplies[0]!.id,
     )).resolves.toMatchObject({
       skill_id: "ab000000-0000-4000-8000-000000000120",
@@ -4109,7 +4109,7 @@ describe("organization channels", () => {
 
     await setChannelMemberApplication({
       db,
-      organizationId,
+      workspaceId,
       channelId: createdBody.channel.id,
       userId: ownerId,
       targetUserId: outsiderId,
@@ -4139,12 +4139,12 @@ describe("organization channels", () => {
     expect(mentionedBody.agentReplies).toHaveLength(1);
     await expect(getChannelAgentReplyJob(
       db,
-      organizationId,
+      workspaceId,
       mentionedBody.agentReplies[0]!.id,
     )).resolves.toMatchObject({ skill_id: null, agent_provider: "claude" });
   });
 
-  it("accepts only the sender's organization device and copies it to every mentioned Agent job", async () => {
+  it("accepts only the sender's workspace device and copies it to every mentioned Agent job", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000107";
     const firstAgentId = "aa000000-0000-4000-8000-000000000107";
     const secondAgentId = "aa000000-0000-4000-8000-000000000108";
@@ -4152,7 +4152,7 @@ describe("organization channels", () => {
     const observedAt = new Date().toISOString();
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "preferred-device-api",
@@ -4167,9 +4167,9 @@ describe("organization channels", () => {
       [firstAgentId, "Local One"],
       [secondAgentId, "Local Two"],
     ]) {
-      await createOrganizationAgent(db, {
+      await createWorkspaceAgent(db, {
         id,
-        organizationId,
+        workspaceId,
         name,
         provider: "claude",
         model: null,
@@ -4211,7 +4211,7 @@ describe("organization channels", () => {
          ) values (?, ?, ?, 'Outsider device', ?, 'online', ?, ?, ?)`,
       ).bind(
         outsiderDeviceId,
-        organizationId,
+        workspaceId,
         outsiderId,
         "7".repeat(64),
         observedAt,
@@ -4257,9 +4257,9 @@ describe("organization channels", () => {
     const channelId = "e0000000-0000-4000-8000-000000000701";
     const triggerId = "f0000000-0000-4000-8000-000000000701";
     const successTriggerId = "f0000000-0000-4000-8000-000000000702";
-    const agent = await createOrganizationAgent(db, {
+    const agent = await createWorkspaceAgent(db, {
       id: "aa000000-0000-4000-8000-000000000701",
-      organizationId,
+      workspaceId,
       name: "Retry Agent",
       provider: "claude",
       model: null,
@@ -4269,7 +4269,7 @@ describe("organization channels", () => {
     });
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "final-reply-failure",
@@ -4300,7 +4300,7 @@ describe("organization channels", () => {
       createdAt: at(81),
     });
     const [job] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -4385,7 +4385,7 @@ describe("organization channels", () => {
       author: { type: "agent", id: agent!.id, name: "Retry Agent" },
     });
     await expect(
-      listChannelConversationNotifications(db, organizationId, ownerId),
+      listChannelConversationNotifications(db, workspaceId, ownerId),
     ).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: job.reply_message_id,
@@ -4423,7 +4423,7 @@ describe("organization channels", () => {
       createdAt: at(88),
     });
     const [successfulJob] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: successTriggerId,
       parentMessageId: successTriggerId,
@@ -4466,9 +4466,9 @@ describe("organization channels", () => {
   it("persists an unavailable Worker as an immediate failed reply", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000099";
     const triggerId = "f0000000-0000-4000-8000-000000000099";
-    const agent = await createOrganizationAgent(db, {
+    const agent = await createWorkspaceAgent(db, {
       id: "aa000000-0000-4000-8000-000000000099",
-      organizationId,
+      workspaceId,
       name: "Unavailable",
       provider: "claude",
       model: null,
@@ -4478,7 +4478,7 @@ describe("organization channels", () => {
     });
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "unavailable-worker",
@@ -4510,7 +4510,7 @@ describe("organization channels", () => {
     });
 
     const [reply] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: triggerId,
       parentMessageId: triggerId,
@@ -4569,7 +4569,7 @@ describe("organization channels", () => {
          ) values (?, ?, ?, 'Eligible Mac', ?, 'online', ?, ?, ?)`,
       ).bind(
         fallbackDeviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         "8".repeat(64),
         observedAt,
@@ -4607,7 +4607,7 @@ describe("organization channels", () => {
                    'Remain on the pinned Worker', null, ?, 'Pinned Mac', ?, ?)`,
       ).bind(
         agentId,
-        organizationId,
+        workspaceId,
         projectId,
         boundWorkerId,
         observedAt,
@@ -4616,7 +4616,7 @@ describe("organization channels", () => {
     ]);
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "designated-worker-error",
@@ -4707,11 +4707,11 @@ describe("organization channels", () => {
            responsibility, effort, created_at, updated_at
          ) values (?, ?, ?, 'Limit Agent', 'grok', 'grok-4.6',
                    'Reply with Grok', 'high', ?, ?)`,
-      ).bind(agentId, organizationId, projectId, observedAt, observedAt),
+      ).bind(agentId, workspaceId, projectId, observedAt, observedAt),
     ]);
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "usage-limit-error",
@@ -4745,7 +4745,7 @@ describe("organization channels", () => {
     const hiddenId = "e0000000-0000-4000-8000-000000000008";
     await createChannel(db, {
       id: hiddenId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "leadership",
@@ -4756,7 +4756,7 @@ describe("organization channels", () => {
       createdByUserId: ownerId,
       createdAt: at(25),
     });
-    const beforeCursor = await getChannelSyncCursor(db, organizationId);
+    const beforeCursor = await getChannelSyncCursor(db, workspaceId);
     await createChannelMessage(db, {
       id: "f0000000-0000-4000-8000-000000000008",
       channelId: hiddenId,
@@ -4773,7 +4773,7 @@ describe("organization channels", () => {
 
     const outsiderDelta = await loadChannelDelta(
       db,
-      organizationId,
+      workspaceId,
       outsiderId,
       beforeCursor,
     );
@@ -4786,7 +4786,7 @@ describe("organization channels", () => {
 
     const ownerDelta = await loadChannelDelta(
       db,
-      organizationId,
+      workspaceId,
       ownerId,
       beforeCursor,
     );
@@ -4795,8 +4795,8 @@ describe("organization channels", () => {
     );
   });
 
-  it("keeps roster and channel reads scoped to their organization", async () => {
-    expect(await getChannelById(db, otherOrganizationId, "e0000000-0000-4000-8000-000000000002")).toBeNull();
+  it("keeps roster and channel reads scoped to their workspace", async () => {
+    expect(await getChannelById(db, otherWorkspaceId, "e0000000-0000-4000-8000-000000000002")).toBeNull();
     const agents = await listChannelAgents(
       db,
       "e0000000-0000-4000-8000-000000000004",
@@ -4809,7 +4809,7 @@ describe("organization channels", () => {
     const messageId = "f0000000-0000-4000-8000-0000000000a1";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "reactions",
@@ -4833,7 +4833,7 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       createdAt: at(51),
     });
-    const before = await getChannelSyncCursor(db, organizationId);
+    const before = await getChannelSyncCursor(db, workspaceId);
 
     const added = await toggleChannelMessageReaction(db, {
       channelId,
@@ -4906,7 +4906,7 @@ describe("organization channels", () => {
     const listed = await listChannelRootMessages(db, channelId);
     expect(listed[0]?.reactions).toEqual(removed?.reactions);
 
-    const delta = await loadChannelDelta(db, organizationId, ownerId, before);
+    const delta = await loadChannelDelta(db, workspaceId, ownerId, before);
     expect(delta.messages.some((message) => message.id === messageId)).toBe(
       true,
     );
@@ -4921,10 +4921,10 @@ describe("organization channels", () => {
     const rootId = "f0000000-0000-4000-8000-0000000000d1";
     const replyId = "f0000000-0000-4000-8000-0000000000d2";
     const attachmentId = "f0000000-0000-4000-8000-0000000000d3";
-    const objectKey = `channel-attachments/${organizationId}/${channelId}/${rootId}/${attachmentId}`;
+    const objectKey = `channel-attachments/${workspaceId}/${channelId}/${rootId}/${attachmentId}`;
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "deletion-thread",
@@ -4949,7 +4949,7 @@ describe("organization channels", () => {
       mentionedAgentIds: [],
       attachments: [{
         id: attachmentId,
-        organization_id: organizationId,
+        organization_id: workspaceId,
         object_key: objectKey,
         filename: "private.png",
         content_type: "image/png",
@@ -4992,10 +4992,10 @@ describe("organization channels", () => {
       at(62),
       at(62),
     ).run();
-    const beforeDelete = await getChannelSyncCursor(db, organizationId);
+    const beforeDelete = await getChannelSyncCursor(db, workspaceId);
 
     expect(await deleteChannelMessage(db, {
-      organizationId,
+      workspaceId,
       channelId,
       messageId: rootId,
       userId: outsiderId,
@@ -5006,7 +5006,7 @@ describe("organization channels", () => {
     );
 
     const deleted = await deleteChannelMessage(db, {
-      organizationId,
+      workspaceId,
       channelId,
       messageId: rootId,
       userId: ownerId,
@@ -5027,7 +5027,7 @@ describe("organization channels", () => {
     );
     expect(await getChannelMessageAttachment(
       db,
-      organizationId,
+      workspaceId,
       channelId,
       rootId,
       attachmentId,
@@ -5038,7 +5038,7 @@ describe("organization channels", () => {
 
     const delta = await loadChannelDelta(
       db,
-      organizationId,
+      workspaceId,
       outsiderId,
       beforeDelete,
     );
@@ -5053,7 +5053,7 @@ describe("organization channels", () => {
     });
 
     const repeated = await deleteChannelMessage(db, {
-      organizationId,
+      workspaceId,
       channelId,
       messageId: rootId,
       userId: ownerId,
@@ -5071,7 +5071,7 @@ describe("organization channels", () => {
     const standaloneId = "f0000000-0000-4000-8000-0000000000e3";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "deletion-hard",
@@ -5101,10 +5101,10 @@ describe("organization channels", () => {
         createdAt,
       });
     }
-    const beforeDelete = await getChannelSyncCursor(db, organizationId);
+    const beforeDelete = await getChannelSyncCursor(db, workspaceId);
 
     const replyDeletion = await deleteChannelMessage(db, {
-      organizationId,
+      workspaceId,
       channelId,
       messageId: replyId,
       userId: outsiderId,
@@ -5117,7 +5117,7 @@ describe("organization channels", () => {
     });
 
     const managerDeletion = await deleteChannelMessage(db, {
-      organizationId,
+      workspaceId,
       channelId,
       messageId: standaloneId,
       userId: ownerId,
@@ -5129,7 +5129,7 @@ describe("organization channels", () => {
       parentMessage: null,
     });
     expect((await deleteChannelMessage(db, {
-      organizationId,
+      workspaceId,
       channelId,
       messageId: standaloneId,
       userId: ownerId,
@@ -5138,7 +5138,7 @@ describe("organization channels", () => {
 
     const delta = await loadChannelDelta(
       db,
-      organizationId,
+      workspaceId,
       outsiderId,
       beforeDelete,
     );
@@ -5157,7 +5157,7 @@ describe("organization channels", () => {
     const messageId = "f0000000-0000-4000-8000-0000000000f1";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "deletion-route",
@@ -5189,9 +5189,9 @@ describe("organization channels", () => {
       GOOGLE_CLIENT_ID: "google-client-test",
       GOOGLE_CLIENT_SECRET: "google-secret-test",
     } as unknown as Env;
-    const remove = (userId: string) => deleteOrganizationChannelMessage({
+    const remove = (userId: string) => deleteWorkspaceChannelMessage({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       messageId,
       userId,

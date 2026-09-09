@@ -129,7 +129,7 @@ export const appChannelSummary = (row: ChannelRow) =>
 export const appChannelSidebarSection = (section: ChannelSidebarSection) =>
   create(ChannelSidebarSectionSchema, {
     id: section.id,
-    workspaceId: section.organizationId,
+    workspaceId: section.workspaceId,
     name: section.name,
     position: section.position,
     createdAt: requiredTimestamp(section.createdAt, "Sidebar section creation"),

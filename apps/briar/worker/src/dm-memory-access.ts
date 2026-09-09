@@ -3,7 +3,7 @@ import { HttpError } from "./http-response";
 // The caller derives these identities from an authenticated, live server claim.
 // Neither the model nor a request-supplied namespace is an authority.
 export type DmMemoryAccess = {
-  organizationId: string; channelId: string; ownerUserId: string;
+  workspaceId: string; channelId: string; ownerUserId: string;
   agentId: string; spaceId: string; revocationEpoch: number;
 };
 export type DmMemorySnapshot = { memory_revision: number; revocation_epoch: number; use_enabled: number };
@@ -30,7 +30,7 @@ export async function requireDmMemoryAccess(db: D1Database, access: DmMemoryAcce
     where space.id = ? and space.organization_id = ? and space.channel_id = ?
       and space.owner_user_id = ? and space.agent_id = ? and space.status = 'active'
       and space.use_enabled = 1 and space.revocation_epoch = ?`)
-    .bind(access.spaceId, access.organizationId, access.channelId, access.ownerUserId,
+    .bind(access.spaceId, access.workspaceId, access.channelId, access.ownerUserId,
       access.agentId, access.revocationEpoch).first<DmMemorySnapshot>();
   if (!space) throw new HttpError(409, "Memory permissions changed", "memory_scope_revoked");
   return space;

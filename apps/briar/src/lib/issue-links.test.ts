@@ -14,7 +14,7 @@ import {
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
 const sessionId = "33333333-3333-4333-8333-333333333333";
-const organizationId = "44444444-4444-4444-8444-444444444444";
+const workspaceId = "44444444-4444-4444-8444-444444444444";
 const channelId = "55555555-5555-4555-8555-555555555555";
 const messageId = "66666666-6666-4666-8666-666666666666";
 const rootMessageId = "77777777-7777-4777-8777-777777777777";
@@ -123,11 +123,11 @@ describe("issue links", () => {
     ).toEqual({ kind: "session", projectId, sessionId });
     expect(
       parseBriarLink(
-        `briar-companion://channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+        `briar-companion://channels/${workspaceId}/${channelId}/${messageId}?root=${rootMessageId}`,
       ),
     ).toEqual({
       kind: "channel",
-      organizationId,
+      workspaceId,
       channelId,
       messageId,
       rootMessageId,
@@ -137,67 +137,67 @@ describe("issue links", () => {
   it("builds and parses channel share and app deep links", () => {
     expect(
       channelShareUrl(
-        { organizationId, channelId },
+        { workspaceId, channelId },
         "https://briar-api.example/base",
       ),
     ).toBe(
-      `https://briar-api.example/open/channels/${organizationId}/${channelId}`,
+      `https://briar-api.example/open/channels/${workspaceId}/${channelId}`,
     );
     expect(
       parseChannelLink(
-        `https://briar-api.example/open/channels/${organizationId}/${channelId}`,
+        `https://briar-api.example/open/channels/${workspaceId}/${channelId}`,
         apiOrigin,
       ),
     ).toEqual({
-      organizationId,
+      workspaceId,
       channelId,
       messageId: null,
       rootMessageId: null,
     });
     expect(
       parseBriarLink(
-        `briar-companion://channels/${organizationId}/${channelId}`,
+        `briar-companion://channels/${workspaceId}/${channelId}`,
       ),
     ).toEqual({
       kind: "channel",
-      organizationId,
+      workspaceId,
       channelId,
       messageId: null,
       rootMessageId: null,
     });
     expect(
       channelShareUrl(
-        { organizationId, channelId, messageId },
+        { workspaceId, channelId, messageId },
         "https://briar-api.example/base",
       ),
     ).toBe(
-      `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}`,
+      `https://briar-api.example/open/channels/${workspaceId}/${channelId}/${messageId}`,
     );
     expect(
       channelShareUrl(
-        { organizationId, channelId, messageId, rootMessageId },
+        { workspaceId, channelId, messageId, rootMessageId },
         "https://briar-api.example/base",
       ),
     ).toBe(
-      `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+      `https://briar-api.example/open/channels/${workspaceId}/${channelId}/${messageId}?root=${rootMessageId}`,
     );
     expect(
       parseChannelLink(
-        `https://briar-api.example/open/channels/${organizationId}/${channelId}/${messageId}`,
+        `https://briar-api.example/open/channels/${workspaceId}/${channelId}/${messageId}`,
         apiOrigin,
       ),
     ).toEqual({
-      organizationId,
+      workspaceId,
       channelId,
       messageId,
       rootMessageId: messageId,
     });
     expect(
       parseChannelLink(
-        `briar-companion://channels/${organizationId}/${channelId}/${messageId}?root=${rootMessageId}`,
+        `briar-companion://channels/${workspaceId}/${channelId}/${messageId}?root=${rootMessageId}`,
       ),
     ).toEqual({
-      organizationId,
+      workspaceId,
       channelId,
       messageId,
       rootMessageId,

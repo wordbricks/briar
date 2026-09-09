@@ -34,7 +34,7 @@ import {
   issueAttachmentUploadConsumeStatements,
   resolveIssueAttachmentUploads,
 } from "./issue-attachment-upload-repository";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import {
   decodeExecutionPreferences,
   decodeIssueInput,
@@ -48,7 +48,7 @@ import {
   type IssueUpdateMutationReceiptResponse,
 } from "./issue-mutation-receipt-contract";
 import { sha256 } from "./crypto-digest";
-import { listProjectMembers } from "./organization-repository";
+import { listProjectMembers } from "./workspace-repository";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
 import { decodeIssueCheckpointsInput } from "./run-request-contract";
 import type {
@@ -113,13 +113,13 @@ type IssueCoreApplicationInput = {
 
 async function requireIssueProject(
   input: IssueCoreApplicationInput,
-  capability: "issues:execute" | "issues:write" | "organization:read" |
+  capability: "issues:execute" | "issues:write" | "workspace:read" |
     "results:review",
   deniedMessage: string,
 ) {
   const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
-  if (!hasOrganizationCapability(project.member_role, capability)) {
+  if (!hasWorkspaceCapability(project.member_role, capability)) {
     throw new HttpError(403, deniedMessage);
   }
   return project;
@@ -173,7 +173,7 @@ export async function createProjectIssue(
   const attachmentIds = validateAttachmentReferences(input.attachmentIds);
   const requestHash = await sha256(JSON.stringify({
     projectId: project.id,
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     userId: input.userId,
     clientIssueId: input.clientIssueId,
     planningProjectId: planningProject?.id ?? null,
@@ -233,7 +233,7 @@ export async function createProjectIssue(
   const observedAt = new Date().toISOString();
   const uploads = await resolveIssueAttachmentUploads(input.db, {
     purpose: "issue_create",
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     projectId: project.id,
     userId: input.userId,
     mutationId: input.clientIssueId,
@@ -336,7 +336,7 @@ export async function createProjectIssue(
           : []),
         issueCreateMutationReceiptStatement(input.db, {
           clientIssueId: input.clientIssueId,
-          organizationId: project.organization_id,
+          workspaceId: project.organization_id,
           projectId: project.id,
           userId: input.userId,
           requestHash,
@@ -346,7 +346,7 @@ export async function createProjectIssue(
         }),
         ...issueAttachmentUploadConsumeStatements(input.db, {
           purpose: "issue_create",
-          organizationId: project.organization_id,
+          workspaceId: project.organization_id,
           projectId: project.id,
           userId: input.userId,
           mutationId: input.clientIssueId,
@@ -418,7 +418,7 @@ export async function updateProjectIssue(
   }
   const requestHash = await sha256(JSON.stringify({
     projectId: project.id,
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     runId: input.runId,
     userId: input.userId,
     requestId: input.requestId,
@@ -482,7 +482,7 @@ export async function updateProjectIssue(
   ).toISOString();
   const uploads = await resolveIssueAttachmentUploads(input.db, {
     purpose: "issue_update",
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     projectId: project.id,
     userId: input.userId,
     mutationId: input.requestId,
@@ -522,7 +522,7 @@ export async function updateProjectIssue(
     (attachment) => !new Set(selectedKeptIds).has(attachment.id),
   );
   const statements = updateIssueMutationStatements(input.db, {
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     projectId: project.id,
     runId: input.runId,
     userId: input.userId,
@@ -551,7 +551,7 @@ export async function updateProjectIssue(
       statements.receipt,
       ...issueAttachmentUploadConsumeStatements(input.db, {
         purpose: "issue_update",
-        organizationId: project.organization_id,
+        workspaceId: project.organization_id,
         projectId: project.id,
         userId: input.userId,
         mutationId: input.requestId,
@@ -583,7 +583,7 @@ export async function updateProjectIssue(
         listIssueAttachments(input.db, project.id, input.runId),
         resolveIssueAttachmentUploads(input.db, {
           purpose: "issue_update",
-          organizationId: project.organization_id,
+          workspaceId: project.organization_id,
           projectId: project.id,
           userId: input.userId,
           mutationId: input.requestId,
@@ -668,7 +668,7 @@ export async function setProjectIssueSubscription(
 ) {
   const project = await requireIssueProject(
     input,
-    "organization:read",
+    "workspace:read",
     "Project reading permission required",
   );
   const run = await getHuntRunForProject(input.db, project.id, input.runId);

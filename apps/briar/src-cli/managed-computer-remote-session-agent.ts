@@ -25,7 +25,7 @@ const RemoteAgentConfig = Schema.Struct({
   deviceId: Schema.String.check(
     Schema.isPattern(/^managed-[0-9a-f-]{36}$/u),
   ),
-  organizationId: Schema.String.check(
+  workspaceId: Schema.String.check(
     Schema.isPattern(/^[0-9a-f-]{36}$/u),
   ),
   managedComputerId: Schema.String.check(

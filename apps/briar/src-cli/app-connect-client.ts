@@ -51,7 +51,7 @@ export async function fetchProjects(
 export async function fetchManagedComputer(
   apiUrl: string,
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
 ) {
   const response = await createAuthenticatedConnectClient(
@@ -59,7 +59,7 @@ export async function fetchManagedComputer(
     apiUrl,
     token,
   ).getManagedComputer(
-    { workspaceId: organizationId, managedComputerId },
+    { workspaceId: workspaceId, managedComputerId },
   );
   return managedComputerFromProto(
     requiredMessage(response.computer, "managedComputer"),
@@ -69,7 +69,7 @@ export async function fetchManagedComputer(
 export async function createManagedComputerSetupSession(
   apiUrl: string,
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
   projectId: string,
   requestId: string,
@@ -79,7 +79,7 @@ export async function createManagedComputerSetupSession(
     apiUrl,
     token,
   ).createManagedComputerSetupSession(
-    { workspaceId: organizationId, managedComputerId, projectId, requestId },
+    { workspaceId: workspaceId, managedComputerId, projectId, requestId },
   );
   return managedComputerSetupSessionTicketFromProto(response);
 }
@@ -87,7 +87,7 @@ export async function createManagedComputerSetupSession(
 export async function fetchManagedComputerSetupStatus(
   apiUrl: string,
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
 ) {
   const response = await createAuthenticatedConnectClient(
@@ -95,7 +95,7 @@ export async function fetchManagedComputerSetupStatus(
     apiUrl,
     token,
   ).getManagedComputerSetupStatus(
-    { workspaceId: organizationId, managedComputerId },
+    { workspaceId: workspaceId, managedComputerId },
   );
   return managedComputerSetupStatusFromProto(response);
 }

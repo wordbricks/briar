@@ -51,7 +51,7 @@ export interface SidebarDirectMessageActions {
   onCreateSection?: (name: string) => Promise<ChannelSidebarSection>;
   onDelete?: (channelId: string) => Promise<void>;
   onDeleteSection?: (sectionId: string) => Promise<void>;
-  /** Opens organization settings on this Agent's editor. */
+  /** Opens workspace settings on this Agent's editor. */
   onEditAgentProfile?: (agentId: string) => void;
   onMarkRead?: (channelId: string) => void;
   onMarkUnread?: (channelId: string) => Promise<void>;

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { RegistryContext } from "@effect/atom-react";
 import { createTestRegistry } from "../state/registry";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import { tokenAtom } from "../state/session/atoms";
 import * as api from "../lib/api";
 import type { ChannelSummary } from "../lib/channels-contract";
@@ -55,7 +55,7 @@ describe("DirectMessages", () => {
           isSidebarOpen
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>
@@ -95,7 +95,7 @@ describe("DirectMessages", () => {
           isSidebarOpen={false}
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>
@@ -223,7 +223,7 @@ describe("DirectMessageConversationPane", () => {
       <RegistryContext.Provider
         value={createTestRegistry([
           [tokenAtom, "token"],
-          [activeOrganizationIdAtom, "org-1"],
+          [activeWorkspaceIdAtom, "org-1"],
         ])}
       >
         <I18nProvider>
@@ -236,7 +236,7 @@ describe("DirectMessageConversationPane", () => {
             isSidebarOpen
             onChannelSelect={() => undefined}
             onChannelsChange={(value) => catalogWrites.push(value)}
-            organizationId="org-1"
+            workspaceId="org-1"
             token="token"
           />
         </I18nProvider>
@@ -271,7 +271,7 @@ describe("DirectMessageConversationPane", () => {
 describe("DirectMessages, opening an Agent conversation", () => {
   const originDirectMessage: ChannelSummary = {
     id: "channel-1",
-    organizationId: "org-1",
+    workspaceId: "org-1",
     slug: "channel-1",
     name: "Ava",
     topic: null,
@@ -400,7 +400,7 @@ describe("DirectMessages, opening an Agent conversation", () => {
           isSidebarOpen
           onChannelSelect={selectChannel}
           onChannelsChange={replaceCatalog}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       );
@@ -411,7 +411,7 @@ describe("DirectMessages, opening an Agent conversation", () => {
       <RegistryContext.Provider
         value={createTestRegistry([
           [tokenAtom, "token"],
-          [activeOrganizationIdAtom, "org-1"],
+          [activeWorkspaceIdAtom, "org-1"],
         ])}
       >
         <I18nProvider>
@@ -480,7 +480,7 @@ describe("DirectMessages, opening an Agent conversation", () => {
       <RegistryContext.Provider
         value={createTestRegistry([
           [tokenAtom, "token"],
-          [activeOrganizationIdAtom, "org-1"],
+          [activeWorkspaceIdAtom, "org-1"],
         ])}
       >
         <I18nProvider>
@@ -492,7 +492,7 @@ describe("DirectMessages, opening an Agent conversation", () => {
             isSidebarOpen
             onChannelSelect={(channelId) => selections.push(channelId)}
             onChannelsChange={() => undefined}
-            organizationId="org-1"
+            workspaceId="org-1"
             token="token"
           />
         </I18nProvider>

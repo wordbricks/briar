@@ -30,13 +30,13 @@ import type { ChannelSummary } from "./channels-contract";
 import { directMessageDisplayName } from "./direct-messages";
 import { formatIssueKey } from "./issue-key";
 import type { NavigationHistoryRunLabel } from "../state/navigation/atoms";
-import type { Organization, Project } from "../types";
+import type { Workspace, Project } from "../types";
 
 /*
   Turning navigation history entries into the labels the window controls show.
 
   A location is only ids, so every row has to be resolved against the teams,
-  organizations, channels and the runs the visit stack points at — which is why
+  workspaces, channels and the runs the visit stack points at — which is why
   this was a 200 line `useMemo` in the app shell. It is pure, so it lives here
   with the other navigation helpers and is tested directly.
 */
@@ -45,7 +45,7 @@ export interface NavigationHistoryItemsInput {
   /** The history entries, oldest first. */
   readonly entries: readonly AppNavigationLocation[];
   readonly teams: readonly Project[];
-  readonly organizations: readonly Organization[];
+  readonly workspaces: readonly Workspace[];
   readonly channels: readonly ChannelSummary[];
   /** Issue key and title per visited run, keyed by run id. */
   readonly runLabels: ReadonlyMap<string, NavigationHistoryRunLabel>;
@@ -56,7 +56,7 @@ export interface NavigationHistoryItemsInput {
 export function buildNavigationHistoryItems({
   entries,
   teams,
-  organizations,
+  workspaces,
   channels,
   runLabels,
   currentUserId,
@@ -69,7 +69,7 @@ export function buildNavigationHistoryItems({
     inbox: t("sidebar.inbox"),
     "my-issues": t("sidebar.myIssues"),
     projects: t("projects.title"),
-    "organization-create": t("sidebar.addOrganization"),
+    "workspace-create": t("sidebar.addWorkspace"),
     issues: t("sidebar.issues"),
     lobby: t("lobby.eyebrow"),
     schedule: t("sidebar.schedule"),
@@ -81,11 +81,11 @@ export function buildNavigationHistoryItems({
     ),
   );
   const organizationSettingLabels = {
-    agents: t("organization.agents"),
-    general: t("organization.general"),
-    integrations: t("organization.integrations"),
-    members: t("organization.membersAndInvites"),
-    workers: t("organization.workers"),
+    agents: t("workspace.agents"),
+    general: t("workspace.general"),
+    integrations: t("workspace.integrations"),
+    members: t("workspace.membersAndInvites"),
+    workers: t("workspace.workers"),
   };
   const projectSettingLabels = {
     "agent-configuration": t("settings.navAgent"),
@@ -106,7 +106,7 @@ export function buildNavigationHistoryItems({
     if (page === "projects") return <FolderKanban aria-hidden="true" size={16} />;
     if (page === "channels") return <Hash aria-hidden="true" size={16} />;
     if (page === "dms") return <MessageCircle aria-hidden="true" size={16} />;
-    if (page === "organization-create") {
+    if (page === "workspace-create") {
       return <Building2 aria-hidden="true" size={16} />;
     }
     return <Settings aria-hidden="true" size={16} />;
@@ -123,9 +123,9 @@ export function buildNavigationHistoryItems({
     const project = projectId
       ? teams.find((candidate) => candidate.id === projectId)
       : undefined;
-    const organizationId = organizationIdFromNavigationLocation(location);
-    const organization = organizationId
-      ? organizations.find((candidate) => candidate.id === organizationId)
+    const workspaceId = organizationIdFromNavigationLocation(location);
+    const workspace = workspaceId
+      ? workspaces.find((candidate) => candidate.id === workspaceId)
       : undefined;
     const runId = runIdFromNavigationLocation(location);
     if (runId) {
@@ -152,7 +152,7 @@ export function buildNavigationHistoryItems({
           ? t("sidebar.dms")
           : t("sidebar.channels");
       return createItem(index, location, {
-        context: organization?.name ?? null,
+        context: workspace?.name ?? null,
         eyebrow: isDirectMessage
           ? t("sidebar.dms")
           : channel
@@ -170,12 +170,12 @@ export function buildNavigationHistoryItems({
       const sectionLabel = settingsTarget.scope === "application"
         ? applicationSettingLabels.get(settingsTarget.section) ??
           t("account.settings")
-        : settingsTarget.scope === "organization"
+        : settingsTarget.scope === "workspace"
           ? organizationSettingLabels[settingsTarget.section]
           : projectSettingLabels[settingsTarget.section];
-      const settingsOwner = settingsTarget.scope === "organization"
-        ? organizations.find(
-            (candidate) => candidate.id === settingsTarget.organizationId,
+      const settingsOwner = settingsTarget.scope === "workspace"
+        ? workspaces.find(
+            (candidate) => candidate.id === settingsTarget.workspaceId,
           )?.name
         : settingsTarget.scope === "project"
           ? teams.find(
@@ -185,11 +185,11 @@ export function buildNavigationHistoryItems({
       return createItem(index, location, {
         context: settingsTarget.scope === "application"
           ? null
-          : settingsTarget.scope === "organization"
-            ? t("organization.settingsLabel")
+          : settingsTarget.scope === "workspace"
+            ? t("workspace.settingsLabel")
             : t("sidebar.projectSettings"),
         eyebrow: settingsOwner ?? t("account.settings"),
-        icon: settingsTarget.scope === "organization"
+        icon: settingsTarget.scope === "workspace"
           ? <Building2 aria-hidden="true" size={16} />
           : <Settings aria-hidden="true" size={16} />,
         label: sectionLabel,
@@ -199,16 +199,16 @@ export function buildNavigationHistoryItems({
     if (page === "inbox" || page === "my-issues") {
       return createItem(index, location, {
         context: null,
-        eyebrow: organization?.name ?? t("sidebar.myIssues"),
+        eyebrow: workspace?.name ?? t("sidebar.myIssues"),
         icon: pageIcon(page),
         label: pageLabels[page],
       });
     }
 
-    if (page === "organization-create") {
+    if (page === "workspace-create") {
       return createItem(index, location, {
         context: null,
-        eyebrow: t("sidebar.organizationSettings"),
+        eyebrow: t("sidebar.workspaceSettings"),
         icon: pageIcon(page),
         label: pageLabels[page],
       });
@@ -226,7 +226,7 @@ export function buildNavigationHistoryItems({
     if (page === "channels" || page === "dms") {
       return createItem(index, location, {
         context: project?.name ?? null,
-        eyebrow: organization?.name ?? t("navigation.history"),
+        eyebrow: workspace?.name ?? t("navigation.history"),
         icon: pageIcon(page),
         label: pageLabels[page],
       });

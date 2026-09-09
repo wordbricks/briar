@@ -84,13 +84,13 @@ export function ManagedComputerRemoteDesktop({
   agentId,
   computer,
   onClose,
-  organizationId,
+  workspaceId,
   token,
 }: {
   agentId?: string;
   computer: ManagedComputer;
   onClose: () => void;
-  organizationId: string;
+  workspaceId: string;
   token: string;
 }) {
   const { t } = useI18n();
@@ -133,7 +133,7 @@ export function ManagedComputerRemoteDesktop({
         window.sessionStorage.getItem(storageKey) ?? undefined;
       const ticket = await createManagedComputerRemoteSession(
         token,
-        organizationId,
+        workspaceId,
         computer.id,
         {
           requestId: crypto.randomUUID(),
@@ -144,7 +144,7 @@ export function ManagedComputerRemoteDesktop({
       if (generation !== generationRef.current || !targetRef.current) {
         void endManagedComputerRemoteSession(
           token,
-          organizationId,
+          workspaceId,
           computer.id,
           ticket.session.id,
         ).catch(() => undefined);
@@ -194,7 +194,7 @@ export function ManagedComputerRemoteDesktop({
             : String(caught),
       );
     }
-  }, [agentId, clipboardController, computer.id, destroyRfb, organizationId, storageKey, t, token]);
+  }, [agentId, clipboardController, computer.id, destroyRfb, workspaceId, storageKey, t, token]);
 
   const endAndClose = useCallback(async () => {
     if (endingRef.current) return;
@@ -210,7 +210,7 @@ export function ManagedComputerRemoteDesktop({
       try {
         await endManagedComputerRemoteSession(
           token,
-          organizationId,
+          workspaceId,
           computer.id,
           sessionId,
         );
@@ -220,7 +220,7 @@ export function ManagedComputerRemoteDesktop({
       }
     }
     onClose();
-  }, [computer.id, destroyRfb, onClose, organizationId, storageKey, token]);
+  }, [computer.id, destroyRfb, onClose, workspaceId, storageKey, token]);
 
   useEffect(() => {
     setRemoteDesktopKeyboardCapture(true);
@@ -237,14 +237,14 @@ export function ManagedComputerRemoteDesktop({
         if (sessionId) {
           void endManagedComputerRemoteSession(
             token,
-            organizationId,
+            workspaceId,
             computer.id,
             sessionId,
           ).catch(() => undefined);
         }
       }
     };
-  }, [computer.id, connect, destroyRfb, organizationId, storageKey, token]);
+  }, [computer.id, connect, destroyRfb, workspaceId, storageKey, token]);
 
   useEffect(() => {
     const onFullscreenChange = () => setFullscreen(Boolean(document.fullscreenElement));

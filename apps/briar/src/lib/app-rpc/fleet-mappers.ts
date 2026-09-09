@@ -29,7 +29,7 @@ import {
   type ManagedComputerRemoteSession as ManagedComputerRemoteSessionMessage,
   type ManagedComputerSetupSession as ManagedComputerSetupSessionMessage,
   type ManagedComputerSetupStatusSession,
-  type WorkspaceExecutionWorker as OrganizationExecutionWorkerMessage,
+  type WorkspaceExecutionWorker as WorkspaceExecutionWorkerMessage,
   type RequestExecutionWorkerUpdateResponse,
   type RetryManagedComputerResponse,
   type RetireManagedComputerResponse,
@@ -51,7 +51,7 @@ import type {
   ManagedComputerRemoteSessionTicket,
   ManagedComputerSetupSessionTicket,
   ManagedComputerState,
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
   WorkerIcon,
 } from "../../types";
 import {
@@ -226,7 +226,7 @@ export const dashboardWorkerFromProto = (
 
 const workerUpdateStatusFromProto = (
   value: ExecutionWorkerUpdateStatus,
-): NonNullable<OrganizationExecutionWorker["updateRequest"]>["status"] => {
+): NonNullable<WorkspaceExecutionWorker["updateRequest"]>["status"] => {
   switch (value) {
     case ExecutionWorkerUpdateStatus.REQUESTED:
       return "requested";
@@ -244,7 +244,7 @@ const workerUpdateStatusFromProto = (
 const workerHandoffStateFromProto = (
   value: ExecutionWorkerHandoffState,
 ): NonNullable<
-  OrganizationExecutionWorker["updateRequest"]
+  WorkspaceExecutionWorker["updateRequest"]
 >["handoffState"] => {
   switch (value) {
     case ExecutionWorkerHandoffState.IDLE:
@@ -263,8 +263,8 @@ const workerHandoffStateFromProto = (
 };
 
 export const organizationExecutionWorkerFromProto = (
-  worker: OrganizationExecutionWorkerMessage,
-): OrganizationExecutionWorker => ({
+  worker: WorkspaceExecutionWorkerMessage,
+): WorkspaceExecutionWorker => ({
   deviceId: worker.deviceId,
   ownerUserId: worker.ownerUserId,
   ownerName: worker.ownerName,
@@ -275,11 +275,11 @@ export const organizationExecutionWorkerFromProto = (
   activeSessions: worker.activeSessions,
   lastHeartbeatAt: requiredTimestamp(
     worker.lastHeartbeatAt,
-    "organizationExecutionWorker.lastHeartbeatAt",
+    "workspaceExecutionWorker.lastHeartbeatAt",
   ),
   createdAt: requiredTimestamp(
     worker.createdAt,
-    "organizationExecutionWorker.createdAt",
+    "workspaceExecutionWorker.createdAt",
   ),
   versions: { ...worker.versions },
   remoteUpdateSupported: worker.remoteUpdateSupported,
@@ -292,7 +292,7 @@ export const organizationExecutionWorkerFromProto = (
           status: workerUpdateStatusFromProto(worker.updateRequest.status),
           requestedAt: requiredTimestamp(
             worker.updateRequest.requestedAt,
-            "organizationExecutionWorker.updateRequest.requestedAt",
+            "workspaceExecutionWorker.updateRequest.requestedAt",
           ),
           handoffState: workerHandoffStateFromProto(
             worker.updateRequest.handoffState,
@@ -357,7 +357,7 @@ export const managedComputerFromProto = (
   computer: ManagedComputerMessage,
 ): ManagedComputer => ({
   id: computer.id,
-  organizationId: computer.workspaceId,
+  workspaceId: computer.workspaceId,
   requesterUserId: computer.requesterUserId,
   state: managedComputerStateFromProto(computer.state),
   provider: computer.provider === ProtoManagedComputerProvider.SANDBOX ? "sandbox" : "aws",
@@ -463,14 +463,14 @@ export const managedComputerProductFromProto = (
 
 export const promotionLimitReasonFromProto = (
   value: ManagedComputerPromotionLimitReason | undefined,
-): "user" | "organization" | "fleet" | null => {
+): "user" | "workspace" | "fleet" | null => {
   switch (value) {
     case undefined:
       return null;
     case ManagedComputerPromotionLimitReason.USER:
       return "user";
     case ManagedComputerPromotionLimitReason.WORKSPACE:
-      return "organization";
+      return "workspace";
     case ManagedComputerPromotionLimitReason.FLEET:
       return "fleet";
     case ManagedComputerPromotionLimitReason.UNSPECIFIED:
@@ -600,7 +600,7 @@ const managedComputerSetupSessionFromProto = (
   return {
     id: session.id,
     managedComputerId: session.managedComputerId,
-    organizationId: session.workspaceId,
+    workspaceId: session.workspaceId,
     teamId: session.projectId,
     status,
     expiresAt: requiredTimestamp(

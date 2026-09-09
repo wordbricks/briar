@@ -88,7 +88,7 @@ export async function claimNextQueueWork(input: {
     }
     if (run && authenticatedWorker) {
       await auditExecutionEvent(db, {
-        organizationId: authenticatedWorker.principal.organizationId,
+        workspaceId: authenticatedWorker.principal.workspaceId,
         projectId,
         runId: run.id,
         workerId: authenticatedWorker.binding.id,

@@ -25,7 +25,7 @@ import {
   appManagedComputerSetupSession,
   appManagedComputerSetupStatusSession,
   appManagedComputerSocketTicket,
-  appOrganizationExecutionWorker,
+  appWorkspaceExecutionWorker,
 } from "./app-connect-fleet-mappers";
 import { appDashboardWorker } from "./app-connect-mappers";
 import {
@@ -222,7 +222,7 @@ export const createAppFleetService = (
     );
     context.responseHeader.set("Cache-Control", "no-store");
     return {
-      workspaceId: result.organizationId,
+      workspaceId: result.workspaceId,
       deviceId: result.device.id,
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),
       workerToken: result.workerToken,
@@ -241,7 +241,7 @@ export const createAppFleetService = (
       observedAt,
     }));
     return {
-      workspaceId: result.organizationId,
+      workspaceId: result.workspaceId,
       deviceId: result.device.id,
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),
     };
@@ -266,12 +266,12 @@ export const createAppFleetService = (
     const result = await withFleetErrors(listExecutionWorkersApplication({
       db,
       releases: env.RELEASES,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
     }));
     return {
-      workers: result.workers.map(appOrganizationExecutionWorker),
+      workers: result.workers.map(appWorkspaceExecutionWorker),
       latestVersion: result.latestVersion ?? undefined,
       canManage: result.canManage,
       generatedAt: appFleetTimestamp(result.generatedAt),
@@ -284,7 +284,7 @@ export const createAppFleetService = (
       requestExecutionWorkerUpdateApplication({
         db,
         releases: env.RELEASES,
-        organizationId: decodeUuid(input.workspaceId),
+        workspaceId: decodeUuid(input.workspaceId),
         deviceId: decodeDeviceId(input.deviceId),
         userId: session.user.id,
         observedAt: new Date().toISOString(),
@@ -312,7 +312,7 @@ export const createAppFleetService = (
     });
     const worker = await withFleetErrors(updateExecutionWorkerApplication({
       db,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       deviceId: decodeDeviceId(input.deviceId),
       userId: session.user.id,
       update,
@@ -334,7 +334,7 @@ export const createAppFleetService = (
     return await withFleetErrors(deleteExecutionWorkerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       deviceId: decodeDeviceId(input.deviceId),
       userId: session.user.id,
       requestId: decodeWorkerLifecycleRequestId(input.requestId),
@@ -347,7 +347,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(getManagedComputerProductApplication({
       db,
       env,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       userId: session.user.id,
     }));
     return {
@@ -365,7 +365,7 @@ export const createAppFleetService = (
     const session = await requireSession(auth, request);
     const result = await withFleetErrors(listManagedComputersApplication({
       db,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
     }));
@@ -383,7 +383,7 @@ export const createAppFleetService = (
     }
     const result = await withFleetErrors(registerSandboxComputerApplication({
       db,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       deviceId: decodeWorkerDeviceId(input.deviceId),
       label,
       userId: session.user.id,
@@ -398,7 +398,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(unregisterSandboxComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       deviceId: decodeWorkerDeviceId(input.deviceId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
@@ -410,7 +410,7 @@ export const createAppFleetService = (
     const session = await requireSession(auth, request);
     const computer = await withFleetErrors(getManagedComputerApplication({
       db,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       managedComputerId: decodeUuid(input.managedComputerId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
@@ -427,7 +427,7 @@ export const createAppFleetService = (
       validateManagedComputerPromotionApplication({
         db,
         env,
-        organizationId: decodeUuid(input.workspaceId),
+        workspaceId: decodeUuid(input.workspaceId),
         userId: session.user.id,
         code: decoded.code,
         observedAt: new Date().toISOString(),
@@ -452,7 +452,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(applyForManagedComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       userId: session.user.id,
       ...decoded,
       observedAt: new Date().toISOString(),
@@ -470,7 +470,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(retryManagedComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       managedComputerId: decodeUuid(input.managedComputerId),
       userId: session.user.id,
       requestId: decoded.requestId,
@@ -487,7 +487,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(retireManagedComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       managedComputerId: decodeUuid(input.managedComputerId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
@@ -507,7 +507,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(terminateManagedComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.workspaceId),
+      workspaceId: decodeUuid(input.workspaceId),
       managedComputerId: decodeUuid(input.managedComputerId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
@@ -529,7 +529,7 @@ export const createAppFleetService = (
       createManagedComputerRemoteSessionApplication({
         db,
         env,
-        organizationId: decodeUuid(input.workspaceId),
+        workspaceId: decodeUuid(input.workspaceId),
         managedComputerId: decodeUuid(input.managedComputerId),
         userId: session.user.id,
         ...decoded,
@@ -552,7 +552,7 @@ export const createAppFleetService = (
       endManagedComputerRemoteSessionApplication({
         db,
         env,
-        organizationId: decodeUuid(input.workspaceId),
+        workspaceId: decodeUuid(input.workspaceId),
         managedComputerId: decodeUuid(input.managedComputerId),
         remoteSessionId: decodeUuid(input.remoteSessionId),
         userId: session.user.id,
@@ -573,7 +573,7 @@ export const createAppFleetService = (
       createManagedComputerSetupSessionApplication({
         db,
         env,
-        organizationId: decodeUuid(input.workspaceId),
+        workspaceId: decodeUuid(input.workspaceId),
         managedComputerId: decodeUuid(input.managedComputerId),
         userId: session.user.id,
         ...decoded,
@@ -595,7 +595,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(
       getManagedComputerSetupStatusApplication({
         db,
-        organizationId: decodeUuid(input.workspaceId),
+        workspaceId: decodeUuid(input.workspaceId),
         managedComputerId: decodeUuid(input.managedComputerId),
         userId: session.user.id,
         observedAt: new Date().toISOString(),

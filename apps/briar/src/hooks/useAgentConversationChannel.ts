@@ -29,7 +29,7 @@ export function useAgentConversationChannel({
   channelId,
   channels,
   enabled,
-  organizationId,
+  workspaceId,
   token,
 }: {
   channelId: string | null;
@@ -37,14 +37,14 @@ export function useAgentConversationChannel({
   channels: readonly ChannelSummary[];
   /** False while the catalog is still loading, since it may yet hold the id. */
   enabled: boolean;
-  organizationId: string;
+  workspaceId: string;
   token: string;
 }): AgentConversationChannelState {
   const registry = useRegistry();
   const known = channelId !== null &&
     channels.some((channel) => channel.id === channelId);
   const wanted = enabled && channelId !== null && !known &&
-    Boolean(token) && Boolean(organizationId);
+    Boolean(token) && Boolean(workspaceId);
   /*
     The answer, with the id it answers for.
 
@@ -74,7 +74,7 @@ export function useAgentConversationChannel({
       the latest conversation.
     */
     claimOpenAgentConversation(registry, channelId);
-    void loadChannel(token, organizationId, channelId, { messageLimit: 1 })
+    void loadChannel(token, workspaceId, channelId, { messageLimit: 1 })
       .then((result) => {
         if (cancelled) return;
         const held = result.channel.readOnly ? result.channel : null;
@@ -91,7 +91,7 @@ export function useAgentConversationChannel({
     return () => {
       cancelled = true;
     };
-  }, [channelId, organizationId, registry, token, wanted]);
+  }, [channelId, workspaceId, registry, token, wanted]);
 
   useEffect(() => () => {
     claimOpenAgentConversation(registry, null);
@@ -148,7 +148,7 @@ export function useAgentConversationSurface({
   enabled,
   onChannelSelect,
   onNavigateBack,
-  organizationId,
+  workspaceId,
   token,
 }: {
   activeChannelId: string | null;
@@ -159,7 +159,7 @@ export function useAgentConversationSurface({
   onChannelSelect: (channelId: string) => void;
   /** Where back goes when the reader did not arrive through a relay row. */
   onNavigateBack: () => void;
-  organizationId: string;
+  workspaceId: string;
   token: string;
 }): AgentConversationSurface {
   const registry = useRegistry();
@@ -167,7 +167,7 @@ export function useAgentConversationSurface({
     channelId: activeChannelId,
     channels,
     enabled,
-    organizationId,
+    workspaceId,
     token,
   });
   const [relayTarget, setRelayTarget] = useState<RelayTarget | null>(null);

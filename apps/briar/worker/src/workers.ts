@@ -124,7 +124,7 @@ export type ProjectExecutionWorkerPolicy = {
   updatedAt: string | null;
 };
 
-export type OrganizationExecutionWorker = {
+export type WorkspaceExecutionWorker = {
   deviceId: string;
   ownerUserId: string;
   ownerName: string;
@@ -239,7 +239,7 @@ export async function requestExecutionWorkerUpdate(
   db: D1Database,
   input: {
     id: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     requestedByUserId: string;
     targetVersion: string;
@@ -272,7 +272,7 @@ export async function requestExecutionWorkerUpdate(
     )
     .bind(
       input.id,
-      input.organizationId,
+      input.workspaceId,
       input.deviceId,
       input.requestedByUserId,
       input.targetVersion,
@@ -406,7 +406,7 @@ export async function completeExecutionWorkerUpdates(
     if (device) {
       await recordPreservedWorkerBinding(db, {
         requestId: `worker-update:${pending.id}`,
-        organizationId: device.organization_id,
+        workspaceId: device.organization_id,
         projectId: null,
         deviceId,
         workerId: null,
@@ -433,7 +433,7 @@ export async function handoffExecutionWorkerClaim(
   db: D1Database,
   input: {
     requestId: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     projectId: string;
     workerId: string;
@@ -448,7 +448,7 @@ export async function handoffExecutionWorkerClaim(
   if (!(await executionWorkerUpdateIsReady(db, {
     requestId: input.requestId,
     deviceId: input.deviceId,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
   }))) {
     return { outcome: "not_ready" as const, activeWorkCount: 0 };
   }
@@ -530,7 +530,7 @@ export async function handoffExecutionWorkerClaim(
         ).bind(
           input.observedAt,
           input.workId,
-          input.organizationId,
+          input.workspaceId,
           input.projectId,
           input.deviceId,
           input.workerId,
@@ -565,7 +565,7 @@ export async function handoffExecutionWorkerClaim(
     .bind(
       crypto.randomUUID(),
       input.requestId,
-      input.organizationId,
+      input.workspaceId,
       input.deviceId,
       input.projectId,
       input.workerId,
@@ -629,7 +629,7 @@ export async function failExecutionWorkerUpdateHandoff(
   db: D1Database,
   input: {
     requestId: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     projectId: string;
     workerId: string;
@@ -656,7 +656,7 @@ export async function failExecutionWorkerUpdateHandoff(
         input.observedAt,
         input.requestId,
         input.deviceId,
-        input.organizationId,
+        input.workspaceId,
       ),
     db
       .prepare(
@@ -684,7 +684,7 @@ export async function failExecutionWorkerUpdateHandoff(
       .bind(
         crypto.randomUUID(),
         input.requestId,
-        input.organizationId,
+        input.workspaceId,
         input.deviceId,
         input.projectId,
         input.workerId,
@@ -703,7 +703,7 @@ export async function failExecutionWorkerUpdate(
   db: D1Database,
   input: {
     requestId: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     error: string;
     observedAt: string;
@@ -724,7 +724,7 @@ export async function failExecutionWorkerUpdate(
         input.observedAt,
         input.requestId,
         input.deviceId,
-        input.organizationId,
+        input.workspaceId,
       ),
     db
       .prepare(
@@ -744,7 +744,7 @@ export async function failExecutionWorkerUpdate(
 
 export type ExecutionWorkerCredentialPrincipal = {
   deviceId: string;
-  organizationId: string;
+  workspaceId: string;
   ownerUserId: string;
 };
 
@@ -863,7 +863,7 @@ export function projectExecutionWorkerCapabilityCatalog(
 /**
  * Channel mentions route to a live Worker or wait for its planned update.
  * Project Agents require an exact project
- * binding; Organization Agents may use any live binding in the organization.
+ * binding; Workspace Agents may use any live binding in the workspace.
  */
 export type ChannelReplyWorkerAvailability =
   | "available"
@@ -873,7 +873,7 @@ export type ChannelReplyWorkerAvailability =
 export async function channelReplyWorkerAvailability(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     projectId: string | null;
     preferredDeviceId?: string | null;
     preferredWorkerId?: string | null;
@@ -924,7 +924,7 @@ export async function channelReplyWorkerAvailability(
          )`,
     )
     .bind(
-      input.organizationId,
+      input.workspaceId,
       input.projectId,
       input.projectId,
       input.preferredDeviceId ?? null,
@@ -1026,7 +1026,7 @@ export async function isDeviceInPlannedUpdateWindow(
 export async function getProjectDesignatedWorker(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     workerId: string;
     provider: AgentProvider;
@@ -1046,7 +1046,7 @@ export async function getProjectDesignatedWorker(
   ).bind(
     input.workerId,
     input.projectId,
-    input.organizationId,
+    input.workspaceId,
   ).first<{ id: string; device_id: string; label: string }>();
   if (!worker) return null;
   return {
@@ -1054,7 +1054,7 @@ export async function getProjectDesignatedWorker(
     deviceId: worker.device_id,
     label: worker.label,
     availability: await channelReplyWorkerAvailability(db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       projectId: input.projectId,
       preferredDeviceId: worker.device_id,
       preferredWorkerId: worker.id,
@@ -1068,12 +1068,12 @@ export async function getProjectDesignatedWorker(
 
 export async function userOwnsExecutionWorkerDevice(
   db: D1Database,
-  input: { organizationId: string; userId: string; deviceId: string },
+  input: { workspaceId: string; userId: string; deviceId: string },
 ) {
   const row = await db.prepare(
     `select 1 as present from briar_execution_worker_devices
      where id = ? and organization_id = ? and owner_user_id = ?`,
-  ).bind(input.deviceId, input.organizationId, input.userId)
+  ).bind(input.deviceId, input.workspaceId, input.userId)
     .first<{ present: number }>();
   return row?.present === 1;
 }
@@ -1115,10 +1115,10 @@ const executionWorkerIcon = (input: {
     : null;
 
 /**
- * Enroll an organization-scoped device and bind it to one project.
+ * Enroll an workspace-scoped device and bind it to one project.
  *
  * Re-enrollment is explicit and rotates the device credential. A device may be
- * bound to several projects in the same organization, while runs continue to
+ * bound to several projects in the same workspace, while runs continue to
  * reference the project-specific worker row.
  */
 export async function registerExecutionWorker(
@@ -1126,7 +1126,7 @@ export async function registerExecutionWorker(
   projectId: string,
   input: {
     deviceId: string;
-    organizationId: string;
+    workspaceId: string;
     ownerUserId: string;
     deviceIdentityHash: string;
     credentialTokenHash: string;
@@ -1161,8 +1161,8 @@ export async function registerExecutionWorker(
     .prepare(`select organization_id from briar_teams where id = ?`)
     .bind(projectId)
     .first<{ organization_id: string }>();
-  if (!team || team.organization_id !== input.organizationId) {
-    throw new WorkerConflictError("Worker project must belong to its organization");
+  if (!team || team.organization_id !== input.workspaceId) {
+    throw new WorkerConflictError("Worker project must belong to its workspace");
   }
 
   await db
@@ -1183,7 +1183,7 @@ export async function registerExecutionWorker(
     )
     .bind(
       input.deviceId,
-      input.organizationId,
+      input.workspaceId,
       input.ownerUserId,
       label,
       input.deviceIdentityHash,
@@ -1200,11 +1200,11 @@ export async function registerExecutionWorker(
       `select * from briar_execution_worker_devices
        where organization_id = ? and device_identity_hash = ?`,
     )
-    .bind(input.organizationId, input.deviceIdentityHash)
+    .bind(input.workspaceId, input.deviceIdentityHash)
     .first<ExecutionWorkerDeviceRow>();
   if (!device || device.owner_user_id !== input.ownerUserId) {
     throw new WorkerConflictError(
-      "Worker device is already owned by another organization member",
+      "Worker device is already owned by another workspace member",
     );
   }
 
@@ -1267,14 +1267,14 @@ export async function registerExecutionWorker(
 
 /**
  * Add a project binding for an already enrolled device without rotating its
- * organization-scoped credential. This keeps other project services alive.
+ * workspace-scoped credential. This keeps other project services alive.
  */
 export async function bindExecutionWorkerProject(
   db: D1Database,
   projectId: string,
   input: {
     id: string;
-    organizationId: string;
+    workspaceId: string;
     ownerUserId: string;
     deviceIdentityHash: string;
     runtime: WorkerRuntimeMetadata;
@@ -1293,11 +1293,11 @@ export async function bindExecutionWorkerProject(
          and device.state != 'disabled'
          and credential.revoked_at is null`,
     )
-    .bind(input.organizationId, input.ownerUserId, input.deviceIdentityHash)
+    .bind(input.workspaceId, input.ownerUserId, input.deviceIdentityHash)
     .first<ExecutionWorkerDeviceRow>();
   if (!device) {
     throw new WorkerConflictError(
-      "This computer must be enrolled in the organization before another project can be enabled",
+      "This computer must be enrolled in the workspace before another project can be enabled",
     );
   }
   const team = await db
@@ -1306,7 +1306,7 @@ export async function bindExecutionWorkerProject(
     .first<{ organization_id: string }>();
   if (!team || team.organization_id !== device.organization_id) {
     throw new WorkerConflictError(
-      "Worker project must belong to its organization",
+      "Worker project must belong to its workspace",
     );
   }
   await db
@@ -1538,7 +1538,7 @@ export async function authenticateExecutionWorker(
   }
   return {
     deviceId: row.id,
-    organizationId: row.organization_id,
+    workspaceId: row.organization_id,
     ownerUserId: row.owner_user_id,
   };
 }
@@ -1702,7 +1702,7 @@ async function detachReplySessionOwnership(
 }
 
 /**
- * Permanently remove an idle organization Worker and its project bindings.
+ * Permanently remove an idle workspace Worker and its project bindings.
  *
  * Disable first so a concurrent request cannot claim new work while deletion
  * waits for already-issued leases to drain. Device foreign keys cascade the
@@ -2039,7 +2039,7 @@ export async function listExecutionWorkers(
 export async function availableExecutionWorkerForAgentSkill(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     workerId: string;
     provider: AgentProvider;
@@ -2074,12 +2074,12 @@ export async function availableExecutionWorkerForAgentSkill(
       last_heartbeat_at: string;
       owner_is_member: number;
     }>();
-  if (device?.organization_id !== input.organizationId) {
-    throw new WorkerConflictError("Worker is outside this organization");
+  if (device?.organization_id !== input.workspaceId) {
+    throw new WorkerConflictError("Worker is outside this workspace");
   }
   if (device.owner_is_member !== 1) {
     throw new WorkerConflictError(
-      "Worker owner is not a member of this organization",
+      "Worker owner is not a member of this workspace",
     );
   }
   if (
@@ -2116,11 +2116,11 @@ export async function availableExecutionWorkerForAgentSkill(
   return worker;
 }
 
-export async function listOrganizationExecutionWorkers(
+export async function listWorkspaceExecutionWorkers(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   observedAt: string,
-): Promise<OrganizationExecutionWorker[]> {
+): Promise<WorkspaceExecutionWorker[]> {
   const result = await db
     .prepare(
       `select device.id as device_id, device.owner_user_id, owner.name as owner_name,
@@ -2181,7 +2181,7 @@ export async function listOrganizationExecutionWorkers(
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, team.created_at`,
     )
-    .bind(observedAt, observedAt, observedAt, observedAt, organizationId)
+    .bind(observedAt, observedAt, observedAt, observedAt, workspaceId)
     .all<{
       device_id: string;
       owner_user_id: string;
@@ -2204,7 +2204,7 @@ export async function listOrganizationExecutionWorkers(
       worker_heartbeat_at: string | null;
       active_sessions: number;
     }>();
-  const workers = new Map<string, OrganizationExecutionWorker>();
+  const workers = new Map<string, WorkspaceExecutionWorker>();
   for (const row of result.results ?? []) {
     const activeSessions = row.active_sessions ?? 0;
     const device =
@@ -2230,7 +2230,7 @@ export async function listOrganizationExecutionWorkers(
           update?.status === "requested" || (update?.status === "cancelled" && update.handoffError)
             ? update : null),
         bindings: [],
-      } satisfies OrganizationExecutionWorker);
+      } satisfies WorkspaceExecutionWorker);
     workers.set(row.device_id, device);
     if (
       !row.worker_id ||
@@ -2284,9 +2284,9 @@ export async function listOrganizationExecutionWorkers(
   return [...workers.values()];
 }
 
-export async function listOrganizationExecutionProviders(
+export async function listWorkspaceExecutionProviders(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ): Promise<AgentProvider[]> {
   const result = await db
     .prepare(
@@ -2299,7 +2299,7 @@ export async function listOrganizationExecutionProviders(
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, team.created_at`,
     )
-    .bind(organizationId)
+    .bind(workspaceId)
     .all<{ runtime_proto_json: string | null }>();
   const providers = new Set<AgentProvider>();
   for (const row of result.results ?? []) {
@@ -2542,7 +2542,7 @@ export async function updateExecutionWorkerIcon(
     .first<ExecutionWorkerDeviceRow>();
 }
 
-/** Keep the organization device and every project binding on the same name. */
+/** Keep the workspace device and every project binding on the same name. */
 export async function updateExecutionWorkerLabel(
   db: D1Database,
   deviceId: string,
@@ -2592,7 +2592,7 @@ export async function updateExecutionWorkerLabel(
 export async function auditExecutionEvent(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     runId?: string | null;
     workerId?: string | null;
@@ -2625,7 +2625,7 @@ export async function auditExecutionEvent(
     )
     .bind(
       crypto.randomUUID(),
-      input.organizationId,
+      input.workspaceId,
       input.projectId,
       input.runId ?? null,
       input.workerId ?? null,
@@ -2649,7 +2649,7 @@ export async function auditExecutionEvent(
  */
 export async function assertExecutionSelectionAvailable(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   projectId: string,
   input: {
     provider: AgentProvider;
@@ -2670,7 +2670,7 @@ export async function assertExecutionSelectionAvailable(
          where worker.id = ? and worker.project_id = ?
            and device.organization_id = ?`,
       )
-      .bind(input.workerId, projectId, organizationId)
+      .bind(input.workerId, projectId, workspaceId)
       .first<{
         runtime_proto_json: string;
         state: ExecutionWorkerState;
@@ -2742,7 +2742,7 @@ export async function assertExecutionSelectionAvailable(
          )
        limit 100`,
     )
-    .bind(projectId, organizationId, input.provider)
+    .bind(projectId, workspaceId, input.provider)
     .all<Pick<
       ExecutionWorkerRow,
       | "id"
@@ -2776,7 +2776,7 @@ export async function assertExecutionSelectionAvailable(
  */
 export async function dispatchHuntRun(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   projectId: string,
   input: {
     runId: string;
@@ -2894,7 +2894,7 @@ export async function dispatchHuntRun(
         ? preferences.preferred_agent_effort
         : null;
 
-  await assertExecutionSelectionAvailable(db, organizationId, projectId, {
+  await assertExecutionSelectionAvailable(db, workspaceId, projectId, {
     provider,
     model,
     effort,
@@ -3012,7 +3012,7 @@ export async function dispatchHuntRun(
       )
       .bind(
         crypto.randomUUID(),
-        organizationId,
+        workspaceId,
         projectId,
         input.workerId ?? null,
         agent?.id ?? null,
@@ -3047,7 +3047,7 @@ export async function dispatchHuntRun(
 
 export async function unassignHuntRun(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   projectId: string,
   input: { runId: string; requestedByUserId: string; requestId: string; occurredAt: string },
 ) {
@@ -3176,7 +3176,7 @@ export async function unassignHuntRun(
        returning id`,
     ).bind(
       crypto.randomUUID(),
-      organizationId,
+      workspaceId,
       projectId,
       run.worker_id,
       input.requestedByUserId,
@@ -3440,7 +3440,7 @@ export async function reapStalledHuntRuns(
       )
       .run();
     await auditExecutionEvent(db, {
-      organizationId: run.organization_id,
+      workspaceId: run.organization_id,
       projectId,
       runId: run.id,
       workerId: run.worker_id,

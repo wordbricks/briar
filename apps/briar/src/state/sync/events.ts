@@ -60,19 +60,19 @@ export type SyncEvent =
   | { readonly kind: "run-deleted"; readonly teamId: string; readonly runId: string }
   /**
    * One channel summary was created or changed without moving in the list — a
-   * read receipt or a realtime edit. A channel the organization does not list
+   * read receipt or a realtime edit. A channel the workspace does not list
    * yet is appended.
    */
   | { readonly kind: "channel-changed"; readonly channel: ChannelSummary }
   /**
-   * The organization's whole channel list, in the order it renders. Both the
+   * The workspace's whole channel list, in the order it renders. Both the
    * catalog load and the local writes that reorder the list (creating a
    * channel, a conversation view replacing its own copy) describe themselves
    * this way, because order is the one thing a per-channel event cannot carry.
    */
   | {
       readonly kind: "channel-catalog-snapshot";
-      readonly organizationId: string;
+      readonly workspaceId: string;
       readonly channels: readonly ChannelSummary[];
     }
   /**
@@ -82,22 +82,22 @@ export type SyncEvent =
    */
   | {
       readonly kind: "channel-catalog-delta";
-      readonly organizationId: string;
+      readonly workspaceId: string;
       readonly channels: readonly ChannelSummary[];
       readonly removedChannelIds: readonly string[];
       readonly reset: boolean;
     }
-  /** One channel is gone from an organization. */
+  /** One channel is gone from an workspace. */
   | {
       readonly kind: "channel-removed";
-      readonly organizationId: string;
+      readonly workspaceId: string;
       readonly channelId: string;
     }
-  /** The organization's catalog is dropped: nothing is known about it again. */
-  | { readonly kind: "channel-catalog-cleared"; readonly organizationId: string }
+  /** The workspace's catalog is dropped: nothing is known about it again. */
+  | { readonly kind: "channel-catalog-cleared"; readonly workspaceId: string }
   /*
     One channel's conversation. The messages are per channel rather than per
-    organization because a timeline is large and only a handful of channels are
+    workspace because a timeline is large and only a handful of channels are
     worth keeping; `state/channel-conversation/atoms.ts` bounds how many.
   */
   /**
@@ -237,9 +237,9 @@ export type SyncEvent =
   /** The team's entities and per-team state are dropped. */
   | { readonly kind: "team-cleared"; readonly teamId: string }
   /**
-   * The account left an organization, so every team outside
-   * `retainedOrganizationId` drops its entities. `null` retains nothing.
+   * The account left an workspace, so every team outside
+   * `retainedWorkspaceId` drops its entities. `null` retains nothing.
    */
-  | { readonly kind: "organization-left"; readonly retainedOrganizationId: string | null }
+  | { readonly kind: "workspace-left"; readonly retainedWorkspaceId: string | null }
   /** The session ended or changed accounts: nothing may survive. */
   | { readonly kind: "session-cleared" };

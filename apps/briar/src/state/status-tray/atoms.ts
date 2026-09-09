@@ -14,7 +14,7 @@ import type { StatusTrayRun } from "../../types";
 import { translatorAtom } from "../i18n/atoms";
 import { teamRunsAtom } from "../entities/runs";
 import { teamEntityAtom } from "../entities/teams";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { tokenAtom } from "../session/atoms";
 import { activeTeamIdAtom } from "../team/atoms";
@@ -23,7 +23,7 @@ import { activeTeamIdAtom } from "../team/atoms";
   The macOS menu bar tray's own state.
 
   The tray is not a view: nothing on screen renders `statusTrayRuns`, and the
-  organization poll behind it runs on the dashboard's interval whether or not
+  workspace poll behind it runs on the dashboard's interval whether or not
   anyone is looking. That is exactly the shape a subscription atom is for — it
   starts when something first observes it and stops through its finalizer when
   the last observer goes away, instead of living for as long as a component
@@ -161,7 +161,7 @@ export const activeTeamTrayRunsAtom = Atom.make(
 export const STATUS_TRAY_POLL_IDLE_TTL_MS = 5_000;
 
 /**
- * The organization-wide tray poll, as a subscription rather than an effect.
+ * The workspace-wide tray poll, as a subscription rather than an effect.
  *
  * Observing it starts the loop; the finalizer aborts the request in flight and
  * clears the timer. A project window has one team and no tray, and a build
@@ -179,12 +179,12 @@ export const statusTrayPollAtom = Atom.make((get) => {
   const api = get(statusTrayApiAtom);
   const lockedTeamId = get(lockedTeamIdAtom);
   const token = get(tokenAtom);
-  const organizationId = get(activeOrganizationIdAtom);
+  const workspaceId = get(activeWorkspaceIdAtom);
   const registry = get.registry;
 
   const seed = registry.get(activeTeamTrayRunsAtom);
   registry.set(statusTrayRunsAtom, seed ? [...seed.runs] : []);
-  if (!api.macDesktop || lockedTeamId || !token || !organizationId) {
+  if (!api.macDesktop || lockedTeamId || !token || !workspaceId) {
     return false;
   }
 
@@ -197,12 +197,12 @@ export const statusTrayPollAtom = Atom.make((get) => {
     try {
       const result = await api.loadStatusTrayRuns(
         token,
-        organizationId,
+        workspaceId,
         request.signal,
       );
       if (cancelled) return;
       /*
-        The organization's answer replaces every team's share of the list
+        The workspace's answer replaces every team's share of the list
         except the open one's, which the board keeps fresher than a poll on
         the dashboard interval can. Replacing the whole list was the other
         half of the flash: the first result dropped the runs the merge below

@@ -5,7 +5,7 @@ import {
   transferIssue,
 } from "./db";
 import { HttpError } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import { decodeTeamTransferInput } from "./team-request-contract";
 import {
   decodeMoveRunInput,
@@ -40,7 +40,7 @@ async function requireIssueExecutionProject(
 ) {
   const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
-  if (!hasOrganizationCapability(project.member_role, capability)) {
+  if (!hasWorkspaceCapability(project.member_role, capability)) {
     throw new HttpError(403, deniedMessage);
   }
   return project;
@@ -67,7 +67,7 @@ export async function transferProjectIssue(
   if (targetProject.organization_id !== sourceProject.organization_id) {
     throw new HttpError(
       403,
-      "Issues can only be transferred within the same organization",
+      "Issues can only be transferred within the same workspace",
     );
   }
   const outcome = await transferIssue(input.db, {
@@ -142,7 +142,7 @@ export async function recoverProjectIssueRun(
     (result.outcome === "cancelled" || result.outcome === "already_cancelled")
   ) {
     await auditExecutionEvent(input.db, {
-      organizationId: project.organization_id,
+      workspaceId: project.organization_id,
       projectId: project.id,
       runId: input.runId,
       actorUserId: input.userId,

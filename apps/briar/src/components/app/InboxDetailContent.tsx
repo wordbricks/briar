@@ -23,7 +23,7 @@ import {
   viewingIssueConversationRunIdAtom,
 } from "../../state/channels/atoms";
 import { useIssueActions } from "../../state/issues/actions";
-import { activeOrganizationIdAtom } from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../../state/workspace/atoms";
 import { useRunDetailActions } from "../../state/run-detail/actions";
 import { tokenAtom } from "../../state/session/atoms";
 import { runAtom } from "../../state/entities/runs";
@@ -105,7 +105,7 @@ export function InboxDetailContent({
   const workers = useAtomValue(teamWorkersAtom(loadedTeamId ?? ""));
   const teams = useAtomValue(teamsAtom);
   const token = useAtomValue(tokenAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const setTarget = useAtomSet(inboxDetailTargetAtom);
   const setPendingBriarLink = useAtomSet(pendingBriarLinkAtom);
   const setRequestedRunId = useAtomSet(requestedRunIdAtom);
@@ -118,7 +118,7 @@ export function InboxDetailContent({
   );
   const setSettingsTarget = useAtomSet(settingsTargetAtom);
   const setIsSidebarOpen = useAtomSet(isSidebarOpenAtom);
-  const { openOrganizationChannel, selectChannel } = useChannelActions();
+  const { openWorkspaceChannel, selectChannel } = useChannelActions();
   const { removeIssue } = useIssueActions();
   const { addIssueMessage } = useRunDetailActions();
   const { processIssueNow } = useWorkerDispatch();
@@ -214,7 +214,7 @@ export function InboxDetailContent({
           token={token}
           workers={workers ?? []}
         />
-      ) : channelId && activeOrganizationId && token ? (
+      ) : channelId && activeWorkspaceId && token ? (
         <ChannelsWithCatalog
           activeChannelId={channelId}
           inboxDetail
@@ -225,12 +225,12 @@ export function InboxDetailContent({
           }}
           onInboxChannelOpen={(nextChannelId) => {
             setTarget(null);
-            openOrganizationChannel(nextChannelId);
+            openWorkspaceChannel(nextChannelId);
           }}
           onCreateAgent={() => {
             setSettingsTarget({
-              scope: "organization",
-              organizationId: activeOrganizationId,
+              scope: "workspace",
+              workspaceId: activeWorkspaceId,
               section: "agents",
             });
             setIsSidebarOpen(true);

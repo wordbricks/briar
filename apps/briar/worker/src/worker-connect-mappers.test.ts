@@ -37,12 +37,12 @@ const channelReply = {
   ...common,
   workType: "channelReply" as const,
   routing: null,
-  organizationId: "77777777-7777-4777-8777-777777777777",
+  workspaceId: "77777777-7777-4777-8777-777777777777",
   channelId: common.runId,
   projectId: "88888888-8888-4888-8888-888888888888",
   scope: {
     kind: "project" as const,
-    organizationId: "77777777-7777-4777-8777-777777777777",
+    workspaceId: "77777777-7777-4777-8777-777777777777",
     projectId: "88888888-8888-4888-8888-888888888888",
   },
   triggerMessageId: "99999999-9999-4999-8999-999999999999",
@@ -70,7 +70,7 @@ const channelReply = {
     contentType: "image/png",
     byteSize: 42,
     url:
-      "/organizations/77777777-7777-4777-8777-777777777777/channel-reply-claims/11111111-1111-4111-8111-111111111111/attachments/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "/workspaces/77777777-7777-4777-8777-777777777777/channel-reply-claims/11111111-1111-4111-8111-111111111111/attachments/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
   }],
       memory: null,
       memoryLearningEnabled: false,
@@ -175,7 +175,7 @@ describe("Worker claim protobuf mapper", () => {
       agentMessageTargets: [{
         agentId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
         agentName: "Repository Guide",
-        // An Organization Agent has no repository, so both project fields
+        // An Workspace Agent has no repository, so both project fields
         // must survive as absent rather than as an empty string.
         projectId: null,
         projectName: null,

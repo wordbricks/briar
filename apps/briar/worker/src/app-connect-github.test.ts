@@ -27,8 +27,8 @@ import { githubSha256Hex } from "./github";
 import worker from "./index";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 
-const installOrganizationId = "11111111-1111-4111-8111-111111111111";
-const projectOrganizationId = "22222222-2222-4222-8222-222222222222";
+const installWorkspaceId = "11111111-1111-4111-8111-111111111111";
+const projectWorkspaceId = "22222222-2222-4222-8222-222222222222";
 const projectId = "33333333-3333-4333-8333-333333333333";
 const otherProjectId = "44444444-4444-4444-8444-444444444444";
 const deviceId = "55555555-5555-4555-8555-555555555555";
@@ -105,8 +105,8 @@ describe("GitHub Connect services", () => {
         ).bind(`session-${userId}`, token, observedAt, observedAt, userId)
       ),
       ...[
-        [installOrganizationId, "github-install", "GitHub Install"],
-        [projectOrganizationId, "github-project", "GitHub Project"],
+        [installWorkspaceId, "github-install", "GitHub Install"],
+        [projectWorkspaceId, "github-project", "GitHub Project"],
       ].map(([id, handle, name]) =>
         db.prepare(
           `insert into briar_organizations (
@@ -114,18 +114,18 @@ describe("GitHub Connect services", () => {
            ) values (?, ?, ?, ?, ?)`,
         ).bind(id, name, handle, observedAt, observedAt)
       ),
-      ...[installOrganizationId, projectOrganizationId].flatMap(
-        (organizationId) => [
+      ...[installWorkspaceId, projectWorkspaceId].flatMap(
+        (workspaceId) => [
           db.prepare(
             `insert into briar_organization_members (
                organization_id, user_id, role, created_at, updated_at
              ) values (?, ?, 'owner', ?, ?)`,
-          ).bind(organizationId, ownerId, observedAt, observedAt),
+          ).bind(workspaceId, ownerId, observedAt, observedAt),
           db.prepare(
             `insert into briar_organization_members (
                organization_id, user_id, role, created_at, updated_at
              ) values (?, ?, 'viewer', ?, ?)`,
-          ).bind(organizationId, viewerId, observedAt, observedAt),
+          ).bind(workspaceId, viewerId, observedAt, observedAt),
         ],
       ),
       db.prepare(
@@ -136,7 +136,7 @@ describe("GitHub Connect services", () => {
       ).bind(
         projectId,
         ownerId,
-        projectOrganizationId,
+        projectWorkspaceId,
         await sha256(agentToken),
         observedAt,
         observedAt,
@@ -149,7 +149,7 @@ describe("GitHub Connect services", () => {
       ).bind(
         otherProjectId,
         ownerId,
-        projectOrganizationId,
+        projectWorkspaceId,
         await sha256(otherAgentToken),
         observedAt,
         observedAt,
@@ -174,7 +174,7 @@ describe("GitHub Connect services", () => {
          ) values (?, ?, ?, 'GitHub Device', ?, 'online', ?, ?, ?)`,
       ).bind(
         deviceId,
-        projectOrganizationId,
+        projectWorkspaceId,
         ownerId,
         "a".repeat(64),
         observedAt,
@@ -204,7 +204,7 @@ describe("GitHub Connect services", () => {
     ]);
 
     await connectGithubInstallation(db, {
-      organizationId: projectOrganizationId,
+      workspaceId: projectWorkspaceId,
       installationId,
       installationAccountId: 301,
       accountLogin: "wordbricks",
@@ -251,10 +251,10 @@ describe("GitHub Connect services", () => {
     return (error as ConnectError).code;
   };
 
-  it("scopes organization visibility and persists install state exactly once", async () => {
+  it("scopes workspace visibility and persists install state exactly once", async () => {
     const github = integrationClient();
     await expect(github.getGitHubIntegration(
-      { workspaceId: installOrganizationId },
+      { workspaceId: installWorkspaceId },
       options(viewerToken),
     )).resolves.toMatchObject({
       configured: true,
@@ -262,17 +262,17 @@ describe("GitHub Connect services", () => {
       connected: false,
     });
     expect(await errorCode(github.getGitHubIntegration(
-      { workspaceId: installOrganizationId },
+      { workspaceId: installWorkspaceId },
       options(outsiderToken),
     ))).toBe(Code.NotFound);
     expect(await errorCode(github.beginGitHubInstallation(
-      { workspaceId: installOrganizationId },
+      { workspaceId: installWorkspaceId },
       options(viewerToken),
     ))).toBe(Code.PermissionDenied);
 
     let responseHeaders: Headers | undefined;
     const begun = await github.beginGitHubInstallation(
-      { workspaceId: installOrganizationId },
+      { workspaceId: installWorkspaceId },
       {
         ...options(ownerToken),
         onHeader: (headers) => {
@@ -289,7 +289,7 @@ describe("GitHub Connect services", () => {
       stateHash,
       new Date().toISOString(),
     )).resolves.toMatchObject({
-      organization_id: installOrganizationId,
+      organization_id: installWorkspaceId,
       user_id: ownerId,
     });
     await expect(consumeGithubInstallState(
@@ -303,7 +303,7 @@ describe("GitHub Connect services", () => {
     await db.prepare(`insert into briar_project_members (
       project_id, organization_id, user_id, created_at, updated_at
     ) values (?, ?, ?, ?, ?)`)
-      .bind(projectId, projectOrganizationId, viewerId, observedAt, observedAt).run();
+      .bind(projectId, projectWorkspaceId, viewerId, observedAt, observedAt).run();
     const mergedAt = new Date(Date.now() - 60_000).toISOString();
     const fetchMock = vi.fn(async (url: string) => url.includes("access_tokens")
       ? Response.json({ token: "installation-token", expires_at: new Date(Date.now() + 3_600_000).toISOString() })

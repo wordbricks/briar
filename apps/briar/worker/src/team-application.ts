@@ -6,9 +6,9 @@ import {
   isTeamIconName,
 } from "../../src/lib/team-icon-library";
 import type { TeamIconUpdate } from "./team-command-repository";
-import { createWorkspace } from "./organization-command-repository";
-import { hasOrganizationCapability } from "./organization-access";
-import { listOrganizations } from "./organization-repository";
+import { createWorkspace } from "./workspace-command-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { listWorkspaces } from "./workspace-repository";
 import {
   createTeam,
   deleteTeam,
@@ -55,7 +55,7 @@ export type TeamApplicationServices = {
   readonly getTeam: typeof getTeam;
   readonly getTeamRunChildMismatch: typeof getTeamRunChildMismatch;
   readonly issueProjectAgentToken: typeof issueProjectAgentToken;
-  readonly listOrganizations: typeof listOrganizations;
+  readonly listWorkspaces: typeof listWorkspaces;
   readonly updateTeamIcon: typeof updateTeamIcon;
   readonly updateTeamIssueKeyPrefix: typeof updateTeamIssueKeyPrefix;
   readonly updateTeamScheduleTabEnabled:
@@ -69,7 +69,7 @@ const teamApplicationServices: TeamApplicationServices = {
   getTeam,
   getTeamRunChildMismatch,
   issueProjectAgentToken,
-  listOrganizations,
+  listWorkspaces,
   updateTeamIcon,
   updateTeamIssueKeyPrefix,
   updateTeamScheduleTabEnabled,
@@ -150,7 +150,7 @@ const requireTeam = async (
       "Project not found",
     );
   }
-  if (!hasOrganizationCapability(project.member_role, capability)) {
+  if (!hasWorkspaceCapability(project.member_role, capability)) {
     throw new TeamApplicationError(
       capability === "projects:manage"
         ? "project_management_required"
@@ -168,23 +168,23 @@ export async function createTeamApplication(
     readonly db: D1Database;
     readonly user: TeamApplicationUser;
     readonly name: string;
-    readonly organizationId?: string;
+    readonly workspaceId?: string;
     readonly locale: TeamAgentLocale;
   },
   services: TeamApplicationServices = teamApplicationServices,
 ) {
   const name = decodeTeamName(input.name);
-  const workspaceId = input.organizationId === undefined
+  const workspaceId = input.workspaceId === undefined
     ? undefined
-    : decodeWorkspaceId(input.organizationId);
-  let workspaces = await services.listOrganizations(input.db, input.user.id);
+    : decodeWorkspaceId(input.workspaceId);
+  let workspaces = await services.listWorkspaces(input.db, input.user.id);
   if (workspaces.length === 0) {
     const created = await services.createWorkspace(input.db, {
       name:
         input.user.name?.trim() ||
         input.user.email.split("@")[0]?.trim() ||
         "Briar",
-      handle: `organization-${crypto.randomUUID().replaceAll("-", "")}`,
+      handle: `workspace-${crypto.randomUUID().replaceAll("-", "")}`,
       ownerUserId: input.user.id,
     });
     workspaces = [created];
@@ -194,7 +194,7 @@ export async function createTeamApplication(
     (workspaceId ? null : workspaces[0]);
   if (
     !workspace ||
-    !hasOrganizationCapability(workspace.role, "projects:manage")
+    !hasWorkspaceCapability(workspace.role, "projects:manage")
   ) {
     throw new TeamApplicationError(
       "project_management_required",
@@ -205,7 +205,7 @@ export async function createTeamApplication(
   const agentToken = createAgentToken();
   const project = await services.createTeam(input.db, {
     ownerUserId: input.user.id,
-    organizationId: workspace.id,
+    workspaceId: workspace.id,
     name,
     agentTokenHash: await sha256(agentToken),
     locale: input.locale,

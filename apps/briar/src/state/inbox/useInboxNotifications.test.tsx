@@ -12,7 +12,7 @@ import { seedInboxMessages } from "../../test/inbox";
 import type { Project } from "../../types";
 import { demoUser } from "../demo-fixtures";
 import { pendingInboxNotificationTargetAtom } from "../navigation/atoms";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom, userAtom } from "../session/atoms";
@@ -89,7 +89,7 @@ const signedIn = (lockedTeamId: string | null = null): AtomRegistry =>
     [userAtom, demoUser],
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
-    [activeOrganizationIdAtom, team.organizationId],
+    [activeWorkspaceIdAtom, team.workspaceId],
     [lockedTeamIdAtom, lockedTeamId],
   ]);
 

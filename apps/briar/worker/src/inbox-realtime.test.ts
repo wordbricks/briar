@@ -1,13 +1,13 @@
-import { WorkspaceNotificationSchema as OrganizationNotificationSchema} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import { WorkspaceNotificationSchema as WorkspaceNotificationSchema} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { fromBinary } from "@bufbuild/protobuf";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
+import { flushWorkspaceInboxRealtimeOutbox } from "./realtime-scheduling";
 
-describe("organization Inbox realtime outbox", () => {
+describe("workspace Inbox realtime outbox", () => {
   it("preserves a newer revision that commits while an older publish is acknowledged", async () => {
     const db = cloudflareEnv.DB;
-    const organizationId = "22222222-2222-4222-8222-222222222222";
+    const workspaceId = "22222222-2222-4222-8222-222222222222";
     await db
       .prepare(`delete from briar_organization_inbox_realtime_outbox`)
       .run();
@@ -19,12 +19,12 @@ describe("organization Inbox realtime outbox", () => {
       `insert into briar_organization_inbox_sync_state (
          organization_id, current_version
        ) values (?, 1)`,
-    ).bind(organizationId).run();
+    ).bind(workspaceId).run();
     await db.prepare(
       `insert into briar_organization_inbox_realtime_outbox (
          organization_id, version, updated_at
        ) values (?, 1, datetime('now'))`,
-    ).bind(organizationId).run();
+    ).bind(workspaceId).run();
 
     const published: unknown[] = [];
     let injectNewerRevision = true;
@@ -36,7 +36,7 @@ describe("organization Inbox realtime outbox", () => {
               throw new Error("Expected a protobuf Inbox notification");
             }
             const notification = fromBinary(
-              OrganizationNotificationSchema,
+              WorkspaceNotificationSchema,
               init.body,
             ).notification;
             if (notification.case !== "inboxChanged") {
@@ -51,7 +51,7 @@ describe("organization Inbox realtime outbox", () => {
               await db.prepare(
                 `update briar_organization_inbox_sync_state
                  set current_version = 2 where organization_id = ?`,
-              ).bind(organizationId).run();
+              ).bind(workspaceId).run();
               await db.prepare(
                 `insert into briar_organization_inbox_realtime_outbox (
                    organization_id, version, updated_at
@@ -62,7 +62,7 @@ describe("organization Inbox realtime outbox", () => {
                      excluded.version
                    ),
                    updated_at = excluded.updated_at`,
-              ).bind(organizationId).run();
+              ).bind(workspaceId).run();
             }
             return new Response(null, { status: 204 });
           },
@@ -70,16 +70,16 @@ describe("organization Inbox realtime outbox", () => {
       },
     } as unknown as Env;
 
-    await flushOrganizationInboxRealtimeOutbox(env, db);
+    await flushWorkspaceInboxRealtimeOutbox(env, db);
     await expect(db.prepare(
       `select organization_id, version
        from briar_organization_inbox_realtime_outbox`,
     ).first()).resolves.toEqual({
-      organization_id: organizationId,
+      organization_id: workspaceId,
       version: 2,
     });
 
-    await flushOrganizationInboxRealtimeOutbox(env, db);
+    await flushWorkspaceInboxRealtimeOutbox(env, db);
     expect(published).toEqual([
       { topic: "inbox", version: 1 },
       { topic: "inbox", version: 2 },

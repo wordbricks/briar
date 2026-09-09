@@ -13,7 +13,7 @@ import {
   createChannelMessage,
   enqueueChannelAgentReplies,
 } from "./channels";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import {
   listClaimedChannelReplyMessagesApplication,
   TeamAgentChannelApplicationError,
@@ -31,8 +31,8 @@ import {
  */
 describe("claim-scoped channel message history", () => {
   const db = cloudflareEnv.DB;
-  const organizationId = "1a000000-0000-4000-8000-000000000001";
-  const otherOrganizationId = "1a000000-0000-4000-8000-000000000002";
+  const workspaceId = "1a000000-0000-4000-8000-000000000001";
+  const otherWorkspaceId = "1a000000-0000-4000-8000-000000000002";
   const projectId = "1b000000-0000-4000-8000-000000000001";
   const deviceId = "1c000000-0000-4000-8000-000000000001";
   const workerId = "1d000000-0000-4000-8000-000000000001";
@@ -61,16 +61,16 @@ describe("claim-scoped channel message history", () => {
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Claimed History Org', 'claimed-history-org', ?, ?)`,
-      ).bind(organizationId, at(0), at(0)),
+      ).bind(workspaceId, at(0), at(0)),
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Other Claimed Org', 'other-claimed-org', ?, ?)`,
-      ).bind(otherOrganizationId, at(0), at(0)),
+      ).bind(otherWorkspaceId, at(0), at(0)),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, at(0), at(0)),
+      ).bind(workspaceId, ownerId, at(0), at(0)),
       db.prepare(
         `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
@@ -79,7 +79,7 @@ describe("claim-scoped channel message history", () => {
       ).bind(
         projectId,
         ownerId,
-        organizationId,
+        workspaceId,
         sha256Hex(agentToken),
         at(0),
         at(0),
@@ -91,7 +91,7 @@ describe("claim-scoped channel message history", () => {
          ) values (?, ?, ?, 'Claimed Device', ?, 'online', ?, ?, ?)`,
       ).bind(
         deviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         sha256Hex("claimed-history-device"),
         at(0),
@@ -124,7 +124,7 @@ describe("claim-scoped channel message history", () => {
     ).run();
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "claimed-history",
@@ -135,9 +135,9 @@ describe("claim-scoped channel message history", () => {
       createdByUserId: ownerId,
       createdAt: at(0),
     });
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: agentId,
-      organizationId,
+      workspaceId,
       name: "Historian",
       provider: "claude",
       model: null,
@@ -167,7 +167,7 @@ describe("claim-scoped channel message history", () => {
       });
     }
     await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId,
       parentMessageId: triggerMessageId,
@@ -185,7 +185,7 @@ describe("claim-scoped channel message history", () => {
       new Date().toISOString(),
       workerId,
     ).run();
-    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+    const claimed = await claimNextChannelAgentReply(db, workspaceId, {
       deviceId,
       workerId,
       ...workerClaimRuntimeFixture({
@@ -208,7 +208,7 @@ describe("claim-scoped channel message history", () => {
     > = {},
   ) => listClaimedChannelReplyMessagesApplication({
     db,
-    organizationId,
+    workspaceId,
     deviceId,
     jobId,
     parentMessageId: null,
@@ -247,13 +247,13 @@ describe("claim-scoped channel message history", () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it("refuses another device, a dead lease, and another organization", async () => {
+  it("refuses another device, a dead lease, and another workspace", async () => {
     await rejects(
       { deviceId: "1c000000-0000-4000-8000-000000000009" },
       "claim_not_active",
     );
     await rejects({ observedAt: "2099-06-01T00:00:00.000Z" }, "claim_not_active");
-    await rejects({ organizationId: otherOrganizationId }, "claim_not_active");
+    await rejects({ workspaceId: otherWorkspaceId }, "claim_not_active");
     await rejects(
       { jobId: "1f000000-0000-4000-8000-000000000099" },
       "claim_not_active",

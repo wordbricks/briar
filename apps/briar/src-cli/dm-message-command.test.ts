@@ -15,7 +15,7 @@ it("uses the same authenticated command for a provider whose ACP adapter ignores
   const executeDmScheduleTool = vi.fn(async () => create(ExecuteDmScheduleToolResponseSchema, { notice: "saved", schedules: [] }));
   const invocation = await DmMessageInvocation.create({ projectId: "project", workerId: "worker",
     work: { workType: "channelReply", workId: crypto.randomUUID(), runId: "run", claimToken: "token",
-      organizationId: "org", inputRevision: 0, publishedMessageBatches: [], provider: "pi", routing: { action: "new" } } as unknown as ClaimedChannelReply,
+      workspaceId: "org", inputRevision: 0, publishedMessageBatches: [], provider: "pi", routing: { action: "new" } } as unknown as ClaimedChannelReply,
     queue: { executeDmScheduleTool, publishDmMessageBatch: vi.fn(async () => create(PublishDmMessageBatchResponseSchema)) } as never });
   const binding = invocation.binding();
   const workspacePath = await mkdtemp(join(tmpdir(), "dm-command-test-"));

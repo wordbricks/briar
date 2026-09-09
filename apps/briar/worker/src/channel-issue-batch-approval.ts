@@ -70,7 +70,7 @@ export async function listChannelIssueBatchItems(
 export async function materializeChannelIssueBatch(input: {
   db: D1Database;
   project: Pick<TeamRow, "id" | "name">;
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   proposalId: string;
   messageId: string;
@@ -104,7 +104,7 @@ export async function materializeChannelIssueBatch(input: {
   const repository = settings?.github_repository ?? input.project.name;
   const recordedAt = new Date().toISOString();
   const relatedMessage = channelRelatedMessageReference({
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     messageId: input.messageId,
     rootMessageId: input.rootMessageId,
@@ -191,7 +191,7 @@ export async function materializeChannelIssueBatch(input: {
            local_key, position, source_key, run_id, created_at
          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
-        input.organizationId,
+        input.workspaceId,
         input.channelId,
         input.proposalId,
         input.project.id,
@@ -210,7 +210,7 @@ export async function materializeChannelIssueBatch(input: {
       ).bind(
         `${input.proposalId}:batch-approval:${item.localKey}`,
         input.proposalId,
-        input.organizationId,
+        input.workspaceId,
         input.channelId,
         input.project.id,
         item.runId,

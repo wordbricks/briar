@@ -3,15 +3,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { markInitialOnboardingComplete } from "../lib/initial-onboarding";
 import {
-  beginOrganizationInvitation,
-  clearOrganizationInvitationProgress,
-  leaveOrganizationInvitationRoute,
-  loadOrganizationInvitationProgress,
-  loadOrganizationInvitationToken,
+  beginWorkspaceInvitation,
+  clearWorkspaceInvitationProgress,
+  leaveWorkspaceInvitationRoute,
+  loadWorkspaceInvitationProgress,
+  loadWorkspaceInvitationToken,
   organizationInvitationProgressFrom,
-  storeOrganizationInvitationProgress,
-  type OrganizationInvitationProgress,
-} from "../lib/organization-invitation";
+  storeWorkspaceInvitationProgress,
+  type WorkspaceInvitationProgress,
+} from "../lib/workspace-invitation";
 import {
   createIssueTeamIdAtom,
   isIssueDialogOpenAtom,
@@ -31,9 +31,10 @@ import {
   teamsAtom,
 } from "../state/team/atoms";
 import { useWorkspaceActions } from "../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../state/local-workspace/actions";
 
 /*
-  Joining an organization from an invitation link, and the setup step that
+  Joining an workspace from an invitation link, and the setup step that
   follows it.
 
   The token comes off the URL, the progress marker survives the reload the
@@ -53,7 +54,7 @@ export interface InvitationFlow {
   readonly beginInvitation: (token: string) => void;
   /** Leaves the invitation route without accepting. */
   readonly clearInvitationToken: () => void;
-  readonly invitationProgress: OrganizationInvitationProgress | null;
+  readonly invitationProgress: WorkspaceInvitationProgress | null;
   /** The progress marker belongs to the signed-in user. */
   readonly hasCurrentUserInvitationProgress: boolean;
   /** The collaborator tutorial replaces the first-run one after a join. */
@@ -74,7 +75,7 @@ export function useInvitationFlow({
   onInitialOnboardingComplete,
 }: InvitationFlowInput): InvitationFlow {
   const { acceptInvitation } = useSessionActions();
-  const { reconnectProject: reconnectTeam } = useWorkspaceActions();
+  const { reconnectProject: reconnectTeam } = useLocalWorkspaceActions();
   const { resetNavigation } = useNavigationActions();
   const user = useAtomValue(userAtom);
   const teams = useAtomValue(teamsAtom);
@@ -85,10 +86,10 @@ export function useInvitationFlow({
   const setCreateIssueTeamId = useAtomSet(createIssueTeamIdAtom);
   const setIsIssueDialogOpen = useAtomSet(isIssueDialogOpenAtom);
   const [invitationToken, setInvitationToken] = useState(
-    loadOrganizationInvitationToken,
+    loadWorkspaceInvitationToken,
   );
   const [invitationProgress, setInvitationProgress] = useState(
-    loadOrganizationInvitationProgress,
+    loadWorkspaceInvitationProgress,
   );
   const [acceptingInvitation, setAcceptingInvitation] = useState(false);
   const [developerToolsSetupRequested, setDeveloperToolsSetupRequested] =
@@ -113,11 +114,11 @@ export function useInvitationFlow({
         result.invitation,
         user.id,
       );
-      storeOrganizationInvitationProgress(progress);
+      storeWorkspaceInvitationProgress(progress);
       setInvitationProgress(progress);
       markInitialOnboardingComplete();
       onInitialOnboardingComplete();
-      leaveOrganizationInvitationRoute({ preserveProgress: true });
+      leaveWorkspaceInvitationRoute({ preserveProgress: true });
       setInvitationToken(null);
       setRequestedRunId(null);
       setRequestedSessionId(null);
@@ -139,7 +140,7 @@ export function useInvitationFlow({
     if (!user || !invitationProgress || invitationProgress.userId === user.id) {
       return;
     }
-    clearOrganizationInvitationProgress();
+    clearWorkspaceInvitationProgress();
     developerSetupRequestRef.current = null;
     setInvitationProgress(null);
   }, [user, invitationProgress]);
@@ -171,7 +172,7 @@ export function useInvitationFlow({
   ]);
 
   const beginInvitation = useCallback((token: string) => {
-    beginOrganizationInvitation(token);
+    beginWorkspaceInvitation(token);
     setInvitationToken(token);
   }, []);
 
@@ -180,7 +181,7 @@ export function useInvitationFlow({
   }, []);
 
   const clearInvitationProgress = useCallback(() => {
-    clearOrganizationInvitationProgress();
+    clearWorkspaceInvitationProgress();
     setInvitationProgress(null);
   }, []);
 

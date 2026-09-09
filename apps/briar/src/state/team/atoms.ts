@@ -16,7 +16,7 @@ import { teamRunIdsAtom, teamRunsAtom } from "../entities/runs";
 import { teamEntityAtom } from "../entities/teams";
 import { shallowArrayEqual } from "../entities/upsert";
 import { teamWorkersAtom } from "../entities/workers";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { companionMode, demoMode, lockedTeamIdAtom } from "../platform";
 
 /*
@@ -28,7 +28,7 @@ import { companionMode, demoMode, lockedTeamIdAtom } from "../platform";
   `registry.get(activeTeamIdAtom)` instead of a ref written during render.
 */
 
-/** Every team the account can open, across all of its organizations. */
+/** Every team the account can open, across all of its workspaces. */
 export const teamsAtom = Atom.make<Project[]>(
   demoMode ? [demoDashboard.team] : [],
 ).pipe(Atom.keepAlive, Atom.withLabel("team/list"));
@@ -97,22 +97,22 @@ export const visibleTeamsAtom = Atom.make((get): Project[] => {
 );
 
 /**
- * The teams a view scoped to the active organization offers. The selected team
+ * The teams a view scoped to the active workspace offers. The selected team
  * is always included: it stays reachable for the moment between switching
- * organizations and the team selection catching up.
+ * workspaces and the team selection catching up.
  */
-export const activeOrganizationTeamsAtom = Atom.make((get): Project[] => {
+export const activeWorkspaceTeamsAtom = Atom.make((get): Project[] => {
   if (get(lockedTeamIdAtom)) return get(visibleTeamsAtom);
-  const activeOrganizationId = get(activeOrganizationIdAtom);
+  const activeWorkspaceId = get(activeWorkspaceIdAtom);
   const activeTeamId = get(activeTeamIdAtom);
   return get(teamsAtom).filter(
     (team) =>
-      team.organizationId === activeOrganizationId || team.id === activeTeamId,
+      team.workspaceId === activeWorkspaceId || team.id === activeTeamId,
   );
 }).pipe(
   Atom.keepAlive,
   Atom.withEquality<Project[]>(shallowArrayEqual),
-  Atom.withLabel("team/activeOrganization"),
+  Atom.withLabel("team/activeWorkspace"),
 );
 
 /*

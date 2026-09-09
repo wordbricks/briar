@@ -118,7 +118,7 @@ export type SandboxState = typeof SandboxState.Type;
 export const SandboxRemoteAgentConfig = Schema.Struct({
   credential: Schema.String.check(Schema.isStartsWith("briar_worker_")),
   deviceId: Schema.String.check(Schema.isMinLength(1)),
-  organizationId: Schema.String.check(Schema.isUUID()),
+  workspaceId: Schema.String.check(Schema.isUUID()),
   managedComputerId: Schema.String.check(Schema.isUUID()),
   apiOrigin: HttpsUrl,
 }).annotate({ parseOptions: strictParseOptions });
@@ -267,7 +267,7 @@ export type SandboxBootstrapDependencies = {
   readonly registerComputer: (input: {
     apiUrl: string;
     userToken: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     label: string;
   }) => Promise<{ managedComputerId: string }>;
@@ -327,7 +327,7 @@ const defaultDependencies: SandboxBootstrapDependencies = {
       { binary: true },
     );
     const response = await client.registerSandboxComputer({
-      workspaceId: input.organizationId,
+      workspaceId: input.workspaceId,
       deviceId: input.deviceId,
       label: input.label,
     });
@@ -466,7 +466,7 @@ export async function runSandboxBootstrap(
       const registered = await dependencies.registerComputer({
         apiUrl: payload.apiUrl,
         userToken: payload.userToken,
-        organizationId: relayWorker.organizationId,
+        workspaceId: relayWorker.workspaceId,
         deviceId: relayWorker.deviceId,
         label: payload.label,
       });
@@ -474,7 +474,7 @@ export async function runSandboxBootstrap(
       await dependencies.writeRemoteAgentConfig({
         credential: relayWorker.token,
         deviceId: relayWorker.deviceId,
-        organizationId: relayWorker.organizationId,
+        workspaceId: relayWorker.workspaceId,
         managedComputerId,
         apiOrigin: payload.apiUrl,
       });
@@ -645,7 +645,7 @@ export type SandboxUnregisterResult = {
 async function unregisterSandboxComputer(input: {
   apiUrl: string;
   userToken: string;
-  organizationId: string;
+  workspaceId: string;
   deviceId: string;
 }) {
   const client = createAuthenticatedConnectClient(
@@ -655,7 +655,7 @@ async function unregisterSandboxComputer(input: {
     { binary: true },
   );
   const response = await client.unregisterSandboxComputer({
-    workspaceId: input.organizationId,
+    workspaceId: input.workspaceId,
     deviceId: input.deviceId,
   });
   return response.removed;
@@ -696,7 +696,7 @@ export async function runSandboxUnregister(overrides: {
         computerRemoved = await (overrides.unregisterComputer ?? unregisterSandboxComputer)({
           apiUrl: remoteAgent.apiOrigin,
           userToken,
-          organizationId: worker.organizationId,
+          workspaceId: worker.workspaceId,
           deviceId: remoteAgent.deviceId,
         });
       } catch {

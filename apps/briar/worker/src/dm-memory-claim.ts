@@ -14,7 +14,7 @@ export const dmMemoryDescriptor = (space: ClaimSpace, enabled: boolean): DmMemor
   briefState: enabled && space.use_enabled === 1 ? "available" : "disabled",
 });
 export const dmMemoryClaimAccess = (space: ClaimSpace): DmMemoryAccess => ({
-  organizationId: space.organization_id, channelId: space.channel_id, ownerUserId: space.owner_user_id,
+  workspaceId: space.organization_id, channelId: space.channel_id, ownerUserId: space.owner_user_id,
   agentId: space.agent_id, spaceId: space.id, revocationEpoch: space.revocation_epoch,
 });
 

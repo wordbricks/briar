@@ -5,9 +5,9 @@ import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 import { CompanionHeader } from "./CompanionHeader";
 
-const organizations = [
+const workspaces = [
   {
-    id: "organization-1",
+    id: "workspace-1",
     name: "Wordbricks",
     handle: "wordbricks",
     logo: null,
@@ -15,7 +15,7 @@ const organizations = [
     createdAt: "2026-07-23",
   },
   {
-    id: "organization-2",
+    id: "workspace-2",
     name: "Acme",
     handle: "acme",
     logo: null,
@@ -30,8 +30,8 @@ const projects = [
     name: "Briar",
     issueKeyPrefix: "BR",
     scheduleTabEnabled: true,
-    organizationId: "organization-1",
-    organizationName: "Wordbricks",
+    workspaceId: "workspace-1",
+    workspaceName: "Wordbricks",
     role: "owner" as const,
     icon: "data:image/png;base64,AA==",
     iconName: null,
@@ -49,24 +49,24 @@ const user = {
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 describe("CompanionHeader", () => {
-  it("opens account actions without logging out and switches organizations", async () => {
+  it("opens account actions without logging out and switches workspaces", async () => {
     const { cleanup, container, root } = createReactTestRoot();
     const onLogout = vi.fn();
-    const onOrganizationChange = vi.fn();
+    const onWorkspaceChange = vi.fn();
     const onSettings = vi.fn();
 
     await renderReactTestRoot(
       root,
       <CompanionHeader
-        activeOrganizationId="organization-1"
+        activeWorkspaceId="workspace-1"
         activeProjectId="project-1"
         loading={false}
         onLogout={onLogout}
-        onOrganizationChange={onOrganizationChange}
+        onWorkspaceChange={onWorkspaceChange}
         onProjectChange={() => undefined}
         onRefresh={() => undefined}
         onSettings={onSettings}
-        organizations={organizations}
+        workspaces={workspaces}
         projects={projects}
         user={user}
       />,
@@ -92,7 +92,7 @@ describe("CompanionHeader", () => {
     ).find((button) => button.textContent?.includes("Acme"));
     await act(async () => acmeButton?.click());
 
-    expect(onOrganizationChange).toHaveBeenCalledWith("organization-2");
+    expect(onWorkspaceChange).toHaveBeenCalledWith("workspace-2");
     expect(container.querySelector('[role="menu"]')).toBeNull();
 
     await act(async () => accountButton?.click());
@@ -113,16 +113,16 @@ describe("CompanionHeader", () => {
     await renderReactTestRoot(
       root,
       <CompanionHeader
-        activeOrganizationId="organization-1"
+        activeWorkspaceId="workspace-1"
         activeProjectId="project-1"
         loading={false}
         onLogout={() => undefined}
         onMarkAllRead={onMarkAllRead}
-        onOrganizationChange={() => undefined}
+        onWorkspaceChange={() => undefined}
         onProjectChange={() => undefined}
         onRefresh={() => undefined}
         onSettings={() => undefined}
-        organizations={organizations}
+        workspaces={workspaces}
         pageTitle="Inbox"
         projects={projects}
         user={user}

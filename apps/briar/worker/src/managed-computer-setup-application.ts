@@ -16,7 +16,7 @@ export async function getManagedComputerSetupContextApplication(input: {
 }) {
   const context = await managedComputerSetupContext(input.db, {
     managedComputerId: input.managedComputerId,
-    organizationId: input.principal.organizationId,
+    workspaceId: input.principal.workspaceId,
     deviceId: input.principal.deviceId,
     setupToken: input.setupToken,
     observedAt: input.observedAt,
@@ -27,7 +27,7 @@ export async function getManagedComputerSetupContextApplication(input: {
         env: input.env,
         project: {
           id: context.project.id,
-          organization_id: input.principal.organizationId,
+          organization_id: input.principal.workspaceId,
         },
       })
     : undefined;
@@ -44,7 +44,7 @@ export async function bindManagedComputerSetupApplication(input: {
 }) {
   return bindManagedComputerSetup(input.db, {
     managedComputerId: input.managedComputerId,
-    organizationId: input.principal.organizationId,
+    workspaceId: input.principal.workspaceId,
     deviceId: input.principal.deviceId,
     setupToken: input.setupToken,
     worker: input.runtime,

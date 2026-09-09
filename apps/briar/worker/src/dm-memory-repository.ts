@@ -14,7 +14,7 @@ import { sha256 } from "./crypto-digest";
 import { HttpError } from "./http-response";
 import { dmLearningCapacityTable } from "./dm-memory-capacity";
 
-export type DmMemoryOwner = { organizationId: string; channelId: string; userId: string };
+export type DmMemoryOwner = { workspaceId: string; channelId: string; userId: string };
 type SpaceRow = {
   id: string; organization_id: string; channel_id: string; owner_user_id: string;
   agent_id: string; roster_epoch: number; status: "active" | "closed";
@@ -45,7 +45,7 @@ export const dmMemorySpaceJson = (space: SpaceRow): DmMemorySpace => ({
 const ownerWhere = `space.organization_id = ? and space.channel_id = ? and space.owner_user_id = ?
   and exists (select 1 from briar_organization_members member
     where member.organization_id = space.organization_id and member.user_id = space.owner_user_id)`;
-const ownerBindings = (owner: DmMemoryOwner) => [owner.organizationId, owner.channelId, owner.userId];
+const ownerBindings = (owner: DmMemoryOwner) => [owner.workspaceId, owner.channelId, owner.userId];
 const liveSpaceWhere = `space.status = 'active' and exists (
   select 1 from briar_dm_memory_live_rosters live
   where live.organization_id = space.organization_id and live.channel_id = space.channel_id

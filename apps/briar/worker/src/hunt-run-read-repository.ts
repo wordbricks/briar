@@ -257,7 +257,7 @@ export async function listDashboardRunSummaries(
   };
 }
 
-export type OrganizationStatusTrayRunRow = Pick<
+export type WorkspaceStatusTrayRunRow = Pick<
   HuntRunRow,
   | "id"
   | "title"
@@ -364,9 +364,9 @@ export async function listDashboardRunsByIds(
   return runs.results;
 }
 
-export async function listOrganizationStatusTrayRuns(
+export async function listWorkspaceStatusTrayRuns(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ) {
   const runs = await db
@@ -394,8 +394,8 @@ export async function listOrganizationStatusTrayRuns(
        order by run.updated_at desc, run.id
        limit 200`,
     )
-    .bind(userId, organizationId)
-    .all<OrganizationStatusTrayRunRow>();
+    .bind(userId, workspaceId)
+    .all<WorkspaceStatusTrayRunRow>();
 
   return runs.results;
 }

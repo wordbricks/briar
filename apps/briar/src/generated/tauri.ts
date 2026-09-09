@@ -117,7 +117,7 @@ export const commands = {
 	refreshExecutionWorkerRuntime: () => __TAURI_INVOKE<boolean>("refresh_execution_worker_runtime"),
 	syncExecutionWorkerLabels: () => __TAURI_INVOKE<null>("sync_execution_worker_labels"),
 	inspectExecutionWorkers: (projectIds: string[]) => __TAURI_INVOKE<LocalExecutionWorkerStatus[]>("inspect_execution_workers", { projectIds }),
-	currentExecutionWorkerDeviceId: (organizationId: string) => __TAURI_INVOKE<string | null>("current_execution_worker_device_id", { organizationId }),
+	currentExecutionWorkerDeviceId: (workspaceId: string) => __TAURI_INVOKE<string | null>("current_execution_worker_device_id", { workspaceId }),
 	showInboxNotification: (title: string, body: string, target: InboxNotificationTarget_Deserialize, playSound: boolean) => __TAURI_INVOKE<null>("show_inbox_notification", { title, body, target, playSound }),
 	requestInboxNotificationPermission: () => __TAURI_INVOKE<boolean>("request_inbox_notification_permission"),
 	inboxNotificationPermissionStatus: () => __TAURI_INVOKE<InboxNotificationPermissionStatus>("inbox_notification_permission_status"),
@@ -220,7 +220,7 @@ export type AgentProviderModelCatalogEntry = {
  */
 export type AgentProviderUnavailableReason = "disabled" | "not_installed" | "not_authenticated" | "usage_exhausted";
 
-export type AgentResultImpact = "issue" | "project" | "organization";
+export type AgentResultImpact = "issue" | "project" | "workspace";
 
 export type AgentResultImportance = "routine" | "important" | "critical";
 
@@ -761,7 +761,7 @@ export type ProjectGithubCredential = {
 
 export type ProjectGithubCredentialProject = {
 	id: string,
-	organizationId: string,
+	workspaceId: string,
 };
 
 export type ProjectGithubCredentialRepository = {

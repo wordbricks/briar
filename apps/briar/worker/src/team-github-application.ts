@@ -17,7 +17,7 @@ import {
   listGithubConnectionRepositories,
 } from "./github-connection-repository";
 import { HttpError } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import { getTeam } from "./team-command-repository";
 import { getTeamSettings } from "./team-settings-repository";
 import { decodeRequestSync } from "./request-schema";
@@ -101,7 +101,7 @@ export async function requireTeamGithubAccess(input: {
       session.user.id,
     );
     if (!project) throw new HttpError(404, "Project not found");
-    if (!hasOrganizationCapability(project.member_role, "issues:execute")) {
+    if (!hasWorkspaceCapability(project.member_role, "issues:execute")) {
       throw new HttpError(403, "Issue execution permission required");
     }
     return project;
@@ -208,7 +208,7 @@ export async function createTeamGithubCredentialApplication(
   );
   return {
     projectId: input.project.id,
-    organizationId: input.project.organization_id,
+    workspaceId: input.project.organization_id,
     repositoryId: identity.repositoryId,
     repository: identity.repository,
     cloneUrl: `https://github.com/${identity.repository}.git`,

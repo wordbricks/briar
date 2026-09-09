@@ -33,7 +33,7 @@ export type LinearImportConnectResult = {
   viewer: {
     name: string;
     email: string | null;
-    organizationName: string;
+    workspaceName: string;
   };
   teams: LinearTeamSummary[];
 };

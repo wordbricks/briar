@@ -19,7 +19,7 @@ async function configureSuccessfulProvisioning(
     await modifier.mockStepResult(
       { name: "reserve provisioning job" },
       {
-        organizationId: "11111111-1111-4111-8111-111111111111",
+        workspaceId: "11111111-1111-4111-8111-111111111111",
         region: "us-east-1",
         instanceId: null,
         accountId: null,

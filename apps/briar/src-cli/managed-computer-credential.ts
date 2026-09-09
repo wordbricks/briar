@@ -4,7 +4,7 @@ import { isAbsolute } from "node:path";
 export type ManagedComputerCredential = {
   credential: string;
   deviceId: string;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   apiOrigin: string;
 };
@@ -36,8 +36,8 @@ export function decodeManagedComputerCredential(
     ? record.credential
     : "";
   const deviceId = typeof record.deviceId === "string" ? record.deviceId : "";
-  const organizationId = typeof record.organizationId === "string"
-    ? record.organizationId
+  const workspaceId = typeof record.workspaceId === "string"
+    ? record.workspaceId
     : "";
   const managedComputerId = typeof record.managedComputerId === "string"
     ? record.managedComputerId
@@ -53,7 +53,7 @@ export function decodeManagedComputerCredential(
     !credentialPattern.test(credential) ||
     deviceId !== `managed-${managedComputerId}` ||
     !uuidPattern.test(managedComputerId) ||
-    !uuidPattern.test(organizationId) ||
+    !uuidPattern.test(workspaceId) ||
     parsedOrigin.protocol !== "https:" ||
     parsedOrigin.origin !== apiOrigin.replace(/\/$/u, "") ||
     parsedOrigin.pathname !== "/" ||
@@ -65,7 +65,7 @@ export function decodeManagedComputerCredential(
   return {
     credential,
     deviceId,
-    organizationId,
+    workspaceId,
     managedComputerId,
     apiOrigin: parsedOrigin.origin,
   };

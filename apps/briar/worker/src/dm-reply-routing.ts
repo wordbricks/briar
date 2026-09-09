@@ -69,7 +69,7 @@ const authorized = `exists (
 
 /** The chosen intent survives a restart. Its effect and public receipt commit together. */
 export async function resolveDmReplyRouting(db: D1Database, input: {
-  jobId: string; organizationId: string; channelId: string; deviceId: string;
+  jobId: string; workspaceId: string; channelId: string; deviceId: string;
   workerId: string; claimTokenHash: string; observedAt: string;
   decision: DmReplyRoutingDecision;
 }) {
@@ -77,7 +77,7 @@ export async function resolveDmReplyRouting(db: D1Database, input: {
       ((input.decision.action === "steer" || input.decision.action === "cancel") && !input.decision.targetJobId) ||
       ((input.decision.action === "answer" || input.decision.action === "clarify") && !input.decision.response?.trim()) ||
       (input.decision.response?.length ?? 0) > 8000) throw new HttpError(400, "Invalid DM routing decision");
-  const identity = [input.jobId, input.organizationId, input.channelId,
+  const identity = [input.jobId, input.workspaceId, input.channelId,
     input.deviceId, input.workerId, input.claimTokenHash];
   const claimed = `incoming.id = ? and incoming.organization_id = ? and incoming.channel_id = ?
     and incoming.claimed_device_id = ? and incoming.claimed_worker_id = ? and incoming.claim_token_hash = ?`;
@@ -126,7 +126,7 @@ export async function resolveDmReplyRouting(db: D1Database, input: {
       select agent_id from briar_channel_agent_reply_jobs where id = ?)
       and earlier.rowid < (select rowid from briar_channel_agent_reply_jobs where id = ?)
       and earlier.routing_action = 'pending' and earlier.status in ('queued', 'running')`)
-    .bind(input.organizationId, input.channelId, input.jobId, input.jobId).first()) return existing;
+    .bind(input.workspaceId, input.channelId, input.jobId, input.jobId).first()) return existing;
   // A terminal result stays the result. A late steer becomes a fresh follow-up;
   // a late cancel never selects a different running job.
   const liveTarget = `${target} and target.status in ('queued', 'running') and target.stop_requested_at is null

@@ -110,13 +110,13 @@ const inboxMessageFromProto = (message: InboxFeedMessage): InboxMessage => {
 
 export async function getInboxFeed(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   knownVersion: string | undefined,
   signal?: AbortSignal,
 ) {
   const client = requireInboxClient();
   const response = await client.getInboxFeed(
-    { workspaceId: organizationId, knownVersion },
+    { workspaceId: workspaceId, knownVersion },
     appCallOptions(token, signal),
   );
   return {

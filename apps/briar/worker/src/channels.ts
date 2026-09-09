@@ -288,7 +288,7 @@ export type ChannelMessageMutationCommit = ChannelMessageUploadScope & {
 };
 
 export type ChannelAgentReplyEnqueueInput = {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   /** The originating channel kind controls DM-only acknowledgement reactions. */
   channelKind?: ChannelKind;
@@ -561,8 +561,8 @@ const dmKeyAfterParticipantChangeSql = `case
 end`;
 
 /**
- * Public channels are readable by every organization member; private channels
- * require an explicit membership row. Organization membership itself is checked
+ * Public channels are readable by every workspace member; private channels
+ * require an explicit membership row. Workspace membership itself is checked
  * by the caller before any of these queries run.
  */
 const visibleToUser = `(
@@ -587,10 +587,10 @@ const notAgentDirectMessage =
 /**
  * An Agent-to-Agent DM carries no `briar_channel_members` rows, so membership
  * cannot grant it. Plan §3.5 asks instead whether the reader can reach every
- * participating Agent: organization owners and co-owners always can, everybody
+ * participating Agent: workspace owners and co-owners always can, everybody
  * else needs a `briar_project_members` row for each project-scoped
- * participant. A conversation between Organization Agents alone is therefore
- * readable by the whole organization. Binds the reader's user ID once.
+ * participant. A conversation between Workspace Agents alone is therefore
+ * readable by the whole workspace. Binds the reader's user ID once.
  */
 const agentDirectMessageVisibleToUser = `(
   channel.kind = 'dm'
@@ -836,7 +836,7 @@ export const isAgentDirectMessage = (
 
 export const channelJson = (row: ChannelRow): ChannelSummary => ({
   id: row.id,
-  organizationId: row.organization_id,
+  workspaceId: row.organization_id,
   kind: row.kind,
   slug: row.slug,
   name: row.name,
@@ -1125,7 +1125,7 @@ function aggregateReactions(
 
 export async function listChannels(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ) {
   const rows = await db
@@ -1135,7 +1135,7 @@ export async function listChannels(
          and ${notAgentDirectMessage}
        order by channel.archived_at is not null, channel.name, channel.id`,
     )
-    .bind(userId, userId, userId, organizationId, userId)
+    .bind(userId, userId, userId, workspaceId, userId)
     .all<ChannelRow>();
   return rows.results;
 }
@@ -1147,7 +1147,7 @@ export async function listChannels(
  */
 export async function listAgentDirectMessages(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   agentId: string,
   userId: string,
 ) {
@@ -1166,14 +1166,14 @@ export async function listAgentDirectMessages(
            and not ${agentAnswerCopySql("message")}
        ), channel.created_at) desc, channel.id`,
     )
-    .bind(userId, userId, userId, organizationId, agentId, userId)
+    .bind(userId, userId, userId, workspaceId, agentId, userId)
     .all<ChannelRow>();
   return rows.results;
 }
 
 export async function getChannel(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
 ) {
@@ -1182,7 +1182,7 @@ export async function getChannel(
       `${channelSelectForUser}
        where channel.organization_id = ? and channel.id = ? and ${readableByUser}`,
     )
-    .bind(userId, userId, userId, organizationId, channelId, userId, userId)
+    .bind(userId, userId, userId, workspaceId, channelId, userId, userId)
     .first<ChannelRow>();
 }
 
@@ -1214,14 +1214,14 @@ export async function markChannelRead(
 /** Worker-plane lookup: a claimed job already proves the channel is reachable. */
 export async function getChannelById(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
 ) {
   return db
     .prepare(
       `${channelSelect} where channel.organization_id = ? and channel.id = ?`,
     )
-    .bind(organizationId, channelId)
+    .bind(workspaceId, channelId)
     .first<ChannelRow>();
 }
 
@@ -1255,8 +1255,8 @@ export async function getProjectAgentChannel(
     .first<ChannelRow>();
 }
 
-/** Used to distinguish an inaccessible same-organization channel from 404. */
-export async function getProjectOrganizationChannel(
+/** Used to distinguish an inaccessible same-workspace channel from 404. */
+export async function getProjectWorkspaceChannel(
   db: D1Database,
   projectId: string,
   channelId: string,
@@ -1272,10 +1272,10 @@ export async function getProjectOrganizationChannel(
     .first<ChannelRow>();
 }
 
-/** Resolves a project only when it belongs to the given organization. */
-export async function getOrganizationProject(
+/** Resolves a project only when it belongs to the given workspace. */
+export async function getWorkspaceProject(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   projectId: string,
 ) {
   return db
@@ -1283,7 +1283,7 @@ export async function getOrganizationProject(
       `select id, name, organization_id from briar_teams
        where id = ? and organization_id = ?`,
     )
-    .bind(projectId, organizationId)
+    .bind(projectId, workspaceId)
     .first<{ id: string; name: string; organization_id: string }>();
 }
 
@@ -1291,7 +1291,7 @@ export async function createChannel(
   db: D1Database,
   input: {
     id: string;
-    organizationId: string;
+    workspaceId: string;
     slug: string;
     name: string;
     topic: string | null;
@@ -1320,7 +1320,7 @@ export async function createChannel(
       )
       .bind(
         input.id,
-        input.organizationId,
+        input.workspaceId,
         input.kind,
         input.dmKey,
         input.slug,
@@ -1354,12 +1354,12 @@ export async function createChannel(
       ).bind(input.id, agentId, input.createdByUserId, input.createdAt)
     ),
   ]);
-  return getChannel(db, input.organizationId, input.id, input.createdByUserId);
+  return getChannel(db, input.workspaceId, input.id, input.createdByUserId);
 }
 
 export async function getDirectMessageByKey(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   dmKey: string,
   userId: string,
 ) {
@@ -1369,14 +1369,14 @@ export async function getDirectMessageByKey(
        where channel.organization_id = ? and channel.kind = 'dm'
          and channel.dm_key = ? and ${visibleToUser}`,
     )
-    .bind(userId, userId, userId, organizationId, dmKey, userId)
+    .bind(userId, userId, userId, workspaceId, dmKey, userId)
     .first<ChannelRow>();
 }
 
 export async function updateChannel(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     userId: string;
     name?: string;
@@ -1389,7 +1389,7 @@ export async function updateChannel(
 ) {
   const current = await getChannel(
     db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -1415,15 +1415,15 @@ export async function updateChannel(
           : null,
       input.updatedAt,
       input.channelId,
-      input.organizationId,
+      input.workspaceId,
     )
     .run();
-  return getChannel(db, input.organizationId, input.channelId, input.userId);
+  return getChannel(db, input.workspaceId, input.channelId, input.userId);
 }
 
 export async function deleteChannel(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
   observedAt: string,
@@ -1469,7 +1469,7 @@ export async function deleteChannel(
            alert_state = 'none',
            alert_detail_json = null`,
       )
-      .bind(observedAt, organizationId, channelId, userId, userId),
+      .bind(observedAt, workspaceId, channelId, userId, userId),
     db
       .prepare(
         `delete from briar_channels
@@ -1485,7 +1485,7 @@ export async function deleteChannel(
            )
          returning id`,
       )
-      .bind(channelId, organizationId, userId, userId),
+      .bind(channelId, workspaceId, userId, userId),
   ]);
   return (results[1]?.results?.length ?? 0) > 0;
 }
@@ -1831,7 +1831,7 @@ const channelMessageAttachmentJson = (
   filename: row.filename,
   contentType: row.content_type,
   byteSize: row.byte_size,
-  url: `/organizations/${row.organization_id}/channels/${row.channel_id}/messages/${row.message_id}/attachments/${row.id}`,
+  url: `/workspaces/${row.organization_id}/channels/${row.channel_id}/messages/${row.message_id}/attachments/${row.id}`,
   imageWidth: row.image_width ?? null,
   imageHeight: row.image_height ?? null,
 });
@@ -2430,7 +2430,7 @@ type ChannelMessageDeletionTarget = {
 async function getChannelMessageDeletionTarget(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     messageId: string;
     userId: string;
@@ -2457,7 +2457,7 @@ async function getChannelMessageDeletionTarget(
     input.userId,
     input.userId,
     input.userId,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.messageId,
   ).first<ChannelMessageDeletionTarget>();
@@ -2479,7 +2479,7 @@ export type DeleteChannelMessageOutcome = {
 export async function deleteChannelMessage(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     messageId: string;
     userId: string;
@@ -2524,7 +2524,7 @@ export async function deleteChannelMessage(
   const authorizationBindings = () => [
     input.messageId,
     input.channelId,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
     input.userId,
     input.userId,
@@ -2553,7 +2553,7 @@ export async function deleteChannelMessage(
          alert_detail_json = null`,
     ).bind(
       input.deletedAt,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.messageId,
       ...authorizationBindings(),
@@ -2899,7 +2899,7 @@ export async function createIncomingChannelWebhookMessage(
 
 export async function getChannelMessageAttachment(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   messageId: string,
   attachmentId: string,
@@ -2911,7 +2911,7 @@ export async function getChannelMessageAttachment(
        from briar_channel_message_attachments
        where organization_id = ? and channel_id = ? and message_id = ? and id = ?`,
     )
-    .bind(organizationId, channelId, messageId, attachmentId)
+    .bind(workspaceId, channelId, messageId, attachmentId)
     .first<ChannelMessageAttachmentRow>();
 }
 
@@ -2941,7 +2941,7 @@ export async function getChannelMessageDocument(
 export async function getClaimedChannelReplyChannel(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     jobId: string;
     deviceId: string;
     observedAt: string;
@@ -2974,7 +2974,7 @@ export async function getClaimedChannelReplyChannel(
     )
     .bind(
       input.jobId,
-      input.organizationId,
+      input.workspaceId,
       input.deviceId,
       input.observedAt,
     )
@@ -2990,7 +2990,7 @@ export async function getClaimedChannelReplyChannel(
 export async function getClaimedChannelReplyAttachment(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     jobId: string;
     deviceId: string;
     claimTokenHash: string;
@@ -3048,7 +3048,7 @@ export async function getClaimedChannelReplyAttachment(
     )
     .bind(
       input.jobId,
-      input.organizationId,
+      input.workspaceId,
       input.deviceId,
       input.claimTokenHash,
       input.observedAt,
@@ -3074,8 +3074,8 @@ const channelReplyPlainConversationTurn = (job: string) =>
 
 /**
  * One job per mentioned agent, so a message that names two agents gets two
- * independent replies. Organization agents leave project_id null, which is what
- * makes them claimable by any device in the organization.
+ * independent replies. Workspace agents leave project_id null, which is what
+ * makes them claimable by any device in the workspace.
  */
 async function channelAgentReplyEnqueueStatements(
   db: D1Database,
@@ -3100,7 +3100,7 @@ async function channelAgentReplyEnqueueStatements(
        case when current_skill.id is null then null else trigger_message.body end`;
   const routingAgents = new Set((await Promise.all(input.agents.map(async (agent) =>
     input.channelKind === "dm" && !agent.skillId && await dmReplyRoutingAvailable(db, {
-      organizationId: input.organizationId, channelId: input.channelId, provider: agent.provider, preferredDeviceId: input.preferredDeviceId,
+      workspaceId: input.workspaceId, channelId: input.channelId, provider: agent.provider, preferredDeviceId: input.preferredDeviceId,
     }) ? agent.id : null))).filter((id) => id !== null));
   return input.agents.flatMap((agent) => {
       const routed = routingAgents.has(agent.id);
@@ -3201,7 +3201,7 @@ async function channelAgentReplyEnqueueStatements(
              updated_at = excluded.updated_at`,
         ).bind(
           sessionId,
-          input.organizationId,
+          input.workspaceId,
           input.channelId,
           sessionRootMessageId,
           agent.projectId,
@@ -3218,7 +3218,7 @@ async function channelAgentReplyEnqueueStatements(
           sessionRootMessageId,
           input.channelId,
           agent.id,
-          input.organizationId,
+          input.workspaceId,
           agent.projectId,
           agent.skillId ?? null,
           agent.provider,
@@ -3270,7 +3270,7 @@ async function channelAgentReplyEnqueueStatements(
            on conflict (channel_id, trigger_message_id, agent_id) do nothing`,
         ).bind(
           jobId,
-          input.organizationId,
+          input.workspaceId,
           input.channelId,
           agent.projectId,
           agent.id,
@@ -3290,7 +3290,7 @@ async function channelAgentReplyEnqueueStatements(
           sessionRootMessageId,
           input.channelId,
           agent.id,
-          input.organizationId,
+          input.workspaceId,
           agent.projectId,
           agent.skillId ?? null,
           agent.provider,
@@ -3375,7 +3375,7 @@ export async function listActiveChannelAgentReplies(
 
 export async function getChannelAgentReplyJob(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   jobId: string,
 ) {
   return db
@@ -3383,7 +3383,7 @@ export async function getChannelAgentReplyJob(
       `select * from briar_channel_agent_reply_jobs
        where id = ? and organization_id = ?`,
     )
-    .bind(jobId, organizationId)
+    .bind(jobId, workspaceId)
     .first<ChannelReplyJobRow>();
 }
 
@@ -3620,7 +3620,7 @@ const channelReplySettled = (job: string) => `(
  */
 export async function nextChannelReplySettleWaitMs(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   input: { observedAt: string; settleMs?: number },
 ) {
   const settleMs = input.settleMs ?? DM_REPLY_SETTLE_MS;
@@ -3647,7 +3647,7 @@ export async function nextChannelReplySettleWaitMs(
            and active_job.lease_expires_at > ?
        )`,
   ).bind(
-    organizationId,
+    workspaceId,
     settleThreshold,
     MAX_REPLY_ATTEMPTS,
     input.observedAt,
@@ -3662,13 +3662,13 @@ export async function nextChannelReplySettleWaitMs(
 }
 
 /**
- * Any enabled binding may host an organization job. A Project Agent job may
+ * Any enabled binding may host an workspace job. A Project Agent job may
  * only be claimed by the exact binding for that project; device identity alone
  * is insufficient because one device can run several project loops.
  */
 export async function claimNextChannelAgentReply(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   input: {
     deviceId: string;
     workerId: string;
@@ -3774,7 +3774,7 @@ export async function claimNextChannelAgentReply(
            and ${liveSkillSnapshot("briar_channel_agent_reply_jobs")}
          )`,
     )
-    .bind(input.claimedAt, input.claimedAt, organizationId)
+    .bind(input.claimedAt, input.claimedAt, workspaceId)
     .run();
   await db
     .prepare(
@@ -3787,7 +3787,7 @@ export async function claimNextChannelAgentReply(
          and steer_revision = applied_steer_revision
          and lease_expires_at <= ?`,
     )
-    .bind(input.claimedAt, organizationId, MAX_REPLY_ATTEMPTS, input.claimedAt)
+    .bind(input.claimedAt, workspaceId, MAX_REPLY_ATTEMPTS, input.claimedAt)
     .run();
   const assignedJobs = await db.prepare(
     `select job.id, job.project_id, agent.computer_use_policy,
@@ -3813,7 +3813,7 @@ export async function claimNextChannelAgentReply(
        and coalesce(job.routing_action, 'new') <> 'pending'
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))`,
-  ).bind(organizationId, input.claimedAt).all<{
+  ).bind(workspaceId, input.claimedAt).all<{
     id: string;
     project_id: string | null;
     agent_provider: AgentProvider | null;
@@ -3828,7 +3828,7 @@ export async function claimNextChannelAgentReply(
   for (const assigned of assignedJobs.results) {
     if (!assigned.agent_provider) continue;
     const availability = await channelReplyWorkerAvailability(db, {
-      organizationId,
+      workspaceId,
       projectId: assigned.project_id,
       preferredDeviceId: assigned.owner_device_id,
       preferredWorkerId: assigned.owner_worker_id,
@@ -3872,7 +3872,7 @@ export async function claimNextChannelAgentReply(
       input.claimedAt,
       input.claimedAt,
       assigned.id,
-      organizationId,
+      workspaceId,
       input.claimedAt,
       assigned.owner_worker_id,
     ).run();
@@ -3957,7 +3957,7 @@ export async function claimNextChannelAgentReply(
        )
      order by job.planned_update_resume desc, job.created_at, job.id`,
   ).bind(
-    organizationId,
+    workspaceId,
     MAX_REPLY_ATTEMPTS,
     input.claimedAt,
     settleThreshold,
@@ -4020,7 +4020,7 @@ export async function claimNextChannelAgentReply(
       let available = preferredAvailability.get(preferenceKey);
       if (available === undefined) {
         available = await hasAvailableChannelReplyWorker(db, {
-          organizationId,
+          workspaceId,
           projectId: candidate.project_id,
           preferredDeviceId: candidate.preferred_device_id,
           provider: candidate.agent_provider,
@@ -4117,7 +4117,7 @@ export async function claimNextChannelAgentReply(
         input.leaseExpiresAt,
         input.claimedAt,
         candidate.id,
-        organizationId,
+        workspaceId,
         MAX_REPLY_ATTEMPTS,
         candidate.session_id,
         input.claimedAt,
@@ -4311,14 +4311,14 @@ export async function snapshotChannelReplyExecutionTargets(
 }
 
 /**
- * Revalidates the complete authority chain for one Organization Agent context
+ * Revalidates the complete authority chain for one Workspace Agent context
  * request. A valid token alone is insufficient: the claim, Worker binding,
- * device, organization scope, Agent scope, and live lease must still agree.
+ * device, workspace scope, Agent scope, and live lease must still agree.
  */
-export async function getActiveOrganizationChannelReplyContextClaim(
+export async function getActiveWorkspaceChannelReplyContextClaim(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     jobId: string;
     deviceId: string;
     workerId: string;
@@ -4358,7 +4358,7 @@ export async function getActiveOrganizationChannelReplyContextClaim(
        and binding_project.organization_id = job.organization_id`,
   ).bind(
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.deviceId,
     input.workerId,
     input.claimTokenHash,
@@ -4890,7 +4890,7 @@ export async function completeChannelReply(
     throw new Error("Project Agent output must target its claimed project");
   }
   if (delegation && (job.project_id !== null || job.delegated_by_reply_job_id)) {
-    throw new Error("Only a top-level Organization Agent reply can delegate");
+    throw new Error("Only a top-level Workspace Agent reply can delegate");
   }
   if (delegation && (
     input.document || input.issueProposal || input.issueBatchProposal ||
@@ -4912,7 +4912,7 @@ export async function completeChannelReply(
   }
   if (input.issueProposal?.executeAfterCreate && job.project_id === null) {
     throw new Error(
-      "An Organization Agent must delegate create-and-execute requests",
+      "An Workspace Agent must delegate create-and-execute requests",
     );
   }
   if (input.issueProposal && input.executionProposal) {
@@ -4950,7 +4950,7 @@ export async function completeChannelReply(
   /*
     Second line of defence behind the completion application: a send only
     applies from an untouched hop-0 turn in a conversation with a person, and
-    only towards another Agent of the same organization.
+    only towards another Agent of the same workspace.
   */
   const agentMessageGuardSql = `and (
          ? = 0
@@ -6238,7 +6238,7 @@ export async function completeChannelReply(
     workerId: input.workerId,
     claimTokenHash: input.claimTokenHash,
     completedAt: input.completedAt,
-    organizationId: job.organization_id,
+    workspaceId: job.organization_id,
     channelId: job.channel_id,
     channelMessageId: job.reply_message_id,
     body: input.body,
@@ -6429,7 +6429,7 @@ export async function declineChannelActionProposal(
 
 /**
  * Records the member's approval target before creating the issue. The guarded
- * update is the serialization point for organization Agent proposals whose
+ * update is the serialization point for workspace Agent proposals whose
  * project is chosen at approval time: two members may retry the same target,
  * but they can never create the proposal in two different projects.
  *
@@ -6444,7 +6444,7 @@ export async function declineChannelActionProposal(
 export async function reserveChannelActionProposalApproval(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     proposalId: string;
     projectId: string;
@@ -6518,7 +6518,7 @@ export async function reserveChannelActionProposalApproval(
       input.projectId,
       input.userId,
       input.projectId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.projectId,
     )
@@ -6583,7 +6583,7 @@ export async function acceptChannelActionProposal(
 export async function getChannelExecutionProposal(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     proposalId: string;
     userId: string;
@@ -6607,7 +6607,7 @@ export async function getChannelExecutionProposal(
     )
     .bind(
       input.proposalId,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.userId,
     )
@@ -6617,7 +6617,7 @@ export async function getChannelExecutionProposal(
 export async function getChannelAgentSkillExecutionProposal(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     proposalId: string;
     userId: string;
@@ -6663,7 +6663,7 @@ export async function getChannelAgentSkillExecutionProposal(
     )
     .bind(
       input.proposalId,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.userId,
     )
@@ -6673,7 +6673,7 @@ export async function getChannelAgentSkillExecutionProposal(
 export async function reserveChannelExecutionProposalApproval(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     proposalId: string;
     userId: string;
@@ -6769,7 +6769,7 @@ export async function reserveChannelExecutionProposalApproval(
       input.dispatchRequestId,
       input.reservedAt,
       input.proposalId,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.userId,
       input.provider,
@@ -6784,31 +6784,31 @@ export async function reserveChannelExecutionProposalApproval(
 
 export async function getChannelSyncCursor(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const row = await db
     .prepare(
       `select current_version from briar_channel_sync_state
        where organization_id = ?`,
     )
-    .bind(organizationId)
+    .bind(workspaceId)
     .first<{ current_version: number }>();
   return row?.current_version ?? 0;
 }
 
 /**
  * Channel deltas answer "what changed for this member" rather than "what
- * changed in the organization": changes in channels the caller cannot see are
+ * changed in the workspace": changes in channels the caller cannot see are
  * consumed by the cursor but never returned.
  */
 export async function loadChannelDelta(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
   since: number,
   limit = 200,
 ) {
-  const currentCursor = await getChannelSyncCursor(db, organizationId);
+  const currentCursor = await getChannelSyncCursor(db, workspaceId);
   if (currentCursor <= since) {
     return {
       cursor: since,
@@ -6827,7 +6827,7 @@ export async function loadChannelDelta(
        where organization_id = ? and version > ?
        order by version limit ?`,
     )
-    .bind(organizationId, since, limit + 1)
+    .bind(workspaceId, since, limit + 1)
     .all<{
       version: number;
       channel_id: string;
@@ -6858,7 +6858,7 @@ export async function loadChannelDelta(
           `select channel.id from briar_channels channel
            where channel.organization_id = ? and ${readableByUser}`,
         )
-        .bind(organizationId, userId, userId)
+        .bind(workspaceId, userId, userId)
         .all<{ id: string }>()
     ).results.map((row) => row.id),
   );
@@ -6908,7 +6908,7 @@ export async function loadChannelDelta(
             `${channelSelectForUser} where channel.organization_id = ?
              and channel.id in (${[...channelIds].map(() => "?").join(", ")})`,
           )
-          .bind(userId, userId, userId, organizationId, ...channelIds)
+          .bind(userId, userId, userId, workspaceId, ...channelIds)
           .all<ChannelRow>()
       ).results
     : [];

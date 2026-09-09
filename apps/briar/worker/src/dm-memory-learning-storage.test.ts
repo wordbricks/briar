@@ -19,14 +19,14 @@ import { reserveDmLearningModelCall, submitDmLearningProposal, submitDmLearningV
 import { countExecutionWorkerDeviceSessions } from "./workers";
 import { reconcileDmMemory } from "./dm-memory-indexing";
 import { deleteDmMemory, getDmMemory, listDmMemories, saveDmMemory, updateDmMemorySettings } from "./dm-memory-repository";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import { syntheticDmLearningChange, syntheticDmLearningPolicy } from "./test-helpers/dm-memory-learning";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 import { createWorkerQueueService } from "./worker-connect-queue";
 
 describe("durable DM learning inputs and deletion", () => {
   const db = env.DB;
-  const organizationId = crypto.randomUUID(), userId = crypto.randomUUID(), agentId = crypto.randomUUID();
+  const workspaceId = crypto.randomUUID(), userId = crypto.randomUUID(), agentId = crypto.randomUUID();
   const projectId = crypto.randomUUID(), workerId = crypto.randomUUID(), deviceId = crypto.randomUUID();
   const workerToken = `briar_worker_${crypto.randomUUID().replaceAll("-", "")}`;
   const now = "2026-09-01T00:00:00.000Z";
@@ -35,16 +35,16 @@ describe("durable DM learning inputs and deletion", () => {
       db.prepare(`insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
         values (?, 'Synthetic memory owner', ?, 1, ?, ?)`).bind(userId, `${userId}@example.com`, now, now),
       db.prepare(`insert into briar_organizations (id, name, handle, created_at, updated_at)
-        values (?, 'Synthetic memory organization', ?, ?, ?)`).bind(organizationId, organizationId, now, now),
+        values (?, 'Synthetic memory workspace', ?, ?, ?)`).bind(workspaceId, workspaceId, now, now),
       db.prepare(`insert into briar_organization_members (organization_id, user_id, role, created_at, updated_at)
-        values (?, ?, 'owner', ?, ?)`).bind(organizationId, userId, now, now),
+        values (?, ?, 'owner', ?, ?)`).bind(workspaceId, userId, now, now),
       db.prepare(`insert into briar_teams(id, owner_user_id, organization_id, name, agent_token_hash, created_at, updated_at)
         values (?, ?, ?, 'Synthetic project', ?, ?, ?)`)
-        .bind(projectId, userId, organizationId, "b".repeat(64), now, now),
+        .bind(projectId, userId, workspaceId, "b".repeat(64), now, now),
       db.prepare(`insert into briar_execution_worker_devices
         (id, organization_id, owner_user_id, label, device_identity_hash, state, last_heartbeat_at, created_at, updated_at)
         values (?, ?, ?, 'Synthetic device', ?, 'online', ?, ?, ?)`)
-        .bind(deviceId, organizationId, userId, "b".repeat(64), now, now, now),
+        .bind(deviceId, workspaceId, userId, "b".repeat(64), now, now, now),
       db.prepare(`insert into briar_execution_workers
         (id, project_id, label, host_fingerprint, runtime_proto_json, state, accepting_work, readiness_state,
           last_heartbeat_at, created_at, updated_at, device_id)
@@ -54,7 +54,7 @@ describe("durable DM learning inputs and deletion", () => {
           dmMemoryLearning: { protocol: 2, transports: ["agent"], providers: ["codex"] },
         }), now, now, now, deviceId),
     ]);
-    await createOrganizationAgent(db, { id: agentId, organizationId, name: "Synthetic memory agent", provider: "grok",
+    await createWorkspaceAgent(db, { id: agentId, workspaceId, name: "Synthetic memory agent", provider: "grok",
       model: null, effort: null, responsibility: "Synthetic tests only", createdAt: now });
     await db.prepare(`insert into briar_execution_worker_credentials(device_id, token_hash, created_at) values (?, ?, ?)`)
       .bind(deviceId, await sha256(workerToken), now).run();
@@ -71,8 +71,8 @@ describe("durable DM learning inputs and deletion", () => {
   const memory = (body: string) => ({ requestId: crypto.randomUUID(), title: "Synthetic preference", body,
     memoryClass: "profile" as const, sourceLanguage: "en", observedAt: now, validUntil: null });
   async function fixture() {
-    const channelId = crypto.randomUUID(), owner = { organizationId, channelId, userId };
-    await createChannel(db, { id: channelId, organizationId, kind: "dm", dmKey: null, slug: channelId, name: "Synthetic DM",
+    const channelId = crypto.randomUUID(), owner = { workspaceId, channelId, userId };
+    await createChannel(db, { id: channelId, workspaceId, kind: "dm", dmKey: null, slug: channelId, name: "Synthetic DM",
       visibility: "private", topic: null, defaultProjectId: null, createdByUserId: userId, agentIds: [agentId], createdAt: now });
     const saved = await saveDmMemory(db, owner, memory("Start with a conclusion."));
     const spaceId = (await getDmMemory(db, owner, saved.documentId!)).memorySpaceId;
@@ -115,7 +115,7 @@ describe("durable DM learning inputs and deletion", () => {
       db.prepare(`insert into briar_dm_memory_model_calls(id, job_id, space_id, organization_id, claim_token_hash, stage,
         input_hash, proposal_hash, model_json, reserved_micro_usd, created_at)
         values (?, ?, ?, ?, ?, 'proposing', ?, ?, '{}', 0, ?)`)
-        .bind(callId, jobId, spaceId, organizationId, "b".repeat(64), "a".repeat(64), "c".repeat(64), now),
+        .bind(callId, jobId, spaceId, workspaceId, "b".repeat(64), "a".repeat(64), "c".repeat(64), now),
       db.prepare(`insert into briar_dm_memory_proposals(id, job_id, space_id, input_hash, proposal_hash, proposal_json,
         normalized_json, status, created_at) values (?, ?, ?, ?, ?, ?, ?, 'proposed', ?)`)
         .bind(callId, jobId, spaceId, "a".repeat(64), "c".repeat(64), '{"copy":"Synthetic private copy"}',
@@ -129,21 +129,21 @@ describe("durable DM learning inputs and deletion", () => {
     await enable(f.spaceId);
     const first = await message(f.owner.channelId, "First future fact");
     await outbox(f.spaceId, "2026-09-01T00:00:15.000Z", now);
-    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:15.000Z");
+    await scheduleDmLearningJobs(db, workspaceId, "2026-09-01T00:00:15.000Z");
     expect(await job(f.spaceId)).toBeNull();
     const rest: string[] = [];
     for (let i = 2; i <= dmMemoryLearningExtractBatchSources; i++) rest.push(await message(f.owner.channelId, `Future fact ${i}`));
     await outbox(f.spaceId, "2026-09-01T00:00:29.000Z", now);
     // Enough messages, but the first reply's deadline still gates the batch.
-    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:14.000Z");
+    await scheduleDmLearningJobs(db, workspaceId, "2026-09-01T00:00:14.000Z");
     expect(await job(f.spaceId)).toBeNull();
-    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:15.000Z");
+    await scheduleDmLearningJobs(db, workspaceId, "2026-09-01T00:00:15.000Z");
     const created = await job(f.spaceId);
     expect(created).toMatchObject({ kind: "extract", status: "pending", source_start: 0 });
     const events = (await db.prepare(`select message_id from briar_dm_memory_source_events where space_id = ? order by sequence`)
       .bind(f.spaceId).all<{ message_id: string }>()).results;
     expect(events.map((event) => event.message_id)).toEqual([first, ...rest]);
-    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:01:00.000Z");
+    await scheduleDmLearningJobs(db, workspaceId, "2026-09-01T00:01:00.000Z");
     expect((await db.prepare(`select count(*) as count from briar_dm_memory_jobs where space_id = ? and kind = 'extract'`)
       .bind(f.spaceId).first<{ count: number }>())!.count).toBe(1);
   });
@@ -151,16 +151,16 @@ describe("durable DM learning inputs and deletion", () => {
     const f = await fixture(); await enable(f.spaceId);
     await message(f.owner.channelId, "A single quiet fact");
     await outbox(f.spaceId, now, "2026-08-31T00:00:00.001Z");
-    await scheduleDmLearningJobs(db, organizationId, now);
+    await scheduleDmLearningJobs(db, workspaceId, now);
     expect(await job(f.spaceId)).toBeNull();
-    await scheduleDmLearningJobs(db, organizationId, "2026-09-01T00:00:00.001Z");
+    await scheduleDmLearningJobs(db, workspaceId, "2026-09-01T00:00:00.001Z");
     expect(await job(f.spaceId)).toMatchObject({ kind: "extract", status: "pending", source_start: 0 });
   });
   it("splits a durable interval beyond the chat snapshot without consuming its remainder", async () => {
     const f = await fixture(); await enable(f.spaceId);
     for (let i = 0; i < 35; i++) await message(f.owner.channelId, `Synthetic durable fact ${i}`);
     await outbox(f.spaceId, now);
-    await scheduleDmLearningJobs(db, organizationId, now);
+    await scheduleDmLearningJobs(db, workspaceId, now);
     const pending = await job(f.spaceId);
     const space = (await db.prepare("select * from briar_dm_memory_spaces where id = ?").bind(f.spaceId).first<DmLearningSpaceRow>())!;
     const input = await captureDmLearningInput(db, pending, space, syntheticDmLearningPolicy, now);
@@ -180,7 +180,7 @@ describe("durable DM learning inputs and deletion", () => {
     await saveDmMemory(db, f.owner, memory("Deploys always go out from main."));
     await message(f.owner.channelId, "A synthetic exchange to review.");
     await outbox(f.spaceId, now);
-    await scheduleDmLearningJobs(db, organizationId, now);
+    await scheduleDmLearningJobs(db, workspaceId, now);
     const space = (await db.prepare("select * from briar_dm_memory_spaces where id = ?").bind(f.spaceId).first<DmLearningSpaceRow>())!;
     const input = await captureDmLearningInput(db, await job(f.spaceId), space, syntheticDmLearningPolicy, now);
     const episodes = input.documents.filter((document) => document.memoryClass === "log");
@@ -195,7 +195,7 @@ describe("durable DM learning inputs and deletion", () => {
     const first = async (at: string) => {
       await db.prepare("update briar_dm_memory_learning_state set last_scheduled_at = '2000-01-01T00:00:00.000Z' where space_id = ?")
         .bind(f.spaceId).run();
-      await scheduleDmLearningJobs(db, organizationId, at);
+      await scheduleDmLearningJobs(db, workspaceId, at);
       return db.prepare("select id, kind, source_end from briar_dm_memory_jobs where space_id = ? and kind = 'consolidate'")
         .bind(f.spaceId).first<{ id: string; kind: string; source_end: number }>();
     };
@@ -262,10 +262,10 @@ describe("durable DM learning inputs and deletion", () => {
     const f = await fixture(); await enable(f.spaceId);
     const sourceId = await message(f.owner.channelId, "Use tables when comparing implementation options.");
     await outbox(f.spaceId, now);
-    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    const claim = await claimDmLearningJob(db, { workspaceId, deviceId, workerId, projectId, now });
     expect(claim).not.toBeNull();
     if (!claim) throw new Error("Synthetic learning claim was not acquired");
-    const identity = { organizationId, workerId, deviceId, jobId: claim.workId, claimTokenHash: await sha256(claim.claimToken) };
+    const identity = { workspaceId, workerId, deviceId, jobId: claim.workId, claimTokenHash: await sha256(claim.claimToken) };
     const proposal = { explicitRequest: false, changes: [syntheticDmLearningChange(claim.snapshot, {
       title: "Comparison preference", content: "The user prefers tables when comparing implementation options.",
       sourceLanguage: "en", observedAt: now, sourceRefs: [{ type: "message", id: sourceId, version: 1 }],
@@ -282,11 +282,11 @@ describe("durable DM learning inputs and deletion", () => {
     const f = await fixture(); await enable(f.spaceId);
     await message(f.owner.channelId, "Use the connected Agent for this synthetic preference.");
     await outbox(f.spaceId, now);
-    await scheduleDmLearningJobs(db, organizationId, now);
+    await scheduleDmLearningJobs(db, workspaceId, now);
     // The DM Agent runs on Grok, which is not verified, so the queue pins Codex.
     const enqueued = await job(f.spaceId);
     expect(JSON.parse(enqueued.policy_json!)).toEqual(syntheticDmLearningPolicy);
-    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    const claim = await claimDmLearningJob(db, { workspaceId, deviceId, workerId, projectId, now });
     expect(claim?.snapshot.policy).toEqual(syntheticDmLearningPolicy);
     expect(JSON.parse((await job(f.spaceId)).policy_json!)).toEqual(syntheticDmLearningPolicy);
   });
@@ -294,7 +294,7 @@ describe("durable DM learning inputs and deletion", () => {
     const f = await fixture(); await enable(f.spaceId);
     await message(f.owner.channelId, "Resolve the learning provider at claim time.");
     await outbox(f.spaceId, now);
-    await scheduleDmLearningJobs(db, organizationId, now);
+    await scheduleDmLearningJobs(db, workspaceId, now);
     const pinned = { ...syntheticDmLearningPolicy,
       proposer: { ...syntheticDmLearningPolicy.proposer, provider: "grok" as const },
       verifier: { ...syntheticDmLearningPolicy.verifier, provider: "grok" as const } };
@@ -302,7 +302,7 @@ describe("durable DM learning inputs and deletion", () => {
     await db.prepare("update briar_dm_memory_jobs set policy_json = ? where id = ?")
       .bind(dmMemoryCanonicalJson(pinned), pending.id).run();
     // This Worker cannot run Grok, so the claim falls back inside the verified list.
-    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    const claim = await claimDmLearningJob(db, { workspaceId, deviceId, workerId, projectId, now });
     expect(claim?.workId).toBe(pending.id);
     expect(claim?.snapshot.policy).toEqual(syntheticDmLearningPolicy);
     expect(JSON.parse((await job(f.spaceId)).policy_json!)).toEqual(syntheticDmLearningPolicy);
@@ -314,9 +314,9 @@ describe("durable DM learning inputs and deletion", () => {
     try {
       await setRuntime(workerRuntimeProtoJsonFixture({ agentProvider: "claude", providers: ["claude"],
         dmMemoryLearning: { protocol: 2, transports: ["agent"], providers: ["grok"] } }));
-      expect(await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now })).toBeNull();
+      expect(await claimDmLearningJob(db, { workspaceId, deviceId, workerId, projectId, now })).toBeNull();
       await setRuntime(workerRuntimeProtoJsonFixture({ providers: ["codex"], dmMemoryLearning: true }));
-      expect(await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now })).toBeNull();
+      expect(await claimDmLearningJob(db, { workspaceId, deviceId, workerId, projectId, now })).toBeNull();
     } finally {
       await setRuntime(defaultRuntime);
       // Leave nothing claimable behind: a later test's claim orders same-time candidates by id.
@@ -391,9 +391,9 @@ describe("durable DM learning inputs and deletion", () => {
       decisions: [{ changeId: "change-1", verdict: "supported" }] } })).rejects.toMatchObject({ code: "scope_revoked" });
   });
   async function emptyExtraction(spaceId: string) {
-    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    const claim = await claimDmLearningJob(db, { workspaceId, deviceId, workerId, projectId, now });
     if (!claim) throw new Error("Synthetic extraction was not claimed");
-    const identity = { organizationId, workerId, deviceId, jobId: claim.workId, claimTokenHash: await sha256(claim.claimToken) };
+    const identity = { workspaceId, workerId, deviceId, jobId: claim.workId, claimTokenHash: await sha256(claim.claimToken) };
     const callId = crypto.randomUUID(), common = { identity, inputHash: claim.inputHash, now };
     await reserveDmLearningModelCall(db, { ...common, callId, stage: "proposing" });
     const result = await submitDmLearningProposal(db, { ...common, callId, proposal: { explicitRequest: false, changes: [] }, usage });
@@ -412,7 +412,7 @@ describe("durable DM learning inputs and deletion", () => {
     expect(first.watermark).toBe(first.claim.snapshot.sourceStart);
     await message(f.owner.channelId, "And keep that for every repository.");
     await outbox(f.spaceId, now);
-    const next = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    const next = await claimDmLearningJob(db, { workspaceId, deviceId, workerId, projectId, now });
     expect(next?.snapshot).toMatchObject({ kind: "extract", sourceStart: first.claim.snapshot.sourceStart });
     expect(next?.snapshot.inputSources).toHaveLength(3);
   });
@@ -425,12 +425,12 @@ describe("durable DM learning inputs and deletion", () => {
     expect(first.watermark).toBe(first.claim.snapshot.sourceStart);
     await message(f.owner.channelId, "One more line after the review.");
     await outbox(f.spaceId, now, now);
-    await scheduleDmLearningJobs(db, organizationId, now);
+    await scheduleDmLearningJobs(db, workspaceId, now);
     expect((await db.prepare(`select count(*) as count from briar_dm_memory_jobs where space_id = ? and kind = 'extract'`)
       .bind(f.spaceId).first<{ count: number }>())!.count).toBe(1);
     for (let i = 2; i <= dmMemoryLearningExtractBatchSources; i++) await message(f.owner.channelId, `Later line ${i}`);
     await outbox(f.spaceId, now, now);
-    await scheduleDmLearningJobs(db, organizationId, now);
+    await scheduleDmLearningJobs(db, workspaceId, now);
     const next = await db.prepare(`select source_start, status from briar_dm_memory_jobs where space_id = ? and kind = 'extract'
       and status = 'pending'`).bind(f.spaceId).first<{ source_start: number; status: string }>();
     expect(next).toEqual({ source_start: first.claim.snapshot.sourceStart, status: "pending" });
@@ -487,7 +487,7 @@ describe("durable DM learning inputs and deletion", () => {
     await db.batch(Array.from({ length: day }, () => db.prepare(`insert into briar_dm_memory_model_calls
       (id, job_id, space_id, organization_id, claim_token_hash, stage, input_hash, proposal_hash, model_json, reserved_micro_usd, created_at)
       values (?, ?, ?, ?, ?, 'proposing', ?, null, '{}', 0, ?)`)
-      .bind(crypto.randomUUID(), f.claim.workId, f.spaceId, organizationId, "d".repeat(64), "e".repeat(64), now)));
+      .bind(crypto.randomUUID(), f.claim.workId, f.spaceId, workspaceId, "d".repeat(64), "e".repeat(64), now)));
     await expect(reserveDmLearningModelCall(db, { ...f.common, callId: crypto.randomUUID(), stage: "proposing" }))
       .rejects.toMatchObject({ code: "budget_exhausted" });
     expect(await failDmLearningClaim(db, f.identity, "budget_exhausted", now)).toBe(true);
@@ -496,7 +496,7 @@ describe("durable DM learning inputs and deletion", () => {
       source_start: f.claim.snapshot.sourceStart, source_end: f.claim.snapshot.sourceEnd });
     // The waiting job still serializes its space; nothing new is scheduled behind it.
     await message(f.owner.channelId, "Another line while the budget is spent."); await outbox(f.spaceId, now);
-    expect(await scheduleDmLearningJobs(db, organizationId, now)).toBe(0);
+    expect(await scheduleDmLearningJobs(db, workspaceId, now)).toBe(0);
     expect((await db.prepare("select source_watermark from briar_dm_memory_learning_state where space_id = ?")
       .bind(f.spaceId).first<{ source_watermark: number }>())!.source_watermark).toBe(0);
   });
@@ -516,7 +516,7 @@ describe("durable DM learning inputs and deletion", () => {
   it("retires expired attempts without losing the durable input interval or refunding unknown calls", async () => {
     const f = await claimedLearning(), callId = crypto.randomUUID();
     await reserveDmLearningModelCall(db, { ...f.common, callId, stage: "proposing" });
-    await reapDmLearningClaims(db, "2026-09-01T00:05:00.000Z", organizationId);
+    await reapDmLearningClaims(db, "2026-09-01T00:05:00.000Z", workspaceId);
     expect(await job(f.spaceId)).toMatchObject({ status: "retry_wait", input_json: null, input_hash: null,
       lease_token_hash: null, calls_used: 1, source_start: f.claim.snapshot.sourceStart, source_end: f.claim.snapshot.sourceEnd });
     expect(await db.prepare("select status, error_code from briar_dm_memory_model_calls where id = ?")
@@ -614,8 +614,8 @@ describe("durable DM learning inputs and deletion", () => {
       values (?, ?, 'explicit_request', 0, ?, ?, 0, ?, ?)`)
       .bind(crypto.randomUUID(), f.spaceId, requestSource,
         JSON.stringify([{ documentId: f.documentId, version: 1 }]), now, now).run();
-    expect(await scheduleDmLearningJobs(db, organizationId, now)).toBe(1);
-    const claim = await claimDmLearningJob(db, { organizationId, deviceId, workerId, projectId, now });
+    expect(await scheduleDmLearningJobs(db, workspaceId, now)).toBe(1);
+    const claim = await claimDmLearningJob(db, { workspaceId, deviceId, workerId, projectId, now });
     expect(claim?.snapshot.requestSource).toEqual({ type: "message", id: requestSource, version: 1 });
     expect(claim?.snapshot.documents.map((document) => document.id)).toEqual([f.documentId]);
     expect(claim?.snapshot.documents.map((document) => document.id)).not.toContain(unrelated.documentId);
@@ -626,7 +626,7 @@ describe("durable DM learning inputs and deletion", () => {
   it("retries a failed interval idempotently without resetting its model-call ceiling", async () => {
     const f = await fixture(); await enable(f.spaceId);
     await message(f.owner.channelId, "Synthetic retry source."); await outbox(f.spaceId, now);
-    expect(await scheduleDmLearningJobs(db, organizationId, now)).toBe(1);
+    expect(await scheduleDmLearningJobs(db, workspaceId, now)).toBe(1);
     const failed = (await db.prepare(`select id from briar_dm_memory_jobs where space_id = ? and kind = 'extract'
       order by created_at desc limit 1`).bind(f.spaceId).first<{ id: string }>())!;
     await db.prepare("update briar_dm_memory_jobs set status = 'failed', calls_used = 2, error_code = 'model_unavailable' where id = ?")
@@ -653,7 +653,7 @@ describe("durable DM learning inputs and deletion", () => {
     await db.prepare(`insert into briar_dm_memory_vectors
       (id, organization_id, space_id, document_id, document_version, chunk_id, embedding_profile, state, available_at, created_at)
       values (?, ?, ?, ?, 1, ?, 'cf-bge-m3-1024-cosine-v1', 'purging', ?, ?)`)
-      .bind(vectorId, organizationId, f.spaceId, derived.documentId, crypto.randomUUID(), now, now).run();
+      .bind(vectorId, workspaceId, f.spaceId, derived.documentId, crypto.randomUUID(), now, now).run();
     await deleteDmMemory(db, f.owner, f.documentId);
     await reconcileDmMemory(db, null, now, false);
     expect(await deleteDmMemory(db, f.owner, f.documentId)).toMatchObject({ purgeState: "pending" });

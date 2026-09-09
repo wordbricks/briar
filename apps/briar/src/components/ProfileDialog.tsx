@@ -7,7 +7,7 @@ import type {
   ChannelMember,
   DirectMessageParticipant,
 } from "../lib/channels-contract";
-import type { OrganizationRole } from "../types";
+import type { WorkspaceRole } from "../types";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +23,8 @@ export type ProfileTarget =
       name: string;
       email: string;
       image: string | null;
-      role: OrganizationRole;
-      roleContext: "organization";
+      role: WorkspaceRole;
+      roleContext: "workspace";
       createdAt: string;
     }
   | {
@@ -135,7 +135,7 @@ export function ProfileDialog({
               ? "profile.channelOwner"
               : "profile.channelMember",
           )
-        : t(`organization.role.${profile.role}`)
+        : t(`workspace.role.${profile.role}`)
       : profile?.projectId
         ? t("channel.projectAgent")
         : t("channel.orgAgent");

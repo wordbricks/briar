@@ -34,7 +34,7 @@ import {
 import { archiveCompletedLogs, type ArchiveBucket } from "./archive";
 import apiWorker from "./index";
 import {
-  acceptOrganizationChannelSkillExecutionProposal,
+  acceptWorkspaceChannelSkillExecutionProposal,
 } from "./channel-proposal-routes";
 import {
   workerClaimRuntimeFixture,
@@ -51,7 +51,7 @@ import {
 import { encodeApprovedTeamAgentTaskSession } from "./team-agent-session-materialization";
 import { decodeStoredTeamAgentSessionPayload } from "./team-request-contract";
 
-const organizationId = "91000000-0000-4000-8000-000000000001";
+const workspaceId = "91000000-0000-4000-8000-000000000001";
 const projectId = "92000000-0000-4000-8000-000000000001";
 const channelId = "93000000-0000-4000-8000-000000000001";
 const ownerId = "skill-approval-owner";
@@ -213,17 +213,17 @@ describe("conversational Agent Skill execution approval", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Skill approval org', 'skill-approval-org', ?, ?)`,
-      ).bind(organizationId, observedAt, observedAt),
+      ).bind(workspaceId, observedAt, observedAt),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, observedAt, observedAt),
+      ).bind(workspaceId, ownerId, observedAt, observedAt),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'developer', ?, ?)`,
-      ).bind(organizationId, memberId, observedAt, observedAt),
+      ).bind(workspaceId, memberId, observedAt, observedAt),
       db.prepare(
         `insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
@@ -232,7 +232,7 @@ describe("conversational Agent Skill execution approval", () => {
       ).bind(
         projectId,
         ownerId,
-        organizationId,
+        workspaceId,
         "a".repeat(64),
         observedAt,
         observedAt,
@@ -243,7 +243,7 @@ describe("conversational Agent Skill execution approval", () => {
          ) values (?, ?, ?, ?, ?)`,
       ).bind(
         projectId,
-        organizationId,
+        workspaceId,
         memberId,
         observedAt,
         observedAt,
@@ -273,7 +273,7 @@ describe("conversational Agent Skill execution approval", () => {
       ).bind(
         staleBootstrapProjectId,
         ownerId,
-        organizationId,
+        workspaceId,
         "b".repeat(64),
         observedAt,
         observedAt,
@@ -292,7 +292,7 @@ describe("conversational Agent Skill execution approval", () => {
       await registerExecutionWorker(db, projectId, {
         id,
         deviceId,
-        organizationId,
+        workspaceId,
         ownerUserId: workerOwnerId,
         label: `Skill Worker ${suffix}`,
         deviceIdentityHash: sha256(`skill-device-${suffix}`),
@@ -306,7 +306,7 @@ describe("conversational Agent Skill execution approval", () => {
     await registerExecutionWorker(db, staleBootstrapProjectId, {
       id: staleBootstrapWorkerId,
       deviceId: staleWorkerDeviceId,
-      organizationId,
+      workspaceId,
       ownerUserId: ownerId,
       label: "Stale device Worker",
       deviceIdentityHash: sha256("skill-device-stale"),
@@ -317,7 +317,7 @@ describe("conversational Agent Skill execution approval", () => {
     });
     await bindExecutionWorkerProject(db, projectId, {
       id: staleDeviceWorkerId,
-      organizationId,
+      workspaceId,
       ownerUserId: ownerId,
       deviceIdentityHash: sha256("skill-device-stale"),
       runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
@@ -325,7 +325,7 @@ describe("conversational Agent Skill execution approval", () => {
     });
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "skill-approval",
@@ -588,7 +588,7 @@ describe("conversational Agent Skill execution approval", () => {
     expect(unauthorizedWorker.status).toBe(400);
     expect(await unauthorizedWorker.json()).toMatchObject({
       code: "failed_precondition",
-      message: "Worker owner is not a member of this organization",
+      message: "Worker owner is not a member of this workspace",
     });
     expect({
       tasks: await tableCount("briar_project_agent_task_jobs"),
@@ -600,7 +600,7 @@ describe("conversational Agent Skill execution approval", () => {
     await expect(acceptAgentSkillExecutionProposal(db, {
       proposalId: seeded.proposal.id,
       sourceKind: "issue",
-      organizationId,
+      workspaceId,
       projectId,
       channelId: null,
       conversationRunId: seeded.runId,
@@ -636,7 +636,7 @@ describe("conversational Agent Skill execution approval", () => {
     await expect(acceptAgentSkillExecutionProposal(db, {
       proposalId: seeded.proposal.id,
       sourceKind: "issue",
-      organizationId,
+      workspaceId,
       projectId,
       channelId: null,
       conversationRunId: seeded.runId,
@@ -681,7 +681,7 @@ describe("conversational Agent Skill execution approval", () => {
     await expect(acceptAgentSkillExecutionProposal(db, {
       proposalId: seeded.proposal.id,
       sourceKind: "issue",
-      organizationId,
+      workspaceId,
       projectId,
       channelId: null,
       conversationRunId: seeded.runId,
@@ -944,7 +944,7 @@ describe("conversational Agent Skill execution approval", () => {
       createdAt: new Date().toISOString(),
     });
     const [queued] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId,
       parentMessageId: triggerMessageId,
@@ -957,7 +957,7 @@ describe("conversational Agent Skill execution approval", () => {
       createdAt: new Date().toISOString(),
     });
     const claimHash = sha256(`channel-reply-${queued.id}`);
-    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+    const claimed = await claimNextChannelAgentReply(db, workspaceId, {
       deviceId: workerDeviceId,
       workerId,
       ...workerClaimRuntimeFixture({
@@ -1089,7 +1089,7 @@ describe("conversational Agent Skill execution approval", () => {
       createdAt: new Date().toISOString(),
     });
     const [source] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId,
       parentMessageId: triggerMessageId,
@@ -1102,7 +1102,7 @@ describe("conversational Agent Skill execution approval", () => {
       createdAt: new Date().toISOString(),
     });
     const sourceClaimHash = sha256(`conversation-source-${source.id}`);
-    const sourceClaim = await claimNextChannelAgentReply(db, organizationId, {
+    const sourceClaim = await claimNextChannelAgentReply(db, workspaceId, {
       deviceId: workerDeviceId,
       workerId,
       ...workerClaimRuntimeFixture({
@@ -1153,10 +1153,10 @@ describe("conversational Agent Skill execution approval", () => {
        where id = ?`,
     ).bind(source.session_id).run();
     const taskCountBefore = await tableCount("briar_project_agent_task_jobs");
-    const accepted = await acceptOrganizationChannelSkillExecutionProposal({
+    const accepted = await acceptWorkspaceChannelSkillExecutionProposal({
       db,
       env: env(),
-      organizationId,
+      workspaceId,
       channelId,
       proposalId: proposal!.id,
       userId: ownerId,
@@ -1541,7 +1541,7 @@ describe("conversational Agent Skill execution approval", () => {
           new Date().toISOString(),
         ),
       );
-      expect(await dispatchHuntRun(db, organizationId, projectId, {
+      expect(await dispatchHuntRun(db, workspaceId, projectId, {
         runId: capacityRunId,
         provider: "codex",
         workerId,
@@ -1777,14 +1777,14 @@ describe("conversational Agent Skill execution approval", () => {
       .toBe("failed");
 
     // Migration 0074's existing channel-delete sync trigger reinserts a row
-    // with the old organization during an organization FK cascade. Remove the
+    // with the old workspace during an workspace FK cascade. Remove the
     // test channel explicitly so this assertion isolates the 0092 cascade.
     await db.prepare(`delete from briar_channels where id = ?`)
       .bind(channelId).run();
     await expect(db.prepare(`delete from briar_organizations where id = ?`)
-      .bind(organizationId).run()).resolves.toBeDefined();
+      .bind(workspaceId).run()).resolves.toBeDefined();
     expect(await db.prepare(
       `select 1 from briar_organizations where id = ?`,
-    ).bind(organizationId).first()).toBeNull();
+    ).bind(workspaceId).first()).toBeNull();
   }, 60_000);
 });

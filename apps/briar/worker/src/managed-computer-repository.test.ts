@@ -8,7 +8,7 @@ import {
   createSandboxManagedComputer,
   deleteSandboxManagedComputer,
   listManagedComputersForReconciliation,
-  listOrganizationManagedComputers,
+  listWorkspaceManagedComputers,
   sandboxManagedComputerByDevice,
   enrollManagedComputerDevice,
   failManagedComputerProvisioning,
@@ -23,7 +23,7 @@ import {
   workerRuntimeProtoJsonFixture,
 } from "./test-helpers/worker-runtime";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "pilot-owner";
 const observedAt = "2026-08-22T00:00:00.000Z";
 
@@ -35,10 +35,10 @@ describe("managed computer repository", () => {
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${userId}', 'Pilot Owner', 'pilot@example.com', 1, '${observedAt}', '${observedAt}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values ('${organizationId}', 'Pilot Org', 'pilot-org', '${observedAt}', '${observedAt}');
+      values ('${workspaceId}', 'Pilot Org', 'pilot-org', '${observedAt}', '${observedAt}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${userId}', 'owner', '${observedAt}', '${observedAt}');
+      ) values ('${workspaceId}', '${userId}', 'owner', '${observedAt}', '${observedAt}');
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('pilot-owner-2', 'Second Owner', 'pilot-2@example.com', 1, '${observedAt}', '${observedAt}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
@@ -55,7 +55,7 @@ describe("managed computer repository", () => {
       managedComputerId: "33333333-3333-4333-8333-333333333333",
       provisioningJobId: "44444444-4444-4444-8444-444444444444",
       workflowInstanceId: "managed-computer-33333333-3333-4333-8333-333333333333",
-      organizationId,
+      workspaceId,
       userId,
       campaignId: "getbriar-pilot",
       requestId: "55555555-5555-4555-8555-555555555555",
@@ -73,7 +73,7 @@ describe("managed computer repository", () => {
     });
     expect(computer).toMatchObject({
       state: "requested",
-      organization_id: organizationId,
+      organization_id: workspaceId,
       requester_user_id: userId,
       aws_region: "us-east-1",
       retry_count: 0,
@@ -94,7 +94,7 @@ describe("managed computer repository", () => {
       audits: 2,
     });
     const capacity = await managedComputerCapacity(db, {
-      organizationId,
+      workspaceId,
       userId,
       campaignId: "getbriar-pilot",
       organizationLimit: 1,
@@ -108,9 +108,9 @@ describe("managed computer repository", () => {
     });
   });
 
-  it("rejects another organization atomically when the fleet limit is full", async () => {
+  it("rejects another workspace atomically when the fleet limit is full", async () => {
     const capacity = await managedComputerCapacity(db, {
-      organizationId: "99999999-9999-4999-8999-999999999999",
+      workspaceId: "99999999-9999-4999-8999-999999999999",
       userId: "pilot-owner-2",
       campaignId: "getbriar-pilot",
       organizationLimit: 1,
@@ -122,7 +122,7 @@ describe("managed computer repository", () => {
       managedComputerId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       provisioningJobId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       workflowInstanceId: "managed-computer-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      organizationId: "99999999-9999-4999-8999-999999999999",
+      workspaceId: "99999999-9999-4999-8999-999999999999",
       userId: "pilot-owner-2",
       campaignId: "getbriar-pilot",
       requestId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
@@ -172,7 +172,7 @@ describe("managed computer repository", () => {
     ).bind(oldIdentityHash).run();
     const retry = await createManagedComputerRetry(db, {
       managedComputerId: "33333333-3333-4333-8333-333333333333",
-      organizationId,
+      workspaceId,
       actorUserId: userId,
       requestId: "66666666-6666-4666-8666-666666666666",
       provisioningJobId: "77777777-7777-4777-8777-777777777777",
@@ -194,7 +194,7 @@ describe("managed computer repository", () => {
     });
     const duplicate = await createManagedComputerRetry(db, {
       managedComputerId: "33333333-3333-4333-8333-333333333333",
-      organizationId,
+      workspaceId,
       actorUserId: userId,
       requestId: "66666666-6666-4666-8666-666666666666",
       provisioningJobId: "88888888-8888-4888-8888-888888888888",
@@ -235,7 +235,7 @@ describe("managed computer repository", () => {
          'Managed computer', ?, 'online', 1, ?, ?, ?
        )`,
     ).bind(
-      organizationId,
+      workspaceId,
       userId,
       oldIdentityHash,
       "2026-08-22T00:03:30.000Z",
@@ -297,7 +297,7 @@ describe("managed computer repository", () => {
       ).run();
       const nextRetry = await createManagedComputerRetry(db, {
         managedComputerId: "33333333-3333-4333-8333-333333333333",
-        organizationId,
+        workspaceId,
         actorUserId: userId,
         requestId: `retry-request-${attempt}`,
         provisioningJobId: `retry-job-${attempt}`,
@@ -327,7 +327,7 @@ describe("managed computer repository", () => {
   });
 
   it("keeps a retiring managed computer from accepting new work", async () => {
-    const secondOrganizationId = "99999999-9999-4999-8999-999999999999";
+    const secondWorkspaceId = "99999999-9999-4999-8999-999999999999";
     const secondUserId = "pilot-owner-2";
     const computerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab";
     const jobId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc";
@@ -340,7 +340,7 @@ describe("managed computer repository", () => {
       managedComputerId: computerId,
       provisioningJobId: jobId,
       workflowInstanceId: `managed-computer-${computerId}`,
-      organizationId: secondOrganizationId,
+      workspaceId: secondWorkspaceId,
       userId: secondUserId,
       campaignId: "getbriar-pilot",
       requestId: "ffffffff-ffff-4fff-8fff-fffffffffff0",
@@ -374,7 +374,7 @@ describe("managed computer repository", () => {
       ).bind(
         projectId,
         secondUserId,
-        secondOrganizationId,
+        secondWorkspaceId,
         "f".repeat(64),
         observedAt,
         observedAt,
@@ -387,7 +387,7 @@ describe("managed computer repository", () => {
          ) values (?, ?, ?, 'Retiring computer', ?, 'online', 1, ?, ?, ?)`,
       ).bind(
         deviceId,
-        secondOrganizationId,
+        secondWorkspaceId,
         secondUserId,
         "1".repeat(64),
         observedAt,
@@ -422,7 +422,7 @@ describe("managed computer repository", () => {
 
     const retired = await beginManagedComputerRetirement(db, {
       managedComputerId: computerId,
-      organizationId: secondOrganizationId,
+      workspaceId: secondWorkspaceId,
       observedAt: retirementAt,
     });
     expect(retired).toMatchObject({ state: "draining" });
@@ -453,7 +453,7 @@ describe("managed computer repository", () => {
     });
     expect(await beginManagedComputerRetirement(db, {
       managedComputerId: computerId,
-      organizationId: secondOrganizationId,
+      workspaceId: secondWorkspaceId,
       observedAt: "2026-08-22T00:22:00.000Z",
     })).toBeUndefined();
   });
@@ -467,7 +467,7 @@ describe("managed computer repository", () => {
        ) values (?, ?, ?, 'sandbox-gx10', ?, 'online', 1, ?, ?, ?)`,
     ).bind(
       deviceId,
-      organizationId,
+      workspaceId,
       userId,
       await sha256Hex("sandbox-device"),
       observedAt,
@@ -478,7 +478,7 @@ describe("managed computer repository", () => {
       createSandboxManagedComputer(db, {
         managedComputerId: `aaaaaaaa-aaaa-4aaa-8aaa-${suffix}`,
         entitlementId: `bbbbbbbb-bbbb-4bbb-8bbb-${suffix}`,
-        organizationId,
+        workspaceId,
         userId,
         deviceId,
         apiOrigin: "https://briar.example",
@@ -498,7 +498,7 @@ describe("managed computer repository", () => {
       (await listManagedComputersForReconciliation(db)).some((row) => row.provider === "sandbox"),
     ).toBe(false);
     expect(
-      (await listOrganizationManagedComputers(db, organizationId))
+      (await listWorkspaceManagedComputers(db, workspaceId))
         .find((row) => row.id === first!.id)?.device_label,
     ).toBe("sandbox-gx10");
     // Re-registering the same device keeps the record and its id, so the
@@ -512,18 +512,18 @@ describe("managed computer repository", () => {
     expect(await createSandboxManagedComputer(db, {
       managedComputerId: "aaaaaaaa-aaaa-4aaa-8aaa-000000000003",
       entitlementId: "bbbbbbbb-bbbb-4bbb-8bbb-000000000003",
-      organizationId,
+      workspaceId,
       userId: "pilot-owner-2",
       deviceId,
       apiOrigin: "https://briar.example",
       enrollmentNonceHash: await sha256Hex("sandbox:3"),
       observedAt,
     })).toBeNull();
-    expect(await sandboxManagedComputerByDevice(db, organizationId, deviceId))
+    expect(await sandboxManagedComputerByDevice(db, workspaceId, deviceId))
       .toMatchObject({ id: second!.id });
-    expect(await deleteSandboxManagedComputer(db, organizationId, deviceId)).toMatchObject({
+    expect(await deleteSandboxManagedComputer(db, workspaceId, deviceId)).toMatchObject({
       id: second!.id,
     });
-    expect(await sandboxManagedComputerByDevice(db, organizationId, deviceId)).toBeNull();
+    expect(await sandboxManagedComputerByDevice(db, workspaceId, deviceId)).toBeNull();
   });
 });

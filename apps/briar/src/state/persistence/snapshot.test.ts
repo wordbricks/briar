@@ -4,18 +4,15 @@ import type { ChannelSummary } from "../../lib/channels-contract";
 import { demoDashboard } from "../../lib/demo-data";
 import type {
   DashboardPayload,
-  Organization,
-  OrganizationMember,
+  Workspace,
+  WorkspaceMember,
   Project,
   SessionUser,
 } from "../../types";
 import { organizationChannelIdsAtom } from "../entities/channels";
 import { retainedTeamIdsAtom } from "../entities/retention";
 import { runsByIdAtom } from "../entities/runs";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom, userAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
@@ -44,7 +41,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -53,18 +50,18 @@ const organization: Organization = {
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
-const teamOf = (id: string, organizationId: string): Project => ({
+const teamOf = (id: string, workspaceId: string): Project => ({
   ...demoDashboard.team,
   id,
   name: id,
-  organizationId,
-  organizationName: "Org A",
+  workspaceId,
+  workspaceName: "Org A",
 });
 
-const teamA = teamOf("team-a", organization.id);
+const teamA = teamOf("team-a", workspace.id);
 const teamB = teamOf("team-b", "org-b");
 
-const member: OrganizationMember = {
+const member: WorkspaceMember = {
   userId: "user-1",
   name: "Tester",
   email: "tester@briar.local",
@@ -75,7 +72,7 @@ const member: OrganizationMember = {
 
 const channel: ChannelSummary = {
   id: "channel-1",
-  organizationId: organization.id,
+  workspaceId: workspace.id,
   kind: "channel",
   slug: "general",
   name: "general",
@@ -119,8 +116,8 @@ function loadedRegistry(): AtomRegistry {
   const registry = createTestRegistry([
     [userAtom, user],
     [tokenAtom, "token-1"],
-    [organizationsAtom, [organization]],
-    [activeOrganizationIdAtom, organization.id],
+    [workspacesAtom, [workspace]],
+    [activeWorkspaceIdAtom, workspace.id],
     [teamsAtom, [teamA]],
     [activeTeamIdAtom, teamA.id],
   ]);
@@ -131,7 +128,7 @@ function loadedRegistry(): AtomRegistry {
   });
   applySyncEvent(registry, {
     kind: "channel-catalog-snapshot",
-    organizationId: organization.id,
+    workspaceId: workspace.id,
     channels: [channel],
   });
   return registry;
@@ -144,7 +141,7 @@ describe("client snapshot", () => {
     if (!snapshot) throw new Error("expected a snapshot");
     expect(snapshot.schemaVersion).toBe(SNAPSHOT_SCHEMA_VERSION);
     expect(snapshot.userId).toBe(user.id);
-    expect(snapshot.organizationId).toBe(organization.id);
+    expect(snapshot.workspaceId).toBe(workspace.id);
 
     const restored = deserializeSnapshot(serializeSnapshot(snapshot));
     if (!restored) throw new Error("expected the snapshot to parse");
@@ -156,12 +153,12 @@ describe("client snapshot", () => {
     expect(readActiveTeamView(target)).toEqual(payloadA);
     expect(target.get(userAtom)).toEqual(user);
     expect(target.get(teamsAtom)).toEqual([teamA]);
-    expect(target.get(organizationsAtom)).toEqual([organization]);
-    expect(target.get(activeOrganizationIdAtom)).toBe(organization.id);
+    expect(target.get(workspacesAtom)).toEqual([workspace]);
+    expect(target.get(activeWorkspaceIdAtom)).toBe(workspace.id);
     expect(target.get(activeTeamIdAtom)).toBe(teamA.id);
     // …and the cursor the next boot resumes its delta from.
     expect(target.get(teamCursorAtom(teamA.id))).toBe(7);
-    expect(target.get(organizationChannelIdsAtom(organization.id))).toEqual([
+    expect(target.get(organizationChannelIdsAtom(workspace.id))).toEqual([
       channel.id,
     ]);
   });
@@ -183,7 +180,7 @@ describe("client snapshot", () => {
     expect(target.get(tokenAtom)).toBeNull();
   });
 
-  it("collects only the teams of the organization it is keyed by", () => {
+  it("collects only the teams of the workspace it is keyed by", () => {
     const registry = loadedRegistry();
     registry.set(teamsAtom, [teamA, teamB]);
     applySyncEvent(registry, {
@@ -201,12 +198,12 @@ describe("client snapshot", () => {
     ).toBe(true);
   });
 
-  it("has nothing to write without an account or an organization", () => {
+  it("has nothing to write without an account or an workspace", () => {
     const registry = loadedRegistry();
-    registry.set(activeOrganizationIdAtom, null);
+    registry.set(activeWorkspaceIdAtom, null);
     expect(collectSnapshot(registry)).toBeNull();
 
-    registry.set(activeOrganizationIdAtom, organization.id);
+    registry.set(activeWorkspaceIdAtom, workspace.id);
     registry.set(userAtom, null);
     expect(collectSnapshot(registry)).toBeNull();
   });

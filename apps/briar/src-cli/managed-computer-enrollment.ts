@@ -170,7 +170,7 @@ export async function enrollManagedComputerFromInstance(
   const credential = decodeManagedComputerCredential({
     credential: response.credential,
     deviceId: response.deviceId,
-    organizationId: response.workspaceId,
+    workspaceId: response.workspaceId,
     managedComputerId: response.managedComputerId,
     apiOrigin: config.apiOrigin.origin,
   });

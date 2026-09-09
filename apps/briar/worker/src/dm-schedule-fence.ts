@@ -1,4 +1,4 @@
-/** The existing live-roster view includes organization and Project Agent access. */
+/** The existing live-roster view includes workspace and Project Agent access. */
 export const dmScheduleScopeCurrent = (schedule: string) => `exists (
   select 1 from briar_dm_memory_live_rosters live
   join briar_project_agents agent on agent.id = live.agent_id

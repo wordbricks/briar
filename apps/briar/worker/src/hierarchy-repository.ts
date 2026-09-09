@@ -4,7 +4,7 @@ import {
   type TeamId,
   type WorkspaceId,
 } from "../../src/lib/entity-ids";
-import type { OrganizationRole } from "./organization-repository";
+import type { WorkspaceRole } from "./workspace-repository";
 import type { PlanningProjectStatus } from "./hierarchy-request-contract";
 
 export type TeamHierarchyRow = {
@@ -14,7 +14,7 @@ export type TeamHierarchyRow = {
   name: string;
   issue_key_prefix: string;
   icon: string | null;
-  role: OrganizationRole;
+  role: WorkspaceRole;
   github_repository_id: number | null;
   github_repository: string | null;
   workflow_json: string | null;
@@ -40,7 +40,7 @@ export type PlanningProjectRow = {
   color: string | null;
   sort_order: number;
   is_default: number;
-  role: OrganizationRole;
+  role: WorkspaceRole;
   created_at: string;
   updated_at: string;
 };

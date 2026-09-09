@@ -65,7 +65,7 @@ export const createManagedComputerEnrollmentService = (
       managedComputerId,
       credential: result.credential,
       deviceId: result.deviceId,
-      workspaceId: result.organizationId,
+      workspaceId: result.workspaceId,
     };
   },
 });

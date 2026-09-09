@@ -7,7 +7,7 @@ import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { insertAgentSkillStatement } from "./agent-skills";
 import { decodeChannelMessageApplicationInput } from "./app-mutation-request-mappers";
-import { createOrganizationChannelMessage } from "./channel-message-routes";
+import { createWorkspaceChannelMessage } from "./channel-message-routes";
 import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import {
   DM_REPLY_SETTLE_MAX_RETRY_MS,
@@ -29,7 +29,7 @@ import {
   nextChannelReplySettleWaitMs,
   renewChannelReplyLease,
 } from "./channels";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import apiWorker from "./index";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
@@ -41,7 +41,7 @@ import { requireWorkerProjectBinding } from "./worker-route-auth";
   same last-ten-message snapshot on its own.
 */
 
-const organizationId = "1a000000-0000-4000-8000-000000000001";
+const workspaceId = "1a000000-0000-4000-8000-000000000001";
 const projectId = "1b000000-0000-4000-8000-000000000001";
 const deviceId = "1c000000-0000-4000-8000-000000000001";
 const workerId = "1d000000-0000-4000-8000-000000000001";
@@ -67,20 +67,20 @@ describe("direct message reply bursts", () => {
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'DM Burst Org', 'dm-burst-org', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
     ]);
     await db.batch([
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, now, now),
+      ).bind(workspaceId, ownerId, now, now),
       db.prepare(
         `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Briar', ?, ?, ?)`,
-      ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+      ).bind(projectId, ownerId, workspaceId, "a".repeat(64), now, now),
     ]);
     await db.batch([
       db.prepare(
@@ -88,7 +88,7 @@ describe("direct message reply bursts", () => {
            id, organization_id, owner_user_id, label, device_identity_hash,
            state, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'DM burst device', ?, 'online', ?, ?, ?)`,
-      ).bind(deviceId, organizationId, ownerId, "b".repeat(64), now, now, now),
+      ).bind(deviceId, workspaceId, ownerId, "b".repeat(64), now, now, now),
       db.prepare(
         `insert into briar_execution_worker_credentials (
            device_id, token_hash, created_at
@@ -115,9 +115,9 @@ describe("direct message reply bursts", () => {
       now,
       deviceId,
     ).run();
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: agentId,
-      organizationId,
+      workspaceId,
       name: "Assistant",
       provider: "claude",
       model: null,
@@ -155,25 +155,25 @@ describe("direct message reply bursts", () => {
   }) as unknown as Env;
 
   /*
-    Each test gets its own conversation, and the organization's queue is emptied
-    first: the claim query walks every job in the organization, so work another
+    Each test gets its own conversation, and the workspace's queue is emptied
+    first: the claim query walks every job in the workspace, so work another
     test left behind would decide which job this one claims.
     */
   const freshConversation = async (kind: "dm" | "channel", clear = true) => {
     if (clear) {
     await db.prepare(
       `delete from briar_channel_agent_reply_jobs where organization_id = ?`,
-    ).bind(organizationId).run();
+    ).bind(workspaceId).run();
     await db.prepare(
       `delete from briar_channel_reply_sessions where organization_id = ?`,
-    ).bind(organizationId).run();
+    ).bind(workspaceId).run();
     }
     channelSequence += 1;
     const channelId =
       `1a100000-0000-4000-8000-${String(channelSequence).padStart(12, "0")}`;
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       ...(kind === "dm"
         ? {
           kind: "dm" as const,
@@ -207,9 +207,9 @@ describe("direct message reply bursts", () => {
       mentionedAgentIds: overrides.mentionedAgentIds ?? [],
       skillId: overrides.skillId ?? null,
     });
-    const result = await createOrganizationChannelMessage({
+    const result = await createWorkspaceChannelMessage({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: ownerId,
       request: { ...decoded, clientMessageId: crypto.randomUUID() },
@@ -235,7 +235,7 @@ describe("direct message reply bursts", () => {
     ).run();
 
   const sessionIdOf = async (jobId: string) =>
-    (await getChannelAgentReplyJob(db, organizationId, jobId))!.session_id;
+    (await getChannelAgentReplyJob(db, workspaceId, jobId))!.session_id;
 
   const claim = async () => {
     const authenticatedWorker = await requireWorkerProjectBinding(
@@ -247,7 +247,7 @@ describe("direct message reply bursts", () => {
       workerId,
     );
     return claimNextChannelReplyWork({
-      input: { organizationId, workerId },
+      input: { workspaceId, workerId },
       db,
       env: env(),
       authenticatedWorker,
@@ -326,28 +326,28 @@ describe("direct message reply bursts", () => {
       emoji: "👀", createdAt: new Date().toISOString(),
     });
     const otherAgentId = crypto.randomUUID();
-    await createOrganizationAgent(db, {
-      id: otherAgentId, organizationId, name: "Other", provider: "claude",
+    await createWorkspaceAgent(db, {
+      id: otherAgentId, workspaceId, name: "Other", provider: "claude",
       model: null, responsibility: "Other", effort: null, createdAt: new Date().toISOString(),
     });
     await db.prepare(`insert into briar_channel_message_reactions (message_id, agent_id, emoji, created_at)
       values (?, ?, '👀', ?)`).bind(sent.messageId, otherAgentId, new Date().toISOString()).run();
     await stopTyping(sent.job.id);
     const claimed = (await claim())!;
-    const cursor = await getChannelSyncCursor(db, organizationId);
+    const cursor = await getChannelSyncCursor(db, workspaceId);
     await react(claimed, emoji);
     const message = await getChannelMessage(db, channelId, sent.messageId);
     expect(message?.reactions.some((reaction) => reaction.emoji === emoji && reaction.agentIds?.includes(agentId))).toBe(true);
     expect(message?.reactions.find((reaction) => reaction.emoji === "👀")).toMatchObject({ userIds: [ownerId] });
     expect(message?.reactions.find((reaction) => reaction.emoji === "👀")?.agentIds).toContain(otherAgentId);
-    expect((await getChannelAgentReplyJob(db, organizationId, claimed.workId))?.status).toBe("running");
-    const delta = await loadChannelDelta(db, organizationId, ownerId, cursor);
+    expect((await getChannelAgentReplyJob(db, workspaceId, claimed.workId))?.status).toBe("running");
+    const delta = await loadChannelDelta(db, workspaceId, ownerId, cursor);
     expect(delta.messages.find((entry) => entry.id === sent.messageId)?.reactions).toEqual(message?.reactions);
     await Promise.all([react(claimed, "🔥"), react(claimed, "🙏")]);
     expect(await finish(claimed, { acknowledgementReaction: "🔥" })).not.toBeNull();
     await expect(react(claimed, "😄")).rejects.toThrow();
     await enqueueChannelAgentReplies(db, {
-      organizationId, channelId, triggerMessageId: sent.messageId,
+      workspaceId, channelId, triggerMessageId: sent.messageId,
       parentMessageId: sent.messageId, addAgentAcknowledgementReaction: true,
       agents: [{ id: agentId, projectId: null, provider: "claude" }], createdAt: new Date().toISOString(),
     });
@@ -458,7 +458,7 @@ describe("direct message reply bursts", () => {
     });
     // The job still points at its own trigger, so nothing the client renders
     // moves onto the anchor message.
-    expect(await getChannelAgentReplyJob(db, organizationId, second.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, second.job.id))
       .toMatchObject({
         parent_message_id: second.messageId,
         trigger_message_id: second.messageId,
@@ -514,7 +514,7 @@ describe("direct message reply bursts", () => {
           "connect-protocol-version": "1", "content-type": "application/json" },
         body: JSON.stringify({ projectId, workerId, stopUnconfirmed, work: {
           workId: work.workId, runId: work.channelId, claimToken: work.claimToken,
-          channelReply: { workspaceId: organizationId },
+          channelReply: { workspaceId: workspaceId },
         } }),
       }), env());
     expect(response.status).toBe(200);
@@ -527,11 +527,11 @@ describe("direct message reply bursts", () => {
     await stopTyping(first.job.id, 31);
     const running = (await claim())!;
     const next = await send(channelId, "second input");
-    const incoming = (await getChannelAgentReplyJob(db, organizationId, next.job.id))!;
+    const incoming = (await getChannelAgentReplyJob(db, workspaceId, next.job.id))!;
     await db.prepare("update briar_channel_agent_reply_jobs set last_input_at = ? where id = ?")
       .bind(new Date(Date.parse(incoming.created_at) - gap).toISOString(), first.job.id).run();
     await db.batch(dmReplySteerStatements(db, next.job.id));
-    const absorbed = (await getChannelAgentReplyJob(db, organizationId, next.job.id))!;
+    const absorbed = (await getChannelAgentReplyJob(db, workspaceId, next.job.id))!;
     expect(absorbed.superseded_by_reply_job_id).toBe(gap <= 30_000 ? first.job.id : null);
     expect(await acknowledgeSteer(running)).toBe(gap <= 30_000);
   });
@@ -552,10 +552,10 @@ describe("direct message reply bursts", () => {
     await db.prepare("update briar_channel_agent_reply_jobs set created_at = ? where id = ?")
       .bind(new Date(base).toISOString(), third.job.id).run();
     await db.batch(dmReplySteerStatements(db, third.job.id));
-    expect(await getChannelAgentReplyJob(db, organizationId, first.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, first.job.id))
       .toMatchObject({ steer_revision: 2, last_input_at: new Date(base).toISOString() });
     for (const input of [second, third]) {
-      expect(await getChannelAgentReplyJob(db, organizationId, input.job.id))
+      expect(await getChannelAgentReplyJob(db, workspaceId, input.job.id))
         .toMatchObject({ superseded_by_reply_job_id: first.job.id });
     }
   });
@@ -567,10 +567,10 @@ describe("direct message reply bursts", () => {
     const running = (await claim())!;
     const detail = await send(channelId, "detail");
     await send(channelId, "stop", { parentMessageId: detail.messageId });
-    expect(await getChannelAgentReplyJob(db, organizationId, first.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, first.job.id))
       .toMatchObject({ status: "completed" });
     expect(await acknowledgeSteer(running)).toBe(true);
-    expect((await getChannelAgentReplyJob(db, organizationId, running.workId))?.stop_confirmed_at).toBeTruthy();
+    expect((await getChannelAgentReplyJob(db, workspaceId, running.workId))?.stop_confirmed_at).toBeTruthy();
     expect(await claim()).toBeNull();
   });
 
@@ -624,7 +624,7 @@ describe("direct message reply bursts", () => {
     const next = await send(channelId, "a different task");
     const nextDetail = await send(channelId, "different task detail");
     for (const item of [next, nextDetail]) {
-      expect(await getChannelAgentReplyJob(db, organizationId, item.job.id))
+      expect(await getChannelAgentReplyJob(db, workspaceId, item.job.id))
         .toMatchObject({ status: "queued", superseded_by_reply_job_id: null });
     }
     expect(await acknowledgeSteer(resumed)).toBe(false);
@@ -641,7 +641,7 @@ describe("direct message reply bursts", () => {
     const [next, completed] = await Promise.all([
       send(channelId, "racing detail"), finish(running),
     ]);
-    const nextJob = (await getChannelAgentReplyJob(db, organizationId, next.job.id))!;
+    const nextJob = (await getChannelAgentReplyJob(db, workspaceId, next.job.id))!;
     if (nextJob.superseded_by_reply_job_id) {
       expect(completed).toBeNull();
       expect(await acknowledgeSteer(running)).toBe(true);
@@ -689,9 +689,9 @@ describe("direct message reply bursts", () => {
     const other = await send(channelId, "Another task", { mentionedAgentIds: [agentId], skillId });
     const stop = await send(channelId, "그만해", { parentMessageId: original.messageId });
     expect(stop.job).toBeUndefined();
-    expect(await getChannelAgentReplyJob(db, organizationId, original.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, original.job.id))
       .toMatchObject({ status: "completed", claim_token_hash: null, lease_expires_at: null });
-    expect(await getChannelAgentReplyJob(db, organizationId, other.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, other.job.id))
       .toMatchObject({ status: "queued" });
     expect((await listChannelThreadMessages(db, channelId, original.messageId))
       .some((message) => message.body === "요청한 Agent 작업을 중단했습니다.")).toBe(true);
@@ -720,7 +720,7 @@ describe("direct message reply bursts", () => {
       completedAt: new Date().toISOString(),
     });
     expect(await getChannelMessage(db, channelId, oldJob.reply_message_id)).toBeNull();
-    expect(await getChannelAgentReplyJob(db, organizationId, other.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, other.job.id))
       .toMatchObject({ status: "queued" });
   });
 
@@ -731,7 +731,7 @@ describe("direct message reply bursts", () => {
     const firstClaim = (await claim())!;
     const followup = await send(channelId, "중단이라는 단어를 설명해 줘", { parentMessageId: original.messageId });
     expect(followup.job).toBeDefined();
-    expect(await getChannelAgentReplyJob(db, organizationId, original.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, original.job.id))
       .toMatchObject({ status: "running" });
     await finish(firstClaim);
     await stopTyping(followup.job.id);
@@ -742,7 +742,7 @@ describe("direct message reply bursts", () => {
       followup.messageId,
     ]);
     await finish(next);
-    const row = (await getChannelAgentReplyJob(db, organizationId, next.workId))!;
+    const row = (await getChannelAgentReplyJob(db, workspaceId, next.workId))!;
     expect(await getChannelMessage(db, channelId, row.reply_message_id))
       .toMatchObject({ parentMessageId: original.messageId });
   });
@@ -751,7 +751,7 @@ describe("direct message reply bursts", () => {
     const channelId = await freshConversation("dm");
     const otherAgentId = crypto.randomUUID();
     const now = new Date().toISOString();
-    await createOrganizationAgent(db, { id: otherAgentId, organizationId, name: "Other",
+    await createWorkspaceAgent(db, { id: otherAgentId, workspaceId, name: "Other",
       provider: "claude", model: null, responsibility: "Answer", effort: null, createdAt: now });
     await db.prepare(`insert into briar_channel_agents (channel_id, agent_id, created_at)
       values (?, ?, ?)`).bind(channelId, otherAgentId, now).run();
@@ -770,12 +770,12 @@ describe("direct message reply bursts", () => {
     const channelId = await freshConversation("dm");
     const original = await send(channelId, "First task");
     const request = { ...decodeChannelMessageApplicationInput({ body: "stop", parentMessageId: original.messageId }), clientMessageId: crypto.randomUUID() };
-    const input = { db, organizationId, channelId, userId: ownerId, request, attachmentIds: [] };
-    await createOrganizationChannelMessage(input);
+    const input = { db, workspaceId, channelId, userId: ownerId, request, attachmentIds: [] };
+    await createWorkspaceChannelMessage(input);
     const before = await listChannelThreadMessages(db, channelId, original.messageId);
     const later = await send(channelId, "Continue", { parentMessageId: original.messageId });
-    await createOrganizationChannelMessage(input);
-    expect(await getChannelAgentReplyJob(db, organizationId, later.job.id))
+    await createWorkspaceChannelMessage(input);
+    expect(await getChannelAgentReplyJob(db, workspaceId, later.job.id))
       .toMatchObject({ status: "queued" });
     const after = await listChannelThreadMessages(db, channelId, original.messageId);
     expect(after.filter((message) => message.body === "요청한 Agent 작업을 중단했습니다.")).toHaveLength(1);
@@ -786,12 +786,12 @@ describe("direct message reply bursts", () => {
     const channelId = await freshConversation("dm");
     const original = await send(channelId, "First task");
     const request = { ...decodeChannelMessageApplicationInput({ body: "stop", parentMessageId: original.messageId }), clientMessageId: crypto.randomUUID() };
-    await expect(createOrganizationChannelMessage({ db, organizationId, channelId,
+    await expect(createWorkspaceChannelMessage({ db, workspaceId, channelId,
       userId: "not-a-participant", request, attachmentIds: [] })).rejects.toThrow();
     const otherChannelId = crypto.randomUUID();
-    await expect(createOrganizationChannelMessage({ db, organizationId, channelId: otherChannelId,
+    await expect(createWorkspaceChannelMessage({ db, workspaceId, channelId: otherChannelId,
       userId: ownerId, request, attachmentIds: [] })).rejects.toThrow();
-    expect(await getChannelAgentReplyJob(db, organizationId, original.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, original.job.id))
       .toMatchObject({ status: "queued" });
   });
 
@@ -800,12 +800,12 @@ describe("direct message reply bursts", () => {
     const first = await send(channelId, "hi");
     const second = await send(channelId, "one more thing");
     for (const item of [first, second]) {
-      expect(await getChannelAgentReplyJob(db, organizationId, item.job.id))
+      expect(await getChannelAgentReplyJob(db, workspaceId, item.job.id))
         .toMatchObject({ status: "queued", superseded_by_reply_job_id: null });
     }
     expect(await sessionIdOf(first.job.id)).toBe(await sessionIdOf(second.job.id));
     await send(channelId, "stop", { parentMessageId: first.messageId });
-    expect(await getChannelAgentReplyJob(db, organizationId, second.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, second.job.id))
       .toMatchObject({ status: "queued" });
     await stopTyping(second.job.id);
     expect((await claim())?.workId).toBe(second.job.id);
@@ -818,7 +818,7 @@ describe("direct message reply bursts", () => {
     expect((await claim())?.workId).toBe(first.job.id);
 
     await send(channelId, "and one more thing");
-    expect(await getChannelAgentReplyJob(db, organizationId, first.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, first.job.id))
       .toMatchObject({
         status: "running",
         superseded_by_reply_job_id: null,
@@ -831,13 +831,13 @@ describe("direct message reply bursts", () => {
       mentionedAgentIds: [agentId],
       skillId,
     });
-    expect(await getChannelAgentReplyJob(db, organizationId, command.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, command.job.id))
       .toMatchObject({ skill_id: skillId, status: "queued" });
 
     const plain = await send(channelId, "hi");
     expect(await sessionIdOf(plain.job.id))
       .toBe(await sessionIdOf(command.job.id));
-    expect(await getChannelAgentReplyJob(db, organizationId, command.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, command.job.id))
       .toMatchObject({ status: "queued", superseded_by_reply_job_id: null });
 
     const secondCommand = await send(channelId, "Summarize", {
@@ -845,7 +845,7 @@ describe("direct message reply bursts", () => {
       skillId,
     });
     expect(secondCommand.job.id).not.toBe(command.job.id);
-    expect(await getChannelAgentReplyJob(db, organizationId, plain.job.id))
+    expect(await getChannelAgentReplyJob(db, workspaceId, plain.job.id))
       .toMatchObject({ status: "queued", superseded_by_reply_job_id: null });
   });
 
@@ -855,7 +855,7 @@ describe("direct message reply bursts", () => {
     expect(await claim()).toBeNull();
 
     const observedAt = new Date().toISOString();
-    const waitMs = await nextChannelReplySettleWaitMs(db, organizationId, {
+    const waitMs = await nextChannelReplySettleWaitMs(db, workspaceId, {
       observedAt,
     });
     expect(waitMs).not.toBeNull();
@@ -874,7 +874,7 @@ describe("direct message reply bursts", () => {
     );
 
     await stopTyping(first.job.id);
-    expect(await nextChannelReplySettleWaitMs(db, organizationId, {
+    expect(await nextChannelReplySettleWaitMs(db, workspaceId, {
       observedAt: new Date().toISOString(),
     })).toBeNull();
     expect((await claimThroughQueue()).work?.channelReply?.workId).toBe(
@@ -923,7 +923,7 @@ describe("direct message reply bursts", () => {
     expect(await sessionIdOf(followUp.job.id))
       .toBe(await sessionIdOf(root.job.id));
     for (const thread of [root, followUp]) {
-      expect(await getChannelAgentReplyJob(db, organizationId, thread.job.id))
+      expect(await getChannelAgentReplyJob(db, workspaceId, thread.job.id))
         .toMatchObject({
           status: "queued",
           superseded_by_reply_job_id: null,
@@ -933,7 +933,7 @@ describe("direct message reply bursts", () => {
     // No settle window outside a direct message: the root turn is claimable the
     // moment it is queued.
     expect((await claim())?.workId).toBe(root.job.id);
-    expect(await nextChannelReplySettleWaitMs(db, organizationId, {
+    expect(await nextChannelReplySettleWaitMs(db, workspaceId, {
       observedAt: new Date().toISOString(),
     })).toBeNull();
   });
@@ -954,7 +954,7 @@ describe("direct message reply bursts", () => {
     };
     const route = (work: NonNullable<Awaited<ReturnType<typeof claim>>>, action: string,
       targetJobId: string | null = null, response: string | null = null) =>
-      resolveDmReplyRouting(db, { jobId: work.workId, organizationId, channelId: work.channelId,
+      resolveDmReplyRouting(db, { jobId: work.workId, workspaceId, channelId: work.channelId,
         deviceId, workerId, claimTokenHash: sha256(work.claimToken), observedAt: new Date().toISOString(),
         decision: { action, targetJobId, response } });
 
@@ -967,17 +967,17 @@ describe("direct message reply bursts", () => {
       await db.prepare("update briar_execution_workers set last_heartbeat_at = '2000-01-01T00:00:00.000Z', accepting_work = 0, readiness_state = 'needs_attention' where id = ?")
         .bind(workerId).run();
       const waiting = await send(channelId, "메시지 구조를 C로 변경해줘");
-      expect(await getChannelAgentReplyJob(db, organizationId, waiting.job.id))
+      expect(await getChannelAgentReplyJob(db, workspaceId, waiting.job.id))
         .toMatchObject({ status: "queued", routing_action: "pending" });
       await expect(claim()).rejects.toThrow("Worker is not ready to claim replies");
-      expect(await getChannelAgentReplyJob(db, organizationId, waiting.job.id))
+      expect(await getChannelAgentReplyJob(db, workspaceId, waiting.job.id))
         .toMatchObject({ status: "queued", routing_action: "pending" });
       await db.prepare("update briar_execution_workers set last_heartbeat_at = ?, accepting_work = 1, readiness_state = 'busy' where id = ?")
         .bind(new Date().toISOString(), workerId).run();
       await stopTyping(waiting.job.id);
       const first = (await claim())!;
       expect(first.workId).toBe(waiting.job.id);
-      expect(await getDmPublicMessageClaim(db, { jobId: first.workId, organizationId,
+      expect(await getDmPublicMessageClaim(db, { jobId: first.workId, workspaceId,
         workerId, deviceId, claimTokenHash: sha256(first.claimToken), observedAt: new Date().toISOString() })).toBeNull();
       expect(await finish(first)).toBeNull();
       const requestRouting = (token: string) => apiWorker.fetch(new Request(
@@ -985,7 +985,7 @@ describe("direct message reply bursts", () => {
           method: "POST", headers: { authorization: `Bearer ${workerToken}`,
             "connect-protocol-version": "1", "content-type": "application/json" },
           body: JSON.stringify({ projectId, workerId, work: { workId: first.workId,
-            runId: channelId, claimToken: token, channelReply: { workspaceId: organizationId } },
+            runId: channelId, claimToken: token, channelReply: { workspaceId: workspaceId } },
             decision: { action: "new" } }),
         }), env());
       expect((await requestRouting("stale-token")).status).toBe(400);
@@ -1003,7 +1003,7 @@ describe("direct message reply bursts", () => {
       expect(await route(question, "answer", null, "세 작업이 실행 중입니다.")).toMatchObject({ action: "answer" });
       await finish(question, { body: "세 작업이 실행 중입니다." });
       for (const work of [first, second, third]) {
-        expect(await getChannelAgentReplyJob(db, organizationId, work.workId))
+        expect(await getChannelAgentReplyJob(db, workspaceId, work.workId))
           .toMatchObject({ status: "running", steer_revision: 0 });
       }
     });
@@ -1034,7 +1034,7 @@ describe("direct message reply bursts", () => {
       } });
       // Reclaim retains the already classified intent even if a retry submits another target.
       await route(recovered, "cancel", independent.workId);
-      expect(await getChannelAgentReplyJob(db, organizationId, first.workId))
+      expect(await getChannelAgentReplyJob(db, workspaceId, first.workId))
         .toMatchObject({ status: "running", steer_revision: 2 });
       expect(await finish(first)).toBeNull();
       expect(await acknowledgeSteer(first)).toBe(true);
@@ -1042,9 +1042,9 @@ describe("direct message reply bursts", () => {
       expect(resumed).toMatchObject({ workId: first.workId,
         session: { id: first.session!.id, conversationId: "routing-conversation" } });
       expect(resumed.pendingTriggerMessageIds).toEqual([first.triggerMessageId, d.triggerMessageId, e.triggerMessageId]);
-      expect(await getChannelAgentReplyJob(db, organizationId, independent.workId))
+      expect(await getChannelAgentReplyJob(db, workspaceId, independent.workId))
         .toMatchObject({ status: "running", steer_revision: 0 });
-      expect(await listDmPublicMessagesForReply(db, { jobId: d.workId, organizationId })).toHaveLength(1);
+      expect(await listDmPublicMessagesForReply(db, { jobId: d.workId, workspaceId: workspaceId })).toHaveLength(1);
     });
 
     it("cancels only the selected running job and publishes stop confirmation only after acknowledgement", async () => {
@@ -1056,14 +1056,14 @@ describe("direct message reply bursts", () => {
       await route(logs, "new");
       const cancel = await incoming(channelId, "로그 조사만 취소해줘");
       await route(cancel, "cancel", logs.workId);
-      expect(await getChannelAgentReplyJob(db, organizationId, logs.workId))
+      expect(await getChannelAgentReplyJob(db, workspaceId, logs.workId))
         .toMatchObject({ status: "completed", stop_confirmed_at: null });
       await expect(finish(logs)).rejects.toThrow();
-      expect(await listDmPublicMessagesForReply(db, { jobId: logs.workId, organizationId })).toHaveLength(0);
+      expect(await listDmPublicMessagesForReply(db, { jobId: logs.workId, workspaceId: workspaceId })).toHaveLength(0);
       expect(await acknowledgeSteer(logs)).toBe(true);
       expect(await acknowledgeSteer(logs)).toBe(true);
-      expect(await listDmPublicMessagesForReply(db, { jobId: logs.workId, organizationId })).toHaveLength(1);
-      expect(await getChannelAgentReplyJob(db, organizationId, first.workId))
+      expect(await listDmPublicMessagesForReply(db, { jobId: logs.workId, workspaceId: workspaceId })).toHaveLength(1);
+      expect(await getChannelAgentReplyJob(db, workspaceId, first.workId))
         .toMatchObject({ status: "running", steer_revision: 0 });
       expect(await claim()).toBeNull();
       const change = await incoming(channelId, "C 대신 D로 변경해줘");
@@ -1071,13 +1071,13 @@ describe("direct message reply bursts", () => {
       expect(await acknowledgeSteer(first, true)).toBe(false);
       await db.prepare("update briar_channel_agent_reply_jobs set lease_expires_at = ? where id = ?")
         .bind(new Date(Date.now() - 1000).toISOString(), first.workId).run();
-      expect(await getChannelAgentReplyJob(db, organizationId, first.workId))
+      expect(await getChannelAgentReplyJob(db, workspaceId, first.workId))
         .toMatchObject({ error: "dm_reply_stop_unconfirmed", status: "running" });
       expect(await claim()).toBeNull();
-      const progress = await listDmPublicMessagesForReply(db, { jobId: first.workId, organizationId });
+      const progress = await listDmPublicMessagesForReply(db, { jobId: first.workId, workspaceId });
       const explicitStop = await send(channelId, "stop", { parentMessageId: progress[0]!.messageIds[0]! });
       expect(explicitStop.job).toBeUndefined();
-      expect(await getChannelAgentReplyJob(db, organizationId, first.workId)).toMatchObject({ status: "completed" });
+      expect(await getChannelAgentReplyJob(db, workspaceId, first.workId)).toMatchObject({ status: "completed" });
     });
 
     it("refuses another DM target and preserves a completed target instead of cancelling a different job", async () => {
@@ -1091,7 +1091,7 @@ describe("direct message reply bursts", () => {
       const cancel = await incoming(channelId, "방금 작업 취소해");
       await expect(route(cancel, "cancel", other.workId)).rejects.toThrow();
       expect(await route(cancel, "cancel", first.workId)).toMatchObject({ action: "answer", targetJobId: first.workId });
-      expect(await getChannelAgentReplyJob(db, organizationId, other.workId)).toMatchObject({ status: "running" });
+      expect(await getChannelAgentReplyJob(db, workspaceId, other.workId)).toMatchObject({ status: "running" });
     });
 
     it("serializes completion against steering without losing the incoming request", async () => {
@@ -1107,7 +1107,7 @@ describe("direct message reply bursts", () => {
       } else {
         expect(decision.action).toBe("new");
         expect(completed).not.toBeNull();
-        expect(await getChannelAgentReplyJob(db, organizationId, next.workId))
+        expect(await getChannelAgentReplyJob(db, workspaceId, next.workId))
           .toMatchObject({ status: "running", superseded_by_reply_job_id: null });
       }
     });

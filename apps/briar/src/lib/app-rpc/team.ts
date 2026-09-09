@@ -57,8 +57,8 @@ export const teamFromMessage = (project: TeamMessage): Project => ({
     project.iconColor !== undefined && isTeamIconColor(project.iconColor)
       ? project.iconColor
       : null,
-  organizationId: project.workspaceId,
-  organizationName: project.workspaceName,
+  workspaceId: project.workspaceId,
+  workspaceName: project.workspaceName,
   role: teamRoleFromProto(project.role),
   createdAt: requiredTimestamp(project.createdAt, "project.createdAt"),
 });

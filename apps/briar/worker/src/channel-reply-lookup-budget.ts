@@ -12,7 +12,7 @@ export type ReplyLookupReservation = {
 };
 
 export async function reserveReplyLookup(db: D1Database, input: {
-  jobId: string; claimTokenHash: string; requestId: string; kind: "memory" | "organization";
+  jobId: string; claimTokenHash: string; requestId: string; kind: "memory" | "workspace";
   request: unknown; queries?: readonly string[]; memoryRevision: number | null; revocationEpoch: number | null;
 }): Promise<ReplyLookupReservation> {
   const now = new Date().toISOString();

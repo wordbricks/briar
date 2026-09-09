@@ -1,22 +1,22 @@
 export type SettingsAccountTarget =
   | { scope: "application" }
-  | { scope: "organization"; organizationId: string }
+  | { scope: "workspace"; workspaceId: string }
   | { scope: "project"; projectId: string };
 
 export type SettingsAccountSelection =
-  | { scope: "organization"; organizationId: string }
+  | { scope: "workspace"; workspaceId: string }
   | { scope: "project"; projectId: string }
   | null;
 
 export function settingsAccountSelection(
   target: SettingsAccountTarget,
-  activeOrganizationId: string | null,
+  activeWorkspaceId: string | null,
   activeProjectId: string | null,
 ): SettingsAccountSelection {
-  if (target.scope === "organization") {
-    return target.organizationId === activeOrganizationId
+  if (target.scope === "workspace") {
+    return target.workspaceId === activeWorkspaceId
       ? null
-      : { scope: "organization", organizationId: target.organizationId };
+      : { scope: "workspace", workspaceId: target.workspaceId };
   }
   if (target.scope === "project") {
     return target.projectId === activeProjectId

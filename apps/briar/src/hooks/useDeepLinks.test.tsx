@@ -12,7 +12,7 @@ import {
   issueNavigationLocation,
   projectNavigationLocation,
 } from "../lib/app-navigation";
-import { activeOrganizationIdAtom, organizationsAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../state/workspace/atoms";
 import { lockedTeamIdAtom } from "../state/platform";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { loadingAtom, tokenAtom, userAtom } from "../state/session/atoms";
@@ -39,7 +39,7 @@ import {
 } from "../state/navigation/atoms";
 import { readInboxMessageIds, seedInboxMessages } from "../test/inbox";
 import { createReactTestRoot, flush } from "../test/react";
-import type { Organization, Project, SessionUser } from "../types";
+import type { Workspace, Project, SessionUser } from "../types";
 import type { InboxMessage } from "../state/inbox/model";
 import {
   deepLinkListenerApiAtom,
@@ -66,7 +66,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -79,13 +79,13 @@ const teamA: Project = {
   ...demoDashboard.team,
   id: "team-a",
   name: "Team A",
-  organizationId: organization.id,
+  workspaceId: workspace.id,
 };
 const teamB: Project = { ...teamA, id: "team-b", name: "Team B" };
 
 const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   id: "channel-1",
-  organizationId: organization.id,
+  workspaceId: workspace.id,
   kind: "channel",
   slug: "general",
   name: "General",
@@ -174,19 +174,19 @@ const mount = async (registry: AtomRegistry, input: UseDeepLinksInput) => {
 const harness = (
   registryOverrides: {
     activeTeamId?: string | null;
-    activeOrganizationId?: string | null;
+    activeWorkspaceId?: string | null;
   } = {},
 ) => {
   const registry = createTestRegistry([
     [userAtom, user],
     [tokenAtom, null],
     [loadingAtom, false],
-    [organizationsAtom, [organization]],
+    [workspacesAtom, [workspace]],
     [
-      activeOrganizationIdAtom,
-      registryOverrides.activeOrganizationId === undefined
-        ? organization.id
-        : registryOverrides.activeOrganizationId,
+      activeWorkspaceIdAtom,
+      registryOverrides.activeWorkspaceId === undefined
+        ? workspace.id
+        : registryOverrides.activeWorkspaceId,
     ],
     [teamsAtom, [teamA, teamB]],
     [
@@ -203,7 +203,7 @@ const harness = (
   ]);
   /*
     Every side effect a case observes is now a store write: the team and
-    organization selections are real actions, and so is the read receipt. The
+    workspace selections are real actions, and so is the read receipt. The
     inbox is seeded with the notification the cases route on, because a read
     receipt for a message the inbox does not have is a no-op.
   */
@@ -215,7 +215,7 @@ const harness = (
 const loadCatalog = (registry: AtomRegistry, channels: ChannelSummary[]) => {
   applySyncEvent(registry, {
     kind: "channel-catalog-snapshot",
-    organizationId: organization.id,
+    workspaceId: workspace.id,
     channels,
   });
   registry.set(channelCatalogCursorAtom, 1);
@@ -234,7 +234,7 @@ describe("useDeepLinks", () => {
     await act(async () => {
       registry.set(pendingBriarLinkAtom, {
         kind: "channel",
-        organizationId: organization.id,
+        workspaceId: workspace.id,
         channelId: "channel-1",
         messageId: null,
         rootMessageId: null,
@@ -258,16 +258,16 @@ describe("useDeepLinks", () => {
     await view.cleanup();
   });
 
-  it("switches organizations first when the link points at another one", async () => {
+  it("switches workspaces first when the link points at another one", async () => {
     const { input, registry } = harness({
-      activeOrganizationId: "org-b",
+      activeWorkspaceId: "org-b",
     });
     const view = await mount(registry, input);
 
     await act(async () => {
       registry.set(pendingBriarLinkAtom, {
         kind: "channel",
-        organizationId: organization.id,
+        workspaceId: workspace.id,
         channelId: "channel-1",
         messageId: null,
         rootMessageId: null,
@@ -275,20 +275,20 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(registry.get(activeOrganizationIdAtom)).toBe(organization.id);
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(workspace.id);
     expect(destination(registry)).toEqual(nowhere);
 
     await view.cleanup();
   });
 
-  it("ignores a link to an organization the account is not in", async () => {
+  it("ignores a link to an workspace the account is not in", async () => {
     const { input, registry } = harness();
     const view = await mount(registry, input);
 
     await act(async () => {
       registry.set(pendingBriarLinkAtom, {
         kind: "channel",
-        organizationId: "org-unknown",
+        workspaceId: "org-unknown",
         channelId: "channel-1",
         messageId: null,
         rootMessageId: null,
@@ -296,7 +296,7 @@ describe("useDeepLinks", () => {
     });
     await flush();
 
-    expect(registry.get(activeOrganizationIdAtom)).toBe(organization.id);
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(workspace.id);
     expect(destination(registry)).toEqual(nowhere);
     expect(registry.get(pendingBriarLinkAtom)).not.toBeNull();
 
@@ -311,7 +311,7 @@ describe("useDeepLinks", () => {
     await act(async () => {
       registry.set(pendingBriarLinkAtom, {
         kind: "channel",
-        organizationId: organization.id,
+        workspaceId: workspace.id,
         channelId: "channel-1",
         messageId: "message-1",
         rootMessageId: "message-1",

@@ -19,18 +19,18 @@ import {
   updateChannel,
 } from "./channels";
 import { HttpError } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import {
-  getOrganizationAgent,
-} from "./organization-agents";
+  getWorkspaceAgent,
+} from "./workspace-agents";
 import {
-  getOrganizationRole,
-} from "./organization-repository";
+  getWorkspaceRole,
+} from "./workspace-repository";
 import { getTeam } from "./team-command-repository";
 
 type ChannelApplicationInput = {
   readonly db: D1Database;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly userId: string;
 };
 
@@ -61,15 +61,15 @@ export type ChannelMemberMembershipChange =
 export async function createChannelApplication(
   input: ChannelApplicationInput & { readonly command: CreateChannelCommand },
 ) {
-  const role = await getOrganizationRole(
+  const role = await getWorkspaceRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    throw new HttpError(404, "Organization not found");
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    throw new HttpError(404, "Workspace not found");
   }
-  if (!hasOrganizationCapability(role, "conversations:write")) {
+  if (!hasWorkspaceCapability(role, "conversations:write")) {
     throw new HttpError(403, "Conversation editing permission required");
   }
 
@@ -91,7 +91,7 @@ export async function createChannelApplication(
   try {
     channel = await createChannel(input.db, {
       id: channelId,
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       kind: "channel",
       dmKey: null,
       slug,
@@ -121,7 +121,7 @@ export async function updateChannelApplication(
 ) {
   const currentChannel = await requireChannelWriteAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -131,7 +131,7 @@ export async function updateChannelApplication(
   ) {
     throw new HttpError(
       400,
-      "Direct messages must remain private and organization-scoped",
+      "Direct messages must remain private and workspace-scoped",
     );
   }
   if (input.command.defaultProjectId) {
@@ -143,7 +143,7 @@ export async function updateChannelApplication(
     if (!project) throw new HttpError(404, "Project not found");
   }
   const channel = await updateChannel(input.db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     userId: input.userId,
     ...input.command,
@@ -158,14 +158,14 @@ export async function deleteChannelApplication(
 ) {
   await requireChannelDeletionAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
   const observedAt = new Date().toISOString();
   const deleted = await deleteChannel(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
     observedAt,
@@ -183,17 +183,17 @@ export async function setChannelMemberApplication(
 ) {
   const channel = await requireChannelWriteAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
   if (input.change.case === "add") {
-    const targetRole = await getOrganizationRole(
+    const targetRole = await getWorkspaceRole(
       input.db,
-      input.organizationId,
+      input.workspaceId,
       input.targetUserId,
     );
-    if (!targetRole) throw new HttpError(404, "Organization member not found");
+    if (!targetRole) throw new HttpError(404, "Workspace member not found");
     await addChannelMember(input.db, {
       channelId: channel.id,
       userId: input.targetUserId,
@@ -215,14 +215,14 @@ export async function setChannelAgentApplication(
 ) {
   const channel = await requireChannelWriteAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
   if (input.change.case === "add") {
-    const agent = await getOrganizationAgent(
+    const agent = await getWorkspaceAgent(
       input.db,
-      input.organizationId,
+      input.workspaceId,
       input.agentId,
     );
     if (!agent) throw new HttpError(404, "Agent not found");

@@ -4,7 +4,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import type { TeamId, WorkspaceId } from "../../src/lib/entity-ids";
 import { runD1 } from "./d1-runtime";
-import { OrganizationRole } from "./organization-repository";
+import { WorkspaceRole } from "./workspace-repository";
 import { createSqlQueryCache } from "./sql-query-cache";
 
 const TeamRow = Schema.Struct({
@@ -17,7 +17,7 @@ const TeamRow = Schema.Struct({
   icon_color: Schema.mutableKey(Schema.NullOr(Schema.String)),
   organization_id: Schema.mutableKey(Schema.String),
   organization_name: Schema.mutableKey(Schema.String),
-  member_role: Schema.mutableKey(OrganizationRole),
+  member_role: Schema.mutableKey(WorkspaceRole),
   created_at: Schema.mutableKey(Schema.String),
 });
 /**
@@ -43,11 +43,11 @@ const makeTeamQueries = (sql: SqlClient.SqlClient) => {
                coalesce(team.icon_data_url_browser, team.icon_data_url) as icon,
                team.icon_name, team.icon_color,
                team.organization_id,
-               organization.name as organization_name,
+               workspace.name as organization_name,
                membership.role as member_role, team.created_at
         from briar_teams team
-        join briar_organizations organization
-          on organization.id = team.organization_id
+        join briar_organizations workspace
+          on workspace.id = team.organization_id
         join briar_organization_members membership
           on membership.organization_id = team.organization_id
          and membership.user_id = ${userId}
@@ -57,26 +57,26 @@ const makeTeamQueries = (sql: SqlClient.SqlClient) => {
          and project_membership.user_id = membership.user_id
         where membership.role in ('owner', 'co-owner')
            or project_membership.user_id is not null
-        order by organization.created_at, team.created_at
+        order by workspace.created_at, team.created_at
       `,
   });
 
-  const findOrganizationTeams = SqlSchema.findAll({
+  const findWorkspaceTeams = SqlSchema.findAll({
     Request: TeamListRequest,
     Result: TeamRow,
-    execute: ({ scopeId: organizationId }) => sql`
+    execute: ({ scopeId: workspaceId }) => sql`
         select team.id, team.name,
                team.issue_key_prefix,
                team.schedule_tab_enabled,
                coalesce(team.icon_data_url_browser, team.icon_data_url) as icon,
                team.icon_name, team.icon_color,
                team.organization_id,
-               organization.name as organization_name,
+               workspace.name as organization_name,
                'viewer' as member_role, team.created_at
         from briar_teams team
-        join briar_organizations organization
-          on organization.id = team.organization_id
-        where team.organization_id = ${organizationId}
+        join briar_organizations workspace
+          on workspace.id = team.organization_id
+        where team.organization_id = ${workspaceId}
         order by team.created_at
       `,
   });
@@ -87,13 +87,13 @@ const makeTeamQueries = (sql: SqlClient.SqlClient) => {
     issue_key_prefix: Schema.String,
   });
 
-  const findOrganizationInboxTeams = SqlSchema.findAll({
+  const findWorkspaceInboxTeams = SqlSchema.findAll({
     Request: Schema.Struct({
-      organizationId: Schema.String,
+      workspaceId: Schema.String,
       userId: Schema.String,
     }),
     Result: InboxTeamRow,
-    execute: ({ organizationId, userId }) => sql`
+    execute: ({ workspaceId, userId }) => sql`
         select team.id, team.name, team.issue_key_prefix
         from briar_teams team
         join briar_organization_members membership
@@ -103,7 +103,7 @@ const makeTeamQueries = (sql: SqlClient.SqlClient) => {
           on project_membership.project_id = team.id
          and project_membership.organization_id = team.organization_id
          and project_membership.user_id = membership.user_id
-        where team.organization_id = ${organizationId}
+        where team.organization_id = ${workspaceId}
           and (
             membership.role in ('owner', 'co-owner')
             or project_membership.user_id is not null
@@ -113,8 +113,8 @@ const makeTeamQueries = (sql: SqlClient.SqlClient) => {
   });
 
   return {
-    findOrganizationInboxTeams,
-    findOrganizationTeams,
+    findWorkspaceInboxTeams,
+    findWorkspaceTeams,
     findTeams,
   };
 };
@@ -128,21 +128,21 @@ const listTeamsEffect = Effect.fn("listTeamsEffect")(
   },
 );
 
-const listOrganizationTeamsEffect = Effect.fn(
-  "listOrganizationTeamsEffect",
-)(function*(organizationId: string) {
+const listWorkspaceTeamsEffect = Effect.fn(
+  "listWorkspaceTeamsEffect",
+)(function*(workspaceId: string) {
   const sql = yield* SqlClient.SqlClient;
   const queries = teamQueries(sql);
-  return yield* queries.findOrganizationTeams({ scopeId: organizationId });
+  return yield* queries.findWorkspaceTeams({ scopeId: workspaceId });
 });
 
-const listOrganizationInboxTeamsEffect = Effect.fn(
-  "listOrganizationInboxTeamsEffect",
-)(function*(organizationId: string, userId: string) {
+const listWorkspaceInboxTeamsEffect = Effect.fn(
+  "listWorkspaceInboxTeamsEffect",
+)(function*(workspaceId: string, userId: string) {
   const sql = yield* SqlClient.SqlClient;
   const queries = teamQueries(sql);
-  return yield* queries.findOrganizationInboxTeams({
-    organizationId,
+  return yield* queries.findWorkspaceInboxTeams({
+    workspaceId,
     userId,
   });
 });
@@ -158,19 +158,19 @@ export const listTeams = (
 ): Promise<Array<TeamRow>> =>
   runD1(db, listTeamsEffect(userId)) as Promise<Array<TeamRow>>;
 
-export const listOrganizationTeams = (
+export const listWorkspaceTeams = (
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ): Promise<Array<TeamRow>> =>
-  runD1(db, listOrganizationTeamsEffect(organizationId)) as Promise<
+  runD1(db, listWorkspaceTeamsEffect(workspaceId)) as Promise<
     Array<TeamRow>
   >;
 
-export const listOrganizationInboxTeams = (
+export const listWorkspaceInboxTeams = (
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ): Promise<Array<Pick<TeamRow, "id" | "name" | "issue_key_prefix">>> =>
-  runD1(db, listOrganizationInboxTeamsEffect(organizationId, userId)) as Promise<
+  runD1(db, listWorkspaceInboxTeamsEffect(workspaceId, userId)) as Promise<
     Array<Pick<TeamRow, "id" | "name" | "issue_key_prefix">>
   >;

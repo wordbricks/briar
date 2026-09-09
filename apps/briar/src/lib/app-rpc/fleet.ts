@@ -33,13 +33,13 @@ const requireFleetClient = () => {
   return fleetClient;
 };
 
-export async function loadOrganizationExecutionWorkers(
+export async function loadWorkspaceExecutionWorkers(
   token: string,
-  organizationId: string,
+  workspaceId: string,
 ) {
   return listExecutionWorkersResponseFromProto(
     await requireFleetClient().listExecutionWorkers(
-      { workspaceId: organizationId },
+      { workspaceId: workspaceId },
       appCallOptions(token),
     ),
   );
@@ -47,11 +47,11 @@ export async function loadOrganizationExecutionWorkers(
 
 export async function loadManagedComputerProduct(
   token: string,
-  organizationId: string,
+  workspaceId: string,
 ): Promise<ManagedComputerProduct> {
   return managedComputerProductFromProto(
     await requireFleetClient().getManagedComputerProduct(
-      { workspaceId: organizationId },
+      { workspaceId: workspaceId },
       appCallOptions(token),
     ),
   );
@@ -59,11 +59,11 @@ export async function loadManagedComputerProduct(
 
 export async function loadManagedComputers(
   token: string,
-  organizationId: string,
+  workspaceId: string,
 ) {
   return listManagedComputersResponseFromProto(
     await requireFleetClient().listManagedComputers(
-      { workspaceId: organizationId },
+      { workspaceId: workspaceId },
       appCallOptions(token),
     ),
   );
@@ -71,12 +71,12 @@ export async function loadManagedComputers(
 
 export async function validateManagedComputerPromotion(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   code: string,
 ) {
   return validateManagedComputerPromotionResponseFromProto(
     await requireFleetClient().validateManagedComputerPromotion(
-      { workspaceId: organizationId, code },
+      { workspaceId: workspaceId, code },
       appCallOptions(token),
     ),
   );
@@ -84,12 +84,12 @@ export async function validateManagedComputerPromotion(
 
 export async function applyForManagedComputer(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   input: { code: string; requestId: string },
 ) {
   return applyForManagedComputerResponseFromProto(
     await requireFleetClient().applyForManagedComputer(
-      { workspaceId: organizationId, code: input.code, requestId: input.requestId },
+      { workspaceId: workspaceId, code: input.code, requestId: input.requestId },
       appCallOptions(token),
     ),
   );
@@ -97,13 +97,13 @@ export async function applyForManagedComputer(
 
 export async function retryManagedComputer(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
   requestId: string,
 ) {
   return managedComputerMutationResponseFromProto(
     await requireFleetClient().retryManagedComputer(
-      { workspaceId: organizationId, managedComputerId, requestId },
+      { workspaceId: workspaceId, managedComputerId, requestId },
       appCallOptions(token),
     ),
   );
@@ -111,12 +111,12 @@ export async function retryManagedComputer(
 
 export async function retireManagedComputer(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
 ) {
   return managedComputerMutationResponseFromProto(
     await requireFleetClient().retireManagedComputer(
-      { workspaceId: organizationId, managedComputerId },
+      { workspaceId: workspaceId, managedComputerId },
       appCallOptions(token),
     ),
   );
@@ -124,12 +124,12 @@ export async function retireManagedComputer(
 
 export async function terminateManagedComputer(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
 ) {
   return managedComputerMutationResponseFromProto(
     await requireFleetClient().terminateManagedComputer(
-      { workspaceId: organizationId, managedComputerId },
+      { workspaceId: workspaceId, managedComputerId },
       appCallOptions(token),
     ),
   );
@@ -137,14 +137,14 @@ export async function terminateManagedComputer(
 
 export async function createManagedComputerRemoteSession(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
   input: { requestId: string; reconnectSessionId?: string; agentId?: string },
 ): Promise<ManagedComputerRemoteSessionTicket> {
   return managedComputerRemoteSessionTicketFromProto(
     await requireFleetClient().createManagedComputerRemoteSession(
       {
-        workspaceId: organizationId,
+        workspaceId: workspaceId,
         managedComputerId,
         requestId: input.requestId,
         reconnectSessionId: input.reconnectSessionId,
@@ -157,14 +157,14 @@ export async function createManagedComputerRemoteSession(
 
 export async function createManagedComputerSetupSession(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
   input: { projectId: string; requestId: string },
 ): Promise<ManagedComputerSetupSessionTicket> {
   return managedComputerSetupSessionTicketFromProto(
     await requireFleetClient().createManagedComputerSetupSession(
       {
-        workspaceId: organizationId,
+        workspaceId: workspaceId,
         managedComputerId,
         projectId: input.projectId,
         requestId: input.requestId,
@@ -176,37 +176,37 @@ export async function createManagedComputerSetupSession(
 
 export async function endManagedComputerRemoteSession(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
   remoteSessionId: string,
 ): Promise<void> {
   await requireFleetClient().endManagedComputerRemoteSession(
-    { workspaceId: organizationId, managedComputerId, remoteSessionId },
+    { workspaceId: workspaceId, managedComputerId, remoteSessionId },
     appCallOptions(token),
   );
 }
 
-export async function requestOrganizationExecutionWorkerUpdate(
+export async function requestWorkspaceExecutionWorkerUpdate(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   deviceId: string,
 ) {
   return requestExecutionWorkerUpdateResponseFromProto(
     await requireFleetClient().requestExecutionWorkerUpdate(
-      { workspaceId: organizationId, deviceId },
+      { workspaceId: workspaceId, deviceId },
       appCallOptions(token),
     ),
   );
 }
 
-export async function deleteOrganizationExecutionWorker(
+export async function deleteWorkspaceExecutionWorker(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   deviceId: string,
 ): Promise<void> {
   await requireFleetClient().deleteExecutionWorker(
     {
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       deviceId,
       requestId: `worker-deprovision:${deviceId}`,
     },
@@ -214,30 +214,30 @@ export async function deleteOrganizationExecutionWorker(
   );
 }
 
-export async function updateOrganizationExecutionWorkerConcurrency(
+export async function updateWorkspaceExecutionWorkerConcurrency(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   deviceId: string,
   maxConcurrentSessions: number,
 ) {
   return executionWorkerConcurrencyResponseFromProto(
     await requireFleetClient().updateExecutionWorker(
-      { workspaceId: organizationId, deviceId, maxConcurrentSessions },
+      { workspaceId: workspaceId, deviceId, maxConcurrentSessions },
       appCallOptions(token),
     ),
   );
 }
 
-export async function updateOrganizationExecutionWorkerIcon(
+export async function updateWorkspaceExecutionWorkerIcon(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   deviceId: string,
   icon: WorkerIcon | null,
 ) {
   return executionWorkerIconResponseFromProto(
     await requireFleetClient().updateExecutionWorker(
       {
-        workspaceId: organizationId,
+        workspaceId: workspaceId,
         deviceId,
         iconUpdate: executionWorkerIconUpdateFromDomain(icon),
       },

@@ -148,7 +148,7 @@ const workflowFor = (checkpoint: Checkpoint) => {
 
 describe("GitHub pull request D1 integration", () => {
   const db = env.DB;
-  let organizationId: string;
+  let workspaceId: string;
 
   const createScenario = async (
     checkpoint: Checkpoint = {
@@ -160,7 +160,7 @@ describe("GitHub pull request D1 integration", () => {
     scenarioNumber += 1;
     const project = await createTeam(db, {
       ownerUserId: ownerId,
-      organizationId,
+      workspaceId,
       name: `GitHub DB project ${scenarioNumber}`,
       agentTokenHash: scenarioNumber.toString(16).padStart(64, "0"),
     });
@@ -334,12 +334,12 @@ describe("GitHub pull request D1 integration", () => {
         createdAt,
       )
       .run();
-    const organization = await createWorkspace(db, {
+    const workspace = await createWorkspace(db, {
       name: "GitHub DB Test Organization",
       handle: "github-db-test",
       ownerUserId: ownerId,
     });
-    organizationId = organization.id;
+    workspaceId = workspace.id;
   }, 60_000);
 
   it("links pull_request evidence to the current attempt and revision", async () => {
@@ -844,14 +844,14 @@ describe("GitHub pull request D1 integration", () => {
     });
   });
 
-  it("restricts a mapped installation to projects in its Briar organization", async () => {
-    const otherOrganization = await createWorkspace(db, {
+  it("restricts a mapped installation to projects in its Briar workspace", async () => {
+    const otherWorkspace = await createWorkspace(db, {
       name: `Other GitHub organization ${scenarioNumber}`,
       handle: `other-github-${scenarioNumber}`,
       ownerUserId: ownerId,
     });
     await expect(connectGithubInstallation(db, {
-      organizationId: otherOrganization.id,
+      workspaceId: otherWorkspace.id,
       installationId: 177,
       installationAccountId: 277,
       accountLogin: "other-github-org",
@@ -870,7 +870,7 @@ describe("GitHub pull request D1 integration", () => {
       db,
       pullRequestEvent(pullRequest, "merged", {
         installationId: 177,
-        organizationId: otherOrganization.id,
+        workspaceId: otherWorkspace.id,
       }),
     )).resolves.toMatchObject({
       matchedRunCount: 0,
@@ -887,7 +887,7 @@ describe("GitHub pull request D1 integration", () => {
 
   it("quarantines merged snapshots when an installation disconnects", async () => {
     await expect(connectGithubInstallation(db, {
-      organizationId,
+      workspaceId,
       installationId: 178,
       installationAccountId: 278,
       accountLogin: "github-db-test",
@@ -904,7 +904,7 @@ describe("GitHub pull request D1 integration", () => {
       db,
       pullRequestEvent(pullRequest, "merged", {
         installationId: 178,
-        organizationId,
+        workspaceId,
       }),
     )).resolves.toMatchObject({
       matchedRunCount: 1,
@@ -912,7 +912,7 @@ describe("GitHub pull request D1 integration", () => {
       resumedRunCount: 0,
     });
 
-    await disconnectGithubInstallation(db, organizationId, nextTime());
+    await disconnectGithubInstallation(db, workspaceId, nextTime());
     await pauseAtConfiguredCheckpoint(scenario);
     await expect(reconcileGithubMergedRuns(db)).resolves.toMatchObject({
       resumed: 0,

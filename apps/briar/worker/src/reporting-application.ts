@@ -10,24 +10,24 @@ import { parseExecutionMetrics } from "./agent-result-json";
 import {
   getHuntRunForProject,
   getTeam,
-  listOrganizationStatusTrayRuns,
-  listOrganizationUsageCostRecords,
-  listOrganizationUsageExecutionAttempts,
-  listOrganizationUsageRecords,
-  listOrganizationUsageRuns,
+  listWorkspaceStatusTrayRuns,
+  listWorkspaceUsageCostRecords,
+  listWorkspaceUsageExecutionAttempts,
+  listWorkspaceUsageRecords,
+  listWorkspaceUsageRuns,
   listProjectUsageRuns,
   listProjectUsageTotals,
   listRunUsageRecords,
-  type OrganizationCostRecordRow,
-  type OrganizationUsageRecordRow,
-  type OrganizationUsageRunRow,
+  type WorkspaceCostRecordRow,
+  type WorkspaceUsageRecordRow,
+  type WorkspaceUsageRunRow,
   type ProjectUsageTotalRow,
   type RunExecutionAttemptRow,
 } from "./db";
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceRole } from "./workspace-repository";
 import {
-  estimateOrganizationUsageCosts,
+  estimateWorkspaceUsageCosts,
   estimateRunExecutionCost,
   loadAgentUsagePricing,
 } from "./usage-pricing";
@@ -73,7 +73,7 @@ const usageExecutionAttemptReport = (attempt: RunExecutionAttemptRow) => ({
   recordedAt: attempt.recorded_at,
 });
 
-const organizationUsageRecordReport = (record: OrganizationUsageRecordRow) => ({
+const organizationUsageRecordReport = (record: WorkspaceUsageRecordRow) => ({
   executionId: record.execution_id,
   projectId: record.project_id,
   runAttempt: record.run_attempt,
@@ -100,7 +100,7 @@ const organizationUsageRecordReport = (record: OrganizationUsageRecordRow) => ({
   recordedAt: record.recorded_at,
 });
 
-const organizationCostRecordReport = (record: OrganizationCostRecordRow) => ({
+const organizationCostRecordReport = (record: WorkspaceCostRecordRow) => ({
   executionId: record.execution_id,
   projectId: record.project_id,
   runAttempt: record.run_attempt,
@@ -124,12 +124,12 @@ const organizationCostRecordReport = (record: OrganizationCostRecordRow) => ({
 });
 
 export const organizationUsageRunReport = (
-  run: OrganizationUsageRunRow,
+  run: WorkspaceUsageRunRow,
   ledger: {
     readonly attempts?: readonly RunExecutionAttemptRow[];
-    readonly records?: readonly OrganizationUsageRecordRow[];
-    readonly costRecords?: readonly OrganizationCostRecordRow[];
-    readonly estimatedCostRecords?: ReturnType<typeof estimateOrganizationUsageCosts>;
+    readonly records?: readonly WorkspaceUsageRecordRow[];
+    readonly costRecords?: readonly WorkspaceCostRecordRow[];
+    readonly estimatedCostRecords?: ReturnType<typeof estimateWorkspaceUsageCosts>;
   } = {},
 ) => ({
   id: run.id,
@@ -163,31 +163,31 @@ const indexByRun = <Row extends { readonly run_id: string }>(rows: readonly Row[
   return byRun;
 };
 
-const requireOrganizationRead = async (db: D1Database, organizationId: string, userId: string) => {
-  const role = await getOrganizationRole(db, organizationId, userId);
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    throw new ReportingApplicationError("organization_not_found", "Organization not found");
+const requireWorkspaceRead = async (db: D1Database, workspaceId: string, userId: string) => {
+  const role = await getWorkspaceRole(db, workspaceId, userId);
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    throw new ReportingApplicationError("organization_not_found", "Workspace not found");
   }
 };
 
 export async function listWorkspaceUsageRunsApplication(
   input: {
     readonly db: D1Database;
-    readonly organizationId: string;
+    readonly workspaceId: string;
     readonly userId: string;
     readonly days: 7 | 30 | 90;
     readonly generatedAt?: number;
   },
   services: ReportingApplicationServices = reportingApplicationServices,
 ) {
-  await requireOrganizationRead(input.db, input.organizationId, input.userId);
+  await requireWorkspaceRead(input.db, input.workspaceId, input.userId);
   const generatedAt = input.generatedAt ?? Date.now();
   const since = organizationUsageQuerySince(input.days, generatedAt);
   const [runs, attempts, usageRecords, costRecords, loadedPricing] = await Promise.all([
-    listOrganizationUsageRuns(input.db, input.organizationId, since),
-    listOrganizationUsageExecutionAttempts(input.db, input.organizationId, since),
-    listOrganizationUsageRecords(input.db, input.organizationId, since),
-    listOrganizationUsageCostRecords(input.db, input.organizationId, since),
+    listWorkspaceUsageRuns(input.db, input.workspaceId, since),
+    listWorkspaceUsageExecutionAttempts(input.db, input.workspaceId, since),
+    listWorkspaceUsageRecords(input.db, input.workspaceId, since),
+    listWorkspaceUsageCostRecords(input.db, input.workspaceId, since),
     services.loadPricing(),
   ]);
   const attemptsByRun = indexByRun(attempts);
@@ -201,7 +201,7 @@ export async function listWorkspaceUsageRunsApplication(
         attempts: attemptsByRun.get(run.id),
         records: runUsageRecords,
         costRecords: runCostRecords,
-        estimatedCostRecords: estimateOrganizationUsageCosts({
+        estimatedCostRecords: estimateWorkspaceUsageCosts({
           usageRecords: runUsageRecords,
           costRecords: runCostRecords,
           table: loadedPricing.table,
@@ -214,7 +214,7 @@ export async function listWorkspaceUsageRunsApplication(
 }
 
 const projectUsageSummaryRun = (
-  run: OrganizationUsageRunRow,
+  run: WorkspaceUsageRunRow,
   totals: readonly ProjectUsageTotalRow[],
 ) => ({
   ...organizationUsageRunReport(run),
@@ -270,12 +270,12 @@ export async function getProjectUsageSummaryApplication(input: {
 
 export async function listStatusTrayRunsApplication(input: {
   readonly db: D1Database;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly userId: string;
   readonly generatedAt?: number;
 }) {
-  await requireOrganizationRead(input.db, input.organizationId, input.userId);
-  const runs = await listOrganizationStatusTrayRuns(input.db, input.organizationId, input.userId);
+  await requireWorkspaceRead(input.db, input.workspaceId, input.userId);
+  const runs = await listWorkspaceStatusTrayRuns(input.db, input.workspaceId, input.userId);
   return {
     runs: runs.map((run) => {
       const workflow = normalizeAutoHuntWorkflow(JSON.parse(run.workflow_snapshot_json));

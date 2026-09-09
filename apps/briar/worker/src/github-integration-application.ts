@@ -1,5 +1,5 @@
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceRole } from "./workspace-repository";
 import {
   createGithubOAuthState,
   getGithubConnectionForOrganization,
@@ -53,7 +53,7 @@ export const githubOAuthRedirectUri = (origin: string) =>
 type OrganizationGithubApplicationInput = {
   readonly db: D1Database;
   readonly env: Env;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly userId: string;
   readonly fetchImpl?: typeof fetch;
 };
@@ -64,7 +64,7 @@ type OrganizationGithubApplicationInput = {
  * created repository over the installation_repositories webhook, so without
  * this every caller that checks the snapshot rejects repositories the App does
  * have access to. A GitHub failure leaves the snapshot as it was rather than
- * emptying an organization's repository list.
+ * emptying an workspace's repository list.
  */
 async function refreshedInstallationRepositories(
   input: {
@@ -115,21 +115,21 @@ async function refreshedInstallationRepositories(
 export async function getGithubIntegrationApplication(
   input: OrganizationGithubApplicationInput,
 ) {
-  const role = await getOrganizationRole(
+  const role = await getWorkspaceRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    throw new HttpError(404, "Organization not found");
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    throw new HttpError(404, "Workspace not found");
   }
   const connection = await getGithubConnectionForOrganization(
     input.db,
-    input.organizationId,
+    input.workspaceId,
   );
   const common = {
     configured: githubConfigAvailable(input.env),
-    canManage: hasOrganizationCapability(role, "development:manage"),
+    canManage: hasWorkspaceCapability(role, "development:manage"),
   };
   if (!connection) return { ...common, connected: false as const };
   const repositories = await refreshedInstallationRepositories({
@@ -157,19 +157,19 @@ export async function getGithubIntegrationApplication(
 export async function beginGithubInstallationApplication(
   input: OrganizationGithubApplicationInput,
 ) {
-  const role = await getOrganizationRole(
+  const role = await getWorkspaceRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
-  if (!hasOrganizationCapability(role, "development:manage")) {
+  if (!hasWorkspaceCapability(role, "development:manage")) {
     throw new HttpError(403, "Development management permission required");
   }
   if (!githubConfigAvailable(input.env)) {
     throw new HttpError(503, "GitHub integration is not configured");
   }
   if (
-    await getGithubConnectionForOrganization(input.db, input.organizationId)
+    await getGithubConnectionForOrganization(input.db, input.workspaceId)
   ) {
     throw new HttpError(409, "GitHub integration is already connected");
   }
@@ -177,7 +177,7 @@ export async function beginGithubInstallationApplication(
   const createdAt = new Date();
   await createGithubOAuthState(input.db, {
     stateHash: await githubSha256Hex(state),
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     userId: input.userId,
     // The setup callback consumes this state and rotates to a fresh state and
     // PKCE verifier. This request-only verifier is never disclosed.

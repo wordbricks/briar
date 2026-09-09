@@ -91,7 +91,7 @@ export const createManagedComputerSetupService = (
       session: create(ManagedComputerSetupSessionSchema, {
         id: result.session.id,
         managedComputerId,
-        workspaceId: principal.organizationId,
+        workspaceId: principal.workspaceId,
         projectId: result.session.projectId,
         status: ManagedComputerSetupSessionStatus.PENDING,
         expiresAt: appFleetTimestamp(result.session.expiresAt),
@@ -121,7 +121,7 @@ export const createManagedComputerSetupService = (
     );
     return {
       managedComputerId,
-      workspaceId: principal.organizationId,
+      workspaceId: principal.workspaceId,
       teamId: result.session.project_id,
       deviceId: principal.deviceId,
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),

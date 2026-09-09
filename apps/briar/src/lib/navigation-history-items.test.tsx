@@ -12,7 +12,7 @@ import {
   type AppNavigationLocation,
 } from "./app-navigation";
 import { buildNavigationHistoryItems } from "./navigation-history-items";
-import type { Organization, Project } from "../types";
+import type { Workspace, Project } from "../types";
 
 /*
   A history entry is only ids, so every label is a lookup that can miss. What
@@ -28,11 +28,11 @@ const team: Project = {
   ...demoDashboard.team,
   id: "team-a",
   name: "Team A",
-  organizationId: "org-a",
+  workspaceId: "org-a",
   issueKeyPrefix: "TA",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -50,7 +50,7 @@ const runLabels = new Map([
 
 const channel = (overrides: Partial<ChannelSummary> = {}): ChannelSummary => ({
   id: "channel-1",
-  organizationId: organization.id,
+  workspaceId: workspace.id,
   kind: "channel",
   slug: "general",
   name: "General",
@@ -88,7 +88,7 @@ const build = (
     currentUserId: overrides.currentUserId ?? "user-1",
     runLabels: overrides.runLabels ?? runLabels,
     entries,
-    organizations: [organization],
+    workspaces: [workspace],
     t,
     teams: [team],
   });
@@ -126,7 +126,7 @@ describe("buildNavigationHistoryItems", () => {
       [
         channelNavigationLocation(
           "channels",
-          organization.id,
+          workspace.id,
           "channel-1",
           team.id,
         ),
@@ -135,13 +135,13 @@ describe("buildNavigationHistoryItems", () => {
     );
     expect(item?.label).toBe("General");
     expect(item?.eyebrow).toBe("#general");
-    expect(item?.context).toBe(organization.name);
+    expect(item?.context).toBe(workspace.name);
   });
 
   it("labels a direct message by its participants", () => {
     const [item] = build(
       [
-        channelNavigationLocation("dms", organization.id, "channel-1", team.id),
+        channelNavigationLocation("dms", workspace.id, "channel-1", team.id),
       ],
       {
         channels: [
@@ -178,21 +178,21 @@ describe("buildNavigationHistoryItems", () => {
 
     const [organizationItem] = build([
       settingsNavigationLocation({
-        scope: "organization",
-        organizationId: organization.id,
+        scope: "workspace",
+        workspaceId: workspace.id,
         section: "members",
       }),
     ]);
-    expect(organizationItem?.label).toBe("organization.membersAndInvites");
-    expect(organizationItem?.eyebrow).toBe(organization.name);
+    expect(organizationItem?.label).toBe("workspace.membersAndInvites");
+    expect(organizationItem?.eyebrow).toBe(workspace.name);
   });
 
-  it("names an organization page after the organization", () => {
+  it("names an workspace page after the workspace", () => {
     const [item] = build([
-      organizationNavigationLocation(organization.id, "inbox"),
+      organizationNavigationLocation(workspace.id, "inbox"),
     ]);
     expect(item?.label).toBe("sidebar.inbox");
-    expect(item?.eyebrow).toBe(organization.name);
+    expect(item?.eyebrow).toBe(workspace.name);
   });
 
   it("names a team page after the team, and an unknown team after the list", () => {

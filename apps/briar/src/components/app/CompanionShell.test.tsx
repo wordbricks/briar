@@ -15,10 +15,7 @@ import {
   activeShellAtom,
   keptPageKeysAtom,
 } from "../../state/navigation/keep-alive";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
@@ -31,7 +28,7 @@ import {
 } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
 import {
-  demoOrganization,
+  demoWorkspace,
   demoUser,
 } from "../../state/demo-fixtures";
 import type { DashboardPayload, HuntRun } from "../../types";
@@ -85,8 +82,8 @@ const harness = (): AtomRegistry => {
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
-    [organizationsAtom, [demoOrganization]],
-    [activeOrganizationIdAtom, demoOrganization.id],
+    [workspacesAtom, [demoWorkspace]],
+    [activeWorkspaceIdAtom, demoWorkspace.id],
     // A vitest run is not a companion build, so the shell constant says
     // "desktop". The phone chain is what these cases are about.
     [activeShellAtom, "companion"],
@@ -165,7 +162,7 @@ describe("CompanionShell", () => {
         ?.firstElementChild,
     ).toBe(board);
     expect(registry.get(keptPageKeysAtom)).toEqual([
-      `inbox:${demoOrganization.id}`,
+      `inbox:${demoWorkspace.id}`,
       `board:${team.id}`,
     ]);
 

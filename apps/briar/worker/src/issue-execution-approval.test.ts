@@ -34,15 +34,15 @@ import {
   transferIssue,
 } from "./db";
 import {
-  acceptOrganizationChannelExecutionProposal,
-  acceptOrganizationChannelProposal,
+  acceptWorkspaceChannelExecutionProposal,
+  acceptWorkspaceChannelProposal,
 } from "./channel-proposal-routes";
 import {
   acceptProjectIssueActionProposal,
   acceptProjectIssueExecutionProposal,
 } from "./issue-proposal-routes";
 import { HttpError } from "./http-response";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import { RequestDecodeError } from "./request-schema";
 import { workerRuntimeMetadataFixture } from "./test-helpers/worker-runtime";
 import { completeIssueReplyApplication } from "./worker-reply-completion-application";
@@ -54,7 +54,7 @@ import {
   WorkerConflictError,
 } from "./workers";
 
-const organizationId = "a1000000-0000-4000-8000-000000000001";
+const workspaceId = "a1000000-0000-4000-8000-000000000001";
 const projectAId = "a2000000-0000-4000-8000-000000000001";
 const projectBId = "a2000000-0000-4000-8000-000000000002";
 const ownerId = "execution-owner";
@@ -195,17 +195,17 @@ describe("conversational issue execution approval", () => {
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Execution Org', 'execution-org', ?, ?)`,
-      ).bind(organizationId, initialAt, initialAt),
+      ).bind(workspaceId, initialAt, initialAt),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, initialAt, initialAt),
+      ).bind(workspaceId, ownerId, initialAt, initialAt),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'developer', ?, ?)`,
-      ).bind(organizationId, memberId, initialAt, initialAt),
+      ).bind(workspaceId, memberId, initialAt, initialAt),
     ]);
     for (const [id, name] of [
       [projectAId, "Project A"],
@@ -220,7 +220,7 @@ describe("conversational issue execution approval", () => {
         ).bind(
           id,
           ownerId,
-          organizationId,
+          workspaceId,
           name,
           createHash("sha256")
             .update(id === projectAId ? projectAAgentToken : `${id}:agent`)
@@ -253,7 +253,7 @@ describe("conversational issue execution approval", () => {
           `insert into briar_project_members (
              project_id, organization_id, user_id, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
-        ).bind(projectId, organizationId, memberId, initialAt, initialAt)
+        ).bind(projectId, workspaceId, memberId, initialAt, initialAt)
       ),
     );
     projectAgentId = (await createTeamAgent(db, projectAId, {
@@ -267,7 +267,7 @@ describe("conversational issue execution approval", () => {
     await registerExecutionWorker(db, projectAId, {
       id: "execution-any-worker",
       deviceId: "execution-device",
-      organizationId,
+      workspaceId,
       ownerUserId: ownerId,
       label: "Execution Worker",
       deviceIdentityHash: createHash("sha256").update("execution-device").digest("hex"),
@@ -316,19 +316,19 @@ describe("conversational issue execution approval", () => {
     }
     try {
       const result = call.kind === "create"
-        ? await acceptOrganizationChannelProposal({
+        ? await acceptWorkspaceChannelProposal({
           db,
           env: runtimeEnv,
-          organizationId,
+          workspaceId,
           channelId: call.channelId,
           proposalId: call.proposalId,
           userId,
           request: call.request,
         })
-        : await acceptOrganizationChannelExecutionProposal({
+        : await acceptWorkspaceChannelExecutionProposal({
           db,
           env: runtimeEnv,
-          organizationId,
+          workspaceId,
           channelId: call.channelId,
           proposalId: call.proposalId,
           userId,
@@ -541,7 +541,7 @@ describe("conversational issue execution approval", () => {
     db,
     env: env(),
     worker: {
-      principal: { organizationId, deviceId: "execution-device" },
+      principal: { workspaceId, deviceId: "execution-device" },
       binding: { id: "execution-any-worker", project_id: projectAId },
     },
     request: completeIssueReplyInputFromProto(create(
@@ -833,7 +833,7 @@ describe("conversational issue execution approval", () => {
       workerId: "execution-any-worker",
       detachedOnly: true,
     })).rejects.toThrow("conversational execution approval audit is missing");
-    await expect(unassignHuntRun(db, organizationId, projectAId, {
+    await expect(unassignHuntRun(db, workspaceId, projectAId, {
       runId,
       requestedByUserId: ownerId,
       requestId: `partial-reset-${sequence}`,
@@ -890,7 +890,7 @@ describe("conversational issue execution approval", () => {
     );
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: `execution-${sequence}`,
@@ -946,7 +946,7 @@ describe("conversational issue execution approval", () => {
        from briar_hunt_runs run where run.id = ? and run.project_id = ?`,
     ).bind(
       proposalId,
-      organizationId,
+      workspaceId,
       projectAId,
       channelId,
       triggerMessageId,
@@ -962,7 +962,7 @@ describe("conversational issue execution approval", () => {
     const reservation = options.reserve === false
       ? null
       : await reserveChannelExecutionProposalApproval(db, {
-          organizationId,
+          workspaceId,
           channelId,
           proposalId,
           userId: approverId,
@@ -1139,7 +1139,7 @@ describe("conversational issue execution approval", () => {
     const channelExecutionId = `d9000000-0000-4000-8000-${channelSuffix}`;
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: `create-execute-${sequence}`,
@@ -1366,7 +1366,7 @@ describe("conversational issue execution approval", () => {
       channel_id: null,
       dispatch_request_id: deletedReservation.dispatch_request_id,
     });
-    await expect(dispatchHuntRun(db, organizationId, projectAId, {
+    await expect(dispatchHuntRun(db, workspaceId, projectAId, {
       runId: deleted.runId,
       agentId: projectAgentId,
       provider: "codex",
@@ -1467,7 +1467,7 @@ describe("conversational issue execution approval", () => {
     )).status).toBe(200);
     await db.prepare(`delete from briar_issue_execution_proposals where id = ?`)
       .bind(unassigned.proposalId).run();
-    await expect(unassignHuntRun(db, organizationId, projectAId, {
+    await expect(unassignHuntRun(db, workspaceId, projectAId, {
       runId: unassigned.runId,
       requestedByUserId: ownerId,
       requestId: `audit-only-unassign-${sequence}`,
@@ -1541,7 +1541,7 @@ describe("conversational issue execution approval", () => {
     await registerExecutionWorker(db, projectAId, {
       id: selectedWorkerId,
       deviceId: `execution-committed-device-${sequence}`,
-      organizationId,
+      workspaceId,
       ownerUserId: ownerId,
       label: "Committed Worker",
       deviceIdentityHash: createHash("sha256")
@@ -1612,12 +1612,12 @@ describe("conversational issue execution approval", () => {
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'developer', ?, ?)`,
-      ).bind(organizationId, approverId, initialAt, initialAt),
+      ).bind(workspaceId, approverId, initialAt, initialAt),
       db.prepare(
         `insert into briar_project_members (
            project_id, organization_id, user_id, created_at, updated_at
          ) values (?, ?, ?, ?, ?)`,
-      ).bind(projectAId, organizationId, approverId, initialAt, initialAt),
+      ).bind(projectAId, workspaceId, approverId, initialAt, initialAt),
     ]);
     const memberApproval = await seedIssueProposal();
     expect((await worker.fetch(acceptIssueRequest(
@@ -1683,9 +1683,9 @@ describe("conversational issue execution approval", () => {
 
     const delegatedAgentId = `e1000000-0000-4000-8000-${(++sequence)
       .toString(16).padStart(12, "0")}`;
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: delegatedAgentId,
-      organizationId,
+      workspaceId,
       name: `Delegator ${sequence}`,
       provider: "codex",
       model: null,
@@ -1711,7 +1711,7 @@ describe("conversational issue execution approval", () => {
     await registerExecutionWorker(db, projectAId, {
       id: selectedWorkerId,
       deviceId: `execution-selected-device-${sequence}`,
-      organizationId,
+      workspaceId,
       ownerUserId: ownerId,
       label: "Selected Worker",
       deviceIdentityHash: createHash("sha256")
@@ -1752,22 +1752,22 @@ describe("conversational issue execution approval", () => {
     });
   });
 
-  it("allows project and organization erasure with reserved approval rows", async () => {
-    const seedReservedProject = async (ownOrganization: boolean) => {
+  it("allows project and workspace erasure with reserved approval rows", async () => {
+    const seedReservedProject = async (ownWorkspace: boolean) => {
       sequence += 1;
       const suffix = sequence.toString(16).padStart(12, "0");
-      const cascadeOrganizationId = ownOrganization
+      const cascadeWorkspaceId = ownWorkspace
         ? `f1000000-0000-4000-8000-${suffix}`
-        : organizationId;
+        : workspaceId;
       const cascadeProjectId = `f2000000-0000-4000-8000-${suffix}`;
-      if (ownOrganization) {
+      if (ownWorkspace) {
         await db.batch([
           db.prepare(
             `insert into briar_organizations (
                id, name, handle, created_at, updated_at
              ) values (?, ?, ?, ?, ?)`,
           ).bind(
-            cascadeOrganizationId,
+            cascadeWorkspaceId,
             `Cascade Org ${sequence}`,
             `cascade-org-${sequence}`,
             initialAt,
@@ -1777,7 +1777,7 @@ describe("conversational issue execution approval", () => {
             `insert into briar_organization_members (
                organization_id, user_id, role, created_at, updated_at
              ) values (?, ?, 'owner', ?, ?)`,
-          ).bind(cascadeOrganizationId, ownerId, initialAt, initialAt),
+          ).bind(cascadeWorkspaceId, ownerId, initialAt, initialAt),
         ]);
       }
       await db.batch([
@@ -1789,7 +1789,7 @@ describe("conversational issue execution approval", () => {
         ).bind(
           cascadeProjectId,
           ownerId,
-          cascadeOrganizationId,
+          cascadeWorkspaceId,
           `Cascade Project ${sequence}`,
           createHash("sha256").update(`cascade-${sequence}`).digest("hex"),
           initialAt,
@@ -1870,7 +1870,7 @@ describe("conversational issue execution approval", () => {
         dispatchRequestId: crypto.randomUUID(),
         reservedAt: new Date().toISOString(),
       })).resolves.not.toBeNull();
-      return { cascadeOrganizationId, cascadeProjectId, proposalId };
+      return { cascadeWorkspaceId, cascadeProjectId, proposalId };
     };
 
     const projectCascade = await seedReservedProject(false);
@@ -1888,7 +1888,7 @@ describe("conversational issue execution approval", () => {
 
     const organizationCascade = await seedReservedProject(true);
     await expect(db.prepare(`delete from briar_organizations where id = ?`)
-      .bind(organizationCascade.cascadeOrganizationId).run())
+      .bind(organizationCascade.cascadeWorkspaceId).run())
       .resolves.toBeDefined();
     await expect(db.prepare(
       `select count(*) as count from briar_issue_execution_proposals

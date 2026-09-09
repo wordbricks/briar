@@ -4,7 +4,7 @@ import type { AutoHuntSession } from "../../types";
 import {
   buildCurrentInboxMessages,
   classifyInboxMessage,
-  filterInboxMessagesByOrganization,
+  filterInboxMessagesByWorkspace,
   inboxReadVersionsToPush,
   isInboxMessageUnread,
   mergeInboxMessages,
@@ -418,12 +418,12 @@ describe("Inbox messages", () => {
     });
   });
 
-  it("keeps only messages from the selected organization", () => {
+  it("keeps only messages from the selected workspace", () => {
     const otherProject = {
       ...project,
       id: "project-other",
       name: "Other project",
-      organizationId: "organization-other",
+      workspaceId: "workspace-other",
     };
     const messages = buildCurrentInboxMessages(
       null,
@@ -439,17 +439,17 @@ describe("Inbox messages", () => {
     );
 
     expect(
-      filterInboxMessagesByOrganization(
+      filterInboxMessagesByWorkspace(
         messages,
         [project, otherProject],
-        project.organizationId,
+        project.workspaceId,
       ).map((message) => message.id),
     ).toEqual(["session:selected-session"]);
     expect(
-      filterInboxMessagesByOrganization(
+      filterInboxMessagesByWorkspace(
         messages,
         [project, otherProject],
-        otherProject.organizationId,
+        otherProject.workspaceId,
       ).map((message) => message.id),
     ).toEqual(["session:other-session"]);
   });

@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 export const ChannelRealtimeTicketPayload = Schema.Struct({
-  organizationId: Schema.String,
+  workspaceId: Schema.String,
   userId: Schema.NonEmptyString,
   expiresAt: Schema.Int,
   nonce: Schema.NonEmptyString,

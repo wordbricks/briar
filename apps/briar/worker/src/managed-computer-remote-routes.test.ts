@@ -9,7 +9,7 @@ import { sha256Hex } from "./managed-computer-crypto";
 import { createPromotionalManagedComputer } from "./managed-computer-repository";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const computerId = "22222222-2222-4222-8222-222222222222";
 const ownerId = "remote-route-owner";
 const memberId = "remote-route-member";
@@ -41,20 +41,20 @@ describe("managed computer remote desktop routes", () => {
       insert into "session" (id, expiresAt, token, createdAt, updatedAt, userId)
       values ('remote-member-session', '2099-01-01T00:00:00.000Z', '${memberToken}', '${now}', '${now}', '${memberId}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values ('${organizationId}', 'Remote Routes', 'remote-routes', '${now}', '${now}');
+      values ('${workspaceId}', 'Remote Routes', 'remote-routes', '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${ownerId}', 'owner', '${now}', '${now}');
+      ) values ('${workspaceId}', '${ownerId}', 'owner', '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${memberId}', 'developer', '${now}', '${now}');
+      ) values ('${workspaceId}', '${memberId}', 'developer', '${now}', '${now}');
     `);
     await createPromotionalManagedComputer(db, {
       entitlementId: "33333333-3333-4333-8333-333333333333",
       managedComputerId: computerId,
       provisioningJobId: "44444444-4444-4444-8444-444444444444",
       workflowInstanceId: `managed-computer-${computerId}`,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       campaignId: "getbriar-pilot",
       requestId: "55555555-5555-4555-8555-555555555555",
@@ -85,7 +85,7 @@ describe("managed computer remote desktop routes", () => {
          id, organization_id, owner_user_id, label, device_identity_hash,
          state, max_concurrent_sessions, last_heartbeat_at, created_at, updated_at
        ) values (?, ?, ?, 'Remote computer', ?, 'online', 1, ?, ?, ?)`,
-    ).bind(deviceId, organizationId, ownerId, "f".repeat(64), now, now, now).run();
+    ).bind(deviceId, workspaceId, ownerId, "f".repeat(64), now, now, now).run();
     await db.batch([
       db.prepare(
         `insert into briar_execution_worker_credentials (
@@ -137,7 +137,7 @@ describe("managed computer remote desktop routes", () => {
     targetAgentId?: string,
   ) => fleet().createManagedComputerRemoteSession(
     {
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       managedComputerId: computerId,
       requestId,
       reconnectSessionId,
@@ -318,7 +318,7 @@ describe("managed computer remote desktop routes", () => {
 
   it("ends control when the managed computer Worker credential is removed", async () => {
     const remove = () => fleet().deleteExecutionWorker({
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       deviceId,
       requestId: `worker-deprovision:${deviceId}`,
     }, options(ownerToken));

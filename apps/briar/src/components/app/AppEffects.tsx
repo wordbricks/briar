@@ -5,7 +5,7 @@ import { useChannelCatalogSync } from "../../state/channels/useChannelCatalogSyn
 import { useInboxNotifications } from "../../state/inbox/useInboxNotifications";
 import { useInboxSync } from "../../state/inbox/useInboxSync";
 import { useNavigationReconciliation } from "../../state/navigation/useNavigationReconciliation";
-import { useActiveOrganizationPersistence } from "../../state/organization/useActiveOrganizationPersistence";
+import { useActiveWorkspacePersistence } from "../../state/workspace/useActiveWorkspacePersistence";
 import { useHydration } from "../../state/persistence/useHydration";
 import { useSnapshotWriter } from "../../state/persistence/useSnapshotWriter";
 import { usePlanningProjectsSync } from "../../state/planning/usePlanningProjectsSync";
@@ -13,7 +13,7 @@ import { useAuthReturnListener } from "../../state/session/useAuthReturnListener
 import { useSessionBootstrap } from "../../state/session/useSessionBootstrap";
 import { useTeamSync } from "../../state/sync/useTeamSync";
 import { useWorkflowAutoGeneration } from "../../state/workflow/useWorkflowAutoGeneration";
-import { useWorkspaceSync } from "../../state/workspace/useWorkspaceSync";
+import { useWorkspaceSync } from "../../state/local-workspace/useWorkspaceSync";
 
 /**
  * Mount point for every domain effect: what used to be `useEffect` blocks
@@ -33,7 +33,7 @@ import { useWorkspaceSync } from "../../state/workspace/useWorkspaceSync";
  */
 export function AppEffects() {
   useHydration();
-  useActiveOrganizationPersistence();
+  useActiveWorkspacePersistence();
   useTeamSync();
   useChannelCatalogSync();
   useAgentSessionSync();

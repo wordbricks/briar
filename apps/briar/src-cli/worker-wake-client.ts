@@ -22,13 +22,13 @@ export type WorkerWakeSource = {
 
 export type WorkerWakeClientConfig = {
   apiUrl: string;
-  organizationId: string;
+  workspaceId: string;
   credential: string;
 };
 
 export function workerWakeSocketUrl(config: WorkerWakeClientConfig) {
   const url = new URL(
-    `/organizations/${config.organizationId}/worker-wake`,
+    `/workspaces/${config.workspaceId}/worker-wake`,
     config.apiUrl,
   );
   url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
@@ -36,7 +36,7 @@ export function workerWakeSocketUrl(config: WorkerWakeClientConfig) {
 }
 
 /**
- * Keeps one socket to the organization's wake hub open and reports every wake
+ * Keeps one socket to the workspace's wake hub open and reports every wake
  * frame to the Worker loop.
  *
  * The socket is pure latency optimization: it carries no work, and every

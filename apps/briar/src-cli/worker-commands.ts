@@ -40,9 +40,9 @@ import {
   projectWorktreeRoot,
 } from "./worktree";
 import {
-  cleanupOrphanedOrganizationAgentWorkspaces,
-  prepareOrganizationAgentWorkspace,
-} from "./organization-agent-context";
+  cleanupOrphanedWorkspaceAgentWorkspaces,
+  prepareWorkspaceAgentWorkspace,
+} from "./workspace-agent-context";
 import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
@@ -292,7 +292,7 @@ const inspectComputerUseCapability = async (
 
 export type ProjectWorkerRegistration = {
   projectId: string;
-  organizationId: string;
+  workspaceId: string;
   deviceId: string;
   workerId: string;
   label: string;
@@ -370,8 +370,8 @@ export async function registerProjectExecutionWorker(input: {
       if (!(error instanceof ConnectError) || error.code !== Code.FailedPrecondition) {
         throw error;
       }
-      // The device is not enrolled in this organization yet. Registration
-      // below creates it and issues the first organization credential.
+      // The device is not enrolled in this workspace yet. Registration
+      // below creates it and issues the first workspace credential.
     }
   }
   registration ??= await enrollment.register({
@@ -401,7 +401,7 @@ export async function registerProjectExecutionWorker(input: {
           candidate.id === project.id
             ? resolved.worker.id
             : candidate.executionWorker!.workerId,
-        organizationId: resolved.organizationId,
+        workspaceId: resolved.workspaceId,
         token: resolved.workerToken,
         label,
         maxConcurrentSessions: resolved.worker.maxConcurrentSessions,
@@ -411,7 +411,7 @@ export async function registerProjectExecutionWorker(input: {
   await saveConfig(config);
   return {
     projectId: project.id,
-    organizationId: resolved.organizationId,
+    workspaceId: resolved.workspaceId,
     deviceId: resolved.deviceId,
     workerId: resolved.worker.id,
     label,
@@ -620,7 +620,7 @@ async function workerSyncLabelCommand() {
 
 async function workerCommand() {
   const config = await loadConfig();
-  await cleanupOrphanedOrganizationAgentWorkspaces({
+  await cleanupOrphanedWorkspaceAgentWorkspaces({
     workerSessionsDirectory: join(configDirectory, "worker-sessions"),
   });
   const projectId = value("--team");
@@ -645,7 +645,7 @@ async function workerCommand() {
   if (
     managedCredential &&
     (managedCredential.deviceId !== registered.deviceId ||
-      managedCredential.organizationId !== registered.organizationId)
+      managedCredential.workspaceId !== registered.workspaceId)
   ) {
     throw new Error("Managed computer credential does not match this worker");
   }
@@ -728,7 +728,7 @@ async function workerCommand() {
   const wakeClient = new WorkerWakeClient(
     {
       apiUrl: config.apiUrl,
-      organizationId: registered.organizationId,
+      workspaceId: registered.workspaceId,
       credential: workerToken,
     },
     (line) => console.log(line),
@@ -742,7 +742,7 @@ async function workerCommand() {
   const result = await runWorkerLoop<ClaimedWork>(
     {
       claim: async (_options) => workerQueue.claimWork({
-          organizationId: registered.organizationId,
+          workspaceId: registered.workspaceId,
           projectId: project.id,
           workerId,
           claimedBy: label,
@@ -776,7 +776,7 @@ async function workerCommand() {
                 });
               }
             } else {
-              await prepareOrganizationAgentWorkspace(
+              await prepareWorkspaceAgentWorkspace(
                 join(
                   configDirectory,
                   "worker-sessions",
@@ -800,7 +800,7 @@ async function workerCommand() {
         if (Date.now() - lastAnalysisWorktreeSweepAt >= 5 * 60_000) {
           lastAnalysisWorktreeSweepAt = Date.now();
           try {
-            await cleanupOrphanedOrganizationAgentWorkspaces({
+            await cleanupOrphanedWorkspaceAgentWorkspaces({
               workerSessionsDirectory: join(configDirectory, "worker-sessions"),
             });
             const maintenance = await maintainIdleAnalysisWorktrees(

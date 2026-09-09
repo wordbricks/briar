@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { demoDashboard } from "../../lib/demo-data";
-import type { HuntRun, OrganizationMember } from "../../types";
+import type { HuntRun, WorkspaceMember } from "../../types";
 import {
   mergeTeamRuns,
   removeMany,
@@ -63,7 +63,7 @@ describe("entity upsert", () => {
 
   it("keys entities that carry no id under the identifier they do have", () => {
     const members = demoDashboard.members ?? [];
-    const identify = (member: OrganizationMember) => member.userId;
+    const identify = (member: WorkspaceMember) => member.userId;
     const map = new Map(members.map((member) => [member.userId, member]));
 
     expect(upsertManyBy(map, members, identify)).toBe(map);

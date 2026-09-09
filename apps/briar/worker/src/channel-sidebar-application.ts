@@ -15,8 +15,8 @@ import {
 } from "./channel-sidebar-repository";
 import { channelJson, getChannel } from "./channels";
 import { HttpError } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceRole } from "./workspace-repository";
 import { decodeRequestSync } from "./request-schema";
 
 /*
@@ -32,25 +32,25 @@ const decodeSectionName = decodeRequestSync(channelSidebarSectionNameSchema);
 
 type SidebarApplicationInput = {
   readonly db: D1Database;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly userId: string;
 };
 
-const requireOrganizationReader = async (input: SidebarApplicationInput) => {
-  const role = await getOrganizationRole(
+const requireWorkspaceReader = async (input: SidebarApplicationInput) => {
+  const role = await getWorkspaceRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    throw new HttpError(404, "Organization not found");
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    throw new HttpError(404, "Workspace not found");
   }
 };
 
 const sections = async (input: SidebarApplicationInput) =>
   (await listChannelSidebarSections(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   )).map(channelSidebarSectionJson);
 
@@ -60,7 +60,7 @@ const reloadChannel = async (
 ) => {
   const updated = await getChannel(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -76,14 +76,14 @@ export async function updateChannelSidebarPreferenceApplication(
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
   if (input.update.section?.case === "set") {
     const section = await getChannelSidebarSection(
       input.db,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.update.section.sectionId,
     );
@@ -95,7 +95,7 @@ export async function updateChannelSidebarPreferenceApplication(
     update: input.update,
     now: new Date().toISOString(),
   });
-  await recordChannelSummaryChange(input.db, input.organizationId, channel.id);
+  await recordChannelSummaryChange(input.db, input.workspaceId, channel.id);
   return { channel: await reloadChannel({ ...input, channelId: channel.id }) };
 }
 
@@ -104,7 +104,7 @@ export async function markChannelUnreadApplication(
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -119,25 +119,25 @@ export async function markChannelUnreadApplication(
     userId: input.userId,
     channelId: channel.id,
   });
-  await recordChannelSummaryChange(input.db, input.organizationId, channel.id);
+  await recordChannelSummaryChange(input.db, input.workspaceId, channel.id);
   return { channel: await reloadChannel({ ...input, channelId: channel.id }) };
 }
 
 export async function listChannelSidebarSectionsApplication(
   input: SidebarApplicationInput,
 ) {
-  await requireOrganizationReader(input);
+  await requireWorkspaceReader(input);
   return { sections: await sections(input) };
 }
 
 export async function createChannelSidebarSectionApplication(
   input: SidebarApplicationInput & { readonly name: string },
 ) {
-  await requireOrganizationReader(input);
+  await requireWorkspaceReader(input);
   const now = new Date().toISOString();
   const created = await createChannelSidebarSection(input.db, {
     id: crypto.randomUUID(),
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     userId: input.userId,
     name: decodeSectionName(input.name),
     createdAt: now,
@@ -155,10 +155,10 @@ export async function renameChannelSidebarSectionApplication(
     readonly name: string;
   },
 ) {
-  await requireOrganizationReader(input);
+  await requireWorkspaceReader(input);
   const renamed = await renameChannelSidebarSection(input.db, {
     sectionId: input.sectionId,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     userId: input.userId,
     name: decodeSectionName(input.name),
     updatedAt: new Date().toISOString(),
@@ -173,17 +173,17 @@ export async function renameChannelSidebarSectionApplication(
 export async function deleteChannelSidebarSectionApplication(
   input: SidebarApplicationInput & { readonly sectionId: string },
 ) {
-  await requireOrganizationReader(input);
+  await requireWorkspaceReader(input);
   const result = await deleteChannelSidebarSection(input.db, {
     sectionId: input.sectionId,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     userId: input.userId,
   });
   if (!result.deleted) throw new HttpError(404, "Sidebar section not found");
   // The conversations that were filed in it are Unassigned now, so each of
   // their summaries changed for this member's other devices.
   for (const channelId of result.channelIds) {
-    await recordChannelSummaryChange(input.db, input.organizationId, channelId);
+    await recordChannelSummaryChange(input.db, input.workspaceId, channelId);
   }
   return { sections: await sections(input) };
 }

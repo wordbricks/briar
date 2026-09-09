@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useAppCollectionKeyboardCommandScope } from "@/hooks/useAppCollectionKeyboardCommandScope";
 import { useControlledCollectionNavigation } from "@/hooks/useControlledCollectionNavigation";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
-import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project } from "@/types";
+import type { HuntRun, HuntRunPlacement, IssueExecutionPreferences, WorkspaceMember, PlanningProject, Project } from "@/types";
 import { type AgentProvider } from "@/lib/team-llm";
 import { useI18n } from "@/i18n";
 import { IssueListHeader } from "./IssueListHeader";
@@ -51,7 +51,7 @@ export function IssueList({
   onPriorityChange: (run: HuntRun, priority: number | null) => void;
   onPreferencesChange: (run: HuntRun, preferences: IssueExecutionPreferences) => void;
   onCheckpointsChange: (run: HuntRun, checkpoints: AutoHuntWorkflowCheckpoint[]) => void;
-  members: OrganizationMember[];
+  members: WorkspaceMember[];
   runs: HuntRun[];
   processingIssueIds: ReadonlySet<string>;
   updatingIssueId: string | null;

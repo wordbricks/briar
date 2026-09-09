@@ -12,14 +12,14 @@ import {
 import { HttpError } from "./http-response";
 
 import { appInboxFeedMessage } from "./app-connect-mappers";
-import { hasOrganizationCapability } from "./organization-access";
-import { loadOrganizationInboxFeed } from "./organization-inbox-feed";
-import { getOrganizationInboxSyncVersion } from "./organization-inbox-outbox-repository";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { loadWorkspaceInboxFeed } from "./workspace-inbox-feed";
+import { getWorkspaceInboxSyncVersion } from "./workspace-inbox-outbox-repository";
+import { getWorkspaceRole } from "./workspace-repository";
 import {
   decodeInboxReadStatesInput,
   decodeInboxUnreadStateInput,
-} from "./account-organization-request-contract";
+} from "./account-workspace-request-contract";
 import { scheduleInboxRealtimeFlush } from "./realtime-scheduling";
 import { decodeRequestSync } from "./request-schema";
 import { trimmedText, UuidString } from "./schema-codecs";
@@ -34,7 +34,7 @@ export type AppConnectInboxInput = {
 };
 
 const decodeInboxFeedInput = decodeRequestSync(Schema.Struct({
-  organizationId: UuidString,
+  workspaceId: UuidString,
   knownVersion: Schema.optional(trimmedText(1, 500)),
 }));
 
@@ -47,21 +47,21 @@ export const createAppInboxService = (
 ): ServiceImpl<typeof InboxService> => ({
   getInboxFeed: async (rpcRequest) => {
     const input = decodeInboxFeedInput({
-      organizationId: rpcRequest.workspaceId,
+      workspaceId: rpcRequest.workspaceId,
       knownVersion: rpcRequest.knownVersion,
     });
     const session = await requireSession(auth, request);
-    const role = await getOrganizationRole(
+    const role = await getWorkspaceRole(
       db,
-      input.organizationId,
+      input.workspaceId,
       session.user.id,
     );
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
+    if (!hasWorkspaceCapability(role, "workspace:read")) {
+      throw new HttpError(404, "Workspace not found");
     }
 
     const version = String(
-      await getOrganizationInboxSyncVersion(db, input.organizationId),
+      await getWorkspaceInboxSyncVersion(db, input.workspaceId),
     );
     const generatedAt = timestampFromDate(new Date());
     if (input.knownVersion === version) {
@@ -74,9 +74,9 @@ export const createAppInboxService = (
       };
     }
 
-    const feed = await loadOrganizationInboxFeed(
+    const feed = await loadWorkspaceInboxFeed(
       db,
-      input.organizationId,
+      input.workspaceId,
       session.user.id,
     );
     return {

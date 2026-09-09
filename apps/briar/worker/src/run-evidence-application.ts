@@ -28,7 +28,7 @@ import {
 } from "./worker-run-execution-application";
 import { RunEvidenceApplicationInput } from "./run-request-contract";
 
-const projectOrganizationId = async (
+const projectWorkspaceId = async (
   db: D1Database,
   projectId: string,
 ) => (await db.prepare(
@@ -37,7 +37,7 @@ const projectOrganizationId = async (
 
 export type RunEvidenceApplicationServices = {
   authorizeActiveIssueClaim: typeof authorizeActiveIssueClaim;
-  projectOrganizationId: typeof projectOrganizationId;
+  projectWorkspaceId: typeof projectWorkspaceId;
   prepareUploadRows: typeof prepareUploadRows;
   createUploadCapability: typeof createUploadCapability;
   enqueueExpiredUploadCleanup: typeof enqueueExpiredUploadCleanup;
@@ -49,7 +49,7 @@ export type RunEvidenceApplicationServices = {
 
 const runEvidenceApplicationServices: RunEvidenceApplicationServices = {
   authorizeActiveIssueClaim,
-  projectOrganizationId,
+  projectWorkspaceId,
   prepareUploadRows,
   createUploadCapability,
   enqueueExpiredUploadCleanup,
@@ -75,14 +75,14 @@ const uploadScope = async (
   services: RunEvidenceApplicationServices,
 ) => {
   const active = await services.authorizeActiveIssueClaim(input);
-  const organizationId = await services.projectOrganizationId(
+  const workspaceId = await services.projectWorkspaceId(
     input.db,
     input.projectId,
   );
-  if (!organizationId) throw new HttpError(404, "Project not found");
+  if (!workspaceId) throw new HttpError(404, "Project not found");
   const scope: UploadScope = {
     purpose: "run_evidence",
-    organizationId,
+    workspaceId,
     projectId: input.projectId,
     channelId: null,
     userId: null,

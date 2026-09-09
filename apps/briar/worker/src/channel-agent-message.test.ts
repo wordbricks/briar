@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { decodeChannelMessageApplicationInput } from "./app-mutation-request-mappers";
 import { requireChannelAccess } from "./channel-route-access";
 import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
-import { createOrganizationChannelMessage } from "./channel-message-routes";
+import { createWorkspaceChannelMessage } from "./channel-message-routes";
 import {
   agentDirectMessageKey,
   channelJson,
@@ -23,14 +23,14 @@ import {
 } from "./channels";
 import { createTeamAgent } from "./db";
 import { HttpError } from "./http-response";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 import { completeChannelReplyApplication } from "./worker-reply-completion-application";
 import type { ChannelReplyCompletionInput } from "./worker-reply-completion-mappers";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
 
-const organizationId = "11000000-0000-4000-8000-000000000001";
+const workspaceId = "11000000-0000-4000-8000-000000000001";
 const projectId = "12000000-0000-4000-8000-000000000001";
 const deviceId = "13000000-0000-4000-8000-000000000001";
 const workerId = "14000000-0000-4000-8000-000000000001";
@@ -50,10 +50,10 @@ describe("Agent-to-Agent messaging", () => {
   const archives = cloudflareEnv.ARCHIVES;
   let projectAgent: Awaited<ReturnType<typeof createTeamAgent>>;
   let senderAgent: NonNullable<
-    Awaited<ReturnType<typeof createOrganizationAgent>>
+    Awaited<ReturnType<typeof createWorkspaceAgent>>
   >;
   let peerAgent: NonNullable<
-    Awaited<ReturnType<typeof createOrganizationAgent>>
+    Awaited<ReturnType<typeof createWorkspaceAgent>>
   >;
 
   beforeAll(async () => {
@@ -70,26 +70,26 @@ describe("Agent-to-Agent messaging", () => {
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Agent Message Org', 'agent-message-org', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
     ]);
     await db.batch([
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, now, now),
+      ).bind(workspaceId, ownerId, now, now),
       // A developer reaches every conversation but only the projects they join.
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'developer', ?, ?)`,
-      ).bind(organizationId, outsiderId, now, now),
+      ).bind(workspaceId, outsiderId, now, now),
       db.prepare(
         `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Briar', ?, ?, ?)`,
-      ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+      ).bind(projectId, ownerId, workspaceId, "a".repeat(64), now, now),
     ]);
     await db.batch([
       db.prepare(
@@ -97,7 +97,7 @@ describe("Agent-to-Agent messaging", () => {
            id, organization_id, owner_user_id, label, device_identity_hash,
            state, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'Agent message device', ?, 'online', ?, ?, ?)`,
-      ).bind(deviceId, organizationId, ownerId, "b".repeat(64), now, now, now),
+      ).bind(deviceId, workspaceId, ownerId, "b".repeat(64), now, now, now),
       db.prepare(
         `insert into briar_execution_worker_credentials (
            device_id, token_hash, created_at
@@ -124,9 +124,9 @@ describe("Agent-to-Agent messaging", () => {
       now,
       deviceId,
     ).run();
-    senderAgent = (await createOrganizationAgent(db, {
+    senderAgent = (await createWorkspaceAgent(db, {
       id: senderAgentId,
-      organizationId,
+      workspaceId,
       name: "Assistant",
       provider: "claude",
       model: null,
@@ -134,9 +134,9 @@ describe("Agent-to-Agent messaging", () => {
       effort: null,
       createdAt: now,
     }))!;
-    peerAgent = (await createOrganizationAgent(db, {
+    peerAgent = (await createWorkspaceAgent(db, {
       id: peerAgentId,
-      organizationId,
+      workspaceId,
       name: "Ticker",
       provider: "claude",
       model: null,
@@ -160,7 +160,7 @@ describe("Agent-to-Agent messaging", () => {
     ) {
       await createChannel(db, {
         id: channelId,
-        organizationId,
+        workspaceId,
         kind: "dm",
         dmKey: `agent:${JSON.stringify([userId, senderAgentId])}`,
         slug: `dm-${channelId}`,
@@ -175,7 +175,7 @@ describe("Agent-to-Agent messaging", () => {
     }
     await createChannel(db, {
       id: teamChannelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "agent-message-channel",
@@ -213,7 +213,7 @@ describe("Agent-to-Agent messaging", () => {
       runtimeEnv?: Env;
     },
   ) => {
-    const job = await getChannelAgentReplyJob(db, organizationId, jobId);
+    const job = await getChannelAgentReplyJob(db, workspaceId, jobId);
     if (!job) throw new Error("Reply job is missing");
     const result = input.result;
     try {
@@ -222,7 +222,7 @@ describe("Agent-to-Agent messaging", () => {
           db,
           env: input.runtimeEnv ?? env(),
           worker: {
-            principal: { organizationId, deviceId },
+            principal: { workspaceId, deviceId },
             binding: { id: workerId, project_id: projectId },
           },
           request: {
@@ -231,7 +231,7 @@ describe("Agent-to-Agent messaging", () => {
             workerId,
             claim: {
               replyKind: "channel",
-              organizationId,
+              workspaceId,
               workId: jobId,
               runId: job.channel_id,
               claimToken: input.claimToken,
@@ -279,7 +279,7 @@ describe("Agent-to-Agent messaging", () => {
       workerId,
     );
     return claimNextChannelReplyWork({
-      input: { organizationId, workerId },
+      input: { workspaceId, workerId },
       db,
       env: env(),
       authenticatedWorker,
@@ -307,7 +307,7 @@ describe("Agent-to-Agent messaging", () => {
       createdAt: now,
     });
     const jobs = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: messageId,
       parentMessageId: messageId,
@@ -324,7 +324,7 @@ describe("Agent-to-Agent messaging", () => {
     db.prepare(
       `select id, kind, dm_key, visibility, created_by_user_id
        from briar_channels where organization_id = ? and dm_key = ?`,
-    ).bind(organizationId, agentDirectMessageKey(agentId, otherAgentId))
+    ).bind(workspaceId, agentDirectMessageKey(agentId, otherAgentId))
       .first<{
         id: string;
         kind: string;
@@ -528,7 +528,7 @@ describe("Agent-to-Agent messaging", () => {
       .toContain(noticeId);
     expect(personTimeline?.messages.map((message) => message.body))
       .not.toContain("Nothing new since this morning.");
-    const [ownerDirectMessage] = (await listChannels(db, organizationId, ownerId))
+    const [ownerDirectMessage] = (await listChannels(db, workspaceId, ownerId))
       .filter((channel) => channel.id === ownerDirectMessageId);
     expect(ownerDirectMessage?.last_message_preview)
       .not.toBe("Nothing new since this morning.");
@@ -602,7 +602,7 @@ describe("Agent-to-Agent messaging", () => {
       createdAt: now,
     });
     const [job] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId: teamChannelId,
       triggerMessageId: messageId,
       parentMessageId: messageId,
@@ -691,7 +691,7 @@ describe("Agent-to-Agent messaging", () => {
       `select count(*) as count from briar_channels
        where organization_id = ? and dm_key = ?`,
     ).bind(
-      organizationId,
+      workspaceId,
       agentDirectMessageKey(senderAgent.id, peerAgent.id),
     ).first()).resolves.toEqual({ count: 1 });
     await expect(db.prepare(
@@ -726,7 +726,7 @@ describe("Agent-to-Agent messaging", () => {
     ).resolves.toMatchObject({ relay: { status: "failed" } });
   });
 
-  it("stops sending once the organization's hourly ceiling is reached", async () => {
+  it("stops sending once the workspace's hourly ceiling is reached", async () => {
     const turn = await startTurn(
       outsiderDirectMessageId,
       outsiderId,
@@ -747,7 +747,7 @@ describe("Agent-to-Agent messaging", () => {
       message: "Agent message hourly limit (1) reached",
     });
     await expect(
-      getChannelAgentReplyJob(db, organizationId, turn.job.id),
+      getChannelAgentReplyJob(db, workspaceId, turn.job.id),
     ).resolves.toMatchObject({
       status: "failed",
       error: "Agent message hourly limit (1) reached",
@@ -786,23 +786,23 @@ describe("Agent-to-Agent messaging", () => {
     expect(projectConversation).not.toBeNull();
 
     await expect(
-      getChannel(db, organizationId, projectConversation!.id, ownerId),
+      getChannel(db, workspaceId, projectConversation!.id, ownerId),
     ).resolves.toMatchObject({ id: projectConversation!.id, kind: "dm" });
     await expect(
-      getChannel(db, organizationId, projectConversation!.id, outsiderId),
+      getChannel(db, workspaceId, projectConversation!.id, outsiderId),
     ).resolves.toBeNull();
     await expect(requireChannelAccess(
       db,
-      organizationId,
+      workspaceId,
       projectConversation!.id,
       outsiderId,
     )).rejects.toMatchObject({ status: 404 });
-    // Two Organization Agents belong to nobody's project, so anybody may read.
+    // Two Workspace Agents belong to nobody's project, so anybody may read.
     await expect(
-      getChannel(db, organizationId, organizationConversation!.id, outsiderId),
+      getChannel(db, workspaceId, organizationConversation!.id, outsiderId),
     ).resolves.toMatchObject({ id: organizationConversation!.id });
 
-    const catalog = await listChannels(db, organizationId, ownerId);
+    const catalog = await listChannels(db, workspaceId, ownerId);
     expect(catalog.map((channel) => channel.id)).not.toContain(
       organizationConversation!.id,
     );
@@ -815,7 +815,7 @@ describe("Agent-to-Agent messaging", () => {
 
     const ownerConversations = await listAgentDirectMessages(
       db,
-      organizationId,
+      workspaceId,
       senderAgent.id,
       ownerId,
     );
@@ -830,7 +830,7 @@ describe("Agent-to-Agent messaging", () => {
     )).not.toContain(false);
     const outsiderConversations = await listAgentDirectMessages(
       db,
-      organizationId,
+      workspaceId,
       senderAgent.id,
       outsiderId,
     );
@@ -838,9 +838,9 @@ describe("Agent-to-Agent messaging", () => {
       organizationConversation!.id,
     ]);
 
-    await expect(createOrganizationChannelMessage({
+    await expect(createWorkspaceChannelMessage({
       db,
-      organizationId,
+      workspaceId,
       channelId: organizationConversation!.id,
       userId: ownerId,
       request: decodeChannelMessageApplicationInput({
@@ -856,7 +856,7 @@ describe("Agent-to-Agent messaging", () => {
 
   it("streams the Agent conversation to a member who can read it", async () => {
     const conversation = await agentConversation(senderAgent.id, peerAgent.id);
-    const delta = await loadChannelDelta(db, organizationId, ownerId, 0, 1_000);
+    const delta = await loadChannelDelta(db, workspaceId, ownerId, 0, 1_000);
     expect(delta.channels.map((channel) => channel.id)).toContain(
       conversation!.id,
     );
@@ -867,7 +867,7 @@ describe("Agent-to-Agent messaging", () => {
     ).not.toHaveLength(0);
     const outsiderDelta = await loadChannelDelta(
       db,
-      organizationId,
+      workspaceId,
       outsiderId,
       0,
       1_000,

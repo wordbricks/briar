@@ -476,7 +476,7 @@ export async function runManagedComputerGuidedSetup(
   ));
   if (
     session.managedComputerId !== config.managedComputerId ||
-    session.workspaceId !== config.organizationId ||
+    session.workspaceId !== config.workspaceId ||
     session.projectId !== setupProject.id ||
     session.status !== ManagedComputerSetupSessionStatus.PENDING
   ) {
@@ -564,7 +564,7 @@ export async function runManagedComputerGuidedSetup(
   };
   if (
     binding.managedComputerId !== config.managedComputerId ||
-    binding.workspaceId !== config.organizationId ||
+    binding.workspaceId !== config.workspaceId ||
     binding.teamId !== setupProject.id ||
     binding.deviceId !== config.deviceId
   ) {
@@ -589,7 +589,7 @@ export async function runManagedComputerGuidedSetup(
     executionWorker: {
       deviceId: config.deviceId,
       workerId: binding.worker.id,
-      organizationId: config.organizationId,
+      workspaceId: config.workspaceId,
       label: binding.worker.label,
       maxConcurrentSessions: binding.worker.maxConcurrentSessions,
     },
@@ -601,7 +601,7 @@ export async function runManagedComputerGuidedSetup(
     managedComputer: {
       managedComputerId: config.managedComputerId,
       deviceId: config.deviceId,
-      organizationId: config.organizationId,
+      workspaceId: config.workspaceId,
       credentialFile:
         process.env.BRIAR_MANAGED_CREDENTIAL_FILE?.trim() ||
         "/var/lib/briar/worker-credential.json",

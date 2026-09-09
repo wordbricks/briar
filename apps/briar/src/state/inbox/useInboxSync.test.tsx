@@ -16,7 +16,7 @@ import type {
 import { createReactTestRoot, type ReactTestRoot } from "../../test/react";
 import type { DashboardPayload, Project } from "../../types";
 import { demoUser } from "../demo-fixtures";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom, userAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
@@ -161,7 +161,7 @@ const signedIn = (
     [tokenAtom, overrides.token ?? "token-a"],
     [teamsAtom, overrides.teams ?? [team]],
     [activeTeamIdAtom, (overrides.teams ?? [team])[0]!.id],
-    [activeOrganizationIdAtom, team.organizationId],
+    [activeWorkspaceIdAtom, team.workspaceId],
   ]);
   registry.set(inboxApiAtom, api);
   return registry;

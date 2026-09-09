@@ -1,8 +1,8 @@
-import { type OrganizationRole } from "./organization-repository";
+import { type WorkspaceRole } from "./workspace-repository";
 
 export type AccountDeletionPlan = {
-  blockedOrganizations: Array<{ id: string; name: string }>;
-  organizationIds: string[];
+  blockedWorkspaces: Array<{ id: string; name: string }>;
+  workspaceIds: string[];
   projectIds: string[];
 };
 
@@ -12,55 +12,55 @@ export async function planAccountDeletion(
 ): Promise<AccountDeletionPlan> {
   const organizationResult = await db
     .prepare(
-      `select organization.id, organization.name, membership.role,
+      `select workspace.id, workspace.name, membership.role,
               (select count(*)
                from briar_organization_members peer
-               where peer.organization_id = organization.id) as member_count,
+               where peer.organization_id = workspace.id) as member_count,
               exists(
                 select 1 from briar_teams team
-                where team.organization_id = organization.id
+                where team.organization_id = workspace.id
                   and team.owner_user_id = ?
               ) as owns_project,
               exists(
                 select 1 from briar_execution_worker_devices device
-                where device.organization_id = organization.id
+                where device.organization_id = workspace.id
                   and device.owner_user_id = ?
               ) as owns_worker,
               exists(
                 select 1 from briar_slack_installations installation
-                where installation.organization_id = organization.id
+                where installation.organization_id = workspace.id
                   and installation.installed_by_user_id = ?
               ) as owns_slack_installation
        from briar_organization_members membership
-       join briar_organizations organization
-         on organization.id = membership.organization_id
+       join briar_organizations workspace
+         on workspace.id = membership.organization_id
        where membership.user_id = ?
-       order by organization.created_at, organization.id`,
+       order by workspace.created_at, workspace.id`,
     )
     .bind(userId, userId, userId, userId)
     .all<{
       id: string;
       name: string;
-      role: OrganizationRole;
+      role: WorkspaceRole;
       member_count: number;
       owns_project: number;
       owns_worker: number;
       owns_slack_installation: number;
     }>();
-  const organizations = organizationResult.results ?? [];
-  const blockedOrganizations = organizations
+  const workspaces = organizationResult.results ?? [];
+  const blockedWorkspaces = workspaces
     .filter(
-      (organization) =>
-        organization.member_count > 1 &&
-        (organization.role === "owner" ||
-          organization.owns_project > 0 ||
-          organization.owns_worker > 0 ||
-          organization.owns_slack_installation > 0),
+      (workspace) =>
+        workspace.member_count > 1 &&
+        (workspace.role === "owner" ||
+          workspace.owns_project > 0 ||
+          workspace.owns_worker > 0 ||
+          workspace.owns_slack_installation > 0),
     )
     .map(({ id, name }) => ({ id, name }));
-  const organizationIds = organizations
-    .filter((organization) => organization.member_count === 1)
-    .map((organization) => organization.id);
+  const workspaceIds = workspaces
+    .filter((workspace) => workspace.member_count === 1)
+    .map((workspace) => workspace.id);
   const projectResult = await db
     .prepare(
       `select distinct team.id
@@ -81,8 +81,8 @@ export async function planAccountDeletion(
     .bind(userId, userId)
     .all<{ id: string }>();
   return {
-    blockedOrganizations,
-    organizationIds,
+    blockedWorkspaces,
+    workspaceIds,
     projectIds: (projectResult.results ?? []).map((team) => team.id),
   };
 }
@@ -113,7 +113,7 @@ export async function deleteAccountData(
   const statements: D1PreparedStatement[] = [
     // This authoritative guard deliberately recomputes the current state. A
     // preview plan is useful UI, but it is never permission to erase an
-    // organization that gained another member or user-owned resource later.
+    // workspace that gained another member or user-owned resource later.
     db
       .prepare(
         `insert into briar_account_deletion_jobs (
@@ -309,7 +309,7 @@ export async function deleteAccountData(
            bucket, object_key, project_id, run_id, queued_at
          )
          select 'attachments', agent.avatar_spritesheet_object_key,
-                'organization:' || agent.organization_id, null, ?
+                'workspace:' || agent.organization_id, null, ?
          from briar_project_agents agent
          join briar_account_deletion_job_organizations scope
            on scope.job_id = ?
@@ -324,7 +324,7 @@ export async function deleteAccountData(
            bucket, object_key, project_id, run_id, queued_at
          )
          select 'attachments', attachment.object_key,
-                'organization:' || attachment.organization_id, null, ?
+                'workspace:' || attachment.organization_id, null, ?
          from briar_channel_message_attachments attachment
          join briar_account_deletion_job_organizations scope
            on scope.job_id = ?

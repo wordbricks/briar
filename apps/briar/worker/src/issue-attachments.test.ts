@@ -29,7 +29,7 @@ import {
   processUploadCleanupQueue,
 } from "./upload-repository";
 
-const organizationId = "a7100000-0000-4000-8000-000000000001";
+const workspaceId = "a7100000-0000-4000-8000-000000000001";
 const projectId = asTeamId("b7100000-0000-4000-8000-000000000001");
 const ownerId = "issue-attachment-owner";
 const signingSecret = "issue-attachment-upload-secret".repeat(4);
@@ -53,20 +53,20 @@ describe("issue create and update attachment mutations", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Issue Uploads', 'issue-uploads', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
     ]);
     await db.batch([
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, now, now),
+      ).bind(workspaceId, ownerId, now, now),
       db.prepare(
         `insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Issue Project', ?, ?, ?)`,
-      ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+      ).bind(projectId, ownerId, workspaceId, "a".repeat(64), now, now),
     ]);
     await db.prepare(
       `insert into briar_project_settings (
@@ -507,7 +507,7 @@ describe("issue create and update attachment mutations", () => {
     const requestId = crypto.randomUUID();
     const updatedAt = new Date(Date.parse(run.updated_at) + 1_000).toISOString();
     const statements = updateIssueMutationStatements(db, {
-      organizationId,
+      workspaceId,
       projectId,
       runId: clientIssueId,
       userId: ownerId,

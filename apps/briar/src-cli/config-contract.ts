@@ -212,7 +212,7 @@ const LlmConfig = strict(Schema.Struct({
 const ExecutionWorkerConfig = strict(Schema.Struct({
   deviceId: Schema.mutableKey(WorkerDeviceId),
   workerId: Schema.mutableKey(Schema.NonEmptyString),
-  organizationId: Schema.mutableKey(Uuid),
+  workspaceId: Schema.mutableKey(Uuid),
   token: Schema.mutableKey(
     Schema.optional(Schema.String.check(Schema.isStartsWith("briar_worker_"))),
   ),
@@ -256,7 +256,7 @@ export type TeamConfig = typeof TeamConfig.Type;
 const ManagedComputerConfig = strict(Schema.Struct({
   managedComputerId: Schema.mutableKey(Uuid),
   deviceId: Schema.mutableKey(ManagedComputerDeviceId),
-  organizationId: Schema.mutableKey(Uuid),
+  workspaceId: Schema.mutableKey(Uuid),
   credentialFile: Schema.mutableKey(
     Schema.String.check(
       Schema.makeFilter((value) =>
@@ -306,7 +306,7 @@ const projectHasExecutionCredential = (
   return Boolean(
     managedComputer && project.executionWorker &&
       project.executionWorker.deviceId === managedComputer.deviceId &&
-      project.executionWorker.organizationId === managedComputer.organizationId,
+      project.executionWorker.workspaceId === managedComputer.workspaceId,
   );
 };
 
@@ -571,7 +571,7 @@ const teamFromProto = (value: LocalTeamConfig) => ({
     : {
       deviceId: value.executionWorker.deviceId,
       workerId: value.executionWorker.workerId,
-      organizationId: value.executionWorker.organizationId,
+      workspaceId: value.executionWorker.organizationId,
       token: value.executionWorker.token,
       label: value.executionWorker.label,
       maxConcurrentSessions: value.executionWorker.maxConcurrentSessions,
@@ -639,7 +639,7 @@ const configFromProto = (value: LocalConfig): Config => {
       : {
         managedComputerId: value.managedComputer.managedComputerId,
         deviceId: value.managedComputer.deviceId,
-        organizationId: value.managedComputer.organizationId,
+        workspaceId: value.managedComputer.organizationId,
         credentialFile: value.managedComputer.credentialFile,
       },
     teams: value.teams.map(teamFromProto),
@@ -716,7 +716,7 @@ const teamToProto = (value: TeamConfig) => ({
     : {
       deviceId: value.executionWorker.deviceId,
       workerId: value.executionWorker.workerId,
-      organizationId: value.executionWorker.organizationId,
+      organizationId: value.executionWorker.workspaceId,
       token: value.executionWorker.token,
       label: value.executionWorker.label,
       maxConcurrentSessions: value.executionWorker.maxConcurrentSessions,

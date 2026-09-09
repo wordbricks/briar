@@ -15,13 +15,13 @@ import {
   type ChannelNavigationPage,
 } from "../../lib/app-navigation";
 import { createChannelActions } from "../channels/actions";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { activeTeamIdAtom } from "../team/atoms";
 import {
   navigationChannelIdAtom,
   navigationHistoryAtom,
-  navigationOrganizationIdAtom,
+  navigationWorkspaceIdAtom,
   navigationTeamIdAtom,
   settingsTargetAtom,
 } from "./atoms";
@@ -48,7 +48,7 @@ export interface NavigationActions {
   readonly navigateToLocation: (location: AppNavigationLocation) => void;
   /** Swaps the location on screen without recording a visit. */
   readonly replaceNavigationLocation: (location: AppNavigationLocation) => void;
-  /** Navigates to a page, carrying the team or organization it belongs to. */
+  /** Navigates to a page, carrying the team or workspace it belongs to. */
   readonly navigateToPage: (page: ActivePage, teamId?: string | null) => void;
   /** Opens an issue, on the team that owns it. */
   readonly navigateToIssue: (runId: string, teamId?: string | null) => void;
@@ -56,14 +56,14 @@ export interface NavigationActions {
   readonly navigateToChannel: (
     channelId: string,
     page: ChannelNavigationPage,
-    organizationId?: string | null,
+    workspaceId?: string | null,
     teamId?: string | null,
   ) => void;
   /** Swaps which channel the page shows, without recording a visit. */
   readonly replaceChannelDestination: (
     channelId: string | null,
     page: ChannelNavigationPage,
-    organizationId?: string | null,
+    workspaceId?: string | null,
     teamId?: string | null,
   ) => void;
   /** The channel list's "this one is gone, take that one instead". */
@@ -101,12 +101,12 @@ export function createNavigationActions(
     page,
     teamId = defaultTeamId(),
   ) => {
-    const organizationId = registry.get(activeOrganizationIdAtom);
+    const workspaceId = registry.get(activeWorkspaceIdAtom);
     navigateToLocation(
-      (page === "inbox" || page === "my-issues") && organizationId
-        ? organizationNavigationLocation(organizationId, page)
-        : (page === "channels" || page === "dms") && organizationId
-          ? channelPageNavigationLocation(page, organizationId, teamId)
+      (page === "inbox" || page === "my-issues") && workspaceId
+        ? organizationNavigationLocation(workspaceId, page)
+        : (page === "channels" || page === "dms") && workspaceId
+          ? channelPageNavigationLocation(page, workspaceId, teamId)
           : teamId && isProjectNavigationPage(page)
             ? projectNavigationLocation(page, teamId)
             : page,
@@ -117,23 +117,23 @@ export function createNavigationActions(
     (
       channelId,
       page,
-      organizationId = registry.get(activeOrganizationIdAtom),
+      workspaceId = registry.get(activeWorkspaceIdAtom),
       teamId = defaultTeamId(),
     ) => {
       Atom.batch(() => {
         channels.selectChannel(channelId);
-        if (!channelId || !organizationId) {
+        if (!channelId || !workspaceId) {
           replaceNavigationLocation(
-            organizationId
-              ? channelPageNavigationLocation(page, organizationId, teamId)
+            workspaceId
+              ? channelPageNavigationLocation(page, workspaceId, teamId)
               : page,
           );
           return;
         }
         startDesktopChannelTransition(channelId);
-        channels.markOrganizationChannelRead(channelId);
+        channels.markWorkspaceChannelRead(channelId);
         replaceNavigationLocation(
-          channelNavigationLocation(page, organizationId, channelId, teamId),
+          channelNavigationLocation(page, workspaceId, channelId, teamId),
         );
       });
     };
@@ -152,36 +152,36 @@ export function createNavigationActions(
     navigateToChannel(
       channelId,
       page,
-      organizationId = registry.get(activeOrganizationIdAtom),
+      workspaceId = registry.get(activeWorkspaceIdAtom),
       teamId = defaultTeamId(),
     ) {
-      if (!organizationId) return;
+      if (!workspaceId) return;
       startDesktopChannelTransition(channelId);
       Atom.batch(() => {
         channels.selectChannel(channelId);
-        channels.markOrganizationChannelRead(channelId);
+        channels.markWorkspaceChannelRead(channelId);
         navigateToLocation(
-          channelNavigationLocation(page, organizationId, channelId, teamId),
+          channelNavigationLocation(page, workspaceId, channelId, teamId),
         );
       });
     },
 
     handleDesktopChannelFallback(channelId, page) {
-      const activeOrganizationId = registry.get(activeOrganizationIdAtom);
-      const locationOrganizationId = registry.get(navigationOrganizationIdAtom);
+      const activeWorkspaceId = registry.get(activeWorkspaceIdAtom);
+      const locationWorkspaceId = registry.get(navigationWorkspaceIdAtom);
       // A channel view that is on its way out still reports its fallback. If
-      // the location already moved to another organization, that report is
+      // the location already moved to another workspace, that report is
       // about the previous one and must not move anything.
       if (
         registry.get(navigationChannelIdAtom) &&
-        locationOrganizationId !== activeOrganizationId
+        locationWorkspaceId !== activeWorkspaceId
       ) {
         return;
       }
       replaceChannelDestination(
         channelId,
         page,
-        locationOrganizationId ?? activeOrganizationId,
+        locationWorkspaceId ?? activeWorkspaceId,
         registry.get(navigationTeamIdAtom) ?? defaultTeamId(),
       );
     },

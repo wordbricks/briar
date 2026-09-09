@@ -7,7 +7,7 @@ import { useRegistry } from "../state/registry";
 /*
   A timer that keeps one conversation current without the catalog.
 
-  Every conversation the sidebar knows about rides the organization's channel
+  Every conversation the sidebar knows about rides the workspace's channel
   delta loop, which only carries the channels the catalog holds. An
   Agent-to-Agent conversation is read on demand and deliberately absent from
   that catalog, so while one is open this asks for its page directly. It stops
@@ -22,26 +22,26 @@ export function useChannelMessagePolling({
   enabled,
   intervalMs = readOnlyChannelPollIntervalMs,
   limit = 50,
-  organizationId,
+  workspaceId,
   token,
 }: {
   channelId: string | null;
   enabled: boolean;
   intervalMs?: number;
   limit?: number;
-  organizationId: string;
+  workspaceId: string;
   token: string;
 }): void {
   const registry = useRegistry();
   useEffect(() => {
-    if (!enabled || !channelId || !token || !organizationId) return;
+    if (!enabled || !channelId || !token || !workspaceId) return;
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
     const poll = async () => {
       try {
         const { messages } = await listChannelMessages(
           token,
-          organizationId,
+          workspaceId,
           channelId,
           undefined,
           { limit },
@@ -75,5 +75,5 @@ export function useChannelMessagePolling({
       stop();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [channelId, enabled, intervalMs, limit, organizationId, registry, token]);
+  }, [channelId, enabled, intervalMs, limit, workspaceId, registry, token]);
 }

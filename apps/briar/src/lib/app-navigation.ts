@@ -11,7 +11,7 @@ const ActivePage = Schema.Literals([
   "schedule",
   "inbox",
   "my-issues",
-  "organization-create",
+  "workspace-create",
   "settings",
 ]);
 export type ActivePage = typeof ActivePage.Type;
@@ -43,15 +43,15 @@ export const AppSettingsSection = Schema.Literals([
   "archive",
 ]);
 export type AppSettingsSection = typeof AppSettingsSection.Type;
-export const OrganizationSettingsSection = Schema.Literals([
+export const WorkspaceSettingsSection = Schema.Literals([
   "general",
   "members",
   "agents",
   "workers",
   "integrations",
 ]);
-export type OrganizationSettingsSection =
-  typeof OrganizationSettingsSection.Type;
+export type WorkspaceSettingsSection =
+  typeof WorkspaceSettingsSection.Type;
 export const ProjectSettingsSection = Schema.Literals([
   "general",
   "tabs",
@@ -67,15 +67,15 @@ export const organizationNavigationPages = [
   "inbox",
   "my-issues",
 ] as const;
-const OrganizationNavigationPage = Schema.Literals(organizationNavigationPages);
-export type OrganizationNavigationPage = typeof OrganizationNavigationPage.Type;
+const WorkspaceNavigationPage = Schema.Literals(organizationNavigationPages);
+export type WorkspaceNavigationPage = typeof WorkspaceNavigationPage.Type;
 
 export type SettingsNavigationTarget =
   | { readonly scope: "application"; readonly section: AppSettingsSection }
   | {
-      readonly scope: "organization";
-      readonly organizationId: string;
-      readonly section: OrganizationSettingsSection;
+      readonly scope: "workspace";
+      readonly workspaceId: string;
+      readonly section: WorkspaceSettingsSection;
     }
   | {
       readonly scope: "project";
@@ -91,9 +91,9 @@ export type AppNavigationLocation =
   | `${ChannelNavigationPage}/${string}/${string}/${string}`
   | `channel-pages/${ChannelNavigationPage}/${string}`
   | `channel-pages/${ChannelNavigationPage}/${string}/${string}`
-  | `organizations/${string}/${OrganizationNavigationPage}`
+  | `workspaces/${string}/${WorkspaceNavigationPage}`
   | `settings/application/${AppSettingsSection}`
-  | `settings/organization/${string}/${OrganizationSettingsSection}`
+  | `settings/workspace/${string}/${WorkspaceSettingsSection}`
   | `settings/project/${string}/${ProjectSettingsSection}`;
 
 const NavigationId = Schema.NonEmptyString;
@@ -129,10 +129,10 @@ const EncodedProjectSegments = Schema.Tuple([
   NavigationId,
   ProjectNavigationPage,
 ]);
-const EncodedOrganizationSegments = Schema.Tuple([
-  Schema.Literal("organizations"),
+const EncodedWorkspaceSegments = Schema.Tuple([
+  Schema.Literal("workspaces"),
   NavigationId,
-  OrganizationNavigationPage,
+  WorkspaceNavigationPage,
 ]);
 const EncodedSettingsSegments = Schema.Union([
   Schema.Tuple([
@@ -142,9 +142,9 @@ const EncodedSettingsSegments = Schema.Union([
   ]),
   Schema.Tuple([
     Schema.Literal("settings"),
-    Schema.Literal("organization"),
+    Schema.Literal("workspace"),
     NavigationId,
-    OrganizationSettingsSection,
+    WorkspaceSettingsSection,
   ]),
   Schema.Tuple([
     Schema.Literal("settings"),
@@ -160,8 +160,8 @@ const decodeChannelPageSegments = Schema.decodeUnknownOption(
   EncodedChannelPageSegments,
 );
 const decodeProjectSegments = Schema.decodeUnknownOption(EncodedProjectSegments);
-const decodeOrganizationSegments = Schema.decodeUnknownOption(
-  EncodedOrganizationSegments,
+const decodeWorkspaceSegments = Schema.decodeUnknownOption(
+  EncodedWorkspaceSegments,
 );
 const decodeSettingsSegments = Schema.decodeUnknownOption(
   EncodedSettingsSegments,
@@ -172,14 +172,14 @@ export const isProjectNavigationPage = Schema.is(ProjectNavigationPage);
 
 type ChannelSegments = {
   readonly page: ChannelNavigationPage;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly channelId: string;
   readonly projectId: string | null;
 };
 
 type ChannelPageSegments = {
   readonly page: ChannelNavigationPage;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly projectId: string | null;
 };
 
@@ -200,9 +200,9 @@ function channelNavigationSegments(
   location: AppNavigationLocation,
 ): Option.Option<ChannelSegments> {
   return decodeChannelSegments(location.split("/")).pipe(
-    Option.flatMap(([page, organizationId, channelId, projectId]) =>
+    Option.flatMap(([page, workspaceId, channelId, projectId]) =>
       Option.all({
-        organizationId: decodeUriComponent(organizationId),
+        workspaceId: decodeUriComponent(workspaceId),
         channelId: decodeUriComponent(channelId),
         projectId: projectId
           ? decodeUriComponent(projectId).pipe(Option.map(Option.some))
@@ -210,7 +210,7 @@ function channelNavigationSegments(
       }).pipe(
         Option.map((decoded) => ({
           page,
-          organizationId: decoded.organizationId,
+          workspaceId: decoded.workspaceId,
           channelId: decoded.channelId,
           projectId: Option.getOrNull(decoded.projectId),
         })),
@@ -223,16 +223,16 @@ function channelPageNavigationSegments(
   location: AppNavigationLocation,
 ): Option.Option<ChannelPageSegments> {
   return decodeChannelPageSegments(location.split("/")).pipe(
-    Option.flatMap(([, page, organizationId, projectId]) =>
+    Option.flatMap(([, page, workspaceId, projectId]) =>
       Option.all({
-        organizationId: decodeUriComponent(organizationId),
+        workspaceId: decodeUriComponent(workspaceId),
         projectId: projectId
           ? decodeUriComponent(projectId).pipe(Option.map(Option.some))
           : Option.some(Option.none<string>()),
       }).pipe(
         Option.map((decoded) => ({
           page,
-          organizationId: decoded.organizationId,
+          workspaceId: decoded.workspaceId,
           projectId: Option.getOrNull(decoded.projectId),
         })),
       ),
@@ -254,12 +254,12 @@ function projectNavigationSegments(
 
 function organizationNavigationSegments(
   location: AppNavigationLocation,
-): Option.Option<readonly [organizationId: string, page: OrganizationNavigationPage]> {
-  return decodeOrganizationSegments(location.split("/")).pipe(
-    Option.flatMap(([, organizationId, page]) =>
-      decodeUriComponent(organizationId).pipe(
-        Option.map((decodedOrganizationId) =>
-          [decodedOrganizationId, page] as const
+): Option.Option<readonly [workspaceId: string, page: WorkspaceNavigationPage]> {
+  return decodeWorkspaceSegments(location.split("/")).pipe(
+    Option.flatMap(([, workspaceId, page]) =>
+      decodeUriComponent(workspaceId).pipe(
+        Option.map((decodedWorkspaceId) =>
+          [decodedWorkspaceId, page] as const
         ),
       ),
     ),
@@ -284,40 +284,40 @@ export function issueNavigationLocation(
 
 export function channelNavigationLocation(
   page: ChannelNavigationPage,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   projectId?: string | null,
 ): AppNavigationLocation {
-  const organization = encodeURIComponent(decodeNavigationId(organizationId));
+  const workspace = encodeURIComponent(decodeNavigationId(workspaceId));
   const channel = encodeURIComponent(decodeNavigationId(channelId));
   if (projectId !== undefined && projectId !== null) {
-    return `${page}/${organization}/${channel}/${encodeURIComponent(
+    return `${page}/${workspace}/${channel}/${encodeURIComponent(
       decodeNavigationId(projectId),
     )}`;
   }
-  return `${page}/${organization}/${channel}`;
+  return `${page}/${workspace}/${channel}`;
 }
 
 export function channelPageNavigationLocation(
   page: ChannelNavigationPage,
-  organizationId: string,
+  workspaceId: string,
   projectId?: string | null,
 ): AppNavigationLocation {
-  const organization = encodeURIComponent(decodeNavigationId(organizationId));
+  const workspace = encodeURIComponent(decodeNavigationId(workspaceId));
   if (projectId !== undefined && projectId !== null) {
-    return `channel-pages/${page}/${organization}/${encodeURIComponent(
+    return `channel-pages/${page}/${workspace}/${encodeURIComponent(
       decodeNavigationId(projectId),
     )}`;
   }
-  return `channel-pages/${page}/${organization}`;
+  return `channel-pages/${page}/${workspace}`;
 }
 
 export function organizationNavigationLocation(
-  organizationId: string,
-  page: OrganizationNavigationPage = "inbox",
+  workspaceId: string,
+  page: WorkspaceNavigationPage = "inbox",
 ): AppNavigationLocation {
-  return `organizations/${encodeURIComponent(
-    decodeNavigationId(organizationId),
+  return `workspaces/${encodeURIComponent(
+    decodeNavigationId(workspaceId),
   )}/${page}`;
 }
 
@@ -327,9 +327,9 @@ export function settingsNavigationLocation(
   if (target.scope === "application") {
     return `settings/application/${target.section}`;
   }
-  if (target.scope === "organization") {
-    return `settings/organization/${encodeURIComponent(
-      decodeNavigationId(target.organizationId),
+  if (target.scope === "workspace") {
+    return `settings/workspace/${encodeURIComponent(
+      decodeNavigationId(target.workspaceId),
     )}/${target.section}`;
   }
   return `settings/project/${encodeURIComponent(
@@ -351,8 +351,8 @@ export function settingsTargetFromNavigationLocation(
       const [, scope, encodedId, section] = segments;
       return decodeUriComponent(encodedId).pipe(
         Option.map((id): SettingsNavigationTarget =>
-          scope === "organization"
-            ? { scope, organizationId: id, section }
+          scope === "workspace"
+            ? { scope, workspaceId: id, section }
             : { scope, projectId: id, section },
         ),
       );
@@ -451,22 +451,22 @@ export function organizationIdFromNavigationLocation(
   location: AppNavigationLocation,
 ): string | null {
   return channelNavigationSegments(location).pipe(
-    Option.map(({ organizationId }) => organizationId),
+    Option.map(({ workspaceId }) => workspaceId),
     Option.orElse(() =>
       channelPageNavigationSegments(location).pipe(
-        Option.map(({ organizationId }) => organizationId),
+        Option.map(({ workspaceId }) => workspaceId),
       ),
     ),
     Option.orElse(() =>
       organizationNavigationSegments(location).pipe(
-        Option.map(([organizationId]) => organizationId),
+        Option.map(([workspaceId]) => workspaceId),
       ),
     ),
     Option.orElse(() =>
       Option.fromNullishOr(settingsTargetFromNavigationLocation(location)).pipe(
         Option.flatMap((target) =>
-          target.scope === "organization"
-            ? Option.some(target.organizationId)
+          target.scope === "workspace"
+            ? Option.some(target.workspaceId)
             : Option.none(),
         ),
       ),

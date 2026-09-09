@@ -37,7 +37,7 @@ import {
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const deviceId = "22222222-2222-4222-8222-222222222222";
-const organizationId = "33333333-3333-4333-8333-333333333333";
+const workspaceId = "33333333-3333-4333-8333-333333333333";
 const workId = "44444444-4444-4444-8444-444444444444";
 const channelId = "66666666-6666-4666-8666-666666666666";
 const requestId = "55555555-5555-4555-8555-555555555555";
@@ -54,7 +54,7 @@ const input = {
 };
 
 const worker = {
-  principal: { organizationId, deviceId },
+  principal: { workspaceId, deviceId },
   binding: { id: workerId },
 } as Awaited<ReturnType<typeof requireWorkerProjectBinding>>;
 
@@ -100,7 +100,7 @@ const channelReplyIdentity = () => create(WorkClaimIdentitySchema, {
   claimToken,
   work: {
     case: "channelReply",
-    value: create(ChannelReplyClaimIdentitySchema, { workspaceId: organizationId }),
+    value: create(ChannelReplyClaimIdentitySchema, { workspaceId: workspaceId }),
   },
 });
 
@@ -127,9 +127,9 @@ const unserializableChannelReplyClaim = {
   workId,
   runId: channelId,
   channelId,
-  organizationId,
+  workspaceId,
   projectId,
-  scope: { kind: "project", organizationId, projectId },
+  scope: { kind: "project", workspaceId, projectId },
   sourceKey: `briar-channel:${channelId}:reply:${workId}`,
   title: "Channel",
   triggerMessageId: "77777777-7777-4777-8777-777777777777",
@@ -226,7 +226,7 @@ describe("WorkerQueueService lifecycle semantics", () => {
     const claimed = vi.fn<WorkerQueueServices["getClaimedChannelReply"]>();
     claimed.mockResolvedValue({
       id: workId,
-      organization_id: organizationId,
+      organization_id: workspaceId,
       channel_id: channelId,
     } as NonNullable<Awaited<ReturnType<
       WorkerQueueServices["getClaimedChannelReply"]

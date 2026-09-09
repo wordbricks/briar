@@ -1,7 +1,7 @@
 import type { ChannelAgentSummary } from "./channels-contract";
 import type {
   ManagedComputer,
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
   ProjectAgent,
 } from "../types";
 
@@ -20,7 +20,7 @@ type AgentComputerConfiguration = Pick<
 >;
 
 type WorkerDevice = Pick<
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
   "bindings" | "deviceId" | "label"
 >;
 

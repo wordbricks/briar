@@ -13,7 +13,7 @@ import {
   activePageAtom,
   activeRunIdAtom,
 } from "../../state/navigation/atoms";
-import { activeOrganizationAtom } from "../../state/organization/atoms";
+import { activeWorkspaceAtom } from "../../state/workspace/atoms";
 import { loadingAtom, userAtom } from "../../state/session/atoms";
 import { activeTeamAtom } from "../../state/team/atoms";
 
@@ -46,7 +46,7 @@ export function CommandPaletteWithContext(props: CommandPaletteShellProps) {
   const channelsLoading = useAtomValue(channelsLoadingAtom);
   const user = useAtomValue(userAtom);
   const activeTeam = useAtomValue(activeTeamAtom);
-  const activeOrganization = useAtomValue(activeOrganizationAtom);
+  const activeWorkspace = useAtomValue(activeWorkspaceAtom);
   const activeChannelId = useAtomValue(activeChannelIdAtom);
   const activeTeamRunIds = useAtomValue(teamRunIdsAtom(activeTeam?.id ?? ""));
   const storedRun = useAtomValue(runAtom(selectedRunId ?? ""));
@@ -63,7 +63,7 @@ export function CommandPaletteWithContext(props: CommandPaletteShellProps) {
         ? activePage === "dms"
           ? directMessageDisplayName(currentChannel, user?.id ?? null)
           : `#${currentChannel.name}`
-        : activeTeam?.name ?? activeOrganization?.name ?? null;
+        : activeTeam?.name ?? activeWorkspace?.name ?? null;
 
   return (
     <Suspense fallback={null}>

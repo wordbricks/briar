@@ -18,17 +18,14 @@ import {
 } from "../channels/actions";
 import {
   activeChannelIdAtom,
-  activeOrganizationChannelsAtom,
+  activeWorkspaceChannelsAtom,
   channelCatalogCursorAtom,
   directMessageComposeAtom,
   openAgentConversationIdAtom,
   organizationDirectMessagesAtom,
 } from "../channels/atoms";
-import { useOrganizationActions } from "../organization/actions";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { useWorkspaceActions } from "../workspace/actions";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { companionMode, lockedTeamIdAtom } from "../platform";
 import { useRegistry } from "../registry";
 import { loadingAtom, userAtom } from "../session/atoms";
@@ -43,7 +40,7 @@ import {
   navigationChannelIdAtom,
   navigationHistoryUserIdAtom,
   navigationLocationAtom,
-  navigationOrganizationIdAtom,
+  navigationWorkspaceIdAtom,
   navigationSettingsTargetAtom,
   navigationTeamIdAtom,
   navigationUserBoundaryChangedAtom,
@@ -65,7 +62,7 @@ import {
        selected one written into it;
     4. team existence — a location naming a team the account no longer has
        falls back, per page kind;
-    5. organization existence — the same for the organization, and otherwise
+    5. workspace existence — the same for the workspace, and otherwise
        the location's channel becomes the selected one;
     6. schedule tab — the schedule page leaves when its team turned the tab off;
     7. latest DM — the DM page with no conversation open shows the latest one,
@@ -73,7 +70,7 @@ import {
 
   Each one reads what the ones before it wrote: 3 gives 4 a team to check, 4
   gives 5 a settled team for its channel fallback, 6 reads the team 3 and 4
-  agreed on, and 7 runs against the organization 5 settled. Splitting them
+  agreed on, and 7 runs against the workspace 5 settled. Splitting them
   across hooks or mount points would leave that ordering to React, which is why
   they stay together.
 
@@ -89,11 +86,11 @@ export function useNavigationReconciliation(): void {
   const user = useAtomValue(userAtom);
   const loading = useAtomValue(loadingAtom);
   const teams = useAtomValue(teamsAtom);
-  const organizations = useAtomValue(organizationsAtom);
+  const workspaces = useAtomValue(workspacesAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const activeChannelId = useAtomValue(activeChannelIdAtom);
-  const organizationChannels = useAtomValue(activeOrganizationChannelsAtom);
+  const organizationChannels = useAtomValue(activeWorkspaceChannelsAtom);
   const directMessages = useAtomValue(organizationDirectMessagesAtom);
   const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
   const composingDirectMessage = useAtomValue(directMessageComposeAtom);
@@ -103,15 +100,15 @@ export function useNavigationReconciliation(): void {
   const activeNavigationLocation = useAtomValue(navigationLocationAtom);
   const activePage = useAtomValue(activePageAtom);
   const navigationTeamId = useAtomValue(navigationTeamIdAtom);
-  const navigationOrganizationId = useAtomValue(navigationOrganizationIdAtom);
+  const navigationWorkspaceId = useAtomValue(navigationWorkspaceIdAtom);
   const navigationChannelId = useAtomValue(navigationChannelIdAtom);
   const navigationSettingsTarget = useAtomValue(navigationSettingsTargetAtom);
   const activeTeamForTabs = useAtomValue(activeTeamForTabsAtom);
   const navigationUserBoundaryChanged = useAtomValue(
     navigationUserBoundaryChangedAtom,
   );
-  const { markOrganizationChannelRead, selectChannel } = useChannelActions();
-  const { selectOrganization } = useOrganizationActions();
+  const { markWorkspaceChannelRead, selectChannel } = useChannelActions();
+  const { selectWorkspace } = useWorkspaceActions();
   const { replaceChannelDestination, replaceNavigationLocation, resetNavigation } =
     actions;
   const navigationUserId = user?.id ?? null;
@@ -210,26 +207,26 @@ export function useNavigationReconciliation(): void {
 
     if (
       (activePage === "channels" || activePage === "dms") &&
-      navigationOrganizationId
+      navigationWorkspaceId
     ) {
       const fallbackTeam =
         teams.find(
           (team) =>
-            team.organizationId === navigationOrganizationId &&
+            team.workspaceId === navigationWorkspaceId &&
             team.id === activeTeamId,
         ) ??
-        teams.find((team) => team.organizationId === navigationOrganizationId);
+        teams.find((team) => team.workspaceId === navigationWorkspaceId);
       replaceNavigationLocation(
         navigationChannelId
           ? channelNavigationLocation(
               activePage,
-              navigationOrganizationId,
+              navigationWorkspaceId,
               navigationChannelId,
               fallbackTeam?.id,
             )
           : channelPageNavigationLocation(
               activePage,
-              navigationOrganizationId,
+              navigationWorkspaceId,
               fallbackTeam?.id,
             ),
       );
@@ -259,32 +256,32 @@ export function useNavigationReconciliation(): void {
     selectTeam,
     user,
     navigationChannelId,
-    navigationOrganizationId,
+    navigationWorkspaceId,
     navigationTeamId,
     navigationUserBoundaryChanged,
     replaceNavigationLocation,
   ]);
 
-  // 5. The same for the organization, and — once it agrees — the location's
+  // 5. The same for the workspace, and — once it agrees — the location's
   //    channel becomes the open one.
   useEffect(() => {
     if (
       navigationUserBoundaryChanged ||
       companionMode ||
-      !navigationOrganizationId
+      !navigationWorkspaceId
     ) {
       return;
     }
-    const navigationOrganizationExists = organizations.some(
-      (organization) => organization.id === navigationOrganizationId,
+    const navigationWorkspaceExists = workspaces.some(
+      (workspace) => workspace.id === navigationWorkspaceId,
     );
-    if (!navigationOrganizationExists) {
+    if (!navigationWorkspaceExists) {
       if (loading || !user) return;
-      const fallbackOrganization =
-        organizations.find(
-          (organization) => organization.id === activeOrganizationId,
-        ) ?? organizations[0];
-      if (!fallbackOrganization) {
+      const fallbackWorkspace =
+        workspaces.find(
+          (workspace) => workspace.id === activeWorkspaceId,
+        ) ?? workspaces[0];
+      if (!fallbackWorkspace) {
         replaceNavigationLocation("lobby");
         return;
       }
@@ -292,20 +289,20 @@ export function useNavigationReconciliation(): void {
         const fallbackTeam =
           teams.find(
             (team) =>
-              team.organizationId === fallbackOrganization.id &&
+              team.workspaceId === fallbackWorkspace.id &&
               team.id === activeTeamId,
           ) ??
-          teams.find((team) => team.organizationId === fallbackOrganization.id);
+          teams.find((team) => team.workspaceId === fallbackWorkspace.id);
         replaceNavigationLocation(
           channelPageNavigationLocation(
             activePage,
-            fallbackOrganization.id,
+            fallbackWorkspace.id,
             fallbackTeam?.id,
           ),
         );
       } else if (activePage === "inbox" || activePage === "my-issues") {
         replaceNavigationLocation(
-          organizationNavigationLocation(fallbackOrganization.id, activePage),
+          organizationNavigationLocation(fallbackWorkspace.id, activePage),
         );
       } else {
         replaceNavigationLocation(
@@ -317,8 +314,8 @@ export function useNavigationReconciliation(): void {
       }
       return;
     }
-    if (navigationOrganizationId !== activeOrganizationId) {
-      selectOrganization(navigationOrganizationId);
+    if (navigationWorkspaceId !== activeWorkspaceId) {
+      selectWorkspace(navigationWorkspaceId);
       return;
     }
     if (!navigationChannelId) {
@@ -334,20 +331,20 @@ export function useNavigationReconciliation(): void {
       startDesktopChannelTransition(navigationChannelId);
       selectChannel(navigationChannelId);
     }
-    markOrganizationChannelRead(navigationChannelId);
+    markWorkspaceChannelRead(navigationChannelId);
   }, [
     activeChannelId,
-    activeOrganizationId,
+    activeWorkspaceId,
     activeTeamId,
     loading,
-    organizations,
+    workspaces,
     teams,
-    selectOrganization,
+    selectWorkspace,
     user,
     activePage,
-    markOrganizationChannelRead,
+    markWorkspaceChannelRead,
     navigationChannelId,
-    navigationOrganizationId,
+    navigationWorkspaceId,
     navigationUserBoundaryChanged,
     // The catalog kept this effect re-running while the read marker was a
     // callback rebuilt from it, which is what re-marks the open channel when a
@@ -390,10 +387,10 @@ export function useNavigationReconciliation(): void {
       lockedTeamId ||
       activePage !== "dms" ||
       composingDirectMessage ||
-      !activeOrganizationId ||
+      !activeWorkspaceId ||
       channelCatalogCursor === null ||
-      (navigationOrganizationId !== null &&
-        navigationOrganizationId !== activeOrganizationId) ||
+      (navigationWorkspaceId !== null &&
+        navigationWorkspaceId !== activeWorkspaceId) ||
       directMessages.some((channel) => channel.id === desktopActiveChannelId)
     ) {
       return;
@@ -416,11 +413,11 @@ export function useNavigationReconciliation(): void {
     replaceChannelDestination(
       latest.id,
       "dms",
-      activeOrganizationId,
+      activeWorkspaceId,
       navigationTeamId ?? activeTeamId,
     );
   }, [
-    activeOrganizationId,
+    activeWorkspaceId,
     activePage,
     activeTeamId,
     channelCatalogCursor,
@@ -428,7 +425,7 @@ export function useNavigationReconciliation(): void {
     desktopActiveChannelId,
     directMessages,
     lockedTeamId,
-    navigationOrganizationId,
+    navigationWorkspaceId,
     navigationTeamId,
     navigationUserBoundaryChanged,
     registry,

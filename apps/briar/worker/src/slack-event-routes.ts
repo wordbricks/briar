@@ -12,8 +12,8 @@ import {
   releaseSlackEvent,
 } from "./db";
 import { HttpError, json } from "./http-response";
-import { listOrganizationTeams } from "./team-repository";
-import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
+import { listWorkspaceTeams } from "./team-repository";
+import { flushWorkspaceInboxRealtimeOutbox } from "./realtime-scheduling";
 import {
   buildSlackIssueCreatedMessage,
   callSlackApi,
@@ -166,7 +166,7 @@ async function processSlackAppMention(env: Env, payload: SlackEventCallback) {
       installation.default_project_id,
     );
     const project = (
-      await listOrganizationTeams(env.DB, installation.organization_id)
+      await listWorkspaceTeams(env.DB, installation.organization_id)
     ).find((candidate) => candidate.id === installation.default_project_id);
     if (!project) {
       throw new Error("Slack default project is unavailable");
@@ -294,7 +294,7 @@ async function handleSlackEventRequest(
   }
   if (isSlackEventCallback(payload)) {
     const processing = processSlackAppMention(env, payload).finally(() =>
-      flushOrganizationInboxRealtimeOutbox(env, env.DB).catch((error) => {
+      flushWorkspaceInboxRealtimeOutbox(env, env.DB).catch((error) => {
         console.error(JSON.stringify({
           message: "Inbox realtime flush after Slack event failed",
           error: error instanceof Error ? error.message : String(error),

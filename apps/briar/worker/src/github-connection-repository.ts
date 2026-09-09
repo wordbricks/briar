@@ -40,7 +40,7 @@ export async function createGithubOAuthState(
   db: D1Database,
   input: {
     stateHash: string;
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     pkceVerifier: string;
     installationId?: number | null;
@@ -61,7 +61,7 @@ export async function createGithubOAuthState(
       )
       .bind(
         input.stateHash,
-        input.organizationId,
+        input.workspaceId,
         input.userId,
         input.pkceVerifier,
         input.installationId ?? null,
@@ -137,7 +137,7 @@ export async function getGithubConnectionByInstallation(
 
 export async function getGithubConnectionForOrganization(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ) {
   return db
     .prepare(
@@ -150,7 +150,7 @@ export async function getGithubConnectionForOrganization(
        order by updated_at desc
        limit 1`,
     )
-    .bind(organizationId)
+    .bind(workspaceId)
     .first<GithubConnectionRow>();
 }
 
@@ -246,7 +246,7 @@ export async function syncGithubConnectionRepositories(
 export async function connectGithubInstallation(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     installationId: number;
     installationAccountId: number;
     accountLogin: string;
@@ -295,7 +295,7 @@ export async function connectGithubInstallation(
       )
       .bind(
         input.installationId,
-        input.organizationId,
+        input.workspaceId,
         input.installationAccountId,
         input.accountLogin,
         input.accountAvatarUrl,
@@ -304,7 +304,7 @@ export async function connectGithubInstallation(
         input.connectedByUserId,
         input.observedAt,
         input.observedAt,
-        input.organizationId,
+        input.workspaceId,
         input.installationId,
       ),
     db
@@ -321,7 +321,7 @@ export async function connectGithubInstallation(
       .bind(
         input.installationId,
         input.installationId,
-        input.organizationId,
+        input.workspaceId,
         input.observedAt,
       ),
     db
@@ -351,7 +351,7 @@ export async function connectGithubInstallation(
         input.observedAt,
         JSON.stringify(input.repositories),
         input.installationId,
-        input.organizationId,
+        input.workspaceId,
         input.observedAt,
       ),
   ];
@@ -362,20 +362,20 @@ export async function connectGithubInstallation(
   );
   if (
     connection?.status === "connected" &&
-    connection.organization_id === input.organizationId
+    connection.organization_id === input.workspaceId
   ) {
     return { outcome: "connected" as const };
   }
   if (connection?.status === "connected") {
     return { outcome: "installation_conflict" as const };
   }
-  const activeForOrganization = await getGithubConnectionForOrganization(
+  const activeForWorkspace = await getGithubConnectionForOrganization(
     db,
-    input.organizationId,
+    input.workspaceId,
   );
   if (
-    activeForOrganization &&
-    activeForOrganization.installation_id !== input.installationId
+    activeForWorkspace &&
+    activeForWorkspace.installation_id !== input.installationId
   ) {
     return { outcome: "organization_conflict" as const };
   }
@@ -384,12 +384,12 @@ export async function connectGithubInstallation(
 
 export async function disconnectGithubInstallation(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   observedAt: string,
 ) {
   const connection = await getGithubConnectionForOrganization(
     db,
-    organizationId,
+    workspaceId,
   );
   if (!connection) return false;
   const results = await db.batch([
@@ -403,7 +403,7 @@ export async function disconnectGithubInstallation(
       .bind(
         observedAt,
         observedAt,
-        organizationId,
+        workspaceId,
         connection.installation_id,
       ),
     db

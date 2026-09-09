@@ -180,7 +180,7 @@ export async function connectManagedComputerSetupClient(
   }
   const { session } = await authorizeManagedComputerSetup(db, {
     managedComputerId: input.managedComputerId,
-    organizationId: candidate.organization_id,
+    workspaceId: candidate.organization_id,
     setupToken: client.token,
     observedAt: input.observedAt,
     requirePending: true,

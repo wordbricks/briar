@@ -54,9 +54,9 @@ import type {
 } from "../../types";
 import { runTask, type TaskAction } from "../actions";
 import { createAgentSessionActions } from "../agent-sessions/actions";
-import { demoOrganization, demoUser, emptyDashboard } from "../demo-fixtures";
+import { demoWorkspace, demoUser, emptyDashboard } from "../demo-fixtures";
 import { runAtom, teamRunIdsAtom, teamRunsAtom } from "../entities/runs";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { demoMode as platformDemoMode } from "../platform";
 import { planningProjectsAtom } from "../planning/atoms";
 import { useRegistry, type AtomRegistry } from "../registry";
@@ -255,7 +255,7 @@ export function createIssueActions(
 
   /**
    * One run of the board on screen, or `null` when that board does not list it.
-   * The store is organization wide, so the membership check is what keeps these
+   * The store is workspace wide, so the membership check is what keeps these
    * actions reading the same list the `dashboard.runs.find` they replaced did.
    */
   const boardRun = (teamId: string, runId: string): HuntRun | null =>
@@ -393,7 +393,7 @@ export function createIssueActions(
           const user = registry.get(userAtom);
           const run: HuntRun = {
             id: crypto.randomUUID(),
-            workspaceId: project.organizationId ?? demoOrganization.id,
+            workspaceId: project.workspaceId ?? demoWorkspace.id,
             teamId,
             projectId,
             projectName: planningProject?.name ?? null,
@@ -463,7 +463,7 @@ export function createIssueActions(
           Atom.batch(() => {
             registry.set(runEventsAtom(run.id), [initialEvent]);
             registry.set(activeTeamIdAtom, teamId);
-            registry.set(activeOrganizationIdAtom, project.organizationId);
+            registry.set(activeWorkspaceIdAtom, project.workspaceId);
             if (onActiveBoard) {
               applySyncEvent(registry, { kind: "run-changed", run, teamId });
             } else {

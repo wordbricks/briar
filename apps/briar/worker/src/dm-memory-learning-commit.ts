@@ -45,7 +45,7 @@ export async function dmLearningCommitStatements(db: D1Database, input: {
     revocationEpoch: snapshot.revocationEpoch + Number(normalized.some((item) => item.change.action !== "create")),
     documents: normalized.map((item) => ({ documentId: item.documentId,
       version: item.change.action === "supersede" ? item.change.expectedVersion! : item.version, action: item.change.action })) };
-  const gateBindings = [identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.organizationId,
+  const gateBindings = [identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.workspaceId,
     now, now, snapshot.memoryRevision, input.inputHash, dmMemoryCanonicalJson(snapshot.policy), input.callId,
     identity.claimTokenHash, input.inputHash, noChange ? "proposing" : "verifying"];
   const statements = [db.prepare(`insert into briar_dm_memory_commits

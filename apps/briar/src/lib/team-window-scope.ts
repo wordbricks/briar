@@ -1,10 +1,10 @@
-import type { Organization, Project } from "../types";
+import type { Workspace, Project } from "../types";
 
 /*
   What a team window is allowed to show.
 
   A team window is pinned to one team, so every list the shell hands a view has
-  to be narrowed to that team and the organization it belongs to — otherwise the
+  to be narrowed to that team and the workspace it belongs to — otherwise the
   window offers navigation to teams it cannot open. The main window has no lock
   and sees everything.
 */
@@ -28,34 +28,34 @@ export function visibleTeams(
   return team ? [team] : [];
 }
 
-/** Organizations the window may switch between, narrowed the same way. */
-export function visibleOrganizations(
-  organizations: Organization[],
+/** Workspaces the window may switch between, narrowed the same way. */
+export function visibleWorkspaces(
+  workspaces: Workspace[],
   teams: Project[],
   lockedTeamId: string | null,
-): Organization[] {
-  if (!lockedTeamId) return organizations;
-  const organizationId = lockedTeam(teams, lockedTeamId)?.organizationId;
-  if (!organizationId) return [];
-  return organizations.filter(
-    (organization) => organization.id === organizationId,
+): Workspace[] {
+  if (!lockedTeamId) return workspaces;
+  const workspaceId = lockedTeam(teams, lockedTeamId)?.workspaceId;
+  if (!workspaceId) return [];
+  return workspaces.filter(
+    (workspace) => workspace.id === workspaceId,
   );
 }
 
 /**
- * Teams of the selected organization, plus the selected team even when the
- * organization switch has not reached it yet — which is what keeps the issue
- * board from blanking for a frame during an organization change.
+ * Teams of the selected workspace, plus the selected team even when the
+ * workspace switch has not reached it yet — which is what keeps the issue
+ * board from blanking for a frame during an workspace change.
  */
-export function activeOrganizationTeams(
+export function activeWorkspaceTeams(
   teams: Project[],
   lockedTeamId: string | null,
-  activeOrganizationId: string | null,
+  activeWorkspaceId: string | null,
   activeTeamId: string | null,
 ): Project[] {
   if (lockedTeamId) return visibleTeams(teams, lockedTeamId);
   return teams.filter(
     (team) =>
-      team.organizationId === activeOrganizationId || team.id === activeTeamId,
+      team.workspaceId === activeWorkspaceId || team.id === activeTeamId,
   );
 }

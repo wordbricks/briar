@@ -28,7 +28,7 @@ import {
   boardVisibleColumnIdsAtom,
 } from "@/state/board/atoms";
 import type {
-  OrganizationMember,
+  WorkspaceMember,
   PlanningProject,
   Project,
   ProjectAgent,
@@ -83,7 +83,7 @@ export function HuntBoard({
   isLoading: boolean;
   isSidebarOpen: boolean;
   issueKeyPrefix: string | undefined;
-  members: OrganizationMember[];
+  members: WorkspaceMember[];
   planningProjects: Array<Pick<PlanningProject, "id" | "name" | "teamId">>;
   recoveringRunId: string | null;
   scrollLeftRef: MutableRefObject<number | null>;

@@ -30,13 +30,13 @@ const requireReportingClient = () => {
 
 export async function loadAgentUsageReport(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   days: UsageRangeDays = 90,
   signal?: AbortSignal,
 ) {
   return organizationUsageReportFromProto(
     await requireReportingClient().listWorkspaceUsageRuns(
-      { workspaceId: organizationId, range: workspaceUsageRangeToProto(days) },
+      { workspaceId: workspaceId, range: workspaceUsageRangeToProto(days) },
       appCallOptions(token, signal),
     ),
   );
@@ -64,12 +64,12 @@ export async function loadProjectUsageSummary(
 
 export async function loadStatusTrayRuns(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   signal?: AbortSignal,
 ) {
   return statusTrayRunsFromProto(
     await requireReportingClient().listStatusTrayRuns(
-      { workspaceId: organizationId },
+      { workspaceId: workspaceId },
       appCallOptions(token, signal),
     ),
   );

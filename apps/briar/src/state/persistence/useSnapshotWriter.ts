@@ -2,20 +2,17 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 import { useEffect } from "react";
 
 import {
-  channelCatalogOrganizationIdsAtom,
+  channelCatalogWorkspaceIdsAtom,
   channelsByIdAtom,
   organizationChannelIdsAtom,
 } from "../entities/channels";
 import { membersByIdAtom, teamMemberIdsAtom } from "../entities/members";
-import { teamOrganizationProvidersAtom } from "../entities/providers";
+import { teamWorkspaceProvidersAtom } from "../entities/providers";
 import { retainedTeamIdsAtom } from "../entities/retention";
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { teamsByIdAtom } from "../entities/teams";
 import { teamWorkerIdsAtom, workersByIdAtom } from "../entities/workers";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { demoMode, lockedTeamIdAtom } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { userAtom } from "../session/atoms";
@@ -62,23 +59,23 @@ export const SNAPSHOT_WRITE_DELAY_MS = 1_000;
  */
 export const snapshotRevisionAtom = Atom.make((get) => {
   get(userAtom);
-  get(organizationsAtom);
+  get(workspacesAtom);
   get(teamsAtom);
-  get(activeOrganizationIdAtom);
+  get(activeWorkspaceIdAtom);
   get(activeTeamIdAtom);
   get(runsByIdAtom);
   get(workersByIdAtom);
   get(membersByIdAtom);
   get(teamsByIdAtom);
   get(channelsByIdAtom);
-  get(channelCatalogOrganizationIdsAtom);
-  const organizationId = get(activeOrganizationIdAtom);
-  if (organizationId) get(organizationChannelIdsAtom(organizationId));
+  get(channelCatalogWorkspaceIdsAtom);
+  const workspaceId = get(activeWorkspaceIdAtom);
+  if (workspaceId) get(organizationChannelIdsAtom(workspaceId));
   for (const teamId of get(retainedTeamIdsAtom)) {
     get(teamSettingsAtom(teamId));
     get(teamExecutionPolicyAtom(teamId));
     get(teamNotificationsAtom(teamId));
-    get(teamOrganizationProvidersAtom(teamId));
+    get(teamWorkspaceProvidersAtom(teamId));
     get(teamGeneratedAtAtom(teamId));
     get(teamRunIdsAtom(teamId));
     get(teamWorkerIdsAtom(teamId));
@@ -94,9 +91,9 @@ export interface SnapshotWriterOptions {
 
 const accountOf = (registry: AtomRegistry): SnapshotAccount | null => {
   const user = registry.get(userAtom);
-  const organizationId = registry.get(activeOrganizationIdAtom);
-  return user && organizationId
-    ? { organizationId, userId: user.id }
+  const workspaceId = registry.get(activeWorkspaceIdAtom);
+  return user && workspaceId
+    ? { workspaceId, userId: user.id }
     : null;
 };
 
@@ -108,7 +105,7 @@ const sameAccount = (
   (left !== null &&
     right !== null &&
     left.userId === right.userId &&
-    left.organizationId === right.organizationId);
+    left.workspaceId === right.workspaceId);
 
 /**
  * Keeps this registry's snapshot on disk, bound to one registry. Returns its
@@ -124,7 +121,7 @@ export function startSnapshotWriter(
   /*
     The account whose record this writer is responsible for. It starts as
     whatever is selected rather than as "nothing written yet", so an
-    organization the app hydrated but never wrote to still has its record
+    workspace the app hydrated but never wrote to still has its record
     removed when the account leaves it.
   */
   let persisted = accountOf(registry);
@@ -142,20 +139,20 @@ export function startSnapshotWriter(
     if (!snapshot) return;
     /*
       A project window is pinned to one team and must not tell the next cold
-      start that its organization is the one to open — the same reason
-      `useActiveOrganizationPersistence` skips its own write there. The record
-      itself is still written: it is keyed by organization, so it can only ever
+      start that its workspace is the one to open — the same reason
+      `useActiveWorkspacePersistence` skips its own write there. The record
+      itself is still written: it is keyed by workspace, so it can only ever
       be read back by a window that resolves to the same one.
     */
     if (!registry.get(lockedTeamIdAtom)) {
       writeSnapshotAccount({
-        organizationId: snapshot.organizationId,
+        workspaceId: snapshot.workspaceId,
         userId: snapshot.userId,
       });
     }
     void writeSnapshotSafely(
       registry,
-      snapshotKey(snapshot.userId, snapshot.organizationId),
+      snapshotKey(snapshot.userId, snapshot.workspaceId),
       snapshot,
     );
   };
@@ -179,12 +176,12 @@ export function startSnapshotWriter(
       */
       cancelTimer();
       if (persisted && account && account.userId === persisted.userId) {
-        // Leaving an organization drops its teams from the store; its record
+        // Leaving an workspace drops its teams from the store; its record
         // goes with them. A change of *account* is not handled here — signing
         // out clears every record, which is stricter.
         void deleteSnapshotSafely(
           registry,
-          snapshotKey(persisted.userId, persisted.organizationId),
+          snapshotKey(persisted.userId, persisted.workspaceId),
         );
       }
       persisted = account;

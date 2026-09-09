@@ -11,7 +11,7 @@ import type { InboxMessage } from "./model";
   feed: another device may still be showing it.
 
   Nothing here is in the IndexedDB `ClientSnapshot`. That record is one
-  organization's server data and is discarded when the account or the schema
+  workspace's server data and is discarded when the account or the schema
   changes; these read versions belong to the account and are pushed to the
   server rather than rebuilt from it.
 */

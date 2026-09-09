@@ -58,7 +58,7 @@ describe("DM memory management", () => {
     documents: [detail],
     nextCursor: null,
   };
-  const scope = { token: "test", organizationId: "22222222-2222-4222-8222-222222222222", channelId: page.spaces[0].channelId };
+  const scope = { token: "test", workspaceId: "22222222-2222-4222-8222-222222222222", channelId: page.spaces[0].channelId };
   const dialog = () => document.querySelector('[role="dialog"]')!;
   const button = (label: string) => [...dialog().querySelectorAll("button")]
     .find((element) => element.textContent?.trim() === label)!;

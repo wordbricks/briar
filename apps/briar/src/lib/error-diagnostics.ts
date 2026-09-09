@@ -31,7 +31,7 @@ const safeRouteSegments = new Set([
   "inbox",
   "invitations",
   "messages",
-  "organizations",
+  "workspaces",
   "projects",
   "read-states",
   "runs",

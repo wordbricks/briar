@@ -18,7 +18,7 @@ import { AgentConversationsSection } from "./AgentConversationsSection";
 
 const conversation: ChannelSummary = {
   id: "agent-dm-1",
-  organizationId: "org-1",
+  workspaceId: "org-1",
   slug: "agent-dm-1",
   name: "Ava, Bay",
   topic: null,
@@ -56,7 +56,7 @@ async function renderSection(channels: ChannelSummary[]) {
       <AgentConversationsSection
         agentId="agent-a"
         onOpenConversation={(channelId) => opened.push(channelId)}
-        organizationId="org-1"
+        workspaceId="org-1"
         token="token"
       />
     </I18nProvider>,

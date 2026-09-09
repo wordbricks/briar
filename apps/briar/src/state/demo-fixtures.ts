@@ -4,7 +4,7 @@ import { demoMode, lockedTeamId } from "./platform";
 import type {
   DashboardPayload,
   IssueMessage,
-  Organization,
+  Workspace,
   PlanningProject,
   Project,
   RunEvidence,
@@ -12,7 +12,7 @@ import type {
 } from "../types";
 
 /**
- * Whether demo mode may preselect its own organization and team. A project
+ * Whether demo mode may preselect its own workspace and team. A project
  * window is pinned to one team, and preselecting a different one would open a
  * board that window may not show — so a pinned window only takes the demo
  * selection when it is pinned to the demo team itself.
@@ -30,9 +30,9 @@ export const demoUser: SessionUser = {
   name: "Jay",
   email: "demo@briar.local",
 };
-export const demoOrganization: Organization = {
-  id: demoDashboard.team.organizationId,
-  name: demoDashboard.team.organizationName,
+export const demoWorkspace: Workspace = {
+  id: demoDashboard.team.workspaceId,
+  name: demoDashboard.team.workspaceName,
   handle: "briar",
   logo: null,
   role: demoDashboard.team.role,
@@ -44,8 +44,8 @@ export const demoOrganization: Organization = {
  */
 export const demoPlanningProject: PlanningProject = {
   id: demoDashboard.team.id,
-  workspaceId: demoOrganization.id,
-  workspaceName: demoOrganization.name,
+  workspaceId: demoWorkspace.id,
+  workspaceName: demoWorkspace.name,
   teamId: demoDashboard.team.id,
   teamName: demoDashboard.team.name,
   name: "General",

@@ -71,7 +71,7 @@ export async function reserveDmLearningModelCall(db: D1Database, input: {
       on conflict (id) do nothing`)
       .bind(input.callId, identity.claimTokenHash, input.stage, input.inputHash, current?.row.proposal_hash ?? null,
         JSON.stringify(model), reserved.reservedMicroUsd, now, identity.jobId, identity.claimTokenHash, identity.workerId,
-        identity.deviceId, identity.organizationId, now, now, input.inputHash, dmMemoryCanonicalJson(snapshot.policy), input.stage,
+        identity.deviceId, identity.workspaceId, now, now, input.inputHash, dmMemoryCanonicalJson(snapshot.policy), input.stage,
         input.stage, current?.row.id ?? null, current?.row.proposal_hash ?? null,
         day, policy.spaceDailyCalls, day, policy.organizationDailyCalls,
         day, reserved.reservedMicroUsd, policy.spaceDailyMicroUsd, day, reserved.reservedMicroUsd, policy.organizationDailyMicroUsd),

@@ -47,7 +47,7 @@ import { claimedWorkFromProto, type ClaimedChannelReply } from "./worker-queue-c
   pre-Connect HTTP endpoints, deleted in #1427, and restored here on a synthetic
   Connect server so the generated Worker Queue client is exercised end to end.
 */
-const organizationId = crypto.randomUUID();
+const workspaceId = crypto.randomUUID();
 const projectId = crypto.randomUUID();
 const workId = crypto.randomUUID();
 const documentId = crypto.randomUUID();
@@ -192,7 +192,7 @@ describe("DM memory in the actual channel reply runner", () => {
               result: {
                 case: "manifest",
                 value: {
-                  workspaceId: organizationId,
+                  workspaceId: workspaceId,
                   workId,
                   snapshotAt: timestampFromDate(new Date(snapshotAt)),
                   revision: "a".repeat(64),
@@ -238,7 +238,7 @@ describe("DM memory in the actual channel reply runner", () => {
       executionWorker: {
         workerId: "synthetic-worker",
         deviceId: crypto.randomUUID(),
-        organizationId,
+        workspaceId,
         token: "briar_worker_synthetic",
         label: "Synthetic",
         maxConcurrentSessions: 1,
@@ -257,7 +257,7 @@ describe("DM memory in the actual channel reply runner", () => {
             scope: {
               case: "workspace",
               value: create(ChannelReplyScope_WorkspaceSchema, {
-                workspaceId: organizationId,
+                workspaceId: workspaceId,
               }),
             },
           }),

@@ -13,7 +13,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 
 describe("TeamService mutations", () => {
-  const organizationId = "11111111-1111-4111-8111-111111111111";
+  const workspaceId = "11111111-1111-4111-8111-111111111111";
   const ownerId = "project-connect-owner";
   const developerId = "project-connect-developer";
   const viewerId = "project-connect-viewer";
@@ -61,7 +61,7 @@ describe("TeamService mutations", () => {
           `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Project Connect', 'project-connect', ?, ?)`,
         )
-        .bind(organizationId, now, now),
+        .bind(workspaceId, now, now),
       ...users.map(([userId, _name, _email, role]) =>
         db
           .prepare(
@@ -69,7 +69,7 @@ describe("TeamService mutations", () => {
              organization_id, user_id, role, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(organizationId, userId, role, now, now),
+          .bind(workspaceId, userId, role, now, now),
       ),
     ]);
   }, 60_000);
@@ -99,7 +99,7 @@ describe("TeamService mutations", () => {
   it("owns the full project control lifecycle and enforces capabilities", async () => {
     const owner = client(tokens.owner);
     const created = await owner.createTeam(
-      { name: "  Connect Project  ", workspaceId: organizationId },
+      { name: "  Connect Project  ", workspaceId: workspaceId },
       options(tokens.owner),
     );
     expect(created.agentToken).toMatch(/^briar_agent_/u);
@@ -107,7 +107,7 @@ describe("TeamService mutations", () => {
       name: "Connect Project",
       issueKeyPrefix: "AH",
       scheduleTabEnabled: true,
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
     });
     const projectId = created.team?.id;
     expect(projectId).toBeTruthy();
@@ -120,7 +120,7 @@ describe("TeamService mutations", () => {
              project_id, organization_id, user_id, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(projectId, organizationId, userId, now, now),
+          .bind(projectId, workspaceId, userId, now, now),
       ),
     );
 
@@ -238,7 +238,7 @@ describe("TeamService mutations", () => {
   it("guards configuration capabilities, revisions, and worker references", async () => {
     const owner = client(tokens.owner);
     const created = await owner.createTeam(
-      { name: "Configured Project", workspaceId: organizationId },
+      { name: "Configured Project", workspaceId: workspaceId },
       options(tokens.owner),
     );
     const projectId = created.team?.id;
@@ -251,7 +251,7 @@ describe("TeamService mutations", () => {
              project_id, organization_id, user_id, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(projectId, organizationId, userId, now, now),
+          .bind(projectId, workspaceId, userId, now, now),
       ),
     );
 
@@ -358,7 +358,7 @@ describe("TeamService mutations", () => {
   it("deletes a planning project without orphaning its issues", async () => {
     const owner = client(tokens.owner);
     const createdTeam = await owner.createTeam(
-      { name: "Planning lifecycle", workspaceId: organizationId },
+      { name: "Planning lifecycle", workspaceId: workspaceId },
       options(tokens.owner),
     );
     const teamId = createdTeam.team?.id;
@@ -369,7 +369,7 @@ describe("TeamService mutations", () => {
           `insert into briar_project_members (
              project_id, organization_id, user_id, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
-        ).bind(teamId, organizationId, userId, now, now),
+        ).bind(teamId, workspaceId, userId, now, now),
       ),
     );
 

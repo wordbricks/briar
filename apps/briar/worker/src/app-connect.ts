@@ -15,7 +15,7 @@ import { registerAppInboxService } from "./app-connect-inbox";
 import { registerAppIssueService } from "./app-connect-issue";
 import { registerAppLinearImportService } from "./app-connect-linear-import";
 import { registerAppMergeQueueService } from "./app-connect-merge-queue";
-import { registerAppOrganizationService } from "./app-connect-organization";
+import { registerAppWorkspaceService } from "./app-connect-workspace";
 import { registerAppReportingService } from "./app-connect-reporting";
 import { registerAppRealtimeService } from "./app-connect-realtime";
 import {
@@ -29,7 +29,7 @@ import {
   registerManagedComputerEnrollmentService,
 } from "./worker-connect-managed-computer-enrollment";
 import { registerManagedComputerSetupService } from "./worker-connect-managed-computer-setup";
-import { registerOrganizationAgentContextService } from "./worker-connect-organization-context";
+import { registerWorkspaceAgentContextService } from "./worker-connect-workspace-context";
 import { registerWorkerQueueService } from "./worker-connect-queue";
 import { registerReplyActivityService } from "./worker-connect-reply-activity";
 
@@ -75,7 +75,7 @@ export async function handleAppConnectRequest(
     attachmentsBucket: input.env.ATTACHMENTS,
     context: input.context,
   });
-  registerAppOrganizationService(router, sharedInput);
+  registerAppWorkspaceService(router, sharedInput);
   registerAppLinearImportService(router, sharedInput);
   registerAppMergeQueueService(router, sharedInput);
   registerAppReportingService(router, sharedInput);
@@ -143,7 +143,7 @@ export async function handleAppConnectRequest(
     db: input.env.DB,
     env: input.env,
   });
-  registerOrganizationAgentContextService(router, {
+  registerWorkspaceAgentContextService(router, {
     request: input.request,
     db: input.env.DB,
     env: input.env,

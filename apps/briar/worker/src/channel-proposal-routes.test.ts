@@ -11,10 +11,10 @@ import {
 } from "./channels";
 import apiWorker from "./index";
 import {
-  acceptOrganizationChannelProposal,
-  declineOrganizationChannelProposal,
+  acceptWorkspaceChannelProposal,
+  declineWorkspaceChannelProposal,
 } from "./channel-proposal-routes";
-import { listOrganizationChannelMessages } from "./channel-message-routes";
+import { listWorkspaceChannelMessages } from "./channel-message-routes";
 import { HttpError } from "./http-response";
 import {
   moveProjectIssueRun,
@@ -23,7 +23,7 @@ import {
 import { acceptProjectIssueActionProposal } from "./issue-proposal-routes";
 import { claimNextQueueWork } from "./queue-claim-routes";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import {
   claimNextQueuedHuntRun,
   createTeamAgent,
@@ -45,8 +45,8 @@ import {
   WorkerConflictError,
 } from "./workers";
 
-const organizationId = "10000000-0000-4000-8000-000000000001";
-const otherOrganizationId = "10000000-0000-4000-8000-000000000002";
+const workspaceId = "10000000-0000-4000-8000-000000000001";
+const otherWorkspaceId = "10000000-0000-4000-8000-000000000002";
 const projectAId = "20000000-0000-4000-8000-000000000001";
 const projectBId = "20000000-0000-4000-8000-000000000002";
 const otherProjectId = "20000000-0000-4000-8000-000000000003";
@@ -162,31 +162,31 @@ describe("channel issue proposal approval route", () => {
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Proposal Org', 'proposal-org', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Other Org', 'other-proposal-org', ?, ?)`,
-      ).bind(otherOrganizationId, now, now),
+      ).bind(otherWorkspaceId, now, now),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, now, now),
+      ).bind(workspaceId, ownerId, now, now),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'developer', ?, ?)`,
-      ).bind(organizationId, memberId, now, now),
+      ).bind(workspaceId, memberId, now, now),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(otherOrganizationId, ownerId, now, now),
+      ).bind(otherWorkspaceId, ownerId, now, now),
     ]);
-    for (const [id, organization, name, tokenCharacter] of [
-      [projectAId, organizationId, "Project A", "a"],
-      [projectBId, organizationId, "Project B", "b"],
-      [otherProjectId, otherOrganizationId, "Other Project", "c"],
+    for (const [id, workspace, name, tokenCharacter] of [
+      [projectAId, workspaceId, "Project A", "a"],
+      [projectBId, workspaceId, "Project B", "b"],
+      [otherProjectId, otherWorkspaceId, "Other Project", "c"],
     ]) {
       await db.prepare(
         `insert into briar_teams (
@@ -196,7 +196,7 @@ describe("channel issue proposal approval route", () => {
       ).bind(
         id,
         ownerId,
-        organization,
+        workspace,
         name,
         id === projectAId
           ? createHash("sha256").update(projectAgentToken).digest("hex")
@@ -233,12 +233,12 @@ describe("channel issue proposal approval route", () => {
           `insert into briar_project_members (
              project_id, organization_id, user_id, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
-        ).bind(projectId, organizationId, memberId, now, now)
+        ).bind(projectId, workspaceId, memberId, now, now)
       ),
     );
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "proposals",
@@ -249,13 +249,13 @@ describe("channel issue proposal approval route", () => {
       createdByUserId: ownerId,
       createdAt: now,
     });
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: agentId,
-      organizationId,
+      workspaceId,
       name: "Bumble",
       provider: "codex",
       model: null,
-      responsibility: "Coordinate organization work.",
+      responsibility: "Coordinate workspace work.",
       effort: null,
       createdAt: now,
     });
@@ -293,7 +293,7 @@ describe("channel issue proposal approval route", () => {
   ) => registerExecutionWorker(db, projectId, {
     id: `channel-${suffix}-worker`,
     deviceId: `channel-${suffix}-device`,
-    organizationId,
+    workspaceId,
     ownerUserId: ownerId,
     label: `Channel ${suffix} Worker`,
     deviceIdentityHash: createHash("sha256")
@@ -347,18 +347,18 @@ describe("channel issue proposal approval route", () => {
     }
     try {
       const result = call.kind === "decline"
-        ? await declineOrganizationChannelProposal({
+        ? await declineWorkspaceChannelProposal({
           db,
           env: runtimeEnv,
-          organizationId,
+          workspaceId,
           channelId,
           proposalId: call.proposalId,
           userId,
         })
-        : await acceptOrganizationChannelProposal({
+        : await acceptWorkspaceChannelProposal({
           db,
           env: runtimeEnv,
-          organizationId,
+          workspaceId,
           channelId,
           proposalId: call.proposalId,
           userId,
@@ -518,7 +518,7 @@ describe("channel issue proposal approval route", () => {
 
   it("persists a decline and prevents later issue creation", async () => {
     const proposalId = await seedProposal(200, { executeAfterCreate: true });
-    const beforeDecline = await getChannelSyncCursor(db, organizationId);
+    const beforeDecline = await getChannelSyncCursor(db, workspaceId);
 
     const declined = await worker.fetch(declineRequest(proposalId), env());
     expect(declined.status).toBe(200);
@@ -542,7 +542,7 @@ describe("channel issue proposal approval route", () => {
 
     const delta = await loadChannelDelta(
       db,
-      organizationId,
+      workspaceId,
       ownerId,
       beforeDecline,
     );
@@ -612,7 +612,7 @@ describe("channel issue proposal approval route", () => {
     return { conversationRunId, proposalId };
   };
 
-  it("requires an authenticated organization member", async () => {
+  it("requires an authenticated workspace member", async () => {
     const proposalId = await seedProposal(1);
     const unauthenticated = await worker.fetch(
       request(proposalId, projectAId, null),
@@ -651,7 +651,7 @@ describe("channel issue proposal approval route", () => {
     expect(JSON.parse(created?.context_json ?? "null")).toMatchObject({
       origin: "briar-channel",
       relatedMessage: {
-        organizationId,
+        workspaceId,
         channelId,
         messageId: "60000000-0000-4000-8000-000000000002",
         rootMessageId: "50000000-0000-4000-8000-000000000002",
@@ -685,7 +685,7 @@ describe("channel issue proposal approval route", () => {
       .toMatchObject({
         issueDescription: "Create it, but do not execute it.",
         relatedMessage: {
-          workspaceId: organizationId,
+          workspaceId: workspaceId,
           channelId,
           messageId: "60000000-0000-4000-8000-000000000002",
           rootMessageId: "50000000-0000-4000-8000-000000000002",
@@ -787,7 +787,7 @@ describe("channel issue proposal approval route", () => {
       const relatedMessage = JSON.parse(
         run.context_json ?? "null",
       ).relatedMessage;
-      return relatedMessage?.organizationId === organizationId &&
+      return relatedMessage?.organizationId === workspaceId &&
         relatedMessage.channelId === channelId &&
         relatedMessage.messageId === "60000000-0000-4000-8000-00000000001f" &&
         relatedMessage.rootMessageId === "50000000-0000-4000-8000-00000000001f";
@@ -832,9 +832,9 @@ describe("channel issue proposal approval route", () => {
        where json_extract(context_json, '$.proposalId') = ?`,
     ).bind(proposalId).first<{ count: number }>()).resolves.toEqual({ count: 3 });
 
-    const channelBody = await listOrganizationChannelMessages({
+    const channelBody = await listWorkspaceChannelMessages({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: ownerId,
       parentMessageId: "50000000-0000-4000-8000-00000000001f",
@@ -1022,7 +1022,7 @@ describe("channel issue proposal approval route", () => {
       "conversation-terminal-reactivation",
       "2026-08-10T00:01:10.000Z",
     );
-    await dispatchHuntRun(db, organizationId, projectAId, {
+    await dispatchHuntRun(db, workspaceId, projectAId, {
       runId: body.resultRunId,
       provider: "codex",
       model: "gpt-5.6-sol",
@@ -1102,7 +1102,7 @@ describe("channel issue proposal approval route", () => {
       "conversation-reset-source",
       "2026-08-10T00:02:00.000Z",
     );
-    await dispatchHuntRun(db, organizationId, projectAId, {
+    await dispatchHuntRun(db, workspaceId, projectAId, {
       runId: acceptedBody.resultRunId,
       provider: "codex",
       model: "gpt-5.6-sol",
@@ -1119,13 +1119,13 @@ describe("channel issue proposal approval route", () => {
        ) values (?, ?, ?, ?, 'requeued', ?, '{}', ?)`,
     ).bind(
       "conversation-conflicting-unassign-audit",
-      organizationId,
+      workspaceId,
       projectAId,
       acceptedBody.resultRunId,
       "conversation-conflicting-unassign-request",
       "2026-08-10T00:02:15.000Z",
     ).run();
-    await expect(unassignHuntRun(db, organizationId, projectAId, {
+    await expect(unassignHuntRun(db, workspaceId, projectAId, {
       runId: acceptedBody.resultRunId,
       requestedByUserId: ownerId,
       requestId: "conversation-conflicting-unassign-request",
@@ -1139,7 +1139,7 @@ describe("channel issue proposal approval route", () => {
       status: "queued",
       dispatch_request_id: "conversation-unassign-dispatch",
     });
-    await expect(unassignHuntRun(db, organizationId, projectAId, {
+    await expect(unassignHuntRun(db, workspaceId, projectAId, {
       runId: acceptedBody.resultRunId,
       requestedByUserId: ownerId,
       requestId: "conversation-unassign-request",
@@ -1180,7 +1180,7 @@ describe("channel issue proposal approval route", () => {
       workerId: sourceWorker.worker.id,
     })).resolves.toBeNull();
 
-    await dispatchHuntRun(db, organizationId, projectAId, {
+    await dispatchHuntRun(db, workspaceId, projectAId, {
       runId: acceptedBody.resultRunId,
       provider: "codex",
       model: "gpt-5.6-sol",
@@ -1451,7 +1451,7 @@ describe("channel issue proposal approval route", () => {
       "transfer-target",
       "2026-08-10T00:07:00.000Z",
     );
-    await dispatchHuntRun(db, organizationId, projectAId, {
+    await dispatchHuntRun(db, workspaceId, projectAId, {
       runId: acceptedBody.resultRunId,
       provider: "codex",
       model: "gpt-5.6-sol",
@@ -1496,7 +1496,7 @@ describe("channel issue proposal approval route", () => {
       detachedOnly: false,
     })).resolves.toBeNull();
 
-    await expect(dispatchHuntRun(db, organizationId, projectBId, {
+    await expect(dispatchHuntRun(db, workspaceId, projectBId, {
       runId: acceptedBody.resultRunId,
       provider: "codex",
       model: "gpt-5.6-sol",
@@ -1537,7 +1537,7 @@ describe("channel issue proposal approval route", () => {
         `${terminalStatus}-transfer-target`,
         "2026-08-10T00:10:00.000Z",
       );
-      await dispatchHuntRun(db, organizationId, projectAId, {
+      await dispatchHuntRun(db, workspaceId, projectAId, {
         runId: acceptedBody.resultRunId,
         provider: "codex",
         model: "gpt-5.6-sol",
@@ -1668,7 +1668,7 @@ describe("channel issue proposal approval route", () => {
         detachedOnly: false,
       })).resolves.toBeNull();
 
-      await expect(dispatchHuntRun(db, organizationId, projectBId, {
+      await expect(dispatchHuntRun(db, workspaceId, projectBId, {
         runId: acceptedBody.resultRunId,
         provider: "codex",
         model: "gpt-5.6-sol",
@@ -1701,7 +1701,7 @@ describe("channel issue proposal approval route", () => {
       "terminal-transfer-source",
       "2026-08-10T00:14:00.000Z",
     );
-    await dispatchHuntRun(db, organizationId, projectAId, {
+    await dispatchHuntRun(db, workspaceId, projectAId, {
       runId: acceptedBody.resultRunId,
       provider: "codex",
       model: "gpt-5.6-sol",
@@ -1775,7 +1775,7 @@ describe("channel issue proposal approval route", () => {
     const proposalId = await seedProposal(3);
     const [first, second] = await Promise.all([
       reserveChannelActionProposalApproval(db, {
-        organizationId,
+        workspaceId,
         channelId,
         proposalId,
         projectId: projectAId,
@@ -1784,7 +1784,7 @@ describe("channel issue proposal approval route", () => {
         issueSourceKey: `briar-channel-approved:${"a".repeat(64)}`,
       }),
       reserveChannelActionProposalApproval(db, {
-        organizationId,
+        workspaceId,
         channelId,
         proposalId,
         projectId: projectBId,
@@ -1881,15 +1881,15 @@ describe("channel issue proposal approval route", () => {
     ).resolves.toMatchObject({ count: 1 });
   });
 
-  it("rejects cross-organization targets", async () => {
-    const crossOrganizationProposalId = await seedProposal(5);
+  it("rejects cross-workspace targets", async () => {
+    const crossWorkspaceProposalId = await seedProposal(5);
 
-    const crossOrganization = await worker.fetch(
-      request(crossOrganizationProposalId, otherProjectId),
+    const crossWorkspace = await worker.fetch(
+      request(crossWorkspaceProposalId, otherProjectId),
       env(),
     );
 
-    expect(crossOrganization.status).toBe(404);
+    expect(crossWorkspace.status).toBe(404);
   });
 
   it("creates an issue in only one project when different targets race", async () => {
@@ -1930,7 +1930,7 @@ describe("channel issue proposal approval route", () => {
   it("requires a fresh explicit approval after its project or approver is deleted", async () => {
     const deletedProjectProposalId = await seedProposal(10);
     const projectReservation = await reserveChannelActionProposalApproval(db, {
-      organizationId,
+      workspaceId,
       channelId,
       proposalId: deletedProjectProposalId,
       projectId: projectAId,
@@ -1945,7 +1945,7 @@ describe("channel issue proposal approval route", () => {
     ).bind(deletedProjectProposalId).run();
     await expect(
       reserveChannelActionProposalApproval(db, {
-        organizationId,
+        workspaceId,
         channelId,
         proposalId: deletedProjectProposalId,
         projectId: projectBId,
@@ -1967,7 +1967,7 @@ describe("channel issue proposal approval route", () => {
 
     const deletedApproverProposalId = await seedProposal(11);
     const approverReservation = await reserveChannelActionProposalApproval(db, {
-      organizationId,
+      workspaceId,
       channelId,
       proposalId: deletedApproverProposalId,
       projectId: projectAId,
@@ -1983,7 +1983,7 @@ describe("channel issue proposal approval route", () => {
     ).bind(deletedApproverProposalId).run();
     await expect(
       reserveChannelActionProposalApproval(db, {
-        organizationId,
+        workspaceId,
         channelId,
         proposalId: deletedApproverProposalId,
         projectId: projectAId,
@@ -2007,7 +2007,7 @@ describe("channel issue proposal approval route", () => {
   it("does not create an orphan issue after its approval record disappears", async () => {
     const proposalId = await seedProposal(12);
     const reservation = await reserveChannelActionProposalApproval(db, {
-      organizationId,
+      workspaceId,
       channelId,
       proposalId,
       projectId: projectAId,

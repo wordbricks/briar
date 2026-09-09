@@ -28,7 +28,7 @@ import {
   getChannelById,
   getChannelMessage,
   getChannelReplySession,
-  getOrganizationProject,
+  getWorkspaceProject,
   isAgentDirectMessage,
   listChannelAgents,
   listChannelRootMessages,
@@ -37,7 +37,7 @@ import {
 } from "./channels";
 import { sha256 } from "./crypto-digest";
 import { HttpError } from "./http-response";
-import { getOrganizationAgent } from "./organization-agents";
+import { getWorkspaceAgent } from "./workspace-agents";
 import {
   channelActivityCredential,
   scheduleChannelRealtimePublish,
@@ -56,7 +56,7 @@ const DM_REPLY_CONTEXT_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1_000;
 export type AuthenticatedChannelWorkerProject = AuthenticatedWorkerTeam;
 
 export type ClaimNextChannelReplyWorkInput = {
-  input: { organizationId: string; workerId: string };
+  input: { workspaceId: string; workerId: string };
   db: D1Database;
   env: Env;
   context?: ExecutionContext;
@@ -73,14 +73,14 @@ export async function claimNextChannelReplyWork(
 ){
   const { input, db, env, context, authenticatedWorker } = claimInput;
   const principal = authenticatedWorker.principal;
-  if (principal.organizationId !== input.organizationId) {
-    throw new HttpError(403, "Worker is not enabled for this organization");
+  if (principal.workspaceId !== input.workspaceId) {
+    throw new HttpError(403, "Worker is not enabled for this workspace");
   }
   // Readiness and provider health still come from a project binding, which
   // every registered device has. Eligibility per job is enforced in the claim.
   const binding = authenticatedWorker.binding;
   if (!binding || binding.id !== input.workerId || binding.state === "disabled") {
-    throw new HttpError(403, "Worker is not enabled for this organization");
+    throw new HttpError(403, "Worker is not enabled for this workspace");
   }
   const observedAt = new Date().toISOString();
   if (
@@ -104,7 +104,7 @@ export async function claimNextChannelReplyWork(
     crypto.randomUUID().replaceAll("-", "")
   }${crypto.randomUUID().replaceAll("-", "")}`;
   const claimTokenHash = await sha256(claimToken);
-  const job = await claimNextChannelAgentReply(db, input.organizationId, {
+  const job = await claimNextChannelAgentReply(db, input.workspaceId, {
     deviceId: principal.deviceId,
     workerId: binding.id,
     runtime,
@@ -114,14 +114,14 @@ export async function claimNextChannelReplyWork(
     settleMs: dmReplySettleMs(env.DM_REPLY_SETTLE_MS),
   });
   if (!job) return null;
-  scheduleChannelRealtimePublish(env, db, input.organizationId, context);
+  scheduleChannelRealtimePublish(env, db, input.workspaceId, context);
   try {
     if (job.claimed_worker_id !== binding.id) {
       throw new HttpError(409, "Reply claim is bound to another Worker");
     }
     const [channel, liveAgent, sourceMessage] = await Promise.all([
       getChannelById(db, job.organization_id, job.channel_id),
-      getOrganizationAgent(db, job.organization_id, job.agent_id),
+      getWorkspaceAgent(db, job.organization_id, job.agent_id),
       getChannelMessage(db, job.channel_id, job.trigger_message_id),
     ]);
     if (!channel || !liveAgent || !job.agent_provider) {
@@ -280,7 +280,7 @@ export async function claimNextChannelReplyWork(
     const replyModel = replyRuntime.model;
     const replyEffort = replyRuntime.effort;
     const project = job.project_id
-      ? await getOrganizationProject(db, job.organization_id, job.project_id)
+      ? await getWorkspaceProject(db, job.organization_id, job.project_id)
       : null;
     if (job.project_id !== null && !project) {
       throw new HttpError(409, "Reply job lost its project context");
@@ -324,7 +324,7 @@ export async function claimNextChannelReplyWork(
       ) {
         throw new HttpError(409, "Delegated reply lost its parent scope");
       }
-      const delegatedByAgent = await getOrganizationAgent(
+      const delegatedByAgent = await getWorkspaceAgent(
         db,
         job.organization_id,
         delegatedByJob.agent_id,
@@ -332,7 +332,7 @@ export async function claimNextChannelReplyWork(
       if (!delegatedByAgent || delegatedByAgent.project_id !== null) {
         throw new HttpError(
           409,
-          "Delegated reply lost its Organization Agent",
+          "Delegated reply lost its Workspace Agent",
         );
       }
       delegation = {
@@ -394,7 +394,7 @@ export async function claimNextChannelReplyWork(
       originReplyJobId: string;
     } | null = null;
     if (originJob && job.agent_message_hop === 1) {
-      const sender = await getOrganizationAgent(
+      const sender = await getWorkspaceAgent(
         db,
         job.organization_id,
         originJob.agent_id,
@@ -471,7 +471,7 @@ export async function claimNextChannelReplyWork(
       : null;
     const agentMessageTargets = triggerAuthor?.author_user_id
       ? (await listAgentMessageTargetAgents(db, {
-        organizationId: job.organization_id,
+        workspaceId: job.organization_id,
         viewerUserId: triggerAuthor.author_user_id,
         excludeAgentId: job.agent_id,
       })).map(agentMessageTargetJson)
@@ -505,7 +505,7 @@ export async function claimNextChannelReplyWork(
       )
       ? await captureDmPublicMessageClaim(db, {
           jobId: job.id,
-          organizationId: job.organization_id,
+          workspaceId: job.organization_id,
           workerId: binding.id,
           deviceId: principal.deviceId,
           claimTokenHash,
@@ -515,7 +515,7 @@ export async function claimNextChannelReplyWork(
     const publishedMessageBatches = publicMessageScope
       ? await listDmPublicMessagesForReply(db, {
           jobId: job.id,
-          organizationId: job.organization_id,
+          workspaceId: job.organization_id,
         })
       : [];
     const activity = env.CHANNEL_ACTIVITY_REALTIME
@@ -532,15 +532,15 @@ export async function claimNextChannelReplyWork(
     return {
         workType: "channelReply" as const,
         workId: job.id,
-        organizationId: job.organization_id,
+        workspaceId: job.organization_id,
         channelId: job.channel_id,
         // Null means there is no repository: the runner skips worktree setup.
         projectId: job.project_id,
         scope: agent.project_id === null
-          ? { kind: "organization", organizationId: job.organization_id }
+          ? { kind: "workspace", workspaceId: job.organization_id }
           : {
               kind: "project",
-              organizationId: job.organization_id,
+              workspaceId: job.organization_id,
               projectId: agent.project_id,
             },
         // The worker loop keys in-flight work by runId; a channel reply has no
@@ -617,7 +617,7 @@ export async function claimNextChannelReplyWork(
             contentType: attachment.contentType,
             byteSize: attachment.byteSize,
             url: channelReplyAttachmentPath({
-              organizationId: job.organization_id,
+              workspaceId: job.organization_id,
               workId: job.id,
               attachmentId: attachment.id,
             }),
@@ -626,7 +626,7 @@ export async function claimNextChannelReplyWork(
         snapshot: {
           dmScheduleContext: scheduleContext ? { ...scheduleContext,
             artifacts: scheduleContext.artifacts.map((attachment) => ({ ...attachment,
-              url: channelReplyAttachmentPath({ organizationId: job.organization_id, workId: job.id, attachmentId: attachment.id }),
+              url: channelReplyAttachmentPath({ workspaceId: job.organization_id, workId: job.id, attachmentId: attachment.id }),
             })),
           } : null,
           dmRoutingContext: job.routing_action ? await dmReplyRoutingContext(db, job) : null,
@@ -670,7 +670,7 @@ export async function claimNextChannelReplyWork(
       error: error instanceof Error ? error.message : String(error),
       updatedAt: new Date().toISOString(),
     });
-    scheduleChannelRealtimePublish(env, db, input.organizationId, context);
+    scheduleChannelRealtimePublish(env, db, input.workspaceId, context);
     throw error;
   }
 }

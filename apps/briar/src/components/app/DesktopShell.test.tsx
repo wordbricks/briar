@@ -11,14 +11,11 @@ import { TooltipProvider } from "../ui/tooltip";
 import { demoDashboard } from "../../lib/demo-data";
 import { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
 import { settingsNavigationLocation } from "../../lib/app-navigation";
-import { demoOrganization, demoUser } from "../../state/demo-fixtures";
+import { demoWorkspace, demoUser } from "../../state/demo-fixtures";
 import { requestedTeamAgentSettingsIdAtom } from "../../state/dialogs/atoms";
 import { createNavigationActions } from "../../state/navigation/actions";
 import { activePageAtom } from "../../state/navigation/atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
@@ -60,7 +57,7 @@ const props: DesktopShellProps = {
     all: [],
     rememberAgent: () => undefined,
   },
-  loadOrganizationProjectDashboard: async () => null,
+  loadWorkspaceProjectDashboard: async () => null,
   loadProjectHomeMerges: async () => ({
     repository: "wordbricks/briar",
     generatedAt: "2026-09-01T00:00:00.000Z",
@@ -77,7 +74,7 @@ const props: DesktopShellProps = {
       knownModels: 0,
     },
   }),
-  openOrganizationIssue: () => undefined,
+  openWorkspaceIssue: () => undefined,
   openProjectInNewWindow: async () => undefined,
   repositorySetup: {
     beginTeamReconnect: () => undefined,
@@ -114,7 +111,7 @@ const agent: ProjectAgent = {
 
 const agentDirectMessage: ChannelSummary = {
   id: "dm-1",
-  organizationId: demoOrganization.id,
+  workspaceId: demoWorkspace.id,
   kind: "dm",
   slug: "atlas",
   name: "Atlas",
@@ -150,8 +147,8 @@ const harness = (): AtomRegistry => {
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
-    [organizationsAtom, [demoOrganization]],
-    [activeOrganizationIdAtom, demoOrganization.id],
+    [workspacesAtom, [demoWorkspace]],
+    [activeWorkspaceIdAtom, demoWorkspace.id],
   ]);
   applySyncEvent(registry, {
     kind: "team-snapshot",
@@ -265,7 +262,7 @@ describe("DesktopShell", () => {
     const registry = harness();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: demoOrganization.id,
+      workspaceId: demoWorkspace.id,
       channels: [agentDirectMessage],
     });
     createNavigationActions(registry).navigateToPage("dms");

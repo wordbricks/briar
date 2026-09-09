@@ -8,7 +8,7 @@ import { issueAttachmentAccept, maxIssueAttachmentCount } from "@/lib/issue-atta
 import { issueTitleInputMaxLength, issueTitleLength, isIssueTitleWithinLimit } from "@/lib/issue-title";
 import { removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import type { IssueDifficulty } from "@/lib/issue-difficulty";
-import type { HuntRun, IssueAttachment, OrganizationMember, UpdateIssueInput } from "@/types";
+import type { HuntRun, IssueAttachment, WorkspaceMember, UpdateIssueInput } from "@/types";
 import { useI18n } from "@/i18n";
 import { DraftIssueDescriptionEditor } from "./DraftIssueDescriptionEditor";
 import { SelectedAttachment } from "./SelectedAttachment";
@@ -22,7 +22,7 @@ export function EditIssueDialog({
   run
 }: {
   isSubmitting: boolean;
-  members?: OrganizationMember[];
+  members?: WorkspaceMember[];
   onClose: () => void;
   onLoadAttachment?: (attachment: IssueAttachment) => Promise<Blob>;
   onUpdate: (input: UpdateIssueInput) => Promise<unknown>;

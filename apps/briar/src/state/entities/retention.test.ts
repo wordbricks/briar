@@ -29,7 +29,7 @@ describe("touchRetainedTeam", () => {
       protectedIds: new Set(["a"]),
     });
 
-    // "내 이슈" pins the organization's teams while it is open; the LRU drops
+    // "내 이슈" pins the workspace's teams while it is open; the LRU drops
     // whatever else it can and leaves the pinned ones in place.
     expect(retained).toEqual(["a", "d"]);
     expect(evicted).toEqual(["b", "c"]);

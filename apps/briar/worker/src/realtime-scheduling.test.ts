@@ -6,7 +6,7 @@ import {
 } from "../../src/lib/channel-agent-activity";
 import {
   channelActivityCredential,
-  flushOrganizationInboxRealtimeOutbox,
+  flushWorkspaceInboxRealtimeOutbox,
   issueActivityCredential,
   scheduleChannelActivityClear,
   scheduleIssueActivityClear,
@@ -16,7 +16,7 @@ import {
   verifyIssueActivityPublishToken,
 } from "./channel-activity-ticket";
 
-const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const workspaceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const channelId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
@@ -27,7 +27,7 @@ const parentMessageId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 
 const channelJob = (leaseExpiresAt: string | null) => ({
   id: replyJobId,
-  organization_id: organizationId,
+  organization_id: workspaceId,
   channel_id: channelId,
   agent_id: agentId,
   trigger_message_id: triggerMessageId,
@@ -64,11 +64,11 @@ describe("activity scheduling adapters", () => {
       channel.token,
       replyJobId,
       now + 1,
-    )).resolves.toMatchObject({ organizationId, channelId, agentId, attempt: 2 });
+    )).resolves.toMatchObject({ workspaceId, channelId, agentId, attempt: 2 });
 
     const issue = await issueActivityCredential(
       env,
-      organizationId,
+      workspaceId,
       issueJob(leaseExpiresAt),
       worker,
     );
@@ -77,7 +77,7 @@ describe("activity scheduling adapters", () => {
       issue.token,
       replyJobId,
       now + 1,
-    )).resolves.toMatchObject({ organizationId, projectId, runId, attempt: 3 });
+    )).resolves.toMatchObject({ workspaceId, projectId, runId, attempt: 3 });
   });
 
   it("publishes terminal tombstones through the shared clear scheduler", async () => {
@@ -106,19 +106,19 @@ describe("activity scheduling adapters", () => {
     } as unknown as ExecutionContext;
 
     scheduleChannelActivityClear(env, channelJob(null), context);
-    scheduleIssueActivityClear(env, organizationId, issueJob(null), context);
+    scheduleIssueActivityClear(env, workspaceId, issueJob(null), context);
     await Promise.all(pending);
 
     expect(requests).toHaveLength(2);
     expect(requests[0]).toMatchObject({
-      name: `${organizationId}:${channelId}`,
+      name: `${workspaceId}:${channelId}`,
       body: {
         sequence: BigInt(Number.MAX_SAFE_INTEGER),
         scope: { case: "channel", value: { channelId } },
       },
     });
     expect(requests[1]).toMatchObject({
-      name: `${organizationId}:issue:${projectId}:${runId}`,
+      name: `${workspaceId}:issue:${projectId}:${runId}`,
       body: {
         sequence: BigInt(Number.MAX_SAFE_INTEGER),
         scope: { case: "issue", value: { projectId, runId } },
@@ -134,7 +134,7 @@ describe("activity scheduling adapters", () => {
     await expect(channelActivityCredential(env, channelJob(null), worker))
       .rejects.toThrow("Reply claim has no active lease");
     await expect(
-      issueActivityCredential(env, organizationId, issueJob(null), worker),
+      issueActivityCredential(env, workspaceId, issueJob(null), worker),
     )
       .rejects.toThrow("Reply claim has no active lease");
   });
@@ -147,14 +147,14 @@ describe("activity scheduling adapters", () => {
     const publishRealtime = vi.fn(async () => undefined);
     const acknowledgeRealtime = vi.fn(async () => undefined);
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const flushing = flushOrganizationInboxRealtimeOutbox(
+    const flushing = flushWorkspaceInboxRealtimeOutbox(
       { CHANNEL_REALTIME: {} } as Env,
       {} as D1Database,
       {
         mobilePushProvidersConfigured: () => true,
         flushMobilePushOutbox: () => push,
         listRealtimeOutbox: async () => [{
-          organization_id: organizationId,
+          organization_id: workspaceId,
           version: 4,
         }],
         publishRealtime,

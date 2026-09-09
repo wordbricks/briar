@@ -10,7 +10,7 @@ import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { AgentSkillRow } from "./agent-skills";
-import type { OrganizationAgentRow } from "./organization-agents";
+import type { WorkspaceAgentRow } from "./workspace-agents";
 
 const requiredTimestamp = (value: string, field: string) => {
   const date = new Date(value);
@@ -30,13 +30,13 @@ const provider = {
   openrouter: AgentProvider.OPENROUTER,
   vertex: AgentProvider.VERTEX,
   pi: AgentProvider.PI,
-} as const satisfies Record<OrganizationAgentRow["provider"], AgentProvider>;
+} as const satisfies Record<WorkspaceAgentRow["provider"], AgentProvider>;
 
 const computerUsePolicy = {
   disabled: ComputerUsePolicy.DISABLED,
   unattended: ComputerUsePolicy.UNATTENDED,
 } as const satisfies Record<
-  OrganizationAgentRow["computer_use_policy"],
+  WorkspaceAgentRow["computer_use_policy"],
   ComputerUsePolicy
 >;
 
@@ -73,8 +73,8 @@ const appWorkspaceAgentSkill = (skill: AgentSkillRow) =>
     updatedAt: requiredTimestamp(skill.updated_at, "Agent Skill update"),
   });
 
-/** Maps the organization-agent domain row directly to its generated API DTO. */
-export const appWorkspaceAgent = (row: OrganizationAgentRow) =>
+/** Maps the workspace-agent domain row directly to its generated API DTO. */
+export const appWorkspaceAgent = (row: WorkspaceAgentRow) =>
   create(WorkspaceAgentSchema, {
     agentId: row.id,
     name: row.name,
@@ -88,5 +88,5 @@ export const appWorkspaceAgent = (row: OrganizationAgentRow) =>
     description: row.description || undefined,
     responsibility: row.responsibility,
     skills: (row.skills ?? []).map(appWorkspaceAgentSkill),
-    createdAt: requiredTimestamp(row.created_at, "Organization Agent creation"),
+    createdAt: requiredTimestamp(row.created_at, "Workspace Agent creation"),
   });

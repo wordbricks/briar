@@ -58,7 +58,7 @@ const ExistingHandoffRequest = Schema.Struct({
 const ReadyUpdateRequest = Schema.Struct({
   requestId: Schema.String,
   deviceId: Schema.String,
-  organizationId: Schema.String,
+  workspaceId: Schema.String,
 });
 
 const updateRequestJson = (
@@ -142,11 +142,11 @@ const makeWorkerUpdateQueries = (sql: SqlClient.SqlClient) => {
     Result: Schema.Struct({
       handoff_state: Schema.Literals(["draining", "ready"]),
     }),
-    execute: ({ requestId, deviceId, organizationId }) => sql`
+    execute: ({ requestId, deviceId, workspaceId }) => sql`
       select handoff_state
       from briar_execution_worker_update_requests
       where id = ${requestId} and device_id = ${deviceId}
-        and organization_id = ${organizationId} and status = 'requested'
+        and organization_id = ${workspaceId} and status = 'requested'
         and handoff_state in ('draining', 'ready')
     `,
   });

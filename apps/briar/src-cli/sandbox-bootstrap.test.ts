@@ -31,7 +31,7 @@ import { SANDBOX_SCHEMA_VERSION } from "./sandbox-image";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const otherProjectId = "22222222-2222-4222-8222-222222222222";
-const organizationId = "33333333-3333-4333-8333-333333333333";
+const workspaceId = "33333333-3333-4333-8333-333333333333";
 const agentToken = `briar_agent_${"a".repeat(40)}`;
 const userToken = `briar_user_${"b".repeat(40)}`;
 const directories: string[] = [];
@@ -87,7 +87,7 @@ const bootstrapStubs = (
   ensureRepository: async () => "/repo",
   registerWorker: async (input) => ({
     projectId: input.project.id,
-    organizationId,
+    workspaceId,
     deviceId: "device",
     workerId: "worker-1",
     label: input.label,
@@ -108,7 +108,7 @@ const bootstrapStubs = (
 const credential = (id: string) =>
   create(ProjectGitHubCredentialSchema, {
     projectId: id,
-    workspaceId: organizationId,
+    workspaceId: workspaceId,
     repositoryId: 42n,
     repository: "wordbricks/briar",
     cloneUrl: "https://github.com/wordbricks/briar.git",
@@ -193,7 +193,7 @@ describe("runSandboxBootstrap", () => {
         expect(input.project.repositoryPath).toContain(projectId);
         return {
           projectId: input.project.id,
-          organizationId,
+          workspaceId,
           deviceId: "device",
           workerId: "worker-1",
           label: input.label,
@@ -252,7 +252,7 @@ describe("runSandboxBootstrap", () => {
       ensureRepository: async () => "/fresh",
       registerWorker: async (input) => ({
         projectId: input.project.id,
-        organizationId,
+        workspaceId,
         deviceId: "device",
         workerId: "worker-1",
         label: input.label,
@@ -347,7 +347,7 @@ describe("sandboxReport", () => {
       executionWorker: {
         deviceId: "device",
         workerId: "worker-1",
-        organizationId,
+        workspaceId,
         label: "sandbox-gx10",
         maxConcurrentSessions: 1,
       },
@@ -438,7 +438,7 @@ describe("sandboxWorkerTeamIds", () => {
         executionWorker: {
           deviceId: "device",
           workerId: "worker-1",
-          organizationId,
+          workspaceId,
           label: "sandbox",
           maxConcurrentSessions: 1,
         },
@@ -475,7 +475,7 @@ describe("runSandboxUnregister", () => {
         executionWorker: {
           deviceId: "device",
           workerId: "worker-1",
-          organizationId,
+          workspaceId,
           label: "sandbox-gx10",
           maxConcurrentSessions: 1,
         },
@@ -599,7 +599,7 @@ describe("remote-desktop relay registration", () => {
   const registeredWorker = {
     deviceId: "briar_device_x",
     workerId: "worker-1",
-    organizationId,
+    workspaceId,
     token: `briar_worker_${"c".repeat(43)}`,
     label: "sandbox-gx10",
     maxConcurrentSessions: 1,
@@ -621,7 +621,7 @@ describe("remote-desktop relay registration", () => {
         );
         return {
           projectId: input.project.id,
-          organizationId,
+          workspaceId,
           deviceId: registeredWorker.deviceId,
           workerId: registeredWorker.workerId,
           label: input.label,
@@ -648,14 +648,14 @@ describe("remote-desktop relay registration", () => {
     expect(registrations).toEqual([{
       apiUrl: "https://briar.example",
       userToken,
-      organizationId,
+      workspaceId,
       deviceId: "briar_device_x",
       label: "sandbox-gx10",
     }]);
     expect(relayConfigs).toEqual([{
       credential: registeredWorker.token,
       deviceId: "briar_device_x",
-      organizationId,
+      workspaceId,
       managedComputerId: "44444444-4444-4444-8444-444444444444",
       apiOrigin: "https://briar.example",
     }]);
@@ -677,7 +677,7 @@ describe("remote-desktop relay registration", () => {
         );
         return {
           projectId: input.project.id,
-          organizationId,
+          workspaceId,
           deviceId: registeredWorker.deviceId,
           workerId: registeredWorker.workerId,
           label: input.label,
@@ -733,7 +733,7 @@ describe("remote-desktop relay registration", () => {
       readRemoteAgentConfig: async () => ({
         credential: registeredWorker.token,
         deviceId: registeredWorker.deviceId,
-        organizationId,
+        workspaceId,
         managedComputerId: "44444444-4444-4444-8444-444444444444",
         apiOrigin: "https://briar.example",
       }),
@@ -751,7 +751,7 @@ describe("remote-desktop relay registration", () => {
     expect(removed).toEqual([{
       apiUrl: "https://briar.example",
       userToken,
-      organizationId,
+      workspaceId,
       deviceId: "briar_device_x",
     }]);
     expect(result.computerRemoved).toBe(true);
@@ -789,7 +789,7 @@ describe("remote-desktop relay registration", () => {
       readRemoteAgentConfig: async () => ({
         credential: registeredWorker.token,
         deviceId: registeredWorker.deviceId,
-        organizationId,
+        workspaceId,
         managedComputerId: "44444444-4444-4444-8444-444444444444",
         apiOrigin: "https://briar.example",
       }),

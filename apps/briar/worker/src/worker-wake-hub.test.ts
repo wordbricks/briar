@@ -58,7 +58,7 @@ async function subscribe(
 }
 
 describe("WorkerWakeHub", () => {
-  it("fans a wake out to every Worker connected to the organization", async () => {
+  it("fans a wake out to every Worker connected to the workspace", async () => {
     const stub = env.WORKER_WAKE.getByName(crypto.randomUUID());
     const first = await subscribe(stub);
     const second = await subscribe(stub);

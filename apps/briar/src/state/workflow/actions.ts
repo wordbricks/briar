@@ -10,9 +10,9 @@ import {
   resolveWorkspaceApi,
   workspaceModes,
   type WorkspaceApi,
-} from "../workspace/api";
-import { refreshTeamHealth } from "../workspace/health";
-import { refreshTeamReadiness } from "../workspace/readiness";
+} from "../local-workspace/api";
+import { refreshTeamHealth } from "../local-workspace/health";
+import { refreshTeamReadiness } from "../local-workspace/readiness";
 
 /*
   Everything that changes a team's Auto Hunt workflow.

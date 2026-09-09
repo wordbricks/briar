@@ -11,7 +11,7 @@ import { I18nProvider } from "../i18n";
 
 const sidebarProps = {
   activePage: "issues" as const,
-  activeOrganizationId: "organization-1",
+  activeWorkspaceId: "workspace-1",
   activeProjectId: "project-1",
   agents: [],
   connectedTeamIds: ["project-1"],
@@ -24,16 +24,16 @@ const sidebarProps = {
   onInboxOpen: () => undefined,
   onIssuesOpen: () => undefined,
   onCreateIssue: () => undefined,
-  onAddOrganization: () => undefined,
+  onAddWorkspace: () => undefined,
   onLogout: () => undefined,
-  onOrganizationChange: () => undefined,
+  onWorkspaceChange: () => undefined,
   onProjectChange: () => undefined,
   onProjectRepositoryOpen: () => undefined,
   onProjectSettings: () => undefined,
   onSettings: () => undefined,
-  organizations: [
+  workspaces: [
     {
-      id: "organization-1",
+      id: "workspace-1",
       name: "Briar",
       handle: "briar",
       logo: null,
@@ -50,8 +50,8 @@ const sidebarProps = {
       icon: null,
       iconName: null,
       iconColor: null,
-      organizationId: "organization-1",
-      organizationName: "Briar",
+      workspaceId: "workspace-1",
+      workspaceName: "Briar",
       role: "owner" as const,
       createdAt: "2026-07-22T00:00:00Z",
     },
@@ -70,7 +70,7 @@ const sidebarChannel = (
   defaultProjectId: string | null,
 ) => ({
   id,
-  organizationId: "organization-1",
+  workspaceId: "workspace-1",
   slug: name.toLowerCase().replaceAll(" ", "-"),
   name,
   topic: null,
@@ -134,7 +134,7 @@ describe("Sidebar", () => {
         planningProjects={[
           {
             id: "planning-1",
-            workspaceId: "organization-1",
+            workspaceId: "workspace-1",
             workspaceName: "Briar",
             teamId: "project-1",
             teamName: "Briar",
@@ -155,7 +155,7 @@ describe("Sidebar", () => {
           },
           {
             id: "planning-2",
-            workspaceId: "organization-1",
+            workspaceId: "workspace-1",
             workspaceName: "Briar",
             teamId: "project-2",
             teamName: "Console",
@@ -272,7 +272,7 @@ describe("Sidebar", () => {
         channels={[
           {
             id: "channel-1",
-            organizationId: "organization-1",
+            workspaceId: "workspace-1",
             slug: "general",
             name: "General",
             topic: null,
@@ -555,8 +555,8 @@ describe("Sidebar", () => {
             icon: null,
             iconName: null,
             iconColor: null,
-            organizationId: "organization-1",
-            organizationName: "Briar",
+            workspaceId: "workspace-1",
+            workspaceName: "Briar",
             role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
@@ -663,8 +663,8 @@ describe("Sidebar", () => {
             icon: null,
             iconName: null,
             iconColor: null,
-            organizationId: "organization-1",
-            organizationName: "Briar",
+            workspaceId: "workspace-1",
+            workspaceName: "Briar",
             role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
@@ -719,8 +719,8 @@ describe("Sidebar", () => {
             icon: null,
             iconName: null,
             iconColor: null,
-            organizationId: "organization-1",
-            organizationName: "Briar",
+            workspaceId: "workspace-1",
+            workspaceName: "Briar",
             role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
@@ -773,8 +773,8 @@ describe("Sidebar", () => {
             icon: null,
             iconName: null,
             iconColor: null,
-            organizationId: "organization-1",
-            organizationName: "Briar",
+            workspaceId: "workspace-1",
+            workspaceName: "Briar",
             role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
@@ -840,8 +840,8 @@ describe("Sidebar", () => {
             icon: null,
             iconName: null,
             iconColor: null,
-            organizationId: "organization-1",
-            organizationName: "Briar",
+            workspaceId: "workspace-1",
+            workspaceName: "Briar",
             role: "owner" as const,
             createdAt: "2026-07-23T00:00:00Z",
           },
@@ -865,8 +865,8 @@ describe("Sidebar", () => {
     await cleanup();
   });
 
-  it("opens the organization list directly from the brand control", async () => {
-    const onOrganizationChange = vi.fn();
+  it("opens the workspace list directly from the brand control", async () => {
+    const onWorkspaceChange = vi.fn();
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -874,11 +874,11 @@ describe("Sidebar", () => {
       root,
       <Sidebar
         {...sidebarProps}
-        onOrganizationChange={onOrganizationChange}
-        organizations={[
-          ...sidebarProps.organizations,
+        onWorkspaceChange={onWorkspaceChange}
+        workspaces={[
+          ...sidebarProps.workspaces,
           {
-            id: "organization-2",
+            id: "workspace-2",
             name: "Wordbricks",
             handle: "wordbricks",
             logo: null,
@@ -896,8 +896,8 @@ describe("Sidebar", () => {
             icon: null,
             iconName: null,
             iconColor: null,
-            organizationId: "organization-2",
-            organizationName: "Wordbricks",
+            workspaceId: "workspace-2",
+            workspaceName: "Wordbricks",
             role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
@@ -941,14 +941,14 @@ describe("Sidebar", () => {
         .find((button) => button.textContent?.includes("Wordbricks"))
         ?.click();
     });
-    expect(onOrganizationChange).toHaveBeenCalledWith("organization-2");
+    expect(onWorkspaceChange).toHaveBeenCalledWith("workspace-2");
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
 
     await cleanup();
   });
 
-  it("opens the organization creation page from the bottom of the organization list", async () => {
-    const onAddOrganization = vi.fn();
+  it("opens the workspace creation page from the bottom of the workspace list", async () => {
+    const onAddWorkspace = vi.fn();
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
@@ -956,7 +956,7 @@ describe("Sidebar", () => {
       root,
       <Sidebar
         {...sidebarProps}
-        onAddOrganization={onAddOrganization}
+        onAddWorkspace={onAddWorkspace}
       />,
     );
 
@@ -973,7 +973,7 @@ describe("Sidebar", () => {
     expect(items.at(-1)?.textContent).toContain("워크스페이스 추가");
 
     await act(async () => items.at(-1)?.click());
-    expect(onAddOrganization).toHaveBeenCalledOnce();
+    expect(onAddWorkspace).toHaveBeenCalledOnce();
     expect(container.querySelector('[aria-label="워크스페이스 메뉴"]')).toBeNull();
 
     await cleanup();
@@ -1407,8 +1407,8 @@ describe("Sidebar", () => {
             icon: null,
             iconName: null,
             iconColor: null,
-            organizationId: "organization-1",
-            organizationName: "Briar",
+            workspaceId: "workspace-1",
+            workspaceName: "Briar",
             role: "developer",
             createdAt: "2026-07-23T00:00:00Z",
           },
@@ -1419,7 +1419,7 @@ describe("Sidebar", () => {
     expect(
       container.querySelector(".sidebar-project-window-brand")?.textContent,
     ).toContain("Briar");
-    expect(container.querySelector(".sidebar-organization-switcher")).toBeNull();
+    expect(container.querySelector(".sidebar-workspace-switcher")).toBeNull();
     expect(container.querySelector(".sidebar-section-heading")).toBeNull();
     expect(container.querySelector(".sidebar-project-menu-trigger")).toBeNull();
 
@@ -1522,14 +1522,14 @@ describe("Sidebar mode toggle", () => {
     ...overrides,
   });
 
-  it("puts the DMs and Work toggle in the organization row instead of a DMs link", async () => {
+  it("puts the DMs and Work toggle in the workspace row instead of a DMs link", async () => {
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
     });
     await renderReactTestRoot(root, <Sidebar {...sidebarProps} />);
 
     const toggle = container.querySelector<HTMLElement>(
-      ".sidebar-organization-switcher .sidebar-mode-toggle",
+      ".sidebar-workspace-switcher .sidebar-mode-toggle",
     )!;
     expect(toggle).not.toBeNull();
     const [dms, work] = [...toggle.querySelectorAll<HTMLButtonElement>("button")];
@@ -1721,7 +1721,7 @@ describe("Sidebar DM conversation menu", () => {
 
   const section = (id: string, name: string, position: number) => ({
     id,
-    organizationId: "organization-1",
+    workspaceId: "workspace-1",
     name,
     position,
     createdAt: "2026-08-01T00:00:00Z",

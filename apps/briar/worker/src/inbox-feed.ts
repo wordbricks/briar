@@ -200,7 +200,7 @@ function structuredResult(run: InboxFeedRun) {
 }
 
 /**
- * Builds one organization-scoped feed without depending on whichever project a
+ * Builds one workspace-scoped feed without depending on whichever project a
  * client currently has selected. Message IDs and versions deliberately match
  * the existing desktop and iOS builders so account read state stays portable.
  */
@@ -330,9 +330,9 @@ export function buildInboxFeedMessages(
     });
   }
 
-  // Channel messages belong to an organization rather than a project. A
+  // Channel messages belong to an workspace rather than a project. A
   // stable first-project association preserves the existing navigation and
-  // project-filter contract while the feed itself remains organization scoped.
+  // project-filter contract while the feed itself remains workspace scoped.
   const channelProject = projectData[0]?.project;
   if (channelProject) {
     for (const notification of channelNotifications) {

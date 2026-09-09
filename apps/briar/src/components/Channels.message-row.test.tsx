@@ -36,7 +36,7 @@ const channelId = "channel-1";
 
 const channel: ChannelSummary = {
   id: channelId,
-  organizationId: "org-1",
+  workspaceId: "org-1",
   slug: "general",
   name: "General",
   topic: null,

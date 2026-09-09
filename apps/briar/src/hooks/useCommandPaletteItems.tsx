@@ -32,7 +32,7 @@ import { useChannelActions } from "../state/channels/actions";
 import {
   activeChannelIdAtom,
   organizationDirectMessagesAtom,
-  visibleOrganizationChannelsAtom,
+  visibleWorkspaceChannelsAtom,
 } from "../state/channels/atoms";
 import {
   createIssueTeamIdAtom,
@@ -54,11 +54,7 @@ import {
   requestedSessionIdAtom,
   settingsTargetAtom,
 } from "../state/navigation/atoms";
-import {
-  activeOrganizationAtom,
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../state/organization/atoms";
+import { activeWorkspaceAtom, activeWorkspaceIdAtom, workspacesAtom } from "../state/workspace/atoms";
 import { runningAgentSessionsAtom } from "../state/agent-sessions/atoms";
 import { teamRunsAtom } from "../state/entities/runs";
 import { lockedTeamIdAtom } from "../state/platform";
@@ -66,7 +62,7 @@ import { tokenAtom, userAtom } from "../state/session/atoms";
 import { visibleInboxUnreadCountAtom } from "../state/inbox/atoms";
 import { useTeamActions } from "../state/team/actions";
 import {
-  activeOrganizationTeamsAtom,
+  activeWorkspaceTeamsAtom,
   activeTeamAtom,
   activeTeamIdAtom,
 } from "../state/team/atoms";
@@ -115,14 +111,14 @@ export function useCommandPaletteItems({
   const { selectTeam, startTeamCreation } = useTeamActions();
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
-  const organizations = useAtomValue(organizationsAtom);
-  const activeOrganization = useAtomValue(activeOrganizationAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaces = useAtomValue(workspacesAtom);
+  const activeWorkspace = useAtomValue(activeWorkspaceAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const activeTeam = useAtomValue(activeTeamAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
-  const activeOrganizationTeams = useAtomValue(activeOrganizationTeamsAtom);
+  const activeWorkspaceTeams = useAtomValue(activeWorkspaceTeamsAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
-  const channels = useAtomValue(visibleOrganizationChannelsAtom);
+  const channels = useAtomValue(visibleWorkspaceChannelsAtom);
   const directMessages = useAtomValue(organizationDirectMessagesAtom);
   const activeChannelId = useAtomValue(activeChannelIdAtom);
   const settingsTarget = useAtomValue(settingsTargetAtom);
@@ -151,7 +147,7 @@ export function useCommandPaletteItems({
   const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
   const setIssueListRequestKey = useAtomSet(issueListRequestKeyAtom);
   const setAgentListRequestKey = useAtomSet(agentListRequestKeyAtom);
-  const { openOrganizationChannel } = useChannelActions();
+  const { openWorkspaceChannel } = useChannelActions();
 
   const paletteSections = {
     actions: {
@@ -221,7 +217,7 @@ export function useCommandPaletteItems({
       scope: "navigation",
     }, paletteSections.continue);
   }
-  if (!lockedTeamId && activeOrganizationId) {
+  if (!lockedTeamId && activeWorkspaceId) {
     if (activeTeam) {
       addPaletteItem({
         active: activePage === "projects",
@@ -237,9 +233,9 @@ export function useCommandPaletteItems({
     }
     addPaletteItem({
       active: activePage === "my-issues",
-      description: activeOrganization?.name,
+      description: activeWorkspace?.name,
       icon: <ListTodo />,
-      id: `navigation:my-issues:${activeOrganizationId}`,
+      id: `navigation:my-issues:${activeWorkspaceId}`,
       keywords: ["my issues", "issues", "내 이슈", "我的问题"],
       label: t("sidebar.myIssues"),
       onSelect: () => navigateToPage("my-issues"),
@@ -249,13 +245,13 @@ export function useCommandPaletteItems({
   }
 
   const paletteProjectIds = new Set(
-    activeOrganizationTeams.map((project) => project.id),
+    activeWorkspaceTeams.map((project) => project.id),
   );
   const runningPaletteSessions = runningSessions.filter((session) =>
     paletteProjectIds.has(session.projectId)
   );
   for (const session of runningPaletteSessions) {
-    const project = activeOrganizationTeams.find(
+    const project = activeWorkspaceTeams.find(
       (candidate) => candidate.id === session.projectId,
     );
     const label = session.request?.trim() || session.agentName?.trim() ||
@@ -400,28 +396,28 @@ export function useCommandPaletteItems({
       restoreFocusOnSelect: false,
       scope: "actions",
     }, paletteSections.actions);
-    if (activeOrganization) {
+    if (activeWorkspace) {
       addPaletteItem({
         active:
           activePage === "settings" &&
-          settingsTarget.scope === "organization" &&
-          settingsTarget.organizationId === activeOrganization.id,
-        description: activeOrganization.name,
+          settingsTarget.scope === "workspace" &&
+          settingsTarget.workspaceId === activeWorkspace.id,
+        description: activeWorkspace.name,
         icon: <Building2 />,
-        id: `action:organization-settings:${activeOrganization.id}`,
+        id: `action:workspace-settings:${activeWorkspace.id}`,
         keywords: [
           "workspace settings",
-          "organization settings",
+          "workspace settings",
           "워크스페이스 설정",
           "조직 설정",
           "组织设置",
-          activeOrganization.name,
+          activeWorkspace.name,
         ],
-        label: t("sidebar.organizationSettings"),
+        label: t("sidebar.workspaceSettings"),
         onSelect: () => {
           setSettingsTarget({
-            scope: "organization",
-            organizationId: activeOrganization.id,
+            scope: "workspace",
+            workspaceId: activeWorkspace.id,
             section: "general",
           });
           navigateToPage("settings");
@@ -514,19 +510,19 @@ export function useCommandPaletteItems({
       }, paletteSections.navigation);
     }
   }
-  if (activeOrganizationId && token) {
+  if (activeWorkspaceId && token) {
     addPaletteItem({
       active: activePage === "channels",
-      description: activeOrganization?.name,
+      description: activeWorkspace?.name,
       icon: <MessagesSquare />,
-      id: `navigation:channels:${activeOrganizationId}`,
+      id: `navigation:channels:${activeWorkspaceId}`,
       keywords: ["channels", "chat", "채널", "대화", "频道"],
       label: t("sidebar.channels"),
       onSelect: () => {
         const channel = channels.find(
           (candidate) => candidate.id === activeChannelId,
         ) ?? channels[0];
-        if (channel) openOrganizationChannel(channel.id);
+        if (channel) openWorkspaceChannel(channel.id);
         else navigateToPage("channels");
       },
       priority: activePage === "channels" ? 120 : 50,
@@ -536,16 +532,16 @@ export function useCommandPaletteItems({
   if (!lockedTeamId) {
     addPaletteItem({
       active: activePage === "dms",
-      description: activeOrganization?.name,
+      description: activeWorkspace?.name,
       icon: <MessageCircle />,
-      id: `navigation:dms:${activeOrganizationId ?? "none"}`,
+      id: `navigation:dms:${activeWorkspaceId ?? "none"}`,
       keywords: ["direct messages", "dm", "messages", "다이렉트 메시지", "私信"],
       label: t("sidebar.dms"),
       onSelect: () => {
         const directMessage = directMessages.find(
           (candidate) => candidate.id === activeChannelId,
         ) ?? directMessages[0];
-        if (directMessage) openOrganizationChannel(directMessage.id);
+        if (directMessage) openWorkspaceChannel(directMessage.id);
         else navigateToPage("dms");
       },
       priority: activePage === "dms" ? 120 : 50,
@@ -576,21 +572,21 @@ export function useCommandPaletteItems({
     shortcut: "⌘,",
   }, paletteSections.navigation);
 
-  for (const project of isCommandPaletteOpen ? activeOrganizationTeams : []) {
-    const organizationName = organizations.find(
-      (organization) => organization.id === project.organizationId,
-    )?.name ?? project.organizationName;
+  for (const project of isCommandPaletteOpen ? activeWorkspaceTeams : []) {
+    const workspaceName = workspaces.find(
+      (workspace) => workspace.id === project.workspaceId,
+    )?.name ?? project.workspaceName;
     addPaletteItem({
       active: project.id === activeTeamId,
       description:
         project.id === activeTeamId
           ? t("commandPalette.currentProject")
-          : organizationName,
+          : workspaceName,
       icon: <TeamIcon className="size-4" project={project} />,
       id: `project:${project.id}`,
       keywords: [
         project.name,
-        organizationName,
+        workspaceName,
         "team",
         "project",
         "팀",
@@ -695,13 +691,13 @@ export function useCommandPaletteItems({
         channel.name,
         channel.slug,
         channel.topic ?? "",
-        activeOrganization?.name ?? "",
+        activeWorkspace?.name ?? "",
         "channel",
         "채널",
         "频道",
       ],
       label: channel.name,
-      onSelect: () => openOrganizationChannel(channel.id),
+      onSelect: () => openWorkspaceChannel(channel.id),
       priority: isCurrent ? 180 : unread ? 130 : 0,
       scope: "channels",
     }, isCurrent
@@ -737,7 +733,7 @@ export function useCommandPaletteItems({
         "私信",
       ],
       label: name,
-      onSelect: () => openOrganizationChannel(directMessage.id),
+      onSelect: () => openWorkspaceChannel(directMessage.id),
       priority: isCurrent ? 180 : unread ? 130 : 0,
       scope: "direct-messages",
     }, isCurrent

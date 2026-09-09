@@ -16,11 +16,11 @@ import {
 
 const attachmentId = "22222222-2222-4222-8222-222222222222";
 const workId = "33333333-3333-4333-8333-333333333333";
-const organizationId = "44444444-4444-4444-8444-444444444444";
+const workspaceId = "44444444-4444-4444-8444-444444444444";
 const imageBytes = new Uint8Array([137, 80, 78, 71]);
 const maxChannelReplyImageBytes = 20 * 1024 * 1024;
 const attachmentUrl =
-  `/organizations/${organizationId}/channel-reply-claims/${workId}/attachments/${attachmentId}`;
+  `/workspaces/${workspaceId}/channel-reply-claims/${workId}/attachments/${attachmentId}`;
 
 const imageAttachment = (overrides: {
   id?: string;
@@ -101,7 +101,7 @@ describe("channel reply attachment inputs", () => {
     const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example/",
       workerToken: "briar_worker_secret",
-      organizationId,
+      workspaceId,
       workId,
       claimToken: "briar_channel_claim_secret",
       triggerAttachments: [svg],
@@ -126,13 +126,13 @@ describe("channel reply attachment inputs", () => {
       contentType: "text/markdown",
       byteSize: markdownBytes.byteLength,
       url:
-        `/organizations/${organizationId}/channel-reply-claims/${workId}/attachments/${markdownId}`,
+        `/workspaces/${workspaceId}/channel-reply-claims/${workId}/attachments/${markdownId}`,
     });
 
     const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example/",
       workerToken: "briar_worker_secret",
-      organizationId,
+      workspaceId,
       workId,
       claimToken: "briar_channel_claim_secret",
       triggerAttachments: [imageAttachment(), markdown],
@@ -160,7 +160,7 @@ describe("channel reply attachment inputs", () => {
     const workspacePath = await temporaryWorkspace();
     const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       expect(String(url)).toBe(
-        `https://api.example/organizations/${organizationId}/channel-reply-claims/${workId}/attachments/${attachmentId}`,
+        `https://api.example/workspaces/${workspaceId}/channel-reply-claims/${workId}/attachments/${attachmentId}`,
       );
       const headers = new Headers(init?.headers);
       expect(init?.redirect).toBe("error");
@@ -176,7 +176,7 @@ describe("channel reply attachment inputs", () => {
     const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example/",
       workerToken: "briar_worker_secret",
-      organizationId,
+      workspaceId,
       workId,
       claimToken: "briar_channel_claim_secret",
       triggerAttachments: triggerAttachments(),
@@ -211,7 +211,7 @@ describe("channel reply attachment inputs", () => {
     const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example/",
       workerToken: "briar_worker_secret",
-      organizationId,
+      workspaceId,
       workId,
       claimToken: "briar_channel_claim_secret",
       triggerAttachments: [pdf],
@@ -239,7 +239,7 @@ describe("channel reply attachment inputs", () => {
     await expect(downloadChannelReplyAttachments({
       apiUrl: "https://api.example",
       workerToken: "briar_worker_secret",
-      organizationId,
+      workspaceId,
       workId,
       claimToken: "briar_channel_claim_secret",
       triggerAttachments: [imageAttachment({ url: "https://evil.example/private.png" })],
@@ -256,7 +256,7 @@ describe("channel reply attachment inputs", () => {
       downloadChannelReplyAttachments({
         apiUrl: "https://api.example",
         workerToken: "briar_worker_secret",
-        organizationId,
+        workspaceId,
         workId,
         claimToken: "briar_channel_claim_secret",
         triggerAttachments: triggerAttachments(),
@@ -277,7 +277,7 @@ describe("channel reply attachment inputs", () => {
     const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example",
       workerToken: "briar_worker_secret",
-      organizationId,
+      workspaceId,
       workId,
       claimToken: "briar_channel_claim_secret",
       triggerAttachments: triggerAttachments(),
@@ -298,7 +298,7 @@ describe("channel reply attachment inputs", () => {
     const downloaded = await downloadChannelReplyAttachments({
       apiUrl: "https://api.example",
       workerToken: "briar_worker_secret",
-      organizationId,
+      workspaceId,
       workId,
       claimToken: "briar_channel_claim_secret",
       triggerAttachments: triggerAttachments(),

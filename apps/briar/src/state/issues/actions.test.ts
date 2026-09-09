@@ -11,7 +11,7 @@ import type {
   SessionUser,
 } from "../../types";
 import { runAtom, teamRunIdsAtom } from "../entities/runs";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { planningProjectsAtom } from "../planning/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { issueMessagesAtom, runEventsAtom } from "../run-detail/atoms";
@@ -449,8 +449,8 @@ describe("addIssue", () => {
     expect(registry.get(teamRunIdsAtom(teamId))).toEqual([result.runId]);
     expect(registry.get(runAtom(result.runId))?.title).toBe("데모 이슈");
     expect(registry.get(runEventsAtom(result.runId))).toHaveLength(1);
-    expect(registry.get(activeOrganizationIdAtom)).toBe(
-      teamOf(teamId).organizationId,
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(
+      teamOf(teamId).workspaceId,
     );
   });
 });

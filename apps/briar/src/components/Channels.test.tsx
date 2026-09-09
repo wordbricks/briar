@@ -7,12 +7,12 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { I18nProvider } from "../i18n";
 import { RegistryContext } from "@effect/atom-react";
 import { createTestRegistry } from "../state/registry";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import { tokenAtom } from "../state/session/atoms";
 import type { ChannelMessage, ChannelSummary } from "../lib/channels-contract";
 import type {
   ManagedComputer,
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
   ProjectAgent,
 } from "../types";
 import { Channels } from "./Channels";
@@ -21,17 +21,17 @@ import type { DmComputerPanelServices, DmComputerRfbConstructor } from "./DmComp
 /*
   The conversation loader reads its credentials from the registry rather than
   from the view's props, so every registry these cases build is signed in to the
-  organization the fixtures use.
+  workspace the fixtures use.
 */
 const createChannelTestRegistry = () =>
   createTestRegistry([
     [tokenAtom, "token"],
-    [activeOrganizationIdAtom, "org-1"],
+    [activeWorkspaceIdAtom, "org-1"],
   ]);
 
 const selectedChannel: ChannelSummary = {
   id: "channel-1",
-  organizationId: "org-1",
+  workspaceId: "org-1",
   slug: "general",
   name: "General",
   topic: null,
@@ -93,7 +93,7 @@ const virtualMessage = (channelId: string, index: number): ChannelMessage => ({
 
 const channelSummaryWire = (channel: ChannelSummary) => ({
   id: channel.id,
-  workspaceId: channel.organizationId,
+  workspaceId: channel.workspaceId,
   slug: channel.slug,
   name: channel.name,
   topic: channel.topic ?? undefined,
@@ -234,7 +234,7 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>
@@ -307,7 +307,7 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>
@@ -406,7 +406,7 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           requestedMessage={{
             channelId: selectedChannel.id,
             messageId: message.id,
@@ -519,7 +519,7 @@ describe("Channels", () => {
           onInboxChannelOpen={openChannel}
           onInboxDetailClose={() => undefined}
           onRequestedMessageOpen={onRequestedMessageOpen}
-          organizationId="org-1"
+          workspaceId="org-1"
           requestedMessage={{
             channelId: conversation.id,
             messageId: replyMessage.id,
@@ -590,7 +590,7 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>
@@ -665,7 +665,7 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>
@@ -756,7 +756,7 @@ describe("Channels", () => {
           onReadOnlyBack={() => {
             backCount += 1;
           }}
-          organizationId="org-1"
+          workspaceId="org-1"
           surface="dm"
           token="token"
         />
@@ -825,7 +825,7 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           surface="dm"
           token="token"
         />
@@ -884,7 +884,7 @@ describe("Channels", () => {
 
     const managedComputer: ManagedComputer = {
       id: "computer-1",
-      organizationId: "org-1",
+      workspaceId: "org-1",
       requesterUserId: "user-1",
       state: "ready",
       provider: "aws",
@@ -900,7 +900,7 @@ describe("Channels", () => {
       expiresAt: "2026-10-02T00:00:00.000Z",
       updatedAt: "2026-09-02T00:00:00.000Z",
     };
-    const organizationWorker: OrganizationExecutionWorker = {
+    const organizationWorker: WorkspaceExecutionWorker = {
       deviceId: "device-1",
       ownerUserId: "user-1",
       ownerName: "Jay",
@@ -1011,7 +1011,7 @@ describe("Channels", () => {
           currentUserId="user-1"
           onChannelSelect={() => undefined}
           onChannelsChange={() => undefined}
-          organizationId="org-1"
+          workspaceId="org-1"
           surface="dm"
           token="token"
         />

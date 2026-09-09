@@ -22,7 +22,7 @@ export type SessionLinkTarget = {
 };
 
 export type ChannelLinkTarget = {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   messageId: string | null;
   rootMessageId: string | null;
@@ -82,7 +82,7 @@ export function sessionShareUrl(
 
 export function channelShareUrl(
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     messageId?: string | null;
     rootMessageId?: string | null;
@@ -91,7 +91,7 @@ export function channelShareUrl(
 ): string {
   const url = new URL(origin);
   url.pathname =
-    `/open/channels/${encodeURIComponent(input.organizationId)}` +
+    `/open/channels/${encodeURIComponent(input.workspaceId)}` +
     `/${encodeURIComponent(input.channelId)}` +
     (input.messageId?.trim()
       ? `/${encodeURIComponent(input.messageId.trim())}`
@@ -169,7 +169,7 @@ export function parseSessionLink(
 }
 
 function channelLinkFromParts(
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   messageId: string | null | undefined,
   rootMessageId?: string | null,
@@ -177,7 +177,7 @@ function channelLinkFromParts(
   const normalizedMessageId = messageId ?? null;
   const root = rootMessageId?.trim();
   return {
-    organizationId,
+    workspaceId,
     channelId,
     messageId: normalizedMessageId,
     rootMessageId: root || normalizedMessageId,
@@ -277,7 +277,7 @@ export async function copySessionShareLink(input: {
 }
 
 export async function copyChannelShareLink(input: {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   messageId: string;
   rootMessageId?: string | null;

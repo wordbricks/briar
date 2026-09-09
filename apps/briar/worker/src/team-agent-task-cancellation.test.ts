@@ -31,7 +31,7 @@ import { registerExecutionWorker } from "./workers";
 import type { AgentSkillRow } from "./agent-skills";
 import type { TeamAgentRow } from "./team-agent-model";
 
-const organizationId = "a1000000-0000-4000-8000-000000000001";
+const workspaceId = "a1000000-0000-4000-8000-000000000001";
 const projectId = "a2000000-0000-4000-8000-000000000001";
 const ownerId = "task-cancel-owner";
 const workerId = "a3000000-0000-4000-8000-000000000001";
@@ -62,12 +62,12 @@ describe("Project Agent task cancellation", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Cancel org', 'task-cancel-org', ?, ?)`,
-      ).bind(organizationId, observedAt, observedAt),
+      ).bind(workspaceId, observedAt, observedAt),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, observedAt, observedAt),
+      ).bind(workspaceId, ownerId, observedAt, observedAt),
       db.prepare(
         `insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
@@ -76,7 +76,7 @@ describe("Project Agent task cancellation", () => {
       ).bind(
         projectId,
         ownerId,
-        organizationId,
+        workspaceId,
         "a".repeat(64),
         observedAt,
         observedAt,
@@ -85,7 +85,7 @@ describe("Project Agent task cancellation", () => {
     await registerExecutionWorker(db, projectId, {
       id: workerId,
       deviceId,
-      organizationId,
+      workspaceId,
       ownerUserId: ownerId,
       label: "Cancel Worker",
       deviceIdentityHash: sha256("task-cancel-device"),

@@ -26,14 +26,14 @@ import {
   ManagedComputerSocketTicketSchema,
   ManagedComputerSpecificationSchema,
   ManagedComputerState,
-  WorkspaceExecutionWorkerSchema as OrganizationExecutionWorkerSchema} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+  WorkspaceExecutionWorkerSchema as WorkspaceExecutionWorkerSchema} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import type { ManagedComputerRow } from "./managed-computer-model";
 import type { managedComputerProductResponse } from "./managed-computer-service";
 import type { ManagedComputerRemoteSessionState as RemoteSessionState } from "./managed-computer-remote-model";
 import type { ManagedComputerSetupSessionRow } from "./managed-computer-model";
 import type {
   ExecutionWorkerState,
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
 } from "./workers";
 import { appAgentProvider } from "./app-connect-mappers";
 
@@ -97,9 +97,9 @@ export const appFleetWorkerIcon = (
   })
   : undefined;
 
-export const appOrganizationExecutionWorker = (
-  worker: OrganizationExecutionWorker,
-) => create(OrganizationExecutionWorkerSchema, {
+export const appWorkspaceExecutionWorker = (
+  worker: WorkspaceExecutionWorker,
+) => create(WorkspaceExecutionWorkerSchema, {
   deviceId: worker.deviceId,
   ownerUserId: worker.ownerUserId,
   ownerName: worker.ownerName,
@@ -197,7 +197,7 @@ export const appManagedComputerPromotionLimitReason = (
       return undefined;
     case "user":
       return ManagedComputerPromotionLimitReason.USER;
-    case "organization":
+    case "workspace":
       return ManagedComputerPromotionLimitReason.WORKSPACE;
     case "fleet":
       return ManagedComputerPromotionLimitReason.FLEET;

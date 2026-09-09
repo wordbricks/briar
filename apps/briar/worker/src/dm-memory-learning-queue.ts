@@ -58,7 +58,7 @@ async function enqueueLearningJob(db: D1Database, input: {
 }
 
 /** This can be retried after restart; no in-memory queue owns unprocessed input. */
-export async function scheduleDmLearningJobs(db: D1Database, organizationId: string, now: string) {
+export async function scheduleDmLearningJobs(db: D1Database, workspaceId: string, now: string) {
   const spaces = (await db.prepare(`select space.id, space.revocation_epoch, agent.provider from briar_dm_memory_spaces space
     join briar_project_agents agent on agent.id = space.agent_id and agent.organization_id = space.organization_id
     left join briar_dm_memory_learning_state scheduled on scheduled.space_id = space.id
@@ -70,7 +70,7 @@ export async function scheduleDmLearningJobs(db: D1Database, organizationId: str
               and rev.version = observation.document_version
           where observation.space_id = space.id and ${dmLearningConsolidatedObservationSql}
             and observation.sequence > coalesce((select observation_watermark from briar_dm_memory_learning_state where space_id = space.id), 0))))
-    order by coalesce(scheduled.last_scheduled_at, space.created_at), space.id limit 20`).bind(organizationId).all<{ id: string; revocation_epoch: number; provider: string }>()).results;
+    order by coalesce(scheduled.last_scheduled_at, space.created_at), space.id limit 20`).bind(workspaceId).all<{ id: string; revocation_epoch: number; provider: string }>()).results;
   let created = 0;
   for (const space of spaces) {
     const policy = dmLearningSpacePolicy(space.provider);

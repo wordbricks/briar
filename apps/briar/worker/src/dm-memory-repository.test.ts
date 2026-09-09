@@ -9,7 +9,7 @@ import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { dmMemoryCreateInput, type DmMemoryCreateInput } from "../../src/lib/dm-memory-contract";
 import { addChannelMember, createChannel, removeChannelMember } from "./channels";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import apiWorker from "./index";
 import {
   deleteDmMemory, exportDmMemoryEntries, getDmMemory, listDmMemories, listDmMemoryRevisions, saveDmMemory, updateDmMemorySettings,
@@ -19,7 +19,7 @@ import { dmMemoryZipResponse } from "./dm-memory-export";
 
 describe("DM memory authoritative storage", () => {
   let db: D1Database;
-  const organizationId = crypto.randomUUID();
+  const workspaceId = crypto.randomUUID();
   const userId = crypto.randomUUID();
   const otherUserId = crypto.randomUUID();
   const agentId = crypto.randomUUID();
@@ -34,12 +34,12 @@ describe("DM memory authoritative storage", () => {
       (id, expiresAt, token, createdAt, updatedAt, userId) values (?, '2099-01-01T00:00:00.000Z', ?, ?, ?, ?)`)
       .bind(crypto.randomUUID(), `memory-test-${id}`, now, now, id).run();
     await db.prepare(`insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values (?, 'Memory test', ?, ?, ?)`).bind(organizationId, organizationId, now, now).run();
+      values (?, 'Memory test', ?, ?, ?)`).bind(workspaceId, workspaceId, now, now).run();
     for (const id of [userId, otherUserId]) await db.prepare(`insert into briar_organization_members
       (organization_id, user_id, role, created_at, updated_at) values (?, ?, 'owner', ?, ?)`)
-      .bind(organizationId, id, now, now).run();
-    await createOrganizationAgent(db, {
-      id: agentId, organizationId, name: "Memory test Agent", provider: "claude", model: null,
+      .bind(workspaceId, id, now, now).run();
+    await createWorkspaceAgent(db, {
+      id: agentId, workspaceId, name: "Memory test Agent", provider: "claude", model: null,
       responsibility: "Use synthetic test data only", effort: null, createdAt: now,
     });
   }, 120_000);
@@ -47,11 +47,11 @@ describe("DM memory authoritative storage", () => {
   async function dm(): Promise<DmMemoryOwner> {
     const channelId = crypto.randomUUID();
     await createChannel(db, {
-      id: channelId, organizationId, kind: "dm", dmKey: null, slug: channelId, name: "Test DM",
+      id: channelId, workspaceId, kind: "dm", dmKey: null, slug: channelId, name: "Test DM",
       visibility: "private", topic: null, defaultProjectId: null,
       createdByUserId: userId, agentIds: [agentId], createdAt: now,
     });
-    return { organizationId, channelId, userId };
+    return { workspaceId, channelId, userId };
   }
   const memory = (overrides: Partial<DmMemoryCreateInput> = {}): DmMemoryCreateInput => ({
     requestId: crypto.randomUUID(), title: "Response preference",
@@ -99,7 +99,7 @@ describe("DM memory authoritative storage", () => {
       .rejects.toMatchObject({ code: "idempotency_conflict" });
   });
 
-  it("M06 does not grant another organization owner access to a private memory", async () => {
+  it("M06 does not grant another workspace owner access to a private memory", async () => {
     const owner = await dm();
     const saved = await saveDmMemory(db, owner, memory());
     const outsider = { ...owner, userId: otherUserId };
@@ -122,18 +122,18 @@ describe("DM memory authoritative storage", () => {
       .not.toBe(page.spaces[0].id);
   });
 
-  it("M07 creates a fresh space after leaving and rejoining the organization", async () => {
+  it("M07 creates a fresh space after leaving and rejoining the workspace", async () => {
     const owner = await dm();
     const saved = await saveDmMemory(db, owner, memory());
     const original = await getDmMemory(db, owner, saved.documentId!);
     await db.prepare("delete from briar_organization_members where organization_id = ? and user_id = ?")
-      .bind(organizationId, userId).run();
+      .bind(workspaceId, userId).run();
     try {
       await expect(getDmMemory(db, owner, saved.documentId!)).rejects.toMatchObject({ status: 404 });
     } finally {
       await db.prepare(`insert into briar_organization_members
         (organization_id, user_id, role, created_at, updated_at) values (?, ?, 'owner', ?, ?)`)
-        .bind(organizationId, userId, now, now).run();
+        .bind(workspaceId, userId, now, now).run();
     }
     expect((await listDmMemories(db, owner)).spaces[0].status).toBe("closed");
     const fresh = await saveDmMemory(db, owner, memory());
@@ -290,7 +290,7 @@ describe("DM memory authoritative storage", () => {
       headers: { authorization: `Bearer memory-test-${actor}` },
     });
     const created = await client.createDmMemoryDocument({
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       channelId: owner.channelId,
       requestId: crypto.randomUUID(),
       title: "Connect memory",
@@ -301,7 +301,7 @@ describe("DM memory authoritative storage", () => {
     expect(created).toMatchObject({ version: 1, replayed: false });
 
     const read = await client.getDmMemoryDocument({
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       channelId: owner.channelId,
       documentId: created.documentId,
     }, options(userId));
@@ -311,17 +311,17 @@ describe("DM memory authoritative storage", () => {
       protectedByUser: true,
     });
     await expect(client.getDmMemoryDocument({
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       channelId: owner.channelId,
       documentId: created.documentId,
     }, options(otherUserId))).rejects.toMatchObject({ code: Code.NotFound });
     await client.deleteDmMemoryDocument({
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       channelId: owner.channelId,
       documentId: created.documentId,
     }, options(userId));
     await expect(client.getDmMemoryDocument({
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       channelId: owner.channelId,
       documentId: created.documentId,
     }, options(userId))).rejects.toMatchObject({ code: Code.NotFound });

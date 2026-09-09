@@ -1,6 +1,6 @@
 import { executeDmScheduleTool } from "./dm-schedules";
 import { ExecuteDmScheduleToolResponseSchema, type ExecuteDmScheduleToolRequest } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import { wakeOrganizationWorkers } from "./worker-wake-hub";
+import { wakeWorkspaceWorkers } from "./worker-wake-hub";
 import { resolveDmReplyRouting } from "./dm-reply-routing";
 import { ResolveDmReplyRoutingResponseSchema, type ResolveDmReplyRoutingRequest } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { acknowledgeDmReplySteer } from "./dm-reply-steer";
@@ -357,7 +357,7 @@ async function channelReplyClaimMessage(
     db: D1Database;
     env: Env;
     context?: ExecutionContext;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     workerId: string;
     services: WorkerQueueServices;
@@ -383,7 +383,7 @@ async function channelReplyClaimMessage(
     scheduleChannelRealtimePublish(
       release.env,
       release.db,
-      release.organizationId,
+      release.workspaceId,
       release.context,
     );
     throw error;
@@ -444,7 +444,7 @@ async function claimWork(
 
   const channelReply = await services.claimNextChannelReplyWork({
     input: {
-      organizationId: worker.principal.organizationId,
+      workspaceId: worker.principal.workspaceId,
       workerId: claimInput.workerId,
     },
     db: input.db,
@@ -458,7 +458,7 @@ async function claimWork(
         db: input.db,
         env: input.env,
         context: input.context,
-        organizationId: worker.principal.organizationId,
+        workspaceId: worker.principal.workspaceId,
         deviceId: worker.principal.deviceId,
         workerId: claimInput.workerId,
         services,
@@ -477,7 +477,7 @@ async function claimWork(
     if (issue) return { work: workerClaimMessage(issue) };
 
     const learning = await services.claimDmLearningJob(input.db, {
-      organizationId: worker.principal.organizationId,
+      workspaceId: worker.principal.workspaceId,
       deviceId: worker.principal.deviceId,
       workerId: claimInput.workerId,
       projectId: claimInput.projectId,
@@ -494,7 +494,7 @@ async function claimWork(
   */
   const settleWaitMs = await services.nextChannelReplySettleWaitMs(
     input.db,
-    worker.principal.organizationId,
+    worker.principal.workspaceId,
     {
       observedAt: new Date().toISOString(),
       settleMs: dmReplySettleMs(input.env.DM_REPLY_SETTLE_MS),
@@ -528,7 +528,7 @@ async function renewIssueLease(
         .first<{ organization_id: string }>();
       if (project) {
         await services.auditExecutionEvent(input.db, {
-          organizationId: project.organization_id,
+          workspaceId: project.organization_id,
           projectId,
           runId: identity.runId,
           workerId: worker.binding.id,
@@ -602,7 +602,7 @@ async function renewWorkLease(
       const nextActivity = input.env.CHANNEL_ACTIVITY_REALTIME
         ? await services.issueActivityCredential(
             input.env,
-            worker.principal.organizationId,
+            worker.principal.workspaceId,
             renewed,
             {
               workerId: worker.binding.id,
@@ -620,9 +620,9 @@ async function renewWorkLease(
     }
     case "channelReply": {
       if (
-        identity.work.value.workspaceId !== worker.principal.organizationId
+        identity.work.value.workspaceId !== worker.principal.workspaceId
       ) {
-        throw new HttpError(403, "Worker is not enabled for this organization");
+        throw new HttpError(403, "Worker is not enabled for this workspace");
       }
       const renewed = await services.renewChannelReplyLease(input.db, {
         jobId: identity.workId,
@@ -658,14 +658,14 @@ async function renewWorkLease(
     case "dmMemory": {
       if (
         identity.work.value.workspaceId !==
-          worker.principal.organizationId
+          worker.principal.workspaceId
       ) {
-        throw new HttpError(403, "Worker is not enabled for this organization");
+        throw new HttpError(403, "Worker is not enabled for this workspace");
       }
       try {
         const renewed = await services.renewDmLearningClaim(input.db, {
           identity: {
-            organizationId: worker.principal.organizationId,
+            workspaceId: worker.principal.workspaceId,
             deviceId: worker.principal.deviceId,
             workerId: worker.binding.id,
             jobId: identity.workId,
@@ -730,14 +730,14 @@ async function handoffWork(
 
   if (identity.work.case === "dmMemory") {
     if (
-      identity.work.value.workspaceId !== worker.principal.organizationId
+      identity.work.value.workspaceId !== worker.principal.workspaceId
     ) {
-      throw new HttpError(403, "Worker is not enabled for this organization");
+      throw new HttpError(403, "Worker is not enabled for this workspace");
     }
     const released = await services.failDmLearningClaim(
       input.db,
       {
-        organizationId: worker.principal.organizationId,
+        workspaceId: worker.principal.workspaceId,
         deviceId: worker.principal.deviceId,
         workerId: worker.binding.id,
         jobId: identity.workId,
@@ -800,7 +800,7 @@ async function handoffWork(
   try {
     outcome = await services.handoffExecutionWorkerClaim(input.db, {
       requestId: decoded.requestId,
-      organizationId: worker.principal.organizationId,
+      workspaceId: worker.principal.workspaceId,
       deviceId: worker.principal.deviceId,
       projectId: decoded.projectId,
       workerId: worker.binding.id,
@@ -815,7 +815,7 @@ async function handoffWork(
     try {
       await services.failExecutionWorkerUpdateHandoff(input.db, {
         requestId: decoded.requestId,
-        organizationId: worker.principal.organizationId,
+        workspaceId: worker.principal.workspaceId,
         deviceId: worker.principal.deviceId,
         projectId: decoded.projectId,
         workerId: worker.binding.id,
@@ -877,17 +877,17 @@ async function executeDmScheduleToolRpc(input: WorkerConnectQueueInput,
   const identity = requiredWork(request.work);
   if (identity.work.case !== "channelReply" || !request.operation) throw new HttpError(400, "DM schedule claim is required");
   const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
-  const organizationId = identity.work.value.workspaceId;
-  if (organizationId !== worker.principal.organizationId) throw new HttpError(403, "Worker organization mismatch");
+  const workspaceId = identity.work.value.workspaceId;
+  if (workspaceId !== worker.principal.workspaceId) throw new HttpError(403, "Worker workspace mismatch");
   const result = await executeDmScheduleTool(input.db, {
-    jobId: identity.workId, organizationId, channelId: identity.runId,
+    jobId: identity.workId, workspaceId, channelId: identity.runId,
     workerId: worker.binding.id, deviceId: worker.principal.deviceId,
     claimTokenHash: await services.sha256(identity.claimToken), observedAt: new Date().toISOString(),
     operation: request.operation,
   });
   if (request.operation.action === "cancel") {
-    wakeOrganizationWorkers(input.env, organizationId, "channel_reply_enqueued", input.context);
-    scheduleChannelRealtimePublish(input.env, input.db, organizationId, input.context);
+    wakeWorkspaceWorkers(input.env, workspaceId, "channel_reply_enqueued", input.context);
+    scheduleChannelRealtimePublish(input.env, input.db, workspaceId, input.context);
   }
   return create(ExecuteDmScheduleToolResponseSchema, result);
 }
@@ -899,17 +899,17 @@ async function resolveDmReplyRoutingRpc(input: WorkerConnectQueueInput,
     throw new HttpError(400, "Channel reply routing identity is required");
   }
   const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
-  const organizationId = identity.work.value.workspaceId;
-  if (organizationId !== worker.principal.organizationId) throw new HttpError(403, "Worker organization mismatch");
+  const workspaceId = identity.work.value.workspaceId;
+  if (workspaceId !== worker.principal.workspaceId) throw new HttpError(403, "Worker workspace mismatch");
   const decision = await resolveDmReplyRouting(input.db, {
-    jobId: identity.workId, organizationId, channelId: identity.runId,
+    jobId: identity.workId, workspaceId, channelId: identity.runId,
     deviceId: worker.principal.deviceId, workerId: worker.binding.id,
     claimTokenHash: await services.sha256(identity.claimToken), observedAt: new Date().toISOString(),
     decision: request.decision,
   });
   if (decision.action !== "pending") {
-    wakeOrganizationWorkers(input.env, organizationId, "channel_reply_enqueued", input.context);
-    scheduleChannelRealtimePublish(input.env, input.db, organizationId, input.context);
+    wakeWorkspaceWorkers(input.env, workspaceId, "channel_reply_enqueued", input.context);
+    scheduleChannelRealtimePublish(input.env, input.db, workspaceId, input.context);
   }
   return create(ResolveDmReplyRoutingResponseSchema, { decision: {
     action: decision.action, proposedAction: decision.proposedAction ?? undefined, targetJobId: decision.targetJobId ?? undefined, response: decision.response ?? undefined,
@@ -926,13 +926,13 @@ async function acknowledgeChannelReplySteerRpc(
     throw new HttpError(400, "Channel reply claim identity is required");
   }
   const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
-  const organizationId = identity.work.value.workspaceId;
-  if (organizationId !== worker.principal.organizationId) {
-    throw new HttpError(403, "Worker is not enabled for this organization");
+  const workspaceId = identity.work.value.workspaceId;
+  if (workspaceId !== worker.principal.workspaceId) {
+    throw new HttpError(403, "Worker is not enabled for this workspace");
   }
   const released = await acknowledgeDmReplySteer(input.db, {
     jobId: identity.workId,
-    organizationId,
+    workspaceId,
     channelId: identity.runId,
     deviceId: worker.principal.deviceId,
     workerId: worker.binding.id,
@@ -941,8 +941,8 @@ async function acknowledgeChannelReplySteerRpc(
     stopUnconfirmed: request.stopUnconfirmed,
   });
   if (released || request.stopUnconfirmed) {
-    wakeOrganizationWorkers(input.env, organizationId, "channel_reply_completed", input.context);
-    scheduleChannelRealtimePublish(input.env, input.db, organizationId, input.context);
+    wakeWorkspaceWorkers(input.env, workspaceId, "channel_reply_completed", input.context);
+    scheduleChannelRealtimePublish(input.env, input.db, workspaceId, input.context);
   }
   return create(AcknowledgeChannelReplySteerResponseSchema, { released });
 }
@@ -962,9 +962,9 @@ async function checkpointChannelReplySessionRpc(
     request.workerId,
     services,
   );
-  const organizationId = identity.work.value.workspaceId;
-  if (organizationId !== worker.principal.organizationId) {
-    throw new HttpError(403, "Worker is not enabled for this organization");
+  const workspaceId = identity.work.value.workspaceId;
+  if (workspaceId !== worker.principal.workspaceId) {
+    throw new HttpError(403, "Worker is not enabled for this workspace");
   }
 
   const observedAt = new Date().toISOString();
@@ -977,7 +977,7 @@ async function checkpointChannelReplySessionRpc(
     observedAt,
   });
   if (
-    !claimed || claimed.organization_id !== organizationId ||
+    !claimed || claimed.organization_id !== workspaceId ||
     claimed.channel_id !== identity.runId
   ) {
     throw new HttpError(409, "Channel reply claim is no longer active");
@@ -1542,21 +1542,21 @@ async function dmLearningScope(
   );
   if (
     work.work.case !== "dmMemory" || work.workId !== work.runId ||
-    work.work.value.workspaceId !== worker.principal.organizationId ||
+    work.work.value.workspaceId !== worker.principal.workspaceId ||
     !work.work.value.inputHash
   ) {
     throw new HttpError(400, "Memory learning claim identity is invalid");
   }
   return {
     identity: {
-      organizationId: worker.principal.organizationId,
+      workspaceId: worker.principal.workspaceId,
       deviceId: worker.principal.deviceId,
       workerId: worker.binding.id,
       jobId: work.workId,
       claimTokenHash: await services.sha256(work.claimToken),
     } satisfies DmLearningClaimIdentity,
     inputHash: work.work.value.inputHash,
-    organizationId: worker.principal.organizationId,
+    workspaceId: worker.principal.workspaceId,
   };
 }
 

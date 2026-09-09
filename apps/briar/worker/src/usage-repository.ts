@@ -9,7 +9,7 @@ import {
 import { type IssueResultReviewRow } from "./issue-result-review-repository";
 import { type TeamAgentProvider } from "./team-agent-model";
 
-export type OrganizationUsageRunRow = {
+export type WorkspaceUsageRunRow = {
   id: string;
   project_id: string;
   status: AutoHuntPersistedRunStatus;
@@ -48,7 +48,7 @@ export type RunExecutionAttemptRow = {
   recorded_at: string;
 };
 
-export type OrganizationUsageRecordRow = {
+export type WorkspaceUsageRecordRow = {
   execution_id: string;
   run_id: string;
   project_id: string;
@@ -83,7 +83,7 @@ export type ProjectUsageTotalRow = {
   observed_at: string;
 };
 
-export type OrganizationCostRecordRow = {
+export type WorkspaceCostRecordRow = {
   execution_id: string;
   run_id: string;
   project_id: string;
@@ -107,9 +107,9 @@ export type OrganizationCostRecordRow = {
   recorded_at: string;
 };
 
-export async function listOrganizationUsageRuns(
+export async function listWorkspaceUsageRuns(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   since: string,
 ) {
   const runs = await db
@@ -181,8 +181,8 @@ export async function listOrganizationUsageRuns(
          run.started_at
        )), run.id`,
     )
-    .bind(organizationId, since, since, since, since)
-    .all<OrganizationUsageRunRow>();
+    .bind(workspaceId, since, since, since, since)
+    .all<WorkspaceUsageRunRow>();
 
   return runs.results;
 }
@@ -241,7 +241,7 @@ export async function listProjectUsageRuns(
                 run.id`,
     )
     .bind(projectId, since, until, since, until, since, until)
-    .all<OrganizationUsageRunRow>();
+    .all<WorkspaceUsageRunRow>();
 
   return runs.results;
 }
@@ -346,9 +346,9 @@ export async function recordRunCostRecords(
   return result.meta.changes ?? 0;
 }
 
-export async function listOrganizationUsageExecutionAttempts(
+export async function listWorkspaceUsageExecutionAttempts(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   since: string,
 ) {
   const result = await db
@@ -369,14 +369,14 @@ export async function listOrganizationUsageExecutionAttempts(
        )
        order by unixepoch(claimed_at), run_id, claim_attempt, id`,
     )
-    .bind(organizationId, since, since, since)
+    .bind(workspaceId, since, since, since)
     .all<RunExecutionAttemptRow>();
   return result.results;
 }
 
-export async function listOrganizationUsageRecords(
+export async function listWorkspaceUsageRecords(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   since: string,
 ) {
   const result = await db
@@ -398,8 +398,8 @@ export async function listOrganizationUsageRecords(
        order by unixepoch(usage.observed_at), attempt.run_id,
                 attempt.claim_attempt, usage.usage_key`,
     )
-    .bind(organizationId, since)
-    .all<OrganizationUsageRecordRow>();
+    .bind(workspaceId, since)
+    .all<WorkspaceUsageRecordRow>();
   return result.results;
 }
 
@@ -431,7 +431,7 @@ export async function listRunUsageRecords(
                 usage.usage_key`,
     )
     .bind(projectId, runId, runAttempt, executionId, executionId)
-    .all<OrganizationUsageRecordRow>();
+    .all<WorkspaceUsageRecordRow>();
   return result.results;
 }
 
@@ -466,9 +466,9 @@ export async function listProjectUsageTotals(
   return result.results;
 }
 
-export async function listOrganizationUsageCostRecords(
+export async function listWorkspaceUsageCostRecords(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   since: string,
 ) {
   const result = await db
@@ -488,8 +488,8 @@ export async function listOrganizationUsageCostRecords(
        order by unixepoch(cost.observed_at), attempt.run_id,
                 attempt.claim_attempt, cost.cost_key`,
     )
-    .bind(organizationId, since)
-    .all<OrganizationCostRecordRow>();
+    .bind(workspaceId, since)
+    .all<WorkspaceCostRecordRow>();
   return result.results;
 }
 

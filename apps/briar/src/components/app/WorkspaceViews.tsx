@@ -3,10 +3,7 @@ import { lazy, type ComponentProps } from "react";
 
 import { localTeamConnectionState } from "../../lib/local-team-connection";
 import { teamWorkersAtom } from "../../state/entities/workers";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import {
   loadingAtom,
   sessionErrorAtom,
@@ -24,13 +21,14 @@ import {
 } from "../../state/team/atoms";
 import { useWorkflowActions } from "../../state/workflow/actions";
 import { useWorkspaceActions } from "../../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../../state/local-workspace/actions";
 import {
   activeTeamConnectionStateAtom,
   connectedTeamIdsAtom,
   healthAtom,
   localInventoryErrorAtom,
   teamReadinessAtom,
-} from "../../state/workspace/atoms";
+} from "../../state/local-workspace/atoms";
 
 /*
   The views that render what this device knows about a team's repository, wired
@@ -74,7 +72,7 @@ export function ConnectionHealthWithWorkspace({
   onReconnect,
 }: Pick<ComponentProps<typeof ConnectionHealth>, "onReconnect">) {
   const health = useAtomValue(healthAtom);
-  const { refreshHealth, repairHealth } = useWorkspaceActions();
+  const { refreshHealth, repairHealth } = useLocalWorkspaceActions();
   return (
     <ConnectionHealth
       error={health.error}
@@ -94,18 +92,18 @@ export function ConnectionHealthWithWorkspace({
 export function WorkerStatusBarWithTeam(
   props: Omit<
     ComponentProps<typeof WorkerStatusBar>,
-    "organizationId" | "token" | "userId" | "workers"
+    "workspaceId" | "token" | "userId" | "workers"
   >,
 ) {
   const teamId = useAtomValue(activeTeamIdAtom);
   const workers = useAtomValue(teamWorkersAtom(teamId ?? ""));
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
   const token = useAtomValue(tokenAtom);
   const user = useAtomValue(userAtom);
   return (
     <WorkerStatusBar
       {...props}
-      organizationId={organizationId}
+      workspaceId={workspaceId}
       token={token}
       userId={user?.id ?? null}
       workers={workers ?? []}
@@ -128,7 +126,7 @@ export function TeamRepositorySetupDialogWithWorkspace({
   const teams = useAtomValue(teamsAtom);
   const readiness = useAtomValue(teamReadinessAtom(teamId ?? ""));
   const { refreshProjectReadiness, startWorkingOnProject } =
-    useWorkspaceActions();
+    useLocalWorkspaceActions();
   if (!teamId) return null;
   return (
     <TeamRepositorySetupDialog
@@ -162,7 +160,7 @@ export function TeamOnboardingWithWorkspace({
   | "startWithDeveloperTools"
 >) {
   const user = useAtomValue(userAtom);
-  const organizations = useAtomValue(organizationsAtom);
+  const workspaces = useAtomValue(workspacesAtom);
   const connection = useAtomValue(teamConnectionAtom);
   const isCreatingTeam = useAtomValue(isCreatingTeamAtom);
   const sessionError = useAtomValue(sessionErrorAtom);
@@ -178,13 +176,13 @@ export function TeamOnboardingWithWorkspace({
     refreshHealth,
     resolveGithubProjectRepository,
     selectProjectRepository,
-  } = useWorkspaceActions();
+  } = useLocalWorkspaceActions();
   const { analyzeWorkflowRequirements, reviseWorkflow } = useWorkflowActions();
   if (remoteMode || !user || (!isCreatingTeam && !connection)) return null;
   return (
     <TeamOnboarding
       {...props}
-      canCancel={organizations.length > 0}
+      canCancel={workspaces.length > 0}
       connection={connection}
       error={sessionError ?? localInventoryError}
       loading={loading}
@@ -237,11 +235,11 @@ export function AppSettingsWithWorkspace(
 ) {
   const user = useAtomValue(userAtom);
   const team = useAtomValue(activeTeamAtom);
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
   const connectionState = useAtomValue(activeTeamConnectionStateAtom);
   const readiness = useAtomValue(teamReadinessAtom(team?.id ?? ""));
   const isSidebarOpen = useAtomValue(isSidebarOpenAtom);
-  const { refreshProjectReadiness } = useWorkspaceActions();
+  const { refreshProjectReadiness } = useLocalWorkspaceActions();
   if (!user) return null;
   return (
     <AppSettings
@@ -256,7 +254,7 @@ export function AppSettingsWithWorkspace(
       projectName={team?.name ?? ""}
       readiness={team ? readiness.readiness : null}
       requiresLocalReadiness={!remoteMode}
-      usageScopeKey={organizationId ?? "none"}
+      usageScopeKey={workspaceId ?? "none"}
       user={user}
     />
   );

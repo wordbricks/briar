@@ -29,7 +29,7 @@ export async function managedComputerRemoteSessionById(
 export async function managedComputerRemoteSessionByRequest(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     controllerUserId: string;
     requestId: string;
   },
@@ -37,7 +37,7 @@ export async function managedComputerRemoteSessionByRequest(
   return db.prepare(
     `select * from briar_managed_computer_remote_sessions
      where organization_id = ? and controller_user_id = ? and request_id = ?`,
-  ).bind(input.organizationId, input.controllerUserId, input.requestId)
+  ).bind(input.workspaceId, input.controllerUserId, input.requestId)
     .first<ManagedComputerRemoteSessionRow>();
 }
 
@@ -80,7 +80,7 @@ export async function expireStaleManagedComputerRemoteSessions(
 export async function managedComputerRemoteSessionCapacity(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     rateCutoff: string;
   },
@@ -96,7 +96,7 @@ export async function managedComputerRemoteSessionCapacity(
         where actor_user_id = ? and occurred_at >= ?
           and action in ('session_created', 'reconnect_issued')) recent_user_count`,
   ).bind(
-    input.organizationId,
+    input.workspaceId,
     ...activeRemoteSessionStates,
     ...activeRemoteSessionStates,
     input.userId,
@@ -117,7 +117,7 @@ export async function createManagedComputerRemoteSession(
   db: D1Database,
   input: {
     id: string;
-    organizationId: string;
+    workspaceId: string;
     managedComputerId: string;
     agentId?: string;
     controllerUserId: string;
@@ -155,7 +155,7 @@ export async function createManagedComputerRemoteSession(
        on conflict (organization_id, controller_user_id, request_id) do nothing`,
     ).bind(
       input.id,
-      input.organizationId,
+      input.workspaceId,
       input.managedComputerId,
       input.agentId ?? null,
       input.controllerUserId,
@@ -165,7 +165,7 @@ export async function createManagedComputerRemoteSession(
       input.maxExpiresAt,
       input.observedAt,
       input.observedAt,
-      input.organizationId,
+      input.workspaceId,
       ...activeRemoteSessionStates,
       input.organizationSessionLimit,
       ...activeRemoteSessionStates,
@@ -186,7 +186,7 @@ export async function reconnectManagedComputerRemoteSession(
   db: D1Database,
   input: {
     sessionId: string;
-    organizationId: string;
+    workspaceId: string;
     managedComputerId: string;
     agentId?: string;
     controllerUserId: string;
@@ -213,7 +213,7 @@ export async function reconnectManagedComputerRemoteSession(
     input.tokenExpiresAt,
     input.observedAt,
     input.sessionId,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
     input.controllerUserId,
     input.agentId ?? null,
@@ -308,7 +308,7 @@ export async function endManagedComputerRemoteSession(
   db: D1Database,
   input: {
     sessionId: string;
-    organizationId: string;
+    workspaceId: string;
     managedComputerId: string;
     reason: string;
     observedAt: string;
@@ -326,7 +326,7 @@ export async function endManagedComputerRemoteSession(
     input.reason.slice(0, 120),
     input.observedAt,
     input.sessionId,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
     ...activeRemoteSessionStates,
   ).first<ManagedComputerRemoteSessionRow>();
@@ -374,7 +374,7 @@ export async function endManagedComputerRemoteSessionsForComputer(
 export async function recordManagedComputerRemoteAuditEvent(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     managedComputerId: string;
     remoteSessionId?: string | null;
     actorUserId?: string | null;
@@ -393,7 +393,7 @@ export async function recordManagedComputerRemoteAuditEvent(
      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     crypto.randomUUID(),
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
     input.remoteSessionId ?? null,
     input.actorUserId ?? null,

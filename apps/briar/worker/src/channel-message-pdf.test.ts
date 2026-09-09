@@ -7,14 +7,14 @@ import { issueAttachmentMarkdown } from "../../src/lib/issue-markdown";
 import { decodeChannelMessageApplicationInput } from "./app-mutation-request-mappers";
 import { prepareChannelMessageAttachmentsApplication } from "./channel-message-upload-application";
 import {
-  createOrganizationChannelMessage,
-  listOrganizationChannelMessages,
+  createWorkspaceChannelMessage,
+  listWorkspaceChannelMessages,
 } from "./channel-message-routes";
 import { createChannel, getChannelMessageAttachment } from "./channels";
 import { channelAttachmentResponse } from "./channel-attachment-response";
 import { uploadReservedFileApplication } from "./upload-application";
 
-const organizationId = "a9000000-0000-4000-8000-000000000001";
+const workspaceId = "a9000000-0000-4000-8000-000000000001";
 const ownerId = "channel-pdf-owner";
 const channelId = "e9000000-0000-4000-8000-000000000001";
 const otherChannelId = "e9000000-0000-4000-8000-000000000002";
@@ -40,13 +40,13 @@ describe("channel and DM PDF messages", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Channel PDF', 'channel-pdf', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
     ]);
     await db.prepare(
       `insert into briar_organization_members (
          organization_id, user_id, role, created_at, updated_at
        ) values (?, ?, 'owner', ?, ?)`,
-    ).bind(organizationId, ownerId, now, now).run();
+    ).bind(workspaceId, ownerId, now, now).run();
     for (const [id, slug, kind] of [
       [channelId, "pdf-dm", "dm"],
       [otherChannelId, "other-pdf-dm", "dm"],
@@ -54,7 +54,7 @@ describe("channel and DM PDF messages", () => {
     ] as const) {
       await createChannel(db, {
         id,
-        organizationId,
+        workspaceId,
         slug,
         name: slug,
         topic: null,
@@ -81,7 +81,7 @@ describe("channel and DM PDF messages", () => {
     const prepared = await prepareChannelMessageAttachmentsApplication({
       db,
       signingSecret,
-      organizationId,
+      workspaceId,
       channelId: targetChannelId,
       userId: ownerId,
       messageId,
@@ -114,9 +114,9 @@ describe("channel and DM PDF messages", () => {
     uploadId: string;
     filename: string;
   }) {
-    return createOrganizationChannelMessage({
+    return createWorkspaceChannelMessage({
       db,
-      organizationId,
+      workspaceId,
       channelId: input.channelId,
       userId: ownerId,
       request: decodeChannelMessageApplicationInput({
@@ -142,9 +142,9 @@ describe("channel and DM PDF messages", () => {
       const uploadId = await prepareAndUploadPdf(targetChannelId, messageId, filename, contentType, contents);
       await expect(createPdfMessage({ channelId: otherChannelId, messageId, parentMessageId: null, uploadId, filename })).rejects.toMatchObject({ status: 409 });
       await createPdfMessage({ channelId: targetChannelId, messageId, parentMessageId: null, uploadId, filename });
-      const reopened = await listOrganizationChannelMessages({ db, organizationId, channelId: targetChannelId, userId: ownerId });
+      const reopened = await listWorkspaceChannelMessages({ db, workspaceId, channelId: targetChannelId, userId: ownerId });
       expect(reopened.messages).toContainEqual(expect.objectContaining({ id: messageId, attachments: [expect.objectContaining({ filename, contentType: expectedType })] }));
-      const metadata = await getChannelMessageAttachment(db, organizationId, targetChannelId, messageId, uploadId);
+      const metadata = await getChannelMessageAttachment(db, workspaceId, targetChannelId, messageId, uploadId);
       expect(metadata).not.toBeNull();
       const object = await bucket.get(metadata!.object_key);
       expect(object).not.toBeNull();
@@ -154,7 +154,7 @@ describe("channel and DM PDF messages", () => {
       expect(response.headers.get("Content-Disposition")).toContain(encodeURIComponent(filename));
       expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
       expect(await response.text()).toBe(contents);
-      await expect(listOrganizationChannelMessages({ db, organizationId, channelId: targetChannelId, userId: "not-a-member" })).rejects.toMatchObject({ status: 404 });
+      await expect(listWorkspaceChannelMessages({ db, workspaceId, channelId: targetChannelId, userId: "not-a-member" })).rejects.toMatchObject({ status: 404 });
     }
   });
 
@@ -208,9 +208,9 @@ describe("channel and DM PDF messages", () => {
       contentType: "application/pdf",
     });
 
-    const thread = await listOrganizationChannelMessages({
+    const thread = await listWorkspaceChannelMessages({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: ownerId,
       parentMessageId: rootId,
@@ -223,7 +223,7 @@ describe("channel and DM PDF messages", () => {
     );
     await expect(getChannelMessageAttachment(
       db,
-      organizationId,
+      workspaceId,
       channelId,
       replyId,
       replyUploadId,
@@ -251,7 +251,7 @@ describe("channel and DM PDF messages", () => {
     });
     await expect(getChannelMessageAttachment(
       db,
-      organizationId,
+      workspaceId,
       publicChannelId,
       channelMessageId,
       channelUploadId,

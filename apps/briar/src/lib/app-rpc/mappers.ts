@@ -12,7 +12,7 @@ import {
   StructuredRunResultSchema,
   type IssueAttachment as IssueAttachmentMessage,
   type MessageAuthor as MessageAuthorMessage,
-  type WorkspaceMember as OrganizationMemberMessage,
+  type WorkspaceMember as WorkspaceMemberMessage,
   type RelatedMessageReference as RelatedMessageReferenceMessage,
   type ResultReview as ResultReviewMessage,
   type StructuredRunResult} from "@briar/contracts/gen/briar/app/v1/common_pb";
@@ -30,7 +30,7 @@ import type {
   IssueAttachment,
   IssueMessageAuthor,
   IssueResultReview,
-  OrganizationMember,
+  WorkspaceMember,
   Project,
   RelatedMessageReference,
 } from "../../types";
@@ -304,7 +304,7 @@ const structuredImpact = (value: StructuredRunResult_Impact): StructuredAgentRes
     case StructuredRunResult_Impact.PROJECT:
       return "project";
     case StructuredRunResult_Impact.WORKSPACE:
-      return "organization";
+      return "workspace";
     default:
       throw new Error(`Unknown structured result impact: ${value}`);
   }
@@ -348,7 +348,7 @@ const structuredUrgencyToProto = {
 const structuredImpactToProto = {
   issue: StructuredRunResult_Impact.ISSUE,
   project: StructuredRunResult_Impact.PROJECT,
-  organization: StructuredRunResult_Impact.WORKSPACE,
+  workspace: StructuredRunResult_Impact.WORKSPACE,
 } as const satisfies Record<StructuredAgentResult["impact"], StructuredRunResult_Impact>;
 
 export const structuredResultToProto = (value: StructuredAgentResult) =>
@@ -374,7 +374,7 @@ export const issueAttachmentFromProto = (value: IssueAttachmentMessage): IssueAt
 export const relatedMessageFromProto = (
   value: RelatedMessageReferenceMessage,
 ): RelatedMessageReference => ({
-  organizationId: value.workspaceId,
+  workspaceId: value.workspaceId,
   channelId: value.channelId,
   messageId: value.messageId,
   rootMessageId: value.rootMessageId,
@@ -397,13 +397,13 @@ export const resultReviewFromProto = (value: ResultReviewMessage): IssueResultRe
 });
 
 export const organizationMemberFromProto = (
-  value: OrganizationMemberMessage,
-): OrganizationMember => ({
+  value: WorkspaceMemberMessage,
+): WorkspaceMember => ({
   userId: value.userId,
   name: value.name,
   email: value.email,
   image: value.image ?? null,
   role: teamRoleFromProto(value.role),
   projectIds: value.projectIds,
-  createdAt: requiredTimestamp(value.createdAt, "organizationMember.createdAt"),
+  createdAt: requiredTimestamp(value.createdAt, "workspaceMember.createdAt"),
 });

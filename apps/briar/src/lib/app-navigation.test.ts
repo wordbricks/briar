@@ -56,20 +56,20 @@ describe("app navigation locations", () => {
   );
 
   it.each(["channels", "dms"] as const)(
-    "stores and restores a %s conversation with its organization context",
+    "stores and restores a %s conversation with its workspace context",
     (page) => {
       const location = channelNavigationLocation(
         page,
-        "organization/one",
+        "workspace/one",
         "channel/with spaces",
       );
 
       expect(location).toBe(
-        `${page}/organization%2Fone/channel%2Fwith%20spaces`,
+        `${page}/workspace%2Fone/channel%2Fwith%20spaces`,
       );
       expect(pageFromNavigationLocation(location)).toBe(page);
       expect(organizationIdFromNavigationLocation(location)).toBe(
-        "organization/one",
+        "workspace/one",
       );
       expect(channelIdFromNavigationLocation(location)).toBe(
         "channel/with spaces",
@@ -77,20 +77,20 @@ describe("app navigation locations", () => {
     },
   );
 
-  it("retains the active project while visiting an organization channel", () => {
+  it("retains the active project while visiting an workspace channel", () => {
     const location = channelNavigationLocation(
       "channels",
-      "organization",
+      "workspace",
       "channel",
       "project/one",
     );
 
     expect(location).toBe(
-      "channels/organization/channel/project%2Fone",
+      "channels/workspace/channel/project%2Fone",
     );
     expect(projectIdFromNavigationLocation(location)).toBe("project/one");
     expect(organizationIdFromNavigationLocation(location)).toBe(
-      "organization",
+      "workspace",
     );
     expect(channelIdFromNavigationLocation(location)).toBe("channel");
   });
@@ -98,46 +98,46 @@ describe("app navigation locations", () => {
   it("stores an empty conversation page without losing its context", () => {
     const location = channelPageNavigationLocation(
       "dms",
-      "organization/one",
+      "workspace/one",
       "project/one",
     );
 
     expect(location).toBe(
-      "channel-pages/dms/organization%2Fone/project%2Fone",
+      "channel-pages/dms/workspace%2Fone/project%2Fone",
     );
     expect(pageFromNavigationLocation(location)).toBe("dms");
     expect(organizationIdFromNavigationLocation(location)).toBe(
-      "organization/one",
+      "workspace/one",
     );
     expect(projectIdFromNavigationLocation(location)).toBe("project/one");
     expect(channelIdFromNavigationLocation(location)).toBeNull();
   });
 
-  it("stores Inbox with its organization context", () => {
-    const location = organizationNavigationLocation("organization/one");
+  it("stores Inbox with its workspace context", () => {
+    const location = organizationNavigationLocation("workspace/one");
 
-    expect(location).toBe("organizations/organization%2Fone/inbox");
+    expect(location).toBe("workspaces/workspace%2Fone/inbox");
     expect(pageFromNavigationLocation(location)).toBe("inbox");
     expect(organizationIdFromNavigationLocation(location)).toBe(
-      "organization/one",
+      "workspace/one",
     );
   });
 
-  it("stores My issues with its organization context", () => {
+  it("stores My issues with its workspace context", () => {
     const location = organizationNavigationLocation(
-      "organization/one",
+      "workspace/one",
       "my-issues",
     );
 
-    expect(location).toBe("organizations/organization%2Fone/my-issues");
+    expect(location).toBe("workspaces/workspace%2Fone/my-issues");
     expect(pageFromNavigationLocation(location)).toBe("my-issues");
     expect(organizationIdFromNavigationLocation(location)).toBe(
-      "organization/one",
+      "workspace/one",
     );
   });
 
-  it("rejects the removed organization-scoped Projects location", () => {
-    const location = "organizations/organization%2Fone/projects" as never;
+  it("rejects the removed workspace-scoped Projects location", () => {
+    const location = "workspaces/workspace%2Fone/projects" as never;
 
     expect(pageFromNavigationLocation(location)).toBe("lobby");
     expect(organizationIdFromNavigationLocation(location)).toBeNull();
@@ -147,8 +147,8 @@ describe("app navigation locations", () => {
   it.each([
     { scope: "application", section: "keybindings" },
     {
-      scope: "organization",
-      organizationId: "organization/one",
+      scope: "workspace",
+      workspaceId: "workspace/one",
       section: "agents",
     },
     {
@@ -165,7 +165,7 @@ describe("app navigation locations", () => {
       target.scope === "project" ? target.projectId : null,
     );
     expect(organizationIdFromNavigationLocation(location)).toBe(
-      target.scope === "organization" ? target.organizationId : null,
+      target.scope === "workspace" ? target.workspaceId : null,
     );
   });
 
@@ -184,7 +184,7 @@ describe("app navigation locations", () => {
   it("does not expose incomplete scoped locations", () => {
     expect(
       channelIdFromNavigationLocation(
-        "channels/organization" as never,
+        "channels/workspace" as never,
       ),
     ).toBeNull();
     expect(
@@ -196,13 +196,13 @@ describe("app navigation locations", () => {
   });
 
   it("rejects a scoped location atomically when any segment is invalid", () => {
-    const invalidOrganization =
+    const invalidWorkspace =
       "channels/%E0%A4%A/channel/project" as never;
 
-    expect(pageFromNavigationLocation(invalidOrganization)).toBe("lobby");
-    expect(organizationIdFromNavigationLocation(invalidOrganization)).toBeNull();
-    expect(channelIdFromNavigationLocation(invalidOrganization)).toBeNull();
-    expect(projectIdFromNavigationLocation(invalidOrganization)).toBeNull();
+    expect(pageFromNavigationLocation(invalidWorkspace)).toBe("lobby");
+    expect(organizationIdFromNavigationLocation(invalidWorkspace)).toBeNull();
+    expect(channelIdFromNavigationLocation(invalidWorkspace)).toBeNull();
+    expect(projectIdFromNavigationLocation(invalidWorkspace)).toBeNull();
 
     const invalidSettings =
       "settings/project/%E0%A4%A/general" as never;
@@ -218,21 +218,21 @@ describe("app navigation locations", () => {
       channelNavigationLocation("channels", "", "channel"),
     ).toThrow();
     expect(() =>
-      channelNavigationLocation("dms", "organization", ""),
+      channelNavigationLocation("dms", "workspace", ""),
     ).toThrow();
     expect(() =>
-      channelNavigationLocation("dms", "organization", "channel", ""),
+      channelNavigationLocation("dms", "workspace", "channel", ""),
     ).toThrow();
     expect(() => projectNavigationLocation("issues", "")).toThrow();
     expect(() => channelPageNavigationLocation("channels", "")).toThrow();
     expect(() =>
-      channelPageNavigationLocation("channels", "organization", ""),
+      channelPageNavigationLocation("channels", "workspace", ""),
     ).toThrow();
     expect(() => organizationNavigationLocation("")).toThrow();
     expect(() =>
       settingsNavigationLocation({
-        scope: "organization",
-        organizationId: "",
+        scope: "workspace",
+        workspaceId: "",
         section: "general",
       }),
     ).toThrow();
@@ -242,7 +242,7 @@ describe("app navigation locations", () => {
     const issue = issueNavigationLocation("project", "run");
     const channel = channelNavigationLocation(
       "channels",
-      "organization",
+      "workspace",
       "channel",
     );
 

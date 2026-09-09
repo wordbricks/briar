@@ -5,11 +5,11 @@ import { createReactTestRoot, renderReactTestRoot } from "../test/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n";
-import type { Organization, Project } from "../types";
+import type { Workspace, Project } from "../types";
 import { UnifiedSettingsSidebar } from "./UnifiedSettingsSidebar";
 
-const organization: Organization = {
-  id: "organization-1",
+const workspace: Workspace = {
+  id: "workspace-1",
   name: "Wordbricks",
   handle: "wordbricks",
   logo: null,
@@ -26,8 +26,8 @@ const projects: Project[] = [
     icon: null,
     iconName: null,
     iconColor: null,
-    organizationId: organization.id,
-    organizationName: organization.name,
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
     role: "owner",
     createdAt: "2026-01-01T00:00:00.000Z",
   },
@@ -39,8 +39,8 @@ const projects: Project[] = [
     icon: null,
     iconName: null,
     iconColor: null,
-    organizationId: organization.id,
-    organizationName: organization.name,
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
     role: "developer",
     createdAt: "2026-01-02T00:00:00.000Z",
   },
@@ -71,7 +71,7 @@ describe("UnifiedSettingsSidebar", () => {
           isOpen
           onBack={() => undefined}
           onNavigate={onNavigate}
-          organizations={[organization]}
+          workspaces={[workspace]}
           projects={projects}
         />
       </I18nProvider>,
@@ -154,33 +154,33 @@ describe("UnifiedSettingsSidebar", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          '[data-organization-settings="organization-1"]',
+          '[data-workspace-settings="workspace-1"]',
         )
         ?.click();
     });
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          '[data-organization-settings-section="members"]',
+          '[data-workspace-settings-section="members"]',
         )
         ?.click();
     });
     expect(onNavigate).toHaveBeenLastCalledWith({
-      scope: "organization",
-      organizationId: "organization-1",
+      scope: "workspace",
+      workspaceId: "workspace-1",
       section: "members",
     });
 
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          '[data-organization-settings-section="agents"]',
+          '[data-workspace-settings-section="agents"]',
         )
         ?.click();
     });
     expect(onNavigate).toHaveBeenLastCalledWith({
-      scope: "organization",
-      organizationId: "organization-1",
+      scope: "workspace",
+      workspaceId: "workspace-1",
       section: "agents",
     });
 
@@ -206,7 +206,7 @@ describe("UnifiedSettingsSidebar", () => {
           isOpen
           onBack={() => undefined}
           onNavigate={onNavigate}
-          organizations={[organization]}
+          workspaces={[workspace]}
           projects={projects}
         />
       </I18nProvider>,
@@ -255,7 +255,7 @@ describe("UnifiedSettingsSidebar", () => {
           isOpen
           onBack={() => undefined}
           onNavigate={onNavigate}
-          organizations={[organization]}
+          workspaces={[workspace]}
           projects={projects}
         />
       </I18nProvider>,
@@ -268,12 +268,12 @@ describe("UnifiedSettingsSidebar", () => {
 
     expect(
       container
-        .querySelector('[data-organization-settings="organization-1"]')
+        .querySelector('[data-workspace-settings="workspace-1"]')
         ?.getAttribute("aria-expanded"),
     ).toBe("true");
     expect(
       container.querySelectorAll(
-        '[data-organization-settings-section="members"]',
+        '[data-workspace-settings-section="members"]',
       ),
     ).toHaveLength(1);
     expect(
@@ -283,7 +283,7 @@ describe("UnifiedSettingsSidebar", () => {
     await act(async () => setInputValue(search, "Workflow"));
 
     expect(
-      container.querySelector('[data-organization-settings="organization-1"]'),
+      container.querySelector('[data-workspace-settings="workspace-1"]'),
     ).toBeNull();
     expect(
       Array.from(

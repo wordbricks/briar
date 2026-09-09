@@ -42,7 +42,7 @@ import {
   unsubscribeChannelThread,
 } from "./channels";
 import { HttpError } from "./http-response";
-import { getOrganizationRole } from "./organization-repository";
+import { getWorkspaceRole } from "./workspace-repository";
 import {
   decodeProjectChannelMessageQuery,
 } from "./query-contract";
@@ -56,7 +56,7 @@ import {
   decodeChannelMessageApplicationInput,
 } from "./app-mutation-request-mappers";
 import { sha256 } from "./crypto-digest";
-import { wakeOrganizationWorkers } from "./worker-wake-hub";
+import { wakeWorkspaceWorkers } from "./worker-wake-hub";
 import {
   findChannelMessageMutationReceipt,
   resolveChannelMessageUploads,
@@ -74,12 +74,12 @@ export type ChannelMessageRouteInput = {
 
 type ChannelMessageApplicationInput = {
   db: D1Database;
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   userId: string;
 };
 
-export async function listOrganizationChannelMessages(
+export async function listWorkspaceChannelMessages(
   input: ChannelMessageApplicationInput & {
     parentMessageId?: string | null;
     cursor?: string | null;
@@ -88,7 +88,7 @@ export async function listOrganizationChannelMessages(
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -127,7 +127,7 @@ export async function listOrganizationChannelMessages(
 }
 
 const channelMessageMutationRequestHash = (input: {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   userId: string;
   messageId: string;
@@ -163,7 +163,7 @@ async function completedChannelMessageMutation(
   };
 }
 
-export async function createOrganizationChannelMessage(
+export async function createWorkspaceChannelMessage(
   input: ChannelMessageApplicationInput & {
     request: ReturnType<typeof decodeChannelMessageApplicationInput>;
     attachmentIds: readonly string[];
@@ -174,7 +174,7 @@ export async function createOrganizationChannelMessage(
 ) {
   const channel = await requireChannelWriteAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -191,7 +191,7 @@ export async function createOrganizationChannelMessage(
     throw new HttpError(400, "Attachment IDs are invalid");
   }
   const requestHash = await channelMessageMutationRequestHash({
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: channel.id,
     userId: input.userId,
     messageId,
@@ -209,7 +209,7 @@ export async function createOrganizationChannelMessage(
   );
   if (existingReceipt) {
     if (
-      existingReceipt.organization_id !== input.organizationId ||
+      existingReceipt.organization_id !== input.workspaceId ||
       existingReceipt.channel_id !== channel.id ||
       existingReceipt.user_id !== input.userId ||
       existingReceipt.request_hash !== requestHash
@@ -244,14 +244,14 @@ export async function createOrganizationChannelMessage(
   if (
     request.preferredDeviceId &&
     !(await userOwnsExecutionWorkerDevice(input.db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       userId: input.userId,
       deviceId: request.preferredDeviceId,
     }))
   ) {
     throw new HttpError(
       403,
-      "Preferred Worker device is not owned by the current user in this organization",
+      "Preferred Worker device is not owned by the current user in this workspace",
     );
   }
   const roster = await hydrateAgentSkills(
@@ -297,8 +297,8 @@ export async function createOrganizationChannelMessage(
     throw new HttpError(400, "Selected Agent Skill was not invoked");
   }
   for (const userId of request.mentionedUserIds) {
-    if (!(await getOrganizationRole(input.db, input.organizationId, userId))) {
-      throw new HttpError(400, "Mentioned member is not in this organization");
+    if (!(await getWorkspaceRole(input.db, input.workspaceId, userId))) {
+      throw new HttpError(400, "Mentioned member is not in this workspace");
     }
   }
   const stopReply = channel.kind === "dm" && request.parentMessageId !== null &&
@@ -307,7 +307,7 @@ export async function createOrganizationChannelMessage(
     isDmReplyStop(request.body, mentionedAgents.map((agent) => agent.name));
   const createdAt = new Date().toISOString();
   const uploads = await resolveChannelMessageUploads(input.db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: channel.id,
     userId: input.userId,
     messageId,
@@ -327,7 +327,7 @@ export async function createOrganizationChannelMessage(
         : null;
       // A classifier must not wait behind the working conversation. Legacy
       // DMs and Skill turns retain their existing session selection.
-      const independentDm = channel.kind === "dm" && !selectedSkill && !isAgentDirectMessage(channel) && await dmReplyRoutingAvailable(input.db, { organizationId: input.organizationId, channelId: channel.id, provider: agent.provider, preferredDeviceId: request.preferredDeviceId });
+      const independentDm = channel.kind === "dm" && !selectedSkill && !isAgentDirectMessage(channel) && await dmReplyRoutingAvailable(input.db, { workspaceId: input.workspaceId, channelId: channel.id, provider: agent.provider, preferredDeviceId: request.preferredDeviceId });
       const anchoredSession = channel.kind === "dm" && !independentDm && !request.parentMessageId
         ? await getLiveDmChannelReplySession(input.db, {
             channelId: channel.id,
@@ -356,7 +356,7 @@ export async function createOrganizationChannelMessage(
         ? liveSession.owner_worker_label
         : agent.designated_worker_label;
       const workerAvailability = await channelReplyWorkerAvailability(input.db, {
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         projectId: agent.project_id,
         preferredDeviceId: liveSession?.owner_device_id ?? null,
         preferredWorkerId: assignedWorkerId,
@@ -408,7 +408,7 @@ export async function createOrganizationChannelMessage(
         image_height: upload.image_height ?? null,
       })),
       mutationCommit: {
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         channelId: channel.id,
         userId: input.userId,
         messageId,
@@ -417,7 +417,7 @@ export async function createOrganizationChannelMessage(
         committedAt: createdAt,
       },
       dmReplyStop: stopReply && request.parentMessageId ? {
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         channelId: channel.id,
         userId: input.userId,
         rootMessageId: request.parentMessageId,
@@ -426,7 +426,7 @@ export async function createOrganizationChannelMessage(
         createdAt,
       } : undefined,
       agentReplyEnqueue: {
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         channelId: channel.id,
         channelKind: channel.kind,
         triggerMessageId: messageId,
@@ -458,7 +458,7 @@ export async function createOrganizationChannelMessage(
     );
     if (concurrentReceipt) {
       if (
-        concurrentReceipt.organization_id === input.organizationId &&
+        concurrentReceipt.organization_id === input.workspaceId &&
         concurrentReceipt.channel_id === channel.id &&
         concurrentReceipt.user_id === input.userId &&
         concurrentReceipt.request_hash === requestHash
@@ -484,11 +484,11 @@ export async function createOrganizationChannelMessage(
     message.id,
   );
   // Push beats the Worker's 15-60s idle poll: a queued reply is claimable the
-  // moment this mutation commits, so tell the organization's Workers now.
+  // moment this mutation commits, so tell the workspace's Workers now.
   if (input.env && (stopReply || agentReplies.some((reply) => reply.status === "queued" || reply.superseded_by_reply_job_id !== null))) {
-    wakeOrganizationWorkers(
+    wakeWorkspaceWorkers(
       input.env,
-      input.organizationId,
+      input.workspaceId,
       stopReply ? "channel_reply_completed" : "channel_reply_enqueued",
       input.context,
     );
@@ -499,7 +499,7 @@ export async function createOrganizationChannelMessage(
   };
 }
 
-export async function deleteOrganizationChannelMessage(
+export async function deleteWorkspaceChannelMessage(
   input: ChannelMessageApplicationInput & {
     messageId: string;
     attachmentsBucket: R2Bucket;
@@ -509,13 +509,13 @@ export async function deleteOrganizationChannelMessage(
 ) {
   await requireChannelWriteAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
   const observedAt = new Date().toISOString();
   const result = await deleteChannelMessage(input.db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     messageId: input.messageId,
     userId: input.userId,
@@ -546,7 +546,7 @@ export async function deleteOrganizationChannelMessage(
   };
 }
 
-export async function setOrganizationChannelThreadSubscription(
+export async function setWorkspaceChannelThreadSubscription(
   input: ChannelMessageApplicationInput & {
     rootMessageId: string;
     subscribed: boolean;
@@ -554,7 +554,7 @@ export async function setOrganizationChannelThreadSubscription(
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -590,7 +590,7 @@ export async function setOrganizationChannelThreadSubscription(
   };
 }
 
-export async function toggleOrganizationChannelMessageReaction(
+export async function toggleWorkspaceChannelMessageReaction(
   input: ChannelMessageApplicationInput & {
     messageId: string;
     request: unknown;
@@ -598,7 +598,7 @@ export async function toggleOrganizationChannelMessageReaction(
 ) {
   const channel = await requireChannelWriteAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -627,7 +627,7 @@ export async function handleChannelMessageRoute(
   const { pathname } = url;
 
   const channelAttachmentMatch = pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
+    /^\/workspaces\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/messages\/([0-9a-f-]+)\/attachments\/([0-9a-f-]+)$/u,
   );
   if (
     channelAttachmentMatch &&

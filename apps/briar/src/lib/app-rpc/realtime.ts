@@ -13,15 +13,15 @@ const requireRealtimeClient = () => {
   return realtimeClient;
 };
 
-export const createOrganizationRealtimeTicket = async (
+export const createWorkspaceRealtimeTicket = async (
   token: string,
-  organizationId: string,
+  workspaceId: string,
   signal?: AbortSignal,
 ) => {
   const response = await requireRealtimeClient().createRealtimeTicket({
     scope: {
       case: "workspaceNotifications",
-      value: { workspaceId: organizationId },
+      value: { workspaceId: workspaceId },
     },
   }, appCallOptions(token, signal));
   return response.url;
@@ -44,14 +44,14 @@ export const createIssueActivityTicket = async (
 
 export const createChannelActivityTicket = async (
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   signal?: AbortSignal,
 ) => {
   const response = await requireRealtimeClient().createRealtimeTicket({
     scope: {
       case: "channelActivity",
-      value: { workspaceId: organizationId, channelId },
+      value: { workspaceId: workspaceId, channelId },
     },
   }, appCallOptions(token, signal));
   return response.url;

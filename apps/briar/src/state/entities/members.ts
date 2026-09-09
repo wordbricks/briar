@@ -1,14 +1,14 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
 import { demoDashboard } from "../../lib/demo-data";
-import type { OrganizationMember } from "../../types";
+import type { WorkspaceMember } from "../../types";
 import { demoMode } from "../platform";
 import { shallowArrayEqual } from "./upsert";
 
 /*
-  Organization members normalized by user id, with one id index per team.
+  Workspace members normalized by user id, with one id index per team.
 
-  Members are organization scoped but arrive on the team dashboard payload, so
+  Members are workspace scoped but arrive on the team dashboard payload, so
   the index is keyed by team: it is the membership list that team's payload
   described. `null` means the payload omitted the projection.
 */
@@ -16,8 +16,8 @@ import { shallowArrayEqual } from "./upsert";
 const demoTeamId = demoMode ? demoDashboard.team.id : null;
 const demoMembers = demoDashboard.members ?? [];
 
-/** Every known organization member, keyed by user id. */
-export const membersByIdAtom = Atom.make<ReadonlyMap<string, OrganizationMember>>(
+/** Every known workspace member, keyed by user id. */
+export const membersByIdAtom = Atom.make<ReadonlyMap<string, WorkspaceMember>>(
   demoMode
     ? new Map(demoMembers.map((member) => [member.userId, member]))
     : new Map(),
@@ -45,18 +45,18 @@ export const teamMemberIdsAtom = Atom.family((teamId: string) =>
 
 /** A team payload's members resolved against the store, or `null` when absent. */
 export const teamMembersAtom = Atom.family((teamId: string) =>
-  Atom.make((get): OrganizationMember[] | null => {
+  Atom.make((get): WorkspaceMember[] | null => {
     const ids = get(teamMemberIdsAtom(teamId));
     if (!ids) return null;
     const members = get(membersByIdAtom);
-    const resolved: OrganizationMember[] = [];
+    const resolved: WorkspaceMember[] = [];
     for (const id of ids) {
       const member = members.get(id);
       if (member) resolved.push(member);
     }
     return resolved;
   }).pipe(
-    Atom.withEquality<OrganizationMember[] | null>(shallowArrayEqual),
+    Atom.withEquality<WorkspaceMember[] | null>(shallowArrayEqual),
     Atom.withLabel(`entities/members/team/${teamId}`),
   ),
 );

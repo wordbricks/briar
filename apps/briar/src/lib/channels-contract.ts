@@ -567,7 +567,7 @@ export const channelProposalAcceptInputSchema = strict(Schema.Struct({
 
 export type ChannelSummary = {
   id: string;
-  organizationId: string;
+  workspaceId: string;
   kind: ChannelKind;
   slug: string;
   name: string;
@@ -600,10 +600,10 @@ export type ChannelSummary = {
   readOnly: boolean;
 };
 
-/** One of the user's own sidebar groups, within one organization. */
+/** One of the user's own sidebar groups, within one workspace. */
 export type ChannelSidebarSection = {
   id: string;
-  organizationId: string;
+  workspaceId: string;
   name: string;
   position: number;
   createdAt: string;
@@ -666,7 +666,7 @@ export type ChannelAgentSkill = {
 
 /**
  * A roster entry is an Agent that can be mentioned in this channel.
- * `projectId` is null for organization Agents, which have no repository.
+ * `projectId` is null for workspace Agents, which have no repository.
  */
 export type ChannelAgentSummary = {
   agentId: string;
@@ -817,7 +817,7 @@ export type ChannelMessageReaction = {
   count: number;
   userIds: string[];
   agentIds?: string[];
-  /** Profiles for reaction authors who are visible in the message's organization. */
+  /** Profiles for reaction authors who are visible in the message's workspace. */
   people?: ChannelMessageReactionPerson[];
 };
 

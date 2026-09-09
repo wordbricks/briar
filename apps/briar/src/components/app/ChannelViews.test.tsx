@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../../i18n";
 import type { ChannelSummary } from "../../lib/channels-contract";
-import { activeOrganizationIdAtom, organizationsAtom } from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { lockedTeamIdAtom } from "../../state/platform";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
@@ -14,7 +14,7 @@ import { applySyncEvent } from "../../state/sync/apply";
 import { activeChannelIdAtom } from "../../state/channels/atoms";
 import { createReactTestRoot, flush } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
-import type { Organization, SessionUser } from "../../types";
+import type { Workspace, SessionUser } from "../../types";
 import { ChannelsWithCatalog } from "./ChannelViews";
 
 /*
@@ -31,7 +31,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-1",
   name: "Org One",
   handle: "org-one",
@@ -42,7 +42,7 @@ const organization: Organization = {
 
 const general: ChannelSummary = {
   id: "channel-1",
-  organizationId: organization.id,
+  workspaceId: workspace.id,
   slug: "general",
   name: "General",
   topic: null,
@@ -68,7 +68,7 @@ const general: ChannelSummary = {
 
 const channelSummaryWire = (channel: ChannelSummary) => ({
   id: channel.id,
-  organizationId: channel.organizationId,
+  workspaceId: channel.workspaceId,
   slug: channel.slug,
   name: channel.name,
   topic: channel.topic ?? undefined,
@@ -92,13 +92,13 @@ const harness = (): AtomRegistry => {
   const registry = createTestRegistry([
     [userAtom, user],
     [tokenAtom, "token-1"],
-    [organizationsAtom, [organization]],
-    [activeOrganizationIdAtom, organization.id],
+    [workspacesAtom, [workspace]],
+    [activeWorkspaceIdAtom, workspace.id],
     [lockedTeamIdAtom, null],
   ]);
   applySyncEvent(registry, {
     kind: "channel-catalog-snapshot",
-    organizationId: organization.id,
+    workspaceId: workspace.id,
     channels: [general],
   });
   registry.set(activeChannelIdAtom, general.id);
@@ -170,7 +170,7 @@ describe("ChannelsWithCatalog", () => {
     await act(async () => {
       applySyncEvent(registry, {
         kind: "channel-catalog-delta",
-        organizationId: organization.id,
+        workspaceId: workspace.id,
         channels: [{ ...general, name: "Announcements" }],
         removedChannelIds: [],
         reset: false,
@@ -188,9 +188,9 @@ describe("ChannelsWithCatalog", () => {
     await view.cleanup();
   });
 
-  it("renders nothing before an organization is selected", async () => {
+  it("renders nothing before an workspace is selected", async () => {
     const registry = harness();
-    registry.set(activeOrganizationIdAtom, null);
+    registry.set(activeWorkspaceIdAtom, null);
     const view = createReactTestRoot();
 
     await view.render(

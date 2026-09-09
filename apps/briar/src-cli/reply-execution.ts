@@ -111,11 +111,11 @@ import { cleanupChannelReplyResources } from "./channel-reply-cleanup";
 import { channelReplyIssueAttachmentDefaults } from "./channel-reply-issue-attachments";
 import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
 import {
-  cleanupOrganizationAgentContext,
-  downloadOrganizationAgentContextManifest,
-  hydrateOrganizationAgentContext,
-  prepareOrganizationAgentWorkspace,
-} from "./organization-agent-context";
+  cleanupWorkspaceAgentContext,
+  downloadWorkspaceAgentContextManifest,
+  hydrateWorkspaceAgentContext,
+  prepareWorkspaceAgentWorkspace,
+} from "./workspace-agent-context";
 import {
   type Config,
   type TeamConfig,
@@ -199,8 +199,8 @@ async function runClaimedProjectAgentTask(
     git: runGit,
   },
 ) {
-  const organizationId = project.executionWorker?.organizationId;
-  if (!organizationId) throw new Error("Worker registration is missing");
+  const workspaceId = project.executionWorker?.workspaceId;
+  if (!workspaceId) throw new Error("Worker registration is missing");
   const worktree = await runtime.allocateWorktree({
     repositoryPath: project.repositoryPath,
     projectId: project.id,
@@ -214,7 +214,7 @@ async function runClaimedProjectAgentTask(
     reportCheckpoint?.({ workspacePath });
     const agent: DetachedAgent = {
       ...detachedAgentWithActiveSkill(task.agent, task.activeSkill),
-      scope: { kind: "project", organizationId, projectId: project.id },
+      scope: { kind: "project", workspaceId, projectId: project.id },
     };
     const taskPrompt = detachedProjectAgentPrompt({
       agent,
@@ -459,7 +459,7 @@ async function runClaimedIssueReply(
       fallbackName: "Project Agent",
       scope: {
         kind: "project",
-        organizationId: registered.organizationId,
+        workspaceId: registered.workspaceId,
         projectId: project.id,
       },
     });
@@ -837,8 +837,8 @@ async function runClaimedChannelReply(
   if (!analysisWorktree) {
     // A prior hard-killed attempt may have left a path behind. Recreate the
     // exact claim workspace so stale files or a planted symlink cannot become
-    // trusted Organization Agent context.
-    await prepareOrganizationAgentWorkspace(workspacePath, process.pid, {
+    // trusted Workspace Agent context.
+    await prepareWorkspaceAgentWorkspace(workspacePath, process.pid, {
       reuse: Boolean(reply.session),
       retainedUntil: retainedUntil ?? undefined,
     });
@@ -900,12 +900,12 @@ async function runClaimedChannelReply(
         label: "private DM memory",
         run: async () => memoryInvocation?.cleanup(),
       },
-      ...(reply.scope.kind === "organization"
+      ...(reply.scope.kind === "workspace"
         ? [{
-            label: "organization context",
+            label: "workspace context",
             run: async () => {
               if (organizationContextCleaned) return;
-              await cleanupOrganizationAgentContext(workspacePath);
+              await cleanupWorkspaceAgentContext(workspacePath);
               organizationContextCleaned = true;
             },
           }]
@@ -1010,11 +1010,11 @@ async function runClaimedChannelReply(
         signal: invocationSignal,
       });
     }
-    const organizationContext = reply.scope.kind === "organization"
-      ? await downloadOrganizationAgentContextManifest({
+    const organizationContext = reply.scope.kind === "workspace"
+      ? await downloadWorkspaceAgentContextManifest({
           apiUrl: config.apiUrl,
           workerToken,
-          organizationId: reply.organizationId,
+          workspaceId: reply.workspaceId,
           workId: reply.workId,
           workerId: registered.workerId,
           claimToken: reply.claimToken,
@@ -1026,7 +1026,7 @@ async function runClaimedChannelReply(
     const downloadedAttachments = await downloadChannelReplyAttachments({
       apiUrl: config.apiUrl,
       workerToken,
-      organizationId: reply.organizationId,
+      workspaceId: reply.workspaceId,
       workId: reply.workId,
       claimToken: reply.claimToken,
       triggerAttachments: reply.triggerAttachments,
@@ -1066,7 +1066,7 @@ async function runClaimedChannelReply(
       delegation: reply.delegation,
       // An Agent-to-Agent hop only changes what this turn may say. Hop 1 stays
       // an ordinary channel reply here, so the claimed scope keeps deciding the
-      // worktree and organization context exactly as it does for hop 0.
+      // worktree and workspace context exactly as it does for hop 0.
       agentMessageTargets: reply.agentMessageTargets,
       inboundAgentMessage: reply.inboundAgentMessage
         ? {
@@ -1141,7 +1141,7 @@ async function runClaimedChannelReply(
           reply.routing ? null : currentMemoryInvocation.prompt(),
           reply.routing ? null : messageInvocation?.prompt(),
           organizationContext
-            ? "Re-read the organization context manifest for previously loaded context."
+            ? "Re-read the workspace context manifest for previously loaded context."
             : null,
         ].filter(Boolean).join("\n\n");
       }
@@ -1160,7 +1160,7 @@ async function runClaimedChannelReply(
         dmMessageMcpServerPath,
         organizationContextManifestPath:
           organizationContext?.manifestPath ?? null,
-        delegationTargets: reply.scope.kind === "organization"
+        delegationTargets: reply.scope.kind === "workspace"
           ? reply.delegationTargets
           : undefined,
         skillCatalog: reply.session ? retainedSkillCatalog : undefined,
@@ -1217,7 +1217,7 @@ async function runClaimedChannelReply(
                 retainedUntil,
               });
             } else if (!analysisWorktree) {
-              await prepareOrganizationAgentWorkspace(
+              await prepareWorkspaceAgentWorkspace(
                 workspacePath,
                 process.pid,
                 { reuse: true, retainedUntil },
@@ -1306,16 +1306,16 @@ async function runClaimedChannelReply(
       }
       if (!organizationContext) {
         throw new Error(
-          "Project reply cannot request organization context",
+          "Project reply cannot request workspace context",
         );
       }
       if (lookupRounds >= 3) {
-        throw new Error("Organization Agent context lookup limit exceeded");
+        throw new Error("Workspace Agent context lookup limit exceeded");
       }
-      const hydrated = await hydrateOrganizationAgentContext({
+      const hydrated = await hydrateWorkspaceAgentContext({
         apiUrl: config.apiUrl,
         workerToken,
-        organizationId: reply.organizationId,
+        workspaceId: reply.workspaceId,
         workId: reply.workId,
         workerId: registered.workerId,
         claimToken: reply.claimToken,
@@ -1325,12 +1325,12 @@ async function runClaimedChannelReply(
         signal: invocationSignal,
       });
       if (hydrated.loaded === 0) {
-        throw new Error("Organization Agent repeated a loaded context query");
+        throw new Error("Workspace Agent repeated a loaded context query");
       }
       lookupRounds += 1;
       conversationId = reply.routing ? null : turn.conversationId;
       const continuation = [
-        `Briar loaded ${hydrated.loaded} requested organization context file(s).`,
+        `Briar loaded ${hydrated.loaded} requested workspace context file(s).`,
         `Re-read the manifest at ${JSON.stringify(hydrated.manifestPath)} and the newly referenced lookup files.`,
         "Use those facts to continue. Request another smallest-possible lookup only if essential; otherwise return the normal channel reply JSON now.",
       ].join("\n\n");
@@ -1425,7 +1425,7 @@ async function runClaimedChannelReply(
           releaseCachedAnalysisWorktree(sessionWorktreePath);
         }
       } else if (!analysisWorktree && reply.session && retainedUntil) {
-        await prepareOrganizationAgentWorkspace(workspacePath, 0, {
+        await prepareWorkspaceAgentWorkspace(workspacePath, 0, {
           reuse: true,
           retainedUntil,
         });

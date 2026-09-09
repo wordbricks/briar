@@ -45,21 +45,21 @@ export {
   updatePlanningProject,
 } from "./app-rpc/team";
 export {
-  acceptOrganizationInvitation,
-  createOrganization,
-  createOrganizationInvitation,
-  isOrganizationHandleAvailable,
-  loadOrganizationInvitation,
-  loadOrganizationInvitations,
-  loadOrganizationMembers,
-  loadOrganizations,
-  removeOrganizationMember,
-  revokeOrganizationInvitation,
-  updateOrganization,
-  updateOrganizationLogo,
-  updateOrganizationMemberProjects,
-  updateOrganizationMemberRole,
-} from "./app-rpc/organization";
+  acceptWorkspaceInvitation,
+  createWorkspace,
+  createWorkspaceInvitation,
+  isWorkspaceHandleAvailable,
+  loadWorkspaceInvitation,
+  loadWorkspaceInvitations,
+  loadWorkspaceMembers,
+  loadWorkspaces,
+  removeWorkspaceMember,
+  revokeWorkspaceInvitation,
+  updateWorkspace,
+  updateWorkspaceLogo,
+  updateWorkspaceMemberProjects,
+  updateWorkspaceMemberRole,
+} from "./app-rpc/workspace";
 import {
   deleteInboxReadStateRpc,
   getInboxFeed,
@@ -186,17 +186,17 @@ export {
   applyForManagedComputer,
   createManagedComputerRemoteSession,
   createManagedComputerSetupSession,
-  deleteOrganizationExecutionWorker,
+  deleteWorkspaceExecutionWorker,
   endManagedComputerRemoteSession,
   loadManagedComputerProduct,
   loadManagedComputers,
-  loadOrganizationExecutionWorkers,
-  requestOrganizationExecutionWorkerUpdate,
+  loadWorkspaceExecutionWorkers,
+  requestWorkspaceExecutionWorkerUpdate,
   retireManagedComputer,
   terminateManagedComputer,
   retryManagedComputer,
-  updateOrganizationExecutionWorkerConcurrency,
-  updateOrganizationExecutionWorkerIcon,
+  updateWorkspaceExecutionWorkerConcurrency,
+  updateWorkspaceExecutionWorkerIcon,
   validateManagedComputerPromotion,
 } from "./app-rpc/fleet";
 export {
@@ -324,13 +324,13 @@ export type InboxFeedSyncResult = {
 
 export async function loadInboxFeed(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   state: InboxFeedSyncState | null = null,
   signal?: AbortSignal,
 ): Promise<InboxFeedSyncResult> {
   const result = await getInboxFeed(
     token,
-    organizationId,
+    workspaceId,
     state?.version,
     signal,
   );

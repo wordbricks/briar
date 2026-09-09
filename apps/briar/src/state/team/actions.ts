@@ -12,10 +12,10 @@ import type { Project } from "../../types";
 import { emptyDashboard } from "../demo-fixtures";
 import { teamsByIdAtom } from "../entities/teams";
 import { upsertManyBy } from "../entities/upsert";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { demoMode, lockedTeamIdAtom } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
-import { bumpReconnectRequest } from "../workspace/api";
+import { bumpReconnectRequest } from "../local-workspace/api";
 import { resolveSessionApi } from "../session/api";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { markTeamStale } from "../sync/apply";
@@ -134,7 +134,7 @@ export function createTeamActions(
       registry.get(loadedTeamIdAtom) === team.id;
     if (activeTeamId === team.id && dashboardMatchesTeam) {
       Atom.batch(() => {
-        registry.set(activeOrganizationIdAtom, team.organizationId);
+        registry.set(activeWorkspaceIdAtom, team.workspaceId);
         registry.set(sessionErrorAtom, null);
       });
       return;
@@ -142,7 +142,7 @@ export function createTeamActions(
     bumpReconnectRequest(registry);
     Atom.batch(() => {
       registry.set(activeTeamIdAtom, team.id);
-      registry.set(activeOrganizationIdAtom, team.organizationId);
+      registry.set(activeWorkspaceIdAtom, team.workspaceId);
       if (!demoMode && !dashboardMatchesTeam) markTeamStale(registry, team.id);
       registry.set(sessionErrorAtom, null);
     });

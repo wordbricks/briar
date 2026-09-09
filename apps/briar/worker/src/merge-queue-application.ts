@@ -10,7 +10,7 @@ import {
 } from "./github-connection-repository";
 import { configureMergeQueueProfile, getMergeQueueProfile } from "./merge-queue-profile";
 import { getMergeQueueStatus } from "./merge-queue-status";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import { getTeam } from "./team-command-repository";
 import { validationCommandsFromStage } from "./team-configuration-application";
 import { getTeamSettings } from "./team-settings-repository";
@@ -118,7 +118,7 @@ export async function updateMergeQueueProfileApplication(
   services: MergeQueueApplicationServices = mergeQueueApplicationServices,
 ) {
   const project = await requireProject(input.db, input.projectId, input.userId, services);
-  if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+  if (!hasWorkspaceCapability(project.member_role, "development:manage")) {
     throw new MergeQueueApplicationError(
       "development_management_required",
       "Development management permission required",

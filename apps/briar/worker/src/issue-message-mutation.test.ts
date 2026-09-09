@@ -17,7 +17,7 @@ import { decodeIssueMessageMutationReceiptResponse } from "./issue-mutation-rece
 import { decodeIssueMessageInput } from "./issue-request-contract";
 import { uploadReservedFileApplication } from "./upload-application";
 
-const organizationId = "a7000000-0000-4000-8000-000000000001";
+const workspaceId = "a7000000-0000-4000-8000-000000000001";
 const projectId = "b7000000-0000-4000-8000-000000000001";
 const ownerId = "issue-message-owner";
 const memberId = "issue-message-member";
@@ -77,25 +77,25 @@ describe("issue message mutation", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Issue Messages', 'issue-messages', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
     ]);
     await db.batch([
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, now, now),
+      ).bind(workspaceId, ownerId, now, now),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'viewer', ?, ?)`,
-      ).bind(organizationId, memberId, now, now),
+      ).bind(workspaceId, memberId, now, now),
       db.prepare(
         `insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Message Project', ?, ?, ?)`,
-      ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+      ).bind(projectId, ownerId, workspaceId, "a".repeat(64), now, now),
     ]);
     await db.prepare(
       `insert into briar_project_settings (
@@ -304,7 +304,7 @@ describe("issue message mutation", () => {
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'viewer', ?, ?)`,
-      ).bind(organizationId, raceMemberId, createdAt, createdAt),
+      ).bind(workspaceId, raceMemberId, createdAt, createdAt),
     ]);
     await createIssueMessage(db, {
       id: parentMessageId,
@@ -332,7 +332,7 @@ describe("issue message mutation", () => {
     const committedAt = new Date().toISOString();
     const uploads = await resolveIssueAttachmentUploads(db, {
       purpose: "issue_message",
-      organizationId,
+      workspaceId,
       projectId,
       runId,
       userId: ownerId,
@@ -357,7 +357,7 @@ describe("issue message mutation", () => {
     };
     const body = `![old](briar-attachment://${existingAttachmentId})`;
     await expect(commitIssueMessageMutation(db, {
-      organizationId,
+      workspaceId,
       projectId,
       runId,
       userId: ownerId,

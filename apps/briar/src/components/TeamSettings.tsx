@@ -93,7 +93,7 @@ import type {
   AutoHuntHealth,
   VelenInspection,
 } from "../generated/tauri";
-import { hasOrganizationCapability } from "../lib/organization-role";
+import { hasWorkspaceCapability } from "../lib/workspace-role";
 import type {
   LinearImportConnectResult,
   LinearImportResult,
@@ -208,11 +208,11 @@ export function TeamSettings({
   workers: ExecutionWorker[];
 }) {
   const { localeTag, t } = useI18n();
-  const canManageProject = hasOrganizationCapability(
+  const canManageProject = hasWorkspaceCapability(
     project.role,
     "projects:manage",
   );
-  const canManageDevelopment = hasOrganizationCapability(
+  const canManageDevelopment = hasWorkspaceCapability(
     project.role,
     "development:manage",
   );

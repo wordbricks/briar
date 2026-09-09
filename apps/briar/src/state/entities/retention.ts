@@ -13,7 +13,7 @@ import { shallowArrayEqual } from "./upsert";
   otherwise grow with every team an account ever opens.
 
   One screen reaches across that bound. "내 이슈" lists the current user's runs in
-  every team of the organization, so it loads and reads more teams than the LRU
+  every team of the workspace, so it loads and reads more teams than the LRU
   is sized for — thirty teams would evict twenty-two of them halfway through the
   list. The pinned set below is that screen's answer: while it is open the teams
   it draws cannot be evicted, and it releases them when it unmounts. The bound

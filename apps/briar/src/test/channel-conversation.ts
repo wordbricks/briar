@@ -112,7 +112,7 @@ export function testChannelSummary(
 ): ChannelSummary {
   return {
     id,
-    organizationId: "org-1",
+    workspaceId: "org-1",
     slug: id,
     name: id,
     topic: null,

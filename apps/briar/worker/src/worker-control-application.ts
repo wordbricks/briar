@@ -77,7 +77,7 @@ export async function prepareWorkerUpdateHandoffApplication(input: {
   if (input.requestId && existing && existing.id !== input.requestId) invalid("A different update is already pending");
   const update = await requestExecutionWorkerUpdate(input.db, {
     id: input.requestId ?? crypto.randomUUID(),
-    organizationId: input.principal.organizationId,
+    workspaceId: input.principal.workspaceId,
     deviceId: input.principal.deviceId,
     requestedByUserId: input.principal.ownerUserId,
     targetVersion: input.targetVersion,
@@ -204,7 +204,7 @@ export async function failWorkerUpdateHandoffApplication(input: {
   }
   await failExecutionWorkerUpdate(input.db, {
     requestId: input.requestId,
-    organizationId: input.principal.organizationId,
+    workspaceId: input.principal.workspaceId,
     deviceId: input.principal.deviceId,
     error,
     observedAt: input.observedAt,
@@ -294,7 +294,7 @@ export async function heartbeatWorkerApplication(input: {
   ) {
     await recordPreservedWorkerBinding(input.db, {
       requestId: `worker-restart:${binding.id}:${binding.last_heartbeat_at}`,
-      organizationId: input.principal.organizationId,
+      workspaceId: input.principal.workspaceId,
       projectId: binding.project_id,
       deviceId: input.principal.deviceId,
       workerId: binding.id,
@@ -314,7 +314,7 @@ export async function heartbeatWorkerApplication(input: {
   }
   if (hasExecutionWorkerReadinessChanged(binding, worker)) {
     await auditExecutionEvent(input.db, {
-      organizationId: input.principal.organizationId,
+      workspaceId: input.principal.workspaceId,
       projectId: binding.project_id,
       workerId: binding.id,
       actorDeviceId: input.principal.deviceId,

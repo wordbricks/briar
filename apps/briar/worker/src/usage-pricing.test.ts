@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { parseAgentUsageModelRates } from "../../src/lib/agent-usage-pricing";
 import type {
-  OrganizationCostRecordRow,
-  OrganizationUsageRecordRow,
+  WorkspaceCostRecordRow,
+  WorkspaceUsageRecordRow,
 } from "./db";
 import {
   createAgentUsagePricingLoader,
-  estimateOrganizationUsageCosts,
+  estimateWorkspaceUsageCosts,
   estimateRunExecutionCost,
 } from "./usage-pricing";
 
@@ -27,8 +27,8 @@ const pricingDocument = {
 };
 
 const usageRow = (
-  overrides: Partial<OrganizationUsageRecordRow> = {},
-): OrganizationUsageRecordRow => ({
+  overrides: Partial<WorkspaceUsageRecordRow> = {},
+): WorkspaceUsageRecordRow => ({
   execution_id: "execution-1",
   run_id: "run-1",
   project_id: "project-1",
@@ -58,8 +58,8 @@ const usageRow = (
 });
 
 const costRow = (
-  overrides: Partial<OrganizationCostRecordRow> = {},
-): OrganizationCostRecordRow => ({
+  overrides: Partial<WorkspaceCostRecordRow> = {},
+): WorkspaceCostRecordRow => ({
   execution_id: "execution-1",
   run_id: "run-1",
   project_id: "project-1",
@@ -177,7 +177,7 @@ describe("worker usage pricing", () => {
       cache_write_tokens: 0,
       output_tokens: 2,
     });
-    const estimated = estimateOrganizationUsageCosts({
+    const estimated = estimateWorkspaceUsageCosts({
       usageRecords: [first, second],
       costRecords: [costRow()],
       table,
@@ -199,7 +199,7 @@ describe("worker usage pricing", () => {
     const modelB = usageRow({ usage_key: "usage-b", model: "model-b" });
 
     expect(
-      estimateOrganizationUsageCosts({
+      estimateWorkspaceUsageCosts({
         usageRecords: [modelA, modelB],
         costRecords: [
           costRow({ usage_key: null, model: null, canonical_model: null }),
@@ -208,7 +208,7 @@ describe("worker usage pricing", () => {
       }),
     ).toEqual([]);
 
-    const afterModelCost = estimateOrganizationUsageCosts({
+    const afterModelCost = estimateWorkspaceUsageCosts({
       usageRecords: [modelA, modelB],
       costRecords: [
         costRow({ usage_key: null, model: "model-a", canonical_model: null }),
@@ -225,7 +225,7 @@ describe("worker usage pricing", () => {
     const usage = usageRow();
 
     expect(
-      estimateOrganizationUsageCosts({
+      estimateWorkspaceUsageCosts({
         usageRecords: [usage],
         costRecords: [
           costRow({
@@ -250,7 +250,7 @@ describe("worker usage pricing", () => {
   it("does not price rows without a trustworthy model or token split", () => {
     const table = parseAgentUsageModelRates(pricingDocument);
     expect(
-      estimateOrganizationUsageCosts({
+      estimateWorkspaceUsageCosts({
         usageRecords: [
           usageRow({ model: null, canonical_model: null }),
           usageRow({ usage_key: "usage-b", uncached_input_tokens: null }),

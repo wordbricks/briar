@@ -31,16 +31,16 @@ export function resolveChannelProposalTargetProjectId(input: {
 }
 
 export function assertChannelProposalAuthorScope(input: {
-  channelOrganizationId: string;
+  channelWorkspaceId: string;
   proposedProjectId: string | null;
   replyAuthorAgentId: string | null;
-  replyAuthorAgentOrganizationId: string | null;
+  replyAuthorAgentWorkspaceId: string | null;
   replyAuthorAgentProjectId: string | null;
 }) {
   if (
     !input.replyAuthorAgentId ||
-    !input.replyAuthorAgentOrganizationId ||
-    input.replyAuthorAgentOrganizationId !== input.channelOrganizationId
+    !input.replyAuthorAgentWorkspaceId ||
+    input.replyAuthorAgentWorkspaceId !== input.channelWorkspaceId
   ) {
     throw new HttpError(
       409,
@@ -73,13 +73,13 @@ export function approvedIssueCreation<T extends Record<string, unknown>>(
 }
 
 export function channelRelatedMessageReference(input: {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   messageId: string;
   rootMessageId: string | null;
 }) {
   return {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     messageId: input.messageId,
     // A root message is required by the in-app deep-link handler. A proposal

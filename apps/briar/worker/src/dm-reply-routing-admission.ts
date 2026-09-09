@@ -1,6 +1,6 @@
 /** Older installations retain their existing reply path until a Worker advertises routing. */
 export async function dmReplyRoutingAvailable(db: D1Database, input: {
-  organizationId: string; channelId: string; provider: string; preferredDeviceId?: string | null;
+  workspaceId: string; channelId: string; provider: string; preferredDeviceId?: string | null;
 }) {
   return Boolean(await db.prepare(`select channel.id from briar_channels channel
     join briar_channel_agents roster on roster.channel_id = channel.id
@@ -26,6 +26,6 @@ export async function dmReplyRoutingAvailable(db: D1Database, input: {
             '$.capabilities.dmReplyRouting.providers') provider where provider.value = ?)
           and exists (select 1 from json_each(binding.runtime_proto_json,
             '$.capabilities.dmPublicMessages.providers') provider where provider.value = ?))`)
-    .bind(input.channelId, input.organizationId, input.preferredDeviceId ?? null, input.preferredDeviceId ?? null,
+    .bind(input.channelId, input.workspaceId, input.preferredDeviceId ?? null, input.preferredDeviceId ?? null,
       `AGENT_PROVIDER_${input.provider.toUpperCase()}`, `AGENT_PROVIDER_${input.provider.toUpperCase()}`).first());
 }

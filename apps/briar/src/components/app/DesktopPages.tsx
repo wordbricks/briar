@@ -42,7 +42,7 @@ import {
   isInboxChannelTarget,
   isInboxRunDetailTarget,
 } from "../../lib/inbox-notifications";
-import { activeOrganizationTeams } from "../../lib/team-window-scope";
+import { activeWorkspaceTeams } from "../../lib/team-window-scope";
 import { cn } from "../../lib/utils";
 import {
   projectNavigationLocation,
@@ -94,11 +94,8 @@ import {
   keptPageKeysAtom,
   type KeptPage,
 } from "../../state/navigation/keep-alive";
-import { useOrganizationActions } from "../../state/organization/actions";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { useLocalWorkspaceActions } from "../../state/local-workspace/actions";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { demoMode, lockedTeamIdAtom } from "../../state/platform";
 import { useRunDetailActions } from "../../state/run-detail/actions";
 import { appErrorAtom } from "../../state/app-error";
@@ -139,7 +136,7 @@ import type {
   and nothing else.
 
   The chain below is in two halves. The heavy pages — the board and the
-  organization lists — are rendered by key into `KeepAliveSlot`s and stay in the
+  workspace lists — are rendered by key into `KeepAliveSlot`s and stay in the
   DOM after the user walks away from them, so walking back is a reveal rather
   than a rebuild. Everything else is the `if`/`else` chain it always was and
   unmounts on leave. `state/navigation/keep-alive.ts` decides which of the two a
@@ -153,14 +150,14 @@ import type {
 const MyIssues = lazy(() =>
   import("../MyIssues").then((m) => ({ default: m.MyIssues })),
 );
-const OrganizationCreate = lazy(() =>
-  import("../OrganizationCreate").then((m) => ({
-    default: m.OrganizationCreate,
+const WorkspaceCreate = lazy(() =>
+  import("../WorkspaceCreate").then((m) => ({
+    default: m.WorkspaceCreate,
   })),
 );
-const OrganizationSettings = lazy(() =>
-  import("./OrganizationSettingsWithSession").then((m) => ({
-    default: m.OrganizationSettingsWithSession,
+const WorkspaceSettings = lazy(() =>
+  import("./WorkspaceSettingsWithSession").then((m) => ({
+    default: m.WorkspaceSettingsWithSession,
   })),
 );
 const TeamSchedule = lazy(() =>
@@ -228,8 +225,8 @@ export interface DesktopPagesProps {
     typeof createCachedTeamUsageSummaryLoader
   >;
   readonly loadProjectHomeMerges: TeamMergeActivityLoader;
-  readonly loadOrganizationProjectDashboard: MyIssuesDashboardLoader;
-  readonly openOrganizationIssue: (teamId: string, runId: string) => void;
+  readonly loadWorkspaceProjectDashboard: MyIssuesDashboardLoader;
+  readonly openWorkspaceIssue: (teamId: string, runId: string) => void;
   readonly startAgentAutoHunt: (
     agent: ProjectAgent,
     runs: HuntRun[],
@@ -243,11 +240,11 @@ export interface DesktopPagesProps {
 
 export function DesktopPages({
   agents,
-  loadOrganizationProjectDashboard,
+  loadWorkspaceProjectDashboard,
   loadProjectHomeMerges,
   loadProjectHomeUsage,
   loadUsageReport,
-  openOrganizationIssue,
+  openWorkspaceIssue,
   repositorySetup,
   startAgentAutoHunt,
   startProjectAgentTask,
@@ -290,10 +287,10 @@ export function DesktopPages({
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
   const projects = useAtomValue(teamsAtom);
-  const organizations = useAtomValue(organizationsAtom);
+  const workspaces = useAtomValue(workspacesAtom);
   const activeProject = useAtomValue(activeTeamAtom) ?? undefined;
   const activeProjectId = useAtomValue(activeTeamIdAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const deletingProjectId = useAtomValue(deletingTeamIdAtom);
   const error = useAtomValue(appErrorAtom);
@@ -333,16 +330,16 @@ export function DesktopPages({
     viewingIssueConversationRunIdAtom,
   );
   const quickProcessError = useAtomValue(quickProcessErrorAtom);
-  const { markOrganizationChannelRead, selectChannel } = useChannelActions();
-  const { addOrganization, checkOrganizationHandle, selectOrganization } =
-    useOrganizationActions();
+  const { markWorkspaceChannelRead, selectChannel } = useChannelActions();
+  const { addWorkspace, checkWorkspaceHandle, selectWorkspace } =
+    useWorkspaceActions();
   const {
     changeTeamIcon,
     changeTeamIssueKeyPrefix,
     changeTeamScheduleTab,
     startTeamCreation,
   } = useTeamActions();
-  const { removeProject } = useWorkspaceActions();
+  const { removeProject } = useLocalWorkspaceActions();
   const { deleteAccount, logout, updateAccountProfile } = useSessionActions();
   const { ensureTeamSelected, selectTeam } = useTeamActions();
   const { refreshActiveTeam } = useSyncActions();
@@ -364,31 +361,31 @@ export function DesktopPages({
     save: saveInboxPaneWidth,
   });
 
-  const activeOrganization = organizations.find(
-    (organization) => organization.id === activeOrganizationId,
+  const activeWorkspace = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId,
   );
-  const settingsOrganization =
-    settingsTarget.scope === "organization"
-      ? organizations.find(
-          (organization) => organization.id === settingsTarget.organizationId,
+  const settingsWorkspace =
+    settingsTarget.scope === "workspace"
+      ? workspaces.find(
+          (workspace) => workspace.id === settingsTarget.workspaceId,
         )
       : null;
-  const activeOrganizationProjects = useMemo(
+  const activeWorkspaceProjects = useMemo(
     () =>
-      activeOrganizationTeams(
+      activeWorkspaceTeams(
         projects,
         lockedTeamId,
-        activeOrganizationId,
+        activeWorkspaceId,
         activeProjectId,
       ),
-    [activeOrganizationId, activeProjectId, lockedTeamId, projects],
+    [activeWorkspaceId, activeProjectId, lockedTeamId, projects],
   );
 
   const settingsSidebar = (
     <AppSettingsSidebar
       onBack={closeSettings}
       onNavigate={navigateToLocation}
-      onSelectOrganization={selectOrganization}
+      onSelectWorkspace={selectWorkspace}
       onSelectTeam={selectTeam}
     />
   );
@@ -432,8 +429,8 @@ export function DesktopPages({
             onSkillSessionAccepted={agentSessions.adoptRemoteSession}
             onCreateAgent={() => {
               setSettingsTarget({
-                scope: "organization",
-                organizationId: scopeId,
+                scope: "workspace",
+                workspaceId: scopeId,
                 section: "agents",
               });
               setIsSidebarOpen(true);
@@ -457,8 +454,8 @@ export function DesktopPages({
             onChannelSelect={(channelId) => navigateToChannel(channelId, "dms")}
             onCreateAgent={() => {
               setSettingsTarget({
-                scope: "organization",
-                organizationId: scopeId,
+                scope: "workspace",
+                workspaceId: scopeId,
                 section: "agents",
               });
               setIsSidebarOpen(true);
@@ -502,13 +499,13 @@ export function DesktopPages({
                     rootMessageId: target.rootMessageId,
                   });
                   selectChannel(target.targetId);
-                  markOrganizationChannelRead(target.targetId);
+                  markWorkspaceChannelRead(target.targetId);
                 } else {
                   setRequestedChannelMessage(null);
                 }
                 setInboxDetailTarget(target);
               }}
-              projects={activeOrganizationProjects}
+              projects={activeWorkspaceProjects}
             />
             <div
               aria-label={t("inbox.resizeDetailPane")}
@@ -546,11 +543,11 @@ export function DesktopPages({
         return (
           <MyIssues
             isSidebarOpen={isSidebarOpen}
-            loadProjectDashboard={loadOrganizationProjectDashboard}
-            onOpenIssue={openOrganizationIssue}
-            organizationId={scopeId}
-            organizationName={activeOrganization?.name}
-            projects={activeOrganizationProjects}
+            loadProjectDashboard={loadWorkspaceProjectDashboard}
+            onOpenIssue={openWorkspaceIssue}
+            workspaceId={scopeId}
+            workspaceName={activeWorkspace?.name}
+            projects={activeWorkspaceProjects}
           />
         );
       default:
@@ -605,7 +602,7 @@ export function DesktopPages({
               setRequestedRunInitialTab(null);
             }}
             onSendIssueMessage={addIssueMessage}
-            projects={activeOrganizationProjects}
+            projects={activeWorkspaceProjects}
           />
         );
     }
@@ -645,14 +642,14 @@ export function DesktopPages({
     ))}
     {activeKeptKey !== null ? null : (
     <Suspense fallback={lazyViewFallback}>
-    {activePage === "organization-create" ? (
-      <OrganizationCreate
+    {activePage === "workspace-create" ? (
+      <WorkspaceCreate
         onBack={() =>
           canGoBack ? goBack() : navigateToPage("issues")
         }
-        onCheckHandle={checkOrganizationHandle}
+        onCheckHandle={checkWorkspaceHandle}
         onCreate={async (input) => {
-          await addOrganization(input);
+          await addWorkspace(input);
           resetNavigation("issues");
         }}
       />
@@ -673,18 +670,18 @@ export function DesktopPages({
         }}
       />
     ) : activePage === "settings" &&
-    settingsTarget.scope === "organization" &&
-    settingsOrganization ? (
-      <OrganizationSettings
+    settingsTarget.scope === "workspace" &&
+    settingsWorkspace ? (
+      <WorkspaceSettings
         initialSection={settingsTarget.section}
-        key={settingsOrganization.id}
+        key={settingsWorkspace.id}
         navigationSidebar={settingsSidebar}
         onBack={closeSettings}
-        organization={settingsOrganization}
+        workspace={settingsWorkspace}
       />
     ) : activePage === "dms" &&
       !lockedTeamId &&
-      activeOrganizationId ? (
+      activeWorkspaceId ? (
       <MainContent id="dms">
         <PageHeader title={t("sidebar.dms")} />
         <EmptyState

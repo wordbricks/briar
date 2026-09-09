@@ -3,7 +3,7 @@ import type { ChannelMember } from "./channels-contract";
 import { resolveChannelReactionPeople } from "./channel-reaction-people";
 
 describe("resolveChannelReactionPeople", () => {
-  it("uses organization profiles when a reaction author is not in the channel roster", () => {
+  it("uses workspace profiles when a reaction author is not in the channel roster", () => {
     const member: ChannelMember = {
       userId: "owner",
       name: "Owner",
@@ -46,7 +46,7 @@ describe("resolveChannelReactionPeople", () => {
     ]);
   });
 
-  it("keeps Agent authors distinct from organization members", () => {
+  it("keeps Agent authors distinct from workspace members", () => {
     expect(
       resolveChannelReactionPeople({
         currentUserId: "owner",

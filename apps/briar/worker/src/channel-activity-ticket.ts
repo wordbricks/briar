@@ -81,12 +81,12 @@ export async function verifyChannelActivityPublishToken(
 
 export async function createChannelActivitySocketTicket(
   secret: string,
-  input: { organizationId: string; channelId: string; userId: string; now?: number },
+  input: { workspaceId: string; channelId: string; userId: string; now?: number },
 ) {
   const now = input.now ?? Date.now();
   const payload: ChannelActivitySocketTicketPayload = {
     purpose: "subscribe",
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     userId: input.userId,
     expiresAt: now + CHANNEL_ACTIVITY_SOCKET_TICKET_TTL_MS,
@@ -102,7 +102,7 @@ export async function createChannelActivitySocketTicket(
 export async function verifyChannelActivitySocketTicket(
   secret: string,
   ticket: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   now = Date.now(),
 ): Promise<ChannelActivitySocketTicketPayload | null> {
@@ -113,7 +113,7 @@ export async function verifyChannelActivitySocketTicket(
   );
   if (
     !payload ||
-    payload.organizationId !== organizationId ||
+    payload.workspaceId !== workspaceId ||
     payload.channelId !== channelId ||
     !expiresWithin(
       payload.expiresAt,
@@ -171,7 +171,7 @@ export async function verifyIssueActivityPublishToken(
 export async function createIssueActivitySocketTicket(
   secret: string,
   input: {
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     runId: string;
     userId: string;
@@ -181,7 +181,7 @@ export async function createIssueActivitySocketTicket(
   const now = input.now ?? Date.now();
   const payload: IssueActivitySocketTicketPayload = {
     purpose: "subscribe-issue",
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     projectId: input.projectId,
     runId: input.runId,
     userId: input.userId,
