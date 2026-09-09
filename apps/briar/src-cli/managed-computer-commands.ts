@@ -275,7 +275,7 @@ export async function managedComputerSetupCommand() {
   };
   if (
     binding.managedComputerId !== credential.managedComputerId ||
-    binding.organizationId !== credential.organizationId ||
+    binding.workspaceId !== credential.organizationId ||
     binding.teamId !== projectId ||
     binding.deviceId !== credential.deviceId
   ) {

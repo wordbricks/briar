@@ -2,14 +2,12 @@ import { createHash } from "node:crypto";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import {
-  DashboardWorker_Readiness,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  DashboardWorker_Readiness} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { ExecutionWorkerHandoffState } from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   WorkerControlService,
-  WorkerReadinessState,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  WorkerReadinessState} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";

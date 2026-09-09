@@ -412,7 +412,7 @@ export async function getDashboard(
     ),
     runs: response.runs.map(dashboardRunFromProto),
     workers: response.workers.map(dashboardWorkerFromProto),
-    organizationProviders: response.organizationProviders.map(
+    organizationProviders: response.workspaceProviders.map(
       agentProviderFromProto,
     ),
     executionPolicy: executionPolicyFromProto(response.executionPolicy),
@@ -516,7 +516,7 @@ export async function syncDashboard(
       ? undefined
       : teamSettingsFromProto(response.settings),
     workers: response.workers.map(dashboardWorkerFromProto),
-    organizationProviders: response.organizationProviders.map(
+    organizationProviders: response.workspaceProviders.map(
       agentProviderFromProto,
     ),
     executionPolicy: executionPolicyFromProto(response.executionPolicy),

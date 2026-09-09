@@ -11,7 +11,7 @@ import { getTeam } from "./team-command-repository";
 
 export type RealtimeTicketScope =
   | {
-    readonly type: "organizationNotifications";
+    readonly type: "workspaceNotifications";
     readonly organizationId: string;
   }
   | {
@@ -85,7 +85,7 @@ export async function createRealtimeTicketApplication(
 ): Promise<IssuedRealtimeTicket> {
   const { db, scope, signingSecret, userId } = input;
   switch (scope.type) {
-    case "organizationNotifications": {
+    case "workspaceNotifications": {
       const role = await services.getOrganizationRole(
         db,
         scope.organizationId,

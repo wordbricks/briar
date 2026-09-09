@@ -8,8 +8,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import {
   GitHubIntegrationService,
   GitHubPullRequestState,
-  ProjectGitHubService,
-} from "@briar/contracts/gen/briar/app/v1/github_pb";
+  ProjectGitHubService} from "@briar/contracts/gen/briar/app/v1/github_pb";
 import {
   afterEach,
   beforeAll,

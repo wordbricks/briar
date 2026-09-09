@@ -10,9 +10,8 @@ import { join } from "node:path";
 import { create, fromJson } from "@bufbuild/protobuf";
 import { timestampFromDate, ValueSchema } from "@bufbuild/protobuf/wkt";
 import {
-  OrganizationAgentContextServiceGetManifestResponseSchema,
-  OrganizationAgentContextServiceLookupResponseSchema,
-} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+  WorkspaceAgentContextServiceGetManifestResponseSchema,
+  WorkspaceAgentContextServiceLookupResponseSchema} from "@briar/contracts/gen/briar/worker/v1/workspace_agent_context_pb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cleanupOrphanedOrganizationAgentWorkspaces,
@@ -33,7 +32,7 @@ const claimToken = `briar_channel_claim_${"a".repeat(64)}`;
 const timestamp = () => timestampFromDate(new Date(snapshotAt));
 
 const protoManifest = () => ({
-  organizationId,
+  workspaceId: organizationId,
   workId,
   snapshotAt: timestamp(),
   revision: "a".repeat(64),
@@ -127,7 +126,7 @@ describe("Organization Agent context downloader", () => {
       OrganizationAgentContextClient["getManifest"]
     >(async (request) => {
       expect(request.knownRevision).toBeUndefined();
-      return create(OrganizationAgentContextServiceGetManifestResponseSchema, {
+      return create(WorkspaceAgentContextServiceGetManifestResponseSchema, {
         result: { case: "manifest", value: protoManifest() },
       });
     });
@@ -152,11 +151,11 @@ describe("Organization Agent context downloader", () => {
       OrganizationAgentContextClient["getManifest"]
     >(async (request) => {
       expect(request.knownRevision).toBe("a".repeat(64));
-      return create(OrganizationAgentContextServiceGetManifestResponseSchema, {
+      return create(WorkspaceAgentContextServiceGetManifestResponseSchema, {
         result: {
           case: "unchanged",
           value: {
-            organizationId,
+            workspaceId: organizationId,
             workId,
             snapshotAt: timestamp(),
             revision: "a".repeat(64),
@@ -183,7 +182,7 @@ describe("Organization Agent context downloader", () => {
     const getManifest = vi.fn<
       OrganizationAgentContextClient["getManifest"]
     >(async () =>
-      create(OrganizationAgentContextServiceGetManifestResponseSchema, {
+      create(WorkspaceAgentContextServiceGetManifestResponseSchema, {
         result: { case: "manifest", value: protoManifest() },
       }));
     const lookup = vi.fn<OrganizationAgentContextClient["lookup"]>(
@@ -195,8 +194,8 @@ describe("Organization Agent context downloader", () => {
           case: "issueSummaries",
           value: { projectId: projectA, limit: 25 },
         });
-        return create(OrganizationAgentContextServiceLookupResponseSchema, {
-          organizationId,
+        return create(WorkspaceAgentContextServiceLookupResponseSchema, {
+          workspaceId: organizationId,
           workId,
           snapshotAt: timestamp(),
           results: [{

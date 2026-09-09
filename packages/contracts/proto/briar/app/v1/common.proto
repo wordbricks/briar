@@ -73,7 +73,7 @@ message User {
   optional string image = 5;
 }
 
-message OrganizationMember {
+message WorkspaceMember {
   string user_id = 1;
   string name = 2;
   string email = 3;
@@ -107,7 +107,7 @@ message MessageAuthor {
 }
 
 message RelatedMessageReference {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string message_id = 3;
   string root_message_id = 4;
@@ -140,7 +140,7 @@ message StructuredRunResult {
     IMPACT_UNSPECIFIED = 0;
     IMPACT_ISSUE = 1;
     IMPACT_PROJECT = 2;
-    IMPACT_ORGANIZATION = 3;
+    IMPACT_WORKSPACE = 3;
   }
 
   string summary = 1;

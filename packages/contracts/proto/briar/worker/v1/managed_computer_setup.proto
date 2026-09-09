@@ -28,7 +28,7 @@ message EnrollManagedComputerResponse {
   string managed_computer_id = 1;
   string credential = 2;
   string device_id = 3;
-  string organization_id = 4;
+  string workspace_id = 4;
 }
 
 // Machine-authenticated unary setup operations. The interactive setup
@@ -63,7 +63,7 @@ message BindManagedComputerSetupRequest {
 
 message BindManagedComputerSetupResponse {
   string managed_computer_id = 1;
-  string organization_id = 2;
+  string workspace_id = 2;
   string team_id = 3;
   string device_id = 4;
   briar.app.v1.DashboardWorker worker = 5;

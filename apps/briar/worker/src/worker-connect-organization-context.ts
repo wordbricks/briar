@@ -9,11 +9,10 @@ import {
   ValueSchema,
 } from "@bufbuild/protobuf/wkt";
 import {
-  OrganizationAgentContextService,
-  OrganizationAgentContextServiceLookupResponseSchema,
-  type OrganizationAgentContextClaim,
-  type OrganizationAgentContextLookup,
-} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+  WorkspaceAgentContextService as OrganizationAgentContextService,
+  WorkspaceAgentContextServiceLookupResponseSchema as OrganizationAgentContextServiceLookupResponseSchema,
+  type WorkspaceAgentContextClaim as OrganizationAgentContextClaim,
+  type WorkspaceAgentContextLookup as OrganizationAgentContextLookup} from "@briar/contracts/gen/briar/worker/v1/workspace_agent_context_pb";
 import type {
   ConnectRouter,
   ServiceImpl,
@@ -188,7 +187,7 @@ export async function requireActiveOrganizationContextClaim(
 ): Promise<ActiveOrganizationContextClaim> {
   if (!claim) throw new HttpError(400, "claim is required");
   const organizationId = contextId(
-    claim.organizationId,
+    claim.workspaceId,
     "claim.organization_id",
   );
   const workId = contextId(claim.workId, "claim.work_id");
@@ -223,7 +222,7 @@ export async function requireActiveOrganizationContextClaim(
 const manifestMessage = (
   manifest: Awaited<ReturnType<typeof organizationAgentContextManifest>>,
 ) => ({
-  organizationId: manifest.organizationId,
+  workspaceId: manifest.organizationId,
   workId: manifest.workId,
   snapshotAt: timestamp(manifest.snapshotAt, "manifest.snapshot_at"),
   revision: manifest.revision,
@@ -321,7 +320,7 @@ const service = (
         result: {
           case: "unchanged",
           value: {
-            organizationId: claim.organizationId,
+            workspaceId: claim.organizationId,
             workId: claim.workId,
             snapshotAt: timestamp(claim.snapshotAt, "claim.snapshot_at"),
             revision: manifest.revision,
@@ -382,7 +381,7 @@ const service = (
         { ...claim, requests },
       );
     const response = create(OrganizationAgentContextServiceLookupResponseSchema, {
-      organizationId: result.organizationId,
+      workspaceId: result.organizationId,
       workId: result.workId,
       snapshotAt: timestamp(result.snapshotAt, "lookup.snapshot_at"),
       results: result.results.map((lookupResult, index) => ({

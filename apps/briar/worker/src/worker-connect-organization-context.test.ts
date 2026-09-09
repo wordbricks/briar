@@ -5,12 +5,12 @@ import {
 } from "@bufbuild/protobuf";
 import { timestampDate, ValueSchema } from "@bufbuild/protobuf/wkt";
 import {
-  OrganizationAgentContextService,
-  OrganizationAgentContextServiceGetManifestRequestSchema,
-  OrganizationAgentContextServiceGetManifestResponseSchema,
-  OrganizationAgentContextServiceLookupRequestSchema,
-  OrganizationAgentContextServiceLookupResponseSchema,
-} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+  WorkspaceAgentContextService,
+  WorkspaceAgentContextServiceGetManifestRequestSchema,
+  WorkspaceAgentContextServiceGetManifestResponseSchema,
+  WorkspaceAgentContextServiceLookupRequestSchema,
+  WorkspaceAgentContextServiceLookupResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/workspace_agent_context_pb";
 import { createConnectRouter } from "@connectrpc/connect";
 import {
   createFetchHandler,
@@ -102,8 +102,8 @@ const services = (): WorkerConnectOrganizationContextServices => ({
 });
 
 const invoke = async (
-  method: typeof OrganizationAgentContextService.method.getManifest |
-    typeof OrganizationAgentContextService.method.lookup,
+  method: typeof WorkspaceAgentContextService.method.getManifest |
+    typeof WorkspaceAgentContextService.method.lookup,
   body: unknown,
   dependencies: WorkerConnectOrganizationContextServices,
 ) => {
@@ -139,20 +139,20 @@ describe("Organization Agent context Connect adapter", () => {
   it("returns a typed manifest or an explicit unchanged result", async () => {
     const dependencies = services();
     const manifestRequest = create(
-      OrganizationAgentContextServiceGetManifestRequestSchema,
+      WorkspaceAgentContextServiceGetManifestRequestSchema,
       { claim },
     );
     const manifestResponse = await invoke(
-      OrganizationAgentContextService.method.getManifest,
+      WorkspaceAgentContextService.method.getManifest,
       toJson(
-        OrganizationAgentContextServiceGetManifestRequestSchema,
+        WorkspaceAgentContextServiceGetManifestRequestSchema,
         manifestRequest,
       ),
       dependencies,
     );
     expect(manifestResponse.status).toBe(200);
     const manifest = fromJson(
-      OrganizationAgentContextServiceGetManifestResponseSchema,
+      WorkspaceAgentContextServiceGetManifestResponseSchema,
       await manifestResponse.json(),
     );
     expect(manifest.result.case).toBe("manifest");
@@ -169,30 +169,30 @@ describe("Organization Agent context Connect adapter", () => {
     ).toBe(snapshotAt);
 
     const unchangedRequest = create(
-      OrganizationAgentContextServiceGetManifestRequestSchema,
+      WorkspaceAgentContextServiceGetManifestRequestSchema,
       { claim, knownRevision: revision },
     );
     const unchangedResponse = await invoke(
-      OrganizationAgentContextService.method.getManifest,
+      WorkspaceAgentContextService.method.getManifest,
       toJson(
-        OrganizationAgentContextServiceGetManifestRequestSchema,
+        WorkspaceAgentContextServiceGetManifestRequestSchema,
         unchangedRequest,
       ),
       dependencies,
     );
     const unchanged = fromJson(
-      OrganizationAgentContextServiceGetManifestResponseSchema,
+      WorkspaceAgentContextServiceGetManifestResponseSchema,
       await unchangedResponse.json(),
     );
     expect(unchanged.result).toMatchObject({
       case: "unchanged",
-      value: { organizationId, workId, revision },
+      value: { workspaceId: organizationId, workId, revision },
     });
   });
 
   it("maps every generated lookup oneof exactly once and preserves ordering", async () => {
     const dependencies = services();
-    const request = create(OrganizationAgentContextServiceLookupRequestSchema, {
+    const request = create(WorkspaceAgentContextServiceLookupRequestSchema, {
       claim,
       requestId: "55555555-5555-4555-8555-555555555555",
       queries: [
@@ -248,8 +248,8 @@ describe("Organization Agent context Connect adapter", () => {
       ],
     });
     const response = await invoke(
-      OrganizationAgentContextService.method.lookup,
-      toJson(OrganizationAgentContextServiceLookupRequestSchema, request),
+      WorkspaceAgentContextService.method.lookup,
+      toJson(WorkspaceAgentContextServiceLookupRequestSchema, request),
       dependencies,
     );
     expect(response.status).toBe(200);
@@ -305,7 +305,7 @@ describe("Organization Agent context Connect adapter", () => {
     ]);
     expect(dependencies.getOrganizationProject).toHaveBeenCalledOnce();
     const decoded = fromJson(
-      OrganizationAgentContextServiceLookupResponseSchema,
+      WorkspaceAgentContextServiceLookupResponseSchema,
       await response.json(),
     );
     expect(decoded.results.map((result) => result.query?.query.case)).toEqual(

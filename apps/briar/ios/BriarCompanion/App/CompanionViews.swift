@@ -910,7 +910,7 @@ private struct HostStatusSheet: View {
         guard let fleet else { return }
         do {
             var request = BriarAPI_ListExecutionWorkersRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             let response = try await fleet.listExecutionWorkers(request: request, headers: [:]).briarValue()
             canManage = response.canManage
             pendingDevices = Set(response.workers.filter {
@@ -928,7 +928,7 @@ private struct HostStatusSheet: View {
         updateError = nil
         do {
             var request = BriarAPI_RequestExecutionWorkerUpdateRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.deviceID = deviceID
             _ = try await fleet.requestExecutionWorkerUpdate(request: request, headers: [:]).briarValue()
             await refreshUpdates()

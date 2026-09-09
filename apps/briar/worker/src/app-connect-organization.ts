@@ -1,6 +1,5 @@
 import {
-  OrganizationService,
-} from "@briar/contracts/gen/briar/app/v1/organization_pb";
+  WorkspaceService as OrganizationService} from "@briar/contracts/gen/briar/app/v1/workspace_pb";
 import { ProjectRole } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   Code,
@@ -106,15 +105,15 @@ const withApplicationErrors = async <A>(operation: Promise<A>) => {
 export const createAppOrganizationService = (
   { request, auth, db }: AppConnectOrganizationInput,
 ): ServiceImpl<typeof OrganizationService> => ({
-  listOrganizations: async () => {
+  listWorkspaces: async () => {
     const session = await requireSession(auth, request);
     const organizations = await withApplicationErrors(
       listWorkspacesApplication({ db, userId: session.user.id }),
     );
-    return { organizations: organizations.map(appOrganization) };
+    return { workspaces: organizations.map(appOrganization) };
   },
 
-  createOrganization: async (input) => {
+  createWorkspace: async (input) => {
     const session = await requireSession(auth, request);
     const organization = await withApplicationErrors(
       createWorkspaceApplication({
@@ -124,10 +123,10 @@ export const createAppOrganizationService = (
         handle: input.handle,
       }),
     );
-    return { organization: appOrganization(organization) };
+    return { workspace: appOrganization(organization) };
   },
 
-  checkOrganizationHandleAvailability: async (input) => {
+  checkWorkspaceHandleAvailability: async (input) => {
     await requireSession(auth, request);
     const available = await withApplicationErrors(
       checkWorkspaceHandleAvailabilityApplication({
@@ -138,20 +137,20 @@ export const createAppOrganizationService = (
     return { available };
   },
 
-  updateOrganization: async (input) => {
+  updateWorkspace: async (input) => {
     const session = await requireSession(auth, request);
     const organization = await withApplicationErrors(
       updateWorkspaceApplication({
         db,
-        workspaceId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: session.user.id,
         name: input.name,
       }),
     );
-    return { organization: appOrganization(organization) };
+    return { workspace: appOrganization(organization) };
   },
 
-  updateOrganizationLogo: async (input) => {
+  updateWorkspaceLogo: async (input) => {
     const session = await requireSession(auth, request);
     const logo = input.logoUpdate.case === "logo"
       ? input.logoUpdate.value
@@ -163,21 +162,21 @@ export const createAppOrganizationService = (
     const organization = await withApplicationErrors(
       updateWorkspaceLogoApplication({
         db,
-        workspaceId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: session.user.id,
         logo,
       }),
     );
-    return { organization: appOrganization(organization) };
+    return { workspace: appOrganization(organization) };
   },
 
-  listOrganizationInvitations: async (input) => {
+  listWorkspaceInvitations: async (input) => {
     const session = await requireSession(auth, request);
     const observedAt = new Date().toISOString();
     const invitations = await withApplicationErrors(
       listWorkspaceInvitationsApplication({
         db,
-        workspaceId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: session.user.id,
       }),
     );
@@ -188,12 +187,12 @@ export const createAppOrganizationService = (
     };
   },
 
-  createOrganizationInvitation: async (input) => {
+  createWorkspaceInvitation: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withApplicationErrors(
       createWorkspaceInvitationApplication({
         db,
-        workspaceId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: session.user.id,
         email: input.email,
         role: assignableRoleInput(input.role),
@@ -209,18 +208,18 @@ export const createAppOrganizationService = (
     };
   },
 
-  revokeOrganizationInvitation: async (input) => {
+  revokeWorkspaceInvitation: async (input) => {
     const session = await requireSession(auth, request);
     await withApplicationErrors(revokeWorkspaceInvitationApplication({
       db,
-      workspaceId: input.organizationId,
+      workspaceId: input.workspaceId,
       invitationId: input.invitationId,
       userId: session.user.id,
     }));
     return {};
   },
 
-  getOrganizationInvitation: async (input) => {
+  getWorkspaceInvitation: async (input) => {
     const result = await withApplicationErrors(
       getWorkspaceInvitationApplication({ db, token: input.token }),
     );
@@ -232,7 +231,7 @@ export const createAppOrganizationService = (
     };
   },
 
-  acceptOrganizationInvitation: async (input) => {
+  acceptWorkspaceInvitation: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withApplicationErrors(
       acceptWorkspaceInvitationApplication({
@@ -250,12 +249,12 @@ export const createAppOrganizationService = (
     };
   },
 
-  listOrganizationMembers: async (input) => {
+  listWorkspaceMembers: async (input) => {
     const session = await requireSession(auth, request);
     const members = await withApplicationErrors(
       listWorkspaceMembersApplication({
         db,
-        workspaceId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: session.user.id,
       }),
     );
@@ -266,12 +265,12 @@ export const createAppOrganizationService = (
     };
   },
 
-  updateOrganizationMemberRole: async (input) => {
+  updateWorkspaceMemberRole: async (input) => {
     const session = await requireSession(auth, request);
     const members = await withApplicationErrors(
       updateWorkspaceMemberRoleApplication({
         db,
-        workspaceId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: session.user.id,
         memberId: input.userId,
         role: assignableRoleInput(input.role),
@@ -284,12 +283,12 @@ export const createAppOrganizationService = (
     };
   },
 
-  updateOrganizationMemberProjects: async (input) => {
+  updateWorkspaceMemberProjects: async (input) => {
     const session = await requireSession(auth, request);
     const members = await withApplicationErrors(
       updateWorkspaceMemberProjectsApplication({
         db,
-        workspaceId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: session.user.id,
         memberId: input.userId,
         projectIds: input.projectIds,
@@ -302,11 +301,11 @@ export const createAppOrganizationService = (
     };
   },
 
-  removeOrganizationMember: async (input) => {
+  removeWorkspaceMember: async (input) => {
     const session = await requireSession(auth, request);
     await withApplicationErrors(removeWorkspaceMemberApplication({
       db,
-      workspaceId: input.organizationId,
+      workspaceId: input.workspaceId,
       userId: session.user.id,
       memberId: input.userId,
     }));

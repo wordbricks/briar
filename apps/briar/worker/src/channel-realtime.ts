@@ -1,12 +1,11 @@
 import {
   ChannelsChangedSchema,
   InboxChangedSchema,
-  type OrganizationNotification,
-  OrganizationNotificationSchema,
+  type WorkspaceNotification as OrganizationNotification,
+  WorkspaceNotificationSchema as OrganizationNotificationSchema,
   ProjectAgentSessionsChangedSchema,
   ProjectChangedSchema,
-  ReadySchema,
-} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+  ReadySchema} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 
 type OrganizationRealtimeSocketAttachment = {

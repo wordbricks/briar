@@ -11617,7 +11617,7 @@ pub enum ResourceKind {
     RESOURCE_KIND_UNSPECIFIED = 0i32,
     RESOURCE_KIND_REQUEST_RATE = 1i32,
     RESOURCE_KIND_USER = 2i32,
-    RESOURCE_KIND_ORGANIZATION = 3i32,
+    RESOURCE_KIND_WORKSPACE = 3i32,
     RESOURCE_KIND_MANAGED_COMPUTER = 4i32,
     RESOURCE_KIND_WORKER_SESSION = 5i32,
     RESOURCE_KIND_STORAGE_BYTES = 6i32,
@@ -11632,9 +11632,9 @@ impl ResourceKind {
     ///Idiomatic alias for [`Self::RESOURCE_KIND_USER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const User: Self = Self::RESOURCE_KIND_USER;
-    ///Idiomatic alias for [`Self::RESOURCE_KIND_ORGANIZATION`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::RESOURCE_KIND_WORKSPACE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const Organization: Self = Self::RESOURCE_KIND_ORGANIZATION;
+    pub const Workspace: Self = Self::RESOURCE_KIND_WORKSPACE;
     ///Idiomatic alias for [`Self::RESOURCE_KIND_MANAGED_COMPUTER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ManagedComputer: Self = Self::RESOURCE_KIND_MANAGED_COMPUTER;
@@ -11742,7 +11742,7 @@ impl ::buffa::Enumeration for ResourceKind {
             0i32 => ::core::option::Option::Some(Self::RESOURCE_KIND_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::RESOURCE_KIND_REQUEST_RATE),
             2i32 => ::core::option::Option::Some(Self::RESOURCE_KIND_USER),
-            3i32 => ::core::option::Option::Some(Self::RESOURCE_KIND_ORGANIZATION),
+            3i32 => ::core::option::Option::Some(Self::RESOURCE_KIND_WORKSPACE),
             4i32 => ::core::option::Option::Some(Self::RESOURCE_KIND_MANAGED_COMPUTER),
             5i32 => ::core::option::Option::Some(Self::RESOURCE_KIND_WORKER_SESSION),
             6i32 => ::core::option::Option::Some(Self::RESOURCE_KIND_STORAGE_BYTES),
@@ -11757,7 +11757,7 @@ impl ::buffa::Enumeration for ResourceKind {
             Self::RESOURCE_KIND_UNSPECIFIED => "RESOURCE_KIND_UNSPECIFIED",
             Self::RESOURCE_KIND_REQUEST_RATE => "RESOURCE_KIND_REQUEST_RATE",
             Self::RESOURCE_KIND_USER => "RESOURCE_KIND_USER",
-            Self::RESOURCE_KIND_ORGANIZATION => "RESOURCE_KIND_ORGANIZATION",
+            Self::RESOURCE_KIND_WORKSPACE => "RESOURCE_KIND_WORKSPACE",
             Self::RESOURCE_KIND_MANAGED_COMPUTER => "RESOURCE_KIND_MANAGED_COMPUTER",
             Self::RESOURCE_KIND_WORKER_SESSION => "RESOURCE_KIND_WORKER_SESSION",
             Self::RESOURCE_KIND_STORAGE_BYTES => "RESOURCE_KIND_STORAGE_BYTES",
@@ -11774,8 +11774,8 @@ impl ::buffa::Enumeration for ResourceKind {
             "RESOURCE_KIND_USER" => {
                 ::core::option::Option::Some(Self::RESOURCE_KIND_USER)
             }
-            "RESOURCE_KIND_ORGANIZATION" => {
-                ::core::option::Option::Some(Self::RESOURCE_KIND_ORGANIZATION)
+            "RESOURCE_KIND_WORKSPACE" => {
+                ::core::option::Option::Some(Self::RESOURCE_KIND_WORKSPACE)
             }
             "RESOURCE_KIND_MANAGED_COMPUTER" => {
                 ::core::option::Option::Some(Self::RESOURCE_KIND_MANAGED_COMPUTER)
@@ -11794,7 +11794,7 @@ impl ::buffa::Enumeration for ResourceKind {
             Self::RESOURCE_KIND_UNSPECIFIED,
             Self::RESOURCE_KIND_REQUEST_RATE,
             Self::RESOURCE_KIND_USER,
-            Self::RESOURCE_KIND_ORGANIZATION,
+            Self::RESOURCE_KIND_WORKSPACE,
             Self::RESOURCE_KIND_MANAGED_COMPUTER,
             Self::RESOURCE_KIND_WORKER_SESSION,
             Self::RESOURCE_KIND_STORAGE_BYTES,

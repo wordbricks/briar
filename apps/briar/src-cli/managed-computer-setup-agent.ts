@@ -476,7 +476,7 @@ export async function runManagedComputerGuidedSetup(
   ));
   if (
     session.managedComputerId !== config.managedComputerId ||
-    session.organizationId !== config.organizationId ||
+    session.workspaceId !== config.organizationId ||
     session.projectId !== setupProject.id ||
     session.status !== ManagedComputerSetupSessionStatus.PENDING
   ) {
@@ -564,7 +564,7 @@ export async function runManagedComputerGuidedSetup(
   };
   if (
     binding.managedComputerId !== config.managedComputerId ||
-    binding.organizationId !== config.organizationId ||
+    binding.workspaceId !== config.organizationId ||
     binding.teamId !== setupProject.id ||
     binding.deviceId !== config.deviceId
   ) {

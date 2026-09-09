@@ -237,7 +237,7 @@ describe("DM memory in active channel claims", () => {
       workId: reply!.workId,
       runId: reply!.workId,
       claimToken: reply!.claimToken,
-      work: { case: "channelReply" as const, value: { organizationId } },
+      work: { case: "channelReply" as const, value: { workspaceId: organizationId } },
     },
     revocationEpoch: BigInt(reply!.memory!.revocationEpoch),
   });

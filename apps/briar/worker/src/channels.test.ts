@@ -6,12 +6,12 @@ import {
 } from "@bufbuild/protobuf";
 import { ValueSchema } from "@bufbuild/protobuf/wkt";
 import {
-  OrganizationAgentContextService,
-  OrganizationAgentContextServiceGetManifestRequestSchema,
-  OrganizationAgentContextServiceGetManifestResponseSchema,
-  OrganizationAgentContextServiceLookupRequestSchema,
-  OrganizationAgentContextServiceLookupResponseSchema,
-} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+  WorkspaceAgentContextService,
+  WorkspaceAgentContextServiceGetManifestRequestSchema,
+  WorkspaceAgentContextServiceGetManifestResponseSchema,
+  WorkspaceAgentContextServiceLookupRequestSchema,
+  WorkspaceAgentContextServiceLookupResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/workspace_agent_context_pb";
 import { createMethodUrl } from "@connectrpc/connect/protocol";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -1698,7 +1698,7 @@ describe("organization channels", () => {
     })).resolves.toBeNull();
 
     const claim = {
-      organizationId,
+      workspaceId: organizationId,
       workId: claimed!.id,
       workerId: otherWorkerId,
       claimToken: claimPayload!.claimToken,
@@ -1709,18 +1709,18 @@ describe("organization channels", () => {
       "content-type": "application/json",
     };
     const manifestRequest = create(
-      OrganizationAgentContextServiceGetManifestRequestSchema,
+      WorkspaceAgentContextServiceGetManifestRequestSchema,
       { claim },
     );
     const manifestResponse = await apiWorker.fetch(
       new Request(createMethodUrl(
         "https://briar-api.example",
-        OrganizationAgentContextService.method.getManifest,
+        WorkspaceAgentContextService.method.getManifest,
       ), {
         method: "POST",
         headers: connectHeaders,
         body: JSON.stringify(toJson(
-          OrganizationAgentContextServiceGetManifestRequestSchema,
+          WorkspaceAgentContextServiceGetManifestRequestSchema,
           manifestRequest,
         )),
       }),
@@ -1728,13 +1728,13 @@ describe("organization channels", () => {
     );
     expect(manifestResponse.status).toBe(200);
     const manifest = fromJson(
-      OrganizationAgentContextServiceGetManifestResponseSchema,
+      WorkspaceAgentContextServiceGetManifestResponseSchema,
       await manifestResponse.json(),
     );
     expect(manifest.result.case).toBe("manifest");
     if (manifest.result.case !== "manifest") return;
     expect(manifest.result.value).toMatchObject({
-      organizationId,
+      workspaceId: organizationId,
       workId: claimed!.id,
       projects: expect.arrayContaining([expect.objectContaining({
         id: projectId,
@@ -1743,18 +1743,18 @@ describe("organization channels", () => {
     expect(manifest.result.value.revision).toMatch(/^[0-9a-f]{64}$/u);
 
     const unchangedRequest = create(
-      OrganizationAgentContextServiceGetManifestRequestSchema,
+      WorkspaceAgentContextServiceGetManifestRequestSchema,
       { claim, knownRevision: manifest.result.value.revision },
     );
     const unchangedManifest = await apiWorker.fetch(
       new Request(createMethodUrl(
         "https://briar-api.example",
-        OrganizationAgentContextService.method.getManifest,
+        WorkspaceAgentContextService.method.getManifest,
       ), {
         method: "POST",
         headers: connectHeaders,
         body: JSON.stringify(toJson(
-          OrganizationAgentContextServiceGetManifestRequestSchema,
+          WorkspaceAgentContextServiceGetManifestRequestSchema,
           unchangedRequest,
         )),
       }),
@@ -1762,15 +1762,15 @@ describe("organization channels", () => {
     );
     expect(unchangedManifest.status).toBe(200);
     expect(fromJson(
-      OrganizationAgentContextServiceGetManifestResponseSchema,
+      WorkspaceAgentContextServiceGetManifestResponseSchema,
       await unchangedManifest.json(),
     ).result).toMatchObject({
       case: "unchanged",
-      value: { organizationId, workId: claimed!.id },
+      value: { workspaceId: organizationId, workId: claimed!.id },
     });
 
     const lookupRequest = create(
-      OrganizationAgentContextServiceLookupRequestSchema,
+      WorkspaceAgentContextServiceLookupRequestSchema,
       {
         claim,
         requestId: crypto.randomUUID(),
@@ -1786,13 +1786,13 @@ describe("organization channels", () => {
       new Request(
         createMethodUrl(
           "https://briar-api.example",
-          OrganizationAgentContextService.method.lookup,
+          WorkspaceAgentContextService.method.lookup,
         ),
         {
           method: "POST",
           headers: connectHeaders,
           body: JSON.stringify(toJson(
-            OrganizationAgentContextServiceLookupRequestSchema,
+            WorkspaceAgentContextServiceLookupRequestSchema,
             lookupRequest,
           )),
         },
@@ -1801,7 +1801,7 @@ describe("organization channels", () => {
     );
     expect(lookupResponse.status).toBe(200);
     const lookup = fromJson(
-      OrganizationAgentContextServiceLookupResponseSchema,
+      WorkspaceAgentContextServiceLookupResponseSchema,
       await lookupResponse.json(),
     );
     expect(lookup.results[0].query?.query).toMatchObject({

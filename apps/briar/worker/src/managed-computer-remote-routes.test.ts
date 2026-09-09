@@ -137,7 +137,7 @@ describe("managed computer remote desktop routes", () => {
     targetAgentId?: string,
   ) => fleet().createManagedComputerRemoteSession(
     {
-      organizationId,
+      workspaceId: organizationId,
       managedComputerId: computerId,
       requestId,
       reconnectSessionId,
@@ -318,7 +318,7 @@ describe("managed computer remote desktop routes", () => {
 
   it("ends control when the managed computer Worker credential is removed", async () => {
     const remove = () => fleet().deleteExecutionWorker({
-      organizationId,
+      workspaceId: organizationId,
       deviceId,
       requestId: `worker-deprovision:${deviceId}`,
     }, options(ownerToken));

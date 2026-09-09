@@ -48,7 +48,7 @@ const channelWork = () => create(WorkClaimIdentitySchema, {
   claimToken: "briar_channel_claim_generated",
   work: {
     case: "channelReply",
-    value: create(ChannelReplyClaimIdentitySchema, { organizationId }),
+    value: create(ChannelReplyClaimIdentitySchema, { workspaceId: organizationId }),
   },
 });
 

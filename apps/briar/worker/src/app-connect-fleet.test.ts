@@ -7,8 +7,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import {
   FleetService,
   ManagedComputerState,
-  UnbindProjectExecutionWorkerRequest_Reason,
-} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+  UnbindProjectExecutionWorkerRequest_Reason} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
@@ -233,7 +232,7 @@ describe("FleetService", () => {
   it("enforces capability and validates promotion input at the Connect boundary", async () => {
     const fleet = client();
     const product = await fleet.getManagedComputerProduct(
-      { organizationId },
+      { workspaceId: organizationId },
       options(memberToken),
     );
     expect(product).toMatchObject({
@@ -244,7 +243,7 @@ describe("FleetService", () => {
     expect(JSON.stringify(product)).not.toContain("GETBRIAR");
 
     const validation = await fleet.validateManagedComputerPromotion(
-      { organizationId, code: "not-it" },
+      { workspaceId: organizationId, code: "not-it" },
       options(ownerToken),
     );
     expect(validation).toMatchObject({
@@ -253,7 +252,7 @@ describe("FleetService", () => {
       totalCents: 10_000,
     });
     expect(await errorCode(fleet.applyForManagedComputer(
-      { organizationId, code: "GETBRIAR", requestId: "not-a-uuid" },
+      { workspaceId: organizationId, code: "GETBRIAR", requestId: "not-a-uuid" },
       options(ownerToken),
     ))).toBe(Code.InvalidArgument);
   });
@@ -261,7 +260,7 @@ describe("FleetService", () => {
   it("creates one managed computer application across an exact request replay", async () => {
     const fleet = client();
     const requestId = "22222222-2222-4222-8222-222222222222";
-    const application = { organizationId, code: "  getbriar ", requestId };
+    const application = { workspaceId: organizationId, code: "  getbriar ", requestId };
     const first = await fleet.applyForManagedComputer(
       application,
       options(ownerToken),
@@ -300,7 +299,7 @@ describe("FleetService", () => {
     const immediateStop = executionContext();
     const fleet = client(immediateStop.context);
     const retired = await fleet.retireManagedComputer(
-      { organizationId, managedComputerId: stableId },
+      { workspaceId: organizationId, managedComputerId: stableId },
       options(memberToken),
     );
     expect(retired).toMatchObject({
@@ -310,7 +309,7 @@ describe("FleetService", () => {
     expect(immediateStop.pending).toHaveLength(1);
     await Promise.all(immediateStop.pending);
     await expect(fleet.retireManagedComputer(
-      { organizationId, managedComputerId: stableId },
+      { workspaceId: organizationId, managedComputerId: stableId },
       options(ownerToken),
     )).resolves.toMatchObject({
       duplicate: true,
@@ -325,7 +324,7 @@ describe("FleetService", () => {
       state: "requested",
     });
     expect(await errorCode(fleet.retireManagedComputer(
-      { organizationId, managedComputerId: preparingId },
+      { workspaceId: organizationId, managedComputerId: preparingId },
       options(ownerToken),
     ))).toBe(Code.FailedPrecondition);
     await expect(db.prepare(
@@ -360,7 +359,7 @@ describe("FleetService", () => {
       "<TerminateInstancesResponse/>",
       { status: 200 },
     ));
-    const request = { organizationId, managedComputerId: computerId };
+    const request = { workspaceId: organizationId, managedComputerId: computerId };
     await expect(fleet.terminateManagedComputer(request, options(memberToken))).resolves.toMatchObject({
       duplicate: false,
       computer: { id: computerId, state: ManagedComputerState.TERMINATED },
@@ -382,7 +381,7 @@ describe("FleetService", () => {
       `select revoked_at from briar_execution_worker_credentials where device_id = ?`,
     ).bind(binding!.device_id).first<{ revoked_at: string | null }>();
     expect(credential?.revoked_at).toEqual(expect.any(String));
-    const listed = await fleet.listManagedComputers({ organizationId }, options(ownerToken));
+    const listed = await fleet.listManagedComputers({ workspaceId: organizationId }, options(ownerToken));
     expect(listed.computers.some((computer) => computer.id === computerId)).toBe(false);
     await expect(fleet.getManagedComputer(request, options(ownerToken))).resolves.toMatchObject({
       computer: { state: ManagedComputerState.TERMINATED },
@@ -406,7 +405,7 @@ describe("FleetService", () => {
       await seedManagedComputer({ computerId, entitlementId: crypto.randomUUID(), nonce: "c", state });
       const aws = vi.spyOn(globalThis, "fetch");
       await expect(client().terminateManagedComputer(
-        { organizationId, managedComputerId: computerId },
+        { workspaceId: organizationId, managedComputerId: computerId },
         options(ownerToken),
       )).rejects.toMatchObject({ code: Code.FailedPrecondition });
       expect(aws).not.toHaveBeenCalled();
@@ -425,9 +424,9 @@ describe("FleetService", () => {
       "<Response><Errors><Error><Code>ServiceUnavailable</Code><Message>Try again</Message></Error></Errors></Response>",
       { status: 503 },
     ));
-    const request = { organizationId, managedComputerId: computerId };
+    const request = { workspaceId: organizationId, managedComputerId: computerId };
     await expect(fleet.terminateManagedComputer(request, options(ownerToken))).rejects.toBeInstanceOf(ConnectError);
-    const listed = await fleet.listManagedComputers({ organizationId }, options(ownerToken));
+    const listed = await fleet.listManagedComputers({ workspaceId: organizationId }, options(ownerToken));
     expect(listed.computers.find((computer) => computer.id === computerId)?.state).toBe(ManagedComputerState.STOPPED);
     aws.mockResolvedValueOnce(new Response("<TerminateInstancesResponse/>", { status: 200 }));
     await expect(fleet.terminateManagedComputer(request, options(ownerToken))).resolves.toMatchObject({
@@ -444,7 +443,7 @@ describe("FleetService", () => {
       .bind(memberId).run();
     try {
       await expect(fleet.terminateManagedComputer(
-        { organizationId, managedComputerId: computerId }, options(memberToken),
+        { workspaceId: organizationId, managedComputerId: computerId }, options(memberToken),
       )).rejects.toMatchObject({ code: Code.PermissionDenied });
     } finally {
       await db.prepare(`update briar_organization_members set role = 'developer' where user_id = ?`)
@@ -460,11 +459,11 @@ describe("FleetService", () => {
         .bind(otherOrganizationId, ownerId, now, now),
     ]);
     await expect(fleet.terminateManagedComputer(
-      { organizationId: otherOrganizationId, managedComputerId: computerId }, options(ownerToken),
+      { workspaceId: otherOrganizationId, managedComputerId: computerId }, options(ownerToken),
     )).rejects.toMatchObject({ code: Code.NotFound });
     expect(aws).not.toHaveBeenCalled();
     await expect(fleet.getManagedComputer(
-      { organizationId, managedComputerId: computerId }, options(ownerToken),
+      { workspaceId: organizationId, managedComputerId: computerId }, options(ownerToken),
     )).resolves.toMatchObject({ computer: { state: ManagedComputerState.STOPPED } });
   });
 });

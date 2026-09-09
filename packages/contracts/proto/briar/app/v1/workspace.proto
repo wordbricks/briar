@@ -1,0 +1,198 @@
+syntax = "proto3";
+
+package briar.app.v1;
+
+import "briar/app/v1/common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "BriarAPI_";
+
+service WorkspaceService {
+  rpc ListWorkspaces(ListWorkspacesRequest) returns (ListWorkspacesResponse);
+  rpc CreateWorkspace(CreateWorkspaceRequest) returns (CreateWorkspaceResponse);
+  rpc CheckWorkspaceHandleAvailability(CheckWorkspaceHandleAvailabilityRequest) returns (CheckWorkspaceHandleAvailabilityResponse);
+  rpc UpdateWorkspace(UpdateWorkspaceRequest) returns (UpdateWorkspaceResponse);
+  rpc UpdateWorkspaceLogo(UpdateWorkspaceLogoRequest) returns (UpdateWorkspaceLogoResponse);
+  rpc ListWorkspaceInvitations(ListWorkspaceInvitationsRequest) returns (ListWorkspaceInvitationsResponse);
+  rpc CreateWorkspaceInvitation(CreateWorkspaceInvitationRequest) returns (CreateWorkspaceInvitationResponse);
+  rpc RevokeWorkspaceInvitation(RevokeWorkspaceInvitationRequest) returns (RevokeWorkspaceInvitationResponse);
+  rpc GetWorkspaceInvitation(GetWorkspaceInvitationRequest) returns (GetWorkspaceInvitationResponse);
+  rpc AcceptWorkspaceInvitation(AcceptWorkspaceInvitationRequest) returns (AcceptWorkspaceInvitationResponse);
+  rpc ListWorkspaceMembers(ListWorkspaceMembersRequest) returns (ListWorkspaceMembersResponse);
+  rpc UpdateWorkspaceMemberRole(UpdateWorkspaceMemberRoleRequest) returns (UpdateWorkspaceMemberRoleResponse);
+  rpc UpdateWorkspaceMemberProjects(UpdateWorkspaceMemberProjectsRequest) returns (UpdateWorkspaceMemberProjectsResponse);
+  rpc RemoveWorkspaceMember(RemoveWorkspaceMemberRequest) returns (RemoveWorkspaceMemberResponse);
+}
+
+enum WorkspaceInvitationStatus {
+  WORKSPACE_INVITATION_STATUS_UNSPECIFIED = 0;
+  WORKSPACE_INVITATION_STATUS_PENDING = 1;
+  WORKSPACE_INVITATION_STATUS_ACCEPTED = 2;
+  WORKSPACE_INVITATION_STATUS_EXPIRED = 3;
+  WORKSPACE_INVITATION_STATUS_REVOKED = 4;
+}
+
+message Workspace {
+  string id = 1;
+  string name = 2;
+  string handle = 3;
+  optional string logo = 4;
+  ProjectRole role = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message WorkspaceInvitation {
+  string id = 1;
+  string workspace_id = 2;
+  string workspace_name = 3;
+  string initial_project_id = 4;
+  string initial_project_name = 5;
+  string email = 6;
+  string email_hint = 7;
+  ProjectRole role = 8;
+  WorkspaceInvitationStatus status = 9;
+  google.protobuf.Timestamp expires_at = 10;
+  optional google.protobuf.Timestamp accepted_at = 11;
+  google.protobuf.Timestamp created_at = 12;
+}
+
+// Public invitation data deliberately has no email field. The server must never
+// expose the invited address to a caller that only possesses an invitation token.
+message WorkspaceInvitationPreview {
+  string id = 1;
+  string workspace_id = 2;
+  string workspace_name = 3;
+  string initial_project_id = 4;
+  string initial_project_name = 5;
+  string email_hint = 6;
+  ProjectRole role = 7;
+  WorkspaceInvitationStatus status = 8;
+  google.protobuf.Timestamp expires_at = 9;
+  optional google.protobuf.Timestamp accepted_at = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message ListWorkspacesRequest {}
+
+message ListWorkspacesResponse {
+  repeated Workspace workspaces = 1;
+}
+
+message CreateWorkspaceRequest {
+  string name = 1;
+  string handle = 2;
+}
+
+message CreateWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message CheckWorkspaceHandleAvailabilityRequest {
+  string handle = 1;
+}
+
+message CheckWorkspaceHandleAvailabilityResponse {
+  bool available = 1;
+}
+
+message UpdateWorkspaceRequest {
+  string workspace_id = 1;
+  string name = 2;
+}
+
+message UpdateWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message UpdateWorkspaceLogoRequest {
+  string workspace_id = 1;
+
+  oneof logo_update {
+    string logo = 2;
+    google.protobuf.Empty clear_logo = 3;
+  }
+}
+
+message UpdateWorkspaceLogoResponse {
+  Workspace workspace = 1;
+}
+
+message ListWorkspaceInvitationsRequest {
+  string workspace_id = 1;
+}
+
+message ListWorkspaceInvitationsResponse {
+  repeated WorkspaceInvitation invitations = 1;
+}
+
+message CreateWorkspaceInvitationRequest {
+  string workspace_id = 1;
+  string email = 2;
+  ProjectRole role = 3;
+  string initial_project_id = 4;
+}
+
+message CreateWorkspaceInvitationResponse {
+  WorkspaceInvitation invitation = 1;
+  string invite_path = 2;
+}
+
+message RevokeWorkspaceInvitationRequest {
+  string workspace_id = 1;
+  string invitation_id = 2;
+}
+
+message RevokeWorkspaceInvitationResponse {}
+
+message GetWorkspaceInvitationRequest {
+  string token = 1;
+}
+
+message GetWorkspaceInvitationResponse {
+  WorkspaceInvitationPreview invitation = 1;
+}
+
+message AcceptWorkspaceInvitationRequest {
+  string token = 1;
+}
+
+message AcceptWorkspaceInvitationResponse {
+  WorkspaceInvitationPreview invitation = 1;
+  bool already_accepted = 2;
+}
+
+message ListWorkspaceMembersRequest {
+  string workspace_id = 1;
+}
+
+message ListWorkspaceMembersResponse {
+  repeated WorkspaceMember members = 1;
+}
+
+message UpdateWorkspaceMemberRoleRequest {
+  string workspace_id = 1;
+  string user_id = 2;
+  ProjectRole role = 3;
+}
+
+message UpdateWorkspaceMemberRoleResponse {
+  repeated WorkspaceMember members = 1;
+}
+
+message UpdateWorkspaceMemberProjectsRequest {
+  string workspace_id = 1;
+  string user_id = 2;
+  repeated string project_ids = 3;
+}
+
+message UpdateWorkspaceMemberProjectsResponse {
+  repeated WorkspaceMember members = 1;
+}
+
+message RemoveWorkspaceMemberRequest {
+  string workspace_id = 1;
+  string user_id = 2;
+}
+
+message RemoveWorkspaceMemberResponse {}

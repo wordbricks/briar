@@ -3,8 +3,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { createClient } from "@connectrpc/connect";
 import {
   AgentSkillExecutionStatus as ProtoAgentSkillExecutionStatus,
-  type AgentSkillExecutionProposal as AgentSkillExecutionProposalMessage,
-} from "@briar/contracts/gen/briar/app/v1/agent_pb";
+  type AgentSkillExecutionProposal as AgentSkillExecutionProposalMessage} from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import {
   ChannelKind as ProtoChannelKind,
   ChannelMemberRole as ProtoChannelMemberRole,
@@ -29,8 +28,7 @@ import {
   type ChannelSummary as ChannelSummaryMessage,
   type ChannelWebhook as ChannelWebhookMessage,
   type CreateChannelMessageResponse as CreateChannelMessageResponseMessage,
-  type SyncChannelsResponse as SyncChannelsResponseMessage,
-} from "@briar/contracts/gen/briar/app/v1/channel_pb";
+  type SyncChannelsResponse as SyncChannelsResponseMessage} from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import {
   ApprovalOutcome as ProtoApprovalOutcome,
   BlockText_Kind as ProtoBlockTextKind,
@@ -42,14 +40,12 @@ import {
   type RichTextElement as RichTextElementMessage,
   type RichTextInline as RichTextInlineMessage,
   type RichTextSection as RichTextSectionMessage,
-  type RichTextStyle as RichTextStyleMessage,
-} from "@briar/contracts/gen/briar/app/v1/common_pb";
+  type RichTextStyle as RichTextStyleMessage} from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   IssueExecutionDispatch_DispatchMode as ProtoDispatchMode,
   IssueExecutionDispatch_Outcome as ProtoDispatchOutcome,
   type IssueExecutionDispatch as IssueExecutionDispatchMessage,
-  type IssueExecutionProposal as IssueExecutionProposalMessage,
-} from "@briar/contracts/gen/briar/app/v1/issue_pb";
+  type IssueExecutionProposal as IssueExecutionProposalMessage} from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import type { AutoHuntSession } from "../../types";
 import type {
   AgentSkillExecutionApprovalInput,

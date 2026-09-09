@@ -6,8 +6,7 @@ import {
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   DmMemoryBriefState,
-  DmMemoryDescriptorSchema,
-} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+  DmMemoryDescriptorSchema} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
@@ -32,7 +31,7 @@ import {
   ChannelDelegationTarget_SkillSchema,
   ClaimedInboundAgentMessageSchema,
   ChannelReplyScopeSchema,
-  ChannelReplyScope_OrganizationSchema,
+  ChannelReplyScope_WorkspaceSchema,
   ChannelReplyScope_ProjectSchema,
   ChannelReplySessionSchema,
   DetachedAgentClaimSchema,
@@ -54,8 +53,7 @@ import {
   MergeBatchValidationFailureCode,
   DmMessagePublicationKind,
   type ClaimedIssue,
-  type ClaimedWork,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  type ClaimedWork} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import {
@@ -65,8 +63,7 @@ import {
   WorkflowCompletionSchema,
   WorkflowExecutionSchema,
   WorkflowRequirementSchema,
-  WorkflowStageSchema,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
+  WorkflowStageSchema} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import type { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import type { claimNextIssueReplyWork } from "./issue-reply-worker-routes";
 import type { claimNextMergeBatchWork } from "./merge-batch-worker";
@@ -535,15 +532,15 @@ const channelReply = (
       scope: create(ChannelReplyScopeSchema, {
         scope: value.scope.kind === "organization"
           ? {
-              case: "organization",
-              value: create(ChannelReplyScope_OrganizationSchema, {
-                organizationId: value.scope.organizationId,
+              case: "workspace",
+              value: create(ChannelReplyScope_WorkspaceSchema, {
+                workspaceId: value.scope.organizationId,
               }),
             }
           : {
               case: "project",
               value: create(ChannelReplyScope_ProjectSchema, {
-                organizationId: value.scope.organizationId,
+                workspaceId: value.scope.organizationId,
                 projectId: value.scope.projectId,
               }),
             },
@@ -579,7 +576,7 @@ const channelReply = (
       claimedAt: requiredTimestamp(value.claimedAt, "claimedAt"),
       leaseExpiresAt: requiredTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
       activity: activity(value.activity),
-      organizationContextSnapshotAt: value.organizationContext
+      workspaceContextSnapshotAt: value.organizationContext
         ? requiredTimestamp(
             value.organizationContext.snapshotAt,
             "organizationContext.snapshotAt",
@@ -783,7 +780,7 @@ const dmMemoryLearning = (
     value: create(ClaimedDmMemoryLearningSchema, {
       workId: value.workId,
       runId: value.runId,
-      organizationId: value.organizationId,
+      workspaceId: value.organizationId,
       workerId: value.workerId,
       sourceKey: value.sourceKey,
       title: value.title,

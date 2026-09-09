@@ -8,17 +8,18 @@ import { ValueSchema, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import {
-  OrganizationAgentContextService,
-  OrganizationAgentContextServiceGetManifestResponseSchema,
-} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+  WorkspaceAgentContextService,
+  WorkspaceAgentContextServiceGetManifestResponseSchema,
+} from "@briar/contracts/gen/briar/worker/v1/workspace_agent_context_pb";
 import {
   DmMemoryBriefState,
   DmMemoryDescriptorSchema,
 } from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
-  ChannelReplyScope_OrganizationSchema,
   CheckDmMemoryClaimResponseSchema,
   ClaimedWorkSchema,
+  ChannelReplyScopeSchema,
+  ChannelReplyScope_WorkspaceSchema,
   DetachedAgentClaimSchema,
   CompleteChannelReplyResponseSchema,
   GetDmMemoryBriefResponseSchema,
@@ -185,13 +186,13 @@ describe("DM memory in the actual channel reply runner", () => {
             });
           },
         });
-        router.service(OrganizationAgentContextService, {
+        router.service(WorkspaceAgentContextService, {
           getManifest: () =>
-            create(OrganizationAgentContextServiceGetManifestResponseSchema, {
+            create(WorkspaceAgentContextServiceGetManifestResponseSchema, {
               result: {
                 case: "manifest",
                 value: {
-                  organizationId,
+                  workspaceId: organizationId,
                   workId,
                   snapshotAt: timestampFromDate(new Date(snapshotAt)),
                   revision: "a".repeat(64),
@@ -252,14 +253,14 @@ describe("DM memory in the actual channel reply runner", () => {
         value: {
           workId,
           channelId: crypto.randomUUID(),
-          scope: {
+          scope: create(ChannelReplyScopeSchema, {
             scope: {
-              case: "organization",
-              value: create(ChannelReplyScope_OrganizationSchema, {
-                organizationId,
+              case: "workspace",
+              value: create(ChannelReplyScope_WorkspaceSchema, {
+                workspaceId: organizationId,
               }),
             },
-          },
+          }),
           runId: crypto.randomUUID(),
           sourceKey: "synthetic",
           title: "Reply",
@@ -277,7 +278,7 @@ describe("DM memory in the actual channel reply runner", () => {
           claimedAt: timestampFromDate(new Date(snapshotAt)),
           leaseExpiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
           snapshot: {},
-          organizationContextSnapshotAt: timestampFromDate(new Date(snapshotAt)),
+          workspaceContextSnapshotAt: timestampFromDate(new Date(snapshotAt)),
           memory: wireDescriptor(0),
           ...(input.activity
             ? {

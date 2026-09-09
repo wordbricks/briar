@@ -4,13 +4,11 @@ import {
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
   DeclineChannelProposalResponse_Outcome,
-  DeclineChannelProposalResponseSchema,
-} from "@briar/contracts/gen/briar/app/v1/channel_pb";
+  DeclineChannelProposalResponseSchema} from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   PreparedUploadSchema,
-  UploadReferenceSchema,
-} from "@briar/contracts/gen/briar/types/v1/upload_pb";
+  UploadReferenceSchema} from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import {
   Code,
   ConnectError,

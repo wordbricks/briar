@@ -68,7 +68,7 @@ final class MobileAPIContractTests: XCTestCase {
     }
 
     func testChannelRealtimeGeneratedOneofMapsToDomainEvent() throws {
-        var frame = BriarRealtime_OrganizationNotification()
+        var frame = BriarRealtime_WorkspaceNotification()
         var changed = BriarRealtime_ProjectAgentSessionsChanged()
         changed.projectID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
         changed.version = 43

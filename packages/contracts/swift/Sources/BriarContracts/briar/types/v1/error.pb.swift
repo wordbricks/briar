@@ -133,7 +133,7 @@ public nonisolated enum BriarTypes_ResourceKind: SwiftProtobuf.Enum, Swift.CaseI
   case unspecified // = 0
   case requestRate // = 1
   case user // = 2
-  case organization // = 3
+  case workspace // = 3
   case managedComputer // = 4
   case workerSession // = 5
   case storageBytes // = 6
@@ -148,7 +148,7 @@ public nonisolated enum BriarTypes_ResourceKind: SwiftProtobuf.Enum, Swift.CaseI
     case 0: self = .unspecified
     case 1: self = .requestRate
     case 2: self = .user
-    case 3: self = .organization
+    case 3: self = .workspace
     case 4: self = .managedComputer
     case 5: self = .workerSession
     case 6: self = .storageBytes
@@ -161,7 +161,7 @@ public nonisolated enum BriarTypes_ResourceKind: SwiftProtobuf.Enum, Swift.CaseI
     case .unspecified: return 0
     case .requestRate: return 1
     case .user: return 2
-    case .organization: return 3
+    case .workspace: return 3
     case .managedComputer: return 4
     case .workerSession: return 5
     case .storageBytes: return 6
@@ -174,7 +174,7 @@ public nonisolated enum BriarTypes_ResourceKind: SwiftProtobuf.Enum, Swift.CaseI
     .unspecified,
     .requestRate,
     .user,
-    .organization,
+    .workspace,
     .managedComputer,
     .workerSession,
     .storageBytes,
@@ -413,7 +413,7 @@ nonisolated extension BriarTypes_WorkerSelectionFailureReason: SwiftProtobuf._Pr
 }
 
 nonisolated extension BriarTypes_ResourceKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0RESOURCE_KIND_UNSPECIFIED\0\u{1}RESOURCE_KIND_REQUEST_RATE\0\u{1}RESOURCE_KIND_USER\0\u{1}RESOURCE_KIND_ORGANIZATION\0\u{1}RESOURCE_KIND_MANAGED_COMPUTER\0\u{1}RESOURCE_KIND_WORKER_SESSION\0\u{1}RESOURCE_KIND_STORAGE_BYTES\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0RESOURCE_KIND_UNSPECIFIED\0\u{1}RESOURCE_KIND_REQUEST_RATE\0\u{1}RESOURCE_KIND_USER\0\u{1}RESOURCE_KIND_WORKSPACE\0\u{1}RESOURCE_KIND_MANAGED_COMPUTER\0\u{1}RESOURCE_KIND_WORKER_SESSION\0\u{1}RESOURCE_KIND_STORAGE_BYTES\0")
 }
 
 nonisolated extension BriarTypes_FieldViolation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

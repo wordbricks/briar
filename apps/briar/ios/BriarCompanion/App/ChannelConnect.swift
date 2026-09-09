@@ -128,7 +128,7 @@ extension DirectMessageParticipant {
 }
 
 extension OrganizationMember {
-    init(connectMessage message: BriarAPI_OrganizationMember) throws {
+    init(connectMessage message: BriarAPI_WorkspaceMember) throws {
         guard !message.userID.isEmpty, message.hasCreatedAt else {
             throw MobileAPIError.invalidResponse
         }

@@ -45,10 +45,10 @@ const ticketScope = (
   request: Parameters<ServiceImpl<typeof RealtimeService>["createRealtimeTicket"]>[0],
 ): RealtimeTicketScope => {
   switch (request.scope.case) {
-    case "organizationNotifications":
+    case "workspaceNotifications":
       return {
-        type: "organizationNotifications",
-        organizationId: canonicalUuid(request.scope.value.organizationId),
+        type: "workspaceNotifications",
+        organizationId: canonicalUuid(request.scope.value.workspaceId),
       };
     case "issueActivity":
       return {
@@ -59,7 +59,7 @@ const ticketScope = (
     case "channelActivity":
       return {
         type: "channelActivity",
-        organizationId: canonicalUuid(request.scope.value.organizationId),
+        organizationId: canonicalUuid(request.scope.value.workspaceId),
         channelId: canonicalUuid(request.scope.value.channelId),
       };
     case undefined:

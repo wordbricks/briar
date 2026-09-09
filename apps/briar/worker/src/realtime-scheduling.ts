@@ -5,8 +5,7 @@ import {
   AgentReplyActivityFrameSchema,
   ChannelActivityScopeSchema,
   IssueActivityScopeSchema,
-  type AgentReplyActivityFrame,
-} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+  type AgentReplyActivityFrame} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import {
   agentActivityKindToProto,
   CHANNEL_AGENT_ACTIVITY_STALE_MS,

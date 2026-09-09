@@ -1302,8 +1302,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
 
     private static func organizationMemberMessage(
         _ value: OrganizationMember
-    ) -> BriarAPI_OrganizationMember {
-        var message = BriarAPI_OrganizationMember()
+    ) -> BriarAPI_WorkspaceMember {
+        var message = BriarAPI_WorkspaceMember()
         message.userID = value.userId
         message.name = value.name
         message.email = value.email

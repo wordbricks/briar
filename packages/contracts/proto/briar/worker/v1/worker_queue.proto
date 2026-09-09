@@ -361,12 +361,12 @@ message IssueReplyClaimIdentity {}
 message ProjectAgentTaskClaimIdentity {}
 message MergeBatchClaimIdentity {}
 message DmMemoryLearningClaimIdentity {
-  string organization_id = 1;
+  string workspace_id = 1;
   string input_hash = 2;
 }
 
 message ChannelReplyClaimIdentity {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message RenewWorkLeaseResponse {
@@ -703,7 +703,7 @@ message DmMemoryLearningLeaseRenewal {}
 message ClaimedDmMemoryLearning {
   string work_id = 1;
   string run_id = 2;
-  string organization_id = 3;
+  string workspace_id = 3;
   string worker_id = 4;
   string source_key = 5;
   string title = 6;
@@ -1215,17 +1215,17 @@ message ClaimedIssueReply {
 }
 
 message ChannelReplyScope {
-  message Organization {
-    string organization_id = 1;
+  message Workspace {
+    string workspace_id = 1;
   }
 
   message Project {
-    string organization_id = 1;
+    string workspace_id = 1;
     string project_id = 2;
   }
 
   oneof scope {
-    Organization organization = 1;
+    Workspace workspace = 1;
     Project project = 2;
   }
 }
@@ -1252,7 +1252,7 @@ message ChannelDelegationTarget {
 }
 
 // An Agent the claiming Agent may message directly. Unlike a delegation target
-// this one is not restricted to the channel roster, and an Organization Agent
+// this one is not restricted to the channel roster, and an Workspace Agent
 // has no project, so both project fields are optional.
 message ChannelAgentMessageTarget {
   string agent_id = 1;
@@ -1310,7 +1310,7 @@ message ClaimedChannelReply {
   google.protobuf.Timestamp claimed_at = 16;
   google.protobuf.Timestamp lease_expires_at = 17;
   optional ChannelActivityCredential activity = 18;
-  optional google.protobuf.Timestamp organization_context_snapshot_at = 19;
+  optional google.protobuf.Timestamp workspace_context_snapshot_at = 19;
   optional ClaimedChannelDelegation delegation = 20;
   repeated ChannelDelegationTarget delegation_targets = 21;
   optional ChannelReplySession session = 22;
@@ -1497,7 +1497,7 @@ message ResolveDmReplyRoutingResponse {
   DmReplyRouting decision = 1;
 }
 
-// This operation inherits its organization, DM, owner and Agent from the live claim.
+// This operation inherits its workspace, DM, owner and Agent from the live claim.
 message DmScheduleToolOperation {
   string action = 1;
   string request_key = 2;

@@ -84,7 +84,7 @@ message ListDirectMessageRecipientsRequest {
 }
 
 message ListDirectMessageRecipientsResponse {
-  repeated OrganizationMember members = 1;
+  repeated WorkspaceMember members = 1;
   repeated WorkspaceAgent agents = 2;
 }
 

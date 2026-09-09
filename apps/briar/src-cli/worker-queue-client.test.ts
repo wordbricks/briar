@@ -20,8 +20,8 @@ describe("worker queue claim validation", () => {
               claimToken: "claim-1",
               scope: {
                 scope: {
-                  case: "organization",
-                  value: { organizationId: "organization-1" },
+                  case: "workspace",
+                  value: { workspaceId: "organization-1" },
                 },
               },
             },
@@ -51,7 +51,7 @@ describe("worker queue claim validation", () => {
         claimToken: "claim-1",
         work: {
           case: "channelReply",
-          value: { organizationId: "organization-1" },
+          value: { workspaceId: "organization-1" },
         },
       },
       outcome: {

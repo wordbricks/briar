@@ -1,8 +1,7 @@
 import {
   WorkspaceUsageRange,
   ProjectUsagePeriod,
-  ReportingService,
-} from "@briar/contracts/gen/briar/app/v1/reporting_pb";
+  ReportingService} from "@briar/contracts/gen/briar/app/v1/reporting_pb";
 import { Code, ConnectError, type ConnectRouter, type ServiceImpl } from "@connectrpc/connect";
 import type { BriarAuth } from "./auth";
 

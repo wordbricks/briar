@@ -8,8 +8,7 @@ import {
   SandboxMode,
   type ComputerUseChildBinding,
   type DmMessagePublicationBinding,
-  type RunnerToParent,
-} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+  type RunnerToParent} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { AgentAttachment } from "../src-agent/runner-attachments";
 import {
   sidecarProviderBlock,

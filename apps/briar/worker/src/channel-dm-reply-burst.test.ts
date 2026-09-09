@@ -514,7 +514,7 @@ describe("direct message reply bursts", () => {
           "connect-protocol-version": "1", "content-type": "application/json" },
         body: JSON.stringify({ projectId, workerId, stopUnconfirmed, work: {
           workId: work.workId, runId: work.channelId, claimToken: work.claimToken,
-          channelReply: { organizationId },
+          channelReply: { workspaceId: organizationId },
         } }),
       }), env());
     expect(response.status).toBe(200);
@@ -985,7 +985,7 @@ describe("direct message reply bursts", () => {
           method: "POST", headers: { authorization: `Bearer ${workerToken}`,
             "connect-protocol-version": "1", "content-type": "application/json" },
           body: JSON.stringify({ projectId, workerId, work: { workId: first.workId,
-            runId: channelId, claimToken: token, channelReply: { organizationId } },
+            runId: channelId, claimToken: token, channelReply: { workspaceId: organizationId } },
             decision: { action: "new" } }),
         }), env());
       expect((await requestRouting("stale-token")).status).toBe(400);

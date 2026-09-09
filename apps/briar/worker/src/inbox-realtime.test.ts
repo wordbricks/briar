@@ -1,4 +1,4 @@
-import { OrganizationNotificationSchema } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+import { WorkspaceNotificationSchema as OrganizationNotificationSchema} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { fromBinary } from "@bufbuild/protobuf";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";

@@ -20,8 +20,8 @@ export const createOrganizationRealtimeTicket = async (
 ) => {
   const response = await requireRealtimeClient().createRealtimeTicket({
     scope: {
-      case: "organizationNotifications",
-      value: { organizationId },
+      case: "workspaceNotifications",
+      value: { workspaceId: organizationId },
     },
   }, appCallOptions(token, signal));
   return response.url;
@@ -51,7 +51,7 @@ export const createChannelActivityTicket = async (
   const response = await requireRealtimeClient().createRealtimeTicket({
     scope: {
       case: "channelActivity",
-      value: { organizationId, channelId },
+      value: { workspaceId: organizationId, channelId },
     },
   }, appCallOptions(token, signal));
   return response.url;

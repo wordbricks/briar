@@ -87,7 +87,7 @@ describe("realtime ticket application", () => {
     await expect(createRealtimeTicketApplication({
       ...common,
       scope: {
-        type: "organizationNotifications",
+        type: "workspaceNotifications",
         organizationId,
       },
     }, mocks.value)).resolves.toEqual({

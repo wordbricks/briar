@@ -5,8 +5,7 @@ import {
 } from "@connectrpc/connect";
 import {
   ApplicationErrorDetailSchema,
-  ValidationErrorDetailSchema,
-} from "@briar/contracts/gen/briar/types/v1/error_pb";
+  ValidationErrorDetailSchema} from "@briar/contracts/gen/briar/types/v1/error_pb";
 import * as SchemaIssue from "effect/SchemaIssue";
 import { agentSkillConflictMessage } from "./agent-skills";
 import { HttpError } from "./http-response";

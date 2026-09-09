@@ -10313,34 +10313,34 @@ where
     }
 }
 
-///Shorthand for `OwnedView<OrganizationAgentContextServiceGetManifestRequestView<'static>>`.
-pub type OwnedOrganizationAgentContextServiceGetManifestRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestRequestView<
+///Shorthand for `OwnedView<WorkspaceAgentContextServiceGetManifestRequestView<'static>>`.
+pub type OwnedWorkspaceAgentContextServiceGetManifestRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<OrganizationAgentContextServiceGetManifestResponseView<'static>>`.
-pub type OwnedOrganizationAgentContextServiceGetManifestResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+///Shorthand for `OwnedView<WorkspaceAgentContextServiceGetManifestResponseView<'static>>`.
+pub type OwnedWorkspaceAgentContextServiceGetManifestResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<OrganizationAgentContextServiceLookupRequestView<'static>>`.
-pub type OwnedOrganizationAgentContextServiceLookupRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupRequestView<
+///Shorthand for `OwnedView<WorkspaceAgentContextServiceLookupRequestView<'static>>`.
+pub type OwnedWorkspaceAgentContextServiceLookupRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<OrganizationAgentContextServiceLookupResponseView<'static>>`.
-pub type OwnedOrganizationAgentContextServiceLookupResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+///Shorthand for `OwnedView<WorkspaceAgentContextServiceLookupResponseView<'static>>`.
+pub type OwnedWorkspaceAgentContextServiceLookupResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
         'static,
     >,
 >;
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
 >
-for crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+for crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
     '_,
 > {
     fn encode(
@@ -10351,10 +10351,10 @@ for crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServ
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
         'static,
     >,
 > {
@@ -10380,9 +10380,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
 >
-for crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+for crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
     '_,
 > {
     fn encode(
@@ -10393,10 +10393,10 @@ for crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServ
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
         'static,
     >,
 > {
@@ -10422,20 +10422,20 @@ for ::buffa::view::OwnedView<
     }
 }
 /// Full service name for this service.
-pub const ORGANIZATION_AGENT_CONTEXT_SERVICE_SERVICE_NAME: &str = "briar.worker.v1.OrganizationAgentContextService";
+pub const WORKSPACE_AGENT_CONTEXT_SERVICE_SERVICE_NAME: &str = "briar.worker.v1.WorkspaceAgentContextService";
 /// Static [`Spec`](::connectrpc::Spec) for the `GetManifest` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const ORGANIZATION_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.OrganizationAgentContextService/GetManifest",
+pub const WORKSPACE_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkspaceAgentContextService/GetManifest",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `Lookup` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.OrganizationAgentContextService/Lookup",
+pub const WORKSPACE_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkspaceAgentContextService/Lookup",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Claim-scoped, lazily hydrated context for Organization Agents. The Worker
+/// Claim-scoped, lazily hydrated context for Workspace Agents. The Worker
 /// credential authenticates the machine; the claim capability in each request
 /// authorizes one active channel reply.
 ///
@@ -10487,7 +10487,7 @@ pub const ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC: ::connectrpc::Spec = :
 /// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
 /// example` doc.
 #[allow(clippy::type_complexity)]
-pub trait OrganizationAgentContextService: Send + Sync + 'static {
+pub trait WorkspaceAgentContextService: Send + Sync + 'static {
     /// Handle the GetManifest RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -10502,12 +10502,12 @@ pub trait OrganizationAgentContextService: Send + Sync + 'static {
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+            crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+                crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -10525,12 +10525,12 @@ pub trait OrganizationAgentContextService: Send + Sync + 'static {
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+            crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+                crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -10550,7 +10550,7 @@ pub trait OrganizationAgentContextService: Send + Sync + 'static {
 /// let service = Arc::new(MyServiceImpl);
 /// let router = service.register(Router::new());
 /// ```
-pub trait OrganizationAgentContextServiceExt: OrganizationAgentContextService {
+pub trait WorkspaceAgentContextServiceExt: WorkspaceAgentContextService {
     /// Register this service implementation with a Router.
     ///
     /// Takes ownership of the `Arc<Self>` and returns a new Router with
@@ -10560,21 +10560,21 @@ pub trait OrganizationAgentContextServiceExt: OrganizationAgentContextService {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router;
 }
-impl<S: OrganizationAgentContextService> OrganizationAgentContextServiceExt for S {
+impl<S: WorkspaceAgentContextService> WorkspaceAgentContextServiceExt for S {
     fn register(
         self: ::std::sync::Arc<Self>,
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
             .route_view(
-                ORGANIZATION_AGENT_CONTEXT_SERVICE_SERVICE_NAME,
+                WORKSPACE_AGENT_CONTEXT_SERVICE_SERVICE_NAME,
                 "GetManifest",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestRequestView<
                                 'static,
                             >,
                         >,
@@ -10583,27 +10583,27 @@ impl<S: OrganizationAgentContextService> OrganizationAgentContextServiceExt for 
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+                                crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
                             >::from_parts(req.reborrow(), req.bytes());
                             svc.get_manifest(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+                                    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(ORGANIZATION_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC)
+            .with_spec(WORKSPACE_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC)
             .route_view(
-                ORGANIZATION_AGENT_CONTEXT_SERVICE_SERVICE_NAME,
+                WORKSPACE_AGENT_CONTEXT_SERVICE_SERVICE_NAME,
                 "Lookup",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupRequestView<
                                 'static,
                             >,
                         >,
@@ -10612,32 +10612,32 @@ impl<S: OrganizationAgentContextService> OrganizationAgentContextServiceExt for 
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+                                crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
                             >::from_parts(req.reborrow(), req.bytes());
                             svc.lookup(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+                                    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC)
+            .with_spec(WORKSPACE_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
 #[doc(hidden)]
-pub struct OrganizationAgentContextServiceRegisterMarker;
+pub struct WorkspaceAgentContextServiceRegisterMarker;
 impl<
-    S: OrganizationAgentContextService,
-> ::connectrpc::ServiceRegister<OrganizationAgentContextServiceRegisterMarker>
+    S: WorkspaceAgentContextService,
+> ::connectrpc::ServiceRegister<WorkspaceAgentContextServiceRegisterMarker>
 for ::std::sync::Arc<S> {
     fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
-        <S as OrganizationAgentContextServiceExt>::register(self, router)
+        <S as WorkspaceAgentContextServiceExt>::register(self, router)
     }
 }
-/// Monomorphic dispatcher for `OrganizationAgentContextService`.
+/// Monomorphic dispatcher for `WorkspaceAgentContextService`.
 ///
 /// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
 ///
@@ -10646,14 +10646,14 @@ for ::std::sync::Arc<S> {
 /// ```rust,ignore
 /// use connectrpc::ConnectRpcService;
 ///
-/// let server = OrganizationAgentContextServiceServer::new(MyImpl);
+/// let server = WorkspaceAgentContextServiceServer::new(MyImpl);
 /// let service = ConnectRpcService::new(server);
 /// // hand `service` to axum/hyper as a fallback_service
 /// ```
-pub struct OrganizationAgentContextServiceServer<T> {
+pub struct WorkspaceAgentContextServiceServer<T> {
     inner: ::std::sync::Arc<T>,
 }
-impl<T: OrganizationAgentContextService> OrganizationAgentContextServiceServer<T> {
+impl<T: WorkspaceAgentContextService> WorkspaceAgentContextServiceServer<T> {
     /// Wrap a service implementation in a monomorphic dispatcher.
     pub fn new(service: T) -> Self {
         Self {
@@ -10665,33 +10665,32 @@ impl<T: OrganizationAgentContextService> OrganizationAgentContextServiceServer<T
         Self { inner }
     }
 }
-impl<T> Clone for OrganizationAgentContextServiceServer<T> {
+impl<T> Clone for WorkspaceAgentContextServiceServer<T> {
     fn clone(&self) -> Self {
         Self {
             inner: ::std::sync::Arc::clone(&self.inner),
         }
     }
 }
-impl<T: OrganizationAgentContextService> ::connectrpc::Dispatcher
-for OrganizationAgentContextServiceServer<T> {
+impl<T: WorkspaceAgentContextService> ::connectrpc::Dispatcher
+for WorkspaceAgentContextServiceServer<T> {
     #[inline]
     fn lookup(
         &self,
         path: &str,
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
-        let method = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/")?;
+        let method = path.strip_prefix("briar.worker.v1.WorkspaceAgentContextService/")?;
         match method {
             "GetManifest" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(ORGANIZATION_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC),
+                        .with_spec(WORKSPACE_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC),
                 )
             }
             "Lookup" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC),
+                        .with_spec(WORKSPACE_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC),
                 )
             }
             _ => None,
@@ -10705,7 +10704,7 @@ for OrganizationAgentContextServiceServer<T> {
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
         let Some(method) = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/") else {
+            .strip_prefix("briar.worker.v1.WorkspaceAgentContextService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
         };
         let _ = (&ctx, &request, &format);
@@ -10714,21 +10713,21 @@ for OrganizationAgentContextServiceServer<T> {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+                        crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+                        crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
                     >::from_parts(&req, &body);
                     svc.get_manifest(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+                            crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
                         >(format)
                 })
             }
@@ -10736,21 +10735,21 @@ for OrganizationAgentContextServiceServer<T> {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+                        crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+                        crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
                     >::from_parts(&req, &body);
                     svc.lookup(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+                            crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
                         >(format)
                 })
             }
@@ -10765,7 +10764,7 @@ for OrganizationAgentContextServiceServer<T> {
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
         let Some(method) = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/") else {
+            .strip_prefix("briar.worker.v1.WorkspaceAgentContextService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
         };
         let _ = (&ctx, &request, &format);
@@ -10781,7 +10780,7 @@ for OrganizationAgentContextServiceServer<T> {
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
         let Some(method) = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/") else {
+            .strip_prefix("briar.worker.v1.WorkspaceAgentContextService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
         };
         let _ = (&ctx, &requests, &format);
@@ -10797,7 +10796,7 @@ for OrganizationAgentContextServiceServer<T> {
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
         let Some(method) = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/") else {
+            .strip_prefix("briar.worker.v1.WorkspaceAgentContextService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
         };
         let _ = (&ctx, &requests, &format);
@@ -10823,7 +10822,7 @@ for OrganizationAgentContextServiceServer<T> {
 /// let conn = Http2Connection::connect_plaintext(uri.clone()).await?.shared(1024);
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
-/// let client = OrganizationAgentContextServiceClient::new(conn, config);
+/// let client = WorkspaceAgentContextServiceClient::new(conn, config);
 /// let response = client.get_manifest(request).await?;
 /// ```
 ///
@@ -10835,7 +10834,7 @@ for OrganizationAgentContextServiceServer<T> {
 /// let http = HttpClient::plaintext();  // cleartext http:// only
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
-/// let client = OrganizationAgentContextServiceClient::new(http, config);
+/// let client = WorkspaceAgentContextServiceClient::new(http, config);
 /// let response = client.get_manifest(request).await?;
 /// ```
 ///
@@ -10865,12 +10864,12 @@ for OrganizationAgentContextServiceServer<T> {
 /// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
 #[cfg(feature = "client")]
 #[derive(Clone)]
-pub struct OrganizationAgentContextServiceClient<T> {
+pub struct WorkspaceAgentContextServiceClient<T> {
     transport: T,
     config: ::connectrpc::client::ClientConfig,
 }
 #[cfg(feature = "client")]
-impl<T> OrganizationAgentContextServiceClient<T>
+impl<T> WorkspaceAgentContextServiceClient<T>
 where
     T: ::connectrpc::client::ClientTransport,
     <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
@@ -10887,14 +10886,14 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the GetManifest RPC. Sends a request to /briar.worker.v1.OrganizationAgentContextService/GetManifest.
+    /// Call the GetManifest RPC. Sends a request to /briar.worker.v1.WorkspaceAgentContextService/GetManifest.
     pub async fn get_manifest(
         &self,
-        request: crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+        request: crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
                     'static,
                 >,
             >,
@@ -10910,12 +10909,12 @@ where
     /// Call the GetManifest RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
     pub async fn get_manifest_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+        request: crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
                     'static,
                 >,
             >,
@@ -10925,21 +10924,21 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                ORGANIZATION_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC
+                WORKSPACE_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the Lookup RPC. Sends a request to /briar.worker.v1.OrganizationAgentContextService/Lookup.
+    /// Call the Lookup RPC. Sends a request to /briar.worker.v1.WorkspaceAgentContextService/Lookup.
     pub async fn lookup(
         &self,
-        request: crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+        request: crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
                     'static,
                 >,
             >,
@@ -10952,12 +10951,12 @@ where
     /// Call the Lookup RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
     pub async fn lookup_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+        request: crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
                     'static,
                 >,
             >,
@@ -10967,7 +10966,7 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC
+                WORKSPACE_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

@@ -22,8 +22,7 @@ import {
   DmMemorySourceSchema,
   DmMemorySourceType as ProtoDmMemorySourceType,
   DmMemorySpaceSchema,
-  DmMemorySpaceStatus as ProtoDmMemorySpaceStatus,
-} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+  DmMemorySpaceStatus as ProtoDmMemorySpaceStatus} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
   Code,
   ConnectError,

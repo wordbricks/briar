@@ -72,7 +72,7 @@ describe("app Realtime Connect adapter", () => {
     const createTicket = vi.fn<AppConnectRealtimeServices["createTicket"]>()
       .mockImplementation(async ({ scope }) => {
         switch (scope.type) {
-          case "organizationNotifications":
+          case "workspaceNotifications":
             return {
               socketPath: `/organizations/${scope.organizationId}/channel-events`,
               ticket: "organization-ticket",
@@ -94,7 +94,7 @@ describe("app Realtime Connect adapter", () => {
     const services = { createTicket, requireSession };
 
     const organization = await invoke({
-      organizationNotifications: { organizationId },
+      workspaceNotifications: { workspaceId: organizationId },
     }, services);
     expect(organization.status).toBe(200);
     expect(await organization.json()).toEqual({
@@ -110,7 +110,7 @@ describe("app Realtime Connect adapter", () => {
     });
 
     const channel = await invoke({
-      channelActivity: { organizationId, channelId },
+      channelActivity: { workspaceId: organizationId, channelId },
     }, services);
     expect(channel.status).toBe(200);
     expect(await channel.json()).toEqual({
@@ -118,7 +118,7 @@ describe("app Realtime Connect adapter", () => {
         `wss://api.example.test/organizations/${organizationId}/channels/${channelId}/agent-activity-events?ticket=channel-ticket`,
     });
     expect(createTicket.mock.calls.map(([input]) => input.scope)).toEqual([
-      { type: "organizationNotifications", organizationId },
+      { type: "workspaceNotifications", organizationId },
       { type: "issueActivity", projectId, runId },
       { type: "channelActivity", organizationId, channelId },
     ]);

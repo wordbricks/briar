@@ -27,9 +27,9 @@ message GetDashboardResponse {
   Team team = 1;
   repeated DashboardRun runs = 2;
   repeated DashboardWorker workers = 3;
-  repeated briar.types.v1.AgentProvider organization_providers = 4;
+  repeated briar.types.v1.AgentProvider workspace_providers = 4;
   optional TeamExecutionWorkerPolicy execution_policy = 5;
-  repeated OrganizationMember members = 6;
+  repeated WorkspaceMember members = 6;
   repeated ConversationNotification conversation_notifications = 7;
   repeated ChannelNotification channel_notifications = 8;
   uint64 cursor = 9;
@@ -42,8 +42,8 @@ message SyncDashboardRequest {
   uint64 cursor = 2;
 }
 
-message OrganizationMembersPatch {
-  repeated OrganizationMember values = 1;
+message WorkspaceMembersPatch {
+  repeated WorkspaceMember values = 1;
 }
 
 message ConversationNotificationsPatch {
@@ -58,9 +58,9 @@ message SyncDashboardResponse {
   repeated string deleted_run_ids = 5;
   optional Team team = 6;
   repeated DashboardWorker workers = 7;
-  repeated briar.types.v1.AgentProvider organization_providers = 8;
+  repeated briar.types.v1.AgentProvider workspace_providers = 8;
   optional TeamExecutionWorkerPolicy execution_policy = 9;
-  optional OrganizationMembersPatch members = 10;
+  optional WorkspaceMembersPatch members = 10;
   optional ConversationNotificationsPatch conversation_notifications = 11;
   repeated ChannelNotification channel_notifications = 12;
   google.protobuf.Timestamp generated_at = 13;
