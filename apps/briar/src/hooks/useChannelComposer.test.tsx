@@ -211,7 +211,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await typeInto(input, "@");
 
     expect(container.textContent).toContain("Builder · Team agent");
-    expect(container.textContent).toContain("Helper · Organization agent");
+    expect(container.textContent).toContain("Helper · Workspace agent");
     expect(container.textContent).toContain("Jay · You · jay@example.com");
     expect(
       [...container.querySelectorAll<HTMLButtonElement>("ul button")].map(

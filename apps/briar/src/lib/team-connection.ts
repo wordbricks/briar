@@ -33,7 +33,7 @@ export async function prepareConfiguredTeamRepository(
 ) {
   if (!settings.githubRepository || settings.githubRepositoryId === null) {
     throw new Error(
-      "조직의 GitHub App에서 프로젝트 저장소를 먼저 선택해 주세요.",
+      "워크스페이스에 연결된 GitHub App에서 프로젝트 저장소를 먼저 선택해 주세요.",
     );
   }
 

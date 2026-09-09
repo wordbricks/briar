@@ -906,36 +906,36 @@ describe("Sidebar", () => {
     );
 
     const trigger = container.querySelector<HTMLButtonElement>(
-      '[aria-label="조직 메뉴 열기"]',
+      '[aria-label="워크스페이스 메뉴 열기"]',
     );
     await act(async () => trigger?.click());
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
-    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).toContain(
+    expect(container.querySelector('[aria-label="워크스페이스 메뉴"]')?.textContent).toContain(
       "Briar",
     );
-    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).toContain(
+    expect(container.querySelector('[aria-label="워크스페이스 메뉴"]')?.textContent).toContain(
       "Wordbricks",
     );
-    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).not.toContain(
-      "조직 설정",
+    expect(container.querySelector('[aria-label="워크스페이스 메뉴"]')?.textContent).not.toContain(
+      "워크스페이스 설정",
     );
-    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).not.toContain(
+    expect(container.querySelector('[aria-label="워크스페이스 메뉴"]')?.textContent).not.toContain(
       "멤버 초대 및 관리",
     );
-    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).not.toContain(
-      "조직 전환",
+    expect(container.querySelector('[aria-label="워크스페이스 메뉴"]')?.textContent).not.toContain(
+      "워크스페이스 전환",
     );
-    expect(container.querySelector('[aria-label="조직 메뉴"]')?.textContent).not.toContain(
+    expect(container.querySelector('[aria-label="워크스페이스 메뉴"]')?.textContent).not.toContain(
       "로그아웃",
     );
-    expect(container.querySelector('[aria-label="조직 선택"]')?.textContent).toContain(
+    expect(container.querySelector('[aria-label="워크스페이스 선택"]')?.textContent).toContain(
       "Wordbricks",
     );
 
     await act(async () => {
       Array.from(
         container.querySelectorAll<HTMLButtonElement>(
-          '[aria-label="조직 선택"] button',
+          '[aria-label="워크스페이스 선택"] button',
         ),
       )
         .find((button) => button.textContent?.includes("Wordbricks"))
@@ -962,19 +962,19 @@ describe("Sidebar", () => {
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('[aria-label="조직 메뉴 열기"]')
+        .querySelector<HTMLButtonElement>('[aria-label="워크스페이스 메뉴 열기"]')
         ?.click();
     });
     const items = Array.from(
       container.querySelectorAll<HTMLButtonElement>(
-        '[aria-label="조직 메뉴"] button',
+        '[aria-label="워크스페이스 메뉴"] button',
       ),
     );
-    expect(items.at(-1)?.textContent).toContain("조직 추가");
+    expect(items.at(-1)?.textContent).toContain("워크스페이스 추가");
 
     await act(async () => items.at(-1)?.click());
     expect(onAddOrganization).toHaveBeenCalledOnce();
-    expect(container.querySelector('[aria-label="조직 메뉴"]')).toBeNull();
+    expect(container.querySelector('[aria-label="워크스페이스 메뉴"]')).toBeNull();
 
     await cleanup();
   });

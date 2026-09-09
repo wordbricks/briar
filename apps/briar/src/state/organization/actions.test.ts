@@ -222,7 +222,7 @@ describe("createOrganizationActions", () => {
     const { actions, server } = harness();
 
     await expect(actions.renameOrganization("org-missing", "x")).rejects.toThrow(
-      "변경할 조직을 찾을 수 없습니다.",
+      "변경할 워크스페이스를 찾을 수 없습니다.",
     );
     expect(server.renamed).toEqual([]);
   });
