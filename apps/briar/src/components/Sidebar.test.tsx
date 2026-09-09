@@ -202,11 +202,11 @@ describe("Sidebar", () => {
     expect(consoleGroup.textContent).not.toContain("Desktop navigation");
 
     const toggle = briarGroup.querySelector<HTMLButtonElement>(
-      ".sidebar-planning-projects .sidebar-channels-toggle",
+      ".sidebar-planning-projects [data-briar-sidebar-section-toggle]",
     )!;
-    expect(toggle.classList.contains("sidebar-project-channels-toggle")).toBe(true);
+    expect(toggle.dataset.briarSidebarSectionToggle).toBe("nested");
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(toggle.querySelector(".sidebar-channels-chevron")).not.toBeNull();
+    expect(toggle.querySelector("[data-briar-sidebar-section-chevron]")).not.toBeNull();
     expect(
       briarGroup.querySelector(".sidebar-planning-projects-heading"),
     ).toBeNull();
@@ -248,7 +248,7 @@ describe("Sidebar", () => {
       );
     });
     const addItem = [...document.body.querySelectorAll<HTMLElement>(
-      ".sidebar-channel-context-menu-item",
+      '[role="menu"] [role=menuitem]',
     )].find((item) => item.textContent?.includes("프로젝트 추가"));
     expect(addItem).toBeTruthy();
     await act(async () => addItem?.click());
@@ -302,7 +302,7 @@ describe("Sidebar", () => {
     );
 
     const toggle = container.querySelector<HTMLButtonElement>(
-      ".sidebar-channels-toggle",
+      "[data-briar-sidebar-section-toggle]",
     )!;
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(container.querySelector("#sidebar-channel-list")?.textContent).toContain(
@@ -333,7 +333,7 @@ describe("Sidebar", () => {
       );
     });
     const addItem = document.body.querySelector<HTMLElement>(
-      ".sidebar-channel-context-menu-item",
+      '[role="menu"] [role=menuitem]',
     );
     expect(addItem?.textContent).toContain("채널 추가");
     await act(async () => addItem?.click());
@@ -419,7 +419,7 @@ describe("Sidebar", () => {
     });
 
     const menu = document.body.querySelector<HTMLElement>(
-      ".sidebar-channel-context-menu",
+      '[role="menu"]',
     )!;
     expect(menu.textContent).toContain("채널 ID 복사");
     expect(menu.textContent).toContain("채널 링크 복사");
@@ -443,7 +443,7 @@ describe("Sidebar", () => {
       );
     });
     const deleteItem = [...document.body.querySelectorAll<HTMLElement>(
-      ".sidebar-channel-context-menu [role=menuitem]",
+      '[role="menu"] [role=menuitem]',
     )].find((item) => item.textContent?.includes("채널 삭제"));
     await act(async () => deleteItem?.click());
 
@@ -491,7 +491,7 @@ describe("Sidebar", () => {
     });
 
     const addItem = document.body.querySelector<HTMLElement>(
-      ".sidebar-channel-context-menu-item",
+      '[role="menu"] [role=menuitem]',
     );
     expect(addItem?.textContent).toContain("채널 추가");
     await act(async () => addItem?.click());
@@ -1417,14 +1417,14 @@ describe("Sidebar", () => {
     );
 
     expect(
-      container.querySelector(".sidebar-project-window-brand")?.textContent,
+      container.querySelector("[data-briar-sidebar-project-brand]")?.textContent,
     ).toContain("Briar");
-    expect(container.querySelector(".sidebar-workspace-switcher")).toBeNull();
+    expect(container.querySelector("[data-briar-sidebar-workspace-switcher]")).toBeNull();
     expect(container.querySelector(".sidebar-section-heading")).toBeNull();
     expect(container.querySelector(".sidebar-project-menu-trigger")).toBeNull();
 
     const topLevelChannels = container.querySelector(
-      ".sidebar-project-channels-top-level",
+      '[data-briar-sidebar-project-channels="top-level"]',
     );
     expect(topLevelChannels?.textContent).toContain("Briar dev");
     expect(topLevelChannels?.textContent).not.toContain("General");
@@ -1529,7 +1529,7 @@ describe("Sidebar mode toggle", () => {
     await renderReactTestRoot(root, <Sidebar {...sidebarProps} />);
 
     const toggle = container.querySelector<HTMLElement>(
-      ".sidebar-workspace-switcher .sidebar-mode-toggle",
+      "[data-briar-sidebar-workspace-switcher] [data-briar-sidebar-mode-toggle]",
     )!;
     expect(toggle).not.toBeNull();
     const [dms, work] = [...toggle.querySelectorAll<HTMLButtonElement>("button")];
@@ -1542,7 +1542,7 @@ describe("Sidebar mode toggle", () => {
     expect(container.querySelector('a[href="#dms"]')).toBeNull();
     // The work navigation is on screen.
     expect(container.querySelector(".sidebar-primary-nav")).not.toBeNull();
-    expect(container.querySelector(".sidebar-dms")).toBeNull();
+    expect(container.querySelector("[data-briar-sidebar-dms]")).toBeNull();
 
     await cleanup();
   });
@@ -1556,8 +1556,8 @@ describe("Sidebar mode toggle", () => {
       <Sidebar {...sidebarProps} projectWindowProjectId="project-1" />,
     );
 
-    expect(container.querySelector(".sidebar-mode-toggle")).toBeNull();
-    expect(container.querySelector(".sidebar-dms")).toBeNull();
+    expect(container.querySelector("[data-briar-sidebar-mode-toggle]")).toBeNull();
+    expect(container.querySelector("[data-briar-sidebar-dms]")).toBeNull();
 
     await cleanup();
   });
@@ -1579,9 +1579,9 @@ describe("Sidebar mode toggle", () => {
     );
 
     const [dms, work] = [
-      ...container.querySelectorAll<HTMLButtonElement>(".sidebar-mode-option"),
+      ...container.querySelectorAll<HTMLButtonElement>("[data-briar-sidebar-mode-option]"),
     ];
-    expect(dms.querySelector(".sidebar-mode-unread")).not.toBeNull();
+    expect(dms.querySelector("[data-briar-sidebar-mode-unread]")).not.toBeNull();
 
     // The half already on does nothing; the other one navigates.
     await act(async () => work.click());
@@ -1623,18 +1623,18 @@ describe("Sidebar mode toggle", () => {
     );
 
     const [dms, work] = [
-      ...container.querySelectorAll<HTMLButtonElement>(".sidebar-mode-option"),
+      ...container.querySelectorAll<HTMLButtonElement>("[data-briar-sidebar-mode-option]"),
     ];
     expect(dms.getAttribute("aria-pressed")).toBe("true");
     // On the DMs half the list carries the unread marks, not the toggle.
-    expect(dms.querySelector(".sidebar-mode-unread")).toBeNull();
+    expect(dms.querySelector("[data-briar-sidebar-mode-unread]")).toBeNull();
     expect(container.querySelector(".sidebar-primary-nav")).toBeNull();
     expect(container.querySelector(".sidebar-projects")).toBeNull();
     // The account footer stays on both halves.
     expect(container.querySelector(".user-card")).not.toBeNull();
 
     const rows = [
-      ...container.querySelectorAll<HTMLButtonElement>(".sidebar-dm-row"),
+      ...container.querySelectorAll<HTMLButtonElement>("[data-briar-sidebar-dm-row]"),
     ];
     // Most recent activity first.
     expect(rows.map((row) => row.querySelector("strong")?.textContent)).toEqual([
@@ -1642,14 +1642,14 @@ describe("Sidebar mode toggle", () => {
       "Sam",
     ]);
     expect(rows[0].getAttribute("aria-current")).toBe("page");
-    expect(rows[0].querySelector(".sidebar-unread-dot")).not.toBeNull();
+    expect(rows[0].querySelector("[data-briar-sidebar-unread]")).not.toBeNull();
     expect(rows[1].textContent).toContain("Hello");
 
     await act(async () => rows[1].click());
     expect(onDirectMessageOpen).toHaveBeenCalledWith("dm-1");
 
     await act(async () =>
-      container.querySelector<HTMLButtonElement>(".sidebar-dm-compose")!.click(),
+      container.querySelector<HTMLButtonElement>("[data-briar-sidebar-dm-compose]")!.click(),
     );
     expect(onDirectMessageCompose).toHaveBeenCalledOnce();
 
@@ -1678,12 +1678,12 @@ describe("Sidebar mode toggle", () => {
     );
 
     expect(
-      container.querySelector(".sidebar-dm-new")?.getAttribute("aria-current"),
+      container.querySelector("[data-briar-sidebar-dm-new]")?.getAttribute("aria-current"),
     ).toBe("page");
-    expect(container.querySelector(".sidebar-dm-row[aria-current]")).toBeNull();
+    expect(container.querySelector("[data-briar-sidebar-dm-row][aria-current]")).toBeNull();
 
     const search = container.querySelector<HTMLInputElement>(
-      ".sidebar-dm-search input",
+      "[data-briar-sidebar-dms] input[type=search]",
     )!;
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
@@ -1694,7 +1694,7 @@ describe("Sidebar mode toggle", () => {
       search.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(
-      [...container.querySelectorAll(".sidebar-dm-row strong")].map(
+      [...container.querySelectorAll("[data-briar-sidebar-dm-row] strong")].map(
         (name) => name.textContent,
       ),
     ).toEqual(["Alex"]);
@@ -1746,11 +1746,11 @@ describe("Sidebar DM conversation menu", () => {
 
   const menuItem = (label: string) =>
     [...document.body.querySelectorAll<HTMLElement>(
-      ".sidebar-channel-context-menu [role=menuitem]",
+      '[role="menu"] [role=menuitem]',
     )].find((item) => item.textContent?.includes(label));
 
   const rowNames = (container: HTMLElement) =>
-    [...container.querySelectorAll(".sidebar-dm-row strong")].map(
+    [...container.querySelectorAll("[data-briar-sidebar-dm-row] strong")].map(
       (name) => name.textContent,
     );
 
@@ -1780,7 +1780,7 @@ describe("Sidebar DM conversation menu", () => {
       />,
     );
 
-    expect(container.querySelector(".sidebar-dm-group-heading")).toBeNull();
+    expect(container.querySelector("[data-briar-sidebar-dm-heading]")).toBeNull();
     expect(rowNames(container)).toEqual(["Alex", "Sam"]);
 
     await cleanup();
@@ -1819,7 +1819,7 @@ describe("Sidebar DM conversation menu", () => {
     );
 
     expect(
-      [...container.querySelectorAll(".sidebar-dm-group-heading")].map(
+      [...container.querySelectorAll("[data-briar-sidebar-dm-heading]")].map(
         (heading) => heading.textContent,
       ),
     ).toEqual(["고정됨", "팀", "고객", "미할당"]);
@@ -1848,12 +1848,12 @@ describe("Sidebar DM conversation menu", () => {
     expect(rowNames(container)).toEqual(["Sam"]);
 
     await typeInto(
-      container.querySelector<HTMLInputElement>(".sidebar-dm-search input")!,
+      container.querySelector<HTMLInputElement>("[data-briar-sidebar-dms] input[type=search]")!,
       "al",
     );
     expect(rowNames(container)).toEqual(["Alex"]);
     // A hidden row offers to come back rather than to be hidden again.
-    await openContextMenu(container.querySelector<HTMLElement>(".sidebar-dm-row")!);
+    await openContextMenu(container.querySelector<HTMLElement>("[data-briar-sidebar-dm-row]")!);
     expect(menuItem("사이드바에 표시")).toBeTruthy();
     expect(menuItem("사이드바에서 숨기기")).toBeUndefined();
 
@@ -1881,7 +1881,7 @@ describe("Sidebar DM conversation menu", () => {
 
     expect(rowNames(container)).toEqual(["Alex", "Sam"]);
     expect(
-      container.querySelector(".sidebar-dm-row")?.getAttribute("aria-current"),
+      container.querySelector("[data-briar-sidebar-dm-row]")?.getAttribute("aria-current"),
     ).toBe("page");
 
     await cleanup();
@@ -1921,10 +1921,10 @@ describe("Sidebar DM conversation menu", () => {
       />,
     );
 
-    const row = container.querySelector<HTMLElement>(".sidebar-dm-row")!;
+    const row = container.querySelector<HTMLElement>("[data-briar-sidebar-dm-row]")!;
     await openContextMenu(row);
     const menu = document.body.querySelector<HTMLElement>(
-      ".sidebar-channel-context-menu",
+      '[role="menu"]',
     )!;
     expect(menu.textContent).toContain("고정");
     expect(menu.textContent).toContain("이동");
@@ -1978,7 +1978,7 @@ describe("Sidebar DM conversation menu", () => {
       />,
     );
 
-    await openContextMenu(container.querySelector<HTMLElement>(".sidebar-dm-row")!);
+    await openContextMenu(container.querySelector<HTMLElement>("[data-briar-sidebar-dm-row]")!);
     await act(async () => menuItem("이동")?.click());
     await act(async () => menuItem("팀")?.click());
     expect(onMoveToSection).toHaveBeenCalledWith("dm-1", "section-1");
@@ -2003,7 +2003,7 @@ describe("Sidebar DM conversation menu", () => {
     );
 
     await openContextMenu(
-      container.querySelector<HTMLElement>(".sidebar-dm-group-heading")!,
+      container.querySelector<HTMLElement>("[data-briar-sidebar-dm-heading]")!,
     );
     expect(menuItem("섹션 삭제")).toBeTruthy();
     await act(async () => menuItem("섹션 이름 바꾸기…")?.click());

@@ -29,7 +29,17 @@ import {
   directMessageParticipants,
   sortDirectMessages,
 } from "../lib/direct-messages";
+import { cn } from "../lib/utils";
 import { DirectMessageAvatar, formatConversationTime } from "./DirectMessages";
+import {
+  sidebarContextMenuAffixClass,
+  sidebarContextMenuClass,
+  sidebarContextMenuDangerClass,
+  sidebarContextMenuItemClass,
+  sidebarContextMenuSeparatorClass,
+  sidebarFocusRing,
+  sidebarUnreadDotClass,
+} from "./sidebar-classes";
 import { Spinner } from "./ui/spinner";
 import { useToast } from "./ui/toast";
 
@@ -71,6 +81,12 @@ interface ConversationGroup {
   readonly section: ChannelSidebarSection | null;
   readonly channels: readonly ChannelSummary[];
 }
+
+const sidebarDmEmptyClass =
+  "mx-3 my-[22px] flex justify-center text-center text-sm/[20px] text-sidebar-foreground-muted";
+
+const sidebarDmGroupHeadingClass =
+  "mt-2.5 mb-0.5 flex items-center px-2 text-2xs/[20px] font-bold tracking-[.06em] text-sidebar-foreground-muted uppercase";
 
 const byActivity = (channels: readonly ChannelSummary[]) =>
   sortDirectMessages(channels);
@@ -186,14 +202,28 @@ export function SidebarDirectMessages({
   return (
     <section
       aria-label={t("dm.conversations")}
-      className="sidebar-dms"
+      className="flex min-h-0 flex-1 flex-col"
+      data-briar-sidebar-dms=""
       data-testid="sidebar-dms"
     >
-      <div className="sidebar-dm-toolbar">
-        <label className="sidebar-dm-search">
+      <div className="flex flex-none items-center gap-1.5 px-2.5 pt-[3px] pb-1.5">
+        <label
+          className={cn(
+            "flex h-[30px] min-w-0 flex-1 items-center gap-1.5 rounded-[8px] px-2",
+            "border border-transparent bg-sidebar-hover text-sidebar-foreground-muted",
+            "transition-[border-color,background-color] duration-150 ease-[ease]",
+            "focus-within:border-sidebar-focus focus-within:bg-sidebar-popover [&>svg]:flex-none",
+          )}
+        >
           <Search aria-hidden="true" size={14} strokeWidth={1.8} />
           <input
             aria-label={t("dm.search")}
+            className={cn(
+              "h-full w-full min-w-0 border-0 bg-transparent p-0 outline-none",
+              "text-sm/[20px] text-sidebar-foreground-strong",
+              "placeholder:text-sidebar-foreground-muted",
+              "[&::-webkit-search-cancel-button]:appearance-none",
+            )}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t("dm.search")}
             type="search"
@@ -202,7 +232,13 @@ export function SidebarDirectMessages({
         </label>
         <button
           aria-label={t("dm.new")}
-          className="sidebar-dm-compose"
+          className={cn(
+            "grid size-[30px] shrink-0 grow-0 basis-[30px] cursor-pointer place-items-center",
+            "rounded-[8px] bg-transparent p-0 text-sidebar-foreground-icon",
+            "hover:bg-sidebar-hover hover:text-sidebar-accent-foreground active:scale-95",
+            sidebarFocusRing,
+          )}
+          data-briar-sidebar-dm-compose=""
           onClick={onCompose}
           title={t("dm.new")}
           type="button"
@@ -210,20 +246,27 @@ export function SidebarDirectMessages({
           <Plus aria-hidden="true" size={16} strokeWidth={1.8} />
         </button>
       </div>
-      <div className="sidebar-dm-list">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2 pb-3 [scrollbar-color:var(--sidebar-scroll-thumb)_transparent]">
         <button
           aria-current={composing ? "page" : undefined}
-          className={`sidebar-dm-new${composing ? " active" : ""}`}
+          className={cn(
+            "mb-1 flex h-10 w-full cursor-pointer items-center gap-[9px] rounded-[9px] px-2",
+            "bg-transparent text-left text-sm/[20px] font-semibold text-sidebar-foreground",
+            "hover:bg-sidebar-hover hover:text-sidebar-accent-foreground",
+            sidebarFocusRing,
+            composing && "bg-sidebar-active text-sidebar-accent-foreground",
+          )}
+          data-briar-sidebar-dm-new=""
           onClick={onCompose}
           type="button"
         >
-          <span className="sidebar-dm-new-icon">
+          <span className="grid size-7 shrink-0 grow-0 basis-7 place-items-center rounded-full border border-sidebar-border bg-sidebar-popover text-sidebar-foreground-muted">
             <Plus aria-hidden="true" size={15} strokeWidth={1.8} />
           </span>
           <span>{t("dm.new")}</span>
         </button>
         {groups.map((group) => (
-          <div className="sidebar-dm-group" key={group.key}>
+          <div className="[&:not(:first-of-type):empty]:hidden" key={group.key}>
             {group.label ? (
               group.section ? (
                 <SidebarDirectMessageSectionHeading
@@ -231,7 +274,8 @@ export function SidebarDirectMessages({
                   section={group.section}
                 />
               ) : (
-                <p className="sidebar-dm-group-heading">{group.label}</p>
+                <p className={sidebarDmGroupHeadingClass}
+            data-briar-sidebar-dm-heading="">{group.label}</p>
               )
             ) : null}
             {group.channels.map((channel) => (
@@ -253,13 +297,13 @@ export function SidebarDirectMessages({
           loading && sorted.length === 0 ? (
             <div
               aria-busy="true"
-              className="sidebar-dm-empty"
+              className={sidebarDmEmptyClass}
               role="status"
             >
               <Spinner aria-hidden="true" className="size-4" />
             </div>
           ) : (
-            <p className="sidebar-dm-empty">
+            <p className={sidebarDmEmptyClass}>
               {query ? t("dm.noResults") : t("dm.empty")}
             </p>
           )
@@ -285,17 +329,18 @@ function SidebarDirectMessageSectionHeading({
     <>
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>
-          <p className="sidebar-dm-group-heading">{section.name}</p>
+          <p className={sidebarDmGroupHeadingClass}
+            data-briar-sidebar-dm-heading="">{section.name}</p>
         </ContextMenu.Trigger>
         {canEdit ? (
           <ContextMenu.Portal>
             <ContextMenu.Content
               aria-label={t("dm.sectionMenu")}
-              className="sidebar-channel-context-menu"
+              className={sidebarContextMenuClass}
             >
               {actions.onRenameSection ? (
                 <ContextMenu.Item
-                  className="sidebar-channel-context-menu-item"
+                  className={sidebarContextMenuItemClass}
                   onSelect={() => setRenameOpen(true)}
                 >
                   <Pencil aria-hidden="true" size={15} strokeWidth={1.7} />
@@ -304,7 +349,7 @@ function SidebarDirectMessageSectionHeading({
               ) : null}
               {actions.onDeleteSection ? (
                 <ContextMenu.Item
-                  className="sidebar-channel-context-menu-item danger"
+                  className={cn(sidebarContextMenuItemClass, sidebarContextMenuDangerClass)}
                   onSelect={() => {
                     void actions.onDeleteSection?.(section.id);
                   }}
@@ -411,16 +456,28 @@ function SidebarDirectMessageRow({
         <ContextMenu.Trigger asChild>
           <button
             aria-current={isCurrent ? "page" : undefined}
-            className={`sidebar-dm-row${isCurrent ? " active" : ""}`}
+            className={cn(
+              "grid min-h-14 w-full cursor-pointer grid-cols-[38px_minmax(0,1fr)_auto] items-center",
+              "gap-[9px] rounded-[9px] bg-transparent px-2 py-[7px] text-left text-sidebar-foreground",
+              "hover:bg-sidebar-hover active:scale-[.99]",
+              "[&_.dm-avatar-part]:border-sidebar-fallback",
+              sidebarFocusRing,
+              isCurrent && "bg-sidebar-active text-sidebar-accent-foreground",
+            )}
+            data-briar-sidebar-dm-row=""
             onClick={() => onOpen(channel.id)}
             type="button"
           >
             <DirectMessageAvatar label={name} participants={participants} />
-            <span className="sidebar-dm-copy">
-              <strong>{name}</strong>
-              <small>{channel.lastMessagePreview ?? t("dm.noMessages")}</small>
+            <span className="grid min-w-0 gap-0.5">
+              <strong className="truncate text-sm/[20px] font-semibold text-sidebar-foreground-strong">
+                {name}
+              </strong>
+              <small className="truncate text-xs/[20px] text-sidebar-foreground-muted">
+                {channel.lastMessagePreview ?? t("dm.noMessages")}
+              </small>
             </span>
-            <span className="sidebar-dm-meta">
+            <span className="flex h-full flex-col items-end justify-center gap-[7px] self-stretch text-2xs/[20px] text-sidebar-foreground-muted [&>i]:ml-0">
               <time dateTime={channel.lastMessageAt ?? channel.createdAt}>
                 {formatConversationTime(
                   channel.lastMessageAt ?? channel.createdAt,
@@ -428,7 +485,8 @@ function SidebarDirectMessageRow({
                 )}
               </time>
               {channel.hasUnread ? (
-                <i aria-label={t("dm.unread")} className="sidebar-unread-dot" />
+                <i aria-label={t("dm.unread")} className={sidebarUnreadDotClass}
+              data-briar-sidebar-unread="" />
               ) : null}
             </span>
           </button>
@@ -436,11 +494,11 @@ function SidebarDirectMessageRow({
         <ContextMenu.Portal>
           <ContextMenu.Content
             aria-label={t("dm.contextMenu")}
-            className="sidebar-channel-context-menu"
+            className={sidebarContextMenuClass}
           >
             {actions.onSetPinned ? (
               <ContextMenu.Item
-                className="sidebar-channel-context-menu-item"
+                className={sidebarContextMenuItemClass}
                 onSelect={() => {
                   void actions.onSetPinned?.(channel.id, !pinned);
                 }}
@@ -455,21 +513,21 @@ function SidebarDirectMessageRow({
             ) : null}
             {actions.onMoveToSection ? (
               <ContextMenu.Sub>
-                <ContextMenu.SubTrigger className="sidebar-channel-context-menu-item">
+                <ContextMenu.SubTrigger className={sidebarContextMenuItemClass}>
                   <Folder aria-hidden="true" size={15} strokeWidth={1.7} />
                   <span>{t("dm.moveTo")}</span>
                   <ChevronRight
                     aria-hidden="true"
-                    className="sidebar-channel-context-menu-chevron"
+                    className={sidebarContextMenuAffixClass}
                     size={14}
                     strokeWidth={1.7}
                   />
                 </ContextMenu.SubTrigger>
                 <ContextMenu.Portal>
-                  <ContextMenu.SubContent className="sidebar-channel-context-menu">
+                  <ContextMenu.SubContent className={sidebarContextMenuClass}>
                     {sections.map((section) => (
                       <ContextMenu.Item
-                        className="sidebar-channel-context-menu-item"
+                        className={sidebarContextMenuItemClass}
                         key={section.id}
                         onSelect={() => {
                           void actions.onMoveToSection?.(
@@ -487,7 +545,7 @@ function SidebarDirectMessageRow({
                         {channel.sidebarSectionId === section.id ? (
                           <Check
                             aria-hidden="true"
-                            className="sidebar-channel-context-menu-check"
+                            className={sidebarContextMenuAffixClass}
                             size={14}
                             strokeWidth={2}
                           />
@@ -495,7 +553,7 @@ function SidebarDirectMessageRow({
                       </ContextMenu.Item>
                     ))}
                     <ContextMenu.Item
-                      className="sidebar-channel-context-menu-item"
+                      className={sidebarContextMenuItemClass}
                       onSelect={() => {
                         void actions.onMoveToSection?.(channel.id, null);
                       }}
@@ -505,7 +563,7 @@ function SidebarDirectMessageRow({
                       {!channel.sidebarSectionId ? (
                         <Check
                           aria-hidden="true"
-                          className="sidebar-channel-context-menu-check"
+                          className={sidebarContextMenuAffixClass}
                           size={14}
                           strokeWidth={2}
                         />
@@ -513,9 +571,9 @@ function SidebarDirectMessageRow({
                     </ContextMenu.Item>
                     {actions.onCreateSection ? (
                       <>
-                        <ContextMenu.Separator className="sidebar-channel-context-menu-separator" />
+                        <ContextMenu.Separator className={sidebarContextMenuSeparatorClass} />
                         <ContextMenu.Item
-                          className="sidebar-channel-context-menu-item"
+                          className={sidebarContextMenuItemClass}
                           onSelect={() => setNewSectionOpen(true)}
                         >
                           <Plus
@@ -534,7 +592,7 @@ function SidebarDirectMessageRow({
             {channel.hasUnread ? (
               actions.onMarkRead ? (
                 <ContextMenu.Item
-                  className="sidebar-channel-context-menu-item"
+                  className={sidebarContextMenuItemClass}
                   onSelect={() => actions.onMarkRead?.(channel.id)}
                 >
                   <Bell aria-hidden="true" size={15} strokeWidth={1.7} />
@@ -543,7 +601,7 @@ function SidebarDirectMessageRow({
               ) : null
             ) : actions.onMarkUnread ? (
               <ContextMenu.Item
-                className="sidebar-channel-context-menu-item"
+                className={sidebarContextMenuItemClass}
                 onSelect={() => {
                   void actions.onMarkUnread?.(channel.id);
                 }}
@@ -554,9 +612,9 @@ function SidebarDirectMessageRow({
             ) : null}
             {agent && actions.onEditAgentProfile ? (
               <>
-                <ContextMenu.Separator className="sidebar-channel-context-menu-separator" />
+                <ContextMenu.Separator className={sidebarContextMenuSeparatorClass} />
                 <ContextMenu.Item
-                  className="sidebar-channel-context-menu-item"
+                  className={sidebarContextMenuItemClass}
                   onSelect={() => actions.onEditAgentProfile?.(agent.id)}
                 >
                   <Pencil aria-hidden="true" size={15} strokeWidth={1.7} />
@@ -564,9 +622,9 @@ function SidebarDirectMessageRow({
                 </ContextMenu.Item>
               </>
             ) : null}
-            <ContextMenu.Separator className="sidebar-channel-context-menu-separator" />
+            <ContextMenu.Separator className={sidebarContextMenuSeparatorClass} />
             <ContextMenu.Item
-              className="sidebar-channel-context-menu-item"
+              className={sidebarContextMenuItemClass}
               onSelect={() => {
                 void copyConversationId();
               }}
@@ -575,11 +633,11 @@ function SidebarDirectMessageRow({
               <span>{t("dm.copyConversationId")}</span>
             </ContextMenu.Item>
             {actions.onSetHidden || actions.onDelete ? (
-              <ContextMenu.Separator className="sidebar-channel-context-menu-separator" />
+              <ContextMenu.Separator className={sidebarContextMenuSeparatorClass} />
             ) : null}
             {actions.onSetHidden ? (
               <ContextMenu.Item
-                className="sidebar-channel-context-menu-item"
+                className={sidebarContextMenuItemClass}
                 onSelect={() => {
                   void actions.onSetHidden?.(channel.id, !hidden);
                 }}
@@ -594,7 +652,7 @@ function SidebarDirectMessageRow({
             ) : null}
             {actions.onDelete ? (
               <ContextMenu.Item
-                className="sidebar-channel-context-menu-item danger"
+                className={cn(sidebarContextMenuItemClass, sidebarContextMenuDangerClass)}
                 onSelect={() => {
                   setDeleteError(null);
                   setDeleteOpen(true);

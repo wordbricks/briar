@@ -27,15 +27,7 @@
   }
 }
 
-.dark .sidebar-channel-list button.unread {
-  color: var(--sidebar-accent-foreground);
-}
-
-.dark .sidebar-brand:hover,
-.dark .sidebar-brand[aria-expanded="true"],
-.dark .sidebar-project-window-brand:hover:not(:disabled),
 .dark .sidebar-primary-nav a:hover,
-.dark .sidebar-channels-toggle:hover,
 .dark .sidebar-project-heading:hover,
 .dark .sidebar-project-toggle:hover,
 .dark .sidebar-project-view:hover,
@@ -53,7 +45,6 @@
 }
 
 .dark .sidebar-primary-nav a.active,
-.dark .sidebar-channel-list button.active,
 .dark .sidebar-project-heading.active,
 .dark .sidebar-project-view.active,
 .dark .sidebar-planning-project-row > button:first-child.active {
@@ -63,7 +54,6 @@
 
 .dark .sidebar-workspace-menu,
 .dark .sidebar-project-menu,
-.dark .sidebar-channel-context-menu,
 .dark .channel-create-dialog,
 .dark .account-popover,
 .dark .app-version-popover,
