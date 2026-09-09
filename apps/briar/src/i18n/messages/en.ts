@@ -485,6 +485,8 @@ export const en = {
   "channel.issueProposalProject": "Target project: {project}",
   "channel.issueProposalBacklogOnly": "Create in backlog only · do not execute · separate approval required for execution",
   "channel.issueProposalCreateAndExecute": "Create one backlog issue · schedule it with the approved execution settings",
+  "channel.issueProposalAttachments": "{count} attachments carried to the issue",
+  "channel.issueProposalAttachmentUnavailable": "Attachment not found in this conversation",
   "channel.issueProposalShowDescription": "Show full description",
   "channel.issueProposalHideDescription": "Collapse description",
   "channel.issueBatchProposalCount": "{count} backlog issues will be created together",

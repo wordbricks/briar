@@ -21,6 +21,8 @@ import {
   recoverProjectIssueRun,
 } from "./issue-control-routes";
 import { acceptProjectIssueActionProposal } from "./issue-proposal-routes";
+import { claimNextQueueWork } from "./queue-claim-routes";
+import { requireWorkerProjectBinding } from "./worker-route-auth";
 import { createOrganizationAgent } from "./organization-agents";
 import {
   claimNextQueuedHuntRun,
@@ -135,6 +137,7 @@ const providerCapabilities = {
 describe("channel issue proposal approval route", () => {
   const db = cloudflareEnv.DB;
   const attachments = cloudflareEnv.ATTACHMENTS;
+  const archives = cloudflareEnv.ARCHIVES;
 
   beforeAll(async () => {
     for (const [id, name, token] of [
@@ -2067,6 +2070,377 @@ describe("channel issue proposal approval route", () => {
       approved_by_user_id: ownerId,
       payload_json: expect.stringContaining("Approved issue 13"),
     });
+  });
+
+
+  /*
+    A DM or channel attachment the Agent named in its proposal has to reach the
+    issue the approval creates; run a98bf275-d5d6-5e66-aa5f-89e77a4ca34a blocked
+    on missing-source-attachments because nothing carried it across.
+  */
+  const seedChannelAttachment = async (input: {
+    id: string;
+    messageId: string;
+    filename: string;
+    contentType: string;
+    byteSize: number;
+    channelId?: string;
+  }) => {
+    await db.prepare(
+      `insert into briar_channel_message_attachments (
+         id, organization_id, channel_id, message_id, object_key, filename,
+         content_type, byte_size, created_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      input.id,
+      organizationId,
+      input.channelId ?? channelId,
+      input.messageId,
+      `channel-attachments/${input.id}`,
+      input.filename,
+      input.contentType,
+      input.byteSize,
+      now,
+    ).run();
+    return input.id;
+  };
+
+  const issueAttachmentRows = (runId: string) =>
+    db.prepare(
+      `select id, object_key, filename, content_type, byte_size
+       from briar_issue_attachments where run_id = ? order by filename`,
+    ).bind(runId).all<{
+      id: string;
+      object_key: string;
+      filename: string;
+      content_type: string;
+      byte_size: number;
+    }>();
+
+  const markdownAttachmentIds = [
+    "80000000-0000-4000-8000-000000000001",
+    "80000000-0000-4000-8000-000000000002",
+  ] as const;
+
+  it("carries the proposal's Markdown attachments onto the created issue", async () => {
+    const proposalId = await seedProposal(40, {
+      payload: {
+        issue: {
+          title: "Approved issue 40",
+          description: "Rewrite the two policy documents.",
+          priority: 2,
+          attachmentIds: [...markdownAttachmentIds],
+        },
+      },
+    });
+    const triggerMessageId = "50000000-0000-4000-8000-000000000028";
+    await seedChannelAttachment({
+      id: markdownAttachmentIds[0],
+      messageId: triggerMessageId,
+      filename: "Terms.md",
+      contentType: "text/markdown",
+      byteSize: 4096,
+    });
+    await seedChannelAttachment({
+      id: markdownAttachmentIds[1],
+      messageId: triggerMessageId,
+      filename: "Privacy.md",
+      contentType: "text/markdown",
+      byteSize: 2048,
+    });
+
+    const accepted = await worker.fetch(request(proposalId, projectAId), env());
+    expect(accepted.status).toBe(200);
+    const body = await accepted.json<{ resultRunId: string }>();
+
+    const attachments = await issueAttachmentRows(body.resultRunId);
+    expect(attachments.results).toEqual([
+      {
+        id: expect.any(String),
+        object_key: `channel-attachments/${markdownAttachmentIds[1]}`,
+        filename: "Privacy.md",
+        content_type: "text/markdown",
+        byte_size: 2048,
+      },
+      {
+        id: expect.any(String),
+        object_key: `channel-attachments/${markdownAttachmentIds[0]}`,
+        filename: "Terms.md",
+        content_type: "text/markdown",
+        byte_size: 4096,
+      },
+    ]);
+    // A fresh id, because the channel attachment's own id doubles as an upload
+    // id and the same file may be carried into more than one issue.
+    expect(attachments.results.map(({ id }) => id)).not.toContain(
+      markdownAttachmentIds[0],
+    );
+    await expect(db.prepare(
+      `select json_extract(context_json, '$.attachmentCount') as count
+       from briar_hunt_runs where id = ?`,
+    ).bind(body.resultRunId).first()).resolves.toEqual({ count: 2 });
+
+    // Approving again must not write a second copy of either file.
+    const retried = await worker.fetch(request(proposalId, projectAId), env());
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toMatchObject({
+      outcome: "already_accepted",
+      resultRunId: body.resultRunId,
+    });
+    await expect(db.prepare(
+      `select count(*) as count from briar_issue_attachments where run_id = ?`,
+    ).bind(body.resultRunId).first()).resolves.toEqual({ count: 2 });
+
+    // The R2 object is shared rather than copied, so deleting the DM message
+    // must leave the issue holding a readable file rather than a dead key.
+    await db.prepare(`delete from briar_channel_messages where id = ?`)
+      .bind(triggerMessageId).run();
+    await expect(db.prepare(
+      `select count(*) as count from briar_channel_message_attachments
+       where message_id = ?`,
+    ).bind(triggerMessageId).first()).resolves.toEqual({ count: 0 });
+    await expect(db.prepare(
+      `select count(*) as count from briar_issue_attachments where run_id = ?`,
+    ).bind(body.resultRunId).first()).resolves.toEqual({ count: 2 });
+  });
+
+  it("hands the carried attachments to the Worker that claims the run", async () => {
+    const attachmentId = "80000000-0000-4000-8000-000000000003";
+    const proposalId = await seedProposal(41, {
+      executeAfterCreate: true,
+      payload: {
+        issue: {
+          title: "Approved issue 41",
+          description: "Implement what the attached specification describes.",
+          priority: 2,
+          attachmentIds: [attachmentId],
+        },
+      },
+    });
+    await seedChannelAttachment({
+      id: attachmentId,
+      messageId: "50000000-0000-4000-8000-000000000029",
+      filename: "Spec.md",
+      contentType: "text/markdown",
+      byteSize: 512,
+    });
+    const claimWorkerToken = "briar_worker_channel_attachment_claim";
+    const claimWorker = await registerExecutionWorker(db, projectAId, {
+      id: "channel-attachment-claim-worker",
+      deviceId: "channel-attachment-claim-device",
+      organizationId,
+      ownerUserId: ownerId,
+      label: "Channel Attachment Claim Worker",
+      deviceIdentityHash: createHash("sha256")
+        .update("channel-attachment-claim-device")
+        .digest("hex"),
+      credentialTokenHash: createHash("sha256")
+        .update(claimWorkerToken)
+        .digest("hex"),
+      runtime: workerRuntimeMetadataFixture({ providerCapabilities }),
+      observedAt: new Date().toISOString(),
+    });
+
+    // The one approval creates the issue and schedules its execution, which is
+    // what makes the run claimable at all: a channel-approved run refuses to
+    // enter the queue without an explicit dispatch.
+    const accepted = await worker.fetch(
+      request(proposalId, projectAId, ownerToken, {
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        effort: "high",
+        workerId: null,
+      }),
+      env(),
+    );
+    expect(accepted.status).toBe(200);
+    const body = await accepted.json<{ resultRunId: string }>();
+
+    const claimEnv = {
+      DB: db,
+      ATTACHMENTS: attachments,
+      ARCHIVES: archives,
+    } as unknown as Env;
+    const claimed = await claimNextQueueWork({
+      db,
+      env: claimEnv,
+      projectId: projectAId,
+      claimedBy: claimWorker.worker.id,
+      runId: body.resultRunId,
+      authenticatedWorker: await requireWorkerProjectBinding(
+        db,
+        new Request("https://briar.example", {
+          headers: { authorization: `Bearer ${claimWorkerToken}` },
+        }),
+        projectAId,
+        claimWorker.worker.id,
+      ),
+    });
+    expect(claimed).toMatchObject({
+      runId: body.resultRunId,
+      attachments: [
+        { filename: "Spec.md", contentType: "text/markdown", byteSize: 512 },
+      ],
+    });
+  });
+
+  it("carries each batch item's own attachments", async () => {
+    const apiAttachmentId = "80000000-0000-4000-8000-000000000004";
+    const proposalId = await seedProposal(42, {
+      payload: {
+        batch: {
+          items: [
+            {
+              key: "api",
+              issue: {
+                title: "Batch API from spec",
+                description: "Build the API the attached spec describes.",
+                priority: 1,
+                attachmentIds: [apiAttachmentId],
+              },
+            },
+            {
+              key: "web",
+              issue: {
+                title: "Batch web",
+                description: "Build the web client.",
+                priority: 2,
+              },
+            },
+          ],
+          dependencies: [{ prerequisiteKey: "api", dependentKey: "web" }],
+        },
+      },
+    });
+    await seedChannelAttachment({
+      id: apiAttachmentId,
+      messageId: "50000000-0000-4000-8000-00000000002a",
+      filename: "Api.pdf",
+      contentType: "application/pdf",
+      byteSize: 9001,
+    });
+
+    const accepted = await worker.fetch(request(proposalId, projectAId), env());
+    expect(accepted.status).toBe(200);
+    const body = await accepted.json<{
+      resultItems: Array<{ localKey: string; runId: string }>;
+    }>();
+    const runByKey = new Map(
+      body.resultItems.map((item) => [item.localKey, item.runId]),
+    );
+
+    await expect(issueAttachmentRows(runByKey.get("api")!)).resolves
+      .toMatchObject({
+        results: [
+          {
+            object_key: `channel-attachments/${apiAttachmentId}`,
+            filename: "Api.pdf",
+            content_type: "application/pdf",
+            byte_size: 9001,
+          },
+        ],
+      });
+    await expect(issueAttachmentRows(runByKey.get("web")!)).resolves
+      .toMatchObject({ results: [] });
+    await expect(db.prepare(
+      `select json_extract(context_json, '$.batchKey') as batch_key,
+              json_extract(context_json, '$.attachmentCount') as count
+       from briar_hunt_runs where id in (?, ?) order by batch_key`,
+    ).bind(runByKey.get("api"), runByKey.get("web")).all()).resolves
+      .toMatchObject({
+        results: [
+          { batch_key: "api", count: 1 },
+          { batch_key: "web", count: 0 },
+        ],
+      });
+  });
+
+  /*
+    24 proposals stored before attachments could travel were still pending in
+    production when this shipped, and their payloads cannot be rewritten.
+  */
+  it("still approves a proposal stored without an attachment list", async () => {
+    const proposalId = await seedProposal(43, {
+      payload: {
+        issue: {
+          title: "Approved issue 43",
+          description: "Stored before attachments could travel.",
+          priority: 2,
+        },
+      },
+    });
+    const accepted = await worker.fetch(request(proposalId, projectAId), env());
+    expect(accepted.status).toBe(200);
+    const body = await accepted.json<{ resultRunId: string }>();
+    await expect(db.prepare(
+      `select json_extract(context_json, '$.attachmentCount') as count
+       from briar_hunt_runs where id = ?`,
+    ).bind(body.resultRunId).first()).resolves.toEqual({ count: 0 });
+    await expect(issueAttachmentRows(body.resultRunId)).resolves.toMatchObject({
+      results: [],
+    });
+  });
+
+  it("refuses a proposal naming an attachment from another channel", async () => {
+    const otherChannelId = "30000000-0000-4000-8000-000000000009";
+    const otherMessageId = "59000000-0000-4000-8000-00000000002b";
+    const foreignAttachmentId = "80000000-0000-4000-8000-000000000005";
+    await createChannel(db, {
+      id: otherChannelId,
+      organizationId,
+      kind: "channel",
+      dmKey: null,
+      slug: "elsewhere",
+      name: "Elsewhere",
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: now,
+    });
+    await createChannelMessage(db, {
+      id: otherMessageId,
+      channelId: otherChannelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: "A private file",
+      mentionedUserIds: [],
+      mentionedAgentIds: [],
+      createdAt: now,
+    });
+    await seedChannelAttachment({
+      id: foreignAttachmentId,
+      channelId: otherChannelId,
+      messageId: otherMessageId,
+      filename: "Secret.md",
+      contentType: "text/markdown",
+      byteSize: 32,
+    });
+
+    const proposalId = await seedProposal(44, {
+      payload: {
+        issue: {
+          title: "Approved issue 44",
+          description: "Reaches for a file from another channel.",
+          priority: 2,
+          attachmentIds: [foreignAttachmentId],
+        },
+      },
+    });
+    const rejected = await worker.fetch(request(proposalId, projectAId), env());
+    expect(rejected.status).toBe(409);
+
+    await expect(db.prepare(
+      `select count(*) as count from briar_hunt_runs where ${proposalRunWhere}`,
+    ).bind(proposalId).first()).resolves.toEqual({ count: 0 });
+    await expect(db.prepare(
+      `select count(*) as count from briar_issue_attachments
+       where object_key = ?`,
+    ).bind(`channel-attachments/${foreignAttachmentId}`).first()).resolves
+      .toEqual({ count: 0 });
   });
 
   it("retries accepted proposals but does not approve pending ones after archive", async () => {

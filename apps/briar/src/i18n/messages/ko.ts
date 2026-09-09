@@ -516,6 +516,8 @@ export const ko = {
   "channel.issueProposalBacklogOnly": "백로그에만 생성 · 실행하지 않음 · 실행하려면 별도 승인 필요",
   "channel.issueProposalCreateAndExecute": "백로그 이슈 생성 · 승인한 설정으로 바로 실행 예약",
   "channel.issueProposalExecutionRequested": "이슈 내용과 실행 설정을 함께 확인합니다. 한 번 승인하면 이슈 생성과 실행 예약이 이어집니다.",
+  "channel.issueProposalAttachments": "함께 전달할 첨부 파일 {count}개",
+  "channel.issueProposalAttachmentUnavailable": "대화에서 찾을 수 없는 첨부 파일",
   "channel.issueProposalShowDescription": "설명 전체 보기",
   "channel.issueProposalHideDescription": "설명 접기",
   "channel.issueBatchProposalCount": "한 번에 생성할 백로그 이슈 {count}개",

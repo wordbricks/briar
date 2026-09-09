@@ -752,6 +752,10 @@ message ChannelIssueProposal {
   string title = 1;
   optional string description = 2;
   optional uint32 priority = 3;
+  // Conversation attachments the approved issue carries into the project. The
+  // approver sees them on the card, so the copy is part of what was approved
+  // rather than a server-side guess about which files belong to the issue.
+  repeated string attachment_ids = 5;
 }
 
 message ChannelIssueProposalPayload {

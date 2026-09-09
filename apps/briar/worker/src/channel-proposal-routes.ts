@@ -28,6 +28,10 @@ import {
   listChannelIssueBatchItems,
   materializeChannelIssueBatch,
 } from "./channel-issue-batch-approval";
+import {
+  channelIssueAttachmentStatements,
+  resolveChannelIssueAttachmentSources,
+} from "./channel-issue-attachment-sources";
 import { recordHuntEvent } from "./hunt-event-repository";
 import { getHuntRunForProject } from "./hunt-run-repository";
 import { HttpError } from "./http-response";
@@ -43,6 +47,7 @@ import {
   newChannelBatchProposalIssueSourceKey,
   newChannelProposalIssueSourceKey,
 } from "./proposal-issue-source";
+import { digestRunId } from "./run-identity";
 import {
   assertExecutionSelectionAvailable,
   dispatchHuntRun,
@@ -89,6 +94,7 @@ async function createApprovedChannelProposalIssue(input: {
   title: string;
   description: string | null;
   priority: number | null;
+  attachmentIds: readonly string[];
   createdByUserId: string;
   occurredAt: string;
 }) {
@@ -98,6 +104,25 @@ async function createApprovedChannelProposalIssue(input: {
     channelId: input.channelId,
     messageId: input.messageId,
     rootMessageId: input.rootMessageId,
+  });
+  // Reject an unresolvable id before the run exists, so a proposal that names
+  // a deleted file fails cleanly instead of creating an issue without it.
+  await resolveChannelIssueAttachmentSources(input.db, {
+    organizationId: input.organizationId,
+    channelId: input.channelId,
+    attachmentIds: input.attachmentIds,
+  });
+  // The run id is derived here rather than read back from the callback so the
+  // attachment rows can be built for it up front: deriving their ids needs a
+  // digest, and the callback that carries them into the batch is synchronous.
+  const runId = await digestRunId(input.project.id, "issue", input.sourceKey);
+  const attachmentStatements = await channelIssueAttachmentStatements(input.db, {
+    projectId: input.project.id,
+    runId,
+    organizationId: input.organizationId,
+    channelId: input.channelId,
+    attachmentIds: input.attachmentIds,
+    createdAt: input.occurredAt,
   });
   // Keep the source message structured so the issue description remains the
   // exact proposal payload while the dashboard can offer an in-app jump back.
@@ -136,12 +161,15 @@ async function createApprovedChannelProposalIssue(input: {
       channelId: input.channelId,
       issueId: input.proposalId,
       relatedMessage,
-      attachmentCount: 0,
+      attachmentCount: input.attachmentIds.length,
     },
     createdByUserId: input.createdByUserId,
     preferredAgentProvider: null,
     preferredAgentModel: null,
     preferredAgentEffort: null,
+  }, {
+    newRunId: runId,
+    additionalStatements: () => attachmentStatements,
   });
 }
 
@@ -748,6 +776,7 @@ export async function acceptOrganizationChannelProposal(
     title: approvedIssue.title,
     description: approvedIssue.description,
     priority: approvedIssue.priority,
+    attachmentIds: approvedIssue.attachmentIds,
     createdByUserId: reservation.accepted_by_user_id,
     occurredAt: proposal.created_at,
   });

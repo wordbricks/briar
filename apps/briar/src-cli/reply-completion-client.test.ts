@@ -161,6 +161,7 @@ describe("generated reply completion client", () => {
               title: "Follow up",
               description: null,
               priority: 2,
+              attachmentIds: [],
             },
           },
           issueBatchProposal: null,

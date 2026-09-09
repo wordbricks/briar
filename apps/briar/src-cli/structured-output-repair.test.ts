@@ -23,6 +23,7 @@ const proposalWithStatus = JSON.stringify({
       title: "Fix the reply contract",
       description: "Replies fail before they reach the channel.",
       priority: 2,
+      attachmentIds: [],
       status: "backlog",
     },
   },

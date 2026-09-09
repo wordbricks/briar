@@ -387,6 +387,8 @@ export const zh = {
   "channel.issueProposalProject": "目标项目：{project}",
   "channel.issueProposalBacklogOnly": "仅创建到待办列表 · 不执行 · 执行需另行批准",
   "channel.issueProposalCreateAndExecute": "创建一个待办问题 · 使用已批准的设置调度执行",
+  "channel.issueProposalAttachments": "将一并带入问题的附件 {count} 个",
+  "channel.issueProposalAttachmentUnavailable": "在此对话中找不到该附件",
   "channel.issueProposalShowDescription": "查看完整说明",
   "channel.issueProposalHideDescription": "收起说明",
   "channel.issueBatchProposalCount": "将一次创建 {count} 个待办问题",

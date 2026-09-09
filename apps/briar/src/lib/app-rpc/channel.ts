@@ -455,6 +455,7 @@ const proposedIssueFromMessage = (value: ChannelIssueProposalMessage) => ({
   title: value.title,
   description: value.description ?? null,
   priority: value.priority ?? null,
+  attachmentIds: [...value.attachmentIds],
 });
 
 const channelProposalFromMessage = (

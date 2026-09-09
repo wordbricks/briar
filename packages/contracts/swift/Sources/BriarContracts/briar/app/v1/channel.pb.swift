@@ -2954,6 +2954,11 @@ public nonisolated struct BriarAPI_ChannelIssueProposal: Sendable {
   /// Clears the value of `priority`. Subsequent reads from it will return its default value.
   public mutating func clearPriority() {self._priority = nil}
 
+  /// Conversation attachments the approved issue carries into the project. The
+  /// approver sees them on the card, so the copy is part of what was approved
+  /// rather than a server-side guess about which files belong to the issue.
+  public var attachmentIds: [String] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -7681,7 +7686,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
 
 nonisolated extension BriarAPI_ChannelIssueProposal: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelIssueProposal"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}title\0\u{1}description\0\u{1}priority\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}title\0\u{1}description\0\u{1}priority\0\u{4}\u{2}attachment_ids\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -7692,6 +7697,7 @@ nonisolated extension BriarAPI_ChannelIssueProposal: SwiftProtobuf.Message, Swif
       case 1: try { try decoder.decodeSingularStringField(value: &self.title) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self._priority) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.attachmentIds) }()
       default: break
       }
     }
@@ -7711,6 +7717,9 @@ nonisolated extension BriarAPI_ChannelIssueProposal: SwiftProtobuf.Message, Swif
     try { if let v = self._priority {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
     } }()
+    if !self.attachmentIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.attachmentIds, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7718,6 +7727,7 @@ nonisolated extension BriarAPI_ChannelIssueProposal: SwiftProtobuf.Message, Swif
     if lhs.title != rhs.title {return false}
     if lhs._description_p != rhs._description_p {return false}
     if lhs._priority != rhs._priority {return false}
+    if lhs.attachmentIds != rhs.attachmentIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -6024,6 +6024,13 @@ button.issue-message-state { width:100%; cursor:pointer; }
 .channel-batch-proposal-dependencies ul { margin:0; padding:0; display:flex; flex-wrap:wrap; gap:4px; list-style:none; }
 .channel-batch-proposal-dependencies li { padding:3px 6px; display:inline-flex; align-items:center; gap:4px; border-radius:6px; background:var(--muted); color:var(--muted-foreground); font-size:10px; }
 .channel-batch-proposal-dependencies code { color:inherit; font-size:inherit; }
+.channel-proposal-attachments { display:grid; gap:3px; }
+.channel-proposal-attachments>strong { color:var(--foreground); font-size:11px; }
+.channel-proposal-attachments ul { margin:0; padding:0; display:grid; gap:3px; list-style:none; }
+.channel-proposal-attachments li { min-width:0; padding:3px 6px; display:flex; align-items:center; gap:5px; border-radius:6px; background:var(--muted); color:var(--muted-foreground); font-size:11px; }
+.channel-proposal-attachments li>span { min-width:0; color:var(--foreground); font-weight:600; overflow-wrap:anywhere; }
+.channel-proposal-attachments li>small { flex-shrink:0; font-size:10px; }
+.channel-batch-proposal-items .channel-proposal-attachments { grid-column:2; }
 .channel-proposal-execution-intent { margin:4px 0 0; color:var(--foreground,#25221f); font-size:11px; line-height:1.4; overflow-wrap:anywhere; }
 .channel-proposal-card select {
   min-width:160px;

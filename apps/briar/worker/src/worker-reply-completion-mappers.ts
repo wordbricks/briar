@@ -244,12 +244,30 @@ export function prepareReplyAttachmentUploadsInputFromProto(
   };
 }
 
+/*
+  An issue-conversation proposal is raised inside the issue that already owns
+  its files, so `attachmentIds` is dropped here rather than carried: only a
+  channel reply names files that have to move between two places.
+*/
 const proposalIssueDraft = (draft: ReplyIssueDraft | undefined) => {
   if (!draft) throw new ReplyCompletionMappingError("Issue draft is required");
   return {
     title: draft.title,
     description: draft.description ?? null,
     priority: draft.priority ?? null,
+  };
+};
+
+const channelProposalIssueDraft = (draft: ReplyIssueDraft | undefined) => {
+  if (!draft) throw new ReplyCompletionMappingError("Issue draft is required");
+  return {
+    ...proposalIssueDraft(draft),
+    attachmentIds: draft.attachmentIds.map((attachmentId) =>
+      mapping(
+        () => canonicalUuid(attachmentId).toLowerCase(),
+        "Issue attachment reference is invalid",
+      )
+    ),
   };
 };
 
@@ -447,7 +465,7 @@ export function completeChannelReplyInputFromProto(
         case "issue":
           issueProposal = {
             projectId: artifacts.proposal.value.projectId ?? null,
-            issue: proposalIssueDraft(artifacts.proposal.value.issue),
+            issue: channelProposalIssueDraft(artifacts.proposal.value.issue),
             executeAfterCreate: artifacts.proposal.value.executeAfterCreate,
           };
           break;
@@ -457,7 +475,7 @@ export function completeChannelReplyInputFromProto(
             batch: {
               items: artifacts.proposal.value.items.map((item) => ({
                 key: item.key,
-                issue: proposalIssueDraft(item.issue),
+                issue: channelProposalIssueDraft(item.issue),
               })),
               dependencies: artifacts.proposal.value.dependencies.map(
                 (dependency) => ({

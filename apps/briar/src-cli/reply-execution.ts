@@ -103,6 +103,7 @@ import {
   downloadChannelReplyAttachments,
 } from "./channel-reply-images";
 import { cleanupChannelReplyResources } from "./channel-reply-cleanup";
+import { channelReplyIssueAttachmentDefaults } from "./channel-reply-issue-attachments";
 import { assertChannelReplyWorkspaceScope } from "./channel-reply-scope";
 import {
   cleanupOrganizationAgentContext,
@@ -1255,7 +1256,10 @@ async function runClaimedChannelReply(
       outcome: {
         case: "success",
         conversationId,
-        result,
+        result: channelReplyIssueAttachmentDefaults(
+          result,
+          reply.triggerAttachments,
+        ),
         attachments: replyAttachments,
         publishedFinalBatchId: finalReceipt?.batchId,
       },

@@ -85795,6 +85795,18 @@ pub struct ChannelIssueProposal {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub priority: ::core::option::Option<u32>,
+    /// Conversation attachments the approved issue carries into the project. The
+    /// approver sees them on the card, so the copy is part of what was approved
+    /// rather than a server-side guess about which files belong to the issue.
+    ///
+    /// Field 5: `attachment_ids`
+    #[serde(
+        rename = "attachmentIds",
+        alias = "attachment_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub attachment_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -85805,6 +85817,7 @@ impl ::core::fmt::Debug for ChannelIssueProposal {
             .field("title", &self.title)
             .field("description", &self.description)
             .field("priority", &self.priority)
+            .field("attachment_ids", &self.attachment_ids)
             .finish()
     }
 }
@@ -85863,6 +85876,9 @@ impl ::buffa::Message for ChannelIssueProposal {
         if let Some(v) = self.priority {
             size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
         }
+        for v in &self.attachment_ids {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -85881,6 +85897,9 @@ impl ::buffa::Message for ChannelIssueProposal {
         }
         if let Some(v) = self.priority {
             ::buffa::types::put_uint32_field(3u32, v, buf);
+        }
+        for v in &self.attachment_ids {
+            ::buffa::types::put_string_field(5u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -85923,6 +85942,17 @@ impl ::buffa::Message for ChannelIssueProposal {
                     ::buffa::types::decode_uint32(buf)?,
                 );
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.attachment_ids.push(__elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -85934,6 +85964,7 @@ impl ::buffa::Message for ChannelIssueProposal {
         self.title.clear();
         self.description = ::core::option::Option::None;
         self.priority = ::core::option::Option::None;
+        self.attachment_ids.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -276168,6 +276199,12 @@ pub mod __buffa {
             pub description: ::core::option::Option<&'a str>,
             /// Field 3: `priority`
             pub priority: ::core::option::Option<u32>,
+            /// Conversation attachments the approved issue carries into the project. The
+            /// approver sees them on the card, so the copy is part of what was approved
+            /// rather than a server-side guess about which files belong to the issue.
+            ///
+            /// Field 5: `attachment_ids`
+            pub attachment_ids: ::buffa::RepeatedView<'a, &'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ChannelIssueProposalView<'a> {
@@ -276223,6 +276260,17 @@ pub mod __buffa {
                         )?;
                         view.priority = Some(::buffa::types::decode_uint32(&mut cur)?);
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.attachment_ids.push(__elem);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -276255,6 +276303,11 @@ pub mod __buffa {
                     title: self.title.to_string(),
                     description: self.description.map(|s| s.to_string()),
                     priority: self.priority,
+                    attachment_ids: self
+                        .attachment_ids
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -276279,6 +276332,9 @@ pub mod __buffa {
                 if let Some(v) = self.priority {
                     size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
                 }
+                for v in &self.attachment_ids {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -276298,6 +276354,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.priority {
                     ::buffa::types::put_uint32_field(3u32, v, buf);
+                }
+                for v in &self.attachment_ids {
+                    ::buffa::types::put_string_field(5u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -276332,6 +276391,9 @@ pub mod __buffa {
                             "priority",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
+                }
+                if !self.attachment_ids.is_empty() {
+                    __map.serialize_entry("attachmentIds", &*self.attachment_ids)?;
                 }
                 __map.end()
             }
@@ -276442,6 +276504,15 @@ pub mod __buffa {
             #[must_use]
             pub fn priority(&self) -> ::core::option::Option<u32> {
                 self.0.reborrow().priority
+            }
+            /// Conversation attachments the approved issue carries into the project. The
+            /// approver sees them on the card, so the copy is part of what was approved
+            /// rather than a server-side guess about which files belong to the issue.
+            ///
+            /// Field 5: `attachment_ids`
+            #[must_use]
+            pub fn attachment_ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().attachment_ids
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChannelIssueProposalView<'static>>>

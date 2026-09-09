@@ -329,7 +329,12 @@ describe("channel conversation loader", () => {
       status: "pending",
       projectId: "project-1",
       payload: {
-        issue: { title: "Follow-up", description: null, priority: 2 },
+        issue: {
+          title: "Follow-up",
+          description: null,
+          priority: 2,
+          attachmentIds: [],
+        },
         executeAfterCreate: false,
       },
       resultRunId: null,
