@@ -61,7 +61,7 @@
   background: var(--sidebar-active);
 }
 
-.dark .sidebar-organization-menu,
+.dark .sidebar-workspace-menu,
 .dark .sidebar-project-menu,
 .dark .sidebar-channel-context-menu,
 .dark .channel-create-dialog,
@@ -100,7 +100,7 @@
 
 .dark .app-content-surface,
 .dark .main-content,
-.dark .organization-create,
+.dark .workspace-create,
 .dark .kanban-board,
 .dark .issue-list {
   color: var(--foreground);
@@ -231,7 +231,7 @@
 .dark .companion-settings > header button,
 .dark .companion-account-identity strong,
 .dark .companion-account-popover > button,
-.dark .companion-organization-options button {
+.dark .companion-workspace-options button {
   color: var(--foreground);
 }
 
