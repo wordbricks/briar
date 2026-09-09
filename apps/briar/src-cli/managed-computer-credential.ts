@@ -36,8 +36,11 @@ export function decodeManagedComputerCredential(
     ? record.credential
     : "";
   const deviceId = typeof record.deviceId === "string" ? record.deviceId : "";
-  const workspaceId = typeof record.workspaceId === "string"
-    ? record.workspaceId
+  // On-disk key stays `organizationId`: the file is written once per instance
+  // by the oneshot enrollment unit, so already-enrolled machines never rewrite
+  // it. Only the in-memory field carries the new name.
+  const workspaceId = typeof record.organizationId === "string"
+    ? record.organizationId
     : "";
   const managedComputerId = typeof record.managedComputerId === "string"
     ? record.managedComputerId

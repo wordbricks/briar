@@ -22,7 +22,7 @@ async function fixture(mode = 0o640) {
   await writeFile(path, JSON.stringify({
     credential,
     deviceId: `managed-${managedComputerId}`,
-    workspaceId,
+    organizationId: workspaceId,
     managedComputerId,
     apiOrigin: "https://briar.example",
   }), { mode });

@@ -278,7 +278,7 @@ describe("CLI config loading", () => {
     await writeFile(credentialFile, JSON.stringify({
       credential: `briar_worker_${"a".repeat(43)}`,
       deviceId: `managed-${managedComputerId}`,
-      workspaceId,
+      organizationId: workspaceId,
       managedComputerId,
       apiOrigin: "https://enrolled.example",
     }), { mode: 0o600 });
