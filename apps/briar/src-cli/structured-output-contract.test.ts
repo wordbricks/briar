@@ -227,6 +227,67 @@ describe("provider structured output contracts", () => {
     }
   });
 
+  it("decodes a repository request as its own turn", () => {
+    const base = {
+      body: null,
+      attachments: [],
+      document: null,
+      issueProposal: null,
+      issueBatchProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+      agentMessage: null,
+      contextRequests: null,
+      memoryRequests: null,
+      memoryCitations: null,
+      memorySaveRequest: null,
+    } as const;
+    const request = { reason: "Read src-cli/worktree.ts to answer accurately" };
+
+    for (const provider of providers) {
+      const contract = providerStructuredOutputContract(
+        provider,
+        ChannelAgentReplyProviderOutputSchema,
+      );
+      expect(contract.decode({ ...base, repositoryRequest: request })).toEqual({
+        case: "repository",
+        request,
+      });
+      // Absent and explicitly null both mean "no repository is being asked
+      // for", so a normal reply keeps decoding exactly as it did.
+      expect(
+        contract.decode({ ...base, body: "A plain answer", repositoryRequest: null }),
+      ).toMatchObject({ case: "reply" });
+      expect(contract.decode({ ...base, body: "A plain answer" }))
+        .toMatchObject({ case: "reply" });
+      // A request is never also a completion, a lookup, or memory data.
+      expect(() =>
+        contract.decode({ ...base, body: "Mixed", repositoryRequest: request })
+      ).toThrow();
+      expect(() =>
+        contract.decode({
+          ...base,
+          repositoryRequest: request,
+          memoryRequests: [{ operation: "search", queries: ["units"] }],
+        })
+      ).toThrow();
+      expect(() =>
+        contract.decode({
+          ...base,
+          repositoryRequest: request,
+          agentMessage: {
+            agentId: "22222222-2222-4222-8222-222222222222",
+            body: "Check the ticker.",
+          },
+        })
+      ).toThrow();
+      expect(() =>
+        contract.decode({ ...base, repositoryRequest: { reason: "" } })
+      ).toThrow();
+    }
+  });
+
   it("encodes a lookup turn with no Agent message", () => {
     /*
       A lookup turn is replayed to the provider through the same codec. An
@@ -251,6 +312,15 @@ describe("provider structured output contracts", () => {
       case: "memory",
       request: { operation: "search", queries: ["metric units"] },
     })).toMatchObject({ agentMessage: null, delegation: null, body: null });
+    expect(encode({
+      case: "repository",
+      request: { reason: "Read the router before answering" },
+    })).toMatchObject({
+      agentMessage: null,
+      delegation: null,
+      body: null,
+      repositoryRequest: { reason: "Read the router before answering" },
+    });
   });
 });
 

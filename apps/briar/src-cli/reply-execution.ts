@@ -79,6 +79,7 @@ import {
   extendCachedAnalysisWorktreeRetention,
   findExistingIssueWorktree,
   issueReplyWorkspaceMode,
+  listCachedAnalysisWorktrees,
   markCachedAnalysisWorktreeIdle,
   projectWorktreeRoot,
   removeAnalysisWorktree,
@@ -86,6 +87,10 @@ import {
 import {
   collectChannelReplyAttachments,
 } from "./channel-reply-attachments";
+import {
+  channelReplyStartsWithoutWorktree,
+  type ChannelReplyWorkspaceKind,
+} from "./channel-reply-workspace";
 import {
   collectIssueReplyAttachments,
   parseIssueReplyAgentResult,
@@ -671,6 +676,8 @@ async function runClaimedChannelReply(
     runProviderTurn: typeof runDetachedProviderTurn;
     workspaceRoot: string;
     dmMessageMcpServerPath?: string;
+    /** Tests observe worktree allocation through this runner. */
+    git?: typeof runGit;
   } = {
     runProviderTurn: runDetachedProviderTurn,
     workspaceRoot: configDirectory,
@@ -679,6 +686,8 @@ async function runClaimedChannelReply(
 ) {
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
+  // Absent means the real one: both sides are the same git runner.
+  const git = runtime.git ?? runGit;
   assertChannelReplyWorkspaceScope(reply, project.id);
   let routing = reply.routing;
   if (routing?.action === "pending") {
@@ -748,10 +757,23 @@ async function runClaimedChannelReply(
       throw new Error("DM 작업 디렉터리를 복구할 수 없어 이전 작업을 다시 시작하지 않았습니다.");
     }
   }
+  // A plain DM conversation turn is never where code changes, so it starts
+  // with no checkout: the fetch and `git worktree add` used to sit on the
+  // critical path of every "hi".
+  const startsWithoutWorktree = channelReplyStartsWithoutWorktree(reply);
+  // One exception inside the gate: a session that already has a checkout on
+  // this disk keeps it, because the conversation may already be talking about
+  // files in it.
+  const sessionWorktreeCached = sessionWorktreePath !== null &&
+      startsWithoutWorktree && reply.session
+    ? (await listCachedAnalysisWorktrees(worktreeRoot)).some(
+      (candidate) => candidate.runId === reply.session!.id,
+    )
+    : false;
   let sessionWorktree:
     | Awaited<ReturnType<typeof allocateCachedAnalysisWorktree>>
     | null = null;
-  if (sessionWorktreePath) {
+  if (sessionWorktreePath && (!startsWithoutWorktree || sessionWorktreeCached)) {
     retainCachedAnalysisWorktree(sessionWorktreePath);
     try {
       sessionWorktree = await allocateCachedAnalysisWorktree({
@@ -759,7 +781,7 @@ async function runClaimedChannelReply(
         projectId: project.id,
         runId: reply.session!.id,
         settings,
-        git: runGit,
+        git,
         retainedUntil: reply.session!.retainedUntil,
       });
     } catch (error) {
@@ -767,24 +789,31 @@ async function runClaimedChannelReply(
       throw error;
     }
   }
-  const analysisWorktree = reply.projectId
+  let analysisWorktree = reply.projectId && !startsWithoutWorktree
     ? sessionWorktree ?? await allocateAnalysisWorktree({
         repositoryPath: project.repositoryPath,
         projectId: project.id,
         workId: reply.workId,
         settings,
-        git: runGit,
+        git,
       })
-    : null;
+    : sessionWorktree;
   let retainedUntil = reply.session?.retainedUntil ?? null;
-  const workspacePath =
-    analysisWorktree?.path ??
-    join(
-      runtime.workspaceRoot,
-      "worker-sessions",
-      `channel-${reply.session?.id ?? reply.workId}`,
-    );
-  if (reply.session) {
+  // The repository-less workspace an Organization Agent already uses. It stays
+  // addressable after a mid-turn checkout because the downloaded attachments
+  // and the retained Skill catalog live under it.
+  const detachedWorkspacePath = join(
+    runtime.workspaceRoot,
+    "worker-sessions",
+    `channel-${reply.session?.id ?? reply.workId}`,
+  );
+  let workspacePath = analysisWorktree?.path ?? detachedWorkspacePath;
+  // Only a project reply has a repository at all, and only one that started
+  // without a checkout has one left to ask for.
+  const repositoryRequestAvailable = startsWithoutWorktree &&
+    reply.projectId !== null && analysisWorktree === null;
+  const logSessionWorkspace = (workspace: ChannelReplyWorkspaceKind) => {
+    if (!reply.session) return;
     console.log(`channel reply session: ${JSON.stringify({
       sessionId: reply.session.id,
       channelId: reply.channelId,
@@ -792,10 +821,19 @@ async function runClaimedChannelReply(
       agentId: reply.agent.id,
       claimReason: reply.session.claimReason,
       workspaceReused: sessionWorktree?.reused ?? false,
+      workspace,
       retainedUntil,
     })}`);
-  }
+  };
+  logSessionWorkspace(
+    analysisWorktree === null
+      ? "none"
+      : sessionWorktree?.reused
+      ? "reused"
+      : "created",
+  );
   reportCheckpoint?.({ workspacePath });
+  let detachedWorkspacePrepared = false;
   if (!analysisWorktree) {
     // A prior hard-killed attempt may have left a path behind. Recreate the
     // exact claim workspace so stale files or a planted symlink cannot become
@@ -804,6 +842,7 @@ async function runClaimedChannelReply(
       reuse: Boolean(reply.session),
       retainedUntil: retainedUntil ?? undefined,
     });
+    detachedWorkspacePrepared = true;
   }
   const attachmentDirectory = channelReplyAttachmentDirectory(workspacePath);
   const memoryAbort = new AbortController();
@@ -884,14 +923,18 @@ async function runClaimedChannelReply(
             label: analysisWorktree ? "analysis worktree" : "channel workspace",
             run: async () => {
               if (workspaceCleaned) return;
+              // A turn that asked for the repository mid-reply owns both: the
+              // checkout it moved into and the repository-less workspace its
+              // attachments were downloaded to.
               if (analysisWorktree) {
                 await removeAnalysisWorktree({
                   repositoryPath: project.repositoryPath,
                   path: analysisWorktree.path,
-                  git: runGit,
+                  git,
                 });
-              } else {
-                await rm(workspacePath, { recursive: true, force: true });
+              }
+              if (detachedWorkspacePrepared) {
+                await rm(detachedWorkspacePath, { recursive: true, force: true });
               }
               workspaceCleaned = true;
             },
@@ -1003,7 +1046,9 @@ async function runClaimedChannelReply(
           lifetime: "retained-conversation",
         })
       : null;
-    const prompt = detachedChannelReplyPrompt({
+    // Rebuilt when a mid-turn checkout changes what the Agent may do, so the
+    // continuation never repeats "you have no repository".
+    const buildPrompt = () => detachedChannelReplyPrompt({
       agent,
       snapshot: {
         ...reply.snapshot,
@@ -1013,6 +1058,8 @@ async function runClaimedChannelReply(
       },
       workspaceAvailable: Boolean(analysisWorktree),
       workspaceRetained: Boolean(reply.routing && reply.session),
+      repositoryRequestAvailable: repositoryRequestAvailable &&
+        analysisWorktree === null,
       organizationContextAvailable: organizationContext !== null,
       memoryLearningAvailable: reply.memoryLearningEnabled,
       delegationTargets: reply.delegationTargets,
@@ -1031,11 +1078,49 @@ async function runClaimedChannelReply(
       skillExecutionTarget: reply.skillExecutionTarget,
       pendingTriggerMessageIds: reply.pendingTriggerMessageIds,
     });
+    let prompt = buildPrompt();
     let conversationId: string | null =
       reply.routing ? null : reply.session?.conversationId ?? reply.handoffContext?.conversationId ?? null;
     if (conversationId) reportCheckpoint?.({ conversationId });
     let lookupRounds = 0;
     let repairRounds = 0;
+    let repositoryRounds = 0;
+    /**
+     * Checks the project out mid-reply, once. A session keeps the checkout in
+     * its cached analysis worktree so a retry or a steer of the same
+     * conversation reuses it; a sessionless reply gets a disposable one that
+     * the cleanup block removes.
+     */
+    const checkOutRepositoryOnDemand = async () => {
+      if (sessionWorktreePath && reply.session) {
+        retainCachedAnalysisWorktree(sessionWorktreePath);
+        try {
+          sessionWorktree = await allocateCachedAnalysisWorktree({
+            repositoryPath: project.repositoryPath,
+            projectId: project.id,
+            runId: reply.session.id,
+            settings,
+            git,
+            ...(retainedUntil === null ? {} : { retainedUntil }),
+          });
+        } catch (error) {
+          releaseCachedAnalysisWorktree(sessionWorktreePath);
+          throw error;
+        }
+        analysisWorktree = sessionWorktree;
+      } else {
+        analysisWorktree = await allocateAnalysisWorktree({
+          repositoryPath: project.repositoryPath,
+          projectId: project.id,
+          workId: reply.workId,
+          settings,
+          git,
+        });
+      }
+      workspacePath = analysisWorktree.path;
+      reportCheckpoint?.({ workspacePath });
+      logSessionWorkspace("on_demand");
+    };
     const decodeReplyJson = repairableDecoder(outputContract.decodeJson);
     let turnPrompt = [
       !reply.routing && reply.session?.conversationId && reply.pendingTriggerMessageIds.length > 1
@@ -1066,7 +1151,8 @@ async function runClaimedChannelReply(
         workspacePath,
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
         conversationId: reply.routing ? null : conversationId,
-        attachments: lookupRounds === 0 && repairRounds === 0
+        attachments: lookupRounds === 0 && repairRounds === 0 &&
+            repositoryRounds === 0
           ? downloadedAttachments.attachments
           : undefined,
         outputSchema: outputContract.jsonSchema,
@@ -1170,6 +1256,40 @@ async function runClaimedChannelReply(
         }
         attachmentPaths = decodedTurn.attachmentPaths;
         break;
+      }
+      if (decodedTurn.case === "repository") {
+        // The request is consumed here and never reported to the server: like
+        // a memory lookup, it is not a completion.
+        if (!repositoryRequestAvailable) {
+          throw new Error("repository_unavailable");
+        }
+        if (repositoryRounds >= 1) throw new Error("repository_budget_exhausted");
+        repositoryRounds += 1;
+        activityPublisher.publishProgress(
+          `repository-${reply.workId}`,
+          "저장소 확인 중",
+        );
+        await checkOutRepositoryOnDemand();
+        prompt = buildPrompt();
+        conversationId = reply.routing ? null : turn.conversationId;
+        const continuation = [
+          `Briar checked the project repository out at ${
+            JSON.stringify(workspacePath)
+          } for the reason you gave: ${
+            JSON.stringify(decodedTurn.request.reason)
+          }.`,
+          "Inspect it and run the commands or tools you need there, then return the normal channel reply JSON. Local changes in this checkout are discarded after this reply, so project-changing work still belongs in a Briar issue proposal.",
+          "The repository is available now; do not request it again.",
+        ].join("\n\n");
+        turnPrompt = conversationId
+          ? continuation
+          : [
+            prompt,
+            continuation,
+            memoryInvocation?.prompt(),
+            messageInvocation?.prompt(),
+          ].filter(Boolean).join("\n\n");
+        continue;
       }
       if (decodedTurn.case === "memory") {
         if (!memoryInvocation) throw new Error("memory_unavailable");
