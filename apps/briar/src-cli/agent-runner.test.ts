@@ -670,6 +670,53 @@ describe("detached Agent runner", () => {
     expect(prompt).not.toContain("discarded after this reply");
   });
 
+  it("offers a repository request when the project is not checked out yet", () => {
+    const snapshot = { channel: { kind: "dm" }, messages: [] };
+    const prompt = detachedChannelReplyPrompt({
+      agent,
+      snapshot,
+      workspaceAvailable: false,
+      repositoryRequestAvailable: true,
+    });
+    expect(prompt).toContain("it is not checked out for this turn");
+    expect(prompt).toContain("return a repository request instead of guessing");
+    expect(prompt).toContain('"repositoryRequest":{"reason":');
+    expect(prompt).toContain("at most once per reply");
+    // The two states this one sits between must stay untouched.
+    expect(prompt).not.toContain("A disposable project worktree is available");
+    expect(prompt).not.toContain("You have no repository.");
+  });
+
+  it("keeps the no-repository and worktree states unchanged", () => {
+    const snapshot = { channel: { kind: "dm" }, messages: [] };
+    const withoutRepository = detachedChannelReplyPrompt({
+      agent,
+      snapshot,
+      workspaceAvailable: false,
+    });
+    expect(withoutRepository).toContain(
+      "You have no repository. Answer from the channel conversation alone",
+    );
+    expect(withoutRepository).toContain(
+      "repositoryRequest must be null on this turn.",
+    );
+    expect(withoutRepository).not.toContain('"repositoryRequest":{"reason":');
+
+    // A checked-out turn never advertises the request, even when the claim
+    // would otherwise allow one.
+    const withWorktree = detachedChannelReplyPrompt({
+      agent,
+      snapshot,
+      workspaceAvailable: true,
+      repositoryRequestAvailable: false,
+    });
+    expect(withWorktree).toContain("A disposable project worktree is available");
+    expect(withWorktree).toContain(
+      "repositoryRequest must be null on this turn.",
+    );
+    expect(withWorktree).not.toContain('"repositoryRequest":{"reason":');
+  });
+
   it("excludes display-only channel data from provider context", () => {
     const avatar = `data:image/png;base64,${"a".repeat(62_554)}`;
     const prompt = detachedChannelReplyPrompt({

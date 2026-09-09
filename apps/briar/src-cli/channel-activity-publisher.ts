@@ -165,6 +165,24 @@ export class ChannelActivityPublisher {
     this.queue(this.commentary);
   }
 
+  /**
+   * Shows one headline Briar itself is responsible for, such as the pause
+   * while a repository is checked out mid-turn. It takes the same descriptor
+   * and rate-limited queue a provider's own `{"progress":…}` message takes, so
+   * the typing strip has exactly one mechanism rather than two.
+   */
+  publishProgress(id: string, headline: string) {
+    if (this.stopped) return;
+    const commentary = {
+      id,
+      kind: "message" as const,
+      headline: safeChannelActivityHeadline("message", headline),
+    };
+    if (sameVisibleActivity(this.commentary, commentary)) return;
+    this.commentary = commentary;
+    this.queue(this.commentary);
+  }
+
   stop() {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);

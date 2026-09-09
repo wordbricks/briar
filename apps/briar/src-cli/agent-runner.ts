@@ -632,6 +632,11 @@ export function detachedChannelReplyPrompt(input: {
   snapshot: Record<string, unknown>;
   workspaceAvailable: boolean;
   workspaceRetained?: boolean;
+  /**
+   * The Agent has a project repository, but this conversation turn started
+   * without a checkout. It can ask for one instead of guessing.
+   */
+  repositoryRequestAvailable?: boolean;
   organizationContextAvailable?: boolean;
   memoryLearningAvailable?: boolean;
   delegationTargets?: readonly DetachedDelegationTarget[];
@@ -682,6 +687,8 @@ export function detachedChannelReplyPrompt(input: {
       ? "This execution has an isolated project worktree retained for its session lifetime. Retries and steering of this job reuse it. A later scheduled occurrence starts a fresh session from saved instructions and result/artifact references; publish artifacts needed later instead of relying on this local path."
       : input.workspaceAvailable
       ? "A disposable project worktree is available with the same shell, network, browser, and filesystem permissions as a project Worker. Inspect it and run the commands or tools needed to answer accurately. Local worktree changes are discarded after this reply."
+      : input.repositoryRequestAvailable
+      ? "You have a project repository, but it is not checked out for this turn. A conversation reply is usually answerable without one, and checking it out makes the person wait. If answering accurately requires inspecting the repository \u2014 reading its files or history, or running commands in it \u2014 return a repository request instead of guessing, and Briar will check the project out and continue this same conversation. Otherwise answer from the conversation alone and say plainly when something cannot be established from it."
       : input.organizationContextAvailable
         ? "You have no repository. A retained organization context index is attached through the trusted Agent profile; request only the project, issue, Skill, or session details needed to answer."
       : "You have no repository. Answer from the channel conversation alone and say plainly when something cannot be established from it.",
@@ -730,6 +737,11 @@ export function detachedChannelReplyPrompt(input: {
 {"body":null,"attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"agentMessage":null,"memoryRequests":null,"memoryCitations":null,"memorySaveRequest":null,"acknowledgementReaction":null,"contextRequests":[{"resource":"issues","projectId":"project UUID from manifest","detail":"summary","limit":25,"cursor":null}]}
 Allowed requests are project-settings; agents/issues/agent-sessions with detail summary plus limit/cursor; agents/issues/agent-sessions with detail full plus 1-50 exact ids discovered from summaries; skills with 1-50 exact ids; and issue-pull-requests with 1-50 exact issueIds. Use at most 12 requests per lookup turn. Request the smallest relevant scope. Briar will load files and continue the same conversation, after which you must return the normal channel reply JSON. During a lookup, keep body and every artifact, delegation, or Agent message field null and attachments empty; only contextRequests may carry data.`
       : null,
+    input.repositoryRequestAvailable
+      ? `When the answer genuinely requires the repository, return only this object instead of a reply. Briar checks the project out and continues this same conversation, after which you must return the normal channel reply JSON:
+{"body":null,"attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"agentMessage":null,"contextRequests":null,"memoryRequests":null,"memoryCitations":null,"memorySaveRequest":null,"acknowledgementReaction":null,"repositoryRequest":{"reason":"what you need to read in the repository and why the conversation cannot answer it"}}
+You may request the repository at most once per reply. During the request keep every other member null and attachments empty; only repositoryRequest may carry data. Every other turn omits repositoryRequest or sets it to null.`
+      : "repositoryRequest must be null on this turn.",
     `Return only one JSON object with this shape:
 {"body":"your reply to the channel","attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":null,"agentMessage":null,"contextRequests":null,"memoryRequests":null,"memoryCitations":null,"memorySaveRequest":null,"acknowledgementReaction":null}
 or
