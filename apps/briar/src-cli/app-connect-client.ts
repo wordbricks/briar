@@ -59,7 +59,7 @@ export async function fetchManagedComputer(
     apiUrl,
     token,
   ).getManagedComputer(
-    { organizationId, managedComputerId },
+    { workspaceId: organizationId, managedComputerId },
   );
   return managedComputerFromProto(
     requiredMessage(response.computer, "managedComputer"),
@@ -79,7 +79,7 @@ export async function createManagedComputerSetupSession(
     apiUrl,
     token,
   ).createManagedComputerSetupSession(
-    { organizationId, managedComputerId, projectId, requestId },
+    { workspaceId: organizationId, managedComputerId, projectId, requestId },
   );
   return managedComputerSetupSessionTicketFromProto(response);
 }
@@ -95,7 +95,7 @@ export async function fetchManagedComputerSetupStatus(
     apiUrl,
     token,
   ).getManagedComputerSetupStatus(
-    { organizationId, managedComputerId },
+    { workspaceId: organizationId, managedComputerId },
   );
   return managedComputerSetupStatusFromProto(response);
 }

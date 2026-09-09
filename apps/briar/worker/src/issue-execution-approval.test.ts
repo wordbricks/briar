@@ -2,8 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import {
   CompleteIssueReplyRequestSchema,
   IssueReplyClaimIdentitySchema,
-  WorkClaimIdentitySchema,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  WorkClaimIdentitySchema} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { createHash } from "node:crypto";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";

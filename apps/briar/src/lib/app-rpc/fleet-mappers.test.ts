@@ -76,7 +76,7 @@ describe("Fleet protobuf mapping", () => {
       session: create(ManagedComputerSetupSessionSchema, {
         id: "setup-1",
         managedComputerId: "computer-1",
-        organizationId: "organization-1",
+        workspaceId: "organization-1",
         projectId: "project-1",
         status: ManagedComputerSetupSessionStatus.PENDING,
         expiresAt,

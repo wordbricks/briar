@@ -27,12 +27,12 @@ public nonisolated struct BriarAPI_CreateRealtimeTicketRequest: Sendable {
 
   public var scope: BriarAPI_CreateRealtimeTicketRequest.OneOf_Scope? = nil
 
-  public var organizationNotifications: BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications {
+  public var workspaceNotifications: BriarAPI_CreateRealtimeTicketRequest.WorkspaceNotifications {
     get {
-      if case .organizationNotifications(let v)? = scope {return v}
-      return BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications()
+      if case .workspaceNotifications(let v)? = scope {return v}
+      return BriarAPI_CreateRealtimeTicketRequest.WorkspaceNotifications()
     }
-    set {scope = .organizationNotifications(newValue)}
+    set {scope = .workspaceNotifications(newValue)}
   }
 
   public var issueActivity: BriarAPI_CreateRealtimeTicketRequest.IssueActivity {
@@ -54,18 +54,18 @@ public nonisolated struct BriarAPI_CreateRealtimeTicketRequest: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Scope: Equatable, Sendable {
-    case organizationNotifications(BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications)
+    case workspaceNotifications(BriarAPI_CreateRealtimeTicketRequest.WorkspaceNotifications)
     case issueActivity(BriarAPI_CreateRealtimeTicketRequest.IssueActivity)
     case channelActivity(BriarAPI_CreateRealtimeTicketRequest.ChannelActivity)
 
   }
 
-  public nonisolated struct OrganizationNotifications: Sendable {
+  public nonisolated struct WorkspaceNotifications: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    public var organizationID: String = String()
+    public var workspaceID: String = String()
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -91,7 +91,7 @@ public nonisolated struct BriarAPI_CreateRealtimeTicketRequest: Sendable {
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    public var organizationID: String = String()
+    public var workspaceID: String = String()
 
     public var channelID: String = String()
 
@@ -121,7 +121,7 @@ fileprivate nonisolated let _protobuf_package = "briar.app.v1"
 
 nonisolated extension BriarAPI_CreateRealtimeTicketRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateRealtimeTicketRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_notifications\0\u{3}issue_activity\0\u{3}channel_activity\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_notifications\0\u{3}issue_activity\0\u{3}channel_activity\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -130,16 +130,16 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest: SwiftProtobuf.Messag
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try {
-        var v: BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications?
+        var v: BriarAPI_CreateRealtimeTicketRequest.WorkspaceNotifications?
         var hadOneofValue = false
         if let current = self.scope {
           hadOneofValue = true
-          if case .organizationNotifications(let m) = current {v = m}
+          if case .workspaceNotifications(let m) = current {v = m}
         }
         try decoder.decodeSingularMessageField(value: &v)
         if let v = v {
           if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.scope = .organizationNotifications(v)
+          self.scope = .workspaceNotifications(v)
         }
       }()
       case 2: try {
@@ -179,8 +179,8 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest: SwiftProtobuf.Messag
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
     switch self.scope {
-    case .organizationNotifications?: try {
-      guard case .organizationNotifications(let v)? = self.scope else { preconditionFailure() }
+    case .workspaceNotifications?: try {
+      guard case .workspaceNotifications(let v)? = self.scope else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     }()
     case .issueActivity?: try {
@@ -203,9 +203,9 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest: SwiftProtobuf.Messag
   }
 }
 
-nonisolated extension BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = BriarAPI_CreateRealtimeTicketRequest.protoMessageName + ".OrganizationNotifications"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+nonisolated extension BriarAPI_CreateRealtimeTicketRequest.WorkspaceNotifications: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = BriarAPI_CreateRealtimeTicketRequest.protoMessageName + ".WorkspaceNotifications"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -213,21 +213,21 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest.OrganizationNotificat
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications, rhs: BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+  public static func ==(lhs: BriarAPI_CreateRealtimeTicketRequest.WorkspaceNotifications, rhs: BriarAPI_CreateRealtimeTicketRequest.WorkspaceNotifications) -> Bool {
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -270,7 +270,7 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest.IssueActivity: SwiftP
 
 nonisolated extension BriarAPI_CreateRealtimeTicketRequest.ChannelActivity: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = BriarAPI_CreateRealtimeTicketRequest.protoMessageName + ".ChannelActivity"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -278,7 +278,7 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest.ChannelActivity: Swif
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       default: break
       }
@@ -286,8 +286,8 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest.ChannelActivity: Swif
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -296,7 +296,7 @@ nonisolated extension BriarAPI_CreateRealtimeTicketRequest.ChannelActivity: Swif
   }
 
   public static func ==(lhs: BriarAPI_CreateRealtimeTicketRequest.ChannelActivity, rhs: BriarAPI_CreateRealtimeTicketRequest.ChannelActivity) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

@@ -4,8 +4,7 @@ import {
   DashboardWorker_State,
   WorkerIcon_Kind,
   WorkerIconSchema,
-  type DashboardWorker as DashboardWorkerMessage,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  type DashboardWorker as DashboardWorkerMessage} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import {
   ExecutionWorkerHandoffState,
   ExecutionWorkerUpdateStatus,
@@ -30,16 +29,15 @@ import {
   type ManagedComputerRemoteSession as ManagedComputerRemoteSessionMessage,
   type ManagedComputerSetupSession as ManagedComputerSetupSessionMessage,
   type ManagedComputerSetupStatusSession,
-  type OrganizationExecutionWorker as OrganizationExecutionWorkerMessage,
+  type WorkspaceExecutionWorker as OrganizationExecutionWorkerMessage,
   type RequestExecutionWorkerUpdateResponse,
   type RetryManagedComputerResponse,
   type RetireManagedComputerResponse,
   type TerminateManagedComputerResponse,
   type UpdateExecutionWorkerResponse,
   type UpdateExecutionWorkerRequest,
-  type ValidateManagedComputerPromotionResponse,
-} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
-import type { WorkerCapabilities as WorkerCapabilitiesMessage } from "@briar/contracts/gen/briar/types/v1/worker_pb";
+  type ValidateManagedComputerPromotionResponse} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import type { WorkerCapabilities as WorkerCapabilitiesMessage} from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import {
   emptyAgentProviderCapabilityCatalog,
   type AgentEffortCapability,
@@ -359,7 +357,7 @@ export const managedComputerFromProto = (
   computer: ManagedComputerMessage,
 ): ManagedComputer => ({
   id: computer.id,
-  organizationId: computer.organizationId,
+  organizationId: computer.workspaceId,
   requesterUserId: computer.requesterUserId,
   state: managedComputerStateFromProto(computer.state),
   provider: computer.provider === ProtoManagedComputerProvider.SANDBOX ? "sandbox" : "aws",
@@ -458,7 +456,7 @@ export const managedComputerProductFromProto = (
     remoteDesktopEnabled: response.remoteDesktopEnabled,
     configurationReady: response.configurationReady,
     canApply: response.canApply,
-    organizationLimit: response.organizationLimit,
+    organizationLimit: response.workspaceLimit,
     fleetLimit: response.fleetLimit,
   };
 };
@@ -471,7 +469,7 @@ export const promotionLimitReasonFromProto = (
       return null;
     case ManagedComputerPromotionLimitReason.USER:
       return "user";
-    case ManagedComputerPromotionLimitReason.ORGANIZATION:
+    case ManagedComputerPromotionLimitReason.WORKSPACE:
       return "organization";
     case ManagedComputerPromotionLimitReason.FLEET:
       return "fleet";
@@ -602,7 +600,7 @@ const managedComputerSetupSessionFromProto = (
   return {
     id: session.id,
     managedComputerId: session.managedComputerId,
-    organizationId: session.organizationId,
+    organizationId: session.workspaceId,
     teamId: session.projectId,
     status,
     expiresAt: requiredTimestamp(

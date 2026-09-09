@@ -45,7 +45,7 @@ describe("managed computer enrollment", () => {
         managedComputerId,
         credential: `briar_worker_${"c".repeat(43)}`,
         deviceId: `managed-${managedComputerId}`,
-        organizationId,
+        workspaceId: organizationId,
       });
       const createEnrollmentClient = vi.fn(() => ({
         enrollManagedComputer,

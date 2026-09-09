@@ -168,7 +168,7 @@ describe("managed computer setup", () => {
     const developerRequestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const developerTicket = await fleet().createManagedComputerSetupSession(
       {
-        organizationId,
+        workspaceId: organizationId,
         managedComputerId,
         projectId,
         requestId: developerRequestId,
@@ -183,7 +183,7 @@ describe("managed computer setup", () => {
     ).bind(developerRequestId).run();
 
     const firstPayload = await fleet().createManagedComputerSetupSession(
-      { organizationId, managedComputerId, projectId, requestId },
+      { workspaceId: organizationId, managedComputerId, projectId, requestId },
       options(ownerToken),
     );
     if (!firstPayload.session || !firstPayload.socket) {
@@ -208,7 +208,7 @@ describe("managed computer setup", () => {
     expect(stored?.token_hash).not.toContain(firstPayload.setupToken);
 
     await expect(fleet().createManagedComputerSetupSession(
-      { organizationId, managedComputerId, projectId, requestId },
+      { workspaceId: organizationId, managedComputerId, projectId, requestId },
       options(ownerToken),
     )).resolves.toMatchObject({
       duplicate: true,
@@ -220,7 +220,7 @@ describe("managed computer setup", () => {
     const contextRequestId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
     const { setupToken } = await fleet().createManagedComputerSetupSession(
       {
-        organizationId,
+        workspaceId: organizationId,
         managedComputerId,
         projectId,
         requestId: contextRequestId,
@@ -253,7 +253,7 @@ describe("managed computer setup", () => {
 
   it("binds the enrolled device once and starts fail-closed", async () => {
     const { setupToken } = await fleet().createManagedComputerSetupSession(
-      { organizationId, managedComputerId, projectId, requestId },
+      { workspaceId: organizationId, managedComputerId, projectId, requestId },
       options(ownerToken),
     );
     const client = setup();
@@ -273,7 +273,7 @@ describe("managed computer setup", () => {
     expect(responseHeaders?.get("cache-control")).toBe("private, no-store");
     expect(first).toMatchObject({
       managedComputerId,
-      organizationId,
+      workspaceId: organizationId,
       teamId: projectId,
       deviceId,
       duplicate: false,
@@ -298,7 +298,7 @@ describe("managed computer setup", () => {
     const reconfigureSetupToken = (
       await fleet().createManagedComputerSetupSession(
         {
-          organizationId,
+          workspaceId: organizationId,
           managedComputerId,
           projectId,
           requestId: reconfigureRequestId,
@@ -324,7 +324,7 @@ describe("managed computer setup", () => {
     expect(counts).toEqual({ sessions: 3, workers: 1 });
 
     await expect(fleet().getManagedComputerSetupStatus(
-      { organizationId, managedComputerId },
+      { workspaceId: organizationId, managedComputerId },
       options(ownerToken),
     )).resolves.toMatchObject({
       session: {
@@ -347,7 +347,7 @@ describe("managed computer setup", () => {
     const addProjectRequestId = "77777777-7777-4777-8777-777777777777";
     const { setupToken } = await fleet().createManagedComputerSetupSession(
       {
-        organizationId,
+        workspaceId: organizationId,
         managedComputerId,
         projectId: secondProjectId,
         requestId: addProjectRequestId,

@@ -1,6 +1,5 @@
 import type {
-  GitHubPullRequestIdentity,
-} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
+  GitHubPullRequestIdentity} from "@briar/contracts/gen/briar/types/v1/github_identity_pb";
 import {
   EventKeyConflictError,
   HuntTransitionError,

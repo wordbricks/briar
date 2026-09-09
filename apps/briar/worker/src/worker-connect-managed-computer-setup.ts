@@ -91,7 +91,7 @@ export const createManagedComputerSetupService = (
       session: create(ManagedComputerSetupSessionSchema, {
         id: result.session.id,
         managedComputerId,
-        organizationId: principal.organizationId,
+        workspaceId: principal.organizationId,
         projectId: result.session.projectId,
         status: ManagedComputerSetupSessionStatus.PENDING,
         expiresAt: appFleetTimestamp(result.session.expiresAt),

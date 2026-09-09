@@ -1,10 +1,9 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
-import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { AgentProvider as ProtoAgentProvider} from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
-  ClaimedWorkSchema,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  ClaimedWorkSchema} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { claimedWorkFromProto } from "./worker-queue-contract";
 
 const organizationId = "77777777-7777-4777-8777-777777777777";
@@ -57,12 +56,12 @@ const channelReplyClaim = (overrides: {
         scope: {
           scope: overrides.scope === "organization"
             ? {
-                case: "organization",
-                value: { organizationId: organizationId },
+                case: "workspace",
+                value: { workspaceId: organizationId },
               }
             : {
                 case: "project",
-                value: { organizationId: organizationId, projectId },
+                value: { workspaceId: organizationId, projectId },
               },
         },
         runId: "55555555-5555-4555-8555-555555555555",
@@ -84,7 +83,7 @@ const channelReplyClaim = (overrides: {
         // requires it for that scope.
         ...(overrides.scope === "organization"
           ? {
-              organizationContextSnapshotAt: timestampFromDate(
+              workspaceContextSnapshotAt: timestampFromDate(
                 new Date("2026-09-06T07:59:00.000Z"),
               ),
             }

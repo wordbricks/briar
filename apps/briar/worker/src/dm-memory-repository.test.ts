@@ -1,8 +1,7 @@
 import * as Schema from "effect/Schema";
 import {
   DmMemoryClass,
-  DmMemoryService,
-} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+  DmMemoryService} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import { Code, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { strFromU8, unzipSync } from "fflate";

@@ -1,13 +1,11 @@
 import {
   type WorkerIcon,
-  WorkerIcon_Kind,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  WorkerIcon_Kind} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import {
   FleetService,
   ManagedComputerCurrency,
   RequestExecutionWorkerUpdateResponse_Outcome,
-  UnbindProjectExecutionWorkerRequest_Reason,
-} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+  UnbindProjectExecutionWorkerRequest_Reason} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import {
   Code,
   ConnectError,
@@ -268,7 +266,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(listExecutionWorkersApplication({
       db,
       releases: env.RELEASES,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
     }));
@@ -286,7 +284,7 @@ export const createAppFleetService = (
       requestExecutionWorkerUpdateApplication({
         db,
         releases: env.RELEASES,
-        organizationId: decodeUuid(input.organizationId),
+        organizationId: decodeUuid(input.workspaceId),
         deviceId: decodeDeviceId(input.deviceId),
         userId: session.user.id,
         observedAt: new Date().toISOString(),
@@ -314,7 +312,7 @@ export const createAppFleetService = (
     });
     const worker = await withFleetErrors(updateExecutionWorkerApplication({
       db,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       deviceId: decodeDeviceId(input.deviceId),
       userId: session.user.id,
       update,
@@ -336,7 +334,7 @@ export const createAppFleetService = (
     return await withFleetErrors(deleteExecutionWorkerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       deviceId: decodeDeviceId(input.deviceId),
       userId: session.user.id,
       requestId: decodeWorkerLifecycleRequestId(input.requestId),
@@ -349,7 +347,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(getManagedComputerProductApplication({
       db,
       env,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       userId: session.user.id,
     }));
     return {
@@ -367,7 +365,7 @@ export const createAppFleetService = (
     const session = await requireSession(auth, request);
     const result = await withFleetErrors(listManagedComputersApplication({
       db,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
     }));
@@ -385,7 +383,7 @@ export const createAppFleetService = (
     }
     const result = await withFleetErrors(registerSandboxComputerApplication({
       db,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       deviceId: decodeWorkerDeviceId(input.deviceId),
       label,
       userId: session.user.id,
@@ -400,7 +398,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(unregisterSandboxComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       deviceId: decodeWorkerDeviceId(input.deviceId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
@@ -412,7 +410,7 @@ export const createAppFleetService = (
     const session = await requireSession(auth, request);
     const computer = await withFleetErrors(getManagedComputerApplication({
       db,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       managedComputerId: decodeUuid(input.managedComputerId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
@@ -429,7 +427,7 @@ export const createAppFleetService = (
       validateManagedComputerPromotionApplication({
         db,
         env,
-        organizationId: decodeUuid(input.organizationId),
+        organizationId: decodeUuid(input.workspaceId),
         userId: session.user.id,
         code: decoded.code,
         observedAt: new Date().toISOString(),
@@ -454,7 +452,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(applyForManagedComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       userId: session.user.id,
       ...decoded,
       observedAt: new Date().toISOString(),
@@ -472,7 +470,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(retryManagedComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       managedComputerId: decodeUuid(input.managedComputerId),
       userId: session.user.id,
       requestId: decoded.requestId,
@@ -489,7 +487,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(retireManagedComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       managedComputerId: decodeUuid(input.managedComputerId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
@@ -509,7 +507,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(terminateManagedComputerApplication({
       db,
       env,
-      organizationId: decodeUuid(input.organizationId),
+      organizationId: decodeUuid(input.workspaceId),
       managedComputerId: decodeUuid(input.managedComputerId),
       userId: session.user.id,
       observedAt: new Date().toISOString(),
@@ -531,7 +529,7 @@ export const createAppFleetService = (
       createManagedComputerRemoteSessionApplication({
         db,
         env,
-        organizationId: decodeUuid(input.organizationId),
+        organizationId: decodeUuid(input.workspaceId),
         managedComputerId: decodeUuid(input.managedComputerId),
         userId: session.user.id,
         ...decoded,
@@ -554,7 +552,7 @@ export const createAppFleetService = (
       endManagedComputerRemoteSessionApplication({
         db,
         env,
-        organizationId: decodeUuid(input.organizationId),
+        organizationId: decodeUuid(input.workspaceId),
         managedComputerId: decodeUuid(input.managedComputerId),
         remoteSessionId: decodeUuid(input.remoteSessionId),
         userId: session.user.id,
@@ -575,7 +573,7 @@ export const createAppFleetService = (
       createManagedComputerSetupSessionApplication({
         db,
         env,
-        organizationId: decodeUuid(input.organizationId),
+        organizationId: decodeUuid(input.workspaceId),
         managedComputerId: decodeUuid(input.managedComputerId),
         userId: session.user.id,
         ...decoded,
@@ -597,7 +595,7 @@ export const createAppFleetService = (
     const result = await withFleetErrors(
       getManagedComputerSetupStatusApplication({
         db,
-        organizationId: decodeUuid(input.organizationId),
+        organizationId: decodeUuid(input.workspaceId),
         managedComputerId: decodeUuid(input.managedComputerId),
         userId: session.user.id,
         observedAt: new Date().toISOString(),

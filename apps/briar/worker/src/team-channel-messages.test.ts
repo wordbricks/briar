@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import {
-  WorkerExecutionService,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  WorkerExecutionService} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { Code, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { env as cloudflareEnv } from "cloudflare:workers";

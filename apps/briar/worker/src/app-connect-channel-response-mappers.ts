@@ -16,8 +16,7 @@ import {
   ProjectAgentSessionStatus,
   ProjectAgentSessionTrigger,
   ProjectAgentSessionType,
-  ProjectAgentSkillSchema,
-} from "@briar/contracts/gen/briar/app/v1/agent_pb";
+  ProjectAgentSkillSchema} from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import {
   ApprovalOutcome,
   BlockText_Kind,
@@ -43,8 +42,7 @@ import {
   RichTextInline_TextSchema,
   RichTextInlineSchema,
   RichTextSectionSchema,
-  RichTextStyleSchema,
-} from "@briar/contracts/gen/briar/app/v1/common_pb";
+  RichTextStyleSchema} from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   AcceptChannelExecutionProposalResponseSchema,
   AcceptChannelProposalResponseSchema,
@@ -75,14 +73,12 @@ import {
   ChannelVisibility,
   CreateChannelMessageResponseSchema,
   DirectMessageParticipant_Kind,
-  DirectMessageParticipantSchema,
-} from "@briar/contracts/gen/briar/app/v1/channel_pb";
+  DirectMessageParticipantSchema} from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import {
   IssueExecutionDispatch_DispatchMode,
   IssueExecutionDispatch_Outcome,
   IssueExecutionDispatchSchema,
-  IssueExecutionProposalSchema,
-} from "@briar/contracts/gen/briar/app/v1/issue_pb";
+  IssueExecutionProposalSchema} from "@briar/contracts/gen/briar/app/v1/issue_pb";
 import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { Code, ConnectError } from "@connectrpc/connect";

@@ -2,8 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   ProviderBlockReason,
-  ProviderBlockSchema,
-} from "@briar/contracts/gen/briar/types/v1/provider_block_pb";
+  ProviderBlockSchema} from "@briar/contracts/gen/briar/types/v1/provider_block_pb";
 import {
   ChannelReplyClaimIdentitySchema,
   ChannelReplyAgentMessageActionSchema,
@@ -14,8 +13,7 @@ import {
   CompleteIssueReplyRequestSchema,
   IssueReplyClaimIdentitySchema,
   ReplyIssueDraftSchema,
-  WorkClaimIdentitySchema,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  WorkClaimIdentitySchema} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { createHash } from "node:crypto";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -327,7 +325,7 @@ describe("reply completion application", () => {
     claimToken: claim.claimToken,
     work: {
       case: "channelReply",
-      value: create(ChannelReplyClaimIdentitySchema, { organizationId }),
+      value: create(ChannelReplyClaimIdentitySchema, { workspaceId: organizationId }),
     },
   });
 

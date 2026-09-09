@@ -4,8 +4,7 @@ import {
   PlanningProjectStatus,
   TeamExecutionWorkerPolicy_SelectionMode,
   TeamService,
-  UpdateCheckpointPolicyRequest_Scope,
-} from "@briar/contracts/gen/briar/app/v1/team_pb";
+  UpdateCheckpointPolicyRequest_Scope} from "@briar/contracts/gen/briar/app/v1/team_pb";
 import type { NullableStringUpdate } from "@briar/contracts/gen/briar/app/v1/team_pb";
 import { ProjectRole } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { create } from "@bufbuild/protobuf";
@@ -13,8 +12,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   WorkflowCheckpoint_Position,
   type AutoHuntWorkflow as AutoHuntWorkflowMessage,
-  type WorkflowCheckpointSpec,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
+  type WorkflowCheckpointSpec} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import {
   Code,
   ConnectError,

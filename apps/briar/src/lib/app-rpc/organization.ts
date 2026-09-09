@@ -1,12 +1,11 @@
 import { createClient } from "@connectrpc/connect";
-import { ProjectRole as ProtoProjectRole } from "@briar/contracts/gen/briar/app/v1/common_pb";
+import { ProjectRole as ProtoProjectRole} from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
-  OrganizationInvitationStatus as ProtoInvitationStatus,
-  OrganizationService,
-  type Organization as OrganizationMessage,
-  type OrganizationInvitation as OrganizationInvitationMessage,
-  type OrganizationInvitationPreview as OrganizationInvitationPreviewMessage,
-} from "@briar/contracts/gen/briar/app/v1/organization_pb";
+  WorkspaceInvitationStatus as ProtoInvitationStatus,
+  WorkspaceService,
+  type Workspace as OrganizationMessage,
+  type WorkspaceInvitation as OrganizationInvitationMessage,
+  type WorkspaceInvitationPreview as OrganizationInvitationPreviewMessage} from "@briar/contracts/gen/briar/app/v1/workspace_pb";
 import type {
   Organization,
   OrganizationAssignableRole,
@@ -25,7 +24,7 @@ import {
 } from "./mappers";
 
 const organizationClient = appTransport
-  ? createClient(OrganizationService, appTransport)
+  ? createClient(WorkspaceService, appTransport)
   : undefined;
 
 const requireOrganizationClient = () => {
@@ -96,8 +95,8 @@ const invitationDetailsFromMessage = (
     | OrganizationInvitationPreviewMessage,
 ) => ({
   id: invitation.id,
-  organizationId: invitation.organizationId,
-  organizationName: invitation.organizationName,
+  organizationId: invitation.workspaceId,
+  organizationName: invitation.workspaceName,
   initialProjectId: invitation.initialProjectId,
   initialProjectName: invitation.initialProjectName,
   emailHint: invitation.emailHint,
@@ -143,24 +142,24 @@ export async function loadOrganizations(
   token: string,
   signal?: AbortSignal,
 ): Promise<Organization[]> {
-  const response = await requireOrganizationClient().listOrganizations(
+  const response = await requireOrganizationClient().listWorkspaces(
     {},
     appCallOptions(token, signal),
   );
-  return response.organizations.map(organizationFromMessage);
+  return response.workspaces.map(organizationFromMessage);
 }
 
 export async function createOrganization(
   token: string,
   input: { readonly name: string; readonly handle: string },
 ): Promise<{ organization: Organization }> {
-  const response = await requireOrganizationClient().createOrganization(
+  const response = await requireOrganizationClient().createWorkspace(
     input,
     appCallOptions(token),
   );
   return {
     organization: organizationFromMessage(
-      requiredMessage(response.organization, "createOrganization.organization"),
+      requiredMessage(response.workspace, "createOrganization.workspace"),
     ),
   };
 }
@@ -169,7 +168,7 @@ export async function isOrganizationHandleAvailable(
   token: string,
   handle: string,
 ) {
-  return (await requireOrganizationClient().checkOrganizationHandleAvailability(
+  return (await requireOrganizationClient().checkWorkspaceHandleAvailability(
     { handle },
     appCallOptions(token),
   )).available;
@@ -180,13 +179,13 @@ export async function updateOrganization(
   organizationId: string,
   name: string,
 ): Promise<{ organization: Organization }> {
-  const response = await requireOrganizationClient().updateOrganization(
-    { organizationId, name },
+  const response = await requireOrganizationClient().updateWorkspace(
+    { workspaceId: organizationId, name },
     appCallOptions(token),
   );
   return {
     organization: organizationFromMessage(
-      requiredMessage(response.organization, "updateOrganization.organization"),
+      requiredMessage(response.workspace, "updateOrganization.workspace"),
     ),
   };
 }
@@ -196,9 +195,9 @@ export async function updateOrganizationLogo(
   organizationId: string,
   logo: string | null,
 ): Promise<{ organization: Organization }> {
-  const response = await requireOrganizationClient().updateOrganizationLogo(
+  const response = await requireOrganizationClient().updateWorkspaceLogo(
     {
-      organizationId,
+      workspaceId: organizationId,
       logoUpdate: logo === null
         ? { case: "clearLogo", value: {} }
         : { case: "logo", value: logo },
@@ -208,7 +207,7 @@ export async function updateOrganizationLogo(
   return {
     organization: organizationFromMessage(
       requiredMessage(
-        response.organization,
+        response.workspace,
         "updateOrganizationLogo.organization",
       ),
     ),
@@ -220,8 +219,8 @@ export async function loadOrganizationInvitations(
   organizationId: string,
 ) {
   const response = await requireOrganizationClient()
-    .listOrganizationInvitations(
-      { organizationId },
+    .listWorkspaceInvitations(
+      { workspaceId: organizationId },
       appCallOptions(token),
     );
   return response.invitations.map(invitationFromMessage);
@@ -237,9 +236,9 @@ export async function createOrganizationInvitation(
   },
 ) {
   const response = await requireOrganizationClient()
-    .createOrganizationInvitation(
+    .createWorkspaceInvitation(
       {
-        organizationId,
+        workspaceId: organizationId,
         email: input.email,
         role: assignableRoleToProto(input.role),
         initialProjectId: input.initialProjectId,
@@ -263,14 +262,14 @@ export async function revokeOrganizationInvitation(
   organizationId: string,
   invitationId: string,
 ) {
-  await requireOrganizationClient().revokeOrganizationInvitation(
-    { organizationId, invitationId },
+  await requireOrganizationClient().revokeWorkspaceInvitation(
+    { workspaceId: organizationId, invitationId },
     appCallOptions(token),
   );
 }
 
 export async function loadOrganizationInvitation(token: string) {
-  const response = await requireOrganizationClient().getOrganizationInvitation(
+  const response = await requireOrganizationClient().getWorkspaceInvitation(
     { token },
   );
   return {
@@ -288,7 +287,7 @@ export async function acceptOrganizationInvitation(
   invitationToken: string,
 ) {
   const response = await requireOrganizationClient()
-    .acceptOrganizationInvitation(
+    .acceptWorkspaceInvitation(
       { token: invitationToken },
       appCallOptions(sessionToken),
     );
@@ -307,8 +306,8 @@ export async function loadOrganizationMembers(
   token: string,
   organizationId: string,
 ) {
-  const response = await requireOrganizationClient().listOrganizationMembers(
-    { organizationId },
+  const response = await requireOrganizationClient().listWorkspaceMembers(
+    { workspaceId: organizationId },
     appCallOptions(token),
   );
   return response.members.map(organizationMemberFromProto);
@@ -321,8 +320,8 @@ export async function updateOrganizationMemberRole(
   role: OrganizationAssignableRole,
 ) {
   const response = await requireOrganizationClient()
-    .updateOrganizationMemberRole(
-      { organizationId, userId, role: assignableRoleToProto(role) },
+    .updateWorkspaceMemberRole(
+      { workspaceId: organizationId, userId, role: assignableRoleToProto(role) },
       appCallOptions(token),
     );
   return { members: response.members.map(organizationMemberFromProto) };
@@ -335,8 +334,8 @@ export async function updateOrganizationMemberProjects(
   projectIds: string[],
 ) {
   const response = await requireOrganizationClient()
-    .updateOrganizationMemberProjects(
-      { organizationId, userId, projectIds },
+    .updateWorkspaceMemberProjects(
+      { workspaceId: organizationId, userId, projectIds },
       appCallOptions(token),
     );
   return { members: response.members.map(organizationMemberFromProto) };
@@ -347,8 +346,8 @@ export async function removeOrganizationMember(
   organizationId: string,
   userId: string,
 ) {
-  await requireOrganizationClient().removeOrganizationMember(
-    { organizationId, userId },
+  await requireOrganizationClient().removeWorkspaceMember(
+    { workspaceId: organizationId, userId },
     appCallOptions(token),
   );
 }

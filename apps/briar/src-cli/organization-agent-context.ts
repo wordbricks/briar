@@ -16,10 +16,9 @@ import {
 } from "@bufbuild/protobuf";
 import { timestampDate, ValueSchema } from "@bufbuild/protobuf/wkt";
 import {
-  OrganizationAgentContextLookupSchema,
-  OrganizationAgentContextService,
-  type OrganizationAgentContextManifest,
-} from "@briar/contracts/gen/briar/worker/v1/organization_agent_context_pb";
+  WorkspaceAgentContextLookupSchema,
+  WorkspaceAgentContextService,
+  type WorkspaceAgentContextManifest as OrganizationAgentContextManifest} from "@briar/contracts/gen/briar/worker/v1/workspace_agent_context_pb";
 import type { Client } from "@connectrpc/connect";
 import {
   decodeOrganizationAgentContextManifest,
@@ -183,7 +182,7 @@ const rememberOrganizationContextManifest = (
 };
 
 export type OrganizationAgentContextClient = Pick<
-  Client<typeof OrganizationAgentContextService>,
+  Client<typeof WorkspaceAgentContextService>,
   "getManifest" | "lookup"
 >;
 
@@ -192,7 +191,7 @@ const organizationContextClient = (input: {
   workerToken: string;
   client?: OrganizationAgentContextClient;
 }) => input.client ?? createAuthenticatedConnectClient(
-  OrganizationAgentContextService,
+  WorkspaceAgentContextService,
   input.apiUrl,
   input.workerToken,
   { binary: true },
@@ -226,7 +225,7 @@ const manifestFromProto = (
 ): OrganizationAgentContextIndexManifest =>
   decodeOrganizationAgentContextManifest({
     schemaVersion: 2,
-    organizationId: manifest.organizationId,
+    organizationId: manifest.workspaceId,
     workId: manifest.workId,
     snapshotAt: isoTimestamp(manifest.snapshotAt, "manifest.snapshot_at"),
     revision: manifest.revision,
@@ -287,7 +286,7 @@ export const organizationAgentContextLookupToProto = (
   request: OrganizationAgentContextLookupRequest,
 ) => {
   if (request.resource === "project-settings") {
-    return create(OrganizationAgentContextLookupSchema, {
+    return create(WorkspaceAgentContextLookupSchema, {
       query: {
         case: "projectSettings",
         value: { projectId: request.projectId },
@@ -295,7 +294,7 @@ export const organizationAgentContextLookupToProto = (
     });
   }
   if (request.resource === "skills") {
-    return create(OrganizationAgentContextLookupSchema, {
+    return create(WorkspaceAgentContextLookupSchema, {
       query: {
         case: "skills",
         value: { projectId: request.projectId, ids: request.ids },
@@ -303,7 +302,7 @@ export const organizationAgentContextLookupToProto = (
     });
   }
   if (request.resource === "issue-pull-requests") {
-    return create(OrganizationAgentContextLookupSchema, {
+    return create(WorkspaceAgentContextLookupSchema, {
       query: {
         case: "issuePullRequests",
         value: {
@@ -315,7 +314,7 @@ export const organizationAgentContextLookupToProto = (
   }
   if (request.resource === "agents") {
     return request.detail === "summary"
-      ? create(OrganizationAgentContextLookupSchema, {
+      ? create(WorkspaceAgentContextLookupSchema, {
           query: {
             case: "agentSummaries",
             value: {
@@ -325,7 +324,7 @@ export const organizationAgentContextLookupToProto = (
             },
           },
         })
-      : create(OrganizationAgentContextLookupSchema, {
+      : create(WorkspaceAgentContextLookupSchema, {
           query: {
             case: "agentDetails",
             value: { projectId: request.projectId, ids: request.ids },
@@ -334,7 +333,7 @@ export const organizationAgentContextLookupToProto = (
   }
   if (request.resource === "issues") {
     return request.detail === "summary"
-      ? create(OrganizationAgentContextLookupSchema, {
+      ? create(WorkspaceAgentContextLookupSchema, {
           query: {
             case: "issueSummaries",
             value: {
@@ -344,7 +343,7 @@ export const organizationAgentContextLookupToProto = (
             },
           },
         })
-      : create(OrganizationAgentContextLookupSchema, {
+      : create(WorkspaceAgentContextLookupSchema, {
           query: {
             case: "issueDetails",
             value: { projectId: request.projectId, ids: request.ids },
@@ -352,7 +351,7 @@ export const organizationAgentContextLookupToProto = (
         });
   }
   return request.detail === "summary"
-    ? create(OrganizationAgentContextLookupSchema, {
+    ? create(WorkspaceAgentContextLookupSchema, {
         query: {
           case: "sessionSummaries",
           value: {
@@ -362,7 +361,7 @@ export const organizationAgentContextLookupToProto = (
           },
         },
       })
-    : create(OrganizationAgentContextLookupSchema, {
+    : create(WorkspaceAgentContextLookupSchema, {
         query: {
           case: "sessionDetails",
           value: { projectId: request.projectId, ids: request.ids },
@@ -398,7 +397,7 @@ export async function downloadOrganizationAgentContextManifest(input: {
     const response = await client.getManifest(
       {
         claim: {
-          organizationId: input.organizationId,
+          workspaceId: input.organizationId,
           workId: input.workId,
           workerId: input.workerId,
           claimToken: input.claimToken,
@@ -422,7 +421,7 @@ export async function downloadOrganizationAgentContextManifest(input: {
       }
       manifest = decodeOrganizationAgentContextManifest({
         schemaVersion: 2,
-        organizationId: unchanged.organizationId,
+        organizationId: unchanged.workspaceId,
         workId: unchanged.workId,
         snapshotAt,
         revision: cached.revision,
@@ -492,7 +491,7 @@ export async function hydrateOrganizationAgentContext(input: {
   const lookup = await organizationContextClient(input).lookup(
     {
       claim: {
-        organizationId: input.organizationId,
+        workspaceId: input.organizationId,
         workId: input.workId,
         workerId: input.workerId,
         claimToken: input.claimToken,
@@ -507,7 +506,7 @@ export async function hydrateOrganizationAgentContext(input: {
     "lookup.snapshot_at",
   );
   if (
-    lookup.organizationId !== input.organizationId ||
+    lookup.workspaceId !== input.organizationId ||
     lookup.workId !== input.workId ||
     lookupSnapshotAt !== input.snapshotAt
   ) {
@@ -517,7 +516,7 @@ export async function hydrateOrganizationAgentContext(input: {
     lookup.results.length !== requests.length ||
     lookup.results.some((result, index) =>
       !result.query ||
-      !equals(OrganizationAgentContextLookupSchema, result.query, queries[index])
+      !equals(WorkspaceAgentContextLookupSchema, result.query, queries[index])
     )
   ) {
     throw new Error("Organization Agent lookup response did not match its request");

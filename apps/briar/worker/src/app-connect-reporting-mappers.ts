@@ -19,12 +19,10 @@ import {
   ProjectUsageBreakdownItemSchema,
   ProjectUsagePeriod,
   ProjectUsageTimelinePointSchema,
-  StatusTrayRunSchema,
-} from "@briar/contracts/gen/briar/app/v1/reporting_pb";
+  StatusTrayRunSchema} from "@briar/contracts/gen/briar/app/v1/reporting_pb";
 import {
   AgentExecutionMetricsSchema,
-  AgentExecutionModelSource,
-} from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
+  AgentExecutionModelSource} from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import type { AutoHuntRunStatus } from "../../src/lib/auto-hunt-contract";
 import type { AgentExecutionMetrics } from "../../src/lib/agent-execution-metrics";
 import type {

@@ -1,5 +1,5 @@
 import {
-  OrganizationNotificationSchema,
+  WorkspaceNotificationSchema,
   ProjectAgentSessionsChangedSchema,
 } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { create, toBinary } from "@bufbuild/protobuf";
@@ -11,7 +11,7 @@ import {
 
 describe("realtime protocol", () => {
   it("decodes a generated protobuf oneof frame", () => {
-    const message = create(OrganizationNotificationSchema, {
+    const message = create(WorkspaceNotificationSchema, {
       notification: {
         case: "projectAgentSessionsChanged",
         value: create(ProjectAgentSessionsChangedSchema, {
@@ -22,7 +22,7 @@ describe("realtime protocol", () => {
     });
 
     expect(Option.getOrUndefined(decodeRealtimeNotificationBinary(
-      toBinary(OrganizationNotificationSchema, message),
+      toBinary(WorkspaceNotificationSchema, message),
     ))).toEqual({
       topic: "project-session",
       projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",

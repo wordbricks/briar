@@ -63,7 +63,7 @@ export const workClaimIdentityToProto = (
             case: "channelReply",
             value: {
               $typeName: "briar.worker.v1.ChannelReplyClaimIdentity",
-              organizationId: work.organizationId,
+              workspaceId: work.organizationId,
             },
           }
         : work.workType === "projectAgentTask"
@@ -78,7 +78,7 @@ export const workClaimIdentityToProto = (
                 case: "dmMemory",
                 value: {
                   $typeName: "briar.worker.v1.DmMemoryLearningClaimIdentity",
-                  organizationId: work.organizationId,
+                  workspaceId: work.organizationId,
                   inputHash: work.inputHash,
                 },
               }
@@ -123,10 +123,10 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
           const raw = response.work.work;
           if (raw.case !== "channelReply") throw cause;
           const scope = raw.value.scope?.scope;
-          const organizationId = scope?.case === "organization"
-            ? scope.value.organizationId
+          const organizationId = scope?.case === "workspace"
+            ? scope.value.workspaceId
             : scope?.case === "project"
-            ? scope.value.organizationId
+            ? scope.value.workspaceId
             : "";
           if (
             organizationId !== input.organizationId ||
@@ -150,7 +150,7 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
                 claimToken: raw.value.claimToken,
                 work: {
                   case: "channelReply",
-                  value: { organizationId },
+                  value: { workspaceId: organizationId },
                 },
               },
               outcome: {

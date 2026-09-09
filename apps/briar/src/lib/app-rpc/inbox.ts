@@ -116,7 +116,7 @@ export async function getInboxFeed(
 ) {
   const client = requireInboxClient();
   const response = await client.getInboxFeed(
-    { organizationId, knownVersion },
+    { workspaceId: organizationId, knownVersion },
     appCallOptions(token, signal),
   );
   return {

@@ -25,7 +25,7 @@ public nonisolated struct BriarAPI_GetInboxFeedRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var knownVersion: String {
     get {_knownVersion ?? String()}
@@ -593,7 +593,7 @@ fileprivate nonisolated let _protobuf_package = "briar.app.v1"
 
 nonisolated extension BriarAPI_GetInboxFeedRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetInboxFeedRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}known_version\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}known_version\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -601,7 +601,7 @@ nonisolated extension BriarAPI_GetInboxFeedRequest: SwiftProtobuf.Message, Swift
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self._knownVersion) }()
       default: break
       }
@@ -613,8 +613,8 @@ nonisolated extension BriarAPI_GetInboxFeedRequest: SwiftProtobuf.Message, Swift
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try { if let v = self._knownVersion {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
@@ -623,7 +623,7 @@ nonisolated extension BriarAPI_GetInboxFeedRequest: SwiftProtobuf.Message, Swift
   }
 
   public static func ==(lhs: BriarAPI_GetInboxFeedRequest, rhs: BriarAPI_GetInboxFeedRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs._knownVersion != rhs._knownVersion {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

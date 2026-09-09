@@ -200,7 +200,7 @@ const structuredImpact = (value: StructuredRunResult_Impact) => {
       return "issue" as const;
     case StructuredRunResult_Impact.PROJECT:
       return "project" as const;
-    case StructuredRunResult_Impact.ORGANIZATION:
+    case StructuredRunResult_Impact.WORKSPACE:
       return "organization" as const;
     case StructuredRunResult_Impact.UNSPECIFIED:
     default:

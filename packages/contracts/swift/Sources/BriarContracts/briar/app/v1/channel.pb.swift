@@ -275,7 +275,7 @@ public nonisolated struct BriarAPI_ListDirectMessageRecipientsResponse: Sendable
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var members: [BriarAPI_OrganizationMember] = []
+  public var members: [BriarAPI_WorkspaceMember] = []
 
   public var agents: [BriarAPI_WorkspaceAgent] = []
 

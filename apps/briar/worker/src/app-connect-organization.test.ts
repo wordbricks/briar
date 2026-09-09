@@ -1,5 +1,5 @@
 import { ProjectRole } from "@briar/contracts/gen/briar/app/v1/common_pb";
-import { OrganizationService } from "@briar/contracts/gen/briar/app/v1/organization_pb";
+import { WorkspaceService as OrganizationService} from "@briar/contracts/gen/briar/app/v1/workspace_pb";
 import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { env } from "cloudflare:workers";
@@ -122,9 +122,9 @@ describe("OrganizationService", () => {
   it("keeps invitations private, capability-scoped, idempotent, and project-scoped", async () => {
     const organization = client();
     expect(
-      await errorCode(organization.createOrganizationInvitation(
+      await errorCode(organization.createWorkspaceInvitation(
         {
-          organizationId,
+          workspaceId: organizationId,
           email: "invitee@example.com",
           role: ProjectRole.EDITOR,
           initialProjectId: projectId,
@@ -133,9 +133,9 @@ describe("OrganizationService", () => {
       )),
     ).toBe(Code.PermissionDenied);
     expect(
-      await errorCode(organization.createOrganizationInvitation(
+      await errorCode(organization.createWorkspaceInvitation(
         {
-          organizationId,
+          workspaceId: organizationId,
           email: "invitee@example.com",
           role: ProjectRole.OWNER,
           initialProjectId: projectId,
@@ -144,15 +144,15 @@ describe("OrganizationService", () => {
       )),
     ).toBe(Code.InvalidArgument);
     expect(
-      await errorCode(organization.updateOrganizationLogo(
-        { organizationId },
+      await errorCode(organization.updateWorkspaceLogo(
+        { workspaceId: organizationId },
         options(tokens.owner),
       )),
     ).toBe(Code.InvalidArgument);
 
-    const created = await organization.createOrganizationInvitation(
+    const created = await organization.createWorkspaceInvitation(
       {
-        organizationId,
+        workspaceId: organizationId,
         email: " Invitee@Example.com ",
         role: ProjectRole.EDITOR,
         initialProjectId: projectId,
@@ -167,7 +167,7 @@ describe("OrganizationService", () => {
     const invitationToken = created.invitePath.split("/").at(-1);
     expect(invitationToken).toMatch(/^briar_invite_[0-9a-f]{64}$/u);
 
-    const preview = await organization.getOrganizationInvitation({
+    const preview = await organization.getWorkspaceInvitation({
       token: invitationToken!,
     });
     expect(preview.invitation).toMatchObject({
@@ -177,24 +177,24 @@ describe("OrganizationService", () => {
     expect(preview.invitation).not.toHaveProperty("email");
 
     expect(
-      await errorCode(organization.acceptOrganizationInvitation(
+      await errorCode(organization.acceptWorkspaceInvitation(
         { token: invitationToken! },
         options(tokens.mismatch),
       )),
     ).toBe(Code.FailedPrecondition);
-    const accepted = await organization.acceptOrganizationInvitation(
+    const accepted = await organization.acceptWorkspaceInvitation(
       { token: invitationToken! },
       options(tokens.invitee),
     );
     expect(accepted.alreadyAccepted).toBe(false);
-    const repeated = await organization.acceptOrganizationInvitation(
+    const repeated = await organization.acceptWorkspaceInvitation(
       { token: invitationToken! },
       options(tokens.invitee),
     );
     expect(repeated.alreadyAccepted).toBe(true);
 
-    const members = await organization.listOrganizationMembers(
-      { organizationId },
+    const members = await organization.listWorkspaceMembers(
+      { workspaceId: organizationId },
       options(tokens.owner),
     );
     expect(
@@ -204,9 +204,9 @@ describe("OrganizationService", () => {
       projectIds: [projectId],
     });
     expect(
-      await errorCode(organization.updateOrganizationMemberProjects(
+      await errorCode(organization.updateWorkspaceMemberProjects(
         {
-          organizationId,
+          workspaceId: organizationId,
           userId: inviteeId,
           projectIds: [otherProjectId],
         },
@@ -214,9 +214,9 @@ describe("OrganizationService", () => {
       )),
     ).toBe(Code.InvalidArgument);
     expect(
-      await errorCode(organization.updateOrganizationMemberRole(
+      await errorCode(organization.updateWorkspaceMemberRole(
         {
-          organizationId,
+          workspaceId: organizationId,
           userId: inviteeId,
           role: ProjectRole.VIEWER,
         },

@@ -100,7 +100,7 @@ const channelReplyIdentity = () => create(WorkClaimIdentitySchema, {
   claimToken,
   work: {
     case: "channelReply",
-    value: create(ChannelReplyClaimIdentitySchema, { organizationId }),
+    value: create(ChannelReplyClaimIdentitySchema, { workspaceId: organizationId }),
   },
 });
 

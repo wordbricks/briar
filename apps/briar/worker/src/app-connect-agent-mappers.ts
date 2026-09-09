@@ -5,8 +5,7 @@ import {
   AgentSkillExecutionMode,
   AgentSkillKind,
   WorkspaceAgentSchema,
-  ProjectAgentSkillSchema,
-} from "@briar/contracts/gen/briar/app/v1/agent_pb";
+  ProjectAgentSkillSchema} from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { Code, ConnectError } from "@connectrpc/connect";

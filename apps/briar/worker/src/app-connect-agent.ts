@@ -8,8 +8,7 @@ import {
   StructuredRunResult_Impact,
   StructuredRunResult_Importance,
   StructuredRunResult_Outcome,
-  StructuredRunResult_Urgency,
-} from "@briar/contracts/gen/briar/app/v1/common_pb";
+  StructuredRunResult_Urgency} from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   AgentService,
   AgentSkillApprovalPolicy,
@@ -18,8 +17,7 @@ import {
   type CreateWorkspaceAgentRequest,
   type CreateProjectAgentRequest,
   ProjectAgentScheduleIntervalUnit as ProtoProjectAgentScheduleIntervalUnit,
-  ProjectAgentScheduleNotificationLevel
-    as ProtoProjectAgentScheduleNotificationLevel,
+  ProjectAgentScheduleNotificationLevel as ProtoProjectAgentScheduleNotificationLevel,
   ProjectAgentScheduleRecurrence as ProtoProjectAgentScheduleRecurrence,
   ProjectAgentScheduleRunStatus as ProtoProjectAgentScheduleRunStatus,
   type ProjectAgentScheduleWrite,
@@ -31,17 +29,13 @@ import {
   ProjectAgentSessionType,
   type ProjectAgentSkillInput,
   type UpdateWorkspaceAgentRequest,
-  type UpdateProjectAgentRequest,
-} from "@briar/contracts/gen/briar/app/v1/agent_pb";
+  type UpdateProjectAgentRequest} from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import {
-  ProjectAgentWorkLogEntryStatus,
-} from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
+  ProjectAgentWorkLogEntryStatus} from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
 import {
-  AgentActivityKind,
-} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+  AgentActivityKind} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import {
-  ComputerUsePolicy as ProtoComputerUsePolicy,
-} from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
+  ComputerUsePolicy as ProtoComputerUsePolicy} from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   Code,
@@ -520,7 +514,7 @@ const domainStructuredImpact = (value: StructuredRunResult_Impact) => {
       return "issue" as const;
     case StructuredRunResult_Impact.PROJECT:
       return "project" as const;
-    case StructuredRunResult_Impact.ORGANIZATION:
+    case StructuredRunResult_Impact.WORKSPACE:
       return "organization" as const;
     default:
       throw new ConnectError(

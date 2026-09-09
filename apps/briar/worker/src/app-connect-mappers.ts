@@ -2,7 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   IssueAttachmentSchema,
-  OrganizationMemberSchema,
+  WorkspaceMemberSchema as OrganizationMemberSchema,
   ProjectRole,
   RelatedMessageReferenceSchema,
   ResultReviewSchema,
@@ -16,8 +16,7 @@ import {
   StructuredRunResult_Outcome,
   StructuredRunResultSchema,
   StructuredRunResult_Urgency,
-  UserSchema,
-} from "@briar/contracts/gen/briar/app/v1/common_pb";
+  UserSchema} from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   InboxChannelMessageSchema,
   InboxConversationMessageSchema,
@@ -25,8 +24,7 @@ import {
   InboxIssueMessageSchema,
   InboxMessageIdentitySchema,
   InboxSessionMessage_Status,
-  InboxSessionMessageSchema,
-} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
+  InboxSessionMessageSchema} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import {
   ChannelNotificationSchema,
   ConversationNotificationSchema,
@@ -44,22 +42,19 @@ import {
   TrackerReferenceSchema,
   WaitingCheckpointSchema,
   WorkerIcon_Kind,
-  WorkerIconSchema,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  WorkerIconSchema} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { AgentExecutionMetricsSchema } from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import {
   LinearSettingsSchema,
   TeamExecutionWorkerPolicy_SelectionMode,
   TeamExecutionWorkerPolicySchema,
   TeamSchema,
-  TeamSettingsSchema,
-} from "@briar/contracts/gen/briar/app/v1/team_pb";
+  TeamSettingsSchema} from "@briar/contracts/gen/briar/app/v1/team_pb";
 import {
-  OrganizationInvitationPreviewSchema,
-  OrganizationInvitationSchema,
-  OrganizationInvitationStatus,
-  OrganizationSchema,
-} from "@briar/contracts/gen/briar/app/v1/organization_pb";
+  WorkspaceInvitationPreviewSchema as OrganizationInvitationPreviewSchema,
+  WorkspaceInvitationSchema as OrganizationInvitationSchema,
+  WorkspaceInvitationStatus as OrganizationInvitationStatus,
+  WorkspaceSchema as OrganizationSchema} from "@briar/contracts/gen/briar/app/v1/workspace_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   AutoHuntWorkflowSchema,
@@ -71,8 +66,7 @@ import {
   WorkflowCompletionSchema,
   WorkflowExecutionSchema,
   WorkflowRequirementSchema,
-  WorkflowStageSchema,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
+  WorkflowStageSchema} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import type {
   AutoHuntWorkflow,
   AutoHuntWorkflowCheckpoint,
@@ -141,7 +135,7 @@ const structuredUrgency = {
 const structuredImpact = {
   issue: StructuredRunResult_Impact.ISSUE,
   project: StructuredRunResult_Impact.PROJECT,
-  organization: StructuredRunResult_Impact.ORGANIZATION,
+  organization: StructuredRunResult_Impact.WORKSPACE,
 } as const;
 
 const sessionStatus = {
@@ -224,8 +218,8 @@ export const appOrganizationInvitation = (
 ) =>
   create(OrganizationInvitationSchema, {
     id: invitation.id,
-    organizationId: invitation.organization_id,
-    organizationName: invitation.organization_name,
+    workspaceId: invitation.organization_id,
+    workspaceName: invitation.organization_name,
     initialProjectId: invitation.initial_project_id,
     initialProjectName: invitation.initial_project_name,
     email: invitation.email_normalized,
@@ -245,8 +239,8 @@ export const appOrganizationInvitationPreview = (
 ) =>
   create(OrganizationInvitationPreviewSchema, {
     id: invitation.id,
-    organizationId: invitation.organization_id,
-    organizationName: invitation.organization_name,
+    workspaceId: invitation.organization_id,
+    workspaceName: invitation.organization_name,
     initialProjectId: invitation.initial_project_id,
     initialProjectName: invitation.initial_project_name,
     emailHint: maskInvitationEmail(invitation.email_normalized),

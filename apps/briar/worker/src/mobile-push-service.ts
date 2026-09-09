@@ -3,8 +3,7 @@ import { EmptySchema } from "@bufbuild/protobuf/wkt";
 import {
   MobilePushChannelDestinationSchema,
   MobilePushConversationDestinationSchema,
-  MobilePushNotificationTargetSchema,
-} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
+  MobilePushNotificationTargetSchema} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import type { InboxFeedMessage } from "./inbox-feed";
 import { listInboxReadStates } from "./inbox-read-state-repository";
 import { sendMobilePush, type MobilePushContent } from "./mobile-push-provider";

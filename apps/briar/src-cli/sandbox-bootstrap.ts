@@ -327,7 +327,7 @@ const defaultDependencies: SandboxBootstrapDependencies = {
       { binary: true },
     );
     const response = await client.registerSandboxComputer({
-      organizationId: input.organizationId,
+      workspaceId: input.organizationId,
       deviceId: input.deviceId,
       label: input.label,
     });
@@ -655,7 +655,7 @@ async function unregisterSandboxComputer(input: {
     { binary: true },
   );
   const response = await client.unregisterSandboxComputer({
-    organizationId: input.organizationId,
+    workspaceId: input.organizationId,
     deviceId: input.deviceId,
   });
   return response.removed;

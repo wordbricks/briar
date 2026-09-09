@@ -14,8 +14,7 @@ import * as Schema from "effect/Schema";
 import { timestampFromDate, ValueSchema } from "@bufbuild/protobuf/wkt";
 import {
   DmMemoryBriefState,
-  DmMemoryDescriptorSchema,
-} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+  DmMemoryDescriptorSchema} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
   AcknowledgeChannelReplySteerResponseSchema,
   type AcknowledgeChannelReplySteerRequest,
@@ -61,8 +60,7 @@ import {
   type RecordMergeBatchValidationRequest,
   type WorkClaimIdentity,
   type SubmitDmMemoryLearningProposalRequest,
-  type SubmitDmMemoryLearningVerificationRequest,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  type SubmitDmMemoryLearningVerificationRequest} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type {
   ConnectRouter,
   HandlerContext,
@@ -622,7 +620,7 @@ async function renewWorkLease(
     }
     case "channelReply": {
       if (
-        identity.work.value.organizationId !== worker.principal.organizationId
+        identity.work.value.workspaceId !== worker.principal.organizationId
       ) {
         throw new HttpError(403, "Worker is not enabled for this organization");
       }
@@ -659,7 +657,7 @@ async function renewWorkLease(
     }
     case "dmMemory": {
       if (
-        identity.work.value.organizationId !==
+        identity.work.value.workspaceId !==
           worker.principal.organizationId
       ) {
         throw new HttpError(403, "Worker is not enabled for this organization");
@@ -732,7 +730,7 @@ async function handoffWork(
 
   if (identity.work.case === "dmMemory") {
     if (
-      identity.work.value.organizationId !== worker.principal.organizationId
+      identity.work.value.workspaceId !== worker.principal.organizationId
     ) {
       throw new HttpError(403, "Worker is not enabled for this organization");
     }
@@ -879,7 +877,7 @@ async function executeDmScheduleToolRpc(input: WorkerConnectQueueInput,
   const identity = requiredWork(request.work);
   if (identity.work.case !== "channelReply" || !request.operation) throw new HttpError(400, "DM schedule claim is required");
   const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
-  const organizationId = identity.work.value.organizationId;
+  const organizationId = identity.work.value.workspaceId;
   if (organizationId !== worker.principal.organizationId) throw new HttpError(403, "Worker organization mismatch");
   const result = await executeDmScheduleTool(input.db, {
     jobId: identity.workId, organizationId, channelId: identity.runId,
@@ -901,7 +899,7 @@ async function resolveDmReplyRoutingRpc(input: WorkerConnectQueueInput,
     throw new HttpError(400, "Channel reply routing identity is required");
   }
   const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
-  const organizationId = identity.work.value.organizationId;
+  const organizationId = identity.work.value.workspaceId;
   if (organizationId !== worker.principal.organizationId) throw new HttpError(403, "Worker organization mismatch");
   const decision = await resolveDmReplyRouting(input.db, {
     jobId: identity.workId, organizationId, channelId: identity.runId,
@@ -928,7 +926,7 @@ async function acknowledgeChannelReplySteerRpc(
     throw new HttpError(400, "Channel reply claim identity is required");
   }
   const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
-  const organizationId = identity.work.value.organizationId;
+  const organizationId = identity.work.value.workspaceId;
   if (organizationId !== worker.principal.organizationId) {
     throw new HttpError(403, "Worker is not enabled for this organization");
   }
@@ -964,7 +962,7 @@ async function checkpointChannelReplySessionRpc(
     request.workerId,
     services,
   );
-  const organizationId = identity.work.value.organizationId;
+  const organizationId = identity.work.value.workspaceId;
   if (organizationId !== worker.principal.organizationId) {
     throw new HttpError(403, "Worker is not enabled for this organization");
   }
@@ -1544,7 +1542,7 @@ async function dmLearningScope(
   );
   if (
     work.work.case !== "dmMemory" || work.workId !== work.runId ||
-    work.work.value.organizationId !== worker.principal.organizationId ||
+    work.work.value.workspaceId !== worker.principal.organizationId ||
     !work.work.value.inputHash
   ) {
     throw new HttpError(400, "Memory learning claim identity is invalid");

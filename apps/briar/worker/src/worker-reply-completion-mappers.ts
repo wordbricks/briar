@@ -149,7 +149,7 @@ export function replyWireClaim(
       throw new ReplyCompletionMappingError("Channel reply claim token is invalid");
     }
     const organizationId = mapping(
-      () => canonicalUuid(variant.value.organizationId).toLowerCase(),
+      () => canonicalUuid(variant.value.workspaceId).toLowerCase(),
       "Reply organization ID is invalid",
     );
     return {

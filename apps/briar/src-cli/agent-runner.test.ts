@@ -1,8 +1,7 @@
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
   ApprovalPolicy,
-  SandboxMode,
-} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+  SandboxMode} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { describe, expect, it } from "vitest";
 import {
   normalizedMessageCompleted,

@@ -1,8 +1,7 @@
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import {
-  InboxService,
-} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
+  InboxService} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import * as Schema from "effect/Schema";
 import type { BriarAuth } from "./auth";
 import {
@@ -48,7 +47,7 @@ export const createAppInboxService = (
 ): ServiceImpl<typeof InboxService> => ({
   getInboxFeed: async (rpcRequest) => {
     const input = decodeInboxFeedInput({
-      organizationId: rpcRequest.organizationId,
+      organizationId: rpcRequest.workspaceId,
       knownVersion: rpcRequest.knownVersion,
     });
     const session = await requireSession(auth, request);

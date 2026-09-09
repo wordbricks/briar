@@ -9,7 +9,7 @@ import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
 
-// FleetService owns authenticated organization-level machine administration.
+// FleetService owns authenticated workspace-level machine administration.
 // WebSocket upgrades for remote desktop and guided setup remain ordinary HTTP;
 // this service owns only their unary control-plane requests and tickets.
 service FleetService {
@@ -45,7 +45,7 @@ message RegisterProjectExecutionWorkerRequest {
 }
 
 message RegisterProjectExecutionWorkerResponse {
-  string organization_id = 1;
+  string workspace_id = 1;
   string device_id = 2;
   DashboardWorker worker = 3;
   string worker_token = 4;
@@ -58,7 +58,7 @@ message BindProjectExecutionWorkerRequest {
 }
 
 message BindProjectExecutionWorkerResponse {
-  string organization_id = 1;
+  string workspace_id = 1;
   string device_id = 2;
   DashboardWorker worker = 3;
 }
@@ -116,7 +116,7 @@ message ExecutionWorkerBinding {
   optional string readiness_detail = 9;
 }
 
-message OrganizationExecutionWorker {
+message WorkspaceExecutionWorker {
   string device_id = 1;
   string owner_user_id = 2;
   string owner_name = 3;
@@ -134,18 +134,18 @@ message OrganizationExecutionWorker {
 }
 
 message ListExecutionWorkersRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message ListExecutionWorkersResponse {
-  repeated OrganizationExecutionWorker workers = 1;
+  repeated WorkspaceExecutionWorker workers = 1;
   optional string latest_version = 2;
   bool can_manage = 3;
   google.protobuf.Timestamp generated_at = 4;
 }
 
 message RequestExecutionWorkerUpdateRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string device_id = 2;
 }
 
@@ -164,7 +164,7 @@ message RequestExecutionWorkerUpdateResponse {
 message UpdateExecutionWorkerRequest {
   message ClearIcon {}
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string device_id = 2;
   optional uint32 max_concurrent_sessions = 3;
   oneof icon_update {
@@ -180,7 +180,7 @@ message UpdateExecutionWorkerResponse {
 }
 
 message DeleteExecutionWorkerRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string device_id = 2;
   string request_id = 3;
 }
@@ -218,7 +218,7 @@ enum ManagedComputerProvider {
 
 message ManagedComputer {
   string id = 1;
-  string organization_id = 2;
+  string workspace_id = 2;
   string requester_user_id = 3;
   ManagedComputerState state = 4;
   string region = 5;
@@ -259,7 +259,7 @@ message ManagedComputerProduct {
 }
 
 message GetManagedComputerProductRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message GetManagedComputerProductResponse {
@@ -268,12 +268,12 @@ message GetManagedComputerProductResponse {
   bool remote_desktop_enabled = 3;
   bool configuration_ready = 4;
   bool can_apply = 5;
-  uint32 organization_limit = 6;
+  uint32 workspace_limit = 6;
   uint32 fleet_limit = 7;
 }
 
 message ListManagedComputersRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message ListManagedComputersResponse {
@@ -285,7 +285,7 @@ message ListManagedComputersResponse {
 // so its desktop can be reached through the remote-desktop relay. The caller
 // must own the device. Re-registering the same device replaces the record.
 message RegisterSandboxComputerRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string device_id = 2;
   string label = 3;
 }
@@ -295,7 +295,7 @@ message RegisterSandboxComputerResponse {
 }
 
 message UnregisterSandboxComputerRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string device_id = 2;
 }
 
@@ -304,7 +304,7 @@ message UnregisterSandboxComputerResponse {
 }
 
 message GetManagedComputerRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string managed_computer_id = 2;
 }
 
@@ -315,12 +315,12 @@ message GetManagedComputerResponse {
 enum ManagedComputerPromotionLimitReason {
   MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_UNSPECIFIED = 0;
   MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_USER = 1;
-  MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_ORGANIZATION = 2;
+  MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_WORKSPACE = 2;
   MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_FLEET = 3;
 }
 
 message ValidateManagedComputerPromotionRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string code = 2;
 }
 
@@ -334,7 +334,7 @@ message ValidateManagedComputerPromotionResponse {
 }
 
 message ApplyForManagedComputerRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string code = 2;
   string request_id = 3;
 }
@@ -357,7 +357,7 @@ message ApplyForManagedComputerResponse {
 }
 
 message RetryManagedComputerRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string managed_computer_id = 2;
   string request_id = 3;
 }
@@ -368,7 +368,7 @@ message RetryManagedComputerResponse {
 }
 
 message RetireManagedComputerRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string managed_computer_id = 2;
 }
 
@@ -378,7 +378,7 @@ message RetireManagedComputerResponse {
 }
 
 message TerminateManagedComputerRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string managed_computer_id = 2;
 }
 
@@ -417,7 +417,7 @@ message ManagedComputerSocketTicket {
 }
 
 message CreateManagedComputerRemoteSessionRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string managed_computer_id = 2;
   string request_id = 3;
   optional string reconnect_session_id = 4;
@@ -431,7 +431,7 @@ message CreateManagedComputerRemoteSessionResponse {
 }
 
 message EndManagedComputerRemoteSessionRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string managed_computer_id = 2;
   string remote_session_id = 3;
 }
@@ -450,14 +450,14 @@ enum ManagedComputerSetupSessionStatus {
 message ManagedComputerSetupSession {
   string id = 1;
   string managed_computer_id = 2;
-  string organization_id = 3;
+  string workspace_id = 3;
   string project_id = 4;
   ManagedComputerSetupSessionStatus status = 5;
   google.protobuf.Timestamp expires_at = 6;
 }
 
 message CreateManagedComputerSetupSessionRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string managed_computer_id = 2;
   string project_id = 3;
   string request_id = 4;
@@ -472,7 +472,7 @@ message CreateManagedComputerSetupSessionResponse {
 }
 
 message GetManagedComputerSetupStatusRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string managed_computer_id = 2;
 }
 

@@ -62,7 +62,7 @@ describe("ManagedComputerEnrollmentService", () => {
       .mockResolvedValue({
         credential: `briar_worker_${"c".repeat(43)}`,
         deviceId: `managed-${managedComputerId}`,
-        organizationId,
+        organizationId: organizationId,
       });
 
     const response = await enrollmentClient({ enroll })
@@ -72,7 +72,7 @@ describe("ManagedComputerEnrollmentService", () => {
       managedComputerId,
       credential: `briar_worker_${"c".repeat(43)}`,
       deviceId: `managed-${managedComputerId}`,
-      organizationId,
+      workspaceId: organizationId,
     });
     expect(enroll).toHaveBeenCalledOnce();
     expect(enroll.mock.calls[0]?.[2]).toMatchObject({

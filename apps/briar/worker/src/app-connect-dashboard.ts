@@ -2,8 +2,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import {
   DashboardRun_Source,
-  DashboardService,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  DashboardService} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import * as Schema from "effect/Schema";
 import { asPlanningProjectId } from "../../src/lib/entity-ids";

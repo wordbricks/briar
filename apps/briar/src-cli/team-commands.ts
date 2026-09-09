@@ -8,8 +8,7 @@ import { create } from "@bufbuild/protobuf";
 import {
   type Team as TeamMessage,
   TeamService,
-  UpdateTeamSettingsRequestSchema,
-} from "@briar/contracts/gen/briar/app/v1/team_pb";
+  UpdateTeamSettingsRequestSchema} from "@briar/contracts/gen/briar/app/v1/team_pb";
 import {
   isRepositoryWorkflowPending,
   repositoryWorkflowPendingStageId,

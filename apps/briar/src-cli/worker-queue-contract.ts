@@ -1,16 +1,14 @@
 import type { JsonObject } from "@bufbuild/protobuf";
 import * as Schema from "effect/Schema";
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
-import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import { ComputerUsePolicy as ProtoComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
+import { AgentProvider as ProtoAgentProvider} from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { ComputerUsePolicy as ProtoComputerUsePolicy} from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import {
   DmMemoryBriefState,
-  type DmMemoryDescriptor as ProtoDmMemoryDescriptor,
-} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+  type DmMemoryDescriptor as ProtoDmMemoryDescriptor} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
   WorkflowCheckpoint_Position,
-  type AutoHuntWorkflow as ProtoAutoHuntWorkflow,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
+  type AutoHuntWorkflow as ProtoAutoHuntWorkflow} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
@@ -36,8 +34,7 @@ import {
   type DetachedAgentSkill as ProtoDetachedAgentSkill,
   type DetachedAgentSkillExecutionTarget as ProtoDetachedAgentSkillExecutionTarget,
   type QueuedAttachment as ProtoQueuedAttachment,
-  type QueuedIssueMessage as ProtoQueuedIssueMessage,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  type QueuedIssueMessage as ProtoQueuedIssueMessage} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import {
   autoHuntRequirementKinds,
   normalizeAutoHuntWorkflow,
@@ -490,15 +487,15 @@ const channelScope = (
 ) => {
   const scope = required(value.scope, "channelReply.scope").scope;
   switch (scope.case) {
-    case "organization":
+    case "workspace":
       return {
         kind: "organization" as const,
-        organizationId: scope.value.organizationId,
+        organizationId: scope.value.workspaceId,
       };
     case "project":
       return {
         kind: "project" as const,
-        organizationId: scope.value.organizationId,
+        organizationId: scope.value.workspaceId,
         projectId: scope.value.projectId,
       };
     default:
@@ -573,10 +570,10 @@ const channelReplyFromProto = (
       ? skillExecutionTarget(value.skillExecutionTarget)
       : null,
     activity: activity(value.activity),
-    organizationContext: value.organizationContextSnapshotAt
+    organizationContext: value.workspaceContextSnapshotAt
       ? {
           snapshotAt: isoTimestamp(
-            value.organizationContextSnapshotAt,
+            value.workspaceContextSnapshotAt,
             "organizationContextSnapshotAt",
           ),
         }
@@ -810,7 +807,7 @@ const claimedDmMemoryFromProto = (value: ProtoClaimedDmMemoryLearning) =>
     workType: "dmMemory",
     workId: value.workId,
     runId: value.runId,
-    organizationId: value.organizationId,
+    organizationId: value.workspaceId,
     workerId: value.workerId,
     sourceKey: value.sourceKey,
     title: value.title,

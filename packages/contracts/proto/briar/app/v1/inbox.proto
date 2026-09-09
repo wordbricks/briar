@@ -16,7 +16,7 @@ service InboxService {
 }
 
 message GetInboxFeedRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   optional string known_version = 2;
 }
 
