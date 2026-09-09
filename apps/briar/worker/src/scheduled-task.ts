@@ -1,3 +1,4 @@
+import { runDueDmSchedules } from "./dm-schedules";
 import {
   archiveCompletedLogs,
   expireArchives,
@@ -35,6 +36,7 @@ export type ScheduledTaskDependencies = {
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
   maintainUploadCleanup: typeof maintainUploadCleanup;
   runDmMemoryMaintenance: typeof runDmMemoryMaintenance;
+  runDueDmSchedules: typeof runDueDmSchedules;
   flushWhatsAppOutbox: typeof flushWhatsAppOutbox;
 };
 
@@ -55,6 +57,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   cleanupExpiredChannelReplySessions,
   maintainUploadCleanup,
   runDmMemoryMaintenance,
+  runDueDmSchedules,
   flushWhatsAppOutbox,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
@@ -70,7 +73,7 @@ export async function handleScheduledTask(
   if (controller.cron === GITHUB_RECONCILIATION_CRON) {
     ctx.waitUntil((async () => {
       try {
-        const [github, mergeQueue, managedComputerRetirements, dmMemory, whatsapp] =
+        const [github, mergeQueue, managedComputerRetirements, dmMemory, whatsapp, dmSchedules] =
           await Promise.all([
           dependencies.reconcileGithubMergedRuns(env.DB),
           dependencies.reconcileEnabledMergeQueueRuns(env.DB, observedAt),
@@ -81,6 +84,7 @@ export async function handleScheduledTask(
           ),
           dependencies.runDmMemoryMaintenance(env, observedAt),
           dependencies.flushWhatsAppOutbox(env, env.DB, observedAt),
+          dependencies.runDueDmSchedules(env.DB, new Date().toISOString()),
         ]);
         await Promise.all([
           flushOrganizationInboxRealtimeOutbox(env, env.DB),
@@ -94,6 +98,7 @@ export async function handleScheduledTask(
           managedComputerRetirements,
           dmMemory,
           whatsapp,
+          dmSchedules,
         }));
       } catch (error) {
         console.error(JSON.stringify({

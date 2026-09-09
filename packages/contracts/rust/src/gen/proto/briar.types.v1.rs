@@ -9196,6 +9196,16 @@ pub struct WorkerCapabilities {
         DmPublicMessageCapability,
         ::buffa::Inline<DmPublicMessageCapability>,
     >,
+    /// Field 11: `dm_reply_routing`
+    #[serde(
+        rename = "dmReplyRouting",
+        alias = "dm_reply_routing",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub dm_reply_routing: ::buffa::MessageField<
+        DmPublicMessageCapability,
+        ::buffa::Inline<DmPublicMessageCapability>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9212,6 +9222,7 @@ impl ::core::fmt::Debug for WorkerCapabilities {
             .field("dm_memory_learning", &self.dm_memory_learning)
             .field("computer_use", &self.computer_use)
             .field("dm_public_messages", &self.dm_public_messages)
+            .field("dm_reply_routing", &self.dm_reply_routing)
             .finish()
     }
 }
@@ -9315,6 +9326,14 @@ impl ::buffa::Message for WorkerCapabilities {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.dm_reply_routing.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.dm_reply_routing.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -9381,6 +9400,14 @@ impl ::buffa::Message for WorkerCapabilities {
                 buf,
             );
             self.dm_public_messages.write_to(__cache, buf);
+        }
+        if self.dm_reply_routing.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                11u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.dm_reply_routing.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9488,6 +9515,17 @@ impl ::buffa::Message for WorkerCapabilities {
                     ctx,
                 )?;
             }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.dm_reply_routing.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9505,6 +9543,7 @@ impl ::buffa::Message for WorkerCapabilities {
         self.dm_memory_learning = ::buffa::MessageField::none();
         self.computer_use = ::buffa::MessageField::none();
         self.dm_public_messages = ::buffa::MessageField::none();
+        self.dm_reply_routing = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -25932,6 +25971,10 @@ pub mod __buffa {
             pub dm_public_messages: ::buffa::MessageFieldView<
                 super::super::__buffa::view::DmPublicMessageCapabilityView<'a>,
             >,
+            /// Field 11: `dm_reply_routing`
+            pub dm_reply_routing: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DmPublicMessageCapabilityView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for WorkerCapabilitiesView<'a> {
@@ -26091,6 +26134,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.dm_reply_routing.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.dm_reply_routing = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DmPublicMessageCapabilityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -26209,6 +26277,15 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    dm_reply_routing: match self.dm_reply_routing.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DmPublicMessageCapability,
+                                ::buffa::Inline<super::super::DmPublicMessageCapability>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -26275,6 +26352,14 @@ pub mod __buffa {
                 if self.dm_public_messages.is_set() {
                     let __slot = __cache.reserve();
                     let inner_size = self.dm_public_messages.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if self.dm_reply_routing.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.dm_reply_routing.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -26347,6 +26432,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.dm_public_messages.write_to(__cache, buf);
+                }
+                if self.dm_reply_routing.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.dm_reply_routing.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -26432,6 +26525,14 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("dmPublicMessages", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .dm_reply_routing
+                        .as_option()
+                    {
+                        __map.serialize_entry("dmReplyRouting", __v)?;
                     }
                 }
                 __map.end()
@@ -26599,6 +26700,15 @@ pub mod __buffa {
                 super::super::__buffa::view::DmPublicMessageCapabilityView<'_>,
             > {
                 &self.0.reborrow().dm_public_messages
+            }
+            /// Field 11: `dm_reply_routing`
+            #[must_use]
+            pub fn dm_reply_routing(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DmPublicMessageCapabilityView<'_>,
+            > {
+                &self.0.reborrow().dm_reply_routing
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>

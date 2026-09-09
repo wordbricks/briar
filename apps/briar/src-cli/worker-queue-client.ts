@@ -213,15 +213,28 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
       };
     },
 
+    resolveDmReplyRouting: async (input: {
+      projectId: string; workerId: string; work: ClaimedChannelReply;
+      decision: { action: string; targetJobId?: string | null; response?: string | null };
+    }) => {
+      const result = await client.resolveDmReplyRouting({
+        projectId: input.projectId, workerId: input.workerId, work: workClaimIdentityToProto(input.work),
+        decision: { action: input.decision.action, targetJobId: input.decision.targetJobId ?? undefined, response: input.decision.response ?? undefined },
+      });
+      if (!result.decision) throw new Error("DM routing response omitted decision");
+      return result.decision;
+    },
     acknowledgeChannelReplySteer: async (input: {
       projectId: string;
       workerId: string;
       work: ClaimedChannelReply;
+      stopUnconfirmed?: boolean;
     }) => {
       const response = await client.acknowledgeChannelReplySteer({
         projectId: input.projectId,
         workerId: input.workerId,
         work: workClaimIdentityToProto(input.work),
+        stopUnconfirmed: input.stopUnconfirmed ?? false,
       });
       return response.released;
     },

@@ -1245,6 +1245,14 @@ pub struct DmMessagePublicationBinding {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub protocol: u32,
+    /// Field 6: `schedule_tools`
+    #[serde(
+        rename = "scheduleTools",
+        alias = "schedule_tools",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub schedule_tools: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1257,6 +1265,7 @@ impl ::core::fmt::Debug for DmMessagePublicationBinding {
             .field("capability", &self.capability)
             .field("expires_at", &self.expires_at)
             .field("protocol", &self.protocol)
+            .field("schedule_tools", &self.schedule_tools)
             .finish()
     }
 }
@@ -1308,6 +1317,9 @@ impl ::buffa::Message for DmMessagePublicationBinding {
         if self.protocol != 0u32 {
             size += 1u64 + ::buffa::types::uint32_encoded_len(self.protocol) as u64;
         }
+        if self.schedule_tools {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1337,6 +1349,9 @@ impl ::buffa::Message for DmMessagePublicationBinding {
         }
         if self.protocol != 0u32 {
             ::buffa::types::put_uint32_field(5u32, self.protocol, buf);
+        }
+        if self.schedule_tools {
+            ::buffa::types::put_bool_field(6u32, self.schedule_tools, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1390,6 +1405,13 @@ impl ::buffa::Message for DmMessagePublicationBinding {
                 )?;
                 self.protocol = ::buffa::types::decode_uint32(buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.schedule_tools = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1403,6 +1425,7 @@ impl ::buffa::Message for DmMessagePublicationBinding {
         self.capability.clear();
         self.expires_at = ::buffa::MessageField::none();
         self.protocol = 0u32;
+        self.schedule_tools = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1650,6 +1673,15 @@ pub struct DmMessagePublicationRequest {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub parts: ::buffa::alloc::vec::Vec<DmMessagePublicationPart>,
+    /// Field 5: `schedule`
+    #[serde(
+        rename = "schedule",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub schedule: ::buffa::MessageField<
+        super::super::worker::v1::DmScheduleToolOperation,
+        ::buffa::Inline<super::super::worker::v1::DmScheduleToolOperation>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1661,6 +1693,7 @@ impl ::core::fmt::Debug for DmMessagePublicationRequest {
             .field("capability", &self.capability)
             .field("operation_key", &self.operation_key)
             .field("parts", &self.parts)
+            .field("schedule", &self.schedule)
             .finish()
     }
 }
@@ -1710,6 +1743,14 @@ impl ::buffa::Message for DmMessagePublicationRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.schedule.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.schedule.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1736,6 +1777,14 @@ impl ::buffa::Message for DmMessagePublicationRequest {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if self.schedule.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.schedule.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1783,6 +1832,17 @@ impl ::buffa::Message for DmMessagePublicationRequest {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.parts.push(elem);
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.schedule.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1795,6 +1855,7 @@ impl ::buffa::Message for DmMessagePublicationRequest {
         self.capability.clear();
         self.operation_key.clear();
         self.parts.clear();
+        self.schedule = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2268,6 +2329,14 @@ impl ::buffa::Message for DmMessagePublicationResponse {
                         += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
                             + inner as u64;
                 }
+                __buffa::oneof::dm_message_publication_response::Result::Schedule(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -2293,6 +2362,14 @@ impl ::buffa::Message for DmMessagePublicationResponse {
                 __buffa::oneof::dm_message_publication_response::Result::Error(x) => {
                     ::buffa::types::put_len_delimited_header(
                         2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::dm_message_publication_response::Result::Schedule(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
@@ -2352,6 +2429,28 @@ impl ::buffa::Message for DmMessagePublicationResponse {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.result = ::core::option::Option::Some(
                         __buffa::oneof::dm_message_publication_response::Result::Error(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::dm_message_publication_response::Result::Schedule(
+                        ref mut existing,
+                    ),
+                ) = self.result
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.result = ::core::option::Option::Some(
+                        __buffa::oneof::dm_message_publication_response::Result::Schedule(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -2441,6 +2540,32 @@ impl<'de> serde::Deserialize<'de> for DmMessagePublicationResponse {
                                 }
                                 __oneof_result = Some(
                                     __buffa::oneof::dm_message_publication_response::Result::Error(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "schedule" => {
+                            let v: ::core::option::Option<
+                                super::super::worker::v1::ExecuteDmScheduleToolResponse,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::worker::v1::ExecuteDmScheduleToolResponse,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_result.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'result'",
+                                        ),
+                                    );
+                                }
+                                __oneof_result = Some(
+                                    __buffa::oneof::dm_message_publication_response::Result::Schedule(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -6107,6 +6232,8 @@ pub mod __buffa {
             >,
             /// Field 5: `protocol`
             pub protocol: u32,
+            /// Field 6: `schedule_tools`
+            pub schedule_tools: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DmMessagePublicationBindingView<'a> {
@@ -6194,6 +6321,13 @@ pub mod __buffa {
                         )?;
                         view.protocol = ::buffa::types::decode_uint32(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.schedule_tools = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -6236,6 +6370,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     protocol: self.protocol,
+                    schedule_tools: self.schedule_tools,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -6280,6 +6415,9 @@ pub mod __buffa {
                         += 1u64
                             + ::buffa::types::uint32_encoded_len(self.protocol) as u64;
                 }
+                if self.schedule_tools {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -6310,6 +6448,9 @@ pub mod __buffa {
                 }
                 if self.protocol != 0u32 {
                     ::buffa::types::put_uint32_field(5u32, self.protocol, buf);
+                }
+                if self.schedule_tools {
+                    ::buffa::types::put_bool_field(6u32, self.schedule_tools, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -6359,6 +6500,9 @@ pub mod __buffa {
                             "protocol",
                             &::buffa::json_helpers::ProtoJson(&self.protocol),
                         )?;
+                }
+                if self.schedule_tools {
+                    __map.serialize_entry("scheduleTools", &self.schedule_tools)?;
                 }
                 __map.end()
             }
@@ -6487,6 +6631,11 @@ pub mod __buffa {
             #[must_use]
             pub fn protocol(&self) -> u32 {
                 self.0.reborrow().protocol
+            }
+            /// Field 6: `schedule_tools`
+            #[must_use]
+            pub fn schedule_tools(&self) -> bool {
+                self.0.reborrow().schedule_tools
             }
         }
         impl ::core::convert::From<
@@ -6877,6 +7026,12 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::DmMessagePublicationPartView<'a>,
             >,
+            /// Field 5: `schedule`
+            pub schedule: ::buffa::MessageFieldView<
+                super::super::super::super::worker::v1::__buffa::view::DmScheduleToolOperationView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DmMessagePublicationRequestView<'a> {
@@ -6931,6 +7086,31 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.operation_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.schedule.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.schedule = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::worker::v1::__buffa::view::DmScheduleToolOperationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -6989,6 +7169,17 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    schedule: match self.schedule.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::worker::v1::DmScheduleToolOperation,
+                                ::buffa::Inline<
+                                    super::super::super::super::worker::v1::DmScheduleToolOperation,
+                                >,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -7028,6 +7219,14 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.schedule.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.schedule.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -7055,6 +7254,14 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if self.schedule.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.schedule.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -7092,6 +7299,12 @@ pub mod __buffa {
                 }
                 if !self.parts.is_empty() {
                     __map.serialize_entry("parts", &*self.parts)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.schedule.as_option()
+                    {
+                        __map.serialize_entry("schedule", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -7216,6 +7429,17 @@ pub mod __buffa {
                 super::super::__buffa::view::DmMessagePublicationPartView<'_>,
             > {
                 &self.0.reborrow().parts
+            }
+            /// Field 5: `schedule`
+            #[must_use]
+            pub fn schedule(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::worker::v1::__buffa::view::DmScheduleToolOperationView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().schedule
             }
         }
         impl ::core::convert::From<
@@ -8055,6 +8279,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::dm_message_publication_response::Result::Schedule(
+                                ref mut existing,
+                            ),
+                        ) = view.result
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.result = Some(
+                                super::super::__buffa::view::oneof::dm_message_publication_response::Result::Schedule(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -8106,6 +8361,15 @@ pub mod __buffa {
                                             ),
                                         )
                                     }
+                                    super::super::__buffa::view::oneof::dm_message_publication_response::Result::Schedule(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::dm_message_publication_response::Result::Schedule(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
                                 },
                             )
                         }
@@ -8138,6 +8402,16 @@ pub mod __buffa {
                                     + inner as u64;
                         }
                         super::super::__buffa::view::oneof::dm_message_publication_response::Result::Error(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::dm_message_publication_response::Result::Schedule(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -8182,6 +8456,16 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::dm_message_publication_response::Result::Schedule(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                3u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -8216,6 +8500,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("error", v)?;
+                        }
+                        super::super::__buffa::view::oneof::dm_message_publication_response::Result::Schedule(
+                            v,
+                        ) => {
+                            __map.serialize_entry("schedule", v)?;
                         }
                     }
                 }
@@ -13356,6 +13645,13 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    Schedule(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
             pub mod parent_to_runner {
@@ -13455,6 +13751,11 @@ pub mod __buffa {
                         super::super::super::DmMessagePublicationError,
                     >,
                 ),
+                Schedule(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::worker::v1::ExecuteDmScheduleToolResponse,
+                    >,
+                ),
             }
             impl ::buffa::Oneof for Result {}
             impl From<super::super::super::DmMessagePublicationReceipt> for Result {
@@ -13479,6 +13780,24 @@ pub mod __buffa {
                     Self::Some(Result::from(v))
                 }
             }
+            impl From<
+                super::super::super::super::super::worker::v1::ExecuteDmScheduleToolResponse,
+            > for Result {
+                fn from(
+                    v: super::super::super::super::super::worker::v1::ExecuteDmScheduleToolResponse,
+                ) -> Self {
+                    Self::Schedule(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::worker::v1::ExecuteDmScheduleToolResponse,
+            > for ::core::option::Option<Result> {
+                fn from(
+                    v: super::super::super::super::super::worker::v1::ExecuteDmScheduleToolResponse,
+                ) -> Self {
+                    Self::Some(Result::from(v))
+                }
+            }
             impl serde::Serialize for Result {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -13492,6 +13811,9 @@ pub mod __buffa {
                         }
                         Self::Error(v) => {
                             map.serialize_entry("error", v)?;
+                        }
+                        Self::Schedule(v) => {
+                            map.serialize_entry("schedule", v)?;
                         }
                     }
                     map.end()

@@ -1,3 +1,4 @@
+import { prepareDmMessageCommand } from "./dm-message-command";
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -43,6 +44,8 @@ import {
 } from "./agent-skill-discovery";
 import { ComputerUseBoxClient } from "./computer-use-box-client";
 import { findAgentBundle } from "./agent-bundle-path";
+import { OwnedProcessSupervisor, supportsOwnedProcessSupervisor } from "./owned-process-supervisor";
+import { runDetachedProviderClassification } from "./detached-provider-no-tools";
 
 export type DetachedProviderTurnResult = {
   exitCode: number | null;
@@ -63,6 +66,14 @@ export class DetachedProviderBlockedError extends Error {
   constructor(readonly block: ProviderBlock) {
     super(providerBlockReplyMessage(block));
     this.name = "DetachedProviderBlockedError";
+  }
+}
+
+/** A cancelled provider exited without confirming that its active work stopped. */
+export class DetachedProviderStopUnconfirmedError extends Error {
+  constructor() {
+    super("provider_stop_unconfirmed");
+    this.name = "DetachedProviderStopUnconfirmedError";
   }
 }
 
@@ -93,6 +104,8 @@ export type DetachedProviderTurnInput = {
   fullAccess: boolean;
   conversationId?: string | null;
   readOnly?: boolean;
+  /** Classify in an isolated read-only turn with no Briar capabilities; reject observed tool attempts. */
+  executionTools?: "disabled";
   attachments?: AgentAttachment[];
   organizationContextManifestPath?: string | null;
   delegationTargets?: readonly DetachedDelegationTarget[];
@@ -273,12 +286,13 @@ export const prepareComputerUseTurn = async (
 export async function runDetachedProviderTurn(
   input: DetachedProviderTurnInput,
 ): Promise<DetachedProviderTurnResult> {
-  const prepared = await prepareComputerUseTurn(input);
+  if (input.executionTools === "disabled") return runDetachedProviderClassification(input, runPreparedDetachedProviderTurn);
+  const command = await prepareDmMessageCommand(input);
   try {
-    return await runPreparedDetachedProviderTurn(prepared.input);
-  } finally {
-    await prepared.release();
-  }
+    const prepared = await prepareComputerUseTurn(command.input);
+    try { return await runPreparedDetachedProviderTurn(prepared.input); }
+    finally { await prepared.release(); }
+  } finally { await command.cleanup(); }
 }
 
 async function runPreparedDetachedProviderTurn(
@@ -349,12 +363,13 @@ async function runPreparedDetachedProviderTurn(
   }
 }
 
-async function executeDetachedProviderTurn(
+export async function executeDetachedProviderTurn(
   input: DetachedProviderTurnInput,
   runnerPath: string,
   agentBinary: string,
   skillCatalog: DetachedAgentSkillCatalog | null,
   diagnose: DiagnosticEmitter,
+  processSupervisionAvailable: () => boolean = supportsOwnedProcessSupervisor,
 ) {
   const maxSidecarFrameBytes = 16 * 1024 * 1024;
   const runnerRequest = detachedProviderRequest({
@@ -417,6 +432,14 @@ async function executeDetachedProviderTurn(
   let conversationId = input.conversationId ?? null;
   let outputCount = 0;
   let runnerStderrBuffer = "";
+  const supervisor = child.pid && processSupervisionAvailable()
+    ? new OwnedProcessSupervisor(child.pid)
+    : null;
+  let stopPromise: Promise<void> | null = null;
+  let stopFailed = false;
+  let inFlightCapture: Promise<void> | null = null;
+  let trackingFailed = false;
+  let processPoll: ReturnType<typeof setInterval> | null = null;
   const signalRunnerTree = (signal: NodeJS.Signals) => {
     if (process.platform !== "win32" && child.pid) {
       try {
@@ -429,15 +452,45 @@ async function executeDetachedProviderTurn(
     }
   };
   const terminate = () => {
-    if (child.exitCode !== null || child.killed) return;
+    if (stopPromise) return;
+    if (!input.signal.aborted && (child.exitCode !== null || child.signalCode !== null)) return;
     diagnose("runner.terminate_requested", {
       runnerPid: child.pid ?? null,
       reason: input.signal.aborted ? "aborted" : "cleanup",
     });
-    signalRunnerTree("SIGTERM");
-    setTimeout(() => {
-      if (child.exitCode === null) signalRunnerTree("SIGKILL");
-    }, 5_000).unref();
+    if (completed && !input.signal.aborted) {
+      signalRunnerTree("SIGTERM");
+      setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) signalRunnerTree("SIGKILL");
+      }, 5_000).unref();
+      return;
+    }
+    stopPromise = (async () => {
+      try {
+        if (!supervisor) throw new Error("process_owner_missing");
+        await inFlightCapture;
+        await supervisor.stopAndVerify();
+        if (trackingFailed) throw new Error("process_tracking_incomplete");
+        diagnose("runner.stop_confirmed", { runnerPid: child.pid ?? null });
+      } catch {
+        stopFailed = true;
+        // Best effort for a failed host inspection. This is never a stop acknowledgement.
+        if (child.exitCode === null && child.signalCode === null) {
+          try { signalRunnerTree("SIGKILL"); } catch { /* The stop remains unconfirmed. */ }
+        }
+        diagnose("runner.stop_unconfirmed", { runnerPid: child.pid ?? null });
+      }
+    })();
+  };
+  const captureOwnedProcesses = () => {
+    if (stopPromise || completed || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+    inFlightCapture ??= (async () => {
+      try { await supervisor?.capture(); }
+      catch {
+        if (!completed && child.exitCode === null && child.signalCode === null) trackingFailed = true;
+      }
+    })().finally(() => { inFlightCapture = null; });
+    return inFlightCapture;
   };
   input.signal.addEventListener("abort", terminate, { once: true });
   child.stderr.setEncoding("utf8");
@@ -463,6 +516,14 @@ async function executeDetachedProviderTurn(
   });
 
   try {
+    // Ordinary turns remain available on hosts without verified process supervision.
+    // Cancellation on those hosts remains unconfirmed through terminate().
+    if (supervisor) {
+      await supervisor.capture();
+      processPoll = setInterval(() => { void captureOwnedProcesses(); }, 1_000);
+      processPoll.unref();
+    }
+    input.signal.throwIfAborted();
     diagnose("runner.stdin_write_start", {
       runnerPid: child.pid ?? null,
       requestBytes,
@@ -488,7 +549,11 @@ async function executeDetachedProviderTurn(
       child.stdout,
       { readMaxBytes: maxSidecarFrameBytes },
     )) {
-      input.signal.throwIfAborted();
+      if (input.signal.aborted) {
+        terminate();
+        await stopPromise;
+        input.signal.throwIfAborted();
+      }
       if (terminalOutputSeen) {
         throw new Error("Agent runner emitted output after a terminal frame");
       }
@@ -498,6 +563,10 @@ async function executeDetachedProviderTurn(
       }
       outputCount += 1;
       const payloadType = payload.case;
+      if (payload.case === "event" && (
+        payload.value.normalized?.event.case === "activityStarted" ||
+        payload.value.normalized?.event.case === "activityCompleted"
+      )) await captureOwnedProcesses();
       diagnose("runner.stdout_payload", {
         runnerPid: child.pid ?? null,
         outputNumber: outputCount,
@@ -610,9 +679,14 @@ async function executeDetachedProviderTurn(
       block,
     };
   } finally {
+    if (processPoll) clearInterval(processPoll);
     input.signal.removeEventListener("abort", terminate);
     terminate();
+    await stopPromise;
     await exitPromise.catch(() => null);
+    if (stopFailed) {
+      throw new DetachedProviderStopUnconfirmedError();
+    }
   }
 }
 

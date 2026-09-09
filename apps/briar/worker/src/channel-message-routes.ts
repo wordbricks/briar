@@ -1,3 +1,4 @@
+import { dmReplyRoutingAvailable } from "./dm-reply-routing-admission";
 import { isDmReplyStop } from "./dm-reply-stop";
 import {
   isIssueAttachmentReference,
@@ -28,6 +29,7 @@ import {
   getChannelReplySessionForThread,
   getLiveDmChannelReplySession,
   isChannelReactionEmoji,
+  isAgentDirectMessage,
   listChannelAgents,
   listChannelAgentReplies,
   listChannelMessagePage,
@@ -323,23 +325,18 @@ export async function createOrganizationChannelMessage(
       const selectedSkill = selectedSkillTarget?.agent.id === agent.id
         ? selectedSkillTarget.skill
         : null;
-      /*
-        A channel thread anchors its reply session on the thread root. A direct
-        message has no root to anchor on, so anchoring on the message being sent
-        gave every message in a burst its own session, its own provider
-        conversation and its own parallel reply. The Agent's live session in
-        this direct message is the conversation the person is already in; only
-        when none is retained does this message become the new anchor.
-      */
-      const anchoredSession = channel.kind === "dm" && !request.parentMessageId
+      // A classifier must not wait behind the working conversation. Legacy
+      // DMs and Skill turns retain their existing session selection.
+      const independentDm = channel.kind === "dm" && !selectedSkill && !isAgentDirectMessage(channel) && await dmReplyRoutingAvailable(input.db, { organizationId: input.organizationId, channelId: channel.id, provider: agent.provider, preferredDeviceId: request.preferredDeviceId });
+      const anchoredSession = channel.kind === "dm" && !independentDm && !request.parentMessageId
         ? await getLiveDmChannelReplySession(input.db, {
             channelId: channel.id,
             agentId: agent.id,
             observedAt: createdAt,
           })
         : null;
-      const sessionRootMessageId = anchoredSession?.thread_root_message_id ??
-        request.parentMessageId ?? messageId;
+      const sessionRootMessageId = independentDm ? messageId :
+        anchoredSession?.thread_root_message_id ?? request.parentMessageId ?? messageId;
       const retainedSession = anchoredSession ??
         await getChannelReplySessionForThread(input.db, {
           channelId: channel.id,

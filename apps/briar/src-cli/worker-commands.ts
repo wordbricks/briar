@@ -1,3 +1,4 @@
+import { supportsOwnedProcessSupervisor } from "./owned-process-supervisor";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
@@ -13,7 +14,7 @@ import { buildComputerUseArgs } from "@briar/agent-exec";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
-import { detachedProviderBlockOf } from "./detached-provider-turn";
+import { detachedProviderBlockOf, DetachedProviderStopUnconfirmedError } from "./detached-provider-turn";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,
@@ -132,7 +133,7 @@ const isRetryableWorkerCompletionError = (error: unknown) =>
 const isMissingWorkerError = (error: unknown) =>
   error instanceof ConnectError && error.code === Code.NotFound;
 
-const workerRuntime = ({
+const workerRuntime = async ({
   providerVersions,
   ...input
 }: {
@@ -145,17 +146,19 @@ const workerRuntime = ({
   workflowRequirements?: WorkerRuntimeInput["workflowRequirements"];
   dmMemoryLearning: WorkerRuntimeInput["dmMemoryLearning"];
   computerUse?: WorkerRuntimeInput["computerUse"];
-}): WorkerRuntimeInput => ({
+}): Promise<WorkerRuntimeInput> => ({
   ...input,
+  dmReplyRouting: { protocol: 1, providers: Object.entries(input.providerHealth)
+    .filter(([, health]) => health.installed && supportsOwnedProcessSupervisor())
+    .map(([provider]) => provider as WorkerRuntimeInput["agentProvider"]) },
   dmPublicMessages: (() => {
     const bundle = agentBundleCandidates(
       import.meta.dir,
       "dm-message-mcp-server.js",
     ).find((path) => Bun.file(path).size > 0);
     const providers = Object.entries(input.providerHealth).flatMap(
-      ([provider, health]) => health.healthy &&
-          supportsDmMessagePublicationProvider(provider as WorkerRuntimeInput["agentProvider"])
-        ? [provider as "codex" | "claude"]
+      ([provider]) => supportsDmMessagePublicationProvider(provider as WorkerRuntimeInput["agentProvider"])
+        ? [provider as WorkerRuntimeInput["agentProvider"]]
         : [],
     );
     return bundle && providers.length > 0
@@ -332,7 +335,7 @@ export async function registerProjectExecutionWorker(input: {
   const provider = providers.includes(configuredProvider)
     ? configuredProvider
     : (providers[0] ?? configuredProvider);
-  const runtime = workerRuntime({
+  const runtime = await workerRuntime({
     agentProvider: provider,
     providerHealth,
     providerCapabilities,
@@ -689,7 +692,7 @@ async function workerCommand() {
     const configuredProvider = project.llm?.provider ?? "codex";
     const heartbeat = await workerControl.heartbeat({
       workerId,
-      runtime: workerRuntime({
+      runtime: await workerRuntime({
         agentProvider: providers.includes(configuredProvider)
           ? configuredProvider
           : (providers[0] ?? configuredProvider),
@@ -880,7 +883,7 @@ async function workerCommand() {
         const configuredProvider = project.llm?.provider ?? "codex";
         const heartbeat = await workerControl.heartbeat({
           workerId,
-          runtime: workerRuntime({
+          runtime: await workerRuntime({
             agentProvider: providers.includes(configuredProvider)
               ? configuredProvider
               : (providers[0] ?? configuredProvider),
@@ -946,7 +949,7 @@ async function workerCommand() {
               effectiveAcceptingWork = false;
               await workerControl.heartbeat({
                 workerId,
-                runtime: workerRuntime({
+                runtime: await workerRuntime({
                   agentProvider: providers.includes(configuredProvider)
                     ? configuredProvider
                     : (providers[0] ?? configuredProvider),
@@ -1092,6 +1095,12 @@ async function workerCommand() {
               reportCheckpoint,
             );
           } catch (error) {
+            if (error instanceof DetachedProviderStopUnconfirmedError) {
+              await workerQueue.acknowledgeChannelReplySteer({
+                projectId: project.id, workerId, work: reply, stopUnconfirmed: true,
+              });
+              throw error;
+            }
             // runClaimedChannelReply has stopped its provider and finished cleanup.
             // Only now may the server make the response claimable again.
             if (await workerQueue.acknowledgeChannelReplySteer({

@@ -49,6 +49,7 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
     deadLettered: 0,
     deferred: 0,
   })),
+  runDueDmSchedules: vi.fn(async () => ({ scanned: 0, enqueued: 0 })),
   runDmMemoryMaintenance: vi.fn(async () => ({ expired: 0, indexing: null, cleanup: null })),
   cleanupExpiredChannelReplySessions: vi.fn(async () => []),
   maintainUploadCleanup: vi.fn(async () => ({
