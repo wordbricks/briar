@@ -54,6 +54,7 @@ import type {
 import {
   channelReplyWorkerAvailability,
   hasAvailableChannelReplyWorker,
+  isDeviceInPlannedUpdateWindow,
 } from "./workers";
 import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
 import { encodeApprovedTeamAgentTaskSession } from "./team-agent-session-materialization";
@@ -3800,6 +3801,7 @@ export async function claimNextChannelAgentReply(
               then agent.effort
               when current_skill.execution_mode = 'conversation'
               then session.effort else job.selected_skill_effort_snapshot end as runtime_effort,
+            job.planned_update_resume,
             session.owner_device_id, session.owner_worker_id,
             session.owner_worker_label
      from briar_channel_agent_reply_jobs job
@@ -3818,6 +3820,7 @@ export async function claimNextChannelAgentReply(
     runtime_model: string | null;
     runtime_effort: AgentSkillEffort | null;
     computer_use_policy: "disabled" | "unattended";
+    planned_update_resume: number;
     owner_device_id: string | null;
     owner_worker_id: string;
     owner_worker_label: string | null;
@@ -3835,6 +3838,19 @@ export async function claimNextChannelAgentReply(
       observedAt: input.claimedAt,
     });
     if (availability === "available") continue;
+    // A reply the owner handed off for a planned update stays queued while
+    // that device restarts: completing the update marks the request done
+    // before the drained Worker rows come back, so failing here would kill
+    // the very reply the update parked.
+    if (
+      assigned.planned_update_resume === 1 &&
+      assigned.owner_device_id &&
+      await isDeviceInPlannedUpdateWindow(
+        db,
+        assigned.owner_device_id,
+        input.claimedAt,
+      )
+    ) continue;
     const error = channelReplyAssignedWorkerUnavailableError(
       assigned.owner_worker_label ?? assigned.owner_worker_id,
     );

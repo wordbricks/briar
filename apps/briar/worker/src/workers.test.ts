@@ -63,6 +63,8 @@ import {
   listOrganizationExecutionProviders,
   listOrganizationExecutionWorkers,
   MAX_CLAIM_ATTEMPTS,
+  PLANNED_UPDATE_DRAINING_READINESS_DETAIL,
+  PLANNED_UPDATE_HANDOFF_READINESS_DETAIL,
   reapStalledHuntRuns,
   recordWorkerHeartbeat,
   registerExecutionWorker,
@@ -762,6 +764,154 @@ describe("detached execution workers", () => {
     expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toMatchObject({ id: requestId });
     await control.client.finishWorkerUpdate({ workerId: worker.worker.id, requestId }, control.options);
     expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
+  });
+
+  it("restores the drained Worker rows when a planned update completes", async () => {
+    const worker = await register("update-restore");
+    const secondBindingId = "worker-update-restore-second";
+    const ownReadinessDetail = "원격 런타임 업데이트에 실패했습니다.";
+    await db.prepare(
+      `insert into briar_execution_workers (
+         id, project_id, device_id, label, host_fingerprint,
+         runtime_proto_json, state, accepting_work, readiness_state,
+         last_heartbeat_at, created_at, updated_at
+       ) values (?, ?, ?, 'update restore second', ?, ?, 'online', 1, 'ready',
+                 ?, ?, ?)`,
+    ).bind(
+      secondBindingId,
+      secondProjectId,
+      worker.device.id,
+      fingerprint("update-restore-second"),
+      runtimeMetadata({}, "1.2.84").runtimeProtoJson,
+      atMinute(1),
+      atMinute(1),
+      atMinute(1),
+    ).run();
+    const readiness = () => db.prepare(
+      `select id, accepting_work, readiness_state, readiness_detail
+       from briar_execution_workers where device_id = ? order by id`,
+    ).bind(worker.device.id).all<{
+      id: string;
+      accepting_work: number;
+      readiness_state: string;
+      readiness_detail: string | null;
+    }>();
+
+    await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777774",
+      organizationId: projectId,
+      deviceId: worker.device.id,
+      requestedByUserId: "owner",
+      targetVersion: "1.2.84",
+      requestedAt: atMinute(2),
+    });
+    expect((await readiness()).results).toEqual([
+      {
+        id: worker.worker.id,
+        accepting_work: 0,
+        readiness_state: "busy",
+        readiness_detail: PLANNED_UPDATE_DRAINING_READINESS_DETAIL,
+      },
+      {
+        id: secondBindingId,
+        accepting_work: 0,
+        readiness_state: "busy",
+        readiness_detail: PLANNED_UPDATE_DRAINING_READINESS_DETAIL,
+      },
+    ]);
+    // A Worker that reported its own problem during the drain keeps it.
+    await db.prepare(
+      `update briar_execution_workers
+       set readiness_state = 'needs_attention', readiness_detail = ?
+       where id = ?`,
+    ).bind(ownReadinessDetail, secondBindingId).run();
+
+    await completeExecutionWorkerUpdates(
+      db,
+      worker.device.id,
+      "1.2.84",
+      atMinute(3),
+    );
+    expect(await pendingExecutionWorkerUpdate(db, worker.device.id)).toBeNull();
+    expect((await readiness()).results).toEqual([
+      {
+        id: worker.worker.id,
+        accepting_work: 1,
+        readiness_state: "ready",
+        readiness_detail: null,
+      },
+      {
+        id: secondBindingId,
+        accepting_work: 1,
+        readiness_state: "needs_attention",
+        readiness_detail: ownReadinessDetail,
+      },
+    ]);
+  });
+
+  it("restores a drained sandbox Worker only when its update finishes", async () => {
+    const credential = "briar_worker_sandbox-restore-test";
+    const worker = await register(
+      "sandbox-restore",
+      1,
+      createHash("sha256").update(credential).digest("hex"),
+    );
+    const env = { DB: db, ARCHIVES: archives,
+      BETTER_AUTH_SECRET: "sandbox-restore-secret-sandbox-restore-secret",
+      GOOGLE_CLIENT_ID: "test", GOOGLE_CLIENT_SECRET: "test" } as unknown as Env;
+    const control = workerControlClient(env, credential);
+    const readiness = () => db.prepare(
+      `select accepting_work, readiness_state, readiness_detail
+       from briar_execution_workers where id = ?`,
+    ).bind(worker.worker.id).first();
+    const cancelledRequestId = "77777777-7777-4777-8777-777777777773";
+    await control.client.prepareWorkerUpdateHandoff({
+      workerId: worker.worker.id,
+      targetVersion: "1.2.95",
+      requiresRuntimeAck: true,
+      requestId: cancelledRequestId,
+    }, control.options);
+    await control.client.finishWorkerUpdate({
+      workerId: worker.worker.id,
+      requestId: cancelledRequestId,
+      cancel: true,
+    }, control.options);
+    // A cancelled update leaves the drain in place for the runtime to resolve.
+    await expect(readiness()).resolves.toMatchObject({
+      accepting_work: 0,
+      readiness_state: "busy",
+      readiness_detail: PLANNED_UPDATE_DRAINING_READINESS_DETAIL,
+    });
+
+    const requestId = "77777777-7777-4777-8777-777777777772";
+    await control.client.prepareWorkerUpdateHandoff({
+      workerId: worker.worker.id,
+      targetVersion: "1.2.95",
+      requiresRuntimeAck: true,
+      requestId,
+    }, control.options);
+    const runtime = workerRuntime("1.2.95");
+    runtime.updateRequestId = requestId;
+    await control.client.heartbeatWorker({
+      workerId: worker.worker.id,
+      runtime,
+      acceptingWork: true,
+      readinessState: WorkerReadinessState.READY,
+    }, control.options);
+    await expect(readiness()).resolves.toMatchObject({
+      accepting_work: 0,
+      readiness_state: "busy",
+      readiness_detail: PLANNED_UPDATE_HANDOFF_READINESS_DETAIL,
+    });
+    await control.client.finishWorkerUpdate({
+      workerId: worker.worker.id,
+      requestId,
+    }, control.options);
+    await expect(readiness()).resolves.toMatchObject({
+      accepting_work: 1,
+      readiness_state: "ready",
+      readiness_detail: null,
+    });
   });
 
   it("atomically fences multiple active runs and resumes them without retry attempts", async () => {
