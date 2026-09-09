@@ -127,6 +127,20 @@ function dashboardAgentSession(run: HuntRun, status: AutoHuntSession["status"] =
   };
 }
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+function pendingAgentReplyState(scope: ParentNode | null | undefined) {
+  return scope?.querySelector<HTMLElement>(":scope > .issue-agent-reply-state");
+}
+function expectPendingAgentReplyLoader(scope: ParentNode | null | undefined) {
+  const pending = pendingAgentReplyState(scope);
+  const loader = pending?.querySelector<HTMLElement>("[data-testid='loading-state']");
+  expect(loader).not.toBeNull();
+  expect(loader?.dataset.variant).toBe("Drive");
+  expect(loader?.dataset.size).toBe("compact");
+  expect(pending?.textContent).toContain("에이전트가 답변을 작성하고 있습니다");
+  expect(pending?.textContent).toContain("0.0s");
+  expect(pending?.querySelector(".animate-spin")).toBeNull();
+  return pending;
+}
 describe("IssueConversation", () => {
   it("highlights and focuses the reply selected from Inbox", async () => {
     const run = demoDashboard.runs[0];
@@ -278,12 +292,29 @@ describe("IssueConversation", () => {
       error: null,
       updatedAt: createdAt
     };
+    // No activity frame at all — the runner may never publish commentary.
     const reviewerReplyJob = {
       ...replyJob,
       id: "reply-job-2",
       agentId: "agent-reviewer",
       agentName: "Reviewer"
     };
+    // On its second attempt, with only a frame left over from the first.
+    const retriedReplyJob = {
+      ...replyJob,
+      id: "reply-job-3",
+      agentId: "agent-retried",
+      agentName: "Retried",
+      attempts: 2
+    };
+    // Neither the job nor the mention list can name this agent.
+    const unnamedReplyJob = {
+      ...replyJob,
+      id: "reply-job-4",
+      agentId: "agent-unnamed",
+      agentName: null
+    };
+    const pendingReplyJobs = [replyJob, reviewerReplyJob, retriedReplyJob, unnamedReplyJob];
     const staleMessage = {
       ...trigger,
       id: "stale-message",
@@ -292,7 +323,7 @@ describe("IssueConversation", () => {
     const loadSnapshot = vi.spyOn(api, "loadIssueConversationSnapshot").mockResolvedValue({
       cursor: 7,
       messages: [trigger, staleMessage],
-      agentReplies: [replyJob, reviewerReplyJob]
+      agentReplies: pendingReplyJobs
     });
     const loadDelta = vi.spyOn(api, "loadIssueConversationDelta").mockResolvedValueOnce({
       cursor: 7,
@@ -305,7 +336,7 @@ describe("IssueConversation", () => {
       changed: true,
       reset: true,
       messages: [trigger, reply],
-      agentReplies: [replyJob, reviewerReplyJob].map(job => ({
+      agentReplies: pendingReplyJobs.map(job => ({
         ...job,
         status: "completed" as const,
         updatedAt: "2026-08-15T00:01:00.000Z"
@@ -317,7 +348,7 @@ describe("IssueConversation", () => {
       subscribe: vi.fn(() => vi.fn())
     };
     const createTransport = vi.spyOn(channelRealtime, "createProjectRealtimeTransport").mockReturnValue(transport);
-    const activity = vi.spyOn(issueActivityHook, "useIssueAgentActivity").mockReturnValue(new Map([[replyJob.id, {
+    const activityFrame = {
       version: 1,
       replyJobId: replyJob.id,
       attempt: 1,
@@ -328,11 +359,20 @@ describe("IssueConversation", () => {
       parentMessageId: trigger.id,
       activity: {
         id: "commentary-1",
-        kind: "message",
+        kind: "message" as const,
         headline: "원인을 확인하고 있습니다."
       },
       sentAt: createdAt,
       expiresAt: "2099-01-01T00:00:00.000Z"
+    };
+    const activity = vi.spyOn(issueActivityHook, "useIssueAgentActivity").mockReturnValue(new Map([[replyJob.id, activityFrame], [retriedReplyJob.id, {
+      ...activityFrame,
+      replyJobId: retriedReplyJob.id,
+      activity: {
+        id: "commentary-2",
+        kind: "message" as const,
+        headline: "이전 시도의 낡은 상태입니다."
+      }
     }]]));
     const { cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,
@@ -349,7 +389,12 @@ describe("IssueConversation", () => {
     expect(loadDelta).toHaveBeenCalledOnce();
     expect(container.textContent).toContain("Developer · 원인을 확인하고 있습니다.");
     expect(container.textContent).not.toContain("Briar · 원인을 확인하고 있습니다.");
-    expect(container.textContent).not.toContain("Reviewer님이 답변을 작성하고 있습니다…");
+    // No frame at all, a frame from an earlier attempt, and no name to show:
+    // each still earns a line, and none of them borrows a stale headline.
+    expect(container.textContent).toContain("Reviewer님이 답변을 작성하고 있습니다…");
+    expect(container.textContent).toContain("Retried님이 답변을 작성하고 있습니다…");
+    expect(container.textContent).not.toContain("이전 시도의 낡은 상태입니다.");
+    expect(container.textContent).toContain("에이전트가 답변을 작성하고 있습니다…");
     expect(container.textContent).toContain(staleMessage.body);
     await act(async () => {
       root.render(renderPage("conversation:message-reply"));
@@ -359,7 +404,8 @@ describe("IssueConversation", () => {
     expect(loadDelta).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain(reply.body);
     expect(container.textContent).not.toContain(staleMessage.body);
-    expect(container.textContent).not.toContain("Agent가 답변을 작성하고 있습니다");
+    // Every job completed, so no line survives — not even the generic one.
+    expect(container.textContent).not.toContain("답변을 작성하고 있습니다");
     await cleanup();
     createTransport.mockRestore();
     activity.mockRestore();
@@ -1065,7 +1111,7 @@ describe("IssueConversation", () => {
       await Promise.resolve();
     });
     const userMessageGroup = Array.from(container.querySelectorAll<HTMLElement>(".issue-message-group")).find(group => group.textContent?.includes(userMessage.body));
-    expect(userMessageGroup?.querySelector(":scope > .issue-agent-reply-state")).toBeNull();
+    expectPendingAgentReplyLoader(userMessageGroup);
     await act(async () => {
       rejectAgentReply(new Error("worker unavailable"));
       await pendingAgentReply.catch(() => undefined);
