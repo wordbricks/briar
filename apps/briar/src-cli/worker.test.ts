@@ -517,6 +517,192 @@ describe("briar worker loop", () => {
     expect(test.sleeps).toEqual([15_000, 30_000]);
   });
 
+  /*
+    Reconstructing a two-minute DM reply meant guessing where the time before
+    the claim went. These hold the account the loop now writes: the idle wait,
+    what ended it, the claim RPC and the heartbeat that ran right before it.
+  */
+  describe("claim latency", () => {
+    /** One measured claim latency line, decoded. */
+    const claimLatency = (logs: readonly string[]) =>
+      logs.flatMap((line) =>
+        line.startsWith("claim latency: ")
+          ? [JSON.parse(line.slice("claim latency: ".length))]
+          : []
+      );
+
+    /** A loop whose every blocking step costs the fake clock something. */
+    const timedHarness = (input: {
+      claim: (attempt: number) => ClaimedIssue | null;
+      claimRpcMs: number;
+      heartbeatMs: number;
+      wake?: WorkerLoopDependencies["wake"];
+      sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
+      clock: { value: number };
+    }) => {
+      let attempts = 0;
+      return harness([], {
+        now: () => input.clock.value,
+        claim: async () => {
+          attempts += 1;
+          input.clock.value += input.claimRpcMs;
+          return input.claim(attempts);
+        },
+        heartbeat: async () => {
+          input.clock.value += input.heartbeatMs;
+        },
+        sleep: input.sleep ?? (async (milliseconds) => {
+          input.clock.value += milliseconds;
+        }),
+        ...(input.wake ? { wake: input.wake } : {}),
+      });
+    };
+
+    it("reports the poll it waited on and the claim RPC it paid for", async () => {
+      const clock = { value: 0 };
+      const test = timedHarness({
+        clock,
+        claimRpcMs: 40,
+        heartbeatMs: 12,
+        claim: (attempt) => attempt > 1 ? issue("issue-polled") : null,
+      });
+      await runWorkerLoop(test.dependencies, {
+        maxIssues: 1,
+        idleDelayMs: 15_000,
+        heartbeatIntervalMs: 10 * 60_000,
+        leaseRenewIntervalMs: 10 * 60_000,
+      });
+
+      expect(claimLatency(test.logs)).toEqual([
+        {
+          workId: null,
+          rpcMs: 40,
+          waitedMs: 15_000,
+          wake: "poll",
+          heartbeatMs: 0,
+        },
+      ]);
+    });
+
+    /*
+      #1837 moved the heartbeat off the claim's critical path. `heartbeatMs` is
+      what proves it stayed there: a beat that blocks is visible here rather
+      than hidden inside the gap between two lines.
+    */
+    it("names the heartbeat the wait ended for, and what it blocked", async () => {
+      const clock = { value: 0 };
+      const test = timedHarness({
+        clock,
+        claimRpcMs: 40,
+        heartbeatMs: 12,
+        claim: (attempt) => attempt > 1 ? issue("issue-beaten") : null,
+      });
+      await runWorkerLoop(test.dependencies, {
+        maxIssues: 1,
+        idleDelayMs: 15_000,
+        heartbeatIntervalMs: 10_000,
+        leaseRenewIntervalMs: 10 * 60_000,
+      });
+
+      // The first beat costs 12ms and puts the next one 10s out, so the idle
+      // wait is cut to it: 9_960ms rather than the 15s poll.
+      expect(claimLatency(test.logs)).toEqual([
+        {
+          workId: null,
+          rpcMs: 40,
+          waitedMs: 9_960,
+          wake: "heartbeat",
+          heartbeatMs: 12,
+        },
+      ]);
+    });
+
+    it("names the server wake that cut the wait short", async () => {
+      const clock = { value: 0 };
+      const reply: ClaimedIssue = {
+        ...issue("briar-channel:reply"),
+        workType: "channelReply",
+        workId: "reply-work-1",
+      };
+      let notify: ((reason: WorkerWakeReason) => void) | null = null;
+      const idleWaits: number[] = [];
+      const test = timedHarness({
+        clock,
+        claimRpcMs: 40,
+        heartbeatMs: 12,
+        claim: (attempt) => attempt > 1 ? reply : null,
+        wake: {
+          subscribe: (listener) => {
+            notify = listener;
+            return () => {};
+          },
+        },
+        sleep: async (milliseconds, signal) => {
+          // Only the lease renewal waits this long; it blocks until the loop
+          // aborts it, exactly as the real timer does.
+          if (milliseconds >= 100_000) {
+            if (signal?.aborted) return;
+            await new Promise<void>((resolve) => {
+              signal?.addEventListener("abort", () => resolve(), { once: true });
+            });
+            return;
+          }
+          idleWaits.push(milliseconds);
+          // The person's message lands three seconds into the poll wait.
+          clock.value += 3_000;
+          notify?.("channel_reply_enqueued");
+        },
+      });
+      await runWorkerLoop(test.dependencies, {
+        maxIssues: 1,
+        idleDelayMs: 15_000,
+        heartbeatIntervalMs: 10 * 60_000,
+        leaseRenewIntervalMs: 10 * 60_000,
+      });
+
+      expect(idleWaits).toEqual([15_000]);
+      expect(claimLatency(test.logs)).toEqual([
+        {
+          workId: "reply-work-1",
+          rpcMs: 40,
+          waitedMs: 3_000,
+          wake: "channel_reply_enqueued",
+          heartbeatMs: 0,
+        },
+      ]);
+    });
+
+    it("says a claim that followed another one waited on nothing", async () => {
+      const clock = { value: 0 };
+      const first = { ...issue("first"), workType: "channelReply" as const, workId: "a" };
+      const second = { ...issue("second"), workType: "channelReply" as const, workId: "b" };
+      const test = timedHarness({
+        clock,
+        claimRpcMs: 40,
+        heartbeatMs: 12,
+        claim: (attempt) => attempt === 1 ? first : attempt === 2 ? second : null,
+      });
+      await runWorkerLoop(test.dependencies, {
+        maxIssues: 2,
+        maxConcurrentSessions: 2,
+        idleDelayMs: 15_000,
+        heartbeatIntervalMs: 10 * 60_000,
+        leaseRenewIntervalMs: 10 * 60_000,
+      });
+
+      const measured = claimLatency(test.logs);
+      expect(measured).toHaveLength(2);
+      expect(measured[0]).toMatchObject({ workId: "a", waitedMs: 0, wake: "poll" });
+      // The heartbeat after the first claim is the one this claim waited on.
+      expect(measured[1]).toMatchObject({
+        workId: "b",
+        waitedMs: 0,
+        wake: "poll",
+        heartbeatMs: 12,
+      });
+    });
+  });
+
   it("holds exactly one issue in flight and renews its lease while it runs", async () => {
     let inFlight = 0;
     let observedMaximum = 0;

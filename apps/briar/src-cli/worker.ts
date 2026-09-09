@@ -14,6 +14,7 @@ import { homedir, hostname, platform } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
+import type { WorkerWakeReason } from "../src/lib/worker-wake-protocol";
 import type { WorkerWakeSource } from "./worker-wake-client";
 import { channelReplySnapshotChannelKind } from "./channel-reply-workspace";
 
@@ -182,6 +183,13 @@ export type WorkerLoopOptions = {
   maxHeartbeatErrorDelayMs?: number;
   leaseRenewIntervalMs?: number;
   maxErrorDelayMs?: number;
+};
+
+/** The idle wait a claim attempt followed, as `claim latency:` reports it. */
+type WorkerIdleWait = {
+  waitedMs: number;
+  /** The wake that cut the wait short, or what the wait was there for. */
+  wake: WorkerWakeReason | "poll" | "heartbeat";
 };
 
 export type WorkerLoopResult = {
@@ -435,7 +443,15 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       }
     }
   };
+  /*
+    What the claim about to be attempted waited on, so `claim latency:` can say
+    whether a slow reply lost its seconds to the poll interval, to the
+    heartbeat, or to the claim RPC itself.
+  */
+  let heartbeatBlockedMs = 0;
+  let idleWait: WorkerIdleWait = { waitedMs: 0, wake: "poll" };
   const reportState = async () => {
+    const startedAt = dependencies.now();
     try {
       applyHeartbeat(
         await dependencies.heartbeat(activeSlotCount > 0 ? "busy" : "ready"),
@@ -448,10 +464,15 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     } catch (error) {
       consecutiveHeartbeatFailures += 1;
       throw new WorkerHeartbeatError(error);
+    } finally {
+      heartbeatBlockedMs = Math.max(0, dependencies.now() - startedAt);
     }
   };
   const beat = async () => {
-    if (dependencies.now() < nextHeartbeatAt) return;
+    if (dependencies.now() < nextHeartbeatAt) {
+      heartbeatBlockedMs = 0;
+      return;
+    }
     await reportState();
   };
 
@@ -462,8 +483,13 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
   const leaseWaits = new Set<AbortController>();
   let leaseWakeVersion = 0;
   let wakePending = false;
+  /** The reason of the most recent server wake, and how many have arrived. */
+  let lastWakeReason: WorkerWakeReason | null = null;
+  let wakeCount = 0;
   const unsubscribeWake = dependencies.wake?.subscribe((reason) => {
     wakePending = true;
+    lastWakeReason = reason;
+    wakeCount += 1;
     // Work exists now, so the empty-queue backoff must start over rather than
     // keep the fleet at its 60s ceiling.
     consecutiveEmptyClaims = 0;
@@ -481,7 +507,10 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     unsubscribeWake?.();
     return result;
   };
-  const idleSleep = async (milliseconds: number, controller?: AbortController) => {
+  const waitWhileIdle = async (
+    milliseconds: number,
+    controller?: AbortController,
+  ) => {
     if (!dependencies.wake) {
       if (controller) {
         await dependencies.sleep(milliseconds, controller.signal);
@@ -501,6 +530,30 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     } finally {
       idleWaits.delete(wait);
       wakePending = false;
+    }
+  };
+  /**
+   * The idle wait, accounted for the next claim. `waiting` is what the wait was
+   * for — the empty-queue poll or the next heartbeat — and a wake that lands
+   * during it (or one already pending when it starts) replaces that with its
+   * own reason.
+   */
+  const idleSleep = async (
+    milliseconds: number,
+    waiting: "poll" | "heartbeat",
+    controller?: AbortController,
+  ) => {
+    const startedAt = dependencies.now();
+    const pendingWakeReason = wakePending ? lastWakeReason : null;
+    const wakesBefore = wakeCount;
+    try {
+      await waitWhileIdle(milliseconds, controller);
+    } finally {
+      const wokenBy = wakeCount > wakesBefore ? lastWakeReason : pendingWakeReason;
+      idleWait = {
+        waitedMs: Math.max(0, dependencies.now() - startedAt),
+        wake: wokenBy === null ? waiting : wokenBy,
+      };
     }
   };
 
@@ -698,7 +751,12 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       ) {
         const repliesOnly = activeSlotCount >= maxConcurrentSessions;
         const claimedAtWakeVersion = leaseWakeVersion;
+        const claimStartedAt = dependencies.now();
         const claim = await dependencies.claim({ repliesOnly });
+        const claimRpcMs = Math.max(0, dependencies.now() - claimStartedAt);
+        const claimWait = idleWait;
+        // The next claim in this burst waited on nothing but this one.
+        idleWait = { waitedMs: 0, wake: "poll" };
         const issue = isWorkerClaimResult(claim) ? claim.work : claim;
         if (!issue) {
           queueWasEmpty = true;
@@ -725,6 +783,20 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         }
         consecutiveEmptyClaims = 0;
         dependencies.log(`claimed ${issue.sourceKey} (${issue.runId})`);
+        /*
+          Where the seconds before this claim went. `waitedMs` is the idle wait
+          the loop was in, `wake` says what ended it — a server push names
+          itself — `rpcMs` is the claim call and `heartbeatMs` is what the
+          heartbeat right before it cost. A reply that reaches the Worker late
+          is one of these four and this line says which.
+        */
+        dependencies.log(`claim latency: ${JSON.stringify({
+          workId: issue.workId ?? null,
+          rpcMs: Math.round(claimRpcMs),
+          waitedMs: Math.round(claimWait.waitedMs),
+          wake: claimWait.wake,
+          heartbeatMs: Math.round(heartbeatBlockedMs),
+        })}`);
         schedule(issue, claimedAtWakeVersion);
         if (!isReplyWork(issue)) activeSlotCount += 1;
         await reportState();
@@ -768,7 +840,10 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
           0,
           nextHeartbeatAt - dependencies.now(),
         );
-        await idleSleep(Math.min(emptyQueueDelayMs, heartbeatDelayMs));
+        await idleSleep(
+          Math.min(emptyQueueDelayMs, heartbeatDelayMs),
+          heartbeatDelayMs < emptyQueueDelayMs ? "heartbeat" : "poll",
+        );
       }
       continue;
     }
@@ -778,10 +853,11 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       0,
       nextHeartbeatAt - dependencies.now(),
     );
-    const waitDelayMs =
-      queueWasEmpty && activeSlotCount < maxConcurrentSessions
-        ? Math.min(emptyQueueDelayMs, heartbeatDelayMs)
-        : heartbeatDelayMs;
+    const pollingWhileActive = queueWasEmpty &&
+      activeSlotCount < maxConcurrentSessions;
+    const waitDelayMs = pollingWhileActive
+      ? Math.min(emptyQueueDelayMs, heartbeatDelayMs)
+      : heartbeatDelayMs;
     // Wake for the next heartbeat even when every execution slot is occupied.
     // Otherwise a long-running issue makes the server report the live worker
     // as stale until that issue finishes. A server wake ends this wait too, so
@@ -789,7 +865,13 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     const waitController = new AbortController();
     const outcome = await Promise.race([
       executionFinished,
-      idleSleep(waitDelayMs, waitController).then(() => null),
+      idleSleep(
+        waitDelayMs,
+        pollingWhileActive && emptyQueueDelayMs <= heartbeatDelayMs
+          ? "poll"
+          : "heartbeat",
+        waitController,
+      ).then(() => null),
     ]);
     waitController.abort();
     if (!outcome) continue;

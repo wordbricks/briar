@@ -3,6 +3,13 @@ import { classifyDmReply } from "./dm-reply-routing";
 
 import type { IssueExecutionRecommendation } from "../src/lib/issue-execution-recommendation";
 import { dmAcknowledgementAgent, dmAcknowledgementPrompt, startDmAcknowledgement } from "./dm-acknowledgement";
+import {
+  ChannelReplyTimeline,
+  channelReplyTriggerCreatedAt,
+  settleChannelReplyTimelineOutcome,
+  type ChannelReplySetupAccount,
+  type ChannelReplyTimelineOutcome,
+} from "./channel-reply-timeline";
 import { normalizeChannelAcknowledgementReaction } from "../src/lib/channel-acknowledgement-reaction";
 import {
   providerBlockHeadline,
@@ -74,6 +81,7 @@ import {
   workerCliPath,
   interruptibleSleep,
   workerExecutionPath,
+  WorkerUpdateDrainError,
   type WorkerExecutionCheckpoint,
 } from "./worker";
 import {
@@ -709,6 +717,7 @@ function startChannelReplyAcknowledgement(
   signal: AbortSignal,
   runtime: ChannelReplyRuntime,
   acknowledgementExecution: IssueExecutionRecommendation | null,
+  timeline: ChannelReplyTimeline,
 ): ChannelReplyAcknowledgementTask {
   const prompt = dmAcknowledgementPrompt(reply.snapshot, reply.triggerMessageId);
   const capability = reply.activity?.token;
@@ -731,6 +740,7 @@ function startChannelReplyAcknowledgement(
   const stop = startDmAcknowledgement({
     signal,
     publish,
+    onPlaceholderPublished: () => timeline.recordAcknowledgementPublished(),
     select: async (selectionSignal) => {
       // The claim has no workspace yet, and this turn never needs one: it runs
       // read-only in a private directory of its own that it then removes.
@@ -777,18 +787,46 @@ async function runClaimedChannelReply(
   runtime: ChannelReplyRuntime = defaultChannelReplyRuntime(),
   acknowledgementExecution: IssueExecutionRecommendation | null = null,
 ) {
+  /*
+    Created before anything else this claim does, so every stretch below is
+    measured from the same origin as `channel reply setup:` — and so the line
+    is owed even by a reply that fails before its first provider turn.
+  */
+  const timeline = new ChannelReplyTimeline({
+    workId: reply.workId,
+    triggerCreatedAt: channelReplyTriggerCreatedAt(
+      reply.snapshot,
+      reply.triggerMessageId,
+    ),
+  });
   const { acknowledgement, stop } = startChannelReplyAcknowledgement(
-    config, reply, signal, runtime, acknowledgementExecution,
+    config, reply, signal, runtime, acknowledgementExecution, timeline,
   );
+  timeline.recordAcknowledgementMode(acknowledgement.mode);
+  /*
+    A planned Worker update aborts the execution with its own reason and the
+    loop hands the claim to the next Worker. The steer verdict is the Worker
+    command's to make — it asks the server only once this cleanup has finished
+    — so an ordinary failure is what this reply knows about itself.
+  */
+  let outcome: ChannelReplyTimelineOutcome = "failed";
   try {
-    return await runClaimedChannelReplyTurn(
+    const result = await runClaimedChannelReplyTurn(
       config, project, reply, workerToken, signal, acknowledgement,
-      reportCheckpoint, runtime,
+      timeline, reportCheckpoint, runtime,
     );
+    outcome = timeline.outcomeWhenCompleted();
+    return result;
+  } catch (error) {
+    if (signal.aborted && signal.reason instanceof WorkerUpdateDrainError) {
+      outcome = "handed_off";
+    }
+    throw error;
   } finally {
     // Cancels an in-flight selection and drops a result that arrives after the
     // reply is already finished.
     stop();
+    timeline.finish(outcome);
   }
 }
 
@@ -881,11 +919,7 @@ function settledSetupValue<T>(result: PromiseSettledResult<T>): T {
 function logChannelReplySetup(
   workId: string,
   durations: ReadonlyMap<ChannelReplySetupStep, number>,
-  totalMs: number,
-  steerFolded: boolean,
-  memoryBrief: "loaded" | "unavailable" | null,
-  prewarm: string,
-  bootMs: number | null,
+  account: ChannelReplySetupAccount,
 ) {
   console.log(`channel reply setup: ${JSON.stringify({
     workId,
@@ -895,12 +929,12 @@ function logChannelReplySetup(
     })),
     // A reply that answered without its stored preferences says so here, so a
     // "it forgot what I told it" report has an answer in this one line.
-    ...(memoryBrief ? { memoryBrief } : {}),
-    total: Math.round(totalMs),
+    ...(account.memoryBrief ? { memoryBrief: account.memoryBrief } : {}),
+    total: Math.round(account.totalMs),
     parallel: true,
-    steerFolded,
-    prewarm,
-    ...(bootMs === null ? {} : { boot: Math.round(bootMs) }),
+    steerFolded: account.steerFolded,
+    prewarm: account.prewarm,
+    ...(account.bootMs === null ? {} : { boot: Math.round(account.bootMs) }),
   })}`);
 }
 
@@ -911,10 +945,11 @@ async function runClaimedChannelReplyTurn(
   workerToken: string,
   signal: AbortSignal,
   acknowledgement: ChannelReplyAcknowledgement,
+  timeline: ChannelReplyTimeline,
   reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
   runtime: ChannelReplyRuntime = defaultChannelReplyRuntime(),
 ) {
-  const claimedAt = performance.now();
+  const claimedAt = timeline.claimedAt;
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
   // Absent means the real one: both sides are the same git runner.
@@ -967,6 +1002,7 @@ async function runClaimedChannelReplyTurn(
         workerId: registered.workerId, work: reply,
         outcome: { case: "success", conversationId: null, result, attachments: [],
           publishedFinalBatchId: receipt?.batchId }, signal });
+      timeline.recordCompletion(completed.disposition);
       terminal = completed.disposition === "completed";
     } finally { await publication?.cleanup({ terminal }); }
     return;
@@ -1125,6 +1161,7 @@ async function runClaimedChannelReplyTurn(
   let workspacePath = detachedWorkspacePath;
   let detachedWorkspacePrepared = false;
   const logSessionWorkspace = (workspace: ChannelReplyWorkspaceKind) => {
+    timeline.recordWorkspace(workspace);
     if (!reply.session) return;
     console.log(`channel reply session: ${JSON.stringify({
       sessionId: reply.session.id,
@@ -1298,14 +1335,17 @@ async function runClaimedChannelReplyTurn(
   const logSetupOnce = () => {
     if (setupLogged) return;
     setupLogged = true;
+    // One record, two lines: the timeline reports exactly what this prints.
     logChannelReplySetup(
       reply.workId,
       setupDurations,
-      performance.now() - claimedAt,
-      steerFolded,
-      memoryInvocation ? memoryInvocation.briefState : null,
-      prewarmOutcome,
-      bootMs,
+      timeline.recordSetup({
+        totalMs: performance.now() - claimedAt,
+        bootMs,
+        steerFolded,
+        memoryBrief: memoryInvocation ? memoryInvocation.briefState : null,
+        prewarm: prewarmOutcome,
+      }),
     );
   };
   const observeProviderDiagnostic = (
@@ -1672,6 +1712,7 @@ async function runClaimedChannelReplyTurn(
         conversation id it was prepared with.
       */
       const roundPreparedRunner = firstRound ? preparedRunner : null;
+      timeline.startTurn();
       const turn = await runtime.runProviderTurn({
         agent,
         prompt: reply.routing ? [turnPrompt, executionContext?.prompt(), memoryInvocation?.prompt(), messageInvocation?.prompt()].filter(Boolean).join("\n\n") : turnPrompt,
@@ -1773,6 +1814,7 @@ async function runClaimedChannelReplyTurn(
       try {
         decodedTurn = decodeReplyJson(turn.resultText);
       } catch (error) {
+        timeline.endTurn("repair");
         turnPrompt = nextStructuredOutputRepairPrompt({
           error,
           rounds: repairRounds,
@@ -1784,6 +1826,7 @@ async function runClaimedChannelReplyTurn(
         continue;
       }
       if (decodedTurn.case === "reply") {
+        timeline.endTurn("reply");
         result = decodedTurn.result;
         if (result.memorySaveRequest && !reply.memoryLearningEnabled) {
           throw new Error("memory_learning_unavailable");
@@ -1792,6 +1835,7 @@ async function runClaimedChannelReplyTurn(
         break;
       }
       if (decodedTurn.case === "repository") {
+        timeline.endTurn("repository");
         // The request is consumed here and never reported to the server: like
         // a memory lookup, it is not a completion.
         if (!repositoryRequestAvailable) {
@@ -1826,6 +1870,7 @@ async function runClaimedChannelReplyTurn(
         continue;
       }
       if (decodedTurn.case === "memory") {
+        timeline.endTurn("memory");
         if (!memoryInvocation) throw new Error("memory_unavailable");
         if (lookupRounds >= 3) throw new Error("lookup_budget_exhausted");
         const memoryPrompt = await memoryInvocation.lookup(decodedTurn.request);
@@ -1838,6 +1883,7 @@ async function runClaimedChannelReplyTurn(
           : `${prompt}\n\n${continuation}`;
         continue;
       }
+      timeline.endTurn("context");
       if (!organizationContext) {
         throw new Error(
           "Project reply cannot request workspace context",
@@ -1919,6 +1965,7 @@ async function runClaimedChannelReplyTurn(
       },
       signal,
     });
+    timeline.recordCompletion(completion.disposition);
     retainedUntil = completion.retainedUntil;
     publicationTerminal = completion.disposition === "completed";
   } catch (error) {
@@ -2005,7 +2052,7 @@ async function failClaimedChannelReply(
   console.error(
     `channel reply ${reply.workId} failed: ${reported} | ${diagnostic}`,
   );
-  await createReplyCompletionClient(config.apiUrl, workerToken)
+  const completion = await createReplyCompletionClient(config.apiUrl, workerToken)
     .completeChannelReply({
       projectId: project.id,
       workerId,
@@ -2018,6 +2065,12 @@ async function failClaimedChannelReply(
         ...(block ? { block: reply.memory ? dmSafeProviderBlock(block) : block } : {}),
       },
     });
+  // Whether this failure ends the job or hands it back to the queue is the
+  // server's answer, and it arrives only here: the timeline waits for it.
+  settleChannelReplyTimelineOutcome(
+    reply.workId,
+    completion.disposition === "requeued" ? "requeued" : "failed",
+  );
 }
 
 /** Keep the reason and provider; drop provider text that could echo a prompt. */

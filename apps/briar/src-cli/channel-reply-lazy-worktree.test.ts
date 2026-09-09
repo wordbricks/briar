@@ -38,6 +38,10 @@ import type {
 import { channelReplyAttachmentPath } from "../src/lib/channel-reply-attachment-path";
 import { runClaimedChannelReply } from "./reply-execution";
 import {
+  deferChannelReplyTimelineOutcome,
+  settleChannelReplyTimelineOutcome,
+} from "./channel-reply-timeline";
+import {
   claimedWorkFromProto,
   type ClaimedChannelReply,
 } from "./worker-queue-contract";
@@ -97,10 +101,17 @@ const turnResult = (
   runnerError: null,
 });
 
+/*
+  A quarter second before the claim: the reply reads this to say how long the
+  person waited before the Worker even had the job.
+*/
+const triggerCreatedAt = () => new Date(Date.now() - 250).toISOString();
+
 const dmMessage = (id: string, body: string) => ({
   id,
   author: { type: "user", id: crypto.randomUUID(), name: "Person" },
   body,
+  createdAt: triggerCreatedAt(),
   mentionedUserIds: [],
   attachments: [],
 });
@@ -181,6 +192,11 @@ type Exercise = {
   steerFold?: "none" | "folded";
   /** Runs once the reply has returned, while the server is still listening. */
   afterRun?: () => Promise<void>;
+  /**
+   * What the Worker command does for a reply it may have to reclaim: register
+   * for the steer verdict before the reply runs, then answer it afterwards.
+   */
+  steerVerdict?: "steered";
   /**
    * Pre-warm the provider process at claim time. The fake stands in for a real
    * prepared runner: it records what the reply asked for and what it did with
@@ -474,6 +490,11 @@ describe("DM reply worktree allocation", () => {
     })) as ClaimedChannelReply;
 
     let failure: unknown;
+    // Every line the reply printed, so a test can read its own account of it.
+    const logs: string[] = [];
+    const logged = vi.spyOn(console, "log")
+      .mockImplementation((...args: unknown[]) => { logs.push(args.join(" ")); });
+    if (input.steerVerdict) deferChannelReplyTimelineOutcome(workId);
     const workspacePaths: string[] = [];
     const acknowledgementWorkspaces: string[] = [];
     const prompts: string[] = [];
@@ -544,6 +565,9 @@ describe("DM reply worktree allocation", () => {
     } catch (error) {
       failure = error;
     } finally {
+      if (input.steerVerdict) {
+        settleChannelReplyTimelineOutcome(workId, input.steerVerdict);
+      }
       const deadline = Date.now() + 5_000;
       while (reactions.length < (input.expectReactions ?? 0) && Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -552,9 +576,11 @@ describe("DM reply worktree allocation", () => {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => error ? reject(error) : resolve())
       );
+      logged.mockRestore();
     }
     return {
       failure,
+      logs,
       turns,
       steerMessageId,
       triggerMessageId,
@@ -1016,17 +1042,11 @@ describe("DM reply worktree allocation", () => {
     its answer to a 7 s stall (2026-09-09).
   */
   it("answers without the brief when it keeps failing at the transport", async () => {
-    const logs: string[] = [];
-    const log = vi.spyOn(console, "log")
-      .mockImplementation((...args: unknown[]) => { logs.push(args.join(" ")); });
-    let observed;
-    try {
-      observed = await exercise({
-        memory: true,
-        memoryBriefFails: "transport",
-        provider: async () => turnResult(answer),
-      });
-    } finally { log.mockRestore(); }
+    const observed = await exercise({
+      memory: true,
+      memoryBriefFails: "transport",
+      provider: async () => turnResult(answer),
+    });
 
     expect(observed.failure).toBeUndefined();
     expect(observed.turns).toBe(1);
@@ -1036,10 +1056,131 @@ describe("DM reply worktree allocation", () => {
       "The memory brief could not be loaded for this reply.",
     );
     expect(observed.completed).toContain("A synthetic answer");
-    expect(logs.some((line) =>
+    expect(observed.logs.some((line) =>
       line.startsWith("channel reply setup:") &&
       line.includes(`"memoryBrief":"unavailable"`)
     )).toBe(true);
+  });
+
+  /*
+    Reconstructing the 2026-09-09 two-minute reply meant cross-referencing the
+    Worker log against D1 rows, file mtimes and provider session files. These
+    hold the one line that answers it: where a reply's time went, whichever way
+    it ended, with the same numbers the setup line already prints.
+  */
+  describe("reply timeline", () => {
+    const decode = (logs: readonly string[], prefix: string) =>
+      logs.flatMap((line) =>
+        line.startsWith(prefix) ? [JSON.parse(line.slice(prefix.length))] : []
+      );
+    const timelines = (logs: readonly string[]) =>
+      decode(logs, "channel reply timeline: ");
+    const setups = (logs: readonly string[]) =>
+      decode(logs, "channel reply setup: ");
+
+    it("accounts for a completed reply from the person's message to the completion", async () => {
+      const observed = await exercise({
+        memory: true,
+        attachment: true,
+        provider: async () => turnResult(answer),
+      });
+
+      expect(observed.failure).toBeUndefined();
+      const [timeline, ...extra] = timelines(observed.logs);
+      // Exactly one line per reply, however it ends.
+      expect(extra).toEqual([]);
+      expect(timeline).toMatchObject({
+        workId: observed.workId,
+        outcome: "completed",
+        acknowledgement: "placeholder",
+        workspace: "none",
+        steerFolded: false,
+        prewarm: "none",
+        turns: [{ round: 1, result: "reply" }],
+      });
+      // The person waited a quarter second before the Worker had the job.
+      expect(timeline.triggerToClaim).toBeGreaterThanOrEqual(250);
+      expect(timeline.claimToAck).toBeGreaterThanOrEqual(0);
+      expect(timeline.turns[0].ms).toBeGreaterThanOrEqual(0);
+      expect(timeline.post).toBeGreaterThanOrEqual(0);
+      expect(timeline.total).toBeGreaterThanOrEqual(timeline.setup);
+      expect(timeline.triggerToReply)
+        .toBeGreaterThanOrEqual(timeline.triggerToClaim);
+      // The two lines are one measurement, not two.
+      const [setup, ...extraSetups] = setups(observed.logs);
+      expect(extraSetups).toEqual([]);
+      expect(timeline.setup).toBe(setup.total);
+      expect(timeline.steerFolded).toBe(setup.steerFolded);
+      expect(timeline.prewarm).toBe(setup.prewarm);
+      expect(timeline.memoryBrief).toBe(setup.memoryBrief);
+      // A stretch this reply never had is absent rather than zero: nothing
+      // reported a provider boot, so neither line claims one.
+      expect(setup).not.toHaveProperty("boot");
+      expect(timeline).not.toHaveProperty("firstTurnBoot");
+    });
+
+    it("still accounts for a reply that failed before its first turn", async () => {
+      const observed = await exercise({
+        memory: true,
+        memoryBriefFails: "revoked",
+        provider: async () => turnResult(answer),
+      });
+
+      expect(observed.failure).toMatchObject({ message: "memory_scope_revoked" });
+      const [timeline, ...extra] = timelines(observed.logs);
+      expect(extra).toEqual([]);
+      expect(timeline).toMatchObject({
+        workId: observed.workId,
+        outcome: "failed",
+        turns: [],
+      });
+      // No round ran and nothing was published, so neither stretch is claimed.
+      expect(timeline).not.toHaveProperty("post");
+      expect(timeline).not.toHaveProperty("triggerToReply");
+      expect(timeline.setup).toBe(setups(observed.logs)[0]!.total);
+    });
+
+    /*
+      A steer is the one ending the reply cannot name itself: the server is
+      asked only after the provider has stopped and the cleanup has finished.
+      The Worker command answers it, exactly as this does.
+    */
+    it("names a steered reply once the Worker command has the verdict", async () => {
+      const observed = await exercise({
+        memory: true,
+        memoryBriefFails: "revoked",
+        steerVerdict: "steered",
+        provider: async () => turnResult(answer),
+      });
+
+      expect(observed.failure).toBeDefined();
+      const [timeline, ...extra] = timelines(observed.logs);
+      expect(extra).toEqual([]);
+      expect(timeline).toMatchObject({
+        workId: observed.workId,
+        outcome: "steered",
+        turns: [],
+      });
+    });
+
+    it("counts every round of a reply that asked for the repository", async () => {
+      const conversationId = crypto.randomUUID();
+      const observed = await exercise({
+        provider: async (_turn, number) =>
+          number === 1
+            ? turnResult(repositoryRequest, conversationId)
+            : turnResult(answer, conversationId),
+      });
+
+      expect(observed.failure).toBeUndefined();
+      const [timeline] = timelines(observed.logs);
+      expect(timeline.turns).toMatchObject([
+        { round: 1, result: "repository" },
+        { round: 2, result: "reply" },
+      ]);
+      expect(timeline.workspace).toBe("on_demand");
+      expect(timeline.outcome).toBe("completed");
+    });
   });
 
   it("neither reacts nor runs a selection when the claim already carries one", async () => {

@@ -106,6 +106,12 @@ import {
   runClaimedChannelReply,
   failClaimedChannelReply,
 } from "./reply-execution";
+import {
+  deferChannelReplyTimelineOutcome,
+  settleChannelReplyTimelineOutcome,
+  type ChannelReplyTimelineOutcome,
+} from "./channel-reply-timeline";
+import { installWorkerLogTimestamps } from "./worker-log-timestamps";
 import { loadManagedComputerCredential } from "./managed-computer-credential";
 import { runClaimedDmMemory } from "./dm-memory-learning";
 import { runDetachedProviderTurn } from "./detached-provider-turn";
@@ -663,6 +669,13 @@ async function workerSyncLabelCommand() {
 }
 
 async function workerCommand() {
+  /*
+    The service's stdout and stderr are the Worker's only log, and until now
+    nothing in it said when anything happened. Installed here rather than at the
+    call sites, so every line this long-running process writes carries the
+    stamp and no one-shot command does.
+  */
+  installWorkerLogTimestamps();
   const config = await loadConfig();
   await cleanupOrphanedWorkspaceAgentWorkspaces({
     workerSessionsDirectory: join(configDirectory, "worker-sessions"),
@@ -1151,37 +1164,52 @@ async function workerCommand() {
         }
         if (issue.workType === "channelReply") {
           const reply = issue;
+          /*
+            Whether a failed reply was steered is this branch's answer, not the
+            reply's: it is what the server says once the provider has stopped
+            and the cleanup has finished. The timeline line waits for it here
+            and the `finally` prints it on every path, steered or not.
+          */
+          deferChannelReplyTimelineOutcome(reply.workId);
+          let timelineOutcome: ChannelReplyTimelineOutcome | null = null;
           try {
-            await runClaimedChannelReply(
-              config,
-              project,
-              reply,
-              workerToken,
-              signal,
-              reportCheckpoint,
-              undefined,
-              acknowledgementExecution,
-            );
-          } catch (error) {
-            if (error instanceof DetachedProviderStopUnconfirmedError) {
-              await workerQueue.acknowledgeChannelReplySteer({
-                projectId: project.id, workerId, work: reply, stopUnconfirmed: true,
-              });
-              throw error;
+            try {
+              await runClaimedChannelReply(
+                config,
+                project,
+                reply,
+                workerToken,
+                signal,
+                reportCheckpoint,
+                undefined,
+                acknowledgementExecution,
+              );
+            } catch (error) {
+              if (error instanceof DetachedProviderStopUnconfirmedError) {
+                await workerQueue.acknowledgeChannelReplySteer({
+                  projectId: project.id, workerId, work: reply, stopUnconfirmed: true,
+                });
+                throw error;
+              }
+              // runClaimedChannelReply has stopped its provider and finished cleanup.
+              // Only now may the server make the response claimable again.
+              if (await workerQueue.acknowledgeChannelReplySteer({
+                projectId: project.id, workerId, work: reply,
+              })) {
+                timelineOutcome = "steered";
+                return { steered: true };
+              }
+              if (signal.aborted) throw error;
+              await failClaimedChannelReply(
+                config,
+                project,
+                reply,
+                workerToken,
+                error,
+              );
             }
-            // runClaimedChannelReply has stopped its provider and finished cleanup.
-            // Only now may the server make the response claimable again.
-            if (await workerQueue.acknowledgeChannelReplySteer({
-              projectId: project.id, workerId, work: reply,
-            })) return { steered: true };
-            if (signal.aborted) throw error;
-            await failClaimedChannelReply(
-              config,
-              project,
-              reply,
-              workerToken,
-              error,
-            );
+          } finally {
+            settleChannelReplyTimelineOutcome(reply.workId, timelineOutcome);
           }
           return;
         }
