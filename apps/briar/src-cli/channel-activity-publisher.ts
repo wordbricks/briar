@@ -1,6 +1,7 @@
 import type { RunnerToParent } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import type { NormalizedAgentEvent } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import { naturalLanguageFromAgentMessage } from "../src/lib/auto-hunt-agent";
+import { agentProgressMessage } from "../src/lib/agent-progress-message";
 import {
   CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH,
   type ChannelAgentActivityDescriptor,
@@ -68,6 +69,34 @@ function normalizedEventFromPayload(
 
 const structuredReplyPrefix = /^\s*(?:```(?:json)?\s*)?\{/iu;
 
+/**
+ * The headline an assistant message should show in the typing strip, or null
+ * when it must stay invisible.
+ *
+ * The typed progress update is read FIRST, before the phase is consulted:
+ * only claude, ACP, and opencode tag mid-turn text `commentary`, while codex
+ * passes its own phases through and agy tags everything `final`. Gating the
+ * parse on `phase === "commentary"` is exactly what left a 122-second codex
+ * reply with an empty typing strip.
+ *
+ * Everything else keeps the original plain-text rule, and
+ * `structuredReplyPrefix` stays a safety net rather than a classifier: JSON
+ * that is not a valid progress update is a reply envelope — opencode tags its
+ * own final envelope `commentary` — and must never leak into the strip.
+ */
+function visibleProgressHeadline(
+  message: { phase?: string; text: string },
+): string | null {
+  const progress = agentProgressMessage(message.text);
+  if (progress) return progress.headline;
+  if (
+    message.phase !== "commentary" ||
+    !message.text.trim() ||
+    structuredReplyPrefix.test(message.text)
+  ) return null;
+  return naturalLanguageFromAgentMessage(message.text);
+}
+
 function sameVisibleActivity(
   left: ChannelAgentActivityDescriptor | null,
   right: ChannelAgentActivityDescriptor | null,
@@ -118,18 +147,12 @@ export class ChannelActivityPublisher {
       normalized.case === "messageStarted" ||
       normalized.case === "messageCompleted"
     ) {
-      if (
-        normalized.value.phase !== "commentary" ||
-        !normalized.value.text.trim() ||
-        structuredReplyPrefix.test(normalized.value.text)
-      ) return;
+      const headline = visibleProgressHeadline(normalized.value);
+      if (headline === null) return;
       const commentary = {
         id: normalized.value.id,
         kind: "message" as const,
-        headline: safeChannelActivityHeadline(
-          "message",
-          naturalLanguageFromAgentMessage(normalized.value.text),
-        ),
+        headline: safeChannelActivityHeadline("message", headline),
       };
       if (sameVisibleActivity(this.commentary, commentary)) return;
       this.commentary = commentary;

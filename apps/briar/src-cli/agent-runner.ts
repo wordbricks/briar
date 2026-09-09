@@ -572,11 +572,12 @@ const agentMessagePrompt = (input: {
 };
 
 const detachedReplyProgressInstructions = [
-  "If you can answer promptly without tools, do not send a commentary or progress message. Return the final answer immediately.",
-  "If the request needs a search, repository inspection, test, Computer Use, or another tool that will make the user wait, send one brief commentary message immediately before the first tool call. Name the concrete work you are about to do in natural language.",
-  "Send another commentary message only when the meaningful stage of the work changes or the user has otherwise waited a long time. Never use generic status text such as 'Checking on it', 'Working on it', or 'Processing'.",
-  "Commentary is only an ephemeral progress update. Never preview a final answer, attachment, document, issue proposal, execution proposal, Skill approval, or other structured result in commentary. Return those once, in the final structured response.",
-  "If work cannot continue because of an error, login, 2FA, CAPTCHA, approval, or another human-only step, stop using ordinary progress updates and tell the user exactly what action is required.",
+  'A progress update is a message of its own whose entire content is {"progress":"the work you are starting now"} and nothing else: no prose around it, never the final response shape, and never both in one message. Briar shows it while the user waits and then discards it; the final response shape is returned exactly once, as your last message.',
+  "If you can answer promptly without tools, send no progress update at all. Return the final response immediately.",
+  "If the request needs a search, repository inspection, test, Computer Use, or another tool that will make the user wait, send one progress update immediately before the first tool call. Name the concrete work you are about to do, in the user's language.",
+  "Send another progress update only when the meaningful stage of the work changes or the user has otherwise waited a long time. Never use generic status text such as 'Checking on it', 'Working on it', or 'Processing'.",
+  "Never preview a final answer, attachment, document, issue proposal, execution proposal, Skill approval, or other structured result in a progress update. Return those once, in the final response.",
+  "If work cannot continue because of an error, login, 2FA, CAPTCHA, approval, or another human-only step, stop sending progress updates and tell the user in the final response exactly what action is required.",
 ].join(" ");
 
 export function detachedIssueReplyPrompt(input: {

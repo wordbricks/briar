@@ -16,6 +16,7 @@ import {
   normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import type { RunnerRequest } from "./runner-request";
+import { agentProgressMessage } from "../src/lib/agent-progress-message";
 import {
   ProviderBlockedError,
   classifyProviderFailure,
@@ -1090,6 +1091,14 @@ function captureAgentMessage(
   if (item?.type !== "agentMessage" || typeof item.text !== "string") return;
   const text = item.text.trim();
   if (!text) return;
+  /*
+    Codex does not phase its mid-turn messages as commentary, so without this
+    a progress update would land in fallbackText and become the turn's answer
+    whenever no final_answer message follows. The strict reply contract would
+    reject it anyway (no `body`, excess `progress`), but only after
+    structured-output-repair spends a whole repair turn recovering from it.
+  */
+  if (agentProgressMessage(text)) return;
   state.fallbackText = item.text;
   if (item.phase === "final_answer") state.finalText = item.text;
 }

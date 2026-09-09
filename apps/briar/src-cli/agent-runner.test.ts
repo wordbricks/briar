@@ -624,8 +624,17 @@ describe("detached Agent runner", () => {
     ];
 
     for (const prompt of prompts) {
+      // The format is stated, not left to the provider: a Codex Agent once
+      // wrapped its progress update in the reply envelope, which the typing
+      // strip suppresses as a structured reply.
       expect(prompt).toContain(
-        "If you can answer promptly without tools, do not send a commentary or progress message.",
+        '{"progress":"the work you are starting now"} and nothing else',
+      );
+      expect(prompt).toContain(
+        "never the final response shape, and never both in one message",
+      );
+      expect(prompt).toContain(
+        "If you can answer promptly without tools, send no progress update at all.",
       );
       expect(prompt).toContain(
         "immediately before the first tool call",
