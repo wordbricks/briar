@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.225",
+        date: "2026년 9월 9일",
+        title: "이슈 대화에서도 Agent가 답변 중인 것이 보입니다",
+        summary:
+          "이슈 대화에서 Agent를 멘션하면 답변이 큐에 들어간 순간부터 상태가 표시됩니다. 진행 문구가 아직 없어도 누가 답변 중인지 먼저 알려주고, 문구가 도착하면 그 내용으로 바뀝니다.",
+        items: [
+          "답변이 시작되면 \"OO님이 답변을 작성하고 있습니다…\"가 바로 뜹니다. 이전에는 Agent가 진행 문구를 보내지 않으면 아무것도 표시되지 않아, 멘션이 유실된 것과 구분할 수 없었습니다.",
+          "진행 문구가 도착하면 그 내용으로 승격되고, 이전 시도에서 남은 문구는 낡은 내용을 유지하는 대신 일반 문구로 되돌립니다.",
+          "채널에서 먼저 되살린 동작을 이슈 대화에 맞췄습니다. DM은 기존대로 구체적인 진행 문구가 있을 때만 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.224",
         date: "2026년 9월 9일",
         title: "DM 리액션에 쉬운 작업용 모델을 사용합니다",
@@ -1990,6 +2002,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.225",
+        date: "September 9, 2026",
+        title: "Issue conversations show that an Agent is replying",
+        summary:
+          "Mentioning an Agent in an issue conversation now shows a status line from the moment the reply is queued. It names the Agent first and upgrades to the concrete progress text once that arrives.",
+        items: [
+          "A queued or running reply shows \"<name> is writing a reply…\" right away. Previously nothing appeared unless the Agent published progress text, which was indistinguishable from a dropped mention.",
+          "A progress headline upgrades that line, and a headline left over from an earlier attempt falls back to the generic wording instead of lingering.",
+          "This matches the behaviour already restored for channels. DMs keep showing progress only when there is something concrete to show.",
+        ],
+      },
       {
         version: "1.2.224",
         date: "September 9, 2026",
