@@ -23,7 +23,7 @@ export const agentResultUrgencies = [
 export const agentResultImpacts = [
   "issue",
   "project",
-  "workspace",
+  "organization",
 ] as const;
 
 const strictSchemaOptions = {

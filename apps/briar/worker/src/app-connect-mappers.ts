@@ -135,7 +135,7 @@ const structuredUrgency = {
 const structuredImpact = {
   issue: StructuredRunResult_Impact.ISSUE,
   project: StructuredRunResult_Impact.PROJECT,
-  workspace: StructuredRunResult_Impact.WORKSPACE,
+  organization: StructuredRunResult_Impact.WORKSPACE,
 } as const;
 
 const sessionStatus = {

@@ -51,7 +51,7 @@ export function classifyMobilePushInboxMessage(
   if (
     result?.importance === "important" ||
     result?.impact === "project" ||
-    result?.impact === "workspace" ||
+    result?.impact === "organization" ||
     (message.status === "completed" &&
       message.priority !== null && message.priority !== undefined &&
       message.priority <= 2)

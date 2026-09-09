@@ -304,7 +304,7 @@ const structuredImpact = (value: StructuredRunResult_Impact): StructuredAgentRes
     case StructuredRunResult_Impact.PROJECT:
       return "project";
     case StructuredRunResult_Impact.WORKSPACE:
-      return "workspace";
+      return "organization";
     default:
       throw new Error(`Unknown structured result impact: ${value}`);
   }
@@ -348,7 +348,7 @@ const structuredUrgencyToProto = {
 const structuredImpactToProto = {
   issue: StructuredRunResult_Impact.ISSUE,
   project: StructuredRunResult_Impact.PROJECT,
-  workspace: StructuredRunResult_Impact.WORKSPACE,
+  organization: StructuredRunResult_Impact.WORKSPACE,
 } as const satisfies Record<StructuredAgentResult["impact"], StructuredRunResult_Impact>;
 
 export const structuredResultToProto = (value: StructuredAgentResult) =>

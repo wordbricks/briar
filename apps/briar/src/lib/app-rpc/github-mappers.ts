@@ -36,7 +36,7 @@ export type GithubIntegration = {
 };
 
 export type ProjectGithubCredential = {
-  project: { id: string; workspaceId: string };
+  project: { id: string; organizationId: string };
   repository: { id: number; fullName: string; cloneUrl: string };
   username: string;
   password: string;
@@ -111,7 +111,7 @@ export const githubIntegrationFromProto = (
 export const projectGithubCredentialFromProto = (
   value: ProjectGitHubCredentialMessage,
 ): ProjectGithubCredential => ({
-  project: { id: value.projectId, workspaceId: value.workspaceId },
+  project: { id: value.projectId, organizationId: value.workspaceId },
   repository: {
     id: positiveSafeNumber(value.repositoryId, "githubCredential.repositoryId"),
     fullName: value.repository,

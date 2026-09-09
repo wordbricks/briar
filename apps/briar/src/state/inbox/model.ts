@@ -606,7 +606,7 @@ export function classifyInboxMessage(
   if (
     result?.importance === "important" ||
     result?.impact === "project" ||
-    result?.impact === "workspace" ||
+    result?.impact === "organization" ||
     (message.status === "completed" &&
       message.priority !== null &&
       message.priority <= 2)
