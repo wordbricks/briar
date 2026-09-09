@@ -1,3 +1,4 @@
+import { dmScheduleReplyFenceCurrent } from "./dm-schedule-fence";
 import { dmPublicMessageBatchStatements, getDmPublicMessageClaim } from "./dm-public-message-repository";
 import { sha256 } from "./crypto-digest";
 import { HttpError } from "./http-response";
@@ -40,7 +41,8 @@ export async function dmReplyRoutingContext(db: D1Database, job: ChannelReplyJob
       and candidate.approved_skill_execution_proposal_id is null
       and candidate.superseded_by_reply_job_id is null
       and (candidate.routing_action is null or candidate.routing_action in ('new', 'pending'))
-      and message.author_user_id is not null and message.deleted_at is null
+      and (message.author_user_id is not null or (candidate.dm_schedule_id is not null and ${dmScheduleReplyFenceCurrent("candidate")}))
+      and message.deleted_at is null
     order by candidate.id = ? desc, candidate.created_at desc, candidate.rowid desc limit 21`)
     .bind(job.organization_id, job.channel_id, job.agent_id, job.id, job.id, explicit?.id ?? null)
     .all();
@@ -100,7 +102,8 @@ export async function resolveDmReplyRouting(db: D1Database, input: {
       and target.approved_skill_execution_proposal_id is null
       and target.superseded_by_reply_job_id is null
       and (target.routing_action is null or target.routing_action = 'new')
-      and source.author_user_id is not null and source.deleted_at is null`;
+      and (source.author_user_id is not null or (target.dm_schedule_id is not null and ${dmScheduleReplyFenceCurrent("target")}))
+      and source.deleted_at is null`;
   if (!existing.proposedAction) {
     const targetAction = input.decision.action === "steer" || input.decision.action === "cancel";
     await db.prepare(`update briar_channel_agent_reply_jobs as incoming

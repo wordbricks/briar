@@ -27,6 +27,7 @@ import "google/protobuf/timestamp.proto";
 // and provider-specific streams intentionally use their dedicated transports.
 service WorkerQueueService {
   rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
+  rpc ExecuteDmScheduleTool(ExecuteDmScheduleToolRequest) returns (ExecuteDmScheduleToolResponse);
   rpc ResolveDmReplyRouting(ResolveDmReplyRoutingRequest) returns (ResolveDmReplyRoutingResponse);
   rpc AcknowledgeChannelReplySteer(AcknowledgeChannelReplySteerRequest) returns (AcknowledgeChannelReplySteerResponse);
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
@@ -1494,4 +1495,45 @@ message ResolveDmReplyRoutingRequest {
 
 message ResolveDmReplyRoutingResponse {
   DmReplyRouting decision = 1;
+}
+
+// This operation inherits its organization, DM, owner and Agent from the live claim.
+message DmScheduleToolOperation {
+  string action = 1;
+  string request_key = 2;
+  string schedule_id = 3;
+  string instruction = 4;
+  optional uint32 delay_seconds = 5;
+  optional string run_at = 6;
+  optional uint32 interval_seconds = 7;
+  string time_zone = 8;
+  bool time_zone_confirmed = 9;
+  optional string previous_job_id = 10;
+}
+
+message ExecuteDmScheduleToolRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  DmScheduleToolOperation operation = 4;
+}
+
+message DmScheduleSummary {
+  string id = 1;
+  string instruction = 2;
+  string next_run_at = 3;
+  optional uint32 interval_seconds = 4;
+  string time_zone = 5;
+  bool enabled = 6;
+  uint32 revision = 7;
+  optional string current_job_id = 8;
+  string next_run_display = 9;
+  optional string stop_state = 10;
+}
+
+message ExecuteDmScheduleToolResponse {
+  repeated DmScheduleSummary schedules = 1;
+  bool replayed = 2;
+  string notice = 3;
+  bool truncated = 4;
 }

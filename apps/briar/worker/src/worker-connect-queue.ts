@@ -1,3 +1,5 @@
+import { executeDmScheduleTool } from "./dm-schedules";
+import { ExecuteDmScheduleToolResponseSchema, type ExecuteDmScheduleToolRequest } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { wakeOrganizationWorkers } from "./worker-wake-hub";
 import { resolveDmReplyRouting } from "./dm-reply-routing";
 import { ResolveDmReplyRoutingResponseSchema, type ResolveDmReplyRoutingRequest } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
@@ -872,6 +874,26 @@ const channelReplyConversationId = (value: string | undefined) => {
   return conversationId;
 };
 
+async function executeDmScheduleToolRpc(input: WorkerConnectQueueInput,
+  request: ExecuteDmScheduleToolRequest, services: WorkerQueueServices) {
+  const identity = requiredWork(request.work);
+  if (identity.work.case !== "channelReply" || !request.operation) throw new HttpError(400, "DM schedule claim is required");
+  const worker = await authenticatedWorker(input, request.projectId, request.workerId, services);
+  const organizationId = identity.work.value.organizationId;
+  if (organizationId !== worker.principal.organizationId) throw new HttpError(403, "Worker organization mismatch");
+  const result = await executeDmScheduleTool(input.db, {
+    jobId: identity.workId, organizationId, channelId: identity.runId,
+    workerId: worker.binding.id, deviceId: worker.principal.deviceId,
+    claimTokenHash: await services.sha256(identity.claimToken), observedAt: new Date().toISOString(),
+    operation: request.operation,
+  });
+  if (request.operation.action === "cancel") {
+    wakeOrganizationWorkers(input.env, organizationId, "channel_reply_enqueued", input.context);
+    scheduleChannelRealtimePublish(input.env, input.db, organizationId, input.context);
+  }
+  return create(ExecuteDmScheduleToolResponseSchema, result);
+}
+
 async function resolveDmReplyRoutingRpc(input: WorkerConnectQueueInput,
   request: ResolveDmReplyRoutingRequest, services: WorkerQueueServices) {
   const identity = requiredWork(request.work);
@@ -1646,6 +1668,7 @@ export function createWorkerQueueService(
   return {
     claimWork: (request) => claimWork(input, request, services),
     renewWorkLease: (request) => renewWorkLease(input, request, services),
+    executeDmScheduleTool: (request) => executeDmScheduleToolRpc(input, request, services),
     resolveDmReplyRouting: (request) => resolveDmReplyRoutingRpc(input, request, services),
     acknowledgeChannelReplySteer: (request) => acknowledgeChannelReplySteerRpc(input, request, services),
     checkpointChannelReplySession: (request) => checkpointChannelReplySessionRpc(input, request, services),

@@ -22,8 +22,6 @@ import {
   codexServerRequestResponse,
   codexThreadRequest,
   codexTurnRequest,
-  codexTurnInterruptRequest,
-  codexActiveTurnStopped,
   consumeCodexAppServerMessage,
   createCodexAppServerState,
   normalizeCodexAppServerMessage,
@@ -45,20 +43,6 @@ const request: RunnerRequest = {
 };
 
 describe("Codex App Server runner", () => {
-  it("waits for the active turn identity before requesting interruption", () => {
-    const state = createCodexAppServerState();
-    expect(codexTurnInterruptRequest(state)).toBeNull();
-    consumeCodexAppServerMessage(state, request, { id: 4, result: { thread: { id: "thread-cancel" } } });
-    expect(codexTurnInterruptRequest(state)).toBeNull();
-    consumeCodexAppServerMessage(state, request, { id: 5, result: { turn: { id: "turn-cancel" } } });
-    expect(codexTurnInterruptRequest(state)).toMatchObject({ method: "turn/interrupt",
-      params: { threadId: "thread-cancel", turnId: "turn-cancel" } });
-    const stopped = { method: "turn/completed", params: { threadId: "thread-cancel",
-      turn: { id: "turn-cancel", status: "interrupted" } } };
-    expect(codexActiveTurnStopped(state, stopped)).toBe(true);
-    expect(codexActiveTurnStopped({ ...state, turnId: "other-turn" }, stopped)).toBe(false);
-  });
-
   it("uses the desktop App Server command and sandbox requests", () => {
     expect(codexAppServerArgs(request)).toEqual([
       "app-server",

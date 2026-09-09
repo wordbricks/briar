@@ -87,3 +87,99 @@ tick은 기한 조회와 필요한 상태 변화만 수행한다. 모든 예약 
 
 범용 cron/RRULE, 영업일·공휴일 달력, 작업 의존성 그래프, 조건 충족 감시 엔진,
 별도 예약 관리 화면, 자동 비용 최적화, 같은 예약 회차의 중첩 실행, 운영 사용자 대상 시험 예약.
+
+## 구현 기록 · 2026-09-09
+
+구현은 `apps/briar/worker/src/dm-schedules.ts`의 생성·목록·취소와 `runDueDmSchedules()`에 있다.
+기존 분 단위 tick이 최대 20개의 기한 인덱스 항목을 읽고, 동일 D1 batch에서 Briar 명의의 회차 메시지,
+독립 session, 기존 DM reply job, 예약 revision/다음 시각을 확정한다. 예약 ID와 예정 시각에서
+결정적인 UUID를 만들어 기존 메시지·job의 고유 제약을 유지한다. 모델은 tick에서 호출하지 않는다.
+
+migration `0217_dm_schedules.sql`은 빈 예약 테이블과 인덱스, 기존 reply job의 nullable
+`dm_schedule_id`만 추가한다. 과거 행 backfill, 테이블 재구축, 운영 DB 변경은 하지 않았다.
+해당 참조는 예약이 삭제되어도 남아, 원래 예약이 사라진 작업이 실행 권한을 되찾지 못하게 한다.
+
+Agent 도구는 기존 DM publication socket을 통한 `create_dm_schedule`, `list_dm_schedules`,
+`cancel_dm_schedule`이다. 조직·DM·소유자·Agent는 입력으로 받지 않고 현재 Worker claim에서 결정한다.
+목록은 50개씩 반환하며 잘렸으면 마지막 ID를 cursor로 이어 읽는다. 도구 응답의 지시 요약은
+200자로 제한하고 실제 실행 지시는 8,000자까지 보존한다. 상대 시간은 원래 메시지의 서버 접수
+시각에서 계산한다. 절대 시간은 명시적으로 확인한 IANA 시간대를 요구한다.
+
+현재 등록된 모든 provider에서 SPEC 2의 공통 실행 경로와 같은 예약 명령을 사용한다.
+Briar가 제공하는 명령을 일반 shell/terminal 도구로 호출한다. 명령은 작업 폴더의 요청·응답
+파일을 사용하고, Briar 부모 프로세스가 고정된 invocation socket으로 중계한다. private capability와
+기존 서버 검증이 생성·조회·취소 권한을 제한한다. 특정 provider의 MCP·스케줄·승인 API는
+사용하지 않는다. capability를 광고하지 않는 구버전 Worker는 새 예약을 실행하지 않는다.
+원본 메시지 version, DM roster epoch, 조직·프로젝트 접근 권한, Agent provider를 실행·갱신·게시에서
+검사한다. 예약 회차에 대한 후속 steering도 기존 SPEC 2의 같은 작업 경로로 전달한다.
+
+이전 결과와 최대 10개의 첨부 참조는 claim 시점에 같은 DM에서 읽는다. 삭제·기억 제외한 결과는
+제외하고, 첨부는 기존 인증 다운로드 경로로 전달한다. 이전 프로세스나 provider conversation을
+새 회차에서 재사용하지 않는다. Worker 작업 용량 확인과 슬롯 집계에서 제외하는 SPEC 2 동작을 유지한다.
+
+### 최초 구현 검증 기록
+
+아래는 Codex 전용 경로였던 최초 구현의 기록이다. 공통 provider 경로 변경 검증은 아래에 별도로 기록한다.
+
+- D1 핵심 테스트 6개: 서버 접수 시각/절대 시간대, 생성 재시도, 일회성/중복 tick,
+  두 번의 반복과 지연·오프라인 합치기, 취소 경합과 중단 확인, 예약 회차 steering,
+  권한 회수·원본 삭제에 따른 실행/게시 차단. 기존 public receipt 테스트 1개도 통과했다.
+- 기존 DM burst/steering 회귀 41개, invocation·prompt·provider adapter 관련 47개 통과.
+  앱/Worker TypeScript와 D1 snapshot digest 검사 통과.
+- 로컬 Miniflare D1과 실제 Codex `gpt-6-astra`/`medium`으로 사용자 메시지 생성 → 실제 분류 →
+  실제 MCP 예약 저장 → due tick → 기존 Worker loop claim → 원래 Agent의 결과 게시·완료까지 확인했다.
+  일회성 비활성화, 회차 하나, completed 상태, 원래 Agent, `2+2는 4입니다.` 회신, Worker loop 오류 없음이 모두 확인됐다.
+- 이 실험은 합성 사용자·조직·Worker와 격리된 로컬 D1을 사용했다. UI 클라이언트는 열지 않았고
+  realtime hub 전달은 stub이었다. 실제 운영 알림·로그인 UI·Linux provider 실험까지 검증했다고 표현하지 않는다.
+  운영 예약이나 배포·병합은 실행하지 않았다.
+
+### 비용 기록
+
+격리된 로컬 D1에 반복 예약 하나를 넣고 기존 schema trigger까지 포함해 측정했다.
+`rows_read`/`rows_written` 기준이며, 운영 데이터 분포·인덱스·기존 trigger 부하에 따라 달라진다.
+
+| tick 상태 | 새 회차 | 읽은 행 | 쓴 행 |
+| --- | ---: | ---: | ---: |
+| 첫 기한 도달 | 1 | 75 | 42 |
+| 같은 시각 중복 호출 | 0 | 1 | 0 |
+| 이전 회차 대기 중 하루 지연 | 0 | 58 | 2 |
+
+첫 기한의 논리적인 변경 대상은 메시지·session·job·예약 네 행이다. 실제 쓰기 수는 기존 trigger와
+인덱스 비용까지 포함하므로 네 번의 D1 쓰기라고 추정하면 안 된다. due 조회는 `(enabled, next_run_at)`
+인덱스와 `limit 20`을 사용하고 전체 예약이나 과거 메시지를 매분 읽지 않는다.
+
+예를 들어 100개가 매시간 실행되면 겹침·실패가 없을 때 하루 2,400회의 Agent 실행이다.
+위 작은 fixture의 비율을 단순 적용하면 회차 처리에서 하루 약 180,000행 읽기와 100,800행 쓰기이며,
+빈 tick·claim·lease·최종 게시·실제 작업의 비용은 별도다. tick 자체의 모델 호출은 0회이고,
+각 회차는 기존 Agent 실행 한 번으로 시작한다. 도구 사용과 재시도에 따른 내부 모델 호출은 추가될 수 있다.
+한꺼번에 몰린 예약은 tick당 20개씩 처리하므로 정시 실행을 보장하지 않는다.
+
+로컬 증거는 `/Users/jay/Documents/Codex/dm-minimal-implementation/`의
+`spec3-result.md`, `spec3-cost.json`, `schedule-provider-smoke.json`,
+`spec3-d1-tests.log`, `spec3-unit-tests.log`에 기록했다.
+
+
+### 공통 provider 경로 검증 (2026-09-09)
+
+- 등록된 9개 provider 모두 예약 생성·실행·완료의 서버 계약 테스트를 통과했다.
+  capability 누락·provider 불일치 차단을 포함한 D1 테스트 17개가 통과했다.
+- 실제 Codex (`gpt-6-astra`, `medium`)와 Claude (`sonnet`, `medium`) 각각에서
+  실제 분류 → 공통 파일 명령으로 예약 저장 → due tick → Worker claim → 원래 Agent 결과 게시·완료를
+  7개 항목으로 검증했다. 두 실행 모두 `fullAccess:false`, `readOnly:false`를 유지했다.
+- 격리된 로컬 D1과 합성 사용자·Worker를 사용했고 realtime hub는 stub이었다.
+  나머지 7개 provider의 실제 모델 실행, 운영·UI는 검증하지 않았다.
+  Claude 실험의 본문 전용 테스트 schema에서는 본문에 JSON이 중첩되어 응답 표시 품질의 증거로 사용하지 않는다.
+- 증거: `neutral-schedule-provider-smoke-{codex,claude}.json` 및 같은 이름의 로그.
+  `claude-main-only` 파일은 분류를 생략한 중간 실험이며 최종 통과 근거에서 제외한다.
+
+
+### OpenCode · Grok · Agy 실제 검수 (2026-09-09)
+
+Grok `grok-4.6`, OpenCode `opencode-go/grok-4.6`, Agy `gemini-3.8-flash-medium`의
+실제 예약 흐름이 각각 7/7을 통과했다. 사용자 지정 OpenCode `vllm/qwen3.8-flash-next`도
+실제 전체 응답 계약으로 7/7을 통과했다. 앞선 단락의 “나머지 7개 미검증” 범위를 이 세 제공자까지 확장한다.
+
+OpenCode의 분류 환경에 사용자 지정 모델 연결 선언을 보존하고, Agy의 OAuth 파일 누락과
+표시용 response를 구조화된 결과 대신 선택하던 어댑터 오류를 수정했다. Agy 최종 회신은 정상적인
+한국어 계산 결과였다. 로컬 합성 D1 검증이며 운영·UI 검증은 아니다. 세부 범위와 실패/수정 증거는
+로컬 `dm-minimal-implementation/provider-review.md` 및 `provider-review.json`에 기록했다.

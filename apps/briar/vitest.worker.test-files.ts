@@ -2,6 +2,7 @@
 // schema. All other Worker tests run without migrations in the fast suite.
 // Add new database integration tests here instead of migrating every test file.
 export const workerD1TestFiles = [
+  "worker/src/dm-schedules.test.ts",
   "worker/src/agent-skill-execution-approval.test.ts",
   "worker/src/agent-worklog.test.ts",
   "worker/src/app-connect-account.test.ts",

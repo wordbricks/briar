@@ -1,6 +1,9 @@
-import type { AgentProvider } from "./agent-provider";
+import {
+  agentProviderCatalog,
+  type AgentProvider,
+} from "./agent-provider";
 
-/** Only providers with enforced workspace and product tool isolation may classify execution intent. */
+/** Every catalogued provider may use the common isolated classification path. */
 export function supportsDetachedProviderClassification(provider: AgentProvider): boolean {
-  return provider === "claude" || provider === "codex";
+  return Object.hasOwn(agentProviderCatalog, provider);
 }
