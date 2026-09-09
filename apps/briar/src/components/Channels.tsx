@@ -1657,6 +1657,7 @@ export function Channels({
           <ChannelThreadTypingStrip
             channelId={activeChannelId ?? ""}
             className="channel-thread-typing"
+            showPendingReplyNames={activeChannel.kind !== "dm"}
           />
           <Composer
             agents={agents}
