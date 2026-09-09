@@ -22,6 +22,7 @@ const request = (overrides: Partial<RunnerRequest> = {}): RunnerRequest => ({
   networkAccess: false,
   attachments: [],
   additionalDirectories: [],
+  toolInheritance: "inherit",
   providerBinaryPath: "/bin/agy",
   ...overrides,
 });

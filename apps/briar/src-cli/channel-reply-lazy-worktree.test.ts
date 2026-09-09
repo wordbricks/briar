@@ -471,6 +471,8 @@ describe("DM reply worktree allocation", () => {
     const workspacePaths: string[] = [];
     const acknowledgementWorkspaces: string[] = [];
     const prompts: string[] = [];
+    const toolInheritances: (string | undefined)[] = [];
+    const acknowledgementToolInheritances: (string | undefined)[] = [];
     try {
       await runClaimedChannelReply(
         config,
@@ -489,6 +491,7 @@ describe("DM reply worktree allocation", () => {
             // not one of this reply's rounds.
             if (turn.agent.name === "DM acknowledgement") {
               acknowledgementWorkspaces.push(turn.workspacePath);
+              acknowledgementToolInheritances.push(turn.toolInheritance);
               return input.selectAcknowledgement
                 ? input.selectAcknowledgement()
                 : Promise.resolve(turnResult({ emoji: "👀" }));
@@ -497,6 +500,7 @@ describe("DM reply worktree allocation", () => {
             events.push(`turn:${turns + 1}`);
             workspacePaths.push(turn.workspacePath);
             prompts.push(turn.prompt);
+            toolInheritances.push(turn.toolInheritance);
             return input.provider(turn, ++turns);
           }) as never,
         },
@@ -526,6 +530,8 @@ describe("DM reply worktree allocation", () => {
       workspacePaths,
       acknowledgementWorkspaces,
       prompts,
+      toolInheritances,
+      acknowledgementToolInheritances,
       sessionId,
       workId,
     };
@@ -644,6 +650,27 @@ describe("DM reply worktree allocation", () => {
       projectWorktreeRoot(worktreeRoot, projectId),
     );
     expect(cached.map((record) => record.runId)).toContain(observed.sessionId);
+  });
+
+  /*
+    The host user's `~/.codex/config.toml` MCP servers, apps and plugins were
+    started before the prompt reached the model on every reply round — 4.5 s of
+    the measured boot — and a channel reply never uses them. The emoji
+    selection turn keeps its own lockdown and is not this axis.
+  */
+  it("asks for Briar-owned tools on every round of a channel reply", async () => {
+    const conversationId = crypto.randomUUID();
+    const observed = await exercise({
+      provider: async (_turn, number) =>
+        number === 1
+          ? turnResult(repositoryRequest, conversationId)
+          : turnResult(answer, conversationId),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(2);
+    expect(observed.toolInheritances).toEqual(["briar", "briar"]);
+    expect(observed.acknowledgementToolInheritances).toEqual([undefined]);
   });
 
   it("reuses a session checkout that already exists without asking again", async () => {

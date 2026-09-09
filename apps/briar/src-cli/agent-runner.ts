@@ -6,6 +6,7 @@ import {
   JsonSchemaSchema,
   RunRequestSchema,
   SandboxMode,
+  ToolInheritance,
   type ComputerUseChildBinding,
   type DmMessagePublicationBinding,
   type RunnerToParent} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
@@ -222,6 +223,17 @@ export function invalidIssueExecutionProfileRunEvent(input: {
     pullRequestUrls: [] as string[],
   };
 }
+
+/**
+ * Whose tool catalog a detached turn may load.
+ *
+ * `briar` keeps the sandbox, network access, Skills and web search of an
+ * ordinary turn and refuses only the host user's own MCP servers, apps and
+ * plugins — whose startup cost (an `npx` resolve, a remote MCP handshake) is
+ * paid on every turn and buys a channel reply nothing. It is a separate axis
+ * from the `externalTools=false` lockdown used for classification.
+ */
+export type DetachedToolInheritance = "inherit" | "briar";
 
 export type DetachedDelegationTarget = {
   agentId: string;
@@ -925,6 +937,8 @@ export function detachedProviderRequest(input: {
   computerUseMcpServerPath?: string | null;
   dmMessagePublicationBinding?: DmMessagePublicationBinding;
   dmMessageMcpServerPath?: string | null;
+  /** Absent means `inherit`: the turn keeps the host user's tool catalog. */
+  toolInheritance?: DetachedToolInheritance;
 }) {
   const computerUseRoleInstructions = input.computerUseBinding === undefined
     ? null
@@ -996,6 +1010,11 @@ export function detachedProviderRequest(input: {
       externalTools: input.agent.provider === "codex"
         ? !input.readOnly
         : undefined,
+      // A separate axis from `externalTools`: this one only decides whose tool
+      // catalog the provider loads, and every other setting of the turn stands.
+      toolInheritance: input.toolInheritance === "briar"
+        ? ToolInheritance.BRIAR
+        : ToolInheritance.INHERIT,
       runKind: input.runKind === "computerUse"
         ? AgentRunKind.COMPUTER_USE
         : AgentRunKind.PARENT,

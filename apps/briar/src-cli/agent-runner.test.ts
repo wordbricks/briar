@@ -1,7 +1,8 @@
 import { CONTRACTS_DESCRIPTOR_FINGERPRINT } from "@briar/contracts/descriptor-fingerprint";
 import {
   ApprovalPolicy,
-  SandboxMode} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
+  SandboxMode,
+  ToolInheritance} from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import { describe, expect, it } from "vitest";
 import {
   normalizedMessageCompleted,
@@ -1208,6 +1209,36 @@ describe("detached Agent runner", () => {
         name,
         mimeType,
       })),
+    });
+  });
+
+  it("asks for Briar-owned tools only when the caller says so", () => {
+    const inheriting = detachedProviderRequest({
+      agent,
+      prompt: "Run the release",
+      workspacePath: "/worktree",
+      fullAccess: true,
+      agentBinary: "/bin/codex",
+    });
+    // Auto Hunt, issue replies and project agent tasks keep the host user's
+    // tool catalog, so an unset mode must stay INHERIT on the wire.
+    expect(inheriting.request.toolInheritance).toBe(ToolInheritance.INHERIT);
+
+    const channelReply = detachedProviderRequest({
+      agent,
+      prompt: "hi",
+      workspacePath: "/worktree",
+      fullAccess: true,
+      toolInheritance: "briar",
+      agentBinary: "/bin/codex",
+    });
+    expect(channelReply.request.toolInheritance).toBe(ToolInheritance.BRIAR);
+    // The axis is independent: a Briar-owned turn keeps the workspace-write
+    // sandbox, network access and the external tool surface of a normal turn.
+    expect(channelReply.request).toMatchObject({
+      sandboxMode: SandboxMode.DANGER_FULL_ACCESS,
+      networkAccess: true,
+      externalTools: true,
     });
   });
 

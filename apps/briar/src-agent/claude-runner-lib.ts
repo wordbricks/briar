@@ -99,6 +99,13 @@ export function claudeOptions(
   mcpServers: Record<string, McpServerConfig> = {},
 ): Options {
   const readOnly = request.sandboxMode === "readOnly";
+  /*
+    Briar-owned tools only: the user's settings sources are what carry their
+    own MCP servers, and `strictMcpConfig` also drops project `.mcp.json`,
+    plugin and agent-frontmatter servers. Skills, sandbox and network stay as
+    an inheriting turn has them.
+  */
+  const briarToolsOnly = request.toolInheritance === "briar";
   const workspaceRoot = resolve(request.workspaceRoot);
   const dangerFullAccess = request.sandboxMode === "dangerFullAccess";
   const promptAppend = request.instructions?.trim();
@@ -119,12 +126,15 @@ export function claudeOptions(
       : {}),
     pathToClaudeCodeExecutable: request.providerBinaryPath,
     ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
+    ...(briarToolsOnly ? { strictMcpConfig: true } : {}),
     systemPrompt: {
       type: "preset",
       preset: "claude_code",
       ...(promptAppend ? { append: promptAppend } : {}),
     },
-    settingSources: readOnly ? [] : ["user", "project", "local"],
+    settingSources: readOnly || briarToolsOnly
+      ? []
+      : ["user", "project", "local"],
     skills: readOnly ? [] : "all",
     includePartialMessages: true,
     ...(request.outputSchema !== null &&

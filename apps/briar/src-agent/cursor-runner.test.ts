@@ -22,6 +22,7 @@ const request: RunnerRequest = {
   networkAccess: true,
   attachments: [],
   additionalDirectories: [],
+  toolInheritance: "inherit",
   providerBinaryPath: "/usr/local/bin/cursor-agent",
 };
 

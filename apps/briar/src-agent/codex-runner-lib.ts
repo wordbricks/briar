@@ -47,6 +47,13 @@ export type CodexAppServerState = {
   invokedMcpCapabilities: Map<string, Set<string>>;
   mcpFailures: Map<string, CodexMcpFailure>;
   isolation: CodexMcpIsolation;
+  /**
+   * The MCP servers Briar itself passed on the command line. A Briar-owned
+   * turn disables every configured server except these, and `config/read`
+   * reports Briar's own beside the user's because a `--config` override merges
+   * into the user's table rather than replacing it.
+   */
+  briarMcpServers: string[];
 };
 
 export type CodexMcpFailureReason =
@@ -101,8 +108,10 @@ const approvalMethods = new Set([
 
 export function createCodexAppServerState(
   isolation: CodexMcpIsolation = emptyCodexMcpIsolation(),
+  briarMcpServers: readonly string[] = [],
 ): CodexAppServerState {
   return {
+    briarMcpServers: [...briarMcpServers],
     phase: "initializing",
     threadId: null,
     turnId: null,
@@ -130,7 +139,10 @@ function tomlStringArray(values: readonly string[]): string {
 
 export function codexAppServerArgs(
   request:
-    & Pick<RunnerRequest, "networkAccess" | "externalTools">
+    & Pick<
+      RunnerRequest,
+      "networkAccess" | "externalTools" | "toolInheritance"
+    >
     & Partial<Pick<RunnerRequest, "additionalDirectories">>,
   browserAutomationProvider?: string,
   computerUseArguments: readonly string[] = [],
@@ -158,6 +170,20 @@ export function codexAppServerArgs(
       "--config",
       'permissions.briar_read_only={filesystem={":minimal"="read",":workspace_roots"={"."="read"}},network={enabled=false}}',
     );
+  } else if (request.toolInheritance === "briar") {
+    /*
+      Only the host user's tool catalog is dropped. The permission profile,
+      web search, skills and project docs stay exactly as an inheriting turn
+      has them, so this is not the `external_tools=false` lockdown.
+
+      There is deliberately no `mcp_servers={}` here. Measured against
+      codex-cli 0.153.4: a `--config mcp_servers=...` override merges into the
+      user's table instead of replacing it, so the override removes nothing and
+      only hides which servers are Briar's. The user's servers are refused by
+      name on the thread request instead, which is where Codex actually starts
+      them.
+    */
+    argumentsList.push("--disable", "apps", "--disable", "plugins");
   }
   if (
     request.externalTools !== false &&
@@ -652,6 +678,19 @@ export function consumeCodexAppServerMessage(
             disablePlugins: true,
           },
         ]);
+      } else if (request.toolInheritance === "briar") {
+        // Everything the host user configured, and nothing Briar passed.
+        state.isolation = mergeMcpIsolation([
+          state.isolation,
+          {
+            mcpServers: state.configuredMcpServers.filter(
+              (name) => !state.briarMcpServers.includes(name),
+            ),
+            apps: [],
+            disableApps: true,
+            disablePlugins: true,
+          },
+        ]);
       }
       const effectiveModel =
         typeof config?.model === "string" ? config.model.trim() : "";
@@ -684,7 +723,9 @@ export function consumeCodexAppServerMessage(
         const name = firstText(app?.runtimeName)?.trim();
         return id && name ? [{ id, name }] : [];
       });
-      if (request.externalTools === false) {
+      if (
+        request.externalTools === false || request.toolInheritance === "briar"
+      ) {
         state.isolation = mergeMcpIsolation([
           state.isolation,
           {

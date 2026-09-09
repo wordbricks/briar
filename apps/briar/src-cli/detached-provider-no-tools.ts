@@ -173,6 +173,9 @@ export async function runDetachedProviderClassification(
       fullAccess: false,
       readOnly: true,
       executionTools: "disabled",
+      // The lockdown below already removes every user tool; naming the axis
+      // keeps a caller's channel-reply mode from reaching this turn.
+      toolInheritance: "inherit",
       conversationId: null,
       attachments: [],
       organizationContextManifestPath: null,

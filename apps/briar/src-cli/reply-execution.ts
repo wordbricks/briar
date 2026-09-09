@@ -1559,6 +1559,14 @@ async function runClaimedChannelReplyTurn(
         agent,
         prompt: reply.routing ? [turnPrompt, executionContext?.prompt(), memoryInvocation?.prompt(), messageInvocation?.prompt()].filter(Boolean).join("\n\n") : turnPrompt,
         workspacePath,
+        /*
+          A channel reply answers in a conversation with the tools Briar gave
+          it. The host user's own MCP servers, apps and plugins are started
+          before the prompt reaches the model on every single turn — 4.5 s of
+          the measured boot on the reference machine — and a reply never uses
+          them. Auto Hunt, issue replies and project agent tasks still inherit.
+        */
+        toolInheritance: "briar",
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
         conversationId: reply.routing ? null : conversationId,
         attachments: lookupRounds === 0 && repairRounds === 0 &&

@@ -36,6 +36,7 @@ import {
   detachedProviderRequest,
   type DetachedAgent,
   type DetachedDelegationTarget,
+  type DetachedToolInheritance,
 } from "./agent-runner";
 import {
   cleanupDetachedAgentSkillCatalog,
@@ -106,6 +107,8 @@ export type DetachedProviderTurnInput = {
   readOnly?: boolean;
   /** Classify in an isolated read-only turn with no Briar capabilities; reject observed tool attempts. */
   executionTools?: "disabled";
+  /** Absent means `inherit`: the provider loads the host user's tool catalog. */
+  toolInheritance?: DetachedToolInheritance;
   attachments?: AgentAttachment[];
   organizationContextManifestPath?: string | null;
   delegationTargets?: readonly DetachedDelegationTarget[];
@@ -316,6 +319,7 @@ async function runPreparedDetachedProviderTurn(
     model: input.agent.model ?? null,
     workspacePath: input.workspacePath,
     readOnly: input.readOnly ?? false,
+    toolInheritance: input.toolInheritance === "briar" ? "briar" : "inherit",
   });
   const agentBinary = Bun.which(binaryName);
   if (!agentBinary) {
@@ -390,6 +394,7 @@ export async function executeDetachedProviderTurn(
     computerUseMcpServerPath: input.computerUseMcpServerPath,
     dmMessagePublicationBinding: input.dmMessagePublicationBinding,
     dmMessageMcpServerPath: input.dmMessageMcpServerPath,
+    toolInheritance: input.toolInheritance,
     agentBinary,
   }).request;
   const requestFrame = encodeSidecarRunRequest(runnerRequest);
