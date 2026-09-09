@@ -588,11 +588,11 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     private final class AgentServiceMock: BriarAPI_AgentServiceClientMock,
         @unchecked Sendable
     {
-        override func listOrganizationAgents(
-            request _: BriarAPI_ListOrganizationAgentsRequest,
+        override func listWorkspaceAgents(
+            request _: BriarAPI_ListWorkspaceAgentsRequest,
             headers _: Connect.Headers = [:]
-        ) async -> ResponseMessage<BriarAPI_ListOrganizationAgentsResponse> {
-            .success(UITestAPIClient.organizationAgentsResponse())
+        ) async -> ResponseMessage<BriarAPI_ListWorkspaceAgentsResponse> {
+            .success(UITestAPIClient.workspaceAgentsResponse())
         }
 
         override func listProjectAgents(
@@ -793,8 +793,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         }
     }
 
-    private static func organizationAgentsResponse() -> BriarAPI_ListOrganizationAgentsResponse {
-        var agent = BriarAPI_OrganizationAgent()
+    private static func workspaceAgentsResponse() -> BriarAPI_ListWorkspaceAgentsResponse {
+        var agent = BriarAPI_WorkspaceAgent()
         agent.agentID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         agent.name = "Honey"
         agent.provider = .codex
@@ -802,7 +802,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         agent.description_p = "제품 작업을 돕는 Organization Agent"
         agent.responsibility = "제품 작업 지원"
         agent.createdAt = .init(date: Date(timeIntervalSince1970: 1_775_260_800))
-        var response = BriarAPI_ListOrganizationAgentsResponse()
+        var response = BriarAPI_ListWorkspaceAgentsResponse()
         response.agents = [agent]
         return response
     }
@@ -1145,7 +1145,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     ) -> BriarAPI_ListDirectMessageRecipientsResponse {
         var response = BriarAPI_ListDirectMessageRecipientsResponse()
         response.members = directMessageMembers.map(organizationMemberMessage)
-        response.agents = organizationAgentsResponse().agents
+        response.agents = workspaceAgentsResponse().agents
         return response
     }
 
@@ -1214,7 +1214,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     ) -> BriarAPI_GetChannelResponse {
         var response = BriarAPI_GetChannelResponse()
         response.channel = channelSummaryMessage(channel)
-        response.agents = agents.map(organizationAgentMessage)
+        response.agents = agents.map(workspaceAgentMessage)
         response.messages = messages.map(channelMessageMessage)
         if let nextCursor {
             response.nextCursor = nextCursor.uuidString.lowercased()
@@ -1328,10 +1328,10 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         return message
     }
 
-    private static func organizationAgentMessage(
+    private static func workspaceAgentMessage(
         _ value: ChannelAgentSummary
-    ) -> BriarAPI_OrganizationAgent {
-        var message = BriarAPI_OrganizationAgent()
+    ) -> BriarAPI_WorkspaceAgent {
+        var message = BriarAPI_WorkspaceAgent()
         message.agentID = value.agentId.uuidString.lowercased()
         message.name = value.name
         if let avatar = value.avatar { message.avatar = avatar }

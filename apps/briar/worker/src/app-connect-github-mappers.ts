@@ -121,7 +121,7 @@ export const appBeginGithubInstallation = (
 export const appProjectGithubCredentialMessage = (result: CredentialResult) =>
   create(ProjectGitHubCredentialSchema, {
     projectId: result.projectId,
-    organizationId: result.organizationId,
+    workspaceId: result.organizationId,
     repositoryId: positiveUint64(
       result.repositoryId,
       "GitHub credential repository id",

@@ -57,8 +57,8 @@ export const teamFromMessage = (project: TeamMessage): Project => ({
     project.iconColor !== undefined && isTeamIconColor(project.iconColor)
       ? project.iconColor
       : null,
-  organizationId: project.organizationId,
-  organizationName: project.organizationName,
+  organizationId: project.workspaceId,
+  organizationName: project.workspaceName,
   role: teamRoleFromProto(project.role),
   createdAt: requiredTimestamp(project.createdAt, "project.createdAt"),
 });
@@ -231,7 +231,7 @@ export async function listTeams(
 
 export async function createTeam(
   token: string,
-  input: { readonly name: string; readonly organizationId?: string },
+  input: { readonly name: string; readonly workspaceId?: string },
 ): Promise<{ project: Project; agentToken: string }> {
   const client = requireTeamClient();
   const response = await client.createTeam(input, appCallOptions(token));

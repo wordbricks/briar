@@ -586,24 +586,24 @@ public nonisolated enum BriarAPI_AgentSkillExecutionStatus: SwiftProtobuf.Enum, 
 
 }
 
-public nonisolated struct BriarAPI_ListOrganizationAgentsRequest: Sendable {
+public nonisolated struct BriarAPI_ListWorkspaceAgentsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct BriarAPI_ListOrganizationAgentsResponse: Sendable {
+public nonisolated struct BriarAPI_ListWorkspaceAgentsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var agents: [BriarAPI_OrganizationAgent] = []
+  public var agents: [BriarAPI_WorkspaceAgent] = []
 
   public var canManage: Bool = false
 
@@ -612,12 +612,12 @@ public nonisolated struct BriarAPI_ListOrganizationAgentsResponse: Sendable {
   public init() {}
 }
 
-public nonisolated struct BriarAPI_CreateOrganizationAgentRequest: Sendable {
+public nonisolated struct BriarAPI_CreateWorkspaceAgentRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var name: String = String()
 
@@ -673,13 +673,13 @@ public nonisolated struct BriarAPI_CreateOrganizationAgentRequest: Sendable {
   fileprivate var _computerUsePolicy: BriarTypes_ComputerUsePolicy? = nil
 }
 
-public nonisolated struct BriarAPI_CreateOrganizationAgentResponse: Sendable {
+public nonisolated struct BriarAPI_CreateWorkspaceAgentResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var agent: BriarAPI_OrganizationAgent {
-    get {_agent ?? BriarAPI_OrganizationAgent()}
+  public var agent: BriarAPI_WorkspaceAgent {
+    get {_agent ?? BriarAPI_WorkspaceAgent()}
     set {_agent = newValue}
   }
   /// Returns true if `agent` has been explicitly set.
@@ -691,15 +691,15 @@ public nonisolated struct BriarAPI_CreateOrganizationAgentResponse: Sendable {
 
   public init() {}
 
-  fileprivate var _agent: BriarAPI_OrganizationAgent? = nil
+  fileprivate var _agent: BriarAPI_WorkspaceAgent? = nil
 }
 
-public nonisolated struct BriarAPI_UpdateOrganizationAgentRequest: Sendable {
+public nonisolated struct BriarAPI_UpdateWorkspaceAgentRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var agentID: String = String()
 
@@ -757,13 +757,13 @@ public nonisolated struct BriarAPI_UpdateOrganizationAgentRequest: Sendable {
   fileprivate var _computerUsePolicy: BriarTypes_ComputerUsePolicy? = nil
 }
 
-public nonisolated struct BriarAPI_UpdateOrganizationAgentResponse: Sendable {
+public nonisolated struct BriarAPI_UpdateWorkspaceAgentResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var agent: BriarAPI_OrganizationAgent {
-    get {_agent ?? BriarAPI_OrganizationAgent()}
+  public var agent: BriarAPI_WorkspaceAgent {
+    get {_agent ?? BriarAPI_WorkspaceAgent()}
     set {_agent = newValue}
   }
   /// Returns true if `agent` has been explicitly set.
@@ -775,15 +775,15 @@ public nonisolated struct BriarAPI_UpdateOrganizationAgentResponse: Sendable {
 
   public init() {}
 
-  fileprivate var _agent: BriarAPI_OrganizationAgent? = nil
+  fileprivate var _agent: BriarAPI_WorkspaceAgent? = nil
 }
 
-public nonisolated struct BriarAPI_DeleteOrganizationAgentRequest: Sendable {
+public nonisolated struct BriarAPI_DeleteWorkspaceAgentRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var agentID: String = String()
 
@@ -792,7 +792,7 @@ public nonisolated struct BriarAPI_DeleteOrganizationAgentRequest: Sendable {
   public init() {}
 }
 
-public nonisolated struct BriarAPI_DeleteOrganizationAgentResponse: Sendable {
+public nonisolated struct BriarAPI_DeleteWorkspaceAgentResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2320,7 +2320,7 @@ public nonisolated struct BriarAPI_ProjectAgent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct BriarAPI_OrganizationAgent: Sendable {
+public nonisolated struct BriarAPI_WorkspaceAgent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3236,9 +3236,9 @@ nonisolated extension BriarAPI_AgentSkillExecutionStatus: SwiftProtobuf._ProtoNa
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AGENT_SKILL_EXECUTION_STATUS_UNSPECIFIED\0\u{1}AGENT_SKILL_EXECUTION_STATUS_WAITING\0\u{1}AGENT_SKILL_EXECUTION_STATUS_RUNNING\0\u{1}AGENT_SKILL_EXECUTION_STATUS_COMPLETED\0\u{1}AGENT_SKILL_EXECUTION_STATUS_FAILED\0")
 }
 
-nonisolated extension BriarAPI_ListOrganizationAgentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListOrganizationAgentsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+nonisolated extension BriarAPI_ListWorkspaceAgentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListWorkspaceAgentsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3246,28 +3246,28 @@ nonisolated extension BriarAPI_ListOrganizationAgentsRequest: SwiftProtobuf.Mess
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_ListOrganizationAgentsRequest, rhs: BriarAPI_ListOrganizationAgentsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+  public static func ==(lhs: BriarAPI_ListWorkspaceAgentsRequest, rhs: BriarAPI_ListWorkspaceAgentsRequest) -> Bool {
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension BriarAPI_ListOrganizationAgentsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListOrganizationAgentsResponse"
+nonisolated extension BriarAPI_ListWorkspaceAgentsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListWorkspaceAgentsResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}agents\0\u{3}can_manage\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3293,7 +3293,7 @@ nonisolated extension BriarAPI_ListOrganizationAgentsResponse: SwiftProtobuf.Mes
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_ListOrganizationAgentsResponse, rhs: BriarAPI_ListOrganizationAgentsResponse) -> Bool {
+  public static func ==(lhs: BriarAPI_ListWorkspaceAgentsResponse, rhs: BriarAPI_ListWorkspaceAgentsResponse) -> Bool {
     if lhs.agents != rhs.agents {return false}
     if lhs.canManage != rhs.canManage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -3301,9 +3301,9 @@ nonisolated extension BriarAPI_ListOrganizationAgentsResponse: SwiftProtobuf.Mes
   }
 }
 
-nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".CreateOrganizationAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0\u{3}computer_use_policy\0")
+nonisolated extension BriarAPI_CreateWorkspaceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateWorkspaceAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3311,7 +3311,7 @@ nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Mes
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._model) }()
@@ -3330,8 +3330,8 @@ nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Mes
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.name.isEmpty {
       try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
@@ -3360,8 +3360,8 @@ nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Mes
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_CreateOrganizationAgentRequest, rhs: BriarAPI_CreateOrganizationAgentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+  public static func ==(lhs: BriarAPI_CreateWorkspaceAgentRequest, rhs: BriarAPI_CreateWorkspaceAgentRequest) -> Bool {
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.name != rhs.name {return false}
     if lhs.provider != rhs.provider {return false}
     if lhs._model != rhs._model {return false}
@@ -3375,8 +3375,8 @@ nonisolated extension BriarAPI_CreateOrganizationAgentRequest: SwiftProtobuf.Mes
   }
 }
 
-nonisolated extension BriarAPI_CreateOrganizationAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".CreateOrganizationAgentResponse"
+nonisolated extension BriarAPI_CreateWorkspaceAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CreateWorkspaceAgentResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}agent\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3402,16 +3402,16 @@ nonisolated extension BriarAPI_CreateOrganizationAgentResponse: SwiftProtobuf.Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_CreateOrganizationAgentResponse, rhs: BriarAPI_CreateOrganizationAgentResponse) -> Bool {
+  public static func ==(lhs: BriarAPI_CreateWorkspaceAgentResponse, rhs: BriarAPI_CreateWorkspaceAgentResponse) -> Bool {
     if lhs._agent != rhs._agent {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".UpdateOrganizationAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}agent_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0\u{3}computer_use_policy\0")
+nonisolated extension BriarAPI_UpdateWorkspaceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateWorkspaceAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}agent_id\0\u{1}name\0\u{1}provider\0\u{1}model\0\u{1}description\0\u{1}responsibility\0\u{1}effort\0\u{1}skills\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3419,7 +3419,7 @@ nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Mes
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
@@ -3439,8 +3439,8 @@ nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Mes
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.agentID.isEmpty {
       try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 2)
@@ -3472,8 +3472,8 @@ nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Mes
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_UpdateOrganizationAgentRequest, rhs: BriarAPI_UpdateOrganizationAgentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+  public static func ==(lhs: BriarAPI_UpdateWorkspaceAgentRequest, rhs: BriarAPI_UpdateWorkspaceAgentRequest) -> Bool {
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.agentID != rhs.agentID {return false}
     if lhs.name != rhs.name {return false}
     if lhs.provider != rhs.provider {return false}
@@ -3488,8 +3488,8 @@ nonisolated extension BriarAPI_UpdateOrganizationAgentRequest: SwiftProtobuf.Mes
   }
 }
 
-nonisolated extension BriarAPI_UpdateOrganizationAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".UpdateOrganizationAgentResponse"
+nonisolated extension BriarAPI_UpdateWorkspaceAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".UpdateWorkspaceAgentResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}agent\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3515,16 +3515,16 @@ nonisolated extension BriarAPI_UpdateOrganizationAgentResponse: SwiftProtobuf.Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_UpdateOrganizationAgentResponse, rhs: BriarAPI_UpdateOrganizationAgentResponse) -> Bool {
+  public static func ==(lhs: BriarAPI_UpdateWorkspaceAgentResponse, rhs: BriarAPI_UpdateWorkspaceAgentResponse) -> Bool {
     if lhs._agent != rhs._agent {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension BriarAPI_DeleteOrganizationAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DeleteOrganizationAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}agent_id\0")
+nonisolated extension BriarAPI_DeleteWorkspaceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteWorkspaceAgentRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}agent_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3532,7 +3532,7 @@ nonisolated extension BriarAPI_DeleteOrganizationAgentRequest: SwiftProtobuf.Mes
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
       default: break
       }
@@ -3540,8 +3540,8 @@ nonisolated extension BriarAPI_DeleteOrganizationAgentRequest: SwiftProtobuf.Mes
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.agentID.isEmpty {
       try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 2)
@@ -3549,16 +3549,16 @@ nonisolated extension BriarAPI_DeleteOrganizationAgentRequest: SwiftProtobuf.Mes
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_DeleteOrganizationAgentRequest, rhs: BriarAPI_DeleteOrganizationAgentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+  public static func ==(lhs: BriarAPI_DeleteWorkspaceAgentRequest, rhs: BriarAPI_DeleteWorkspaceAgentRequest) -> Bool {
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.agentID != rhs.agentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension BriarAPI_DeleteOrganizationAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DeleteOrganizationAgentResponse"
+nonisolated extension BriarAPI_DeleteWorkspaceAgentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DeleteWorkspaceAgentResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}deleted\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3580,7 +3580,7 @@ nonisolated extension BriarAPI_DeleteOrganizationAgentResponse: SwiftProtobuf.Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_DeleteOrganizationAgentResponse, rhs: BriarAPI_DeleteOrganizationAgentResponse) -> Bool {
+  public static func ==(lhs: BriarAPI_DeleteWorkspaceAgentResponse, rhs: BriarAPI_DeleteWorkspaceAgentResponse) -> Bool {
     if lhs.deleted != rhs.deleted {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -6010,8 +6010,8 @@ nonisolated extension BriarAPI_ProjectAgent: SwiftProtobuf.Message, SwiftProtobu
   }
 }
 
-nonisolated extension BriarAPI_OrganizationAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".OrganizationAgent"
+nonisolated extension BriarAPI_WorkspaceAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WorkspaceAgent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_id\0\u{1}name\0\u{1}avatar\0\u{1}provider\0\u{1}model\0\u{1}effort\0\u{3}project_id\0\u{3}project_name\0\u{1}description\0\u{1}responsibility\0\u{1}skills\0\u{3}created_at\0\u{3}computer_use_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -6085,7 +6085,7 @@ nonisolated extension BriarAPI_OrganizationAgent: SwiftProtobuf.Message, SwiftPr
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_OrganizationAgent, rhs: BriarAPI_OrganizationAgent) -> Bool {
+  public static func ==(lhs: BriarAPI_WorkspaceAgent, rhs: BriarAPI_WorkspaceAgent) -> Bool {
     if lhs.agentID != rhs.agentID {return false}
     if lhs.name != rhs.name {return false}
     if lhs._avatar != rhs._avatar {return false}

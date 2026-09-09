@@ -111,7 +111,7 @@ export const githubIntegrationFromProto = (
 export const projectGithubCredentialFromProto = (
   value: ProjectGitHubCredentialMessage,
 ): ProjectGithubCredential => ({
-  project: { id: value.projectId, organizationId: value.organizationId },
+  project: { id: value.projectId, organizationId: value.workspaceId },
   repository: {
     id: positiveSafeNumber(value.repositoryId, "githubCredential.repositoryId"),
     fullName: value.repository,

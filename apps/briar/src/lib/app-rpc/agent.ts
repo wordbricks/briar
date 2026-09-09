@@ -14,7 +14,7 @@ import {
   ProjectAgentSessionStatus as ProtoProjectAgentSessionStatus,
   ProjectAgentSessionTrigger as ProtoProjectAgentSessionTrigger,
   ProjectAgentSessionType as ProtoProjectAgentSessionType,
-  type OrganizationAgent as OrganizationAgentMessage,
+  type WorkspaceAgent as WorkspaceAgentMessage,
   type ProjectAgent as ProjectAgentMessage,
   type ProjectAgentSchedule as ProjectAgentScheduleMessage,
   type ProjectAgentScheduleRun as ProjectAgentScheduleRunMessage,
@@ -179,8 +179,8 @@ export const projectAgentFromMessage = (agent: ProjectAgentMessage): ProjectAgen
   updatedAt: requiredTimestamp(agent.updatedAt, "projectAgent.updatedAt"),
 });
 
-export const organizationAgentFromMessage = (
-  agent: OrganizationAgentMessage,
+export const workspaceAgentFromMessage = (
+  agent: WorkspaceAgentMessage,
 ): ChannelAgentSummary => ({
   agentId: agent.agentId,
   name: agent.name,
@@ -194,7 +194,7 @@ export const organizationAgentFromMessage = (
   projectName: agent.projectName ?? null,
   responsibility: agent.responsibility,
   skills: agent.skills.map(projectAgentSkillFromMessage),
-  createdAt: requiredTimestamp(agent.createdAt, "organizationAgent.createdAt"),
+  createdAt: requiredTimestamp(agent.createdAt, "workspaceAgent.createdAt"),
 });
 
 const sessionTypeFromProto = (
@@ -604,9 +604,9 @@ export type ProjectAgentSessionSyncResult = {
   deletedSessionIds: string[];
 };
 
-export async function createOrganizationAgent(
+export async function createWorkspaceAgent(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   input: {
     name: string;
     provider: AgentProvider;
@@ -619,9 +619,9 @@ export async function createOrganizationAgent(
   },
 ): Promise<{ agent: ChannelAgentSummary }> {
   const client = requireAgentClient();
-  const response = await client.createOrganizationAgent(
+  const response = await client.createWorkspaceAgent(
     {
-      organizationId,
+      workspaceId,
       name: input.name,
       provider: agentProviderToProto(input.provider),
       model: input.model ?? undefined,
@@ -636,15 +636,15 @@ export async function createOrganizationAgent(
     appCallOptions(token),
   );
   return {
-    agent: organizationAgentFromMessage(
-      requiredMessage(response.agent, "createOrganizationAgent.agent"),
+    agent: workspaceAgentFromMessage(
+      requiredMessage(response.agent, "createWorkspaceAgent.agent"),
     ),
   };
 }
 
-export async function updateOrganizationAgent(
+export async function updateWorkspaceAgent(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   agentId: string,
   input: {
     name: string;
@@ -658,9 +658,9 @@ export async function updateOrganizationAgent(
   },
 ): Promise<{ agent: ChannelAgentSummary }> {
   const client = requireAgentClient();
-  const response = await client.updateOrganizationAgent(
+  const response = await client.updateWorkspaceAgent(
     {
-      organizationId,
+      workspaceId,
       agentId,
       name: input.name,
       provider: agentProviderToProto(input.provider),
@@ -676,33 +676,33 @@ export async function updateOrganizationAgent(
     appCallOptions(token),
   );
   return {
-    agent: organizationAgentFromMessage(
-      requiredMessage(response.agent, "updateOrganizationAgent.agent"),
+    agent: workspaceAgentFromMessage(
+      requiredMessage(response.agent, "updateWorkspaceAgent.agent"),
     ),
   };
 }
 
-export async function deleteOrganizationAgent(
+export async function deleteWorkspaceAgent(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   agentId: string,
 ): Promise<{ deleted: boolean }> {
   const client = requireAgentClient();
-  const response = await client.deleteOrganizationAgent(
-    { organizationId, agentId },
+  const response = await client.deleteWorkspaceAgent(
+    { workspaceId, agentId },
     appCallOptions(token),
   );
   return { deleted: response.deleted };
 }
 
-export async function listOrganizationAgents(
+export async function listWorkspaceAgents(
   token: string,
-  organizationId: string,
+  workspaceId: string,
 ): Promise<{ agents: ChannelAgentSummary[]; canManage: boolean }> {
   const client = requireAgentClient();
-  const response = await client.listOrganizationAgents({ organizationId }, appCallOptions(token));
+  const response = await client.listWorkspaceAgents({ workspaceId }, appCallOptions(token));
   return {
-    agents: response.agents.map(organizationAgentFromMessage),
+    agents: response.agents.map(workspaceAgentFromMessage),
     canManage: response.canManage,
   };
 }

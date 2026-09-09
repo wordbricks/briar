@@ -255,7 +255,7 @@ describe("GitHub Connect services", () => {
   it("scopes organization visibility and persists install state exactly once", async () => {
     const github = integrationClient();
     await expect(github.getGitHubIntegration(
-      { organizationId: installOrganizationId },
+      { workspaceId: installOrganizationId },
       options(viewerToken),
     )).resolves.toMatchObject({
       configured: true,
@@ -263,17 +263,17 @@ describe("GitHub Connect services", () => {
       connected: false,
     });
     expect(await errorCode(github.getGitHubIntegration(
-      { organizationId: installOrganizationId },
+      { workspaceId: installOrganizationId },
       options(outsiderToken),
     ))).toBe(Code.NotFound);
     expect(await errorCode(github.beginGitHubInstallation(
-      { organizationId: installOrganizationId },
+      { workspaceId: installOrganizationId },
       options(viewerToken),
     ))).toBe(Code.PermissionDenied);
 
     let responseHeaders: Headers | undefined;
     const begun = await github.beginGitHubInstallation(
-      { organizationId: installOrganizationId },
+      { workspaceId: installOrganizationId },
       {
         ...options(ownerToken),
         onHeader: (headers) => {

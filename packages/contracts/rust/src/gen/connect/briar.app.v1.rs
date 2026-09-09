@@ -1179,51 +1179,41 @@ where
     }
 }
 
-///Shorthand for `OwnedView<ListOrganizationAgentsRequestView<'static>>`.
-pub type OwnedListOrganizationAgentsRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsRequestView<
+///Shorthand for `OwnedView<ListWorkspaceAgentsRequestView<'static>>`.
+pub type OwnedListWorkspaceAgentsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListWorkspaceAgentsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListWorkspaceAgentsResponseView<'static>>`.
+pub type OwnedListWorkspaceAgentsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListWorkspaceAgentsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CreateWorkspaceAgentRequestView<'static>>`.
+pub type OwnedCreateWorkspaceAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateWorkspaceAgentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateWorkspaceAgentResponseView<'static>>`.
+pub type OwnedCreateWorkspaceAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateWorkspaceAgentResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<ListOrganizationAgentsResponseView<'static>>`.
-pub type OwnedListOrganizationAgentsResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsResponseView<
+///Shorthand for `OwnedView<UpdateWorkspaceAgentRequestView<'static>>`.
+pub type OwnedUpdateWorkspaceAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateWorkspaceAgentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UpdateWorkspaceAgentResponseView<'static>>`.
+pub type OwnedUpdateWorkspaceAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateWorkspaceAgentResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<CreateOrganizationAgentRequestView<'static>>`.
-pub type OwnedCreateOrganizationAgentRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentRequestView<
-        'static,
-    >,
+///Shorthand for `OwnedView<DeleteWorkspaceAgentRequestView<'static>>`.
+pub type OwnedDeleteWorkspaceAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteWorkspaceAgentRequestView<'static>,
 >;
-///Shorthand for `OwnedView<CreateOrganizationAgentResponseView<'static>>`.
-pub type OwnedCreateOrganizationAgentResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<UpdateOrganizationAgentRequestView<'static>>`.
-pub type OwnedUpdateOrganizationAgentRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<UpdateOrganizationAgentResponseView<'static>>`.
-pub type OwnedUpdateOrganizationAgentResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<DeleteOrganizationAgentRequestView<'static>>`.
-pub type OwnedDeleteOrganizationAgentRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<DeleteOrganizationAgentResponseView<'static>>`.
-pub type OwnedDeleteOrganizationAgentResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+///Shorthand for `OwnedView<DeleteWorkspaceAgentResponseView<'static>>`.
+pub type OwnedDeleteWorkspaceAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteWorkspaceAgentResponseView<
         'static,
     >,
 >;
@@ -1447,10 +1437,8 @@ pub type OwnedListProjectAgentTranscriptSessionsResponseView = ::buffa::view::Ow
         'static,
     >,
 >;
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::ListOrganizationAgentsResponse,
->
-for crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListWorkspaceAgentsResponse>
+for crate::proto::briar::app::v1::__buffa::view::ListWorkspaceAgentsResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1458,11 +1446,43 @@ for crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsResponseV
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::ListOrganizationAgentsResponse,
->
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::ListWorkspaceAgentsResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsResponseView<
+    crate::proto::briar::app::v1::__buffa::view::ListWorkspaceAgentsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateWorkspaceAgentResponse>
+for crate::proto::briar::app::v1::__buffa::view::CreateWorkspaceAgentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::CreateWorkspaceAgentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::CreateWorkspaceAgentResponseView<
         'static,
     >,
 > {
@@ -1487,12 +1507,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
->
-for crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
-    '_,
-> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateWorkspaceAgentResponse>
+for crate::proto::briar::app::v1::__buffa::view::UpdateWorkspaceAgentResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1500,11 +1516,9 @@ for crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponse
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
->
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::UpdateWorkspaceAgentResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
+    crate::proto::briar::app::v1::__buffa::view::UpdateWorkspaceAgentResponseView<
         'static,
     >,
 > {
@@ -1529,12 +1543,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
->
-for crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
-    '_,
-> {
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteWorkspaceAgentResponse>
+for crate::proto::briar::app::v1::__buffa::view::DeleteWorkspaceAgentResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1542,53 +1552,9 @@ for crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponse
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
->
+impl ::connectrpc::Encodable<crate::proto::briar::app::v1::DeleteWorkspaceAgentResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
-        'static,
-    >,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
->
-for crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
-    '_,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
->
-for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+    crate::proto::briar::app::v1::__buffa::view::DeleteWorkspaceAgentResponseView<
         'static,
     >,
 > {
@@ -2409,27 +2375,27 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const AGENT_SERVICE_SERVICE_NAME: &str = "briar.app.v1.AgentService";
-/// Static [`Spec`](::connectrpc::Spec) for the `ListOrganizationAgents` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const AGENT_SERVICE_LIST_ORGANIZATION_AGENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.AgentService/ListOrganizationAgents",
+/// Static [`Spec`](::connectrpc::Spec) for the `ListWorkspaceAgents` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_LIST_WORKSPACE_AGENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/ListWorkspaceAgents",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `CreateOrganizationAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const AGENT_SERVICE_CREATE_ORGANIZATION_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.AgentService/CreateOrganizationAgent",
+/// Static [`Spec`](::connectrpc::Spec) for the `CreateWorkspaceAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_CREATE_WORKSPACE_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/CreateWorkspaceAgent",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `UpdateOrganizationAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const AGENT_SERVICE_UPDATE_ORGANIZATION_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.AgentService/UpdateOrganizationAgent",
+/// Static [`Spec`](::connectrpc::Spec) for the `UpdateWorkspaceAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_UPDATE_WORKSPACE_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/UpdateWorkspaceAgent",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `DeleteOrganizationAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const AGENT_SERVICE_DELETE_ORGANIZATION_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.AgentService/DeleteOrganizationAgent",
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteWorkspaceAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_DELETE_WORKSPACE_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.AgentService/DeleteWorkspaceAgent",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -2604,7 +2570,7 @@ pub const AGENT_SERVICE_LIST_PROJECT_AGENT_TRANSCRIPT_SESSIONS_SPEC: ::connectrp
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait AgentService: Send + Sync + 'static {
-    /// Handle the ListOrganizationAgents RPC.
+    /// Handle the ListWorkspaceAgents RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2613,21 +2579,21 @@ pub trait AgentService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn list_organization_agents<'a>(
+    fn list_workspace_agents<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::ListOrganizationAgentsRequest,
+            crate::proto::briar::app::v1::ListWorkspaceAgentsRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::ListOrganizationAgentsResponse,
+                crate::proto::briar::app::v1::ListWorkspaceAgentsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the CreateOrganizationAgent RPC.
+    /// Handle the CreateWorkspaceAgent RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2636,21 +2602,21 @@ pub trait AgentService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn create_organization_agent<'a>(
+    fn create_workspace_agent<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+            crate::proto::briar::app::v1::CreateWorkspaceAgentRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
+                crate::proto::briar::app::v1::CreateWorkspaceAgentResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the UpdateOrganizationAgent RPC.
+    /// Handle the UpdateWorkspaceAgent RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2659,21 +2625,21 @@ pub trait AgentService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn update_organization_agent<'a>(
+    fn update_workspace_agent<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+            crate::proto::briar::app::v1::UpdateWorkspaceAgentRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
+                crate::proto::briar::app::v1::UpdateWorkspaceAgentResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the DeleteOrganizationAgent RPC.
+    /// Handle the DeleteWorkspaceAgent RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2682,17 +2648,17 @@ pub trait AgentService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn delete_organization_agent<'a>(
+    fn delete_workspace_agent<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+            crate::proto::briar::app::v1::DeleteWorkspaceAgentRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
+                crate::proto::briar::app::v1::DeleteWorkspaceAgentResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -3190,13 +3156,13 @@ impl<S: AgentService> AgentServiceExt for S {
         router
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
-                "ListOrganizationAgents",
+                "ListWorkspaceAgents",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::ListWorkspaceAgentsRequestView<
                                 'static,
                             >,
                         >,
@@ -3205,27 +3171,27 @@ impl<S: AgentService> AgentServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::ListOrganizationAgentsRequest,
+                                crate::proto::briar::app::v1::ListWorkspaceAgentsRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.list_organization_agents(ctx, sreq)
+                            svc.list_workspace_agents(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::ListOrganizationAgentsResponse,
+                                    crate::proto::briar::app::v1::ListWorkspaceAgentsResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(AGENT_SERVICE_LIST_ORGANIZATION_AGENTS_SPEC)
+            .with_spec(AGENT_SERVICE_LIST_WORKSPACE_AGENTS_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
-                "CreateOrganizationAgent",
+                "CreateWorkspaceAgent",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::CreateWorkspaceAgentRequestView<
                                 'static,
                             >,
                         >,
@@ -3234,27 +3200,27 @@ impl<S: AgentService> AgentServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+                                crate::proto::briar::app::v1::CreateWorkspaceAgentRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.create_organization_agent(ctx, sreq)
+                            svc.create_workspace_agent(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
+                                    crate::proto::briar::app::v1::CreateWorkspaceAgentResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(AGENT_SERVICE_CREATE_ORGANIZATION_AGENT_SPEC)
+            .with_spec(AGENT_SERVICE_CREATE_WORKSPACE_AGENT_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
-                "UpdateOrganizationAgent",
+                "UpdateWorkspaceAgent",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::UpdateWorkspaceAgentRequestView<
                                 'static,
                             >,
                         >,
@@ -3263,27 +3229,27 @@ impl<S: AgentService> AgentServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+                                crate::proto::briar::app::v1::UpdateWorkspaceAgentRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.update_organization_agent(ctx, sreq)
+                            svc.update_workspace_agent(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
+                                    crate::proto::briar::app::v1::UpdateWorkspaceAgentResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(AGENT_SERVICE_UPDATE_ORGANIZATION_AGENT_SPEC)
+            .with_spec(AGENT_SERVICE_UPDATE_WORKSPACE_AGENT_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
-                "DeleteOrganizationAgent",
+                "DeleteWorkspaceAgent",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::DeleteWorkspaceAgentRequestView<
                                 'static,
                             >,
                         >,
@@ -3292,18 +3258,18 @@ impl<S: AgentService> AgentServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+                                crate::proto::briar::app::v1::DeleteWorkspaceAgentRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.delete_organization_agent(ctx, sreq)
+                            svc.delete_workspace_agent(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
+                                    crate::proto::briar::app::v1::DeleteWorkspaceAgentResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(AGENT_SERVICE_DELETE_ORGANIZATION_AGENT_SPEC)
+            .with_spec(AGENT_SERVICE_DELETE_WORKSPACE_AGENT_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
                 "ListProjectAgents",
@@ -3938,28 +3904,28 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("briar.app.v1.AgentService/")?;
         match method {
-            "ListOrganizationAgents" => {
+            "ListWorkspaceAgents" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(AGENT_SERVICE_LIST_ORGANIZATION_AGENTS_SPEC),
+                        .with_spec(AGENT_SERVICE_LIST_WORKSPACE_AGENTS_SPEC),
                 )
             }
-            "CreateOrganizationAgent" => {
+            "CreateWorkspaceAgent" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(AGENT_SERVICE_CREATE_ORGANIZATION_AGENT_SPEC),
+                        .with_spec(AGENT_SERVICE_CREATE_WORKSPACE_AGENT_SPEC),
                 )
             }
-            "UpdateOrganizationAgent" => {
+            "UpdateWorkspaceAgent" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(AGENT_SERVICE_UPDATE_ORGANIZATION_AGENT_SPEC),
+                        .with_spec(AGENT_SERVICE_UPDATE_WORKSPACE_AGENT_SPEC),
                 )
             }
-            "DeleteOrganizationAgent" => {
+            "DeleteWorkspaceAgent" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(AGENT_SERVICE_DELETE_ORGANIZATION_AGENT_SPEC),
+                        .with_spec(AGENT_SERVICE_DELETE_WORKSPACE_AGENT_SPEC),
                 )
             }
             "ListProjectAgents" => {
@@ -4101,91 +4067,91 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "ListOrganizationAgents" => {
+            "ListWorkspaceAgents" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::ListOrganizationAgentsRequest,
+                        crate::proto::briar::app::v1::ListWorkspaceAgentsRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListWorkspaceAgentsRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::ListOrganizationAgentsRequest,
+                        crate::proto::briar::app::v1::ListWorkspaceAgentsRequest,
                     >::from_parts(&req, &body);
-                    svc.list_organization_agents(ctx, req)
+                    svc.list_workspace_agents(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::ListOrganizationAgentsResponse,
+                            crate::proto::briar::app::v1::ListWorkspaceAgentsResponse,
                         >(format)
                 })
             }
-            "CreateOrganizationAgent" => {
+            "CreateWorkspaceAgent" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+                        crate::proto::briar::app::v1::CreateWorkspaceAgentRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::CreateWorkspaceAgentRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+                        crate::proto::briar::app::v1::CreateWorkspaceAgentRequest,
                     >::from_parts(&req, &body);
-                    svc.create_organization_agent(ctx, req)
+                    svc.create_workspace_agent(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::CreateOrganizationAgentResponse,
+                            crate::proto::briar::app::v1::CreateWorkspaceAgentResponse,
                         >(format)
                 })
             }
-            "UpdateOrganizationAgent" => {
+            "UpdateWorkspaceAgent" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+                        crate::proto::briar::app::v1::UpdateWorkspaceAgentRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::UpdateWorkspaceAgentRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+                        crate::proto::briar::app::v1::UpdateWorkspaceAgentRequest,
                     >::from_parts(&req, &body);
-                    svc.update_organization_agent(ctx, req)
+                    svc.update_workspace_agent(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::UpdateOrganizationAgentResponse,
+                            crate::proto::briar::app::v1::UpdateWorkspaceAgentResponse,
                         >(format)
                 })
             }
-            "DeleteOrganizationAgent" => {
+            "DeleteWorkspaceAgent" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+                        crate::proto::briar::app::v1::DeleteWorkspaceAgentRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::DeleteWorkspaceAgentRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+                        crate::proto::briar::app::v1::DeleteWorkspaceAgentRequest,
                     >::from_parts(&req, &body);
-                    svc.delete_organization_agent(ctx, req)
+                    svc.delete_workspace_agent(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::DeleteOrganizationAgentResponse,
+                            crate::proto::briar::app::v1::DeleteWorkspaceAgentResponse,
                         >(format)
                 })
             }
@@ -4696,7 +4662,7 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = AgentServiceClient::new(conn, config);
-/// let response = client.list_organization_agents(request).await?;
+/// let response = client.list_workspace_agents(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -4708,7 +4674,7 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = AgentServiceClient::new(http, config);
-/// let response = client.list_organization_agents(request).await?;
+/// let response = client.list_workspace_agents(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -4718,7 +4684,7 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.list_organization_agents(request).await?;
+/// let resp = client.list_workspace_agents(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -4726,7 +4692,7 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.list_organization_agents(request).await?.into_owned();
+/// let owned = client.list_workspace_agents(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -4759,35 +4725,35 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the ListOrganizationAgents RPC. Sends a request to /briar.app.v1.AgentService/ListOrganizationAgents.
-    pub async fn list_organization_agents(
+    /// Call the ListWorkspaceAgents RPC. Sends a request to /briar.app.v1.AgentService/ListWorkspaceAgents.
+    pub async fn list_workspace_agents(
         &self,
-        request: crate::proto::briar::app::v1::ListOrganizationAgentsRequest,
+        request: crate::proto::briar::app::v1::ListWorkspaceAgentsRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::ListWorkspaceAgentsResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.list_organization_agents_with_options(
+        self.list_workspace_agents_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the ListOrganizationAgents RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn list_organization_agents_with_options(
+    /// Call the ListWorkspaceAgents RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_workspace_agents_with_options(
         &self,
-        request: crate::proto::briar::app::v1::ListOrganizationAgentsRequest,
+        request: crate::proto::briar::app::v1::ListWorkspaceAgentsRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::ListOrganizationAgentsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::ListWorkspaceAgentsResponseView<
                     'static,
                 >,
             >,
@@ -4797,42 +4763,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                AGENT_SERVICE_LIST_ORGANIZATION_AGENTS_SPEC
+                AGENT_SERVICE_LIST_WORKSPACE_AGENTS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the CreateOrganizationAgent RPC. Sends a request to /briar.app.v1.AgentService/CreateOrganizationAgent.
-    pub async fn create_organization_agent(
+    /// Call the CreateWorkspaceAgent RPC. Sends a request to /briar.app.v1.AgentService/CreateWorkspaceAgent.
+    pub async fn create_workspace_agent(
         &self,
-        request: crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+        request: crate::proto::briar::app::v1::CreateWorkspaceAgentRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
+                crate::proto::briar::app::v1::__buffa::view::CreateWorkspaceAgentResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.create_organization_agent_with_options(
+        self.create_workspace_agent_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the CreateOrganizationAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn create_organization_agent_with_options(
+    /// Call the CreateWorkspaceAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_workspace_agent_with_options(
         &self,
-        request: crate::proto::briar::app::v1::CreateOrganizationAgentRequest,
+        request: crate::proto::briar::app::v1::CreateWorkspaceAgentRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::CreateOrganizationAgentResponseView<
+                crate::proto::briar::app::v1::__buffa::view::CreateWorkspaceAgentResponseView<
                     'static,
                 >,
             >,
@@ -4842,42 +4808,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                AGENT_SERVICE_CREATE_ORGANIZATION_AGENT_SPEC
+                AGENT_SERVICE_CREATE_WORKSPACE_AGENT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the UpdateOrganizationAgent RPC. Sends a request to /briar.app.v1.AgentService/UpdateOrganizationAgent.
-    pub async fn update_organization_agent(
+    /// Call the UpdateWorkspaceAgent RPC. Sends a request to /briar.app.v1.AgentService/UpdateWorkspaceAgent.
+    pub async fn update_workspace_agent(
         &self,
-        request: crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+        request: crate::proto::briar::app::v1::UpdateWorkspaceAgentRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateWorkspaceAgentResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.update_organization_agent_with_options(
+        self.update_workspace_agent_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the UpdateOrganizationAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn update_organization_agent_with_options(
+    /// Call the UpdateWorkspaceAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn update_workspace_agent_with_options(
         &self,
-        request: crate::proto::briar::app::v1::UpdateOrganizationAgentRequest,
+        request: crate::proto::briar::app::v1::UpdateWorkspaceAgentRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::UpdateOrganizationAgentResponseView<
+                crate::proto::briar::app::v1::__buffa::view::UpdateWorkspaceAgentResponseView<
                     'static,
                 >,
             >,
@@ -4887,42 +4853,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                AGENT_SERVICE_UPDATE_ORGANIZATION_AGENT_SPEC
+                AGENT_SERVICE_UPDATE_WORKSPACE_AGENT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the DeleteOrganizationAgent RPC. Sends a request to /briar.app.v1.AgentService/DeleteOrganizationAgent.
-    pub async fn delete_organization_agent(
+    /// Call the DeleteWorkspaceAgent RPC. Sends a request to /briar.app.v1.AgentService/DeleteWorkspaceAgent.
+    pub async fn delete_workspace_agent(
         &self,
-        request: crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+        request: crate::proto::briar::app::v1::DeleteWorkspaceAgentRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteWorkspaceAgentResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.delete_organization_agent_with_options(
+        self.delete_workspace_agent_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the DeleteOrganizationAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn delete_organization_agent_with_options(
+    /// Call the DeleteWorkspaceAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_workspace_agent_with_options(
         &self,
-        request: crate::proto::briar::app::v1::DeleteOrganizationAgentRequest,
+        request: crate::proto::briar::app::v1::DeleteWorkspaceAgentRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::DeleteOrganizationAgentResponseView<
+                crate::proto::briar::app::v1::__buffa::view::DeleteWorkspaceAgentResponseView<
                     'static,
                 >,
             >,
@@ -4932,7 +4898,7 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                AGENT_SERVICE_DELETE_ORGANIZATION_AGENT_SPEC
+                AGENT_SERVICE_DELETE_WORKSPACE_AGENT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
@@ -29096,7 +29062,7 @@ pub const GIT_HUB_INTEGRATION_SERVICE_BEGIN_GIT_HUB_INSTALLATION_SPEC: ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// GitHubIntegrationService owns organization installation discovery and the
+/// GitHubIntegrationService owns workspace installation discovery and the
 /// start of the browser installation flow. OAuth/install callbacks and signed
 /// webhooks intentionally remain ordinary HTTP endpoints.
 ///

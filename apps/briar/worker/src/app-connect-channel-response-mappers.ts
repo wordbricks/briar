@@ -6,7 +6,7 @@ import {
   AgentSkillExecutionProposalSchema,
   AgentSkillExecutionStatus,
   AgentSkillKind,
-  OrganizationAgentSchema,
+  WorkspaceAgentSchema,
   ProjectAgentSessionEventSchema,
   ProjectAgentSessionEventType,
   ProjectAgentSessionFollowUpSchema,
@@ -344,7 +344,7 @@ const appChannelAgentSkill = (
 });
 
 export const appChannelAgent = (agent: ChannelAgentSummary) =>
-  create(OrganizationAgentSchema, {
+  create(WorkspaceAgentSchema, {
     agentId: agent.agentId,
     name: agent.name,
     avatar: agent.avatar ?? undefined,

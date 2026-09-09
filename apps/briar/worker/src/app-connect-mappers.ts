@@ -498,8 +498,8 @@ export const appProject = (project: TeamRow) => create(TeamSchema, {
   icon: project.icon ?? undefined,
   iconName: project.icon_name ?? undefined,
   iconColor: project.icon_color ?? undefined,
-  organizationId: project.organization_id,
-  organizationName: project.organization_name,
+  workspaceId: project.organization_id,
+  workspaceName: project.organization_name,
   role: projectRole[project.member_role],
   createdAt: timestamp(project.created_at),
 });

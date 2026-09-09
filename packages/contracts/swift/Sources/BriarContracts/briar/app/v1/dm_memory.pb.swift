@@ -599,7 +599,7 @@ public nonisolated struct BriarAPI_ListDmMemoriesRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -870,7 +870,7 @@ public nonisolated struct BriarAPI_RetryDmMemoryLearningRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -904,7 +904,7 @@ public nonisolated struct BriarAPI_GetDmMemoryDocumentRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -952,7 +952,7 @@ public nonisolated struct BriarAPI_ListDmMemoryRevisionsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1045,7 +1045,7 @@ public nonisolated struct BriarAPI_CreateDmMemoryDocumentRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1110,7 +1110,7 @@ public nonisolated struct BriarAPI_UpdateDmMemoryDocumentRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1211,7 +1211,7 @@ public nonisolated struct BriarAPI_DeleteDmMemoryDocumentRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1241,7 +1241,7 @@ public nonisolated struct BriarAPI_UpdateDmMemorySettingsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1599,7 +1599,7 @@ nonisolated extension BriarAPI_DmMemoryBriefState: SwiftProtobuf._ProtoNameProvi
 
 nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListDmMemoriesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}memory_space_id\0\u{1}cursor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}memory_space_id\0\u{1}cursor\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1607,7 +1607,7 @@ nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, Swi
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._memorySpaceID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._cursor) }()
@@ -1621,8 +1621,8 @@ nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, Swi
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -1637,7 +1637,7 @@ nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, Swi
   }
 
   public static func ==(lhs: BriarAPI_ListDmMemoriesRequest, rhs: BriarAPI_ListDmMemoriesRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs._memorySpaceID != rhs._memorySpaceID {return false}
     if lhs._cursor != rhs._cursor {return false}
@@ -2027,7 +2027,7 @@ nonisolated extension BriarAPI_DmMemoryLearningRetryableJob: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_RetryDmMemoryLearningRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RetryDmMemoryLearningRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}job_id\0\u{3}request_id\0\u{3}revocation_epoch\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}job_id\0\u{3}request_id\0\u{3}revocation_epoch\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2035,7 +2035,7 @@ nonisolated extension BriarAPI_RetryDmMemoryLearningRequest: SwiftProtobuf.Messa
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.jobID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
@@ -2046,8 +2046,8 @@ nonisolated extension BriarAPI_RetryDmMemoryLearningRequest: SwiftProtobuf.Messa
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -2065,7 +2065,7 @@ nonisolated extension BriarAPI_RetryDmMemoryLearningRequest: SwiftProtobuf.Messa
   }
 
   public static func ==(lhs: BriarAPI_RetryDmMemoryLearningRequest, rhs: BriarAPI_RetryDmMemoryLearningRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.jobID != rhs.jobID {return false}
     if lhs.requestID != rhs.requestID {return false}
@@ -2112,7 +2112,7 @@ nonisolated extension BriarAPI_RetryDmMemoryLearningResponse: SwiftProtobuf.Mess
 
 nonisolated extension BriarAPI_GetDmMemoryDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetDmMemoryDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}document_id\0\u{1}version\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}document_id\0\u{1}version\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2120,7 +2120,7 @@ nonisolated extension BriarAPI_GetDmMemoryDocumentRequest: SwiftProtobuf.Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self._version) }()
@@ -2134,8 +2134,8 @@ nonisolated extension BriarAPI_GetDmMemoryDocumentRequest: SwiftProtobuf.Message
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -2150,7 +2150,7 @@ nonisolated extension BriarAPI_GetDmMemoryDocumentRequest: SwiftProtobuf.Message
   }
 
   public static func ==(lhs: BriarAPI_GetDmMemoryDocumentRequest, rhs: BriarAPI_GetDmMemoryDocumentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs._version != rhs._version {return false}
@@ -2195,7 +2195,7 @@ nonisolated extension BriarAPI_GetDmMemoryDocumentResponse: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_ListDmMemoryRevisionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListDmMemoryRevisionsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}document_id\0\u{1}cursor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}document_id\0\u{1}cursor\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2203,7 +2203,7 @@ nonisolated extension BriarAPI_ListDmMemoryRevisionsRequest: SwiftProtobuf.Messa
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self._cursor) }()
@@ -2217,8 +2217,8 @@ nonisolated extension BriarAPI_ListDmMemoryRevisionsRequest: SwiftProtobuf.Messa
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -2233,7 +2233,7 @@ nonisolated extension BriarAPI_ListDmMemoryRevisionsRequest: SwiftProtobuf.Messa
   }
 
   public static func ==(lhs: BriarAPI_ListDmMemoryRevisionsRequest, rhs: BriarAPI_ListDmMemoryRevisionsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs._cursor != rhs._cursor {return false}
@@ -2352,7 +2352,7 @@ nonisolated extension BriarAPI_DmMemoryRevision: SwiftProtobuf.Message, SwiftPro
 
 nonisolated extension BriarAPI_CreateDmMemoryDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateDmMemoryDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}request_id\0\u{3}memory_space_id\0\u{1}title\0\u{1}body\0\u{3}memory_class\0\u{3}source_language\0\u{3}observed_at\0\u{3}valid_until\0\u{3}source_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}request_id\0\u{3}memory_space_id\0\u{1}title\0\u{1}body\0\u{3}memory_class\0\u{3}source_language\0\u{3}observed_at\0\u{3}valid_until\0\u{3}source_message\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2360,7 +2360,7 @@ nonisolated extension BriarAPI_CreateDmMemoryDocumentRequest: SwiftProtobuf.Mess
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._memorySpaceID) }()
@@ -2381,8 +2381,8 @@ nonisolated extension BriarAPI_CreateDmMemoryDocumentRequest: SwiftProtobuf.Mess
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -2418,7 +2418,7 @@ nonisolated extension BriarAPI_CreateDmMemoryDocumentRequest: SwiftProtobuf.Mess
   }
 
   public static func ==(lhs: BriarAPI_CreateDmMemoryDocumentRequest, rhs: BriarAPI_CreateDmMemoryDocumentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs._memorySpaceID != rhs._memorySpaceID {return false}
@@ -2436,7 +2436,7 @@ nonisolated extension BriarAPI_CreateDmMemoryDocumentRequest: SwiftProtobuf.Mess
 
 nonisolated extension BriarAPI_UpdateDmMemoryDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateDmMemoryDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}document_id\0\u{3}request_id\0\u{3}memory_space_id\0\u{3}expected_version\0\u{1}title\0\u{1}body\0\u{3}memory_class\0\u{3}source_language\0\u{3}observed_at\0\u{3}valid_until\0\u{3}source_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}document_id\0\u{3}request_id\0\u{3}memory_space_id\0\u{3}expected_version\0\u{1}title\0\u{1}body\0\u{3}memory_class\0\u{3}source_language\0\u{3}observed_at\0\u{3}valid_until\0\u{3}source_message\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2444,7 +2444,7 @@ nonisolated extension BriarAPI_UpdateDmMemoryDocumentRequest: SwiftProtobuf.Mess
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
@@ -2467,8 +2467,8 @@ nonisolated extension BriarAPI_UpdateDmMemoryDocumentRequest: SwiftProtobuf.Mess
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -2510,7 +2510,7 @@ nonisolated extension BriarAPI_UpdateDmMemoryDocumentRequest: SwiftProtobuf.Mess
   }
 
   public static func ==(lhs: BriarAPI_UpdateDmMemoryDocumentRequest, rhs: BriarAPI_UpdateDmMemoryDocumentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs.requestID != rhs.requestID {return false}
@@ -2610,7 +2610,7 @@ nonisolated extension BriarAPI_UpdateDmMemoryDocumentResponse: SwiftProtobuf.Mes
 
 nonisolated extension BriarAPI_DeleteDmMemoryDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeleteDmMemoryDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}document_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}document_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2618,7 +2618,7 @@ nonisolated extension BriarAPI_DeleteDmMemoryDocumentRequest: SwiftProtobuf.Mess
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       default: break
@@ -2627,8 +2627,8 @@ nonisolated extension BriarAPI_DeleteDmMemoryDocumentRequest: SwiftProtobuf.Mess
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -2640,7 +2640,7 @@ nonisolated extension BriarAPI_DeleteDmMemoryDocumentRequest: SwiftProtobuf.Mess
   }
 
   public static func ==(lhs: BriarAPI_DeleteDmMemoryDocumentRequest, rhs: BriarAPI_DeleteDmMemoryDocumentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -2685,7 +2685,7 @@ nonisolated extension BriarAPI_DeleteDmMemoryDocumentResponse: SwiftProtobuf.Mes
 
 nonisolated extension BriarAPI_UpdateDmMemorySettingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateDmMemorySettingsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}request_id\0\u{3}memory_space_id\0\u{3}expected_memory_revision\0\u{3}use_enabled\0\u{3}auto_enabled\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}request_id\0\u{3}memory_space_id\0\u{3}expected_memory_revision\0\u{3}use_enabled\0\u{3}auto_enabled\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2693,7 +2693,7 @@ nonisolated extension BriarAPI_UpdateDmMemorySettingsRequest: SwiftProtobuf.Mess
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._memorySpaceID) }()
@@ -2710,8 +2710,8 @@ nonisolated extension BriarAPI_UpdateDmMemorySettingsRequest: SwiftProtobuf.Mess
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -2735,7 +2735,7 @@ nonisolated extension BriarAPI_UpdateDmMemorySettingsRequest: SwiftProtobuf.Mess
   }
 
   public static func ==(lhs: BriarAPI_UpdateDmMemorySettingsRequest, rhs: BriarAPI_UpdateDmMemorySettingsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs._memorySpaceID != rhs._memorySpaceID {return false}

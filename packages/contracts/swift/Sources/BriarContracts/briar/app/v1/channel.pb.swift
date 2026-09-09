@@ -277,7 +277,7 @@ public nonisolated struct BriarAPI_ListDirectMessageRecipientsResponse: Sendable
 
   public var members: [BriarAPI_OrganizationMember] = []
 
-  public var agents: [BriarAPI_OrganizationAgent] = []
+  public var agents: [BriarAPI_WorkspaceAgent] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -642,7 +642,7 @@ public nonisolated struct BriarAPI_SetChannelAgentResponse: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var agents: [BriarAPI_OrganizationAgent] = []
+  public var agents: [BriarAPI_WorkspaceAgent] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -942,7 +942,7 @@ public nonisolated struct BriarAPI_GetChannelResponse: Sendable {
 
   public var members: [BriarAPI_ChannelMember] = []
 
-  public var agents: [BriarAPI_OrganizationAgent] = []
+  public var agents: [BriarAPI_WorkspaceAgent] = []
 
   public var messages: [BriarAPI_ChannelMessage] = []
 

@@ -99,7 +99,7 @@ import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
 import { appOrganizationMember } from "./app-connect-mappers";
-import { appOrganizationAgent } from "./app-connect-agent-mappers";
+import { appWorkspaceAgent } from "./app-connect-agent-mappers";
 import {
   appChannelDocumentContent,
   appChannelLinkPreview,
@@ -366,7 +366,7 @@ const createAppChannelService = (
     ]);
     return create(ChannelService.method.listDirectMessageRecipients.output, {
       members: members.map((member) => appOrganizationMember(member)),
-      agents: agents.map(appOrganizationAgent),
+      agents: agents.map(appWorkspaceAgent),
     });
   },
 
@@ -525,7 +525,7 @@ const createAppChannelService = (
       );
     }
     return create(ChannelService.method.setChannelAgent.output, {
-      agents: agents.map(appOrganizationAgent),
+      agents: agents.map(appWorkspaceAgent),
     });
   },
 

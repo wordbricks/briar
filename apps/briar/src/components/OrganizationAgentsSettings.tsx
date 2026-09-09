@@ -26,10 +26,10 @@ import {
   agentResponsibilityMaxLength,
 } from "../lib/agent-limits";
 import {
-  createOrganizationAgent,
-  deleteOrganizationAgent,
-  listOrganizationAgents,
-  updateOrganizationAgent,
+  createWorkspaceAgent,
+  deleteWorkspaceAgent,
+  listWorkspaceAgents,
+  updateWorkspaceAgent,
 } from "../lib/api";
 import {
   type ChannelAgentProvider,
@@ -95,7 +95,7 @@ export function OrganizationAgentsSettings({
     let cancelled = false;
     setIsLoading(true);
     setError(null);
-    void listOrganizationAgents(token, organizationId)
+    void listWorkspaceAgents(token, organizationId)
       .then((result) => {
         if (cancelled) return;
         setAgents(result.agents.filter((agent) => agent.projectId === null));
@@ -123,7 +123,7 @@ export function OrganizationAgentsSettings({
     responsibility: string;
     computerUsePolicy: "disabled" | "unattended";
   }) => {
-    const result = await createOrganizationAgent(token, organizationId, input);
+    const result = await createWorkspaceAgent(token, organizationId, input);
     setAgents((current) => [...current, result.agent]);
     setIsCreateOpen(false);
   };
@@ -133,7 +133,7 @@ export function OrganizationAgentsSettings({
     setIsDeleting(true);
     setError(null);
     try {
-      await deleteOrganizationAgent(
+      await deleteWorkspaceAgent(
         token,
         organizationId,
         deletingAgent.agentId,
@@ -182,7 +182,7 @@ export function OrganizationAgentsSettings({
     setSkillSaveError(null);
     setError(null);
     try {
-      const result = await updateOrganizationAgent(
+      const result = await updateWorkspaceAgent(
         token,
         organizationId,
         editingAgent.agentId,

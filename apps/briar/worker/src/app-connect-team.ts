@@ -479,7 +479,7 @@ export const createAppTeamService = (
         db,
         user: session.user,
         name: input.name,
-        organizationId: input.organizationId,
+        organizationId: input.workspaceId,
         locale: normalizeTeamAgentLocale(
           request.headers.get("accept-language"),
         ),

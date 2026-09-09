@@ -4,7 +4,7 @@ import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
   AgentSkillKind,
-  OrganizationAgentSchema,
+  WorkspaceAgentSchema,
   ProjectAgentSkillSchema,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
@@ -56,7 +56,7 @@ const approvalPolicy = {
   explicit: AgentSkillApprovalPolicy.EXPLICIT,
 } as const satisfies Record<AgentSkillRow["approval_policy"], AgentSkillApprovalPolicy>;
 
-const appOrganizationAgentSkill = (skill: AgentSkillRow) =>
+const appWorkspaceAgentSkill = (skill: AgentSkillRow) =>
   create(ProjectAgentSkillSchema, {
     id: skill.id,
     agentId: skill.agent_id,
@@ -75,8 +75,8 @@ const appOrganizationAgentSkill = (skill: AgentSkillRow) =>
   });
 
 /** Maps the organization-agent domain row directly to its generated API DTO. */
-export const appOrganizationAgent = (row: OrganizationAgentRow) =>
-  create(OrganizationAgentSchema, {
+export const appWorkspaceAgent = (row: OrganizationAgentRow) =>
+  create(WorkspaceAgentSchema, {
     agentId: row.id,
     name: row.name,
     avatar: row.avatar ?? undefined,
@@ -88,6 +88,6 @@ export const appOrganizationAgent = (row: OrganizationAgentRow) =>
     projectName: row.project_name ?? undefined,
     description: row.description || undefined,
     responsibility: row.responsibility,
-    skills: (row.skills ?? []).map(appOrganizationAgentSkill),
+    skills: (row.skills ?? []).map(appWorkspaceAgentSkill),
     createdAt: requiredTimestamp(row.created_at, "Organization Agent creation"),
   });

@@ -9,7 +9,7 @@ import Connect
 import Foundation
 import SwiftProtobuf
 
-/// GitHubIntegrationService owns organization installation discovery and the
+/// GitHubIntegrationService owns workspace installation discovery and the
 /// start of the browser installation flow. OAuth/install callbacks and signed
 /// webhooks intentionally remain ordinary HTTP endpoints.
 public protocol BriarAPI_GitHubIntegrationServiceClientInterface: Sendable {

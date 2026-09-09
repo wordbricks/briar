@@ -227,7 +227,7 @@ export const createAppGithubIntegrationService = (
     return appGithubIntegration(await services.getIntegration({
       db: input.db,
       env: input.env,
-      organizationId: decodeUuid(request.organizationId).toLowerCase(),
+      organizationId: decodeUuid(request.workspaceId).toLowerCase(),
       userId: session.user.id,
     }));
   },
@@ -238,7 +238,7 @@ export const createAppGithubIntegrationService = (
     const result = await services.beginInstallation({
       db: input.db,
       env: input.env,
-      organizationId: decodeUuid(request.organizationId).toLowerCase(),
+      organizationId: decodeUuid(request.workspaceId).toLowerCase(),
       userId: session.user.id,
     });
     scheduleInboxRealtimeFlush(input.env, input.db, input.context);

@@ -164,7 +164,7 @@ extension Project {
     init(connectMessage message: BriarAPI_Team) throws {
         guard
             let id = UUID(uuidString: message.id),
-            let organizationID = UUID(uuidString: message.organizationID),
+            let organizationID = UUID(uuidString: message.workspaceID),
             message.hasCreatedAt
         else {
             throw MobileAPIError.invalidResponse
@@ -191,7 +191,7 @@ extension Project {
             scheduleTabEnabled: message.scheduleTabEnabled,
             icon: message.hasIcon ? message.icon : nil,
             organizationId: organizationID,
-            organizationName: message.organizationName,
+            organizationName: message.workspaceName,
             role: role,
             createdAt: message.createdAt.date
         )
