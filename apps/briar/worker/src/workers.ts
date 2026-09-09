@@ -156,6 +156,13 @@ export type OrganizationExecutionWorker = {
   }>;
 };
 
+/** Readiness detail the drain writes while a planned update hands work off. */
+export const PLANNED_UPDATE_DRAINING_READINESS_DETAIL =
+  "계획된 업데이트 handoff를 준비하고 있습니다.";
+/** Readiness detail every heartbeat writes while the planned update runs. */
+export const PLANNED_UPDATE_HANDOFF_READINESS_DETAIL =
+  "계획된 업데이트 handoff를 진행 중입니다.";
+
 async function beginExecutionWorkerUpdate(
   db: D1Database,
   input: { requestId: string; deviceId: string; observedAt: string },
@@ -179,12 +186,53 @@ async function beginExecutionWorkerUpdate(
         `update briar_execution_workers
          set accepting_work = 0,
              readiness_state = 'busy',
-             readiness_detail = '계획된 업데이트 handoff를 준비하고 있습니다.',
+             readiness_detail = ?,
              updated_at = ?
          where device_id = ? and state <> 'disabled'`,
       )
-      .bind(input.observedAt, input.deviceId),
+      .bind(
+        PLANNED_UPDATE_DRAINING_READINESS_DETAIL,
+        input.observedAt,
+        input.deviceId,
+      ),
   ]);
+}
+
+/**
+ * A planned update drains every Worker on the device, and only a later
+ * heartbeat would undo that. Restoring the rows the moment the update
+ * completes keeps the returning Workers reachable for the work they parked.
+ */
+export async function restoreExecutionWorkersAfterUpdate(
+  db: D1Database,
+  deviceId: string,
+  observedAt: string,
+) {
+  await db
+    .prepare(
+      `update briar_execution_workers
+       set accepting_work = case when exists (
+             select 1 from briar_managed_computers computer
+             where computer.briar_device_id = ?
+               and computer.state not in ('needs_setup', 'ready')
+           ) then 0 else 1 end,
+           readiness_state = case when readiness_detail in (?, ?)
+             then 'ready' else readiness_state end,
+           readiness_detail = case when readiness_detail in (?, ?)
+             then null else readiness_detail end,
+           updated_at = ?
+       where device_id = ? and state <> 'disabled'`,
+    )
+    .bind(
+      deviceId,
+      PLANNED_UPDATE_DRAINING_READINESS_DETAIL,
+      PLANNED_UPDATE_HANDOFF_READINESS_DETAIL,
+      PLANNED_UPDATE_DRAINING_READINESS_DETAIL,
+      PLANNED_UPDATE_HANDOFF_READINESS_DETAIL,
+      observedAt,
+      deviceId,
+    )
+    .run();
 }
 
 export async function requestExecutionWorkerUpdate(
@@ -348,6 +396,7 @@ export async function completeExecutionWorkerUpdates(
     .bind(observedAt, observedAt, pending.id)
     .run();
   if ((completed.meta.changes ?? 0) > 0) {
+    await restoreExecutionWorkersAfterUpdate(db, deviceId, observedAt);
     const device = await db
       .prepare(
         `select organization_id from briar_execution_worker_devices where id = ?`,
@@ -727,6 +776,8 @@ export const WORKER_CREDENTIAL_TOUCH_INTERVAL_MS = 5 * 60_000;
 export const STALLED_RUN_GRACE_MS = 5 * 60_000;
 /** Reaping past this many attempts blocks the run instead of looping forever. */
 export const MAX_CLAIM_ATTEMPTS = 5;
+/** Bounds how long a handed-off reply waits for its Worker once the planned update finished. */
+export const PLANNED_UPDATE_RESUME_GRACE_MS = 3 * 60_000;
 
 export class WorkerConflictError extends Error {}
 export class TranscriptLimitError extends Error {}
@@ -942,6 +993,34 @@ export async function hasAvailableChannelReplyWorker(
   input: Parameters<typeof channelReplyWorkerAvailability>[1],
 ) {
   return await channelReplyWorkerAvailability(db, input) === "available";
+}
+
+/**
+ * A device is inside its planned update window while the request still runs
+ * and for a short grace afterwards, because the restarted Workers only report
+ * back on their next heartbeat. Work parked for the update waits that out
+ * instead of being failed for an owner that is merely restarting.
+ */
+export async function isDeviceInPlannedUpdateWindow(
+  db: D1Database,
+  deviceId: string,
+  observedAt: string,
+) {
+  const graceStartedAt = new Date(
+    Date.parse(observedAt) - PLANNED_UPDATE_RESUME_GRACE_MS,
+  ).toISOString();
+  const row = await db
+    .prepare(
+      `select 1 as in_window
+       from briar_execution_worker_update_requests
+       where device_id = ?
+         and ((status = 'requested' and handoff_state <> 'failed')
+           or (status = 'completed' and completed_at > ?))
+       limit 1`,
+    )
+    .bind(deviceId, graceStartedAt)
+    .first<{ in_window: number }>();
+  return row !== null;
 }
 
 export async function getProjectDesignatedWorker(
