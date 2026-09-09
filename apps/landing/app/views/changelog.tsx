@@ -30,6 +30,17 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.224",
+        date: "2026년 9월 9일",
+        title: "DM 리액션에 쉬운 작업용 모델을 사용합니다",
+        summary:
+          "메시지에 맞는 이모지를 고를 때 기존 쉬운 작업용 모델 설정을 사용합니다. 본문 답변은 Agent에 지정한 모델을 그대로 사용합니다.",
+        items: [
+          "실행기에서 사용 가능한 쉬운 작업용 모델을 고릅니다. 후보가 없으면 Agent 설정을 사용하고, 선택 실패나 시간 초과에는 기존 기본 리액션을 표시합니다.",
+          "Luna의 실제 호출로 감사·축하·위로 리액션을 확인했습니다. 이번 소규모 비교에서는 속도 개선은 관측되지 않았습니다.",
+        ],
+      },
+      {
         version: "1.2.223",
         date: "2026년 9월 9일",
         title: "난이도에 맞는 모델이 실제로 배정됩니다",
@@ -1979,6 +1990,17 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.224",
+        date: "September 9, 2026",
+        title: "DM reactions use the easy-task model settings",
+        summary:
+          "Contextual emoji selection now reuses the existing easy-task model policy. The reply body keeps the Agent's configured model.",
+        items: [
+          "Workers select an available easy-task model, retaining Agent settings when no candidate qualifies. Selection failure or timeout keeps the existing neutral reaction fallback.",
+          "Live Luna calls returned appropriate gratitude, celebration and empathy reactions. This small comparison did not show a latency improvement.",
+        ],
+      },
       {
         version: "1.2.223",
         date: "September 9, 2026",
