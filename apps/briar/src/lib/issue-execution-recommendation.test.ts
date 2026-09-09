@@ -47,6 +47,17 @@ describe("recommendIssueExecution", () => {
     });
   });
 
+  it("skips unavailable easy providers and returns null when none can run", () => {
+    const current = withModel(
+      withModel(catalog(), "agy", "gemini-3.7-flash-high", []),
+      "codex", "gpt-5.6-luna", ["max"],
+    );
+    expect(recommendIssueExecution("easy", current, null, (selection) =>
+      selection.provider === "codex",
+    )).toEqual({ provider: "codex", model: "gpt-5.6-luna", effort: "max" });
+    expect(recommendIssueExecution("easy", current, null, () => false)).toBeNull();
+  });
+
   it("falls through when a designated model lacks the configured effort", () => {
     const current = withModel(
       withModel(catalog(), "codex", "gpt-5.6-sol", ["low"]),

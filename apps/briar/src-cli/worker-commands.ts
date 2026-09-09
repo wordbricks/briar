@@ -1,4 +1,5 @@
 import { supportsOwnedProcessSupervisor } from "./owned-process-supervisor";
+import { recommendIssueExecution, type IssueExecutionRecommendation } from "../src/lib/issue-execution-recommendation";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
@@ -735,6 +736,7 @@ async function workerCommand() {
   wakeClient.start();
   let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
+  let acknowledgementExecution: IssueExecutionRecommendation | null = null;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
   const result = await runWorkerLoop<ClaimedWork>(
@@ -851,6 +853,11 @@ async function workerCommand() {
         );
         const providerVersions = await discoverWorkerProviderVersions();
         const providers = healthyWorkerProviders(providerHealth);
+        // Reuse this worker's heartbeat snapshot; never start discovery on the DM path.
+        acknowledgementExecution = recommendIssueExecution(
+          "easy", providerCapabilities, null,
+          (selection) => providers.includes(selection.provider),
+        );
         const computerUse = await inspectComputerUseCapability(
           config,
           providers,
@@ -1093,6 +1100,8 @@ async function workerCommand() {
               workerToken,
               signal,
               reportCheckpoint,
+              undefined,
+              acknowledgementExecution,
             );
           } catch (error) {
             if (error instanceof DetachedProviderStopUnconfirmedError) {

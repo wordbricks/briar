@@ -1,4 +1,22 @@
+import type { DetachedAgent } from "./agent-runner";
+import type { IssueExecutionRecommendation } from "../src/lib/issue-execution-recommendation";
 import { isWorkerEmoji } from "../src/lib/worker-icon-validation";
+
+/** Match issue execution fallback: absent easy candidates retain the Agent settings. */
+export function dmAcknowledgementAgent(
+  agent: DetachedAgent,
+  execution: IssueExecutionRecommendation | null,
+): DetachedAgent {
+  return {
+    ...agent,
+    ...execution,
+    name: "DM acknowledgement",
+    responsibility: "Choose one contextual acknowledgement emoji only.",
+    skills: [],
+    activeSkill: null,
+    computerUsePolicy: "disabled",
+  };
+}
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === "object" && !Array.isArray(value)

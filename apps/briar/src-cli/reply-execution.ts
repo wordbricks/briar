@@ -1,6 +1,8 @@
 import { DmExecutionContext } from "./dm-execution-context";
 import { classifyDmReply } from "./dm-reply-routing";
-import { dmAcknowledgementPrompt, startDmAcknowledgement } from "./dm-acknowledgement";
+
+import type { IssueExecutionRecommendation } from "../src/lib/issue-execution-recommendation";
+import { dmAcknowledgementAgent, dmAcknowledgementPrompt, startDmAcknowledgement } from "./dm-acknowledgement";
 import { normalizeChannelAcknowledgementReaction } from "../src/lib/channel-acknowledgement-reaction";
 import {
   providerBlockHeadline,
@@ -672,6 +674,7 @@ async function runClaimedChannelReply(
     runProviderTurn: runDetachedProviderTurn,
     workspaceRoot: configDirectory,
   },
+  acknowledgementExecution: IssueExecutionRecommendation | null = null,
 ) {
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
@@ -922,17 +925,17 @@ async function runClaimedChannelReply(
       stopAcknowledgement = startDmAcknowledgement({
         signal: invocationSignal,
         select: async (selectionSignal) => {
+          const selectionAgent = dmAcknowledgementAgent(agent, acknowledgementExecution);
           const selectionWorkspace = await mkdtemp(join(workspacePath, ".acknowledgement-"));
           try {
             const turn = await runtime.runProviderTurn({
-              agent: { ...agent, name: "DM acknowledgement", responsibility: "Choose one contextual acknowledgement emoji only.",
-                skills: [], activeSkill: null, computerUsePolicy: "disabled", effort: "low" },
+              agent: selectionAgent,
               prompt: acknowledgementPrompt,
               workspacePath: selectionWorkspace,
               fullAccess: false,
               readOnly: true,
               conversationId: null,
-              environment: providerExecutionEnvironment(config, agent.provider, { ...process.env }),
+              environment: providerExecutionEnvironment(config, selectionAgent.provider, { ...process.env }),
               signal: selectionSignal,
             });
             assertDetachedProviderTurnSucceeded(turn);
