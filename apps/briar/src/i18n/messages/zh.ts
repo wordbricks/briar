@@ -163,7 +163,6 @@ export const zh = {
   "dm.relay.sentTo": "已发送消息 → {name}",
   "dm.relay.pending": "{name} 正在确认",
   "dm.relay.failed": "未能将消息送达 {name}。",
-  "dm.relay.from": "发送者 {name}",
   "dm.relay.open": "打开与 {name} 的智能体对话",
   "dm.agentConversation.readOnly": "智能体之间的对话 · 只读",
   "dm.agentConversation.back": "返回",

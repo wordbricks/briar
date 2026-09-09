@@ -817,8 +817,10 @@ export type ChannelThreadSubscriber = {
 /**
  * Links a message in the person's thread to its counterpart inside the
  * Agent-to-Agent direct message. `outbound` marks the short "sent to B" notice
- * the sending Agent leaves behind; `inbound` is B's answer copied back, so the
- * timeline can render "from B" and link through to the original.
+ * the sending Agent leaves behind, and is the only kind a round trip writes
+ * now: B's answer stays in the Agent-to-Agent conversation and reaches the
+ * person as the sending Agent's own summary. `inbound` marked a copy of that
+ * answer, and survives only on conversations from before that changed.
  */
 export type ChannelMessageRelay = {
   direction: "outbound" | "inbound";
@@ -827,7 +829,7 @@ export type ChannelMessageRelay = {
   peerAgentId: string;
   peerAgentName: string;
   peerAgentImage: string | null;
-  /** Outbound rows track the round trip; inbound rows are always completed. */
+  /** Outbound rows track the round trip; legacy inbound rows are completed. */
   status: "pending" | "completed" | "failed";
 };
 

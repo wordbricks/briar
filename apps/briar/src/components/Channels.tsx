@@ -124,10 +124,7 @@ import {
   saveChannelThreadWidth,
 } from "../lib/channel-thread-width";
 import { ChannelMessageText } from "./ChannelMessageText";
-import {
-  ChannelRelayFromLabel,
-  ChannelRelayOutboundNotice,
-} from "./ChannelRelayRow";
+import { ChannelRelayOutboundNotice } from "./ChannelRelayRow";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
 import { ChannelDocumentPreview } from "./ChannelDocumentPreview";
 import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
@@ -3291,9 +3288,6 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
       </div>
       <div className="channel-message-body">
-        {relay?.direction === "inbound" ? (
-          <ChannelRelayFromLabel onOpen={onOpenRelay} relay={relay} />
-        ) : null}
         <header>
           <strong>{displayName}</strong>
           {message.author.type === "webhook" ? (

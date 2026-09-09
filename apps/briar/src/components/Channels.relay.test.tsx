@@ -16,10 +16,11 @@ import { createTestRegistry } from "../state/registry";
 import { MessageRow, type MessageRowHandlers } from "./Channels";
 
 /*
-  The two rows an Agent-to-Agent round trip leaves in the person's own
-  conversation: the notice saying the request went out, and the answer that
-  came back wearing the other Agent's name. Both are links into the read-only
-  conversation, which is the only way to reach it from the timeline.
+  The one row an Agent-to-Agent round trip leaves in the person's own
+  conversation: the notice saying the request went out. The other Agent's
+  answer never reaches the timeline — it is read by the Agent that asked, which
+  then speaks for itself — so the notice is also the only way from here into
+  the read-only Agent-to-Agent conversation.
 */
 
 const channel: ChannelSummary = {
@@ -172,35 +173,6 @@ describe("MessageRow relay rows", () => {
     expect(notice?.textContent).toContain(
       "The message to Bay could not be delivered.",
     );
-
-    await view.cleanup();
-  });
-
-  it("labels an inbound relay with the Agent that answered", async () => {
-    const { opened, view } = await renderRow(
-      testChannelMessage("message-1", {
-        author: {
-          type: "agent",
-          id: "agent-b",
-          name: "Bay",
-          provider: "claude",
-          image: null,
-        },
-        body: "Checked. Nothing new.",
-        relay: relay({ direction: "inbound" }),
-      }),
-    );
-
-    // The answer is still a bubble, authored by the Agent that wrote it.
-    expect(view.container.querySelector(".channel-message")).not.toBeNull();
-    expect(view.container.textContent).toContain("Checked. Nothing new.");
-    const label = view.container.querySelector<HTMLButtonElement>(
-      ".channel-relay-from",
-    );
-    expect(label?.textContent).toContain("From Bay");
-
-    await act(async () => label?.click());
-    expect(opened.map((value) => value.peerChannelId)).toEqual(["agent-dm-1"]);
 
     await view.cleanup();
   });
