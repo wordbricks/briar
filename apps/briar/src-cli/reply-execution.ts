@@ -873,6 +873,7 @@ function logChannelReplySetup(
   durations: ReadonlyMap<ChannelReplySetupStep, number>,
   totalMs: number,
   steerFolded: boolean,
+  memoryBrief: "loaded" | "unavailable" | null,
 ) {
   console.log(`channel reply setup: ${JSON.stringify({
     workId,
@@ -880,6 +881,9 @@ function logChannelReplySetup(
       const elapsed = durations.get(step);
       return elapsed === undefined ? [] : [[step, elapsed] as const];
     })),
+    // A reply that answered without its stored preferences says so here, so a
+    // "it forgot what I told it" report has an answer in this one line.
+    ...(memoryBrief ? { memoryBrief } : {}),
     total: Math.round(totalMs),
     parallel: true,
     steerFolded,
@@ -1028,6 +1032,14 @@ async function runClaimedChannelReplyTurn(
         work: reply,
         memory: memoryDescriptor,
         signal: invocationSignal,
+        // A survived failure leaves no other trace: the reply succeeds and the
+        // completion says nothing about the brief it answered without.
+        onTransportFailure: ({ phase, error }) =>
+          console.error(
+            `channel reply memory ${phase} unavailable for ${reply.workId}: ${
+              dmMemoryErrorDiagnostic(error)
+            }`,
+          ),
       });
       try {
         /*
@@ -1517,6 +1529,7 @@ async function runClaimedChannelReplyTurn(
       setupDurations,
       performance.now() - claimedAt,
       folded !== null,
+      memoryInvocation ? memoryInvocation.briefState : null,
     );
     startedChannelReplyTurns.add(reply.workId);
     while (!result) {
