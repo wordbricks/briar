@@ -162,7 +162,7 @@ export function normalizeAgyEvent(
   if (!root) return [];
   const type = eventType(root);
   if (type === "result" || type.endsWith("result")) {
-    const finalText = textFrom(root.result) ?? textFrom(root);
+    const finalText = agyFinalMessage(raw, "");
     const events = completeActiveActivities(state);
     if (finalText && !state.messageStarted) {
       state.messageStarted = true;
@@ -353,6 +353,9 @@ export function agyEnvironment(
 
 export function agyFinalMessage(raw: unknown, fallback: string) {
   const root = recordValue(raw);
+  const result = recordValue(root?.result);
+  const structured = result?.structured_output ?? root?.structured_output;
+  if (structured !== undefined && structured !== null) return JSON.stringify(structured);
   return (root ? textFrom(root.result) ?? textFrom(root) : undefined) ?? fallback;
 }
 

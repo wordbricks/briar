@@ -171,3 +171,15 @@ Briar가 제공하는 명령을 일반 shell/terminal 도구로 호출한다. �
   Claude 실험의 본문 전용 테스트 schema에서는 본문에 JSON이 중첩되어 응답 표시 품질의 증거로 사용하지 않는다.
 - 증거: `neutral-schedule-provider-smoke-{codex,claude}.json` 및 같은 이름의 로그.
   `claude-main-only` 파일은 분류를 생략한 중간 실험이며 최종 통과 근거에서 제외한다.
+
+
+### OpenCode · Grok · Agy 실제 검수 (2026-09-09)
+
+Grok `grok-4.6`, OpenCode `opencode-go/grok-4.6`, Agy `gemini-3.8-flash-medium`의
+실제 예약 흐름이 각각 7/7을 통과했다. 사용자 지정 OpenCode `vllm/qwen3.8-flash-next`도
+실제 전체 응답 계약으로 7/7을 통과했다. 앞선 단락의 “나머지 7개 미검증” 범위를 이 세 제공자까지 확장한다.
+
+OpenCode의 분류 환경에 사용자 지정 모델 연결 선언을 보존하고, Agy의 OAuth 파일 누락과
+표시용 response를 구조화된 결과 대신 선택하던 어댑터 오류를 수정했다. Agy 최종 회신은 정상적인
+한국어 계산 결과였다. 로컬 합성 D1 검증이며 운영·UI 검증은 아니다. 세부 범위와 실패/수정 증거는
+로컬 `dm-minimal-implementation/provider-review.md` 및 `provider-review.json`에 기록했다.

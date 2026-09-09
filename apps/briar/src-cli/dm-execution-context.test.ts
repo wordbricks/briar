@@ -11,6 +11,9 @@ describe("provider-neutral DM continuation", () => {
     const workspace = await mkdtemp(join(tmpdir(), "dm-context-test-"));
     try {
       const context = await DmExecutionContext.open(workspace);
+      expect(context.prompt()).toContain(JSON.stringify(workspace));
+      expect(context.prompt()).toContain("use absolute paths");
+      expect(context.prompt()).not.toContain("historical data");
       await writeFile(join(workspace, "message.txt"), "C");
       await context.observe(create(RunnerToParentSchema, { payload: { case: "event", value: { normalized: { event: {
         case: "activityCompleted", value: { id: "tool1", kind: 3, status: 1, title: "Updated message.txt", text: "Changed structure to C" },
