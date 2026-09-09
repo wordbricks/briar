@@ -1269,7 +1269,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     ) -> BriarAPI_ChannelSummary {
         var message = BriarAPI_ChannelSummary()
         message.id = value.id.uuidString.lowercased()
-        message.organizationID = value.organizationId.uuidString.lowercased()
+        message.workspaceID = value.organizationId.uuidString.lowercased()
         message.slug = value.slug
         message.name = value.name
         if let topic = value.topic { message.topic = topic }

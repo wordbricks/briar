@@ -52,7 +52,7 @@ service ChannelService {
 }
 
 message ListChannelsRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message ListChannelsResponse {
@@ -64,7 +64,7 @@ message ListChannelsResponse {
 }
 
 message SyncChannelsRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   uint64 cursor = 2;
 }
 
@@ -80,7 +80,7 @@ message SyncChannelsResponse {
 }
 
 message ListDirectMessageRecipientsRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message ListDirectMessageRecipientsResponse {
@@ -91,7 +91,7 @@ message ListDirectMessageRecipientsResponse {
 message CreateDirectMessageRequest {
   reserved 2;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   repeated string member_ids = 3;
   repeated string agent_ids = 4;
 }
@@ -103,7 +103,7 @@ message CreateDirectMessageResponse {
 // The Agent-to-Agent conversations one Agent takes part in, for the
 // conversations tab on an Agent detail page. They are read-only for people.
 message ListAgentDirectMessagesRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string agent_id = 2;
 }
 
@@ -112,7 +112,7 @@ message ListAgentDirectMessagesResponse {
 }
 
 message CreateChannelRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string name = 2;
   optional string slug = 3;
   optional string topic = 4;
@@ -124,7 +124,7 @@ message UpdateChannelRequest {
   message ClearTopic {}
   message ClearDefaultProject {}
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   optional string name = 3;
   oneof topic_update {
@@ -148,7 +148,7 @@ message UpdateChannelResponse {
 }
 
 message DeleteChannelRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
 }
 
@@ -160,7 +160,7 @@ message SetChannelAgentRequest {
   message Add {}
   message Remove {}
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string agent_id = 3;
   oneof membership {
@@ -177,7 +177,7 @@ message SetChannelMemberRequest {
   message Add {}
   message Remove {}
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string user_id = 3;
   oneof membership {
@@ -191,7 +191,7 @@ message SetChannelMemberResponse {
 }
 
 message ListChannelWebhooksRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
 }
 
@@ -200,26 +200,26 @@ message ListChannelWebhooksResponse {
 }
 
 message CreateChannelWebhookRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string name = 3;
 }
 
 message UpdateChannelWebhookRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string webhook_id = 3;
   string name = 4;
 }
 
 message RotateChannelWebhookRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string webhook_id = 3;
 }
 
 message RevokeChannelWebhookRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string webhook_id = 3;
 }
@@ -243,7 +243,7 @@ message RevokeChannelWebhookResponse {
 }
 
 message GetChannelRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   optional uint32 message_limit = 3;
 }
@@ -260,7 +260,7 @@ message GetChannelResponse {
 message MarkChannelReadRequest {
   reserved 3;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   optional google.protobuf.Timestamp last_read_at = 4;
 }
@@ -270,7 +270,7 @@ message MarkChannelReadResponse {
 }
 
 message MarkChannelUnreadRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
 }
 
@@ -281,7 +281,7 @@ message MarkChannelUnreadResponse {
 // One conversation's placement in the caller's own sidebar. Every field is
 // optional so a menu action sends only what it changed.
 message UpdateChannelSidebarPreferenceRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   optional bool pinned = 3;
   optional bool hidden = 4;
@@ -297,7 +297,7 @@ message UpdateChannelSidebarPreferenceResponse {
 
 message ChannelSidebarSection {
   string id = 1;
-  string organization_id = 2;
+  string workspace_id = 2;
   string name = 3;
   uint32 position = 4;
   google.protobuf.Timestamp created_at = 5;
@@ -305,7 +305,7 @@ message ChannelSidebarSection {
 }
 
 message ListChannelSidebarSectionsRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message ListChannelSidebarSectionsResponse {
@@ -313,7 +313,7 @@ message ListChannelSidebarSectionsResponse {
 }
 
 message CreateChannelSidebarSectionRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string name = 2;
 }
 
@@ -325,7 +325,7 @@ message CreateChannelSidebarSectionResponse {
 }
 
 message RenameChannelSidebarSectionRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string section_id = 2;
   string name = 3;
 }
@@ -336,7 +336,7 @@ message RenameChannelSidebarSectionResponse {
 }
 
 message DeleteChannelSidebarSectionRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string section_id = 2;
 }
 
@@ -345,7 +345,7 @@ message DeleteChannelSidebarSectionResponse {
 }
 
 message ListChannelMessagesRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   optional string parent_message_id = 3;
   optional string cursor = 4;
@@ -361,7 +361,7 @@ message PrepareChannelMessageAttachmentsRequest {
   // Stable across a retry of one upload preparation attempt. Reusing it with
   // different scope or metadata fails rather than changing the reservation.
   string request_id = 1;
-  string organization_id = 2;
+  string workspace_id = 2;
   string channel_id = 3;
   // Binds this upload batch to the idempotency identity of the message that
   // is allowed to consume it.
@@ -377,7 +377,7 @@ message PrepareChannelMessageAttachmentsResponse {
 message CreateChannelMessageRequest {
   reserved 5, 9;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string client_message_id = 3;
   string body = 4;
@@ -387,7 +387,7 @@ message CreateChannelMessageRequest {
   optional string skill_id = 10;
   optional string preferred_device_id = 11;
   // Uploaded bytes must have been prepared by
-  // PrepareChannelMessageAttachments for this exact organization, channel,
+  // PrepareChannelMessageAttachments for this exact workspace, channel,
   // and authenticated user. The upload ID is also the durable attachment ID.
   repeated briar.types.v1.UploadReference attachments = 12;
 }
@@ -400,7 +400,7 @@ message CreateChannelMessageResponse {
 message DeleteChannelMessageRequest {
   reserved 4;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string message_id = 3;
 }
@@ -414,7 +414,7 @@ message DeleteChannelMessageResponse {
 message ToggleChannelMessageReactionRequest {
   reserved 5;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string message_id = 3;
   string emoji = 4;
@@ -427,7 +427,7 @@ message ToggleChannelMessageReactionResponse {
 message SetChannelThreadSubscriptionRequest {
   reserved 5;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string root_message_id = 3;
   bool subscribed = 4;
@@ -441,7 +441,7 @@ message SetChannelThreadSubscriptionResponse {
 message AcceptChannelProposalRequest {
   reserved 4;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string proposal_id = 3;
   optional string project_id = 5;
@@ -460,7 +460,7 @@ message AcceptChannelProposalResponse {
 message AcceptChannelExecutionProposalRequest {
   reserved 4;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string proposal_id = 3;
   IssueExecutionApproval approval = 5;
@@ -477,7 +477,7 @@ message AcceptChannelExecutionProposalResponse {
 message DeclineChannelProposalRequest {
   reserved 4;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string proposal_id = 3;
 }
@@ -495,7 +495,7 @@ message DeclineChannelProposalResponse {
 message AcceptChannelSkillExecutionProposalRequest {
   reserved 4;
 
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string proposal_id = 3;
   optional string worker_id = 5;
@@ -541,7 +541,7 @@ message DirectMessageParticipant {
 
 message ChannelSummary {
   string id = 1;
-  string organization_id = 2;
+  string workspace_id = 2;
   string slug = 3;
   string name = 4;
   optional string topic = 5;
@@ -636,7 +636,7 @@ message ChannelDocument {
 }
 
 message GetChannelMessageDocumentRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string message_id = 3;
 }
@@ -653,7 +653,7 @@ message GetChannelMessageDocumentResponse {
 }
 
 message GetChannelLinkPreviewRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string url = 3;
 }

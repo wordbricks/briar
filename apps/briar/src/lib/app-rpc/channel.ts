@@ -179,7 +179,7 @@ export const channelSummaryFromMessage = (
   value: ChannelSummaryMessage,
 ): ChannelSummary => ({
   id: value.id,
-  organizationId: value.organizationId,
+  organizationId: value.workspaceId,
   kind: channelKindFromProto(value.kind),
   slug: value.slug,
   name: value.name,
@@ -209,7 +209,7 @@ export const channelSidebarSectionFromMessage = (
   value: ChannelSidebarSectionMessage,
 ): ChannelSidebarSection => ({
   id: value.id,
-  organizationId: value.organizationId,
+  organizationId: value.workspaceId,
   name: value.name,
   position: value.position,
   createdAt: requiredTimestamp(value.createdAt, "sidebarSection.createdAt"),
@@ -872,10 +872,10 @@ export const dispatchFromMessage = (value: IssueExecutionDispatchMessage) => {
   };
 };
 
-export async function listChannels(token: string, organizationId: string) {
+export async function listChannels(token: string, workspaceId: string) {
   const client = requireChannelClient();
   const response = await client.listChannels(
-    { organizationId },
+    { workspaceId },
     appCallOptions(token),
   );
   return {
@@ -889,11 +889,11 @@ export async function listChannels(token: string, organizationId: string) {
 
 export async function listDirectMessageRecipients(
   token: string,
-  organizationId: string,
+  workspaceId: string,
 ): Promise<{ members: OrganizationMember[]; agents: ChannelAgentSummary[] }> {
   const client = requireChannelClient();
   const response = await client.listDirectMessageRecipients(
-    { organizationId },
+    { workspaceId },
     appCallOptions(token),
   );
   return {
@@ -904,12 +904,12 @@ export async function listDirectMessageRecipients(
 
 export async function createDirectMessage(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   input: { memberIds: string[]; agentIds: string[] },
 ) {
   const client = requireChannelClient();
   const response = await client.createDirectMessage(
-    { organizationId, memberIds: input.memberIds, agentIds: input.agentIds },
+    { workspaceId, memberIds: input.memberIds, agentIds: input.agentIds },
     appCallOptions(token),
   );
   return {
@@ -923,12 +923,12 @@ export async function createDirectMessage(
 /** The Agent-to-Agent conversations one Agent takes part in, newest first. */
 export async function listAgentDirectMessages(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   agentId: string,
 ): Promise<{ channels: ChannelSummary[] }> {
   const client = requireChannelClient();
   const response = await client.listAgentDirectMessages(
-    { organizationId, agentId },
+    { workspaceId, agentId },
     appCallOptions(token),
   );
   return { channels: response.channels.map(channelSummaryFromMessage) };
@@ -936,7 +936,7 @@ export async function listAgentDirectMessages(
 
 export async function createChannel(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   input: {
     name: string;
     slug?: string;
@@ -948,7 +948,7 @@ export async function createChannel(
   const client = requireChannelClient();
   const response = await client.createChannel(
     {
-      organizationId,
+      workspaceId,
       name: input.name,
       slug: input.slug,
       topic: input.topic ?? undefined,
@@ -966,7 +966,7 @@ export async function createChannel(
 
 export async function updateChannel(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   input: {
     name?: string;
@@ -979,7 +979,7 @@ export async function updateChannel(
   const client = requireChannelClient();
   const response = await client.updateChannel(
     {
-      organizationId,
+      workspaceId,
       channelId,
       name: input.name,
       topicUpdate: input.topic === undefined
@@ -1008,12 +1008,12 @@ export async function updateChannel(
 
 export async function deleteChannel(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
 ) {
   const client = requireChannelClient();
   const response = await client.deleteChannel(
-    { organizationId, channelId },
+    { workspaceId, channelId },
     appCallOptions(token),
   );
   return { deleted: response.deleted };
@@ -1021,7 +1021,7 @@ export async function deleteChannel(
 
 export async function setChannelAgent(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   agentId: string,
   present: boolean,
@@ -1029,7 +1029,7 @@ export async function setChannelAgent(
   const client = requireChannelClient();
   const response = await client.setChannelAgent(
     {
-      organizationId,
+      workspaceId,
       channelId,
       agentId,
       membership: present
@@ -1043,7 +1043,7 @@ export async function setChannelAgent(
 
 export async function setChannelMember(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
   present: boolean,
@@ -1051,7 +1051,7 @@ export async function setChannelMember(
   const client = requireChannelClient();
   const response = await client.setChannelMember(
     {
-      organizationId,
+      workspaceId,
       channelId,
       userId,
       membership: present
@@ -1065,12 +1065,12 @@ export async function setChannelMember(
 
 export async function listChannelWebhooks(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
 ) {
   const client = requireChannelClient();
   const response = await client.listChannelWebhooks(
-    { organizationId, channelId },
+    { workspaceId, channelId },
     appCallOptions(token),
   );
   return { webhooks: response.webhooks.map(channelWebhookFromMessage) };
@@ -1078,13 +1078,13 @@ export async function listChannelWebhooks(
 
 export async function createChannelWebhook(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   name: string,
 ) {
   const client = requireChannelClient();
   const response = await client.createChannelWebhook(
-    { organizationId, channelId, name },
+    { workspaceId, channelId, name },
     appCallOptions(token),
   );
   return {
@@ -1097,14 +1097,14 @@ export async function createChannelWebhook(
 
 export async function updateChannelWebhook(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   webhookId: string,
   name: string,
 ) {
   const client = requireChannelClient();
   const response = await client.updateChannelWebhook(
-    { organizationId, channelId, webhookId, name },
+    { workspaceId, channelId, webhookId, name },
     appCallOptions(token),
   );
   return {
@@ -1116,13 +1116,13 @@ export async function updateChannelWebhook(
 
 export async function rotateChannelWebhook(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   webhookId: string,
 ) {
   const client = requireChannelClient();
   const response = await client.rotateChannelWebhook(
-    { organizationId, channelId, webhookId },
+    { workspaceId, channelId, webhookId },
     appCallOptions(token),
   );
   return {
@@ -1135,13 +1135,13 @@ export async function rotateChannelWebhook(
 
 export async function revokeChannelWebhook(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   webhookId: string,
 ) {
   const client = requireChannelClient();
   const response = await client.revokeChannelWebhook(
-    { organizationId, channelId, webhookId },
+    { workspaceId, channelId, webhookId },
     appCallOptions(token),
   );
   return {
@@ -1153,14 +1153,14 @@ export async function revokeChannelWebhook(
 
 export async function loadChannel(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   options: { messageLimit?: number; signal?: AbortSignal } = {},
 ) {
   const client = requireChannelClient();
   const response = await client.getChannel(
     {
-      organizationId,
+      workspaceId,
       channelId,
       messageLimit: options.messageLimit,
     },
@@ -1181,14 +1181,14 @@ export async function loadChannel(
 
 export async function markChannelRead(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   input: { lastReadAt?: string } = {},
 ) {
   const client = requireChannelClient();
   const response = await client.markChannelRead(
     {
-      organizationId,
+      workspaceId,
       channelId,
       lastReadAt: input.lastReadAt === undefined
         ? undefined
@@ -1211,12 +1211,12 @@ export async function markChannelRead(
  */
 export async function markChannelUnread(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
 ) {
   const client = requireChannelClient();
   const response = await client.markChannelUnread(
-    { organizationId, channelId },
+    { workspaceId, channelId },
     appCallOptions(token),
   );
   return {
@@ -1234,7 +1234,7 @@ export async function markChannelUnread(
  */
 export async function updateChannelSidebarPreference(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   input: {
     pinned?: boolean;
@@ -1245,7 +1245,7 @@ export async function updateChannelSidebarPreference(
   const client = requireChannelClient();
   const response = await client.updateChannelSidebarPreference(
     {
-      organizationId,
+      workspaceId,
       channelId,
       pinned: input.pinned,
       hidden: input.hidden,
@@ -1267,11 +1267,11 @@ export async function updateChannelSidebarPreference(
 
 export async function listChannelSidebarSections(
   token: string,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const client = requireChannelClient();
   const response = await client.listChannelSidebarSections(
-    { organizationId },
+    { workspaceId },
     appCallOptions(token),
   );
   return { sections: response.sections.map(channelSidebarSectionFromMessage) };
@@ -1279,12 +1279,12 @@ export async function listChannelSidebarSections(
 
 export async function createChannelSidebarSection(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   name: string,
 ) {
   const client = requireChannelClient();
   const response = await client.createChannelSidebarSection(
-    { organizationId, name },
+    { workspaceId, name },
     appCallOptions(token),
   );
   return {
@@ -1298,13 +1298,13 @@ export async function createChannelSidebarSection(
 
 export async function renameChannelSidebarSection(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   sectionId: string,
   name: string,
 ) {
   const client = requireChannelClient();
   const response = await client.renameChannelSidebarSection(
-    { organizationId, sectionId, name },
+    { workspaceId, sectionId, name },
     appCallOptions(token),
   );
   return {
@@ -1318,12 +1318,12 @@ export async function renameChannelSidebarSection(
 
 export async function deleteChannelSidebarSection(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   sectionId: string,
 ) {
   const client = requireChannelClient();
   const response = await client.deleteChannelSidebarSection(
-    { organizationId, sectionId },
+    { workspaceId, sectionId },
     appCallOptions(token),
   );
   return { sections: response.sections.map(channelSidebarSectionFromMessage) };
@@ -1331,7 +1331,7 @@ export async function deleteChannelSidebarSection(
 
 export async function listChannelMessages(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   parentMessageId?: string,
   page: { limit?: number; cursor?: string; signal?: AbortSignal } = {},
@@ -1339,7 +1339,7 @@ export async function listChannelMessages(
   const client = requireChannelClient();
   const response = await client.listChannelMessages(
     {
-      organizationId,
+      workspaceId,
       channelId,
       parentMessageId,
       cursor: page.cursor,
@@ -1355,7 +1355,7 @@ export async function listChannelMessages(
 
 export async function sendChannelMessage(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   input: {
     body: string;
@@ -1391,7 +1391,7 @@ export async function sendChannelMessage(
     : await client.prepareChannelMessageAttachments(
         {
           requestId: crypto.randomUUID(),
-          organizationId,
+          workspaceId,
           channelId,
           clientMessageId,
           attachments: await Promise.all(
@@ -1432,7 +1432,7 @@ export async function sendChannelMessage(
   return createChannelMessageResultFromMessage(
     await client.createChannelMessage(
       {
-        organizationId,
+        workspaceId,
         channelId,
         clientMessageId,
         body,
@@ -1460,13 +1460,13 @@ const createChannelMessageResultFromMessage = (
 
 export async function deleteChannelMessage(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   messageId: string,
 ): Promise<DeleteChannelMessageResponse> {
   const client = requireChannelClient();
   const response = await client.deleteChannelMessage(
-    { organizationId, channelId, messageId },
+    { workspaceId, channelId, messageId },
     appCallOptions(token),
   );
   return {
@@ -1482,14 +1482,14 @@ export async function deleteChannelMessage(
 
 export async function toggleChannelMessageReaction(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   messageId: string,
   emoji: string,
 ) {
   const client = requireChannelClient();
   const response = await client.toggleChannelMessageReaction(
-    { organizationId, channelId, messageId, emoji },
+    { workspaceId, channelId, messageId, emoji },
     appCallOptions(token),
   );
   return {
@@ -1502,14 +1502,14 @@ export async function toggleChannelMessageReaction(
 
 export async function updateChannelThreadSubscription(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   messageId: string,
   subscribed: boolean,
 ) {
   const client = requireChannelClient();
   const response = await client.setChannelThreadSubscription(
-    { organizationId, channelId, rootMessageId: messageId, subscribed },
+    { workspaceId, channelId, rootMessageId: messageId, subscribed },
     appCallOptions(token),
   );
   return {
@@ -1526,7 +1526,7 @@ export async function updateChannelThreadSubscription(
 
 export async function acceptChannelProposal(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   proposalId: string,
   projectId: string | null,
@@ -1535,7 +1535,7 @@ export async function acceptChannelProposal(
   const client = requireChannelClient();
   const response = await client.acceptChannelProposal(
     {
-      organizationId,
+      workspaceId,
       channelId,
       proposalId,
       projectId: projectId ?? undefined,
@@ -1560,13 +1560,13 @@ export async function acceptChannelProposal(
 
 export async function declineChannelProposal(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   proposalId: string,
 ) {
   const client = requireChannelClient();
   const response = await client.declineChannelProposal(
-    { organizationId, channelId, proposalId },
+    { workspaceId, channelId, proposalId },
     appCallOptions(token),
   );
   const outcome = (() => {
@@ -1584,7 +1584,7 @@ export async function declineChannelProposal(
 
 export async function acceptChannelExecutionProposal(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   proposalId: string,
   input: IssueExecutionApprovalInput,
@@ -1592,7 +1592,7 @@ export async function acceptChannelExecutionProposal(
   const client = requireChannelClient();
   const response = await client.acceptChannelExecutionProposal(
     {
-      organizationId,
+      workspaceId,
       channelId,
       proposalId,
       approval: approvalToMessage(input),
@@ -1698,7 +1698,7 @@ export const validateAgentSkillExecutionAcceptance = (
 
 export async function acceptChannelSkillExecutionProposal(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   expectedProposal: AgentSkillExecutionProposal,
   input: AgentSkillExecutionApprovalInput,
@@ -1707,7 +1707,7 @@ export async function acceptChannelSkillExecutionProposal(
   const client = requireChannelClient();
   const response = await client.acceptChannelSkillExecutionProposal(
     {
-      organizationId,
+      workspaceId,
       channelId,
       proposalId: expectedProposal.id,
       workerId: input.workerId,
@@ -1730,14 +1730,14 @@ export async function acceptChannelSkillExecutionProposal(
 
 export async function loadChannelDelta(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   since: number,
   signal?: AbortSignal,
 ): Promise<ChannelDelta> {
   const client = requireChannelClient();
   const response = await client.syncChannels(
     {
-      organizationId,
+      workspaceId,
       cursor: cursorToProto(since, "channels.cursor"),
     },
     appCallOptions(token, signal),
@@ -1756,7 +1756,7 @@ export const channelDocumentContentFromMessage = (
 
 export async function loadChannelMessageDocument(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   messageId: string,
 ) {
@@ -1764,7 +1764,7 @@ export async function loadChannelMessageDocument(
   return ({
     document: channelDocumentContentFromMessage(requiredMessage(
       (await client.getChannelMessageDocument(
-        { organizationId, channelId, messageId },
+        { workspaceId, channelId, messageId },
         appCallOptions(token),
       )).document,
       "getChannelMessageDocument.document",
@@ -1787,13 +1787,13 @@ export const channelLinkPreviewFromMessage = (
 
 export async function loadChannelLinkPreview(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   targetUrl: string,
 ) {
   const client = requireChannelClient();
   const response = await client.getChannelLinkPreview(
-    { organizationId, channelId, url: targetUrl },
+    { workspaceId, channelId, url: targetUrl },
     appCallOptions(token),
   );
   return {

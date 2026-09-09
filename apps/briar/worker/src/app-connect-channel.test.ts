@@ -139,7 +139,7 @@ describe("app Channel Connect adapter", () => {
     });
 
     const result = await client.createChannelMessage({
-      organizationId,
+      workspaceId: organizationId,
       channelId,
       clientMessageId,
       body: "Please create the issue",
@@ -210,7 +210,7 @@ describe("app Channel Connect adapter", () => {
     });
 
     const result = await client.createChannel({
-      organizationId,
+      workspaceId: organizationId,
       name: "  Release Notes  ",
       slug: "  RELEASE-NOTES  ",
       topic: "  Shipping  ",
@@ -233,7 +233,7 @@ describe("app Channel Connect adapter", () => {
 
     createChannel.mockClear();
     await expect(client.createChannel({
-      organizationId,
+      workspaceId: organizationId,
       name: "Release Notes",
       visibility: ChannelVisibility.UNSPECIFIED,
     })).rejects.toMatchObject({ code: Code.InvalidArgument });
@@ -275,7 +275,7 @@ describe("app Channel Connect adapter", () => {
     });
 
     const result = await client.listAgentDirectMessages({
-      organizationId,
+      workspaceId: organizationId,
       agentId,
     });
     await flushBackgroundTasks();
@@ -301,7 +301,7 @@ describe("app Channel Connect adapter", () => {
     });
 
     await client.setChannelMember({
-      organizationId,
+      workspaceId: organizationId,
       channelId,
       userId: "target-member",
       membership: { case: "add", value: {} },
@@ -318,7 +318,7 @@ describe("app Channel Connect adapter", () => {
 
     setChannelMember.mockClear();
     await expect(client.setChannelMember({
-      organizationId,
+      workspaceId: organizationId,
       channelId,
       userId: "target-member",
     })).rejects.toMatchObject({ code: Code.InvalidArgument });

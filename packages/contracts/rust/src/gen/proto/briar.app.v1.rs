@@ -65207,14 +65207,14 @@ impl ::buffa::Enumeration for DmMessagePurpose {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListChannelsRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -65222,7 +65222,7 @@ pub struct ListChannelsRequest {
 impl ::core::fmt::Debug for ListChannelsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListChannelsRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .finish()
     }
 }
@@ -65253,10 +65253,8 @@ impl ::buffa::Message for ListChannelsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -65268,8 +65266,8 @@ impl ::buffa::Message for ListChannelsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -65289,7 +65287,7 @@ impl ::buffa::Message for ListChannelsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -65299,7 +65297,7 @@ impl ::buffa::Message for ListChannelsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -65540,14 +65538,14 @@ pub const __LIST_CHANNELS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct SyncChannelsRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `cursor`
     #[serde(
         rename = "cursor",
@@ -65562,7 +65560,7 @@ pub struct SyncChannelsRequest {
 impl ::core::fmt::Debug for SyncChannelsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("SyncChannelsRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("cursor", &self.cursor)
             .finish()
     }
@@ -65594,10 +65592,8 @@ impl ::buffa::Message for SyncChannelsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if self.cursor != 0u64 {
             size += 1u64 + ::buffa::types::uint64_encoded_len(self.cursor) as u64;
@@ -65612,8 +65608,8 @@ impl ::buffa::Message for SyncChannelsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if self.cursor != 0u64 {
             ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
@@ -65636,7 +65632,7 @@ impl ::buffa::Message for SyncChannelsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -65653,7 +65649,7 @@ impl ::buffa::Message for SyncChannelsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.cursor = 0u64;
         self.__buffa_unknown_fields.clear();
     }
@@ -66028,14 +66024,14 @@ pub const __SYNC_CHANNELS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListDirectMessageRecipientsRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -66043,7 +66039,7 @@ pub struct ListDirectMessageRecipientsRequest {
 impl ::core::fmt::Debug for ListDirectMessageRecipientsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListDirectMessageRecipientsRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .finish()
     }
 }
@@ -66074,10 +66070,8 @@ impl ::buffa::Message for ListDirectMessageRecipientsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -66089,8 +66083,8 @@ impl ::buffa::Message for ListDirectMessageRecipientsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -66110,7 +66104,7 @@ impl ::buffa::Message for ListDirectMessageRecipientsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -66120,7 +66114,7 @@ impl ::buffa::Message for ListDirectMessageRecipientsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -66339,14 +66333,14 @@ pub const __LIST_DIRECT_MESSAGE_RECIPIENTS_RESPONSE_JSON_ANY: ::buffa::type_regi
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateDirectMessageRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 3: `member_ids`
     #[serde(
         rename = "memberIds",
@@ -66370,7 +66364,7 @@ pub struct CreateDirectMessageRequest {
 impl ::core::fmt::Debug for CreateDirectMessageRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateDirectMessageRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("member_ids", &self.member_ids)
             .field("agent_ids", &self.agent_ids)
             .finish()
@@ -66403,10 +66397,8 @@ impl ::buffa::Message for CreateDirectMessageRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         for v in &self.member_ids {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -66424,8 +66416,8 @@ impl ::buffa::Message for CreateDirectMessageRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         for v in &self.member_ids {
             ::buffa::types::put_string_field(3u32, v, buf);
@@ -66451,7 +66443,7 @@ impl ::buffa::Message for CreateDirectMessageRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -66483,7 +66475,7 @@ impl ::buffa::Message for CreateDirectMessageRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.member_ids.clear();
         self.agent_ids.clear();
         self.__buffa_unknown_fields.clear();
@@ -66663,14 +66655,14 @@ pub const __CREATE_DIRECT_MESSAGE_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListAgentDirectMessagesRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `agent_id`
     #[serde(
         rename = "agentId",
@@ -66686,7 +66678,7 @@ pub struct ListAgentDirectMessagesRequest {
 impl ::core::fmt::Debug for ListAgentDirectMessagesRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListAgentDirectMessagesRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("agent_id", &self.agent_id)
             .finish()
     }
@@ -66718,10 +66710,8 @@ impl ::buffa::Message for ListAgentDirectMessagesRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.agent_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
@@ -66736,8 +66726,8 @@ impl ::buffa::Message for ListAgentDirectMessagesRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.agent_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
@@ -66760,7 +66750,7 @@ impl ::buffa::Message for ListAgentDirectMessagesRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -66777,7 +66767,7 @@ impl ::buffa::Message for ListAgentDirectMessagesRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.agent_id.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -66956,14 +66946,14 @@ pub const __LIST_AGENT_DIRECT_MESSAGES_RESPONSE_JSON_ANY: ::buffa::type_registry
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateChannelRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `name`
     #[serde(
         rename = "name",
@@ -66998,7 +66988,7 @@ pub struct CreateChannelRequest {
 impl ::core::fmt::Debug for CreateChannelRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateChannelRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("name", &self.name)
             .field("slug", &self.slug)
             .field("topic", &self.topic)
@@ -67066,10 +67056,8 @@ impl ::buffa::Message for CreateChannelRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
@@ -67099,8 +67087,8 @@ impl ::buffa::Message for CreateChannelRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.name, buf);
@@ -67138,7 +67126,7 @@ impl ::buffa::Message for CreateChannelRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -67196,7 +67184,7 @@ impl ::buffa::Message for CreateChannelRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.name.clear();
         self.slug = ::core::option::Option::None;
         self.topic = ::core::option::Option::None;
@@ -67238,14 +67226,14 @@ pub const __CREATE_CHANNEL_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct UpdateChannelRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -67285,7 +67273,7 @@ pub struct UpdateChannelRequest {
 impl ::core::fmt::Debug for UpdateChannelRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateChannelRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("name", &self.name)
             .field("visibility", &self.visibility)
@@ -67351,10 +67339,8 @@ impl ::buffa::Message for UpdateChannelRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -67412,8 +67398,8 @@ impl ::buffa::Message for UpdateChannelRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -67479,7 +67465,7 @@ impl ::buffa::Message for UpdateChannelRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -67590,7 +67576,7 @@ impl ::buffa::Message for UpdateChannelRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.name = ::core::option::Option::None;
         self.topic_update = ::core::option::Option::None;
@@ -67624,7 +67610,7 @@ impl<'de> serde::Deserialize<'de> for UpdateChannelRequest {
                 self,
                 mut map: A,
             ) -> ::core::result::Result<UpdateChannelRequest, A::Error> {
-                let mut __f_organization_id: ::core::option::Option<
+                let mut __f_workspace_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_channel_id: ::core::option::Option<
@@ -67647,8 +67633,8 @@ impl<'de> serde::Deserialize<'de> for UpdateChannelRequest {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "organizationId" | "organization_id" => {
-                            __f_organization_id = Some({
+                        "workspaceId" | "workspace_id" => {
+                            __f_workspace_id = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::alloc::string::String;
@@ -67828,8 +67814,8 @@ impl<'de> serde::Deserialize<'de> for UpdateChannelRequest {
                     }
                 }
                 let mut __r = <UpdateChannelRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_organization_id {
-                    __r.organization_id = v;
+                if let ::core::option::Option::Some(v) = __f_workspace_id {
+                    __r.workspace_id = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_channel_id {
                     __r.channel_id = v;
@@ -68375,14 +68361,14 @@ pub const __UPDATE_CHANNEL_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct DeleteChannelRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -68398,7 +68384,7 @@ pub struct DeleteChannelRequest {
 impl ::core::fmt::Debug for DeleteChannelRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("DeleteChannelRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .finish()
     }
@@ -68430,10 +68416,8 @@ impl ::buffa::Message for DeleteChannelRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -68448,8 +68432,8 @@ impl ::buffa::Message for DeleteChannelRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -68472,7 +68456,7 @@ impl ::buffa::Message for DeleteChannelRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -68489,7 +68473,7 @@ impl ::buffa::Message for DeleteChannelRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -68651,14 +68635,14 @@ pub const __DELETE_CHANNEL_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct SetChannelAgentRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -68686,7 +68670,7 @@ pub struct SetChannelAgentRequest {
 impl ::core::fmt::Debug for SetChannelAgentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("SetChannelAgentRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("agent_id", &self.agent_id)
             .field("membership", &self.membership)
@@ -68720,10 +68704,8 @@ impl ::buffa::Message for SetChannelAgentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -68761,8 +68743,8 @@ impl ::buffa::Message for SetChannelAgentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -68808,7 +68790,7 @@ impl ::buffa::Message for SetChannelAgentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -68876,7 +68858,7 @@ impl ::buffa::Message for SetChannelAgentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.agent_id.clear();
         self.membership = ::core::option::Option::None;
@@ -68907,7 +68889,7 @@ impl<'de> serde::Deserialize<'de> for SetChannelAgentRequest {
                 self,
                 mut map: A,
             ) -> ::core::result::Result<SetChannelAgentRequest, A::Error> {
-                let mut __f_organization_id: ::core::option::Option<
+                let mut __f_workspace_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_channel_id: ::core::option::Option<
@@ -68921,8 +68903,8 @@ impl<'de> serde::Deserialize<'de> for SetChannelAgentRequest {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "organizationId" | "organization_id" => {
-                            __f_organization_id = Some({
+                        "workspaceId" | "workspace_id" => {
+                            __f_workspace_id = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::alloc::string::String;
@@ -69033,8 +69015,8 @@ impl<'de> serde::Deserialize<'de> for SetChannelAgentRequest {
                     }
                 }
                 let mut __r = <SetChannelAgentRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_organization_id {
-                    __r.organization_id = v;
+                if let ::core::option::Option::Some(v) = __f_workspace_id {
+                    __r.workspace_id = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_channel_id {
                     __r.channel_id = v;
@@ -69434,14 +69416,14 @@ pub const __SET_CHANNEL_AGENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct SetChannelMemberRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -69469,7 +69451,7 @@ pub struct SetChannelMemberRequest {
 impl ::core::fmt::Debug for SetChannelMemberRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("SetChannelMemberRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("user_id", &self.user_id)
             .field("membership", &self.membership)
@@ -69503,10 +69485,8 @@ impl ::buffa::Message for SetChannelMemberRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -69544,8 +69524,8 @@ impl ::buffa::Message for SetChannelMemberRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -69591,7 +69571,7 @@ impl ::buffa::Message for SetChannelMemberRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -69659,7 +69639,7 @@ impl ::buffa::Message for SetChannelMemberRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.user_id.clear();
         self.membership = ::core::option::Option::None;
@@ -69690,7 +69670,7 @@ impl<'de> serde::Deserialize<'de> for SetChannelMemberRequest {
                 self,
                 mut map: A,
             ) -> ::core::result::Result<SetChannelMemberRequest, A::Error> {
-                let mut __f_organization_id: ::core::option::Option<
+                let mut __f_workspace_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_channel_id: ::core::option::Option<
@@ -69704,8 +69684,8 @@ impl<'de> serde::Deserialize<'de> for SetChannelMemberRequest {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "organizationId" | "organization_id" => {
-                            __f_organization_id = Some({
+                        "workspaceId" | "workspace_id" => {
+                            __f_workspace_id = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::alloc::string::String;
@@ -69816,8 +69796,8 @@ impl<'de> serde::Deserialize<'de> for SetChannelMemberRequest {
                     }
                 }
                 let mut __r = <SetChannelMemberRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_organization_id {
-                    __r.organization_id = v;
+                if let ::core::option::Option::Some(v) = __f_workspace_id {
+                    __r.workspace_id = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_channel_id {
                     __r.channel_id = v;
@@ -70219,14 +70199,14 @@ pub const __SET_CHANNEL_MEMBER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAn
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListChannelWebhooksRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -70242,7 +70222,7 @@ pub struct ListChannelWebhooksRequest {
 impl ::core::fmt::Debug for ListChannelWebhooksRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListChannelWebhooksRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .finish()
     }
@@ -70274,10 +70254,8 @@ impl ::buffa::Message for ListChannelWebhooksRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -70292,8 +70270,8 @@ impl ::buffa::Message for ListChannelWebhooksRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -70316,7 +70294,7 @@ impl ::buffa::Message for ListChannelWebhooksRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -70333,7 +70311,7 @@ impl ::buffa::Message for ListChannelWebhooksRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -70512,14 +70490,14 @@ pub const __LIST_CHANNEL_WEBHOOKS_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateChannelWebhookRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -70542,7 +70520,7 @@ pub struct CreateChannelWebhookRequest {
 impl ::core::fmt::Debug for CreateChannelWebhookRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateChannelWebhookRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("name", &self.name)
             .finish()
@@ -70575,10 +70553,8 @@ impl ::buffa::Message for CreateChannelWebhookRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -70596,8 +70572,8 @@ impl ::buffa::Message for CreateChannelWebhookRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -70623,7 +70599,7 @@ impl ::buffa::Message for CreateChannelWebhookRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -70647,7 +70623,7 @@ impl ::buffa::Message for CreateChannelWebhookRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.name.clear();
         self.__buffa_unknown_fields.clear();
@@ -70686,14 +70662,14 @@ pub const __CREATE_CHANNEL_WEBHOOK_REQUEST_JSON_ANY: ::buffa::type_registry::Jso
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct UpdateChannelWebhookRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -70724,7 +70700,7 @@ pub struct UpdateChannelWebhookRequest {
 impl ::core::fmt::Debug for UpdateChannelWebhookRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateChannelWebhookRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("webhook_id", &self.webhook_id)
             .field("name", &self.name)
@@ -70758,10 +70734,8 @@ impl ::buffa::Message for UpdateChannelWebhookRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -70782,8 +70756,8 @@ impl ::buffa::Message for UpdateChannelWebhookRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -70812,7 +70786,7 @@ impl ::buffa::Message for UpdateChannelWebhookRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -70843,7 +70817,7 @@ impl ::buffa::Message for UpdateChannelWebhookRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.webhook_id.clear();
         self.name.clear();
@@ -70883,14 +70857,14 @@ pub const __UPDATE_CHANNEL_WEBHOOK_REQUEST_JSON_ANY: ::buffa::type_registry::Jso
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct RotateChannelWebhookRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -70914,7 +70888,7 @@ pub struct RotateChannelWebhookRequest {
 impl ::core::fmt::Debug for RotateChannelWebhookRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("RotateChannelWebhookRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("webhook_id", &self.webhook_id)
             .finish()
@@ -70947,10 +70921,8 @@ impl ::buffa::Message for RotateChannelWebhookRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -70968,8 +70940,8 @@ impl ::buffa::Message for RotateChannelWebhookRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -70995,7 +70967,7 @@ impl ::buffa::Message for RotateChannelWebhookRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -71019,7 +70991,7 @@ impl ::buffa::Message for RotateChannelWebhookRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.webhook_id.clear();
         self.__buffa_unknown_fields.clear();
@@ -71058,14 +71030,14 @@ pub const __ROTATE_CHANNEL_WEBHOOK_REQUEST_JSON_ANY: ::buffa::type_registry::Jso
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct RevokeChannelWebhookRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -71089,7 +71061,7 @@ pub struct RevokeChannelWebhookRequest {
 impl ::core::fmt::Debug for RevokeChannelWebhookRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("RevokeChannelWebhookRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("webhook_id", &self.webhook_id)
             .finish()
@@ -71122,10 +71094,8 @@ impl ::buffa::Message for RevokeChannelWebhookRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -71143,8 +71113,8 @@ impl ::buffa::Message for RevokeChannelWebhookRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -71170,7 +71140,7 @@ impl ::buffa::Message for RevokeChannelWebhookRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -71194,7 +71164,7 @@ impl ::buffa::Message for RevokeChannelWebhookRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.webhook_id.clear();
         self.__buffa_unknown_fields.clear();
@@ -71833,14 +71803,14 @@ pub const __REVOKE_CHANNEL_WEBHOOK_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetChannelRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -71864,7 +71834,7 @@ pub struct GetChannelRequest {
 impl ::core::fmt::Debug for GetChannelRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetChannelRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("message_limit", &self.message_limit)
             .finish()
@@ -71906,10 +71876,8 @@ impl ::buffa::Message for GetChannelRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -71927,8 +71895,8 @@ impl ::buffa::Message for GetChannelRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -71954,7 +71922,7 @@ impl ::buffa::Message for GetChannelRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -71980,7 +71948,7 @@ impl ::buffa::Message for GetChannelRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.message_limit = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
@@ -72346,14 +72314,14 @@ pub const __GET_CHANNEL_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct MarkChannelReadRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -72379,7 +72347,7 @@ pub struct MarkChannelReadRequest {
 impl ::core::fmt::Debug for MarkChannelReadRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("MarkChannelReadRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("last_read_at", &self.last_read_at)
             .finish()
@@ -72412,10 +72380,8 @@ impl ::buffa::Message for MarkChannelReadRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -72438,8 +72404,8 @@ impl ::buffa::Message for MarkChannelReadRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -72470,7 +72436,7 @@ impl ::buffa::Message for MarkChannelReadRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -72498,7 +72464,7 @@ impl ::buffa::Message for MarkChannelReadRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.last_read_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
@@ -72676,14 +72642,14 @@ pub const __MARK_CHANNEL_READ_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct MarkChannelUnreadRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -72699,7 +72665,7 @@ pub struct MarkChannelUnreadRequest {
 impl ::core::fmt::Debug for MarkChannelUnreadRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("MarkChannelUnreadRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .finish()
     }
@@ -72731,10 +72697,8 @@ impl ::buffa::Message for MarkChannelUnreadRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -72749,8 +72713,8 @@ impl ::buffa::Message for MarkChannelUnreadRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -72773,7 +72737,7 @@ impl ::buffa::Message for MarkChannelUnreadRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -72790,7 +72754,7 @@ impl ::buffa::Message for MarkChannelUnreadRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -72969,14 +72933,14 @@ pub const __MARK_CHANNEL_UNREAD_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct UpdateChannelSidebarPreferenceRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -73002,7 +72966,7 @@ pub struct UpdateChannelSidebarPreferenceRequest {
 impl ::core::fmt::Debug for UpdateChannelSidebarPreferenceRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateChannelSidebarPreferenceRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("pinned", &self.pinned)
             .field("hidden", &self.hidden)
@@ -73053,10 +73017,8 @@ impl ::buffa::Message for UpdateChannelSidebarPreferenceRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -73096,8 +73058,8 @@ impl ::buffa::Message for UpdateChannelSidebarPreferenceRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -73145,7 +73107,7 @@ impl ::buffa::Message for UpdateChannelSidebarPreferenceRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -73213,7 +73175,7 @@ impl ::buffa::Message for UpdateChannelSidebarPreferenceRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.pinned = ::core::option::Option::None;
         self.hidden = ::core::option::Option::None;
@@ -73248,7 +73210,7 @@ impl<'de> serde::Deserialize<'de> for UpdateChannelSidebarPreferenceRequest {
                 UpdateChannelSidebarPreferenceRequest,
                 A::Error,
             > {
-                let mut __f_organization_id: ::core::option::Option<
+                let mut __f_workspace_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_channel_id: ::core::option::Option<
@@ -73265,8 +73227,8 @@ impl<'de> serde::Deserialize<'de> for UpdateChannelSidebarPreferenceRequest {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "organizationId" | "organization_id" => {
-                            __f_organization_id = Some({
+                        "workspaceId" | "workspace_id" => {
+                            __f_workspace_id = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::alloc::string::String;
@@ -73369,8 +73331,8 @@ impl<'de> serde::Deserialize<'de> for UpdateChannelSidebarPreferenceRequest {
                     }
                 }
                 let mut __r = <UpdateChannelSidebarPreferenceRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_organization_id {
-                    __r.organization_id = v;
+                if let ::core::option::Option::Some(v) = __f_workspace_id {
+                    __r.workspace_id = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_channel_id {
                     __r.channel_id = v;
@@ -73574,14 +73536,14 @@ pub struct ChannelSidebarSection {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub id: ::buffa::alloc::string::String,
-    /// Field 2: `organization_id`
+    /// Field 2: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 3: `name`
     #[serde(
         rename = "name",
@@ -73624,7 +73586,7 @@ impl ::core::fmt::Debug for ChannelSidebarSection {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ChannelSidebarSection")
             .field("id", &self.id)
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("name", &self.name)
             .field("position", &self.position)
             .field("created_at", &self.created_at)
@@ -73662,10 +73624,8 @@ impl ::buffa::Message for ChannelSidebarSection {
         if !self.id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
         }
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
@@ -73702,8 +73662,8 @@ impl ::buffa::Message for ChannelSidebarSection {
         if !self.id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.id, buf);
         }
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.workspace_id, buf);
         }
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.name, buf);
@@ -73752,7 +73712,7 @@ impl ::buffa::Message for ChannelSidebarSection {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -73799,7 +73759,7 @@ impl ::buffa::Message for ChannelSidebarSection {
     }
     fn clear(&mut self) {
         self.id.clear();
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.name.clear();
         self.position = 0u32;
         self.created_at = ::buffa::MessageField::none();
@@ -73840,14 +73800,14 @@ pub const __CHANNEL_SIDEBAR_SECTION_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListChannelSidebarSectionsRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -73855,7 +73815,7 @@ pub struct ListChannelSidebarSectionsRequest {
 impl ::core::fmt::Debug for ListChannelSidebarSectionsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListChannelSidebarSectionsRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .finish()
     }
 }
@@ -73886,10 +73846,8 @@ impl ::buffa::Message for ListChannelSidebarSectionsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -73901,8 +73859,8 @@ impl ::buffa::Message for ListChannelSidebarSectionsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -73922,7 +73880,7 @@ impl ::buffa::Message for ListChannelSidebarSectionsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -73932,7 +73890,7 @@ impl ::buffa::Message for ListChannelSidebarSectionsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -74114,14 +74072,14 @@ pub const __LIST_CHANNEL_SIDEBAR_SECTIONS_RESPONSE_JSON_ANY: ::buffa::type_regis
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateChannelSidebarSectionRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `name`
     #[serde(
         rename = "name",
@@ -74136,7 +74094,7 @@ pub struct CreateChannelSidebarSectionRequest {
 impl ::core::fmt::Debug for CreateChannelSidebarSectionRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateChannelSidebarSectionRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("name", &self.name)
             .finish()
     }
@@ -74168,10 +74126,8 @@ impl ::buffa::Message for CreateChannelSidebarSectionRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
@@ -74186,8 +74142,8 @@ impl ::buffa::Message for CreateChannelSidebarSectionRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.name, buf);
@@ -74210,7 +74166,7 @@ impl ::buffa::Message for CreateChannelSidebarSectionRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -74227,7 +74183,7 @@ impl ::buffa::Message for CreateChannelSidebarSectionRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.name.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -74450,14 +74406,14 @@ pub const __CREATE_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY: ::buffa::type_regi
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct RenameChannelSidebarSectionRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `section_id`
     #[serde(
         rename = "sectionId",
@@ -74480,7 +74436,7 @@ pub struct RenameChannelSidebarSectionRequest {
 impl ::core::fmt::Debug for RenameChannelSidebarSectionRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("RenameChannelSidebarSectionRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("section_id", &self.section_id)
             .field("name", &self.name)
             .finish()
@@ -74513,10 +74469,8 @@ impl ::buffa::Message for RenameChannelSidebarSectionRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.section_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.section_id) as u64;
@@ -74534,8 +74488,8 @@ impl ::buffa::Message for RenameChannelSidebarSectionRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.section_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.section_id, buf);
@@ -74561,7 +74515,7 @@ impl ::buffa::Message for RenameChannelSidebarSectionRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -74585,7 +74539,7 @@ impl ::buffa::Message for RenameChannelSidebarSectionRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.section_id.clear();
         self.name.clear();
         self.__buffa_unknown_fields.clear();
@@ -74807,14 +74761,14 @@ pub const __RENAME_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY: ::buffa::type_regi
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct DeleteChannelSidebarSectionRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `section_id`
     #[serde(
         rename = "sectionId",
@@ -74830,7 +74784,7 @@ pub struct DeleteChannelSidebarSectionRequest {
 impl ::core::fmt::Debug for DeleteChannelSidebarSectionRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("DeleteChannelSidebarSectionRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("section_id", &self.section_id)
             .finish()
     }
@@ -74862,10 +74816,8 @@ impl ::buffa::Message for DeleteChannelSidebarSectionRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.section_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.section_id) as u64;
@@ -74880,8 +74832,8 @@ impl ::buffa::Message for DeleteChannelSidebarSectionRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.section_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.section_id, buf);
@@ -74904,7 +74856,7 @@ impl ::buffa::Message for DeleteChannelSidebarSectionRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -74921,7 +74873,7 @@ impl ::buffa::Message for DeleteChannelSidebarSectionRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.section_id.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -75104,14 +75056,14 @@ pub const __DELETE_CHANNEL_SIDEBAR_SECTION_RESPONSE_JSON_ANY: ::buffa::type_regi
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListChannelMessagesRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -75144,7 +75096,7 @@ pub struct ListChannelMessagesRequest {
 impl ::core::fmt::Debug for ListChannelMessagesRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListChannelMessagesRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("parent_message_id", &self.parent_message_id)
             .field("cursor", &self.cursor)
@@ -75208,10 +75160,8 @@ impl ::buffa::Message for ListChannelMessagesRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -75235,8 +75185,8 @@ impl ::buffa::Message for ListChannelMessagesRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -75268,7 +75218,7 @@ impl ::buffa::Message for ListChannelMessagesRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -75316,7 +75266,7 @@ impl ::buffa::Message for ListChannelMessagesRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.parent_message_id = ::core::option::Option::None;
         self.cursor = ::core::option::Option::None;
@@ -75548,14 +75498,14 @@ pub struct PrepareChannelMessageAttachmentsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
-    /// Field 2: `organization_id`
+    /// Field 2: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 3: `channel_id`
     #[serde(
         rename = "channelId",
@@ -75592,7 +75542,7 @@ impl ::core::fmt::Debug for PrepareChannelMessageAttachmentsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("PrepareChannelMessageAttachmentsRequest")
             .field("request_id", &self.request_id)
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("client_message_id", &self.client_message_id)
             .field("attachments", &self.attachments)
@@ -75629,10 +75579,8 @@ impl ::buffa::Message for PrepareChannelMessageAttachmentsRequest {
         if !self.request_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.request_id) as u64;
         }
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -75663,8 +75611,8 @@ impl ::buffa::Message for PrepareChannelMessageAttachmentsRequest {
         if !self.request_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.request_id, buf);
         }
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.channel_id, buf);
@@ -75705,7 +75653,7 @@ impl ::buffa::Message for PrepareChannelMessageAttachmentsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -75742,7 +75690,7 @@ impl ::buffa::Message for PrepareChannelMessageAttachmentsRequest {
     }
     fn clear(&mut self) {
         self.request_id.clear();
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.client_message_id.clear();
         self.attachments.clear();
@@ -75953,14 +75901,14 @@ pub const __PREPARE_CHANNEL_MESSAGE_ATTACHMENTS_RESPONSE_JSON_ANY: ::buffa::type
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateChannelMessageRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -76022,7 +75970,7 @@ pub struct CreateChannelMessageRequest {
     )]
     pub preferred_device_id: ::core::option::Option<::buffa::alloc::string::String>,
     /// Uploaded bytes must have been prepared by
-    /// PrepareChannelMessageAttachments for this exact organization, channel,
+    /// PrepareChannelMessageAttachments for this exact workspace, channel,
     /// and authenticated user. The upload ID is also the durable attachment ID.
     ///
     /// Field 12: `attachments`
@@ -76039,7 +75987,7 @@ pub struct CreateChannelMessageRequest {
 impl ::core::fmt::Debug for CreateChannelMessageRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateChannelMessageRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("client_message_id", &self.client_message_id)
             .field("body", &self.body)
@@ -76111,10 +76059,8 @@ impl ::buffa::Message for CreateChannelMessageRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -76160,8 +76106,8 @@ impl ::buffa::Message for CreateChannelMessageRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -76213,7 +76159,7 @@ impl ::buffa::Message for CreateChannelMessageRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -76314,7 +76260,7 @@ impl ::buffa::Message for CreateChannelMessageRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.client_message_id.clear();
         self.body.clear();
@@ -76537,14 +76483,14 @@ pub const __CREATE_CHANNEL_MESSAGE_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct DeleteChannelMessageRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -76568,7 +76514,7 @@ pub struct DeleteChannelMessageRequest {
 impl ::core::fmt::Debug for DeleteChannelMessageRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("DeleteChannelMessageRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("message_id", &self.message_id)
             .finish()
@@ -76601,10 +76547,8 @@ impl ::buffa::Message for DeleteChannelMessageRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -76622,8 +76566,8 @@ impl ::buffa::Message for DeleteChannelMessageRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -76649,7 +76593,7 @@ impl ::buffa::Message for DeleteChannelMessageRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -76673,7 +76617,7 @@ impl ::buffa::Message for DeleteChannelMessageRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.message_id.clear();
         self.__buffa_unknown_fields.clear();
@@ -76912,14 +76856,14 @@ pub const __DELETE_CHANNEL_MESSAGE_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ToggleChannelMessageReactionRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -76950,7 +76894,7 @@ pub struct ToggleChannelMessageReactionRequest {
 impl ::core::fmt::Debug for ToggleChannelMessageReactionRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ToggleChannelMessageReactionRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("message_id", &self.message_id)
             .field("emoji", &self.emoji)
@@ -76984,10 +76928,8 @@ impl ::buffa::Message for ToggleChannelMessageReactionRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -77008,8 +76950,8 @@ impl ::buffa::Message for ToggleChannelMessageReactionRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -77038,7 +76980,7 @@ impl ::buffa::Message for ToggleChannelMessageReactionRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -77069,7 +77011,7 @@ impl ::buffa::Message for ToggleChannelMessageReactionRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.message_id.clear();
         self.emoji.clear();
@@ -77252,14 +77194,14 @@ pub const __TOGGLE_CHANNEL_MESSAGE_REACTION_RESPONSE_JSON_ANY: ::buffa::type_reg
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct SetChannelThreadSubscriptionRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -77290,7 +77232,7 @@ pub struct SetChannelThreadSubscriptionRequest {
 impl ::core::fmt::Debug for SetChannelThreadSubscriptionRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("SetChannelThreadSubscriptionRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("root_message_id", &self.root_message_id)
             .field("subscribed", &self.subscribed)
@@ -77324,10 +77266,8 @@ impl ::buffa::Message for SetChannelThreadSubscriptionRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -77350,8 +77290,8 @@ impl ::buffa::Message for SetChannelThreadSubscriptionRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -77380,7 +77320,7 @@ impl ::buffa::Message for SetChannelThreadSubscriptionRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -77411,7 +77351,7 @@ impl ::buffa::Message for SetChannelThreadSubscriptionRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.root_message_id.clear();
         self.subscribed = false;
@@ -77621,14 +77561,14 @@ pub const __SET_CHANNEL_THREAD_SUBSCRIPTION_RESPONSE_JSON_ANY: ::buffa::type_reg
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct AcceptChannelProposalRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -77668,7 +77608,7 @@ pub struct AcceptChannelProposalRequest {
 impl ::core::fmt::Debug for AcceptChannelProposalRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("AcceptChannelProposalRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("proposal_id", &self.proposal_id)
             .field("project_id", &self.project_id)
@@ -77715,10 +77655,8 @@ impl ::buffa::Message for AcceptChannelProposalRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -77747,8 +77685,8 @@ impl ::buffa::Message for AcceptChannelProposalRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -77785,7 +77723,7 @@ impl ::buffa::Message for AcceptChannelProposalRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -77832,7 +77770,7 @@ impl ::buffa::Message for AcceptChannelProposalRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.proposal_id.clear();
         self.project_id = ::core::option::Option::None;
@@ -78169,14 +78107,14 @@ pub const __ACCEPT_CHANNEL_PROPOSAL_RESPONSE_JSON_ANY: ::buffa::type_registry::J
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct AcceptChannelExecutionProposalRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -78209,7 +78147,7 @@ pub struct AcceptChannelExecutionProposalRequest {
 impl ::core::fmt::Debug for AcceptChannelExecutionProposalRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("AcceptChannelExecutionProposalRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("proposal_id", &self.proposal_id)
             .field("approval", &self.approval)
@@ -78243,10 +78181,8 @@ impl ::buffa::Message for AcceptChannelExecutionProposalRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -78272,8 +78208,8 @@ impl ::buffa::Message for AcceptChannelExecutionProposalRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -78307,7 +78243,7 @@ impl ::buffa::Message for AcceptChannelExecutionProposalRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -78342,7 +78278,7 @@ impl ::buffa::Message for AcceptChannelExecutionProposalRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.proposal_id.clear();
         self.approval = ::buffa::MessageField::none();
@@ -78646,14 +78582,14 @@ pub const __ACCEPT_CHANNEL_EXECUTION_PROPOSAL_RESPONSE_JSON_ANY: ::buffa::type_r
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct DeclineChannelProposalRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -78677,7 +78613,7 @@ pub struct DeclineChannelProposalRequest {
 impl ::core::fmt::Debug for DeclineChannelProposalRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("DeclineChannelProposalRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("proposal_id", &self.proposal_id)
             .finish()
@@ -78710,10 +78646,8 @@ impl ::buffa::Message for DeclineChannelProposalRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -78731,8 +78665,8 @@ impl ::buffa::Message for DeclineChannelProposalRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -78758,7 +78692,7 @@ impl ::buffa::Message for DeclineChannelProposalRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -78782,7 +78716,7 @@ impl ::buffa::Message for DeclineChannelProposalRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.proposal_id.clear();
         self.__buffa_unknown_fields.clear();
@@ -79109,14 +79043,14 @@ pub mod decline_channel_proposal_response {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct AcceptChannelSkillExecutionProposalRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -79147,7 +79081,7 @@ pub struct AcceptChannelSkillExecutionProposalRequest {
 impl ::core::fmt::Debug for AcceptChannelSkillExecutionProposalRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("AcceptChannelSkillExecutionProposalRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("proposal_id", &self.proposal_id)
             .field("worker_id", &self.worker_id)
@@ -79193,10 +79127,8 @@ impl ::buffa::Message for AcceptChannelSkillExecutionProposalRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -79217,8 +79149,8 @@ impl ::buffa::Message for AcceptChannelSkillExecutionProposalRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -79247,7 +79179,7 @@ impl ::buffa::Message for AcceptChannelSkillExecutionProposalRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -79283,7 +79215,7 @@ impl ::buffa::Message for AcceptChannelSkillExecutionProposalRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.proposal_id.clear();
         self.worker_id = ::core::option::Option::None;
@@ -79928,14 +79860,14 @@ pub struct ChannelSummary {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub id: ::buffa::alloc::string::String,
-    /// Field 2: `organization_id`
+    /// Field 2: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 3: `slug`
     #[serde(
         rename = "slug",
@@ -80118,7 +80050,7 @@ impl ::core::fmt::Debug for ChannelSummary {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ChannelSummary")
             .field("id", &self.id)
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("slug", &self.slug)
             .field("name", &self.name)
             .field("topic", &self.topic)
@@ -80225,10 +80157,8 @@ impl ::buffa::Message for ChannelSummary {
         if !self.id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
         }
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.slug.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.slug) as u64;
@@ -80352,8 +80282,8 @@ impl ::buffa::Message for ChannelSummary {
         if !self.id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.id, buf);
         }
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.workspace_id, buf);
         }
         if !self.slug.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.slug, buf);
@@ -80489,7 +80419,7 @@ impl ::buffa::Message for ChannelSummary {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -80705,7 +80635,7 @@ impl ::buffa::Message for ChannelSummary {
     }
     fn clear(&mut self) {
         self.id.clear();
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.slug.clear();
         self.name.clear();
         self.topic = ::core::option::Option::None;
@@ -82913,14 +82843,14 @@ pub const __CHANNEL_DOCUMENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetChannelMessageDocumentRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -82944,7 +82874,7 @@ pub struct GetChannelMessageDocumentRequest {
 impl ::core::fmt::Debug for GetChannelMessageDocumentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetChannelMessageDocumentRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("message_id", &self.message_id)
             .finish()
@@ -82977,10 +82907,8 @@ impl ::buffa::Message for GetChannelMessageDocumentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -82998,8 +82926,8 @@ impl ::buffa::Message for GetChannelMessageDocumentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -83025,7 +82953,7 @@ impl ::buffa::Message for GetChannelMessageDocumentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -83049,7 +82977,7 @@ impl ::buffa::Message for GetChannelMessageDocumentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.message_id.clear();
         self.__buffa_unknown_fields.clear();
@@ -83442,14 +83370,14 @@ pub const __GET_CHANNEL_MESSAGE_DOCUMENT_RESPONSE_JSON_ANY: ::buffa::type_regist
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetChannelLinkPreviewRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -83472,7 +83400,7 @@ pub struct GetChannelLinkPreviewRequest {
 impl ::core::fmt::Debug for GetChannelLinkPreviewRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetChannelLinkPreviewRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("url", &self.url)
             .finish()
@@ -83505,10 +83433,8 @@ impl ::buffa::Message for GetChannelLinkPreviewRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -83526,8 +83452,8 @@ impl ::buffa::Message for GetChannelLinkPreviewRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -83553,7 +83479,7 @@ impl ::buffa::Message for GetChannelLinkPreviewRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -83577,7 +83503,7 @@ impl ::buffa::Message for GetChannelLinkPreviewRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.url.clear();
         self.__buffa_unknown_fields.clear();
@@ -240929,8 +240855,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListChannelsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListChannelsRequestView<'a> {
@@ -240970,7 +240896,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -241001,7 +240927,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListChannelsRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -241016,10 +240942,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -241033,8 +240959,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -241057,8 +240983,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 __map.end()
             }
@@ -241155,10 +241081,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ListChannelsRequestView<'static>>>
@@ -241588,8 +241514,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct SyncChannelsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `cursor`
             pub cursor: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -241631,7 +241557,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -241669,7 +241595,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SyncChannelsRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     cursor: self.cursor,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -241685,10 +241611,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if self.cursor != 0u64 {
@@ -241706,8 +241632,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if self.cursor != 0u64 {
                     ::buffa::types::put_uint64_field(2u32, self.cursor, buf);
@@ -241733,8 +241659,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.cursor) {
                     __map
@@ -241838,10 +241764,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `cursor`
             #[must_use]
@@ -242449,8 +242375,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListDirectMessageRecipientsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a>
@@ -242491,7 +242417,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -242522,7 +242448,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListDirectMessageRecipientsRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -242537,10 +242463,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -242554,8 +242480,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -242578,8 +242504,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 __map.end()
             }
@@ -242682,10 +242608,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
         }
         impl ::core::convert::From<
@@ -243101,8 +243027,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct CreateDirectMessageRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 3: `member_ids`
             pub member_ids: ::buffa::RepeatedView<'a, &'a str>,
             /// Field 4: `agent_ids`
@@ -243146,7 +243072,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -243199,7 +243125,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateDirectMessageRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     member_ids: self.member_ids.iter().map(|s| s.to_string()).collect(),
                     agent_ids: self.agent_ids.iter().map(|s| s.to_string()).collect(),
                     __buffa_unknown_fields: self
@@ -243216,10 +243142,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 for v in &self.member_ids {
@@ -243239,8 +243165,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 for v in &self.member_ids {
                     ::buffa::types::put_string_field(3u32, v, buf);
@@ -243269,8 +243195,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !self.member_ids.is_empty() {
                     __map.serialize_entry("memberIds", &*self.member_ids)?;
@@ -243377,10 +243303,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 3: `member_ids`
             #[must_use]
@@ -243748,8 +243674,8 @@ pub mod __buffa {
         /// conversations tab on an Agent detail page. They are read-only for people.
         #[derive(Clone, Debug, Default)]
         pub struct ListAgentDirectMessagesRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `agent_id`
             pub agent_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -243791,7 +243717,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -243829,7 +243755,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListAgentDirectMessagesRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     agent_id: self.agent_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -243845,10 +243771,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.agent_id.is_empty() {
@@ -243867,8 +243793,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.agent_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
@@ -243894,8 +243820,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_id) {
                     __map.serialize_entry("agentId", self.agent_id)?;
@@ -244001,10 +243927,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `agent_id`
             #[must_use]
@@ -244358,8 +244284,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct CreateChannelRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `name`
             pub name: &'a str,
             /// Field 3: `slug`
@@ -244409,7 +244335,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -244479,7 +244405,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateChannelRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     name: self.name.to_string(),
                     slug: self.slug.map(|s| s.to_string()),
                     topic: self.topic.map(|s| s.to_string()),
@@ -244499,10 +244425,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.name.is_empty() {
@@ -244534,8 +244460,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.name.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.name, buf);
@@ -244576,8 +244502,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
                     __map.serialize_entry("name", self.name)?;
@@ -244691,10 +244617,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `name`
             #[must_use]
@@ -244759,8 +244685,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct UpdateChannelRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `name`
@@ -244820,7 +244746,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -244967,7 +244893,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateChannelRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     name: self.name.map(|s| s.to_string()),
                     visibility: self.visibility,
@@ -245036,10 +244962,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -245107,8 +245033,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -245182,8 +245108,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -245322,10 +245248,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -246525,8 +246451,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct DeleteChannelRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -246568,7 +246494,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -246606,7 +246532,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::DeleteChannelRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -246622,10 +246548,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -246645,8 +246571,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -246672,8 +246598,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -246773,10 +246699,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -247084,8 +247010,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct SetChannelAgentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `agent_id`
@@ -247134,7 +247060,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -247241,7 +247167,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SetChannelAgentRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     agent_id: self.agent_id.to_string(),
                     membership: match self.membership.as_ref() {
@@ -247285,10 +247211,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -247337,8 +247263,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -247391,8 +247317,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -247509,10 +247435,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -248366,8 +248292,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct SetChannelMemberRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `user_id`
@@ -248416,7 +248342,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -248523,7 +248449,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SetChannelMemberRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     user_id: self.user_id.to_string(),
                     membership: match self.membership.as_ref() {
@@ -248567,10 +248493,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -248619,8 +248545,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -248673,8 +248599,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -248793,10 +248719,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -249650,8 +249576,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListChannelWebhooksRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -249693,7 +249619,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -249731,7 +249657,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListChannelWebhooksRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -249747,10 +249673,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -249770,8 +249696,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -249797,8 +249723,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -249902,10 +249828,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -250257,8 +250183,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct CreateChannelWebhookRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `name`
@@ -250302,7 +250228,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -250347,7 +250273,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateChannelWebhookRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     name: self.name.to_string(),
                     __buffa_unknown_fields: self
@@ -250364,10 +250290,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -250390,8 +250316,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -250420,8 +250346,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -250528,10 +250454,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -250582,8 +250508,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct UpdateChannelWebhookRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `webhook_id`
@@ -250629,7 +250555,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -250681,7 +250607,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateChannelWebhookRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     webhook_id: self.webhook_id.to_string(),
                     name: self.name.to_string(),
@@ -250699,10 +250625,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -250731,8 +250657,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -250764,8 +250690,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -250875,10 +250801,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -250934,8 +250860,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct RotateChannelWebhookRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `webhook_id`
@@ -250979,7 +250905,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -251024,7 +250950,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::RotateChannelWebhookRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     webhook_id: self.webhook_id.to_string(),
                     __buffa_unknown_fields: self
@@ -251041,10 +250967,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -251070,8 +250996,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -251100,8 +251026,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -251208,10 +251134,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -251262,8 +251188,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct RevokeChannelWebhookRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `webhook_id`
@@ -251307,7 +251233,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -251352,7 +251278,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::RevokeChannelWebhookRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     webhook_id: self.webhook_id.to_string(),
                     __buffa_unknown_fields: self
@@ -251369,10 +251295,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -251398,8 +251324,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -251428,8 +251354,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -251536,10 +251462,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -252906,8 +252832,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GetChannelRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `message_limit`
@@ -252951,7 +252877,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -252998,7 +252924,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetChannelRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     message_limit: self.message_limit,
                     __buffa_unknown_fields: self
@@ -253015,10 +252941,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -253041,8 +252967,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -253071,8 +252997,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -253179,10 +253105,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -253792,8 +253718,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct MarkChannelReadRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 4: `last_read_at`
@@ -253839,7 +253765,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -253902,7 +253828,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::MarkChannelReadRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     last_read_at: match self.last_read_at.as_option() {
                         Some(v) => {
@@ -253927,10 +253853,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -253958,8 +253884,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -253993,8 +253919,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -254102,10 +254028,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -254473,8 +254399,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct MarkChannelUnreadRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -254516,7 +254442,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -254554,7 +254480,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::MarkChannelUnreadRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -254570,10 +254496,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -254593,8 +254519,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -254620,8 +254546,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -254723,10 +254649,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -255089,8 +255015,8 @@ pub mod __buffa {
         /// optional so a menu action sends only what it changed.
         #[derive(Clone, Debug, Default)]
         pub struct UpdateChannelSidebarPreferenceRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `pinned`
@@ -255142,7 +255068,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -255236,7 +255162,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateChannelSidebarPreferenceRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     pinned: self.pinned,
                     hidden: self.hidden,
@@ -255280,10 +255206,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -255328,8 +255254,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -255381,8 +255307,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -255508,10 +255434,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -255911,8 +255837,8 @@ pub mod __buffa {
         pub struct ChannelSidebarSectionView<'a> {
             /// Field 1: `id`
             pub id: &'a str,
-            /// Field 2: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 2: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 3: `name`
             pub name: &'a str,
             /// Field 4: `position`
@@ -255971,7 +255897,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -256067,7 +255993,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ChannelSidebarSection {
                     id: self.id.to_string(),
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     name: self.name.to_string(),
                     position: self.position,
                     created_at: match self.created_at.as_option() {
@@ -256105,10 +256031,10 @@ pub mod __buffa {
                 if !self.id.is_empty() {
                     size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
                 }
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.name.is_empty() {
@@ -256149,8 +256075,8 @@ pub mod __buffa {
                 if !self.id.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.id, buf);
                 }
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.workspace_id, buf);
                 }
                 if !self.name.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.name, buf);
@@ -256198,8 +256124,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
                     __map.serialize_entry("id", self.id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
                     __map.serialize_entry("name", self.name)?;
@@ -256327,10 +256253,10 @@ pub mod __buffa {
             pub fn id(&self) -> &'_ str {
                 self.0.reborrow().id
             }
-            /// Field 2: `organization_id`
+            /// Field 2: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 3: `name`
             #[must_use]
@@ -256397,8 +256323,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListChannelSidebarSectionsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListChannelSidebarSectionsRequestView<'a> {
@@ -256438,7 +256364,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -256469,7 +256395,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListChannelSidebarSectionsRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -256484,10 +256410,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -256501,8 +256427,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -256525,8 +256451,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 __map.end()
             }
@@ -256629,10 +256555,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
         }
         impl ::core::convert::From<
@@ -256986,8 +256912,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct CreateChannelSidebarSectionRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `name`
             pub name: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -257030,7 +256956,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -257068,7 +256994,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateChannelSidebarSectionRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     name: self.name.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -257084,10 +257010,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.name.is_empty() {
@@ -257104,8 +257030,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.name.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.name, buf);
@@ -257131,8 +257057,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
                     __map.serialize_entry("name", self.name)?;
@@ -257238,10 +257164,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `name`
             #[must_use]
@@ -257673,8 +257599,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct RenameChannelSidebarSectionRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `section_id`
             pub section_id: &'a str,
             /// Field 3: `name`
@@ -257719,7 +257645,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -257764,7 +257690,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::RenameChannelSidebarSectionRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     section_id: self.section_id.to_string(),
                     name: self.name.to_string(),
                     __buffa_unknown_fields: self
@@ -257781,10 +257707,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.section_id.is_empty() {
@@ -257807,8 +257733,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.section_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.section_id, buf);
@@ -257837,8 +257763,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.section_id) {
                     __map.serialize_entry("sectionId", self.section_id)?;
@@ -257947,10 +257873,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `section_id`
             #[must_use]
@@ -258385,8 +258311,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct DeleteChannelSidebarSectionRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `section_id`
             pub section_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -258429,7 +258355,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -258467,7 +258393,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::DeleteChannelSidebarSectionRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     section_id: self.section_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -258483,10 +258409,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.section_id.is_empty() {
@@ -258506,8 +258432,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.section_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.section_id, buf);
@@ -258533,8 +258459,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.section_id) {
                     __map.serialize_entry("sectionId", self.section_id)?;
@@ -258640,10 +258566,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `section_id`
             #[must_use]
@@ -259005,8 +258931,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListChannelMessagesRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `parent_message_id`
@@ -259054,7 +258980,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -259115,7 +259041,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListChannelMessagesRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     parent_message_id: self.parent_message_id.map(|s| s.to_string()),
                     cursor: self.cursor.map(|s| s.to_string()),
@@ -259134,10 +259060,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -259166,8 +259092,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -259202,8 +259128,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -259320,10 +259246,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -259719,8 +259645,8 @@ pub mod __buffa {
             ///
             /// Field 1: `request_id`
             pub request_id: &'a str,
-            /// Field 2: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 2: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 3: `channel_id`
             pub channel_id: &'a str,
             /// Binds this upload batch to the idempotency identity of the message that
@@ -259782,7 +259708,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -259848,7 +259774,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::PrepareChannelMessageAttachmentsRequest {
                     request_id: self.request_id.to_string(),
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     client_message_id: self.client_message_id.to_string(),
                     attachments: self
@@ -259877,10 +259803,10 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.request_id)
                                 as u64;
                 }
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -259917,8 +259843,8 @@ pub mod __buffa {
                 if !self.request_id.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.request_id, buf);
                 }
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.channel_id, buf);
@@ -259959,8 +259885,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
                     __map.serialize_entry("requestId", self.request_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -260085,10 +260011,10 @@ pub mod __buffa {
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
             }
-            /// Field 2: `organization_id`
+            /// Field 2: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 3: `channel_id`
             #[must_use]
@@ -260506,8 +260432,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct CreateChannelMessageRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `client_message_id`
@@ -260525,7 +260451,7 @@ pub mod __buffa {
             /// Field 11: `preferred_device_id`
             pub preferred_device_id: ::core::option::Option<&'a str>,
             /// Uploaded bytes must have been prepared by
-            /// PrepareChannelMessageAttachments for this exact organization, channel,
+            /// PrepareChannelMessageAttachments for this exact workspace, channel,
             /// and authenticated user. The upload ID is also the durable attachment ID.
             ///
             /// Field 12: `attachments`
@@ -260574,7 +260500,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -260693,7 +260619,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateChannelMessageRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     client_message_id: self.client_message_id.to_string(),
                     body: self.body.to_string(),
@@ -260729,10 +260655,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -260784,8 +260710,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -260840,8 +260766,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -260976,10 +260902,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -261022,7 +260948,7 @@ pub mod __buffa {
                 self.0.reborrow().preferred_device_id
             }
             /// Uploaded bytes must have been prepared by
-            /// PrepareChannelMessageAttachments for this exact organization, channel,
+            /// PrepareChannelMessageAttachments for this exact workspace, channel,
             /// and authenticated user. The upload ID is also the durable attachment ID.
             ///
             /// Field 12: `attachments`
@@ -261452,8 +261378,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct DeleteChannelMessageRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `message_id`
@@ -261497,7 +261423,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -261542,7 +261468,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::DeleteChannelMessageRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     message_id: self.message_id.to_string(),
                     __buffa_unknown_fields: self
@@ -261559,10 +261485,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -261588,8 +261514,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -261618,8 +261544,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -261726,10 +261652,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -262192,8 +262118,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ToggleChannelMessageReactionRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `message_id`
@@ -262240,7 +262166,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -262292,7 +262218,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ToggleChannelMessageReactionRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     message_id: self.message_id.to_string(),
                     emoji: self.emoji.to_string(),
@@ -262311,10 +262237,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -262344,8 +262270,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -262377,8 +262303,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -262490,10 +262416,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -262875,8 +262801,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct SetChannelThreadSubscriptionRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `root_message_id`
@@ -262923,7 +262849,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -262975,7 +262901,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SetChannelThreadSubscriptionRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     root_message_id: self.root_message_id.to_string(),
                     subscribed: self.subscribed,
@@ -262994,10 +262920,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -263026,8 +262952,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -263059,8 +262985,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -263172,10 +263098,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -263575,8 +263501,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct AcceptChannelProposalRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `proposal_id`
@@ -263626,7 +263552,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -263703,7 +263629,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::AcceptChannelProposalRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     proposal_id: self.proposal_id.to_string(),
                     project_id: self.project_id.map(|s| s.to_string()),
@@ -263730,10 +263656,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -263770,8 +263696,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -263811,8 +263737,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -263930,10 +263856,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -264534,8 +264460,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct AcceptChannelExecutionProposalRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `proposal_id`
@@ -264584,7 +264510,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -264654,7 +264580,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::AcceptChannelExecutionProposalRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     proposal_id: self.proposal_id.to_string(),
                     approval: match self.approval.as_option() {
@@ -264681,10 +264607,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -264718,8 +264644,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -264757,8 +264683,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -264873,10 +264799,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -265424,8 +265350,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct DeclineChannelProposalRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `proposal_id`
@@ -265469,7 +265395,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -265514,7 +265440,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::DeclineChannelProposalRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     proposal_id: self.proposal_id.to_string(),
                     __buffa_unknown_fields: self
@@ -265531,10 +265457,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -265560,8 +265486,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -265590,8 +265516,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -265700,10 +265626,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -266043,8 +265969,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct AcceptChannelSkillExecutionProposalRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `proposal_id`
@@ -266091,7 +266017,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -266143,7 +266069,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::AcceptChannelSkillExecutionProposalRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     proposal_id: self.proposal_id.to_string(),
                     worker_id: self.worker_id.map(|s| s.to_string()),
@@ -266162,10 +266088,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -266194,8 +266120,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -266228,8 +266154,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -266344,10 +266270,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -267226,8 +267152,8 @@ pub mod __buffa {
         pub struct ChannelSummaryView<'a> {
             /// Field 1: `id`
             pub id: &'a str,
-            /// Field 2: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 2: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 3: `slug`
             pub slug: &'a str,
             /// Field 4: `name`
@@ -267338,7 +267264,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -267668,7 +267594,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ChannelSummary {
                     id: self.id.to_string(),
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     slug: self.slug.to_string(),
                     name: self.name.to_string(),
                     topic: self.topic.map(|s| s.to_string()),
@@ -267769,10 +267695,10 @@ pub mod __buffa {
                 if !self.id.is_empty() {
                     size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
                 }
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.slug.is_empty() {
@@ -267904,8 +267830,8 @@ pub mod __buffa {
                 if !self.id.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.id, buf);
                 }
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.workspace_id, buf);
                 }
                 if !self.slug.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.slug, buf);
@@ -268040,8 +267966,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
                     __map.serialize_entry("id", self.id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.slug) {
                     __map.serialize_entry("slug", self.slug)?;
@@ -268251,10 +268177,10 @@ pub mod __buffa {
             pub fn id(&self) -> &'_ str {
                 self.0.reborrow().id
             }
-            /// Field 2: `organization_id`
+            /// Field 2: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 3: `slug`
             #[must_use]
@@ -271951,8 +271877,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GetChannelMessageDocumentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `message_id`
@@ -271996,7 +271922,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -272041,7 +271967,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetChannelMessageDocumentRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     message_id: self.message_id.to_string(),
                     __buffa_unknown_fields: self
@@ -272058,10 +271984,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -272087,8 +272013,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -272117,8 +272043,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -272227,10 +272153,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -272945,8 +272871,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GetChannelLinkPreviewRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `url`
@@ -272990,7 +272916,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -273035,7 +272961,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetChannelLinkPreviewRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     url: self.url.to_string(),
                     __buffa_unknown_fields: self
@@ -273052,10 +272978,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -273078,8 +273004,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -273108,8 +273034,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -273218,10 +273144,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]

@@ -247,7 +247,7 @@ final class ChannelRelayTests: XCTestCase {
 
         var summary = BriarAPI_ChannelSummary()
         summary.id = peerChannelID.uuidString.lowercased()
-        summary.organizationID = organizationID.uuidString.lowercased()
+        summary.workspaceID = organizationID.uuidString.lowercased()
         summary.slug = "agents-honey-bosco"
         summary.name = "Honey · Bosco"
         summary.visibility = .private

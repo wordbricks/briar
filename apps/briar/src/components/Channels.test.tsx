@@ -93,7 +93,7 @@ const virtualMessage = (channelId: string, index: number): ChannelMessage => ({
 
 const channelSummaryWire = (channel: ChannelSummary) => ({
   id: channel.id,
-  organizationId: channel.organizationId,
+  workspaceId: channel.organizationId,
   slug: channel.slug,
   name: channel.name,
   topic: channel.topic ?? undefined,

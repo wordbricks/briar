@@ -1082,7 +1082,7 @@ describe("organization channels", () => {
           "connect-protocol-version": "1",
           "content-type": "application/json",
         },
-        body: JSON.stringify({ organizationId, channelId, messageId }),
+        body: JSON.stringify({ workspaceId: organizationId, channelId, messageId }),
       },
     ), apiEnv);
 

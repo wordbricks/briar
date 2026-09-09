@@ -282,7 +282,7 @@ export const appChannelSummaryJson = (channel: ChannelSummary) => {
   }
   return create(ChannelSummarySchema, {
     id: channel.id,
-    organizationId: channel.organizationId,
+    workspaceId: channel.organizationId,
     slug: channel.slug,
     name: channel.name,
     topic: channel.topic ?? undefined,

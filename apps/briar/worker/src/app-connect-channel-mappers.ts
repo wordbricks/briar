@@ -94,7 +94,7 @@ export const appChannelLinkPreview = (preview: ChannelLinkPreview) =>
 export const appChannelSummary = (row: ChannelRow) =>
   create(ChannelSummarySchema, {
     id: row.id,
-    organizationId: row.organization_id,
+    workspaceId: row.organization_id,
     slug: row.slug,
     name: row.name,
     topic: row.topic ?? undefined,
@@ -129,7 +129,7 @@ export const appChannelSummary = (row: ChannelRow) =>
 export const appChannelSidebarSection = (section: ChannelSidebarSection) =>
   create(ChannelSidebarSectionSchema, {
     id: section.id,
-    organizationId: section.organizationId,
+    workspaceId: section.organizationId,
     name: section.name,
     position: section.position,
     createdAt: requiredTimestamp(section.createdAt, "Sidebar section creation"),
