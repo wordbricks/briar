@@ -21,8 +21,8 @@ import SwiftProtobuf
 /// `@unchecked Sendable` conformance to simplify testing and mocking.
 @available(iOS 13, *)
 open class BriarAPI_ReportingServiceClientMock: BriarAPI_ReportingServiceClientInterface, @unchecked Sendable {
-    /// Mocked for async calls to `listOrganizationUsageRuns()`.
-    public var mockAsyncListOrganizationUsageRuns = { (_: BriarAPI_ListOrganizationUsageRunsRequest) -> ResponseMessage<BriarAPI_ListOrganizationUsageRunsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listWorkspaceUsageRuns()`.
+    public var mockAsyncListWorkspaceUsageRuns = { (_: BriarAPI_ListWorkspaceUsageRunsRequest) -> ResponseMessage<BriarAPI_ListWorkspaceUsageRunsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `getProjectUsageSummary()`.
     public var mockAsyncGetProjectUsageSummary = { (_: BriarAPI_GetProjectUsageSummaryRequest) -> ResponseMessage<BriarAPI_GetProjectUsageSummaryResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listStatusTrayRuns()`.
@@ -32,8 +32,8 @@ open class BriarAPI_ReportingServiceClientMock: BriarAPI_ReportingServiceClientI
 
     public init() {}
 
-    open func `listOrganizationUsageRuns`(request: BriarAPI_ListOrganizationUsageRunsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListOrganizationUsageRunsResponse> {
-        return self.mockAsyncListOrganizationUsageRuns(request)
+    open func `listWorkspaceUsageRuns`(request: BriarAPI_ListWorkspaceUsageRunsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListWorkspaceUsageRunsResponse> {
+        return self.mockAsyncListWorkspaceUsageRuns(request)
     }
 
     open func `getProjectUsageSummary`(request: BriarAPI_GetProjectUsageSummaryRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_GetProjectUsageSummaryResponse> {

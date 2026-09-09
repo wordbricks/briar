@@ -14,7 +14,7 @@ import {
   AgentUsageRunSchema,
   GetProjectUsageSummaryResponseSchema,
   GetRunCostEstimateResponseSchema,
-  ListOrganizationUsageRunsResponseSchema,
+  ListWorkspaceUsageRunsResponseSchema,
   ListStatusTrayRunsResponseSchema,
   ProjectUsageBreakdownItemSchema,
   ProjectUsagePeriod,
@@ -34,13 +34,13 @@ import type {
 import type { TeamUsageSummary } from "../../src/lib/team-usage-summary";
 import { appAgentProvider } from "./app-connect-mappers";
 import type {
-  listOrganizationUsageRunsApplication,
+  listWorkspaceUsageRunsApplication,
   listStatusTrayRunsApplication,
   organizationUsageRunReport,
 } from "./reporting-application";
 
 type OrganizationUsageRunReport = ReturnType<typeof organizationUsageRunReport>;
-type OrganizationUsageRunsReport = Awaited<ReturnType<typeof listOrganizationUsageRunsApplication>>;
+type OrganizationUsageRunsReport = Awaited<ReturnType<typeof listWorkspaceUsageRunsApplication>>;
 type StatusTrayRunsReport = Awaited<ReturnType<typeof listStatusTrayRunsApplication>>;
 
 export const appReportingTimestamp = (value: string) => {
@@ -237,7 +237,7 @@ const appOrganizationUsageRun = (run: OrganizationUsageRunReport) =>
   });
 
 export const appOrganizationUsageRuns = (report: OrganizationUsageRunsReport) =>
-  create(ListOrganizationUsageRunsResponseSchema, {
+  create(ListWorkspaceUsageRunsResponseSchema, {
     runs: report.runs.map(appOrganizationUsageRun),
     generatedAt: appReportingTimestamp(report.generatedAt),
     pricing: appAgentUsagePricing(report.pricing),

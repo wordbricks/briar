@@ -2,7 +2,7 @@ import {
   AgentExecutionCostEstimateReason,
   AgentExecutionCostEstimateStatus,
   AgentUsagePricingStatus,
-  OrganizationUsageRange,
+  WorkspaceUsageRange,
   ProjectUsagePeriod as ProtoProjectUsagePeriod,
   type AgentExecutionCostEstimateModel as AgentExecutionCostEstimateModelMessage,
   type AgentUsageCostRecord as AgentUsageCostRecordMessage,
@@ -13,7 +13,7 @@ import {
   type AgentUsageRun as AgentUsageRunMessage,
   type GetProjectUsageSummaryResponse,
   type GetRunCostEstimateResponse,
-  type ListOrganizationUsageRunsResponse,
+  type ListWorkspaceUsageRunsResponse,
   type ListStatusTrayRunsResponse,
 } from "@briar/contracts/gen/briar/app/v1/reporting_pb";
 import { AgentExecutionModelSource } from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
@@ -44,16 +44,16 @@ import {
   safeNumber,
 } from "./mappers";
 
-export const organizationUsageRangeToProto = (
+export const workspaceUsageRangeToProto = (
   days: UsageRangeDays,
-): OrganizationUsageRange => {
+): WorkspaceUsageRange => {
   switch (days) {
     case 7:
-      return OrganizationUsageRange.ORGANIZATION_USAGE_RANGE_7_DAYS;
+      return WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_7_DAYS;
     case 30:
-      return OrganizationUsageRange.ORGANIZATION_USAGE_RANGE_30_DAYS;
+      return WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_30_DAYS;
     case 90:
-      return OrganizationUsageRange.ORGANIZATION_USAGE_RANGE_90_DAYS;
+      return WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_90_DAYS;
   }
 };
 
@@ -287,7 +287,7 @@ const usageRunFromProto = (run: AgentUsageRunMessage): AgentUsageRun => ({
 });
 
 export const organizationUsageReportFromProto = (
-  response: ListOrganizationUsageRunsResponse,
+  response: ListWorkspaceUsageRunsResponse,
 ): AgentUsageReport => ({
   runs: response.runs.map(usageRunFromProto),
   generatedAt: requiredTimestamp(

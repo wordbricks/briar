@@ -223,7 +223,7 @@ describe("ReportingService", () => {
   it("reports only project-scoped status and usage through generated messages", async () => {
     const reporting = client(tokens.developer);
     const status = await reporting.listStatusTrayRuns(
-      { organizationId },
+      { workspaceId: organizationId },
       options(tokens.developer),
     );
     expect(status.runs).toEqual([
@@ -290,7 +290,7 @@ describe("ReportingService", () => {
       options(tokens.developer),
     ))).toBe(Code.InvalidArgument);
     expect(await errorCode(client(tokens.outsider).listStatusTrayRuns(
-      { organizationId },
+      { workspaceId: organizationId },
       options(tokens.outsider),
     ))).toBe(Code.NotFound);
   });
