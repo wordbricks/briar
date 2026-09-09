@@ -54,6 +54,7 @@ const channelReply = {
   activeSkill: null,
   skillExecutionTarget: null,
   activity: { token: "activity", expiresAt: leaseExpiresAt },
+  acknowledgementReaction: null,
   organizationContext: null,
   delegation: null,
   delegationTargets: [],

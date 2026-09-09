@@ -570,6 +570,9 @@ const channelReplyFromProto = (
       ? skillExecutionTarget(value.skillExecutionTarget)
       : null,
     activity: activity(value.activity),
+    // Absent on an older server and on a first attempt alike: either way this
+    // claim has no reaction of its own on the trigger message yet.
+    acknowledgementReaction: value.acknowledgementReaction ?? null,
     organizationContext: value.workspaceContextSnapshotAt
       ? {
           snapshotAt: isoTimestamp(

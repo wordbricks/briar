@@ -9,6 +9,7 @@ import {
   type ProviderBlock,
 } from "../src/lib/provider-block";
 import {
+  chmod,
   mkdtemp,
   mkdir,
   lstat,
@@ -665,6 +666,99 @@ async function failClaimedIssueReply(
     });
 }
 
+type ChannelReplyRuntime = {
+  runProviderTurn: typeof runDetachedProviderTurn;
+  workspaceRoot: string;
+  dmMessageMcpServerPath?: string;
+  /** Tests observe worktree allocation through this runner. */
+  git?: typeof runGit;
+};
+
+type ChannelReplyAcknowledgement = {
+  /** "none" when this reply owes no reaction at all: not a DM, or not a person's message. */
+  mode: "placeholder" | "existing" | "none";
+};
+
+type ChannelReplyAcknowledgementTask = {
+  acknowledgement: ChannelReplyAcknowledgement;
+  stop: () => void;
+};
+
+const defaultChannelReplyRuntime = (): ChannelReplyRuntime => ({
+  runProviderTurn: runDetachedProviderTurn,
+  workspaceRoot: configDirectory,
+});
+
+/*
+  The reaction is the person's first sign that Briar read the message, so it is
+  published from the claim itself rather than from anywhere downstream of
+  routing, the worktree or the memory brief. The emoji the model chooses lands
+  a few seconds later, on its own track, replacing the placeholder.
+*/
+function startChannelReplyAcknowledgement(
+  config: Config,
+  reply: ClaimedChannelReply,
+  signal: AbortSignal,
+  runtime: ChannelReplyRuntime,
+  acknowledgementExecution: IssueExecutionRecommendation | null,
+): ChannelReplyAcknowledgementTask {
+  const prompt = dmAcknowledgementPrompt(reply.snapshot, reply.triggerMessageId);
+  const capability = reply.activity?.token;
+  if (!prompt || !capability) return { acknowledgement: { mode: "none" }, stop: () => {} };
+  // A steer restart or a lease-expiry retry re-claims a message this Agent has
+  // already reacted to; repeating the selection turn would only pay for it.
+  if (reply.acknowledgementReaction !== null) {
+    return { acknowledgement: { mode: "existing" }, stop: () => {} };
+  }
+  const replyActivity = createReplyActivityClient(config.apiUrl);
+  const publish = (emoji: string, publishSignal: AbortSignal) =>
+    replyActivity.publishAcknowledgementReaction({
+      replyJobId: reply.workId, capability, emoji, signal: publishSignal,
+    });
+  const selectionAgent = dmAcknowledgementAgent(detachedReplyAgent({
+    workId: reply.workId, provider: reply.provider, model: reply.model,
+    effort: reply.effort, agent: reply.agent, activeSkill: null,
+    fallbackName: "Briar Channel", scope: reply.scope,
+  }), acknowledgementExecution);
+  const stop = startDmAcknowledgement({
+    signal,
+    publish,
+    select: async (selectionSignal) => {
+      // The claim has no workspace yet, and this turn never needs one: it runs
+      // read-only in a private directory of its own that it then removes.
+      const selectionWorkspace = await mkdtemp(join(tmpdir(), "briar-dm-acknowledgement-"));
+      await chmod(selectionWorkspace, 0o700);
+      try {
+        const turn = await runtime.runProviderTurn({
+          agent: selectionAgent,
+          prompt,
+          workspacePath: selectionWorkspace,
+          fullAccess: false,
+          readOnly: true,
+          conversationId: null,
+          environment: providerExecutionEnvironment(
+            config, selectionAgent.provider, { ...process.env },
+          ),
+          signal: selectionSignal,
+        });
+        assertDetachedProviderTurnSucceeded(turn);
+        return turn.resultText;
+      } finally {
+        await rm(selectionWorkspace, { recursive: true, force: true });
+      }
+    },
+    onRefined: (emoji) => console.log(
+      `channel reply acknowledgement refined for ${reply.workId}: ${emoji}`,
+    ),
+    onError: (error) => console.error(
+      `channel reply acknowledgement publish failed for ${reply.workId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    ),
+  });
+  return { acknowledgement: { mode: "placeholder" }, stop };
+}
+
 async function runClaimedChannelReply(
   config: Config,
   project: TeamConfig,
@@ -672,17 +766,33 @@ async function runClaimedChannelReply(
   workerToken: string,
   signal: AbortSignal,
   reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
-  runtime: {
-    runProviderTurn: typeof runDetachedProviderTurn;
-    workspaceRoot: string;
-    dmMessageMcpServerPath?: string;
-    /** Tests observe worktree allocation through this runner. */
-    git?: typeof runGit;
-  } = {
-    runProviderTurn: runDetachedProviderTurn,
-    workspaceRoot: configDirectory,
-  },
+  runtime: ChannelReplyRuntime = defaultChannelReplyRuntime(),
   acknowledgementExecution: IssueExecutionRecommendation | null = null,
+) {
+  const { acknowledgement, stop } = startChannelReplyAcknowledgement(
+    config, reply, signal, runtime, acknowledgementExecution,
+  );
+  try {
+    return await runClaimedChannelReplyTurn(
+      config, project, reply, workerToken, signal, acknowledgement,
+      reportCheckpoint, runtime,
+    );
+  } finally {
+    // Cancels an in-flight selection and drops a result that arrives after the
+    // reply is already finished.
+    stop();
+  }
+}
+
+async function runClaimedChannelReplyTurn(
+  config: Config,
+  project: TeamConfig,
+  reply: ClaimedChannelReply,
+  workerToken: string,
+  signal: AbortSignal,
+  acknowledgement: ChannelReplyAcknowledgement,
+  reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
+  runtime: ChannelReplyRuntime = defaultChannelReplyRuntime(),
 ) {
   const registered = project.executionWorker;
   if (!registered) throw new Error("Worker registration is missing");
@@ -822,6 +932,7 @@ async function runClaimedChannelReply(
       claimReason: reply.session.claimReason,
       workspaceReused: sessionWorktree?.reused ?? false,
       workspace,
+      acknowledgement: acknowledgement.mode,
       retainedUntil,
     })}`);
   };
@@ -851,7 +962,6 @@ async function runClaimedChannelReply(
   let messageInvocation: DmMessageInvocation | null = null;
   let executionContext: DmExecutionContext | null = null;
   let publicationTerminal = false;
-  let stopAcknowledgement: (() => void) | undefined;
   let organizationContextCleaned = false;
   let attachmentsCleaned = false;
   let workspaceCleaned = false;
@@ -961,36 +1071,6 @@ async function runClaimedChannelReply(
         work: reply,
         memory: reply.memory,
         signal: invocationSignal,
-      });
-    }
-    const acknowledgementPrompt = dmAcknowledgementPrompt(reply.snapshot, reply.triggerMessageId);
-    if (acknowledgementPrompt && reply.activity) {
-      const capability = reply.activity.token;
-      stopAcknowledgement = startDmAcknowledgement({
-        signal: invocationSignal,
-        select: async (selectionSignal) => {
-          const selectionAgent = dmAcknowledgementAgent(agent, acknowledgementExecution);
-          const selectionWorkspace = await mkdtemp(join(workspacePath, ".acknowledgement-"));
-          try {
-            const turn = await runtime.runProviderTurn({
-              agent: selectionAgent,
-              prompt: acknowledgementPrompt,
-              workspacePath: selectionWorkspace,
-              fullAccess: false,
-              readOnly: true,
-              conversationId: null,
-              environment: providerExecutionEnvironment(config, selectionAgent.provider, { ...process.env }),
-              signal: selectionSignal,
-            });
-            assertDetachedProviderTurnSucceeded(turn);
-            return turn.resultText;
-          } finally {
-            await rm(selectionWorkspace, { recursive: true, force: true });
-          }
-        },
-        publish: (emoji, publishSignal) => replyActivity.publishAcknowledgementReaction({
-          replyJobId: reply.workId, capability, emoji, signal: publishSignal,
-        }),
       });
     }
     const durablePublicMessages = reply.dmPublicMessageProtocol === 1 &&
@@ -1396,7 +1476,6 @@ async function runClaimedChannelReply(
     if (!reply.memory || error instanceof DetachedProviderBlockedError || error instanceof DetachedProviderStopUnconfirmedError) throw error;
     throw dmMemoryExecutionError(error);
   } finally {
-    stopAcknowledgement?.();
     await messageInvocation?.cleanup({ terminal: publicationTerminal });
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {

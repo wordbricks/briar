@@ -38912,6 +38912,18 @@ pub struct ClaimedChannelReply {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub routing: ::buffa::MessageField<DmReplyRouting, ::buffa::Inline<DmReplyRouting>>,
+    /// The acknowledgement reaction this Agent already holds on the trigger
+    /// message. Present only when an earlier attempt of this same job published
+    /// one, so a steer restart or a lease-expiry retry neither re-publishes the
+    /// placeholder nor spends a provider turn choosing the emoji again.
+    ///
+    /// Field 36: `acknowledgement_reaction`
+    #[serde(
+        rename = "acknowledgementReaction",
+        alias = "acknowledgement_reaction",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub acknowledgement_reaction: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -38954,6 +38966,7 @@ impl ::core::fmt::Debug for ClaimedChannelReply {
             .field("published_message_batches", &self.published_message_batches)
             .field("dm_public_message_protocol", &self.dm_public_message_protocol)
             .field("routing", &self.routing)
+            .field("acknowledgement_reaction", &self.acknowledgement_reaction)
             .finish()
     }
 }
@@ -38983,6 +38996,16 @@ impl ClaimedChannelReply {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.effort = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::acknowledgement_reaction`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_acknowledgement_reaction(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.acknowledgement_reaction = Some(value.into());
         self
     }
 }
@@ -39220,6 +39243,9 @@ impl ::buffa::Message for ClaimedChannelReply {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.acknowledgement_reaction {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -39436,6 +39462,9 @@ impl ::buffa::Message for ClaimedChannelReply {
                 buf,
             );
             self.routing.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.acknowledgement_reaction {
+            ::buffa::types::put_string_field(36u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -39787,6 +39816,18 @@ impl ::buffa::Message for ClaimedChannelReply {
                     ctx,
                 )?;
             }
+            36u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .acknowledgement_reaction
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -39830,6 +39871,7 @@ impl ::buffa::Message for ClaimedChannelReply {
         self.published_message_batches.clear();
         self.dm_public_message_protocol = 0u32;
         self.routing = ::buffa::MessageField::none();
+        self.acknowledgement_reaction = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -112918,6 +112960,13 @@ pub mod __buffa {
             pub routing: ::buffa::MessageFieldView<
                 super::super::__buffa::view::DmReplyRoutingView<'a>,
             >,
+            /// The acknowledgement reaction this Agent already holds on the trigger
+            /// message. Present only when an earlier attempt of this same job published
+            /// one, so a steer restart or a lease-expiry retry neither re-publishes the
+            /// placeholder nor spends a provider turn choosing the emoji again.
+            ///
+            /// Field 36: `acknowledgement_reaction`
+            pub acknowledgement_reaction: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ClaimedChannelReplyView<'a> {
@@ -113440,6 +113489,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    36u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.acknowledgement_reaction = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
                     21u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -113743,6 +113801,9 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    acknowledgement_reaction: self
+                        .acknowledgement_reaction
+                        .map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -113993,6 +114054,9 @@ pub mod __buffa {
                         += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(ref v) = self.acknowledgement_reaction {
+                    size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -114218,6 +114282,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.routing.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.acknowledgement_reaction {
+                    ::buffa::types::put_string_field(36u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -114448,6 +114515,10 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.routing.as_option() {
                         __map.serialize_entry("routing", __v)?;
                     }
+                }
+                if let ::core::option::Option::Some(__v) = self.acknowledgement_reaction
+                {
+                    __map.serialize_entry("acknowledgementReaction", __v)?;
                 }
                 __map.end()
             }
@@ -114828,6 +114899,16 @@ pub mod __buffa {
                 super::super::__buffa::view::DmReplyRoutingView<'_>,
             > {
                 &self.0.reborrow().routing
+            }
+            /// The acknowledgement reaction this Agent already holds on the trigger
+            /// message. Present only when an earlier attempt of this same job published
+            /// one, so a steer restart or a lease-expiry retry neither re-publishes the
+            /// placeholder nor spends a provider turn choosing the emoji again.
+            ///
+            /// Field 36: `acknowledgement_reaction`
+            #[must_use]
+            pub fn acknowledgement_reaction(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().acknowledgement_reaction
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ClaimedChannelReplyView<'static>>>

@@ -529,6 +529,19 @@ export async function claimNextChannelReplyWork(
       workType: "channelReply",
       workId: job.id,
     });
+    /*
+      A steer restart, a lease-expiry retry or a memory restart re-claims a
+      trigger message this Agent has already reacted to. Telling the runner so
+      keeps it from re-publishing the placeholder and from spending a whole
+      provider turn choosing an emoji that is already on the message.
+    */
+    const heldAcknowledgement = channel.kind === "dm"
+      ? await db.prepare(
+        `select emoji from briar_channel_message_reactions
+         where message_id = ? and agent_id = ?
+         order by created_at, emoji limit 1`,
+      ).bind(job.trigger_message_id, job.agent_id).first<{ emoji: string }>()
+      : null;
     return {
         workType: "channelReply" as const,
         workId: job.id,
@@ -589,6 +602,7 @@ export async function claimNextChannelReplyWork(
         claimedAt: job.claimed_at,
         leaseExpiresAt: job.lease_expires_at,
         activity,
+        acknowledgementReaction: heldAcknowledgement ? heldAcknowledgement.emoji : null,
         handoffContext: memoryBinding ? null : handoffContext,
         memory: memoryBinding?.memory ?? null,
         memoryLearningEnabled:
