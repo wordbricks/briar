@@ -93,7 +93,7 @@ describe("OrganizationCreate", () => {
     );
     expect(
       Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
-        (button) => button.textContent === "조직 만들기",
+        (button) => button.textContent === "워크스페이스 만들기",
       )?.disabled,
     ).toBe(true);
     expect(onCreate).not.toHaveBeenCalled();

@@ -21,6 +21,7 @@ import {
   normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import type { RunnerRequest } from "./runner-request";
+import { agentProgressMessage } from "../src/lib/agent-progress-message";
 import {
   classifyProviderFailure,
   type ProviderBlock,
@@ -925,5 +926,13 @@ export function openCodeResponseText(parts: readonly Part[]): string {
   return parts
     .filter((part): part is Extract<Part, { type: "text" }> => part.type === "text")
     .map((part) => part.text)
+    /*
+      OpenCode returns every text part of the assistant turn, so a progress
+      update sent before a tool call would be concatenated onto the front of
+      the reply envelope and corrupt it. The strict reply contract would
+      reject the result, but only after structured-output-repair spends a
+      repair turn on it.
+    */
+    .filter((text) => !agentProgressMessage(text))
     .join("");
 }

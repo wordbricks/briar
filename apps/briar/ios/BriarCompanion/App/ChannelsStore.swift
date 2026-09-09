@@ -157,10 +157,14 @@ final class ChannelsStore: ObservableObject {
         var id: UUID { proposalID }
     }
 
+    /// One agent's progress line. `activity` is nil when the reply is known to
+    /// be queued or running but the activity socket has published no concrete
+    /// commentary for it — a channel still names the agent, a direct message
+    /// does not produce the status at all.
     struct AgentTypingStatus: Identifiable, Equatable, Sendable {
         let id: UUID
         let agentName: String
-        let activity: ChannelAgentActivity
+        let activity: ChannelAgentActivity?
     }
 
     @Published private(set) var channels: [ChannelSummary] = []
@@ -2817,7 +2821,19 @@ final class ChannelsStore: ObservableObject {
         mergeAgentReplies(concurrent)
     }
 
-    func typingStatuses(messageIDs: Set<UUID>) -> [AgentTypingStatus] {
+    /// The agents answering any of `messageIDs`.
+    ///
+    /// `includesPendingWithoutActivity` is the surface's answer, mirroring the
+    /// web split: a channel names a queued or running reply even when the
+    /// best-effort activity socket has published nothing for it — a runner may
+    /// emit no commentary for the whole reply, and silence there reads as the
+    /// mention having been dropped. A direct message draws its progress as a
+    /// message-shaped row instead, so it passes false and stays commentary-only.
+    /// This store serves both kinds of channel, which is why the caller decides.
+    func typingStatuses(
+        messageIDs: Set<UUID>,
+        includesPendingWithoutActivity: Bool
+    ) -> [AgentTypingStatus] {
         let now = Date()
         var byAgentID: [UUID: AgentTypingStatus] = [:]
         for reply in agentReplies where
@@ -2825,11 +2841,13 @@ final class ChannelsStore: ObservableObject {
             (reply.status == .queued || reply.status == .running) &&
             messageIDs.contains(reply.parentMessageId) {
             let name = agents.first(where: { $0.agentId == reply.agentId })?.name ?? "Agent"
-            guard let frame = activityFrames[reply.id],
-                  frame.attempt == reply.attempts,
-                  frame.expiresAt > now,
-                  let liveActivity = frame.activity
-            else { continue }
+            let frame = activityFrames[reply.id]
+            let liveActivity = frame.flatMap { frame in
+                frame.attempt == reply.attempts && frame.expiresAt > now
+                    ? frame.activity
+                    : nil
+            }
+            if liveActivity == nil && !includesPendingWithoutActivity { continue }
             byAgentID[reply.agentId] = AgentTypingStatus(
                 id: reply.id,
                 agentName: name,
@@ -2944,9 +2962,10 @@ final class ChannelsStore: ObservableObject {
                 } catch is CancellationError {
                     return
                 } catch {
-                    // The socket is best-effort. Avoid inventing a generic
-                    // status while it reconnects; the next frame restores the
-                    // latest concrete progress message.
+                    // The socket is best-effort. A channel falls back to the
+                    // durable reply state's generic line while it reconnects; a
+                    // direct message shows nothing until the next frame
+                    // restores the latest concrete progress message.
                 }
                 reconnectAttempt = min(reconnectAttempt + 1, 5)
                 do {

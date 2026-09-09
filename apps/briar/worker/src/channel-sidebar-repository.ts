@@ -17,6 +17,8 @@
   which is what makes another device refetch the summary.
 */
 
+import { agentAnswerCopySql } from "./channels";
+
 export type ChannelSidebarSectionRow = {
   id: string;
   organization_id: string;
@@ -301,15 +303,23 @@ export async function clearChannelReadState(
     .run();
 }
 
-/** The newest message in the channel written by anybody but this user. */
+/**
+ * The newest message in the channel written by anybody but this user, ignoring
+ * the answers copied back from another Agent for the sender to read: the
+ * summary's own `has_unread` ignores them too, so counting one here would offer
+ * to make a conversation unread that comes straight back read.
+ */
 export async function latestForeignChannelMessageAt(
   db: D1Database,
   input: { userId: string; channelId: string },
 ) {
   const row = await db
     .prepare(
-      `select max(created_at) as created_at from briar_channel_messages
-       where channel_id = ? and ifnull(author_user_id, '') != ?`,
+      `select max(message.created_at) as created_at
+       from briar_channel_messages message
+       where message.channel_id = ?
+         and ifnull(message.author_user_id, '') != ?
+         and not ${agentAnswerCopySql("message")}`,
     )
     .bind(input.channelId, input.userId)
     .first<{ created_at: string | null }>();

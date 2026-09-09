@@ -342,7 +342,10 @@ final class ChannelsStoreTests: XCTestCase {
         XCTAssertFalse(store.channels.isEmpty)
         await store.openChannel(channelID)
         await store.refreshChanges()
-        XCTAssertTrue(store.typingStatuses(messageIDs: [rootID]).isEmpty)
+        XCTAssertTrue(store.typingStatuses(
+            messageIDs: [rootID],
+            includesPendingWithoutActivity: false
+        ).isEmpty)
 
         store.applyActivityFrame(ChannelAgentActivityFrame(
             replyJobId: replyID,
@@ -361,7 +364,10 @@ final class ChannelsStoreTests: XCTestCase {
             expiresAt: Date().addingTimeInterval(30)
         ))
         XCTAssertEqual(
-            store.typingStatuses(messageIDs: [rootID]).first?.activity.headline,
+            store.typingStatuses(
+                messageIDs: [rootID],
+                includesPendingWithoutActivity: false
+            ).first?.activity?.headline,
             "관련 테스트 범위를 확인하겠습니다."
         )
 
@@ -377,7 +383,110 @@ final class ChannelsStoreTests: XCTestCase {
             sentAt: Date(),
             expiresAt: Date().addingTimeInterval(30)
         ))
-        XCTAssertTrue(store.typingStatuses(messageIDs: [rootID]).isEmpty)
+        XCTAssertTrue(store.typingStatuses(
+            messageIDs: [rootID],
+            includesPendingWithoutActivity: false
+        ).isEmpty)
+    }
+
+    /*
+      The channel half of the same split. A runner is free to publish no
+      commentary at all — a Codex-backed agent answered a mention after two
+      minutes having sent no frame — so the reply row on its own has to be
+      enough to name the agent, and a tombstone takes the headline back
+      without taking the agent with it.
+    */
+    func testChannelProgressNamesPendingReplyWithoutConcreteActivity() async throws {
+        let rootID = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
+        let replyID = UUID(uuidString: "66666666-6666-4666-8666-666666666666")!
+        let channel = summary(kind: .channel)
+        let running = agentReply(
+            id: replyID,
+            rootID: rootID,
+            status: .running,
+            attempts: 1
+        )
+        let api = ChannelHTTPRecorder(channel: channel)
+        let scenario = ChannelConnectScenario(
+            channel: channel,
+            initialMessages: [message(id: rootID, body: "@Doti 이 이슈 봐줄래?")],
+            syncResponses: [ChannelDeltaResponse(
+                cursor: 11,
+                hasMore: false,
+                reset: true,
+                channels: [channel],
+                removedChannelIds: [],
+                messages: [message(id: rootID, body: "@Doti 이 이슈 봐줄래?")],
+                removedMessageIds: [],
+                agentReplies: [running]
+            )]
+        )
+        let store = ChannelsStore(
+            api: api,
+            preparedUploadClient: api,
+            channelService: scenario.service(),
+            dashboardService: BriarAPI_DashboardServiceClientMock(),
+            dmMemoryService: BriarAPI_DmMemoryServiceClientMock(),
+            managesRealtime: false,
+            pollInterval: .seconds(3_600)
+        )
+
+        store.applicationDidEnterBackground()
+        store.select(organizationID: organizationID, token: "token")
+        await store.refresh()
+        XCTAssertFalse(store.channels.isEmpty)
+        await store.openChannel(channelID)
+        await store.refreshChanges()
+
+        let silent = store.typingStatuses(
+            messageIDs: [rootID],
+            includesPendingWithoutActivity: true
+        )
+        XCTAssertEqual(silent.count, 1)
+        XCTAssertNil(silent.first?.activity)
+
+        store.applyActivityFrame(ChannelAgentActivityFrame(
+            replyJobId: replyID,
+            attempt: 1,
+            sequence: 1,
+            agentId: agentID,
+            channelId: channelID,
+            triggerMessageId: rootID,
+            parentMessageId: rootID,
+            activity: ChannelAgentActivity(
+                id: "commentary-1",
+                kind: .message,
+                headline: "관련 테스트 범위를 확인하겠습니다."
+            ),
+            sentAt: Date(),
+            expiresAt: Date().addingTimeInterval(30)
+        ))
+        XCTAssertEqual(
+            store.typingStatuses(
+                messageIDs: [rootID],
+                includesPendingWithoutActivity: true
+            ).first?.activity?.headline,
+            "관련 테스트 범위를 확인하겠습니다."
+        )
+
+        store.applyActivityFrame(ChannelAgentActivityFrame(
+            replyJobId: replyID,
+            attempt: 1,
+            sequence: 2,
+            agentId: agentID,
+            channelId: channelID,
+            triggerMessageId: rootID,
+            parentMessageId: rootID,
+            activity: nil,
+            sentAt: Date(),
+            expiresAt: Date().addingTimeInterval(30)
+        ))
+        let cleared = store.typingStatuses(
+            messageIDs: [rootID],
+            includesPendingWithoutActivity: true
+        )
+        XCTAssertEqual(cleared.count, 1)
+        XCTAssertNil(cleared.first?.activity)
     }
 
     private func summary(kind: ChannelSummary.Kind = .channel) -> ChannelSummary {

@@ -410,8 +410,9 @@ export function useCommandPaletteItems({
         icon: <Building2 />,
         id: `action:organization-settings:${activeOrganization.id}`,
         keywords: [
-          "organization settings",
           "workspace settings",
+          "organization settings",
+          "워크스페이스 설정",
           "조직 설정",
           "组织设置",
           activeOrganization.name,

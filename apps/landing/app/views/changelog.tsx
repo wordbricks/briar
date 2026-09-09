@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.223",
+        date: "2026년 9월 9일",
+        title: "난이도에 맞는 모델이 실제로 배정됩니다",
+        summary:
+          "난이도별 모델 배분을 최신 성능 지표 기준으로 다시 맞췄습니다. 보통·어려움이 쉬움보다 약한 모델로 시작하던 문제와, 일부 프로바이더가 아예 후보에서 빠져 있던 문제를 함께 고쳤습니다.",
+        items: [
+          "보통은 GPT-5.6 Sol로, 어려움은 Opus 5로 시작합니다. 이전에는 각 난이도의 첫 후보가 아래 난이도보다 약했습니다.",
+          "쉬움의 Gemini를 3.8 Flash로 올렸습니다. 가격이 같고 성능이 앞섭니다. OpenCode에는 GLM-5.3 계열을 붙였습니다.",
+          "OpenCode와 OpenRouter 후보가 한 번도 선택되지 않던 문제를 고쳤습니다. DeepSeek는 성능이 확인된 빌드만 지정합니다.",
+        ],
+      },
+      {
         version: "1.2.222",
         date: "2026년 9월 9일",
         title: "가장 어려운 일에 가장 강한 모델을 붙입니다",
@@ -1967,6 +1979,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.223",
+        date: "September 9, 2026",
+        title: "Difficulty now picks the model it should",
+        summary:
+          "Model selection per difficulty was rebalanced against current capability scores. Normal and Hard had been starting with weaker models than Easy, and some providers were never being chosen at all.",
+        items: [
+          "Normal now leads with GPT-5.6 Sol and Hard with Opus 5. Each tier's first choice had been weaker than the tier below it.",
+          "Easy moved to Gemini 3.8 Flash, which costs the same as 3.7 and scores higher, and OpenCode gained the GLM-5.3 models.",
+          "Fixed OpenCode and OpenRouter candidates that could never be selected. DeepSeek is now pinned to the build whose capability is known.",
+        ],
+      },
       {
         version: "1.2.222",
         date: "September 9, 2026",

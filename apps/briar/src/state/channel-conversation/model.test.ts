@@ -18,6 +18,7 @@ import {
   removeReplySummary,
   summarizeChannelMessages,
   threadMessageIdSet,
+  typingAgentNamesForReplies,
   typingAgentsForReplies,
 } from "./model";
 
@@ -216,6 +217,36 @@ describe("typing state", () => {
     kind: "command",
     headline: "Running tests",
   } as const;
+
+  it("names the replying agents once each and falls back for unknown ids", () => {
+    const replies = [
+      testChannelAgentReply("reply-1", { parentMessageId: "root" }),
+      testChannelAgentReply("reply-2", { parentMessageId: "root" }),
+      testChannelAgentReply("reply-3", {
+        parentMessageId: "root",
+        agentId: "agent-missing",
+      }),
+      testChannelAgentReply("reply-4", { parentMessageId: "elsewhere" }),
+    ];
+
+    expect(
+      typingAgentNamesForReplies(replies, agents, new Set(["root"]), "Agent"),
+    ).toEqual(["Builder", "Agent"]);
+  });
+
+  /*
+    The name is durable reply state and the headline is the socket, so a reply
+    that has published nothing is still named. A channel depends on it: a runner
+    that never emits commentary would otherwise show nothing for minutes.
+  */
+  it("names a pending reply that has no activity frame at all", () => {
+    const reply = testChannelAgentReply("reply-1", { parentMessageId: "root" });
+
+    expect(
+      typingAgentNamesForReplies([reply], agents, new Set(["root"]), "Agent"),
+    ).toEqual(["Builder"]);
+    expect(activityForReplies([reply], agents, new Map(), "Agent")).toEqual({});
+  });
 
   it("drops an activity frame that describes an earlier attempt", () => {
     const reply = testChannelAgentReply("reply-1", { attempts: 2 });

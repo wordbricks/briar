@@ -36,13 +36,13 @@ describe("recommendIssueExecution", () => {
         ["max"],
       ),
       "agy",
-      "gemini-3.7-flash-high",
+      "gemini-3.8-flash-high",
       [],
     );
 
     expect(recommendIssueExecution("easy", current)).toEqual({
       provider: "agy",
-      model: "gemini-3.7-flash-high",
+      model: "gemini-3.8-flash-high",
       effort: null,
     });
   });
@@ -60,31 +60,31 @@ describe("recommendIssueExecution", () => {
 
   it("falls through when a designated model lacks the configured effort", () => {
     const current = withModel(
-      withModel(catalog(), "codex", "gpt-5.6-luna", ["high"]),
+      withModel(catalog(), "codex", "gpt-5.6-sol", ["low"]),
       "claude",
       "opus",
-      ["high"],
+      ["medium"],
     );
 
     expect(recommendIssueExecution("normal", current)).toEqual({
       provider: "claude",
       model: "opus",
-      effort: "high",
+      effort: "medium",
     });
   });
 
   it("accepts provider prefixes and separator differences for designated models", () => {
     const current = withModel(
       catalog(),
-      "opencode",
-      "opencode-go/deepseek-v4-flash-0731",
-      ["high"],
+      "openrouter",
+      "openrouter/deepseek/deepseek-v4-flash-0731",
+      [],
     );
 
     expect(recommendIssueExecution("easy", current)).toEqual({
-      provider: "opencode",
-      model: "opencode-go/deepseek-v4-flash-0731",
-      effort: "high",
+      provider: "openrouter",
+      model: "openrouter/deepseek/deepseek-v4-flash-0731",
+      effort: null,
     });
   });
 
@@ -139,7 +139,7 @@ describe("recommendIssueExecution", () => {
     expect(recommendIssueExecution("normal", current)).toEqual({
       provider: "claude",
       model: "opus[1m]",
-      effort: "high",
+      effort: "medium",
     });
     expect(recommendIssueExecution("hard", current)).toEqual({
       provider: "claude",
@@ -150,10 +150,10 @@ describe("recommendIssueExecution", () => {
 
   it("skips a merged capability that no individual Worker can run", () => {
     const current = withModel(
-      withModel(catalog(), "codex", "gpt-5.6-luna", ["max"]),
+      withModel(catalog(), "codex", "gpt-5.6-sol", ["high"]),
       "claude",
       "opus",
-      ["high"],
+      ["medium"],
     );
 
     expect(recommendIssueExecution(
@@ -164,7 +164,7 @@ describe("recommendIssueExecution", () => {
     )).toEqual({
       provider: "claude",
       model: "opus",
-      effort: "high",
+      effort: "medium",
     });
   });
 
@@ -252,6 +252,117 @@ describe("recommendIssueExecution", () => {
       provider: "codex",
       model: "gpt-6-astra",
       effort: "ultra",
+    });
+  });
+});
+
+describe("recommendIssueExecution tier bands", () => {
+  const opencode = (
+    current: AgentProviderCapabilityCatalog,
+    ...ids: string[]
+  ) => {
+    current.opencode = {
+      models: ids.map((id) => ({ id, label: id, efforts: [] })),
+      defaultEfforts: [],
+      allowCustomModels: true,
+      error: null,
+    };
+    return current;
+  };
+
+  // OpenCode reports no efforts, per model or as provider defaults, so an
+  // entry that named one could never be selected.
+  it("selects an OpenCode model even though it advertises no efforts", () => {
+    const current = opencode(catalog(), "opencode-go/glm-5.3-flash");
+
+    expect(recommendIssueExecution("easy", current)).toEqual({
+      provider: "opencode",
+      model: "opencode-go/glm-5.3-flash",
+      effort: null,
+    });
+  });
+
+  // `["glm", "5", "3"]` is a prefix of `glm-5.3-flash`, so normal matches the
+  // full model by alias instead, and a flash-first catalog cannot divert it.
+  it("does not let the flash build stand in for GLM 5.3 on normal", () => {
+    const current = opencode(
+      catalog(),
+      "opencode-go/glm-5.3-flash",
+      "opencode-go/glm-5.3",
+    );
+
+    expect(recommendIssueExecution("normal", current)).toEqual({
+      provider: "opencode",
+      model: "opencode-go/glm-5.3",
+      effort: null,
+    });
+    expect(recommendIssueExecution("easy", current)).toEqual({
+      provider: "opencode",
+      model: "opencode-go/glm-5.3-flash",
+      effort: null,
+    });
+  });
+
+  // The undated build scores far below the dated one; only the latter is
+  // designated, so a catalog holding just the undated model matches nothing.
+  it("designates only the dated DeepSeek build", () => {
+    const bare = catalog();
+    bare.openrouter = {
+      models: [{ id: "deepseek/deepseek-v4-flash", label: "DeepSeek V4 Flash", efforts: [] }],
+      defaultEfforts: [],
+      allowCustomModels: true,
+      error: null,
+    };
+    expect(recommendIssueExecution("easy", bare)).toBeNull();
+
+    const dated = catalog();
+    dated.openrouter = {
+      models: [{
+        id: "deepseek/deepseek-v4-flash-0731",
+        label: "DeepSeek V4 Flash 0731",
+        efforts: [],
+      }],
+      defaultEfforts: [],
+      allowCustomModels: true,
+      error: null,
+    };
+    expect(recommendIssueExecution("easy", dated)).toEqual({
+      provider: "openrouter",
+      model: "deepseek/deepseek-v4-flash-0731",
+      effort: null,
+    });
+  });
+
+  // Claude has no model in normal's band, so the two tiers share Opus 5 and
+  // are separated by effort alone.
+  it("separates normal from hard on Claude by effort", () => {
+    const current = withModel(
+      catalog(),
+      "claude",
+      "opus[1m]",
+      ["low", "medium", "high", "xhigh", "max"],
+    );
+    current.claude.models[0]!.label = "Opus (1M context) · claude-opus-5[1m]";
+
+    expect(recommendIssueExecution("normal", current)?.effort).toBe("medium");
+    expect(recommendIssueExecution("hard", current)?.effort).toBe("high");
+  });
+
+  // Every tier's first choice must outrank every candidate below it; hard used
+  // to lead with a weaker model than its own runner-up.
+  it("leads hard with Opus rather than the weaker Codex build", () => {
+    const current = withModel(
+      withModel(catalog(), "codex", "gpt-5.6-sol", ["high", "xhigh"]),
+      "claude",
+      "opus[1m]",
+      ["medium", "high"],
+    );
+    current.claude.models[0]!.label = "Opus (1M context) · claude-opus-5[1m]";
+
+    expect(recommendIssueExecution("hard", current)).toEqual({
+      provider: "claude",
+      model: "opus[1m]",
+      effort: "high",
     });
   });
 });

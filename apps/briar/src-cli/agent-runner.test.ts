@@ -624,8 +624,17 @@ describe("detached Agent runner", () => {
     ];
 
     for (const prompt of prompts) {
+      // The format is stated, not left to the provider: a Codex Agent once
+      // wrapped its progress update in the reply envelope, which the typing
+      // strip suppresses as a structured reply.
       expect(prompt).toContain(
-        "If you can answer promptly without tools, do not send a commentary or progress message.",
+        '{"progress":"the work you are starting now"} and nothing else',
+      );
+      expect(prompt).toContain(
+        "never the final response shape, and never both in one message",
+      );
+      expect(prompt).toContain(
+        "If you can answer promptly without tools, send no progress update at all.",
       );
       expect(prompt).toContain(
         "immediately before the first tool call",
@@ -715,6 +724,34 @@ describe("detached Agent runner", () => {
     expect(prompt).not.toContain('"reactions"');
     expect(prompt).not.toContain('"blocks"');
     expect(prompt.length).toBeLessThan(20_000);
+  });
+
+  it("points the reply at downloaded attachment files and names the ones it never received", () => {
+    const prompt = detachedChannelReplyPrompt({
+      agent,
+      workspaceAvailable: false,
+      snapshot: {
+        downloadedFilePaths: [".briar-channel-attachments/22222222.md"],
+        unreadableAttachments: [
+          { filename: "diagram.svg", contentType: "image/svg+xml" },
+        ],
+      },
+    });
+
+    expect(prompt).toContain("context.downloadedImagePaths and context.downloadedFilePaths");
+    expect(prompt).toContain("never guess what they contain");
+    expect(prompt).toContain("diagram.svg");
+  });
+
+  it("says nothing about attachments when the trigger carried none", () => {
+    const prompt = detachedChannelReplyPrompt({
+      agent,
+      workspaceAvailable: false,
+      snapshot: { downloadedImagePaths: [], unreadableAttachments: [] },
+    });
+
+    expect(prompt).not.toContain("downloadedFilePaths");
+    expect(prompt).not.toContain("unreadableAttachments");
   });
 
   it("names every message a burst left unanswered and marks them in the snapshot", () => {

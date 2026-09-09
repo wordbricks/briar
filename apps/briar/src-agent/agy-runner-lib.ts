@@ -15,6 +15,7 @@ import {
   normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import type { RunnerRequest } from "./runner-request";
+import { agentProgressMessage } from "../src/lib/agent-progress-message";
 import {
   classifyProviderFailure,
   type ProviderBlock,
@@ -353,7 +354,15 @@ export function agyEnvironment(
 
 export function agyFinalMessage(raw: unknown, fallback: string) {
   const root = recordValue(raw);
-  return (root ? textFrom(root.result) ?? textFrom(root) : undefined) ?? fallback;
+  const text = root ? textFrom(root.result) ?? textFrom(root) : undefined;
+  if (text === undefined) return fallback;
+  /*
+    Every assistant step overwrites the running final message, so a progress
+    update would become the answer whenever it is the last text Antigravity
+    emits. The strict reply contract would reject it, but only after
+    structured-output-repair spends a repair turn on it.
+  */
+  return agentProgressMessage(text) ? fallback : text;
 }
 
 const transientUpstreamStatusCodes = new Set([502, 503, 504]);

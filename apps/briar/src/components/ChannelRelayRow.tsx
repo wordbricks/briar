@@ -6,14 +6,14 @@ import { cn } from "../lib/utils";
 import { Spinner } from "./ui/spinner";
 
 /*
-  The two ends of an Agent-to-Agent round trip, as they appear in the person's
-  own conversation.
+  An Agent-to-Agent round trip, as it appears in the person's own conversation.
 
   The Agent that was asked to reach another one leaves a short notice behind
   ("메시지 보냄 → B") rather than a bubble, because the text it sent belongs to
-  the Agent-to-Agent conversation and is only summarised here; the answer that
-  comes back *is* a bubble, authored by the other Agent, so it carries a label
-  saying where it came from. Both link through to the read-only conversation.
+  the Agent-to-Agent conversation and is only summarised here. B's answer never
+  appears either: the Agent that asked reads it and writes its own reply, so
+  the conversation stays in that Agent's voice. The notice links through to the
+  read-only Agent-to-Agent conversation, where both sides are readable in full.
 */
 
 const relayAvatarClass =
@@ -22,24 +22,18 @@ const relayAvatarClass =
 function RelayAgentAvatar({
   name,
   image,
-  size = 18,
 }: {
   name: string;
   image: string | null;
-  size?: number;
 }) {
   return (
     <span
       className={cn(relayAvatarClass, "channel-relay-avatar")}
       role="img"
       aria-label={name}
-      style={{ height: size, width: size }}
+      style={{ height: 18, width: 18 }}
     >
-      {image ? (
-        <img alt="" src={image} />
-      ) : (
-        <Bot aria-hidden="true" size={Math.round(size * 0.62)} />
-      )}
+      {image ? <img alt="" src={image} /> : <Bot aria-hidden="true" size={11} />}
     </span>
   );
 }
@@ -97,30 +91,5 @@ export function ChannelRelayOutboundNotice({
         {time}
       </time>
     </div>
-  );
-}
-
-/** The "from B" label above an answer copied back from the other Agent. */
-export function ChannelRelayFromLabel({
-  onOpen,
-  relay,
-}: {
-  onOpen?: () => void;
-  relay: ChannelMessageRelay;
-}) {
-  const { t } = useI18n();
-  const name = relay.peerAgentName;
-  return (
-    <button
-      className="channel-relay-from mb-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-transparent"
-      data-relay-direction="inbound"
-      disabled={!onOpen}
-      onClick={() => onOpen?.()}
-      title={t("dm.relay.open", { name })}
-      type="button"
-    >
-      <RelayAgentAvatar image={relay.peerAgentImage} name={name} size={16} />
-      <span className="min-w-0 truncate">{t("dm.relay.from", { name })}</span>
-    </button>
   );
 }
