@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.229",
+        date: "2026년 9월 10일",
+        title: "사이드바 왼쪽 위가 깨지던 문제를 고쳤습니다",
+        summary:
+          "워크스페이스 로고가 원래 크기 그대로 펼쳐지면서 사이드바 위쪽의 검색창과 새 메시지 버튼을 덮던 문제를 고쳤습니다. 같은 원인으로 스타일이 빠져 있던 워크스페이스 목록, 워크스페이스 만들기 화면, 휴대폰 화면의 상단 메뉴도 함께 정상으로 돌아옵니다.",
+        items: [
+          "사이드바 맨 위의 워크스페이스 로고가 다시 제 크기로 보입니다.",
+          "워크스페이스를 고르는 목록과 워크스페이스 만들기 화면의 모양이 돌아왔습니다.",
+          "휴대폰 화면 상단의 워크스페이스 메뉴도 함께 고쳤습니다.",
+          "어두운 화면에서 위 화면들의 색이 다시 제대로 적용됩니다.",
+        ],
+      },
+      {
         version: "1.2.228",
         date: "2026년 9월 9일",
         title: "DM 답장이 더 빨리 시작되고 잠깐의 서버 지연에도 끊기지 않습니다",
@@ -2031,6 +2044,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.229",
+        date: "September 10, 2026",
+        title: "Fixed the broken top-left corner of the sidebar",
+        summary:
+          "A workspace logo was drawn at its full original size and covered the search box and New message button at the top of the sidebar. The same cause had stripped the styling from the workspace list, the Create workspace screen, and the top menu on phones, and those are all back to normal too.",
+        items: [
+          "The workspace logo at the top of the sidebar is the right size again.",
+          "The workspace picker and the Create workspace screen look correct again.",
+          "The workspace menu at the top of the phone layout is fixed as well.",
+          "Dark mode colors apply correctly on all of those screens again.",
+        ],
+      },
       {
         version: "1.2.228",
         date: "September 9, 2026",
