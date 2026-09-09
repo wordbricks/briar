@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { create, fromJson, type JsonValue } from "@bufbuild/protobuf";
 import { ValueSchema, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import {
   WorkspaceAgentContextService,
@@ -145,6 +146,8 @@ const wireDescriptor = (revocationEpoch: number) =>
 describe("DM memory in the actual channel reply runner", () => {
   async function exercise(input: {
     revokedAfter?: number;
+    /** Every claim check after this many answers with an unreachable server. */
+    checkTransportFailsAfter?: number;
     activity?: boolean;
     acknowledgement?: { execution: IssueExecutionRecommendation | null };
     provider: (
@@ -164,6 +167,9 @@ describe("DM memory in the actual channel reply runner", () => {
         router.service(WorkerQueueService, {
           checkDmMemoryClaim: () => {
             checks++;
+            if (checks > (input.checkTransportFailsAfter ?? Infinity)) {
+              throw new ConnectError("synthetic claim check outage", Code.Unavailable);
+            }
             return create(CheckDmMemoryClaimResponseSchema, {
               memory: wireDescriptor(epoch()),
             });
@@ -477,6 +483,50 @@ describe("DM memory in the actual channel reply runner", () => {
     expect(observed.completed).toBe("");
     expect(observed.requests.some((path) => path.includes("ReplyActivity")))
       .toBe(false);
+  });
+
+  /*
+    The same publisher path as the M07 abort above, with the one difference
+    that decides whether a reply survives: an unreachable server is not a
+    revocation. A transport failure here threw away a live Computer Use turn
+    100 seconds in (2026-09-09).
+  */
+  it("keeps a live turn when a mid-turn claim check cannot reach the server", async () => {
+    let aborted = false;
+    const observed = await exercise({
+      activity: true,
+      // Everything after the setup check fails, which is the activity-time
+      // check and then the one before publication.
+      checkTransportFailsAfter: 1,
+      provider: async (turn) => {
+        turn.signal.addEventListener("abort", () => { aborted = true; }, { once: true });
+        await turn.onPayload?.(
+          sidecarProviderEvent({
+            raw: { synthetic: true },
+            event: create(NormalizedAgentEventSchema, {
+              event: {
+                case: "messageStarted",
+                value: {
+                  id: "synthetic",
+                  phase: "commentary",
+                  text: "Synthetic progress",
+                },
+              },
+            }),
+          }) as never,
+        );
+        // Outlive all three attempts and their backoff before answering.
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+        return result(final);
+      },
+    });
+    expect(aborted).toBe(false);
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(1);
+    expect(observed.completed).toContain("A synthetic answer in metric units");
+    // The publish the failing check used to take down with the turn.
+    expect(observed.requests.some((path) => path.includes("ReplyActivity")))
+      .toBe(true);
   });
 
   it("M07 blocks a revocation between model generation and final publication", async () => {

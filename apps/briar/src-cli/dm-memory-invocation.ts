@@ -42,6 +42,8 @@ type InvocationInput = {
   work: ClaimedChannelReply;
   memory: DmMemoryDescriptor;
   signal?: AbortSignal;
+  /** A transport failure the invocation survived, so the Worker log keeps it. */
+  onTransportFailure?: (event: { phase: "brief" | "check"; error: unknown }) => void;
 };
 const decodeResponse = <S extends Schema.Top & { readonly DecodingServices: never }>(schema: S, value: unknown): S["Type"] => {
   try { return Schema.decodeUnknownSync(schema)(value); } catch { throw new Error("memory_response_invalid"); }
@@ -52,6 +54,16 @@ const required = <T>(value: T | undefined, field: string): T => {
   return value;
 };
 
+const profileHeader = [
+  "# Profile", "",
+  "Private source data for this owner and Agent. D1 is the source of truth; editing this file does not save changes.",
+  "User characteristics describe the user. Response preferences describe how they want answers, within each item's stated scope.", "",
+];
+const briefUnavailableNotice = "The memory brief could not be loaded for this reply.";
+
+const isTransportFailure = (error: unknown) =>
+  error instanceof Error && error.message === "memory_transport_failed";
+
 const applicationErrorCode = (error: unknown) => {
   if (!(error instanceof ConnectError)) return null;
   return error.findDetails(ApplicationErrorDetailSchema)[0]?.code || null;
@@ -61,6 +73,7 @@ const applicationErrorCode = (error: unknown) => {
 export class DmMemoryInvocation {
   private descriptor: DmMemoryDescriptor;
   private brief: DmMemoryBrief | null = null;
+  private briefLoad: "loaded" | "unavailable" = "loaded";
   private results: Array<{ filename: string; response: DmMemoryLookupResponse }> = [];
   private closed = false;
   private constructor(private readonly input: InvocationInput, readonly directory: string) {
@@ -85,16 +98,35 @@ export class DmMemoryInvocation {
       revocationEpoch: BigInt(this.descriptor.revocationEpoch),
     };
   }
+  /*
+    Three attempts against a stall, because one was enough to lose a whole
+    reply: the first brief of 2026-09-09 13:13Z hit the 7 s timeout and the
+    attempt ended before any model ran. An application code is the server's
+    answer rather than a stall, so it is raised on the first try.
+
+    Every throw keeps the original as its cause: the codes below read the same
+    for a timeout, a refusal and a 500 alike, and only `dmMemoryErrorDiagnostic`
+    reading that cause can tell an operator which one happened.
+  */
   private async rpc<T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> {
     if (this.closed) throw new Error("memory_invocation_closed");
-    const signal = AbortSignal.any([...(this.input.signal ? [this.input.signal] : []), AbortSignal.timeout(7_000)]);
-    try {
-      return await call(signal);
-    } catch (error) {
-      const code = applicationErrorCode(error);
-      if (code) throw new Error(code);
-      throw new Error(this.input.signal?.aborted ? "memory_invocation_aborted" : "memory_transport_failed");
+    let lastFailure: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        try { await delay(300 * 2 ** (attempt - 1), undefined, { signal: this.input.signal }); }
+        catch (error) { throw new Error("memory_invocation_aborted", { cause: error }); }
+      }
+      const signal = AbortSignal.any([...(this.input.signal ? [this.input.signal] : []), AbortSignal.timeout(7_000)]);
+      try {
+        return await call(signal);
+      } catch (error) {
+        const code = applicationErrorCode(error);
+        if (code) throw new Error(code, { cause: error });
+        if (this.input.signal?.aborted) throw new Error("memory_invocation_aborted", { cause: error });
+        lastFailure = error;
+      }
     }
+    throw new Error("memory_transport_failed", { cause: lastFailure });
   }
   private async write(filename: string, value: unknown, markdown = false) {
     const file = await open(join(this.directory, filename), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
@@ -113,10 +145,32 @@ export class DmMemoryInvocation {
     this.descriptor = descriptor;
   }
   private async refresh() {
-    const wire = await this.rpc((signal) => this.input.queue.getDmMemoryBrief(
-      { claim: this.claim() },
-      { signal },
-    ));
+    let wire: Awaited<ReturnType<InvocationInput["queue"]["getDmMemoryBrief"]>>;
+    try {
+      wire = await this.rpc((signal) => this.input.queue.getDmMemoryBrief(
+        { claim: this.claim() },
+        { signal },
+      ));
+    } catch (error) {
+      /*
+        A brief is context, not permission. The claim it would have been fetched
+        under is still the one the server handed out, so an unreachable server
+        costs the reply its stored preferences rather than the answer itself.
+        Revocation and every other application code still throw.
+      */
+      if (!isTransportFailure(error)) throw error;
+      await this.clearFiles();
+      await this.write("profile.md", [
+        ...profileHeader,
+        `${briefUnavailableNotice} No stored profile items are available here; none were deleted.`,
+        "",
+      ].join("\n"), true);
+      await this.write("recent.md", { memory: this.descriptor, items: [], notice: briefUnavailableNotice });
+      this.brief = null;
+      this.briefLoad = "unavailable";
+      this.input.onTransportFailure?.({ phase: "brief", error });
+      return;
+    }
     const response = decodeResponse(dmMemoryBriefResponseSchema, {
       memory: dmMemoryDescriptorFromProto(required(wire.memory, "memory")),
       brief: wire.brief ? toJson(ValueSchema, wire.brief) : null,
@@ -125,21 +179,35 @@ export class DmMemoryInvocation {
     await this.clearFiles();
     this.brief = response.brief;
     await this.write("profile.md", [
-      "# Profile", "",
-      "Private source data for this owner and Agent. D1 is the source of truth; editing this file does not save changes.",
-      "User characteristics describe the user. Response preferences describe how they want answers, within each item's stated scope.", "",
+      ...profileHeader,
       ...(this.brief?.profile ?? []).map((item) =>
         `- ${item.body.trim().replace(/\n/gu, "\n  ")}\n  <!-- source: ${item.documentId} version: ${item.version} -->`),
       ...(this.brief?.omitted ? ["", "More memories may exist. Search when relevant."] : []), "",
     ].join("\n"), true);
     await this.write("recent.md", { memory: this.descriptor, items: this.brief?.progress ?? [] });
+    this.briefLoad = "loaded";
   }
+  /** Whether this reply actually holds a brief, or the placeholders instead. */
+  get briefState(): "loaded" | "unavailable" { return this.briefLoad; }
   /** A changed revision requires a fresh prompt; a changed epoch aborts the claim. */
   async check(refreshIfChanged = true): Promise<boolean> {
-    const wire = await this.rpc((signal) => this.input.queue.checkDmMemoryClaim(
-      { claim: this.claim() },
-      { signal },
-    ));
+    let wire: Awaited<ReturnType<InvocationInput["queue"]["checkDmMemoryClaim"]>>;
+    try {
+      wire = await this.rpc((signal) => this.input.queue.checkDmMemoryClaim(
+        { claim: this.claim() },
+        { signal },
+      ));
+    } catch (error) {
+      /*
+        The fence is against a revocation, and an unreachable server is not
+        one: reporting it as a failure aborted a live provider turn 100 seconds
+        in (2026-09-09). Nothing this reply can see has changed, so it keeps the
+        descriptor it holds and the next check asks again.
+      */
+      if (!isTransportFailure(error)) throw error;
+      this.input.onTransportFailure?.({ phase: "check", error });
+      return false;
+    }
     const { memory } = decodeResponse(checkSchema, {
       memory: dmMemoryDescriptorFromProto(required(wire.memory, "memory")),
     });
@@ -167,9 +235,11 @@ export class DmMemoryInvocation {
       }
       catch (error) {
         const code = error instanceof Error ? error.message : "memory_request_failed";
-        if (attempt === 2 || !["memory_transport_failed", "lookup_in_progress"].includes(code)) throw error;
+        // A stalled transport is already retried inside `rpc`; waiting out a
+        // lookup the server is still running is the only wait left here.
+        if (attempt === 2 || code !== "lookup_in_progress") throw error;
         // A retransmission keeps its ID and does not consume another logical lookup.
-        await delay(code === "lookup_in_progress" ? 7_100 : 300, undefined, { signal: this.input.signal });
+        await delay(7_100, undefined, { signal: this.input.signal });
       }
     }
     const response = decodeResponse(
@@ -191,6 +261,9 @@ export class DmMemoryInvocation {
       this.descriptor.searchEnabled
         ? "Use memory_search when prior preferences or events matter: emit memoryRequests with exactly one search operation (1–3 queries, max_results 1–10). Use a get operation only for documentId/version references already returned in a brief/search. At most three lookup turns are shared with workspace context, with six unique search queries total. A lookup turn must have body, all proposals, delegation, agentMessage and contextRequests null and attachments empty. For a final answer memoryRequests must be null. Set memoryCitations to only the documentId/version pairs actually used, at most ten; never invent references. Use null when no memory contributed."
         : "Memory recall is disabled. Do not request memory lookups or claim to know stored preferences.",
+      ...(this.briefLoad === "unavailable"
+        ? [`${briefUnavailableNotice} Do not claim to know stored preferences; answer from the conversation.`]
+        : []),
       `Private profile file: ${join(this.directory, "profile.md")}`,
       `Private recent file: ${join(this.directory, "recent.md")}`,
       ...this.results.map((result) => `Private lookup file: ${join(this.directory, result.filename)}`),
@@ -251,6 +324,12 @@ export function dmMemoryExecutionError(error: unknown): Error {
   return new Error(executionErrorCodes.has(code) ? code : "memory_reply_failed", { cause: error });
 }
 
+/** Codes a transport or the platform raises; the rest can quote the request. */
+const runtimeConnectCodes = new Set<Code>([
+  Code.Canceled, Code.DeadlineExceeded, Code.Unavailable, Code.Unknown,
+  Code.Internal, Code.Unauthenticated, Code.PermissionDenied, Code.Unimplemented,
+]);
+
 const machineCodeKeys = ["code", "syscall", "errno"] as const;
 const stackFrames = (error: unknown) => {
   const stack = error instanceof Error && typeof error.stack === "string"
@@ -284,7 +363,20 @@ const errorFacts = (error: unknown, detail: boolean) => {
       ? error.constructor?.name || "Error"
       : `non-error:${typeof error}`,
   ];
-  if (error instanceof ConnectError) parts.push(`connect=${Code[error.code]}`);
+  if (error instanceof ConnectError) {
+    parts.push(`connect=${Code[error.code]}`);
+    /*
+      The message of these codes is written by a transport or the platform, not
+      by the request, so it carries no DM content — and without it the code
+      alone is ambiguous: a client-side `AbortSignal.timeout` arrives as
+      Canceled "The operation was aborted due to timeout", the same code a
+      caller's own abort produces. With the detail flag the untruncated message
+      is printed below anyway.
+    */
+    if (!detail && runtimeConnectCodes.has(error.code)) {
+      parts.push(`message="${error.rawMessage.slice(0, 200)}"`);
+    }
+  }
   const applicationCode = applicationErrorCode(error);
   if (applicationCode) parts.push(`application=${applicationCode}`);
   for (const key of machineCodeKeys) {

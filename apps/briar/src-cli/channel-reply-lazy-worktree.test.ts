@@ -29,7 +29,7 @@ import {
   ReplyCompletionDisposition,
   WorkerQueueService,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Config, TeamConfig } from "./config-contract";
 import type {
   DetachedProviderTurnInput,
@@ -161,8 +161,12 @@ type Exercise = {
    * can never open that barrier, so it fails on the order it produced instead.
    */
   hold?: readonly HeldSetupStep[];
-  /** The memory brief answers with a transport failure instead of a brief. */
-  memoryBriefFails?: boolean;
+  /**
+   * How the memory brief refuses: `transport` is an unreachable server, which
+   * the reply is expected to survive, and `revoked` is the server's verdict on
+   * the claim, which it is not.
+   */
+  memoryBriefFails?: "transport" | "revoked";
   /** What the acknowledgement selection turn answers, and when. */
   selectAcknowledgement?: () => Promise<DetachedProviderTurnResult>;
   /**
@@ -275,13 +279,18 @@ describe("DM reply worktree allocation", () => {
             calls.push("memory-brief");
             await holdStep("memory-brief");
             events.push("memory-brief:end");
-            if (input.memoryBriefFails) {
+            if (input.memoryBriefFails === "transport") {
               throw new ConnectError(
                 "synthetic memory brief outage",
                 Code.Unavailable,
               );
             }
-            return create(GetDmMemoryBriefResponseSchema, { memory });
+            return create(GetDmMemoryBriefResponseSchema, {
+              // A revoked scope answers with an epoch the claim cannot accept.
+              memory: input.memoryBriefFails === "revoked"
+                ? { ...memory, revocationEpoch: memory.revocationEpoch + 1n }
+                : memory,
+            });
           },
           checkDmMemoryClaim: async () => {
             calls.push("memory-check");
@@ -839,18 +848,18 @@ describe("DM reply worktree allocation", () => {
     expect(between).toEqual(["memory-check"]);
   });
 
-  it("cleans a created message invocation up when the memory brief fails", async () => {
+  it("cleans a created message invocation up when the memory brief is revoked", async () => {
     const observed = await exercise({
       memory: true,
       publicMessages: true,
-      memoryBriefFails: true,
+      memoryBriefFails: "revoked",
       provider: async () => turnResult(answer),
     });
 
-    // The redacted memory code the reply reported before the steps ran
-    // together, and the model was never asked to answer.
+    // A revocation is the server's answer, not a stall: the reply still stops
+    // before the model is asked anything.
     expect(observed.failure).toMatchObject({
-      message: "memory_transport_failed",
+      message: "memory_scope_revoked",
     });
     expect(observed.turns).toBe(0);
     // The message invocation was created beside the failing brief. Its journal
@@ -863,6 +872,38 @@ describe("DM reply worktree allocation", () => {
     await expect(
       stat(publicationJournalDirectory(observed.workId)),
     ).resolves.toBeDefined();
+  });
+
+  /*
+    The other half of the same claim: a brief the server cannot answer at all
+    used to fail the whole reply, so a DM whose memory space held nothing lost
+    its answer to a 7 s stall (2026-09-09).
+  */
+  it("answers without the brief when it keeps failing at the transport", async () => {
+    const logs: string[] = [];
+    const log = vi.spyOn(console, "log")
+      .mockImplementation((...args: unknown[]) => { logs.push(args.join(" ")); });
+    let observed;
+    try {
+      observed = await exercise({
+        memory: true,
+        memoryBriefFails: "transport",
+        provider: async () => turnResult(answer),
+      });
+    } finally { log.mockRestore(); }
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(1);
+    // Three attempts inside the one setup step, not three claims.
+    expect(observed.calls.filter((call) => call === "memory-brief")).toHaveLength(3);
+    expect(observed.prompts[0]).toContain(
+      "The memory brief could not be loaded for this reply.",
+    );
+    expect(observed.completed).toContain("A synthetic answer");
+    expect(logs.some((line) =>
+      line.startsWith("channel reply setup:") &&
+      line.includes(`"memoryBrief":"unavailable"`)
+    )).toBe(true);
   });
 
   it("neither reacts nor runs a selection when the claim already carries one", async () => {

@@ -84,6 +84,28 @@ const queue = (epoch = 0) => ({
   })),
 });
 
+const briefResponse = () => create(GetDmMemoryBriefResponseSchema, {
+  memory: wireDescriptor(),
+  brief: jsonValue({
+    memorySpaceId,
+    memoryRevision: 1,
+    revocationEpoch: 0,
+    policyVersion: "test-v1",
+    validThrough: null,
+    profile: [],
+    progress: [],
+    omitted: false,
+    notice: "",
+  }),
+});
+const outage = () => new ConnectError("synthetic memory outage", Code.Unavailable);
+const invocationInput = () => ({
+  projectId: crypto.randomUUID(),
+  workerId: "worker-1",
+  work,
+  memory: descriptor,
+});
+
 describe("DM memory Connect invocation", () => {
   it("renders complete profile items and refreshes corrections and deletions from the server", async () => {
     const client = queue();
@@ -176,10 +198,27 @@ describe("DM memory Connect invocation", () => {
   });
 
   it("keeps the machine codes a transport or system failure carries", () => {
+    // A code the request itself can reach quotes the request back, so its
+    // message stays behind the operator flag.
     expect(dmMemoryErrorDiagnostic(
-      new ConnectError("private recalled text", Code.Unavailable),
+      new ConnectError("private recalled text", Code.InvalidArgument),
       {},
-    )).toContain("connect=Unavailable");
+    )).not.toContain("private recalled text");
+    /*
+      A transport code's message is written by the runtime, and it is the only
+      thing that separates a timeout from an outage from a 500: the redacted
+      code is `memory_transport_failed` for all three.
+    */
+    const unavailable = dmMemoryErrorDiagnostic(
+      new ConnectError("upstream connect error: connection refused", Code.Unavailable),
+      {},
+    );
+    expect(unavailable).toContain("connect=Unavailable");
+    expect(unavailable).toContain('message="upstream connect error: connection refused"');
+    expect(dmMemoryErrorDiagnostic(
+      new ConnectError("x".repeat(500), Code.Internal),
+      {},
+    )).toContain(`message="${"x".repeat(200)}"`);
     const systemError = Object.assign(new Error("private recalled text"), {
       code: "ENOSPC",
       syscall: "write",
@@ -246,6 +285,99 @@ describe("DM memory Connect invocation", () => {
     const second = new Error("second", { cause: first });
     Object.assign(first, { cause: second });
     expect(links(second)).toHaveLength(2);
+  });
+
+  it("names the transport a redacted timeout came from", () => {
+    /*
+      What the 7 s `AbortSignal.timeout` in `rpc` actually produces: a
+      DOMException named TimeoutError, which Connect maps to Canceled — the
+      same code a caller's own abort carries, so only the message tells them
+      apart. A deadline Connect raises itself keeps its own code.
+    */
+    const timedOut = ConnectError.from(
+      new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+    );
+    const diagnostic = dmMemoryErrorDiagnostic(
+      dmMemoryExecutionError(new Error("memory_transport_failed", { cause: timedOut })),
+      {},
+    );
+    expect(diagnostic).toContain("connect=Canceled");
+    expect(diagnostic).toContain('message="The operation was aborted due to timeout"');
+    expect(dmMemoryErrorDiagnostic(
+      new ConnectError("the operation timed out", Code.DeadlineExceeded),
+      {},
+    )).toContain("connect=DeadlineExceeded");
+  });
+
+  it("retries a stalled brief instead of losing the reply to it", async () => {
+    const client = queue();
+    let attempts = 0;
+    client.getDmMemoryBrief.mockImplementation(async () => {
+      if (++attempts === 1) throw outage();
+      return briefResponse();
+    });
+    const invocation = await DmMemoryInvocation.create({ queue: client, ...invocationInput() });
+    try {
+      expect(client.getDmMemoryBrief).toHaveBeenCalledTimes(2);
+      expect(invocation.briefState).toBe("loaded");
+      expect(invocation.prompt()).not.toContain("could not be loaded");
+    } finally { await invocation.cleanup(); }
+  });
+
+  it("answers without the brief when every attempt fails at the transport", async () => {
+    const client = queue();
+    client.getDmMemoryBrief.mockImplementation(async () => { throw outage(); });
+    const failures: Array<{ phase: string; error: unknown }> = [];
+    const invocation = await DmMemoryInvocation.create({
+      queue: client,
+      ...invocationInput(),
+      onTransportFailure: (event) => failures.push(event),
+    });
+    try {
+      expect(client.getDmMemoryBrief).toHaveBeenCalledTimes(3);
+      expect(invocation.briefState).toBe("unavailable");
+      const markdown = await readFile(join(invocation.directory, "profile.md"), "utf8");
+      expect(markdown).toContain("# Profile\n");
+      expect(markdown).toContain("The memory brief could not be loaded for this reply.");
+      expect(invocation.prompt())
+        .toContain("The memory brief could not be loaded for this reply.");
+      expect(failures.map((failure) => failure.phase)).toEqual(["brief"]);
+      // The Connect code survives both the retry wrapper and the redaction.
+      expect(dmMemoryErrorDiagnostic(dmMemoryExecutionError(failures[0]!.error), {}))
+        .toContain("connect=Unavailable");
+    } finally { await invocation.cleanup(); }
+  });
+
+  it("keeps the turn when a claim check cannot reach the server", async () => {
+    const client = queue();
+    const failures: Array<{ phase: string; error: unknown }> = [];
+    const invocation = await DmMemoryInvocation.create({
+      queue: client,
+      ...invocationInput(),
+      onTransportFailure: (event) => failures.push(event),
+    });
+    try {
+      client.checkDmMemoryClaim.mockImplementation(async () => { throw outage(); });
+      await expect(invocation.check(false)).resolves.toBe(false);
+      expect(client.checkDmMemoryClaim).toHaveBeenCalledTimes(3);
+      expect(failures.map((failure) => failure.phase)).toEqual(["check"]);
+    } finally { await invocation.cleanup(); }
+  });
+
+  it("stops the invocation when the claim is abandoned during a retry wait", async () => {
+    const client = queue();
+    const controller = new AbortController();
+    client.getDmMemoryBrief.mockImplementation(async () => {
+      // Aborted while the retry is waiting, not before the attempt.
+      setTimeout(() => controller.abort(), 50);
+      throw outage();
+    });
+    await expect(DmMemoryInvocation.create({
+      queue: client,
+      ...invocationInput(),
+      signal: controller.signal,
+    })).rejects.toThrow("memory_invocation_aborted");
+    expect(client.getDmMemoryBrief).toHaveBeenCalledOnce();
   });
 
   it("keeps the field a missing response names", async () => {
