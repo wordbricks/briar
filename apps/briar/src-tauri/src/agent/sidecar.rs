@@ -718,6 +718,13 @@ fn run_chat(
                     }
                     return Err(block.to_error(config.blocked_prefix));
                 }
+                sidecar_proto::runner_to_parent::Payload::Prepared(_) => {
+                    // Only a two-phase turn (the Worker CLI's claim-time
+                    // pre-warm) is answered with this frame. The desktop sends
+                    // a single `run` frame, so a runner that emits it anyway
+                    // has nothing for the desktop to act on: keep reading.
+                    continue;
+                }
                 sidecar_proto::runner_to_parent::Payload::Error(error) => {
                     let code = error
                         .code
