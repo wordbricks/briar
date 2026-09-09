@@ -363,34 +363,55 @@ export function IssueConversation({
     if (byTime !== 0) return byTime;
     return left.id.localeCompare(right.id);
   }), [messages]);
+  // Two views of the same tracked reply, kept apart on purpose. `indicators` is
+  // the durable one — a queued or running job earns a line whether or not the
+  // activity socket ever says anything, because a runner that publishes no
+  // commentary must not read as a dropped mention. `activity` is the live one,
+  // and only a frame for the attempt that is actually running counts: a frame
+  // left over from an earlier attempt degrades the line to the generic wording
+  // instead of keeping a stale headline on screen.
   const agentReplyIndicatorsByThreadId = useMemo(() => {
-    const byThread = new Map<string, Map<string, {
-      agentName: string | null;
-      activity: ChannelAgentActivityDescriptor;
-      sentAt: string;
-    }>>();
+    const byThread = new Map<string, {
+      indicators: Map<string, {
+        agentName: string | null;
+      }>;
+      activity: Map<string, {
+        activity: ChannelAgentActivityDescriptor;
+        sentAt: string;
+      }>;
+    }>();
     for (const [jobId, tracked] of trackedAgentRepliesRef.current) {
       const job = agentRepliesByIdRef.current.get(jobId);
       if (!job) continue;
       const agentName = job.agentName?.trim() || mentionAgents.find(agent => agent.id === job.agentId)?.name.trim() || null;
-      const frame = issueActivity.get(jobId);
-      if (!frame?.activity || frame.attempt !== job.attempts) continue;
       const key = job.agentId ? `agent:${job.agentId}` : agentName ? `name:${agentName}` : `job:${job.id}`;
-      const indicators = byThread.get(tracked.replyThreadId) ?? new Map();
-      const current = indicators.get(key);
-      if (!current || current.sentAt < frame.sentAt) {
-        indicators.set(key, {
-          agentName,
-          activity: frame.activity,
-          sentAt: frame.sentAt
-        });
+      const thread = byThread.get(tracked.replyThreadId) ?? {
+        indicators: new Map(),
+        activity: new Map()
+      };
+      if (!thread.indicators.has(key)) thread.indicators.set(key, {
+        agentName
+      });
+      const frame = issueActivity.get(jobId);
+      if (frame?.activity && frame.attempt === job.attempts) {
+        const current = thread.activity.get(key);
+        // Newest frame wins when several jobs share one indicator key.
+        if (!current || current.sentAt < frame.sentAt) {
+          thread.activity.set(key, {
+            activity: frame.activity,
+            sentAt: frame.sentAt
+          });
+        }
       }
-      byThread.set(tracked.replyThreadId, indicators);
+      byThread.set(tracked.replyThreadId, thread);
     }
-    return Object.fromEntries([...byThread].map(([threadId, indicators]) => [threadId, [...indicators].map(([key, indicator]) => ({
-      key,
-      ...indicator
-    }))]));
+    return Object.fromEntries([...byThread].map(([threadId, thread]) => [threadId, {
+      indicators: [...thread.indicators].map(([key, indicator]) => ({
+        key,
+        ...indicator
+      })),
+      activityByIndicatorKey: Object.fromEntries([...thread.activity].map(([key, entry]) => [key, entry.activity]))
+    }]));
   }, [agentReplyStates, issueActivity, mentionAgents]);
   const replySummaries = useMemo(() => {
     const summaries = new Map<string, {
@@ -764,6 +785,7 @@ export function IssueConversation({
           const isEditing = activeEditMessageId === message.id;
           const parentMessage = message.parentMessageId ? messagesById.get(message.parentMessageId) ?? null : null;
           const replySummary = replySummaries.get(message.id);
+          const agentReplyIndicators = agentReplyIndicatorsByThreadId[message.id];
           const replyParticipants = [issueReplyParticipant(message.author), ...(replySummary?.participants ?? [])].filter((participant, index, participants) => participants.findIndex(candidate => candidate.id === participant.id) === index).slice(0, 3);
           return <div className="issue-message-group" key={message.id}>
                 <IssueMessageItem currentUserId={currentUserId} highlighted={message.id === highlightedMessageId} isEditing={isEditing} isReplying={isReplying} localeTag={localeTag} message={message} mentionHandles={mentionHandles} onMentionOpen={openMentionProfile} onAcceptIssueAction={onAcceptIssueAction && message.proposedAction ? () => void acceptIssueAction(message.proposedAction!) : undefined} onAcceptIssueExecution={onAcceptIssueExecution && message.executionProposal ? input => onAcceptIssueExecution(message.executionProposal!, input) : undefined} onIssueOpen={onIssueOpen} onAcceptSkillExecution={onAcceptSkillExecution && message.skillExecutionProposal ? input => onAcceptSkillExecution(message.skillExecutionProposal!, input) : undefined} onExecutionProposalAccepted={accepted => {
@@ -777,7 +799,7 @@ export function IssueConversation({
                 skillExecutionProposal: accepted
               } : candidate));
             }} loadSkillExecutionContext={() => loadSkillExecutionContext(message.skillExecutionProposal!)} executionPolicy={executionPolicy} executionRun={message.executionProposal ? executionRuns.find(candidate => candidate.id === message.executionProposal?.runId) ?? null : run} executionWorkers={executionWorkers} onDelete={message.optimistic ? undefined : () => void deleteMessage(message.id)} onEdit={message.optimistic ? undefined : () => setActiveEditMessageId(current => current === message.id ? null : message.id)} onLoadAttachment={onLoadAttachment} onReply={message.optimistic ? undefined : () => setActiveReplyMessageId(current => current === message.id ? null : message.id)} parentMessage={parentMessage} replyParticipants={replyParticipants} lastReplyAt={replySummary?.lastReplyAt ?? null} replyComposerId={replyComposerId} editComposerId={editComposerId} actionProposalState={message.proposedAction ? actionProposalStates[message.proposedAction.id] : undefined} actionError={messageErrors[message.id] ?? null} reworkStageLabel={message.proposedAction?.type === "request_issue_rework" ? localizeWorkflowStage(t, message.proposedAction.workflowStage, run.workflow.stages.find(stage => message.proposedAction?.type === "request_issue_rework" && stage.id === message.proposedAction.workflowStage)?.label ?? message.proposedAction.workflowStage) : null} />
-                <AgentReplyState indicators={agentReplyIndicatorsByThreadId[message.id]} state={agentReplyStates[message.id]} />
+                <AgentReplyState activityByIndicatorKey={agentReplyIndicators?.activityByIndicatorKey} indicators={agentReplyIndicators?.indicators} state={agentReplyStates[message.id]} />
                 {isReplying && <div className="issue-inline-reply-composer" id={replyComposerId}>
                     <MessageComposer autoFocus compact mentionMembers={mentionMembers} mentionAgents={mentionAgents} onCancel={() => setActiveReplyMessageId(null)} onMentionOpen={openMentionProfile} onSubmit={async (body, mentionedUserIds, mentionedAgentIds, attachments, references) => {
                 await sendMessage(body, message.id, mentionedUserIds, mentionedAgentIds, attachments, references);
