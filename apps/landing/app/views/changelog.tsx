@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.227",
+        date: "2026년 9월 9일",
+        title: "조직이라는 이름이 워크스페이스로 정리됐습니다",
+        summary:
+          "Briar의 최상위 공간을 부르는 이름이 화면마다 조직과 워크스페이스로 섞여 있었습니다. 이제 워크스페이스 하나로 통일했습니다. 데이터나 설정은 그대로이며 다시 로그인하실 필요는 없습니다.",
+        items: [
+          "앱 전체 문구를 워크스페이스로 맞췄습니다. 한국어·영어·중국어 모두 반영했습니다.",
+          "Slack 워크스페이스를 연결하는 화면처럼 두 이름이 함께 나오던 곳은 어느 쪽을 가리키는지 분명해졌습니다.",
+          "GitHub 조직과 Velen 조직은 각 서비스의 이름이므로 그대로 둡니다.",
+          "정리 과정에서 관리형 컴퓨터 등록과 대시보드 응답에 일부 식별자가 비어 나가던 문제를 함께 고쳤습니다.",
+        ],
+      },
+      {
         version: "1.2.225",
         date: "2026년 9월 9일",
         title: "이슈 대화에서도 Agent가 답변 중인 것이 보입니다",
@@ -2002,6 +2015,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.227",
+        date: "September 9, 2026",
+        title: "Organizations are now workspaces",
+        summary:
+          "Briar's top-level space was called an organization on some screens and a workspace on others. It is a workspace everywhere now. Your data and settings are unchanged and you do not need to sign in again.",
+        items: [
+          "Every screen now says workspace, in English, Korean and Chinese.",
+          "Screens where both names appear at once — connecting a Slack workspace, for instance — now make clear which one is meant.",
+          "GitHub organizations and Velen organizations keep their own names, since those belong to those services.",
+          "The cleanup also surfaced and fixed cases where managed computer enrollment and dashboard responses returned an empty identifier.",
+        ],
+      },
       {
         version: "1.2.225",
         date: "September 9, 2026",
