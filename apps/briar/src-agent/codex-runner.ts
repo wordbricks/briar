@@ -3,11 +3,13 @@ import { createInterface } from "node:readline";
 import { AgentEventDirection } from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import * as Result from "effect/Result";
 import {
+  CODEX_APPS_INSTALLED_REQUEST_ID,
   codexAppServerArgs,
   codexApprovalRequest,
   codexFinalMessage,
   codexInitializeRequest,
   codexMcpRecoveryPrompt,
+  codexPreparedRequestMismatch,
   codexProviderBlock,
   codexServerRequestResponse,
   consumeCodexAppServerMessage,
@@ -28,13 +30,21 @@ import { ProviderBlockedError } from "./provider-block";
 let activeChild: ChildProcessWithoutNullStreams | null = null;
 const runnerIo = createRunnerIo({
   closeError: "Briar closed the Codex runner input.",
+  // Codex is the only provider whose App Server can be started before the
+  // prompt exists, so it is the only runner that accepts the prepare frame.
+  acceptPrepare: true,
   onClose: () => {
     if (activeChild && activeChild.exitCode === null) {
       activeChild.kill("SIGTERM");
     }
   },
 });
-const { emit, request: requestPromise, waitForApproval } = runnerIo;
+const {
+  emit,
+  firstFrame: firstFramePromise,
+  request: requestPromise,
+  waitForApproval,
+} = runnerIo;
 
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.once(signal, () => {
@@ -72,12 +82,21 @@ type CodexAttemptResult =
 
 const maxOptionalMcpRecoveries = 3;
 
+/**
+ * Hands the attempt from its prepare phase to its turn phase. It resolves only
+ * once the parent has sent the `run` frame, so everything before the thread
+ * request — process start, initialize, config, model list, installed apps —
+ * has already happened by the time the prompt exists.
+ */
+type CodexTurnHandoff = () => Promise<RunnerRequest>;
+
 async function runCodexAttempt(
   request: RunnerRequest,
   isolation: CodexMcpIsolation,
   emittedSessions: Set<string>,
   computerUseArguments: readonly string[],
   briarMcpServers: readonly string[],
+  handoff: CodexTurnHandoff | null = null,
 ): Promise<CodexAttemptResult> {
   const child = spawn(
     request.providerBinaryPath,
@@ -103,6 +122,11 @@ async function runCodexAttempt(
   const state = createCodexAppServerState(isolation, briarMcpServers);
   let completed = false;
   let mcpFailure: CodexMcpTurnFailure | null = null;
+  // The prepare phase ends here: the thread request is the first message that
+  // needs the prompt's developer instructions, so everything before it runs
+  // against the prepared request and everything after against the turn's.
+  let activeRequest = request;
+  let pendingHandoff = handoff;
 
   try {
     send(child, codexInitializeRequest());
@@ -147,7 +171,20 @@ async function runCodexAttempt(
         continue;
       }
 
-      const transition = consumeCodexAppServerMessage(state, request, message);
+      if (
+        pendingHandoff &&
+        message.id === CODEX_APPS_INSTALLED_REQUEST_ID &&
+        !message.error
+      ) {
+        emit.prepared();
+        activeRequest = await pendingHandoff();
+        pendingHandoff = null;
+      }
+      const transition = consumeCodexAppServerMessage(
+        state,
+        activeRequest,
+        message,
+      );
       if (state.threadId && !emittedSessions.has(state.threadId)) {
         emittedSessions.add(state.threadId);
         emit.session(state.threadId);
@@ -201,10 +238,35 @@ async function runCodexAttempt(
 }
 
 async function main() {
-  const request = await requestPromise;
-  if (!request.message.trim()) {
+  const first = await firstFramePromise;
+  const request = first.request;
+  if (first.phase === "run" && !request.message.trim()) {
     throw new Error("Codex runner received an empty message.");
   }
+  /*
+    A prepared process has already been started against `request`; the turn
+    that later claims it must agree on everything the App Server was spawned
+    with, and on everything its thread is started with. The parent checks the
+    same list before it hands the process a turn, so a mismatch here is a
+    defect rather than an expected fallback.
+  */
+  let turnRequest = request;
+  const handoff = first.phase === "prepare"
+    ? async () => {
+      const turn = await requestPromise;
+      const mismatch = codexPreparedRequestMismatch(request, turn);
+      if (mismatch) {
+        throw new Error(
+          `Codex prepared process cannot serve this turn: ${mismatch} changed.`,
+        );
+      }
+      if (!turn.message.trim()) {
+        throw new Error("Codex runner received an empty message.");
+      }
+      turnRequest = turn;
+      return turn;
+    }
+    : null;
 
   const computerUseMcp = await prepareComputerUseMcp(request);
   let dmMessageMcp;
@@ -237,6 +299,7 @@ async function main() {
       disablePlugins: false,
     };
     let attemptRequest = request;
+    let attemptHandoff = handoff;
     let recoveryCount = 0;
 
     for (;;) {
@@ -246,7 +309,11 @@ async function main() {
         emittedSessions,
         computerUseArguments,
         briarMcpServers,
+        attemptHandoff,
       );
+      // A recovery attempt re-spawns the App Server and already holds the
+      // prompt, so only the first attempt of a two-phase turn waits.
+      attemptHandoff = null;
       if (result.type === "completed") {
         emit.result({
           sessionId: result.threadId,
@@ -286,7 +353,9 @@ async function main() {
       recoveryCount += 1;
       isolation = nextIsolation;
       attemptRequest = {
-        ...request,
+        // The turn's own request once a two-phase turn has been handed off,
+        // so a recovery attempt keeps the prompt's developer instructions.
+        ...turnRequest,
         conversationId: result.threadId,
         message: codexMcpRecoveryPrompt(),
         attachments: [],

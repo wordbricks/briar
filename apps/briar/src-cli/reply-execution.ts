@@ -53,7 +53,10 @@ import {
   assertDetachedProviderTurnSucceeded,
   detachedProviderBlockOf,
   logDetachedProviderTurnDiagnostic,
+  prepareDetachedProviderTurn,
   runDetachedProviderTurn,
+  type DetachedProviderTurnDiagnostic,
+  type PreparedDetachedProviderTurn,
 } from "./detached-provider-turn";
 import { materializeDetachedAgentSkillCatalog } from "./agent-skill-discovery";
 import { ChannelActivityPublisher } from "./channel-activity-publisher";
@@ -670,6 +673,8 @@ async function failClaimedIssueReply(
 
 type ChannelReplyRuntime = {
   runProviderTurn: typeof runDetachedProviderTurn;
+  /** Start the provider process before the prompt exists; null when it cannot. */
+  prepareProviderTurn: typeof prepareDetachedProviderTurn;
   workspaceRoot: string;
   dmMessageMcpServerPath?: string;
   /** Tests observe worktree allocation through this runner. */
@@ -688,6 +693,7 @@ type ChannelReplyAcknowledgementTask = {
 
 const defaultChannelReplyRuntime = (): ChannelReplyRuntime => ({
   runProviderTurn: runDetachedProviderTurn,
+  prepareProviderTurn: prepareDetachedProviderTurn,
   workspaceRoot: configDirectory,
 });
 
@@ -850,6 +856,7 @@ const channelReplySetupSteps = [
   "organizationContext",
   "attachments",
   "skills",
+  "prewarm",
 ] as const;
 type ChannelReplySetupStep = (typeof channelReplySetupSteps)[number];
 
@@ -863,10 +870,13 @@ function settledSetupValue<T>(result: PromiseSettledResult<T>): T {
 }
 
 /*
-  One line per reply, printed once the setup is ready and before the provider
-  runs, because the gap this measures is invisible from either end: the claim
-  log and `turn.started` were 15–30 seconds apart with nothing between them.
-  A step this claim never needed is absent rather than zero.
+  One line per reply, printed as soon as the first provider turn is accepted,
+  because the gap this measures is invisible from either end: the claim log and
+  `turn.started` were 15–30 seconds apart with nothing between them. A step this
+  claim never needed is absent rather than zero. `boot` is what remained after
+  the setup: `turn.started` to the provider accepting the turn's thread. The
+  reply prints the line even if the turn never gets that far, so a hung or
+  failed provider still leaves the setup account behind.
 */
 function logChannelReplySetup(
   workId: string,
@@ -874,6 +884,8 @@ function logChannelReplySetup(
   totalMs: number,
   steerFolded: boolean,
   memoryBrief: "loaded" | "unavailable" | null,
+  prewarm: string,
+  bootMs: number | null,
 ) {
   console.log(`channel reply setup: ${JSON.stringify({
     workId,
@@ -887,6 +899,8 @@ function logChannelReplySetup(
     total: Math.round(totalMs),
     parallel: true,
     steerFolded,
+    prewarm,
+    ...(bootMs === null ? {} : { boot: Math.round(bootMs) }),
   })}`);
 }
 
@@ -1269,6 +1283,46 @@ async function runClaimedChannelReplyTurn(
           }]
         : []),
     ]);
+  /*
+    A pre-warmed provider process is the one setup resource that outlives the
+    step that made it, so its account and its disposal are owned out here: the
+    reply prints the setup line and kills the process exactly once, whichever
+    way the turn ends.
+  */
+  let preparedRunner: PreparedDetachedProviderTurn | null = null;
+  let prewarmOutcome = "none";
+  let bootStartedAt: number | null = null;
+  let bootMs: number | null = null;
+  let steerFolded = false;
+  let setupLogged = false;
+  const logSetupOnce = () => {
+    if (setupLogged) return;
+    setupLogged = true;
+    logChannelReplySetup(
+      reply.workId,
+      setupDurations,
+      performance.now() - claimedAt,
+      steerFolded,
+      memoryInvocation ? memoryInvocation.briefState : null,
+      prewarmOutcome,
+      bootMs,
+    );
+  };
+  const observeProviderDiagnostic = (
+    diagnostic: DetachedProviderTurnDiagnostic,
+  ) => {
+    if (diagnostic.phase === "turn.started") {
+      bootStartedAt ??= performance.now();
+      return;
+    }
+    if (diagnostic.phase === "runner.prewarm_used") {
+      prewarmOutcome = "used";
+      return;
+    }
+    if (diagnostic.phase === "runner.prewarm_discarded") {
+      prewarmOutcome = `discarded:${String(diagnostic.reason)}`;
+    }
+  };
   try {
     executionContext = reply.routing && reply.session ? await DmExecutionContext.open(workspacePath) : null;
     const agent = detachedReplyAgent({
@@ -1281,6 +1335,65 @@ async function runClaimedChannelReplyTurn(
       fallbackName: "Briar Channel",
       scope: reply.scope,
     });
+    const providerEnvironment = providerExecutionEnvironment(
+      config,
+      agent.provider,
+      {
+        ...process.env,
+        PATH: workerExecutionPath(),
+        BRIAR_CLI: workerCliPath(),
+        BRIAR_WORKER_TOKEN: workerToken,
+        BRIAR_TEAM_ID: project.id,
+        // Identifier only. It lets `briar channel messages` read this
+        // channel's history under the claim the session already holds, so
+        // the Agent never needs a member's Project Agent token. The claim
+        // token stays out of the provider environment because it also
+        // authorizes submitting the reply.
+        BRIAR_CHANNEL_REPLY_WORK_ID: reply.workId,
+      },
+    );
+    /*
+      The provider process is the last thing on the critical path that needs
+      nothing from the steps below: which binary, which workspace, which
+      conversation and which sandbox are all settled. Starting it here lets its
+      boot run against the memory brief, the downloads and the Skill catalog
+      instead of after them. Only Codex supports it; every other provider — and
+      every later round — spawns when its turn starts.
+    */
+    const conversationIdAtClaim: string | null = reply.routing
+      ? null
+      : reply.session?.conversationId ?? reply.handoffContext?.conversationId ??
+        null;
+    const prewarmPending = measureSetup("prewarm", () =>
+      runtime.prepareProviderTurn({
+        agent,
+        prompt: "",
+        workspacePath,
+        fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
+        conversationId: conversationIdAtClaim,
+        toolInheritance: "briar",
+        environment: providerEnvironment,
+        signal: invocationSignal,
+        diagnosticContext: {
+          runId: reply.runId,
+          workId: reply.workId,
+          workType: "channelReply",
+        },
+        onDiagnostic: (diagnostic) => {
+          observeProviderDiagnostic(diagnostic);
+          if (reply.memory) return;
+          logDetachedProviderTurnDiagnostic(diagnostic);
+        },
+      }).catch((error) => {
+        // A pre-warm is an optimization; its failure is one log line and a
+        // cold spawn, never a failed reply.
+        console.error(
+          `channel reply prewarm failed for ${reply.workId}: ${
+            dmMemoryErrorDiagnostic(error)
+          }`,
+        );
+        return null;
+      }));
     /*
       Everything left needs the prepared workspace and nothing from the other
       steps, so the manifest download, the attachment downloads and the Skill
@@ -1343,6 +1456,10 @@ async function runClaimedChannelReplyTurn(
     ]);
     // Assigned before anything can be thrown: the `finally` block below owns
     // every resource a settled step produced, including on the failure path.
+    // That includes the pre-warmed process, which is killed there whether this
+    // reply used it, replaced it or never reached its first turn.
+    preparedRunner = await prewarmPending;
+    if (preparedRunner) prewarmOutcome = "ready";
     if (memorySettled.status === "fulfilled" && memorySettled.value) {
       memoryInvocation = memorySettled.value.invocation;
     }
@@ -1378,6 +1495,7 @@ async function runClaimedChannelReplyTurn(
       reply,
       signal: invocationSignal,
     });
+    steerFolded = folded !== null;
     if (folded) {
       /*
         Only what this turn is about to read. The session is deliberately left
@@ -1471,8 +1589,7 @@ async function runClaimedChannelReplyTurn(
       pendingTriggerMessageIds: reply.pendingTriggerMessageIds,
     });
     let prompt = buildPrompt();
-    let conversationId: string | null =
-      reply.routing ? null : reply.session?.conversationId ?? reply.handoffContext?.conversationId ?? null;
+    let conversationId: string | null = conversationIdAtClaim;
     if (conversationId) reportCheckpoint?.({ conversationId });
     let lookupRounds = 0;
     let repairRounds = 0;
@@ -1524,13 +1641,6 @@ async function runClaimedChannelReplyTurn(
     let result: ParsedChannelReplyAgentResult["result"] | null = null;
     let attachmentPaths: string[] = [];
     const generatedImages = new ReplyGeneratedImageCollector();
-    logChannelReplySetup(
-      reply.workId,
-      setupDurations,
-      performance.now() - claimedAt,
-      folded !== null,
-      memoryInvocation ? memoryInvocation.briefState : null,
-    );
     startedChannelReplyTurns.add(reply.workId);
     while (!result) {
       const currentMemoryInvocation = memoryInvocation;
@@ -1555,6 +1665,13 @@ async function runClaimedChannelReplyTurn(
             : null,
         ].filter(Boolean).join("\n\n");
       }
+      /*
+        Only the claim's first turn can use the pre-warmed process: a later
+        round runs against a conversation the warm process was not prepared
+        with, and the memory-changed refresh above has already dropped the
+        conversation id it was prepared with.
+      */
+      const roundPreparedRunner = firstRound ? preparedRunner : null;
       const turn = await runtime.runProviderTurn({
         agent,
         prompt: reply.routing ? [turnPrompt, executionContext?.prompt(), memoryInvocation?.prompt(), messageInvocation?.prompt()].filter(Boolean).join("\n\n") : turnPrompt,
@@ -1582,19 +1699,7 @@ async function runClaimedChannelReplyTurn(
           ? reply.delegationTargets
           : undefined,
         skillCatalog: reply.session ? retainedSkillCatalog : undefined,
-        environment: providerExecutionEnvironment(config, agent.provider, {
-          ...process.env,
-          PATH: workerExecutionPath(),
-          BRIAR_CLI: workerCliPath(),
-          BRIAR_WORKER_TOKEN: workerToken,
-          BRIAR_TEAM_ID: project.id,
-          // Identifier only. It lets `briar channel messages` read this
-          // channel's history under the claim the session already holds, so
-          // the Agent never needs a member's Project Agent token. The claim
-          // token stays out of the provider environment because it also
-          // authorizes submitting the reply.
-          BRIAR_CHANNEL_REPLY_WORK_ID: reply.workId,
-        }),
+        environment: providerEnvironment,
         signal: invocationSignal,
         diagnosticContext: {
           runId: reply.runId,
@@ -1602,6 +1707,7 @@ async function runClaimedChannelReplyTurn(
           workType: "channelReply",
         },
         onDiagnostic: (diagnostic) => {
+          observeProviderDiagnostic(diagnostic);
           if (!reply.memory) {
             logDetachedProviderTurnDiagnostic(diagnostic);
             return;
@@ -1644,11 +1750,21 @@ async function runClaimedChannelReplyTurn(
           }
         },
         onPayload: async (payload) => {
+          /*
+            The provider accepting this turn's thread is the end of the boot
+            this pre-warm exists to shorten, and the first thing the setup
+            account can be complete about.
+          */
+          if (payload.payload.case === "sessionStarted" && bootStartedAt !== null) {
+            bootMs ??= performance.now() - bootStartedAt;
+            logSetupOnce();
+          }
           await executionContext?.observe(payload);
           activityPublisher.observePayload(payload);
           generatedImages.observePayload(payload);
         },
-      });
+      }, roundPreparedRunner);
+      logSetupOnce();
       assertDetachedProviderTurnSucceeded(turn);
       if (!turn.resultText) {
         throw new Error("Agent returned an empty channel reply");
@@ -1815,6 +1931,10 @@ async function runClaimedChannelReplyTurn(
     throw dmMemoryExecutionError(error);
   } finally {
     startedChannelReplyTurns.delete(reply.workId);
+    // A pre-warmed process must never outlive the reply that started it, on
+    // any path: used, replaced by a cold spawn, or never reached at all.
+    await preparedRunner?.discard("reply_finished");
+    logSetupOnce();
     await messageInvocation?.cleanup({ terminal: publicationTerminal });
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {

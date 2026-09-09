@@ -16,6 +16,7 @@ import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import {
+  encodeSidecarPrepareRequest,
   encodeSidecarRunRequest,
   sidecarProviderRaw,
 } from "./sidecar-protocol";
@@ -99,6 +100,61 @@ describe("Codex runner MCP isolation", () => {
     ).toBe(false);
   });
 
+  /*
+    A DM reply waits on the App Server starting before its prompt can reach the
+    model, and none of that start needs the prompt. The split holds only if the
+    runner stops at exactly the right place: everything up to the installed-apps
+    response runs without a prompt, and the thread request — which carries the
+    turn's developer instructions — waits for one.
+  */
+  it("starts the App Server before the prompt and stops at the thread request", async () => {
+    const result = await runScenario("prepared", "two");
+
+    expect(result.exitCode).toBe(0);
+    const preparedAt = result.payloads.findIndex(
+      (payload) => payload.payload.case === "prepared",
+    );
+    expect(preparedAt).toBeGreaterThan(0);
+    const clientMethods = result.payloads.map((payload) => {
+      const raw = sidecarProviderRaw(payload);
+      return raw && typeof raw === "object"
+        ? (raw as Record<string, unknown>).method
+        : undefined;
+    });
+    // The handshake ran without a prompt.
+    expect(clientMethods.slice(0, preparedAt)).toContain("initialize");
+    expect(clientMethods.slice(0, preparedAt)).toContain("config/read");
+    expect(clientMethods.slice(0, preparedAt)).toContain("app/installed");
+    // The thread request is the first thing the prompt is needed for.
+    expect(clientMethods.slice(0, preparedAt)).not.toContain("thread/start");
+    expect(clientMethods.slice(preparedAt)).toContain("thread/start");
+    expect(clientMethods.slice(preparedAt)).toContain("turn/start");
+    expect(result.payloads).toContainEqual(expect.objectContaining({
+      payload: {
+        case: "result",
+        value: expect.objectContaining({
+          sessionId: "thread-1",
+          message: "The prepared process answered this turn.",
+        }),
+      },
+    }));
+  });
+
+  it("answers a single-shot request without a prepared frame", async () => {
+    const result = await runScenario("prepared");
+
+    expect(result.exitCode).toBe(0);
+    expect(
+      result.payloads.some((payload) => payload.payload.case === "prepared"),
+    ).toBe(false);
+    expect(result.payloads).toContainEqual(expect.objectContaining({
+      payload: {
+        case: "result",
+        value: expect.objectContaining({ sessionId: "thread-1" }),
+      },
+    }));
+  });
+
   it("fails fast when the App Server emits a schema-invalid message", async () => {
     const result = await runScenario("invalid");
 
@@ -115,7 +171,10 @@ describe("Codex runner MCP isolation", () => {
   });
 });
 
-async function runScenario(scenario: "invalid" | "optional" | "required") {
+async function runScenario(
+  scenario: "invalid" | "optional" | "required" | "prepared",
+  phases: "single" | "two" = "single",
+) {
   const directory = await mkdtemp(join(tmpdir(), "briar-codex-runner-test-"));
   const fakeCodex = join(directory, "fake-codex.mjs");
   await writeFile(fakeCodex, fakeCodexSource, "utf8");
@@ -127,6 +186,10 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
   });
   let stderr = "";
   child.stderr.setEncoding("utf8");
+  let announcePrepared = () => {};
+  const preparedSeen = new Promise<void>((resolvePrepared) => {
+    announcePrepared = resolvePrepared;
+  });
   const outputPromise = (async () => {
     const payloads: RunnerToParent[] = [];
     for await (const message of sizeDelimitedDecodeStream(
@@ -135,12 +198,25 @@ async function runScenario(scenario: "invalid" | "optional" | "required") {
       { readMaxBytes: 16 * 1024 * 1024 },
     )) {
       payloads.push(message);
+      if (message.payload.case === "prepared") announcePrepared();
     }
+    // A runner that died before it was prepared must not hang the test.
+    announcePrepared();
     return payloads;
   })();
   child.stderr.on("data", (chunk: string) => {
     stderr += chunk;
   });
+  if (phases === "two") {
+    /*
+      The prepare frame carries no prompt: the App Server starts, the runner
+      answers `prepared`, and only then is the turn's own request written.
+    */
+    child.stdin.write(encodeSidecarPrepareRequest(
+      create(RunRequestSchema, { ...runnerRequest(fakeCodex), message: "" }),
+    ));
+    await preparedSeen;
+  }
   child.stdin.write(encodeSidecarRunRequest(runnerRequest(fakeCodex)));
 
   const timeout = setTimeout(() => child.kill("SIGKILL"), 10_000);
@@ -210,6 +286,25 @@ for await (const line of lines) {
           callable: false,
         }],
       },
+    });
+    continue;
+  }
+  if (message.method === "turn/start" && scenario === "prepared") {
+    send({ id: message.id, result: { turn: { id: "turn-1" } } });
+    send({
+      method: "item/completed",
+      params: {
+        item: {
+          id: "message-1",
+          type: "agentMessage",
+          phase: "final_answer",
+          text: "The prepared process answered this turn.",
+        },
+      },
+    });
+    send({
+      method: "turn/completed",
+      params: { turn: { id: "turn-1", status: "completed", items: [] } },
     });
     continue;
   }

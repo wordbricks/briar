@@ -1,13 +1,25 @@
+import { Buffer } from "node:buffer";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   assertDetachedProviderTurnSucceeded,
+  claimPreparedRunner,
   detachedProviderBlockOf,
   DetachedProviderBlockedError,
   detachedProviderTurnFailure,
+  executeDetachedProviderTurn,
   prepareComputerUseTurn,
+  prepareDetachedProviderRunner,
   type DetachedProviderTurnInput,
   type DetachedProviderTurnResult,
 } from "./detached-provider-turn";
+import {
+  encodeSidecarRunnerOutput,
+  sidecarRunnerPrepared,
+  sidecarRunResult,
+} from "../src-agent/sidecar-protocol";
 import {
   providerBlockReplyMessage,
   type ProviderBlock,
@@ -249,5 +261,216 @@ describe("prepareComputerUseTurn", () => {
     await expect(
       prepareComputerUseTurn(computerUseInput({ runKind: "computerUse" })),
     ).rejects.toThrow("Computer Use child is missing its display binding");
+  });
+});
+
+/*
+  Pre-warming owns a live process between two phases of a reply, so the thing it
+  must never do is leave one behind. These drive the real prepare/claim/discard
+  path against a runner script that speaks the sidecar protocol, and check the
+  process afterwards rather than the bookkeeping.
+*/
+describe("prepared provider runner", () => {
+  const preparedFrame = Buffer.from(
+    encodeSidecarRunnerOutput(sidecarRunnerPrepared()),
+  ).toString("base64");
+  const resultFrame = Buffer.from(
+    encodeSidecarRunnerOutput(
+      sidecarRunResult({ sessionId: "thread-1", message: "done" }),
+    ),
+  ).toString("base64");
+
+  /**
+   * Answers `prepared` to the first frame and a result to the second, and
+   * records its own pid so a test can tell an adopted process from a new one.
+   */
+  const runnerSource = (pidFile: string) => `
+    const fs = require('node:fs');
+    fs.appendFileSync(${JSON.stringify(pidFile)}, process.pid + "\\n");
+    let frames = 0;
+    process.stdin.on('data', () => {
+      frames += 1;
+      if (frames === 1) {
+        process.stdout.write(Buffer.from('${preparedFrame}', 'base64'));
+        return;
+      }
+      process.stdout.write(
+        Buffer.from('${resultFrame}', 'base64'),
+        () => process.exit(0),
+      );
+    });
+    setInterval(() => {}, 1000);
+  `;
+
+  const alive = (pid: number) => {
+    try { process.kill(pid, 0); return true; }
+    catch { return false; }
+  };
+
+  const stillAlive = async (pid: number) => {
+    for (let attempt = 0; attempt < 200 && alive(pid); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    return alive(pid);
+  };
+
+  async function fixture(overrides: Partial<DetachedProviderTurnInput> = {}) {
+    const directory = await mkdtemp(join(tmpdir(), "briar-prewarm-test-"));
+    const pidFile = join(directory, "pids");
+    const runner = join(directory, "runner.cjs");
+    await writeFile(runner, runnerSource(pidFile));
+    const diagnostics: { phase: string; reason?: unknown }[] = [];
+    const input: DetachedProviderTurnInput = {
+      agent: {
+        id: "0f9d4b2a-1c3e-4d5f-8a7b-6c5d4e3f2a1b",
+        name: "Briar Channel",
+        provider: "codex",
+        model: "gpt-5",
+        responsibility: "Answer the channel.",
+        skills: [],
+      },
+      prompt: "hi",
+      workspacePath: directory,
+      fullAccess: true,
+      conversationId: null,
+      toolInheritance: "briar",
+      environment: { ...process.env },
+      signal: new AbortController().signal,
+      onDiagnostic: (diagnostic) =>
+        diagnostics.push({
+          phase: diagnostic.phase,
+          reason: diagnostic.reason,
+        }),
+      ...overrides,
+    };
+    const pids = async () =>
+      (await readFile(pidFile, "utf8")).trim().split("\n").map(Number);
+    return { directory, runner, input, diagnostics, pids };
+  }
+
+  it("adopts the prepared process for a matching turn instead of spawning again", async () => {
+    const { directory, runner, input, diagnostics, pids } = await fixture();
+    try {
+      const prepared = await prepareDetachedProviderRunner(
+        input,
+        runner,
+        process.execPath,
+      );
+      expect(prepared).not.toBeNull();
+      expect(diagnostics.map((entry) => entry.phase))
+        .toEqual(expect.arrayContaining([
+          "runner.prewarm_start",
+          "runner.prewarm_ready",
+        ]));
+      const [preparedPid] = await pids();
+
+      const claimed = await claimPreparedRunner(prepared!, input);
+      expect(claimed).not.toBeNull();
+      const result = await executeDetachedProviderTurn(
+        input,
+        runner,
+        process.execPath,
+        null,
+        (phase, detail) => diagnostics.push({ phase, ...detail }),
+        () => false,
+        claimed,
+      );
+
+      expect(result).toMatchObject({ completed: true, resultText: "done" });
+      // One process served both phases.
+      expect(await pids()).toEqual([preparedPid]);
+      expect(diagnostics.map((entry) => entry.phase))
+        .toContain("runner.prewarm_used");
+      expect(await stillAlive(preparedPid!)).toBe(false);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("discards the process and reports why when the turn no longer fits", async () => {
+    const { directory, runner, input, diagnostics, pids } = await fixture();
+    try {
+      const prepared = await prepareDetachedProviderRunner(
+        input,
+        runner,
+        process.execPath,
+      );
+      const [preparedPid] = await pids();
+
+      // What a memory-changed refresh does: the conversation the process was
+      // prepared to resume is gone, so the process is too.
+      const claimed = await claimPreparedRunner(prepared!, {
+        ...input,
+        conversationId: "thread-9",
+      });
+
+      expect(claimed).toBeNull();
+      expect(await stillAlive(preparedPid!)).toBe(false);
+      expect(diagnostics).toContainEqual(
+        expect.objectContaining({
+          phase: "runner.prewarm_discarded",
+          reason: "changed:conversationId",
+        }),
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("kills a prepared process that was never used", async () => {
+    const { directory, runner, input, pids } = await fixture();
+    try {
+      const prepared = await prepareDetachedProviderRunner(
+        input,
+        runner,
+        process.execPath,
+      );
+      const [preparedPid] = await pids();
+
+      await prepared!.discard("reply_finished");
+
+      expect(await stillAlive(preparedPid!)).toBe(false);
+      // Killing it twice is what the reply's `finally` does after a failure.
+      await expect(prepared!.discard("reply_finished")).resolves.toBeUndefined();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("kills a prepared process when the claim is aborted", async () => {
+    const abort = new AbortController();
+    const { directory, runner, input, pids } = await fixture({
+      signal: abort.signal,
+    });
+    try {
+      await prepareDetachedProviderRunner(input, runner, process.execPath);
+      const [preparedPid] = await pids();
+
+      abort.abort(new Error("Worker execution was cancelled"));
+
+      expect(await stillAlive(preparedPid!)).toBe(false);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("gives up and lets the turn spawn cold when preparing never finishes", async () => {
+    const { directory, input, diagnostics } = await fixture();
+    const silent = join(directory, "silent.cjs");
+    await writeFile(silent, "setInterval(() => {}, 1000);");
+    try {
+      const prepared = await prepareDetachedProviderRunner(
+        input,
+        silent,
+        process.execPath,
+        { readyTimeoutMs: 50 },
+      );
+
+      expect(prepared).toBeNull();
+      expect(diagnostics.map((entry) => entry.phase))
+        .toContain("runner.prewarm_failed");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
