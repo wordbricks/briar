@@ -81,7 +81,7 @@ describe("CompanionHeader", () => {
     expect(onLogout).not.toHaveBeenCalled();
     expect(accountButton?.getAttribute("aria-expanded")).toBe("true");
     expect(menu?.textContent).toContain("설정");
-    expect(menu?.textContent).toContain("조직 전환");
+    expect(menu?.textContent).toContain("워크스페이스 전환");
     expect(menu?.textContent).toContain("Wordbricks");
     expect(menu?.textContent).toContain("Acme");
     expect(menu?.textContent).toContain("로그아웃");

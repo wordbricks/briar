@@ -43,12 +43,12 @@ describe("FirstOrganizationSetup", () => {
       />,
     );
 
-    expect(container.textContent).toContain("새 조직 만들기");
-    expect(container.textContent).toContain("기존 조직 참여하기");
+    expect(container.textContent).toContain("새 워크스페이스 만들기");
+    expect(container.textContent).toContain("기존 워크스페이스 참여하기");
     expect(container.querySelector('input[autocomplete="organization"]')).toBeNull();
 
-    await act(async () => buttonWithText(container, "새 조직 만들기")?.click());
-    expect(container.textContent).toContain("조직 이름");
+    await act(async () => buttonWithText(container, "새 워크스페이스 만들기")?.click());
+    expect(container.textContent).toContain("워크스페이스 이름");
 
     await cleanup();
   });
@@ -70,7 +70,7 @@ describe("FirstOrganizationSetup", () => {
     );
 
     await act(async () =>
-      buttonWithText(container, "기존 조직 참여하기")?.click(),
+      buttonWithText(container, "기존 워크스페이스 참여하기")?.click(),
     );
     expect(container.textContent).toContain(user.email);
     expect(container.textContent).toContain("7일 동안 유효하며 한 번만");
