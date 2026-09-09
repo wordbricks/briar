@@ -30,6 +30,7 @@ service WorkerQueueService {
   rpc ExecuteDmScheduleTool(ExecuteDmScheduleToolRequest) returns (ExecuteDmScheduleToolResponse);
   rpc ResolveDmReplyRouting(ResolveDmReplyRoutingRequest) returns (ResolveDmReplyRoutingResponse);
   rpc AcknowledgeChannelReplySteer(AcknowledgeChannelReplySteerRequest) returns (AcknowledgeChannelReplySteerResponse);
+  rpc RefreshChannelReplyClaim(RefreshChannelReplyClaimRequest) returns (RefreshChannelReplyClaimResponse);
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
   rpc CheckpointChannelReplySession(CheckpointChannelReplySessionRequest) returns (CheckpointChannelReplySessionResponse);
   rpc PrepareReplyAttachmentUploads(PrepareReplyAttachmentUploadsRequest) returns (PrepareReplyAttachmentUploadsResponse);
@@ -1484,6 +1485,26 @@ message AcknowledgeChannelReplySteerRequest {
 
 message AcknowledgeChannelReplySteerResponse {
   bool released = 1;
+}
+
+// Folds a steer that landed after the claim into the same claim, before the
+// provider turn starts. There is no restart: the attempt and the steer restart
+// count stay exactly as they are, and the caller keeps its claim token.
+message RefreshChannelReplyClaimRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  // Must contain the exact active channel_reply claim. Other work variants and
+  // unknown oneof cases are rejected rather than inferred from scalar fields.
+  WorkClaimIdentity work = 3;
+}
+
+message RefreshChannelReplyClaimResponse {
+  // False when nothing was pending: `reply` is then absent and the caller keeps
+  // the claim payload it already holds.
+  bool steered = 1;
+  // The same claim, rebuilt against the folded input: updated snapshot, pending
+  // trigger messages, input revision and published batches.
+  optional ClaimedChannelReply reply = 2;
 }
 
 // A pending route can only run a separate, tool-free classification turn.

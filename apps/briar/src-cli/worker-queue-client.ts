@@ -13,6 +13,7 @@ import {
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type { WorkerExecutionCheckpoint } from "./worker";
 import {
+  channelReplyFromProto,
   claimedWorkFromProto,
   type ChannelActivityCredential,
   type ClaimedChannelReply,
@@ -223,6 +224,29 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
       });
       if (!result.decision) throw new Error("DM routing response omitted decision");
       return result.decision;
+    },
+    /*
+      Folds a steer that landed after the claim into the same claim, before the
+      first provider turn. `null` means nothing was pending and the caller keeps
+      the claim payload it already holds; a payload means the turn must be built
+      from that one instead, with no re-claim and no restart.
+    */
+    refreshChannelReplyClaim: async (input: {
+      projectId: string;
+      workerId: string;
+      work: ClaimedChannelReply;
+      signal?: AbortSignal;
+    }): Promise<ClaimedChannelReply | null> => {
+      const response = await client.refreshChannelReplyClaim({
+        projectId: input.projectId,
+        workerId: input.workerId,
+        work: workClaimIdentityToProto(input.work),
+      }, input.signal ? { signal: input.signal } : undefined);
+      if (!response.steered) return null;
+      if (!response.reply) {
+        throw new Error("Channel reply steer fold omitted its claim payload");
+      }
+      return channelReplyFromProto(response.reply);
     },
     acknowledgeChannelReplySteer: async (input: {
       projectId: string;

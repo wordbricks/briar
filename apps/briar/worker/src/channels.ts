@@ -4596,6 +4596,87 @@ export async function renewChannelReplyLease(
   return (renewed.results[0] as ChannelReplyJobRow | undefined) ?? null;
 }
 
+/**
+ * Folds a steer that landed after the claim into the same claim.
+ *
+ * The restart path is the expensive one: it bumps `attempts` and
+ * `steer_restart_count`, mints a new claim token and makes the Worker set the
+ * whole reply up again. None of that is owed while the provider turn has not
+ * started yet — the only thing out of date is the input the turn is about to
+ * read. So this marks the steer applied in place and leaves everything else
+ * about the claim exactly as it is, and the caller rebuilds the claim payload
+ * against the folded input.
+ *
+ * The authorization is the lease renewal's, verbatim except for the revision
+ * comparison it exists to change: same job, device, Worker and claim token,
+ * still running behind a live lease, still on the roster, still a live runtime
+ * behind a current memory fence and an enabled Worker binding.
+ */
+export async function applyChannelReplySteerInPlace(
+  db: D1Database,
+  input: {
+    jobId: string;
+    deviceId: string;
+    workerId: string;
+    claimTokenHash: string;
+    observedAt: string;
+  },
+) {
+  await requireDmMemoryReplyFence(db, input.jobId);
+  const folded = await db.prepare(
+    `update briar_channel_agent_reply_jobs
+       set applied_steer_revision = steer_revision, updated_at = ?
+     where id = ? and claimed_device_id = ? and claimed_worker_id = ?
+       and claim_token_hash = ? and status = 'running'
+       and steer_revision > applied_steer_revision
+       and lease_expires_at > ?
+       and coalesce(error, '') <> 'dm_reply_stop_unconfirmed'
+       and exists (
+         select 1 from briar_channel_agents current_roster
+         where current_roster.channel_id = briar_channel_agent_reply_jobs.channel_id
+           and current_roster.agent_id = briar_channel_agent_reply_jobs.agent_id
+       )
+       and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
+       and ${dmMemoryReplyFenceCurrent("briar_channel_agent_reply_jobs")}
+       and exists (
+         select 1 from briar_execution_workers binding
+         where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
+           and binding.device_id = briar_channel_agent_reply_jobs.claimed_device_id
+           and binding.state <> 'disabled'
+           and (
+             briar_channel_agent_reply_jobs.project_id is null
+             or binding.project_id = briar_channel_agent_reply_jobs.project_id
+           )
+       )
+     returning *`,
+  ).bind(
+    input.observedAt,
+    input.jobId,
+    input.deviceId,
+    input.workerId,
+    input.claimTokenHash,
+    input.observedAt,
+  ).first<ChannelReplyJobRow>();
+  if (!folded || !folded.session_id) return null;
+  const session = await getChannelReplySession(db, folded.session_id);
+  if (!session) return null;
+  /*
+    The claim's own reason, read back rather than invented: the fold does not
+    re-claim the session, so the payload keeps saying why this Worker holds it.
+  */
+  const claimEvent = await db.prepare(
+    `select reason from briar_channel_reply_session_events
+     where reply_job_id = ? and session_id = ? and event_type = 'claimed'
+     order by occurred_at desc, id desc limit 1`,
+  ).bind(folded.id, session.id).first<{ reason: string }>();
+  if (!claimEvent) return null;
+  return {
+    ...folded,
+    channel_reply_session: session,
+    session_claim_reason: claimEvent.reason,
+  };
+}
+
 export async function failChannelReply(
   db: D1Database,
   input: {

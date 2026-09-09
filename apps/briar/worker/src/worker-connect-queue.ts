@@ -18,6 +18,8 @@ import {
 import {
   AcknowledgeChannelReplySteerResponseSchema,
   type AcknowledgeChannelReplySteerRequest,
+  RefreshChannelReplyClaimResponseSchema,
+  type RefreshChannelReplyClaimRequest,
   BlockMergeBatchResponseSchema,
   CheckpointChannelReplySessionResponseSchema,
   CompleteChannelReplyResponseSchema,
@@ -66,7 +68,10 @@ import type {
   HandlerContext,
   ServiceImpl,
 } from "@connectrpc/connect";
-import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
+import {
+  claimNextChannelReplyWork,
+  refreshChannelReplyClaim,
+} from "./channel-reply-claim-routes";
 import { scheduleChannelRealtimePublish } from "./realtime-scheduling";
 import {
   checkpointChannelReplySession,
@@ -181,6 +186,7 @@ export type WorkerQueueServices = {
   readonly claimNextTeamAgentTaskWork: typeof claimNextTeamAgentTaskWork;
   readonly completeTeamAgentTaskWork: typeof completeTeamAgentTaskWork;
   readonly claimNextChannelReplyWork: typeof claimNextChannelReplyWork;
+  readonly refreshChannelReplyClaim: typeof refreshChannelReplyClaim;
   readonly nextChannelReplySettleWaitMs: typeof nextChannelReplySettleWaitMs;
   readonly claimNextQueueWork: typeof claimNextQueueWork;
   readonly claimDmLearningJob: typeof claimDmLearningJob;
@@ -232,6 +238,7 @@ const workerQueueServices: WorkerQueueServices = {
   claimNextTeamAgentTaskWork,
   completeTeamAgentTaskWork,
   claimNextChannelReplyWork,
+  refreshChannelReplyClaim,
   nextChannelReplySettleWaitMs,
   claimNextQueueWork,
   claimDmLearningJob,
@@ -945,6 +952,58 @@ async function acknowledgeChannelReplySteerRpc(
     scheduleChannelRealtimePublish(input.env, input.db, workspaceId, input.context);
   }
   return create(AcknowledgeChannelReplySteerResponseSchema, { released });
+}
+
+async function refreshChannelReplyClaimRpc(
+  input: WorkerConnectQueueInput,
+  request: RefreshChannelReplyClaimRequest,
+  services: WorkerQueueServices,
+) {
+  const identity = requiredWork(request.work);
+  if (identity.work.case !== "channelReply") {
+    throw new HttpError(400, "Channel reply claim identity is required");
+  }
+  const worker = await authenticatedWorker(
+    input,
+    request.projectId,
+    request.workerId,
+    services,
+  );
+  const workspaceId = identity.work.value.workspaceId;
+  if (workspaceId !== worker.principal.workspaceId) {
+    throw new HttpError(403, "Worker is not enabled for this workspace");
+  }
+  const refreshed = await services.refreshChannelReplyClaim({
+    input: {
+      workspaceId,
+      workerId: worker.binding.id,
+      jobId: identity.workId,
+      claimToken: identity.claimToken,
+    },
+    db: input.db,
+    env: input.env,
+    context: input.context,
+    authenticatedWorker: worker,
+  });
+  if (!refreshed) {
+    return create(RefreshChannelReplyClaimResponseSchema, { steered: false });
+  }
+  const message = await channelReplyClaimMessage(refreshed, {
+    db: input.db,
+    env: input.env,
+    context: input.context,
+    workspaceId,
+    deviceId: worker.principal.deviceId,
+    workerId: worker.binding.id,
+    services,
+  });
+  if (message.work.case !== "channelReply") {
+    throw new HttpError(500, "Refreshed claim lost its channel reply variant");
+  }
+  return create(RefreshChannelReplyClaimResponseSchema, {
+    steered: true,
+    reply: message.work.value,
+  });
 }
 
 async function checkpointChannelReplySessionRpc(
@@ -1669,6 +1728,7 @@ export function createWorkerQueueService(
     executeDmScheduleTool: (request) => executeDmScheduleToolRpc(input, request, services),
     resolveDmReplyRouting: (request) => resolveDmReplyRoutingRpc(input, request, services),
     acknowledgeChannelReplySteer: (request) => acknowledgeChannelReplySteerRpc(input, request, services),
+    refreshChannelReplyClaim: (request) => refreshChannelReplyClaimRpc(input, request, services),
     checkpointChannelReplySession: (request) => checkpointChannelReplySessionRpc(input, request, services),
     handoffWork: (request) => handoffWork(input, request, services),
     completeProjectAgentTask: (request) => completeTeamAgentTask(input, request, services),

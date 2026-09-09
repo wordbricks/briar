@@ -89,6 +89,7 @@ import {
   collectChannelReplyAttachments,
 } from "./channel-reply-attachments";
 import {
+  channelReplySnapshotChannelKind,
   channelReplyStartsWithoutWorktree,
   type ChannelReplyWorkspaceKind,
 } from "./channel-reply-workspace";
@@ -136,6 +137,7 @@ import {
   worktreeSettings,
   worktreesEnabled,
 } from "./command-support";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { downloadClaimAttachment } from "./worktree-commands";
 import {
   activeReplyActivityPublishers,
@@ -784,6 +786,58 @@ async function runClaimedChannelReply(
   }
 }
 
+/*
+  Work ids whose first provider turn has begun. Until it has, a lease conflict
+  is almost always the steer the setup is about to fold into this same claim,
+  so the Worker loop defers to the fold instead of throwing the claim away.
+*/
+const startedChannelReplyTurns = new Set<string>();
+
+export const channelReplyTurnStarted = (workId: string) =>
+  startedChannelReplyTurns.has(workId);
+
+/** The unavailable RPC is worth saying once per Worker, not once per reply. */
+let reportedMissingSteerFold = false;
+
+/**
+ * Asks the server to fold a steer that landed after the claim into this same
+ * claim, and answers with the claim payload rebuilt against the folded input.
+ *
+ * Null means nothing was pending. It also means a server that does not know
+ * this RPC yet: the steer is then noticed by the lease renewal exactly as it
+ * was before, so an older server keeps its old behaviour instead of failing
+ * the reply.
+ */
+async function foldChannelReplySteer(input: {
+  queue: ReturnType<typeof createWorkerQueueOperations>;
+  projectId: string;
+  workerId: string;
+  reply: ClaimedChannelReply;
+  signal: AbortSignal;
+}) {
+  // Only a direct message is ever steered, so nothing else pays the round trip.
+  if (channelReplySnapshotChannelKind(input.reply.snapshot) !== "dm") return null;
+  try {
+    return await input.queue.refreshChannelReplyClaim({
+      projectId: input.projectId,
+      workerId: input.workerId,
+      work: input.reply,
+      signal: input.signal,
+    });
+  } catch (error) {
+    if (!(error instanceof ConnectError) || error.code !== Code.Unimplemented) {
+      throw error;
+    }
+    if (!reportedMissingSteerFold) {
+      reportedMissingSteerFold = true;
+      console.log(
+        "channel reply steer fold is unavailable on this server; steering falls back to the lease renewal",
+      );
+    }
+    return null;
+  }
+}
+
 /**
  * The setup a claimed channel reply owes before its first provider turn, in
  * the order the sequential version ran them: it is also the order a failure is
@@ -818,6 +872,7 @@ function logChannelReplySetup(
   workId: string,
   durations: ReadonlyMap<ChannelReplySetupStep, number>,
   totalMs: number,
+  steerFolded: boolean,
 ) {
   console.log(`channel reply setup: ${JSON.stringify({
     workId,
@@ -827,6 +882,7 @@ function logChannelReplySetup(
     })),
     total: Math.round(totalMs),
     parallel: true,
+    steerFolded,
   })}`);
 }
 
@@ -1292,10 +1348,79 @@ async function runClaimedChannelReplyTurn(
     if (setupFailure?.status === "rejected") throw setupFailure.reason;
     const memorySetup = settledSetupValue(memorySettled);
     const publication = settledSetupValue(messageSettled);
-    const dmMessageMcpServerPath = publication ? publication.serverPath : null;
     const organizationContext = settledSetupValue(organizationContextSettled);
-    const downloadedAttachments = settledSetupValue(attachmentsSettled);
+    let downloadedAttachments = settledSetupValue(attachmentsSettled);
     const retainedSkillCatalog = settledSetupValue(skillCatalogSettled);
+    /*
+      The last thing owed before the provider runs. A message the person sent
+      while this reply was being set up is already folded into this job on the
+      server; nothing here used to notice until the finished answer was refused,
+      which cost a whole provider turn, a requeue and a second setup. One RPC
+      here brings the claim up to date inside the same claim: same claim token,
+      same attempt, no restart.
+    */
+    const folded = await foldChannelReplySteer({
+      queue: workerQueue,
+      projectId: project.id,
+      workerId: registered.workerId,
+      reply,
+      signal: invocationSignal,
+    });
+    if (folded) {
+      /*
+        Only what this turn is about to read. The session is deliberately left
+        as it was claimed: the turn has not started, so there is no interrupted
+        conversation to continue and the prompt must be the ordinary one for two
+        unanswered messages.
+      */
+      const downloaded = new Set(
+        reply.triggerAttachments.map((attachment) => attachment.id),
+      );
+      const addedAttachments = folded.triggerAttachments.some(
+        (attachment) => !downloaded.has(attachment.id),
+      );
+      reply = {
+        ...reply,
+        snapshot: folded.snapshot,
+        pendingTriggerMessageIds: folded.pendingTriggerMessageIds,
+        inputRevision: folded.inputRevision,
+        publishedMessageBatches: folded.publishedMessageBatches,
+        triggerAttachments: folded.triggerAttachments,
+      };
+      if (addedAttachments) {
+        downloadedAttachments = await downloadChannelReplyAttachments({
+          apiUrl: config.apiUrl,
+          workerToken,
+          workspaceId: reply.workspaceId,
+          workId: reply.workId,
+          claimToken: reply.claimToken,
+          triggerAttachments: reply.triggerAttachments,
+          workspacePath,
+        });
+      }
+      /*
+        The relay carries the input revision the server checks every publication
+        against, so the folded revision needs a relay of its own. Nothing has
+        been published from this claim yet; the journal it reopens is the same
+        one, keyed by work id.
+      */
+      if (messageInvocation) {
+        await messageInvocation.cleanup();
+        messageInvocation = await DmMessageInvocation.create({
+          queue: workerQueueClient,
+          projectId: project.id,
+          workerId: registered.workerId,
+          work: reply,
+          signal: invocationSignal,
+        });
+      }
+      console.log(
+        `channel reply steer folded for ${reply.workId}: revision ${
+          reply.inputRevision
+        }, pending ${reply.pendingTriggerMessageIds.join(", ")}`,
+      );
+    }
+    const dmMessageMcpServerPath = publication ? publication.serverPath : null;
     const outputContract = providerStructuredOutputContract(
       agent.provider,
       ChannelAgentReplyProviderOutputSchema,
@@ -1391,7 +1516,9 @@ async function runClaimedChannelReplyTurn(
       reply.workId,
       setupDurations,
       performance.now() - claimedAt,
+      folded !== null,
     );
+    startedChannelReplyTurns.add(reply.workId);
     while (!result) {
       const currentMemoryInvocation = memoryInvocation;
       // Every continuation bumps one of the three round counters, so this is
@@ -1666,6 +1793,7 @@ async function runClaimedChannelReplyTurn(
     if (!reply.memory || error instanceof DetachedProviderBlockedError || error instanceof DetachedProviderStopUnconfirmedError) throw error;
     throw dmMemoryExecutionError(error);
   } finally {
+    startedChannelReplyTurns.delete(reply.workId);
     await messageInvocation?.cleanup({ terminal: publicationTerminal });
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {

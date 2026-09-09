@@ -8,7 +8,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { insertAgentSkillStatement } from "./agent-skills";
 import { decodeChannelMessageApplicationInput } from "./app-mutation-request-mappers";
 import { createWorkspaceChannelMessage } from "./channel-message-routes";
-import { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
+import {
+  claimNextChannelReplyWork,
+  refreshChannelReplyClaim,
+} from "./channel-reply-claim-routes";
 import {
   DM_REPLY_SETTLE_MAX_RETRY_MS,
   DM_REPLY_SETTLE_MIN_RETRY_MS,
@@ -671,6 +674,158 @@ describe("direct message reply bursts", () => {
     const replies = await db.prepare("select id from briar_channel_messages where channel_id = ? and author_agent_id = ?")
       .bind(channelId, agentId).all();
     expect(replies.results).toHaveLength(1);
+  });
+
+  const refresh = async (
+    claimed: NonNullable<Awaited<ReturnType<typeof claim>>>,
+    overrides: { claimToken?: string } = {},
+  ) => {
+    const authenticatedWorker = await requireWorkerProjectBinding(
+      db,
+      new Request("https://briar.example", {
+        headers: { authorization: `Bearer ${workerToken}` },
+      }),
+      projectId,
+      workerId,
+    );
+    return refreshChannelReplyClaim({
+      input: {
+        workspaceId,
+        workerId,
+        jobId: claimed.workId,
+        claimToken: overrides.claimToken ?? claimed.claimToken,
+      },
+      db,
+      env: env(),
+      authenticatedWorker,
+    });
+  };
+
+  /*
+    The steer used to be noticed only when the finished answer was refused: the
+    whole provider turn was thrown away, the job requeued, and a second claim
+    ran the whole setup again. Folded in place there is no restart at all, so
+    the attempt and the steer restart count must not move.
+  */
+  it("folds a steer into the running claim without restarting it", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "ㅎㅇㅎㅇ");
+    await stopTyping(first.job.id, 3);
+    const running = (await claim())!;
+    expect(running.pendingTriggerMessageIds).toEqual([first.messageId]);
+    const second = await send(channelId, "안녕");
+    const steered = (await getChannelAgentReplyJob(db, workspaceId, running.workId))!;
+    expect(steered).toMatchObject({
+      steer_revision: 1,
+      applied_steer_revision: 0,
+      attempts: 1,
+      steer_restart_count: 0,
+    });
+
+    const folded = (await refresh(running))!;
+    expect(folded.claimToken).toBe(running.claimToken);
+    expect(new Set(folded.pendingTriggerMessageIds))
+      .toEqual(new Set([first.messageId, second.messageId]));
+    expect(folded.snapshot.messages.map((message) => message.id))
+      .toEqual([first.messageId, second.messageId]);
+    expect(await getChannelAgentReplyJob(db, workspaceId, running.workId))
+      .toMatchObject({
+        status: "running",
+        steer_revision: 1,
+        applied_steer_revision: 1,
+        attempts: 1,
+        steer_restart_count: 0,
+      });
+    // Nothing is left pending, so neither the renewal nor the completion of
+    // this same claim is refused any more.
+    expect(await acknowledgeSteer(running)).toBe(false);
+    expect(await renewChannelReplyLease(db, {
+      jobId: running.workId, deviceId, workerId,
+      claimTokenHash: sha256(running.claimToken),
+      observedAt: new Date().toISOString(),
+      leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })).not.toBeNull();
+    expect(await finish(folded)).not.toBeNull();
+    expect(await claim()).toBeNull();
+  });
+
+  it("reports nothing to fold when no input is pending", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "only message");
+    await stopTyping(first.job.id, 3);
+    const running = (await claim())!;
+    expect(await refresh(running)).toBeNull();
+    expect(await getChannelAgentReplyJob(db, workspaceId, running.workId))
+      .toMatchObject({
+        status: "running",
+        steer_revision: 0,
+        applied_steer_revision: 0,
+        attempts: 1,
+        steer_restart_count: 0,
+      });
+    expect(await finish(running)).not.toBeNull();
+  });
+
+  it("refuses a fold outside the live claim it is scoped to", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await send(channelId, "task");
+    await stopTyping(first.job.id, 3);
+    const running = (await claim())!;
+    await send(channelId, "detail");
+    await expect(refresh(running, {
+      claimToken: `briar_channel_claim_${"9".repeat(64)}`,
+    })).rejects.toMatchObject({ status: 409 });
+    // A claim released back to the queue cannot be folded either.
+    expect(await acknowledgeSteer(running)).toBe(true);
+    await expect(refresh(running)).rejects.toMatchObject({ status: 409 });
+    expect(await getChannelAgentReplyJob(db, workspaceId, running.workId))
+      .toMatchObject({ status: "queued", applied_steer_revision: 0 });
+  });
+
+  it("keeps the public message claim scope on the folded revision", async () => {
+    const base = workerRuntimeProtoJsonFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
+    });
+    const runtime = JSON.parse(base) as {
+      capabilities: Record<string, unknown>;
+    };
+    runtime.capabilities.dmPublicMessages = {
+      protocol: 1,
+      providers: ["AGENT_PROVIDER_CLAUDE"],
+    };
+    await db.prepare(
+      `update briar_execution_workers set runtime_proto_json = ? where id = ?`,
+    ).bind(JSON.stringify(runtime), workerId).run();
+    try {
+      const channelId = await freshConversation("dm");
+      const first = await send(channelId, "publish as you go");
+      await stopTyping(first.job.id, 3);
+      const running = (await claim())!;
+      expect(running.dmPublicMessageProtocol).toBe(1);
+      expect(running.inputRevision).toBe(0);
+      await send(channelId, "and one more thing");
+      const folded = (await refresh(running))!;
+      expect(folded.dmPublicMessageProtocol).toBe(1);
+      expect(folded.inputRevision).toBe(1);
+      const scope = await getDmPublicMessageClaim(db, {
+        jobId: running.workId,
+        workspaceId,
+        workerId,
+        deviceId,
+        claimTokenHash: sha256(running.claimToken),
+        observedAt: new Date().toISOString(),
+      });
+      expect(scope).toMatchObject({ input_revision: 1 });
+      expect(await listDmPublicMessagesForReply(db, {
+        jobId: running.workId,
+        workspaceId,
+      })).toEqual(folded.publishedMessageBatches);
+    } finally {
+      await db.prepare(
+        `update briar_execution_workers set runtime_proto_json = ? where id = ?`,
+      ).bind(base, workerId).run();
+    }
   });
 
   it("keeps messages beyond a gap out of the running response and claims them afterwards", async () => {

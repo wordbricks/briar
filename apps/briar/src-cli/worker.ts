@@ -15,6 +15,7 @@ import { delimiter, isAbsolute, join } from "node:path";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 import type { WorkerWakeSource } from "./worker-wake-client";
+import { channelReplySnapshotChannelKind } from "./channel-reply-workspace";
 
 export type ClaimedIssue = {
   workType?:
@@ -27,6 +28,11 @@ export type ClaimedIssue = {
   workId?: string;
   session?: { id: string } | null;
   routing?: { action: string } | null;
+  /**
+   * The claim's untrusted prompt snapshot. The loop reads nothing out of it but
+   * the channel kind, which decides how often a reply renews its lease.
+   */
+  snapshot?: unknown;
   /** Immutable identity of one run claim/execution attempt. */
   executionId?: string;
   runId: string;
@@ -127,6 +133,14 @@ export type WorkerLoopDependencies<Issue extends ClaimedIssue = ClaimedIssue> = 
     maxConcurrentSessions?: number;
     updateDirective?: WorkerLoopUpdateDirective | null;
   } | void>;
+  /**
+   * Whether a channel reply's first provider turn has started. Before it has,
+   * a lease conflict is almost always the steer the reply's own setup is about
+   * to fold into the same claim, so the renewal defers to it instead of
+   * throwing a claim away that is still perfectly usable. Absent means the old
+   * behaviour: every conflict aborts.
+   */
+  replyTurnStarted?: (issue: Issue) => boolean;
   /** Run the agent for one claimed issue. */
   runIssue: (
     issue: Issue,
@@ -183,6 +197,20 @@ export const DEFAULT_DRAIN_HEARTBEAT_INTERVAL_MS = 10_000;
 export const DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS = 30_000;
 /** A 15-minute server lease leaves ample recovery margin at this cadence. */
 export const DEFAULT_LEASE_RENEW_INTERVAL_MS = 5 * 60_000;
+/**
+ * How often a direct-message reply renews while it runs.
+ *
+ * The renewal is the only thing that asks the server whether the person has
+ * said something else, and a plain DM used to ask every five minutes: a second
+ * message sent seconds after the first was noticed only when the finished
+ * answer was refused. Five seconds is what a routing reply already used.
+ */
+export const DM_REPLY_STEER_POLL_MS = 5_000;
+
+/** Whether a claim is a direct-message reply, which is steered mid-turn. */
+const isDirectMessageReply = (issue: ClaimedIssue) =>
+  issue.workType === "channelReply" &&
+  channelReplySnapshotChannelKind(issue.snapshot) === "dm";
 export const DEFAULT_MAX_ERROR_DELAY_MS = 5 * 60_000;
 export const DEFAULT_MAX_CONCURRENT_SESSIONS = 1;
 export const MAX_CONCURRENT_SESSIONS = 16;
@@ -476,7 +504,11 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     }
   };
 
-  const execute = async (issue: Issue, waitForTurn: Promise<void>) => {
+  const execute = async (
+    issue: Issue,
+    waitForTurn: Promise<void>,
+    claimedAtWakeVersion: number,
+  ) => {
     const renewal = new AbortController();
     const execution = new AbortController();
     const key = executionKey(issue);
@@ -485,7 +517,14 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     let checkpoint: WorkerExecutionCheckpoint = {};
     const leaseRenewal: LeaseRenewalState = { failure: null };
     const renewalLoop = (async () => {
-      let observedWakeVersion = leaseWakeVersion;
+      /*
+        The version from before the claim RPC, not from here: a wake that landed
+        while the claim was in flight is exactly the one that matters — the
+        server sends it when a message is folded into the job being handed out —
+        and reading the counter here would swallow it and then wait a whole
+        interval before asking again.
+      */
+      let observedWakeVersion = claimedAtWakeVersion;
       while (!renewal.signal.aborted) {
         const leaseWait = new AbortController();
         const stopWait = () => leaseWait.abort();
@@ -494,7 +533,14 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         try {
           if (observedWakeVersion === leaseWakeVersion) {
             await dependencies.sleep(
-              leaseRenewDelayMs(issue.workType === "channelReply" && issue.routing ? Math.min(leaseRenewIntervalMs, 5000) : leaseRenewIntervalMs, dependencies.random),
+              leaseRenewDelayMs(
+                issue.workType === "channelReply" &&
+                    (issue.routing !== null && issue.routing !== undefined ||
+                      isDirectMessageReply(issue))
+                  ? Math.min(leaseRenewIntervalMs, DM_REPLY_STEER_POLL_MS)
+                  : leaseRenewIntervalMs,
+                dependencies.random,
+              ),
               leaseWait.signal,
             );
           }
@@ -510,6 +556,27 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
             `lease renewed for ${issue.sourceKey} (${issue.runId})`,
           );
         } catch (error) {
+          /*
+            A steer makes the server refuse the renewal, and before the first
+            provider turn that is not a reason to throw the claim away: the
+            reply's own setup asks for the folded claim right before it runs the
+            provider, inside this same claim. Keep renewing until it does. Only
+            a direct message is ever steered, so any other channel reply keeps
+            aborting at once: its conflict is a real claim loss. A routing reply
+            is excluded too: its classification turn owns the decision the
+            server is waiting on, and it still aborts as it always has.
+          */
+          if (
+            isDirectMessageReply(issue) && !issue.routing &&
+            dependencies.replyTurnStarted?.(issue) === false
+          ) {
+            dependencies.log(
+              `lease renewal deferred to the steer fold for ${issue.sourceKey}: ${
+                describe(error)
+              }`,
+            );
+            continue;
+          }
           leaseRenewal.failure = { error };
           dependencies.log(
             `lease renewal failed for ${issue.sourceKey}: ${describe(error)}`,
@@ -591,7 +658,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     }
   };
 
-  const schedule = (issue: Issue) => {
+  const schedule = (issue: Issue, claimedAtWakeVersion: number) => {
     const runKey = serialKey(issue);
     const previous = runKey
       ? (serialTails.get(runKey) ?? Promise.resolve())
@@ -605,12 +672,13 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       tail = previous.then(() => current);
       serialTails.set(runKey, tail);
     }
-    const execution = execute(issue, previous).finally(() => {
-      releaseTurn();
-      if (runKey && tail && serialTails.get(runKey) === tail) {
-        serialTails.delete(runKey);
-      }
-    });
+    const execution = execute(issue, previous, claimedAtWakeVersion)
+      .finally(() => {
+        releaseTurn();
+        if (runKey && tail && serialTails.get(runKey) === tail) {
+          serialTails.delete(runKey);
+        }
+      });
     active.set(executionKey(issue), execution);
   };
 
@@ -629,6 +697,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         processed + active.size < maxIssues
       ) {
         const repliesOnly = activeSlotCount >= maxConcurrentSessions;
+        const claimedAtWakeVersion = leaseWakeVersion;
         const claim = await dependencies.claim({ repliesOnly });
         const issue = isWorkerClaimResult(claim) ? claim.work : claim;
         if (!issue) {
@@ -656,7 +725,7 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         }
         consecutiveEmptyClaims = 0;
         dependencies.log(`claimed ${issue.sourceKey} (${issue.runId})`);
-        schedule(issue);
+        schedule(issue, claimedAtWakeVersion);
         if (!isReplyWork(issue)) activeSlotCount += 1;
         await reportState();
       }

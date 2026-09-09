@@ -95,6 +95,7 @@ import {
   runClaimedIssue,
 } from "./issue-execution";
 import {
+  channelReplyTurnStarted,
   runClaimedProjectAgentTask,
   runClaimedIssueReply,
   failClaimedIssueReply,
@@ -748,6 +749,9 @@ async function workerCommand() {
           claimedBy: label,
           repliesOnly: _options?.repliesOnly === true,
         }),
+      replyTurnStarted: (issue) =>
+        issue.workType === "channelReply" &&
+        channelReplyTurnStarted(issue.workId),
       renewLease: async (issue) => {
         const renewed = await workerQueue.renewWorkLease({
           projectId: project.id,
