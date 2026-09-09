@@ -1259,7 +1259,27 @@ private struct ChannelConversationView: View {
     private var typingStatuses: [ChannelsStore.AgentTypingStatus] {
         var messageIDs = Set(messages.map(\.id))
         if let parentMessageID { messageIDs.insert(parentMessageID) }
-        return channels.typingStatuses(messageIDs: messageIDs)
+        /*
+          This view draws both kinds of channel. A channel names an agent whose
+          reply is queued or running whether or not it has published a headline;
+          a direct message keeps its progress commentary-only, matching the web
+          placeholder row.
+        */
+        return channels.typingStatuses(
+            messageIDs: messageIDs,
+            includesPendingWithoutActivity: channel.kind != .directMessage
+        )
+    }
+
+    /// A headline when the agent published one, its name alone when it did not.
+    private func typingLabel(_ status: ChannelsStore.AgentTypingStatus) -> String {
+        guard let activity = status.activity else {
+            return String(
+                format: L10n.text(.channelAgentTyping, locale: locale),
+                status.agentName
+            )
+        }
+        return "\(status.agentName) · \(activity.displayHeadline)"
     }
 
     private var batchPositions: [UUID: ChannelMessageBatchPosition] {
@@ -1435,7 +1455,7 @@ private struct ChannelConversationView: View {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("\(status.agentName) · \(status.activity.displayHeadline)")
+                            Text(typingLabel(status))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
