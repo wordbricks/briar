@@ -678,6 +678,7 @@ const decodedProposalPayload = (proposal: ChannelMessageProposal) => {
               title: item.issue.title,
               description: item.issue.description ?? undefined,
               priority: item.issue.priority ?? undefined,
+              attachmentIds: item.issue.attachmentIds,
             }),
           })
         ),
@@ -695,6 +696,7 @@ const decodedProposalPayload = (proposal: ChannelMessageProposal) => {
         title: payload.issue.title,
         description: payload.issue.description ?? undefined,
         priority: payload.issue.priority ?? undefined,
+        attachmentIds: payload.issue.attachmentIds,
       }),
       executeAfterCreate: payload.executeAfterCreate,
     }),

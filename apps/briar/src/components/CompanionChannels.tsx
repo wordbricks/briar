@@ -1183,6 +1183,7 @@ function MessageRow({
                     : t("channel.issueProposalPending")}
               </span>
               <ChannelIssueProposalDetails
+                channelId={message.channelId}
                 projectName={proposalProjectName}
                 proposal={issueProposal}
               />

@@ -10,6 +10,7 @@ import {
 import { agentProviders, type AgentProvider } from "./agent-provider";
 import type { DmMemoryReference } from "./dm-memory-query-contract";
 import { IsoDateTimeWithOffset } from "./date-time-schema";
+import { maxIssueAttachmentCount } from "./issue-attachments";
 import {
   agentDescriptionMaxLength,
   agentResponsibilityMaxLength,
@@ -96,6 +97,17 @@ const defaultedWith = <S extends Schema.Constraint>(
   Schema.withDecodingDefaultType<S>(Effect.sync(value))(schema);
 const nullableDefault = <S extends Schema.Constraint>(schema: S) =>
   defaulted(Schema.NullOr(schema), null);
+/*
+  The key form of the default above: the key may be absent, and an explicit
+  `undefined` is still rejected. Used for values read back out of JSON columns,
+  where a key written before the field existed is simply missing and
+  `undefined` was never representable in the first place.
+*/
+const defaultedKeyWith = <S extends Schema.Constraint>(
+  schema: S,
+  value: () => S["Type"],
+): Schema.withDecodingDefaultTypeKey<S> =>
+  Schema.withDecodingDefaultTypeKey<S>(Effect.sync(value))(schema);
 const between = (minimum: number, maximum: number) =>
   Schema.Int.check(
     Schema.isGreaterThanOrEqualTo(minimum),
@@ -1036,12 +1048,44 @@ const channelReplyDocumentSchema = strict(Schema.Struct({
   projectId: Schema.NullOr(Uuid),
 }));
 
+/**
+ * The conversation files an approved issue carries into the project. Naming
+ * them in the payload is what lets the approver see, on the card, exactly which
+ * files are being shared into the project.
+ */
+const channelIssueAttachmentIdsSchema = mutableArray(canonicalUuidSchema).check(
+  Schema.isMaxLength(maxIssueAttachmentCount),
+  Schema.makeFilter((attachmentIds) =>
+    new Set(attachmentIds).size === attachmentIds.length ||
+    "An attachment cannot be listed twice"
+  ),
+);
+
+/*
+  What an Agent must produce, where every member of the shape is required, as
+  each sibling field here already is. The stored form below is deliberately a
+  separate schema rather than this one reused: a proposal written before
+  attachments could travel has no `attachmentIds` at all, and those rows are
+  immutable, so tolerating the missing key is a property of reading the
+  database and not of accepting a reply.
+*/
 const channelReplyIssueInputSchema = strict(Schema.Struct({
   title: boundedTrimmedText(1, 300),
   description: Schema.NullOr(
     boundedTrimmedText(0, 100_000),
   ),
   priority: Schema.NullOr(between(1, 4)),
+  attachmentIds: channelIssueAttachmentIdsSchema,
+}));
+
+/** The same issue as stored, where the field may predate its own existence. */
+const channelStoredIssueInputSchema = strict(Schema.Struct({
+  title: boundedTrimmedText(1, 300),
+  description: Schema.NullOr(
+    boundedTrimmedText(0, 100_000),
+  ),
+  priority: Schema.NullOr(between(1, 4)),
+  attachmentIds: defaultedKeyWith(channelIssueAttachmentIdsSchema, () => []),
 }));
 
 const channelReplyIssueProposalSchema = strict(Schema.Struct({
@@ -1072,98 +1116,119 @@ export const channelIssueBatchResultItemSchema = strict(Schema.Struct({
   runId: Uuid,
 }));
 
-const channelIssueBatchSchema = strict(Schema.Struct({
+const channelIssueBatchDependenciesSchema = mutableArray(strict(Schema.Struct({
+  prerequisiteKey: channelIssueBatchLocalKeySchema,
+  dependentKey: channelIssueBatchLocalKeySchema,
+}))).check(Schema.isMaxLength(28));
+
+/*
+  Shared by the reply batch and the stored batch, which differ only in whether
+  an item's issue may omit `attachmentIds`. Neither the keys nor the dependency
+  graph this checks depend on that difference.
+*/
+const channelIssueBatchGraphIssues = (batch: {
+  readonly items: ReadonlyArray<{ readonly key: string }>;
+  readonly dependencies: ReadonlyArray<{
+    readonly prerequisiteKey: string;
+    readonly dependentKey: string;
+  }>;
+}) => {
+  const issues: Array<Schema.FilterIssue> = [];
+  const keyIndexes = new Map<string, number>();
+  batch.items.forEach((item, index) => {
+    const previous = keyIndexes.get(item.key);
+    if (previous !== undefined) {
+      issues.push({
+        path: ["items", index, "key"],
+        issue: `Local key duplicates item ${previous + 1}`,
+      });
+    } else {
+      keyIndexes.set(item.key, index);
+    }
+  });
+
+  const edgeIndexes = new Map<string, number>();
+  batch.dependencies.forEach((dependency, index) => {
+    if (!keyIndexes.has(dependency.prerequisiteKey)) {
+      issues.push({
+        path: ["dependencies", index, "prerequisiteKey"],
+        issue: "Prerequisite key must reference a batch item",
+      });
+    }
+    if (!keyIndexes.has(dependency.dependentKey)) {
+      issues.push({
+        path: ["dependencies", index, "dependentKey"],
+        issue: "Dependent key must reference a batch item",
+      });
+    }
+    if (dependency.prerequisiteKey === dependency.dependentKey) {
+      issues.push({
+        path: ["dependencies", index],
+        issue: "An issue cannot depend on itself",
+      });
+    }
+    const edgeKey =
+      `${dependency.prerequisiteKey}\u0000${dependency.dependentKey}`;
+    const previous = edgeIndexes.get(edgeKey);
+    if (previous !== undefined) {
+      issues.push({
+        path: ["dependencies", index],
+        issue: `Dependency duplicates edge ${previous + 1}`,
+      });
+    } else {
+      edgeIndexes.set(edgeKey, index);
+    }
+  });
+
+  if (issues.length > 0) return issues;
+  const dependents = new Map<string, string[]>();
+  for (const key of keyIndexes.keys()) dependents.set(key, []);
+  for (const dependency of batch.dependencies) {
+    dependents.get(dependency.prerequisiteKey)!.push(
+      dependency.dependentKey,
+    );
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (key: string): boolean => {
+    if (visiting.has(key)) return true;
+    if (visited.has(key)) return false;
+    visiting.add(key);
+    for (const dependent of dependents.get(key) ?? []) {
+      if (visit(dependent)) return true;
+    }
+    visiting.delete(key);
+    visited.add(key);
+    return false;
+  };
+  if ([...keyIndexes.keys()].some(visit)) {
+    issues.push({
+      path: ["dependencies"],
+      issue: "Issue batch dependencies must form an acyclic graph",
+    });
+  }
+  return issues;
+};
+
+const channelReplyIssueBatchSchema = strict(Schema.Struct({
   items: mutableArray(strict(Schema.Struct({
     key: channelIssueBatchLocalKeySchema,
     issue: channelReplyIssueInputSchema,
   }))).check(Schema.isLengthBetween(1, 8)),
-  dependencies: mutableArray(strict(Schema.Struct({
-    prerequisiteKey: channelIssueBatchLocalKeySchema,
-    dependentKey: channelIssueBatchLocalKeySchema,
-  }))).check(Schema.isMaxLength(28)),
-})).check(
-  Schema.makeFilter((batch) => {
-    const issues: Array<Schema.FilterIssue> = [];
-    const keyIndexes = new Map<string, number>();
-    batch.items.forEach((item, index) => {
-      const previous = keyIndexes.get(item.key);
-      if (previous !== undefined) {
-        issues.push({
-          path: ["items", index, "key"],
-          issue: `Local key duplicates item ${previous + 1}`,
-        });
-      } else {
-        keyIndexes.set(item.key, index);
-      }
-    });
+  dependencies: channelIssueBatchDependenciesSchema,
+})).check(Schema.makeFilter(channelIssueBatchGraphIssues));
 
-    const edgeIndexes = new Map<string, number>();
-    batch.dependencies.forEach((dependency, index) => {
-      if (!keyIndexes.has(dependency.prerequisiteKey)) {
-        issues.push({
-          path: ["dependencies", index, "prerequisiteKey"],
-          issue: "Prerequisite key must reference a batch item",
-        });
-      }
-      if (!keyIndexes.has(dependency.dependentKey)) {
-        issues.push({
-          path: ["dependencies", index, "dependentKey"],
-          issue: "Dependent key must reference a batch item",
-        });
-      }
-      if (dependency.prerequisiteKey === dependency.dependentKey) {
-        issues.push({
-          path: ["dependencies", index],
-          issue: "An issue cannot depend on itself",
-        });
-      }
-      const edgeKey =
-        `${dependency.prerequisiteKey}\u0000${dependency.dependentKey}`;
-      const previous = edgeIndexes.get(edgeKey);
-      if (previous !== undefined) {
-        issues.push({
-          path: ["dependencies", index],
-          issue: `Dependency duplicates edge ${previous + 1}`,
-        });
-      } else {
-        edgeIndexes.set(edgeKey, index);
-      }
-    });
-
-    if (issues.length > 0) return issues;
-    const dependents = new Map<string, string[]>();
-    for (const key of keyIndexes.keys()) dependents.set(key, []);
-    for (const dependency of batch.dependencies) {
-      dependents.get(dependency.prerequisiteKey)!.push(
-        dependency.dependentKey,
-      );
-    }
-    const visiting = new Set<string>();
-    const visited = new Set<string>();
-    const visit = (key: string): boolean => {
-      if (visiting.has(key)) return true;
-      if (visited.has(key)) return false;
-      visiting.add(key);
-      for (const dependent of dependents.get(key) ?? []) {
-        if (visit(dependent)) return true;
-      }
-      visiting.delete(key);
-      visited.add(key);
-      return false;
-    };
-    if ([...keyIndexes.keys()].some(visit)) {
-      issues.push({
-        path: ["dependencies"],
-        issue: "Issue batch dependencies must form an acyclic graph",
-      });
-    }
-    return issues;
-  }),
-);
+const channelStoredIssueBatchSchema = strict(Schema.Struct({
+  items: mutableArray(strict(Schema.Struct({
+    key: channelIssueBatchLocalKeySchema,
+    issue: channelStoredIssueInputSchema,
+  }))).check(Schema.isLengthBetween(1, 8)),
+  dependencies: channelIssueBatchDependenciesSchema,
+})).check(Schema.makeFilter(channelIssueBatchGraphIssues));
 
 const channelReplyIssueBatchProposalSchema = strict(Schema.Struct({
   projectId: Schema.NullOr(Uuid),
-  batch: channelIssueBatchSchema,
+  batch: channelReplyIssueBatchSchema,
 }));
 
 const channelReplyExecutionProposalSchema = strict(Schema.Struct({
@@ -1287,10 +1352,10 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
 ));
 
 export const channelStoredIssueProposalPayloadSchema = strict(Schema.Struct({
-  issue: channelReplyIssueInputSchema,
+  issue: channelStoredIssueInputSchema,
 }));
 export const channelStoredIssueBatchProposalPayloadSchema = strict(
-  Schema.Struct({ batch: channelIssueBatchSchema }),
+  Schema.Struct({ batch: channelStoredIssueBatchSchema }),
 );
 export const channelStoredProposalPayloadSchema = Schema.Union([
   channelStoredIssueProposalPayloadSchema,

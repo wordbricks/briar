@@ -423,6 +423,10 @@ message ReplyIssueDraft {
   string title = 1;
   optional string description = 2;
   optional uint32 priority = 3;
+  // Conversation attachments the created issue must carry. Only a channel
+  // reply fills this; an issue-conversation proposal is already inside the
+  // issue that owns its files, so the server ignores it there.
+  repeated string attachment_ids = 5;
 }
 
 message IssueReplyReworkAction {

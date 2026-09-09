@@ -119,6 +119,7 @@ describe("app Channel Connect adapter", () => {
               title: "Implement Connect",
               description: null,
               priority: 1,
+              attachmentIds: [],
             },
             executeAfterCreate: true,
           },

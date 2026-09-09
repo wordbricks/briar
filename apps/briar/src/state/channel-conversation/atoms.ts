@@ -192,6 +192,27 @@ export const channelMessageAtom = Atom.family((key: string) => {
   ).pipe(Atom.withLabel(`channelConversation/${key}/message`));
 });
 
+/**
+ * Every attachment the loaded messages of one channel carry, by id.
+ *
+ * A proposal names the conversation files its issue will carry as bare ids, so
+ * the card that asks a member to approve it resolves their names and sizes
+ * here rather than fetching them again.
+ */
+export const channelAttachmentsByIdAtom = Atom.family((channelId: string) =>
+  Atom.map(
+    channelMessagesByIdAtom(channelId),
+    (messages) =>
+      new Map(
+        [...messages.values()].flatMap((message) =>
+          message.attachments.map((attachment) =>
+            [attachment.id, attachment] as const
+          )
+        ),
+      ),
+  ).pipe(Atom.withLabel(`channelConversation/${channelId}/attachmentsById`)),
+);
+
 /*
   Resolution keeps whatever reference the map holds, and the map keeps the
   reference of every message a page re-sent unchanged (`upsertMany`), so the
