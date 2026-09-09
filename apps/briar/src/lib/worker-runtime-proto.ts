@@ -32,6 +32,10 @@ export type WorkerRuntimeInput = {
     readonly transports: ReadonlyArray<"agent" | "openrouter">;
     readonly providers: ReadonlyArray<AgentProvider>;
   };
+  readonly dmReplyRouting?: {
+    readonly protocol: 1;
+    readonly providers: ReadonlyArray<AgentProvider>;
+  };
   readonly dmPublicMessages?: {
     readonly protocol: 1;
     readonly providers: ReadonlyArray<AgentProvider>;
@@ -94,6 +98,9 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
         healthy: requirement.healthy,
         detail: requirement.detail ?? undefined,
       })) ?? [],
+      dmReplyRouting: input.dmReplyRouting ? {
+        protocol: 1, providers: input.dmReplyRouting.providers.map((provider) => protoAgentProvider[provider]),
+      } : undefined,
       dmMemoryProtocol: 1,
       dmMemoryLearningRequests: input.dmMemoryLearning ? 1 : undefined,
       dmMemoryLearning: input.dmMemoryLearning

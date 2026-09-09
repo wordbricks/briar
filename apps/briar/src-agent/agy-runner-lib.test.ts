@@ -27,6 +27,19 @@ const request = (overrides: Partial<RunnerRequest> = {}): RunnerRequest => ({
 });
 
 describe("Antigravity runner helpers", () => {
+  it("uses the structured result instead of the CLI display response and finish-tool metadata", () => {
+    const raw = { event: "result", result: {
+      response: '{"body":"4"}\n{"body":"4","toolAction":"Finish task","toolSummary":"Finish task"}',
+      structured_output: { body: "4" },
+    } };
+    expect(agyFinalMessage(raw, "earlier text")).toBe('{"body":"4"}');
+    expect(agyFinalMessage({ event: "result", result: { structured_output: { progress: "checking" } } }, "earlier text"))
+      .toBe("earlier text");
+    const events = normalizeAgyEvent(raw, createAgyEventState());
+    expect(JSON.stringify(events)).not.toContain("toolAction");
+    expect(agyFinalMessage({ event: "result", result: { response: "plain answer" } }, "earlier"))
+      .toBe("plain answer");
+  });
   it("builds headless stream arguments without a shell", () => {
     expect(agyArgs(request({
       model: "gemini-3.7-flash",

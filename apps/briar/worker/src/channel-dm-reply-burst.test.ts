@@ -1,3 +1,5 @@
+import { resolveDmReplyRouting } from "./dm-reply-routing";
+import { listDmPublicMessagesForReply, getDmPublicMessageClaim } from "./dm-public-message-repository";
 import { dmReplySteerStatements } from "./dm-reply-steer";
 import { isDmReplyStop } from "./dm-reply-stop";
 import { createHash } from "node:crypto";
@@ -157,13 +159,15 @@ describe("direct message reply bursts", () => {
     first: the claim query walks every job in the organization, so work another
     test left behind would decide which job this one claims.
     */
-  const freshConversation = async (kind: "dm" | "channel") => {
+  const freshConversation = async (kind: "dm" | "channel", clear = true) => {
+    if (clear) {
     await db.prepare(
       `delete from briar_channel_agent_reply_jobs where organization_id = ?`,
     ).bind(organizationId).run();
     await db.prepare(
       `delete from briar_channel_reply_sessions where organization_id = ?`,
     ).bind(organizationId).run();
+    }
     channelSequence += 1;
     const channelId =
       `1a100000-0000-4000-8000-${String(channelSequence).padStart(12, "0")}`;
@@ -502,13 +506,13 @@ describe("direct message reply bursts", () => {
       .toBe("provider-conversation-501");
   });
 
-  const acknowledgeSteer = async (work: NonNullable<Awaited<ReturnType<typeof claim>>>) => {
+  const acknowledgeSteer = async (work: NonNullable<Awaited<ReturnType<typeof claim>>>, stopUnconfirmed = false) => {
     const response = await apiWorker.fetch(new Request(
       "https://briar.example/briar.worker.v1.WorkerQueueService/AcknowledgeChannelReplySteer", {
         method: "POST",
         headers: { authorization: `Bearer ${workerToken}`,
           "connect-protocol-version": "1", "content-type": "application/json" },
-        body: JSON.stringify({ projectId, workerId, work: {
+        body: JSON.stringify({ projectId, workerId, stopUnconfirmed, work: {
           workId: work.workId, runId: work.channelId, claimToken: work.claimToken,
           channelReply: { organizationId },
         } }),
@@ -565,7 +569,8 @@ describe("direct message reply bursts", () => {
     await send(channelId, "stop", { parentMessageId: detail.messageId });
     expect(await getChannelAgentReplyJob(db, organizationId, first.job.id))
       .toMatchObject({ status: "completed" });
-    expect(await acknowledgeSteer(running)).toBe(false);
+    expect(await acknowledgeSteer(running)).toBe(true);
+    expect((await getChannelAgentReplyJob(db, organizationId, running.workId))?.stop_confirmed_at).toBeTruthy();
     expect(await claim()).toBeNull();
   });
 
@@ -932,4 +937,180 @@ describe("direct message reply bursts", () => {
       observedAt: new Date().toISOString(),
     })).toBeNull();
   });
+
+  describe("classified DM input", () => {
+    const enableRouting = () => db.prepare(`update briar_execution_workers set runtime_proto_json =
+      json_set(runtime_proto_json, '$.capabilities.dmReplyRouting', json(?),
+        '$.capabilities.dmPublicMessages', json(?)) where id = ?`)
+      .bind(JSON.stringify({ protocol: 1, providers: ["AGENT_PROVIDER_CLAUDE"] }),
+        JSON.stringify({ protocol: 1, providers: ["AGENT_PROVIDER_CLAUDE"] }), workerId).run();
+    const incoming = async (channelId: string, body: string) => {
+      const sent = await send(channelId, body);
+      await stopTyping(sent.job.id);
+      const work = (await claim())!;
+      expect(work.workId).toBe(sent.job.id);
+      expect(work.routing?.action).toBe("pending");
+      return work;
+    };
+    const route = (work: NonNullable<Awaited<ReturnType<typeof claim>>>, action: string,
+      targetJobId: string | null = null, response: string | null = null) =>
+      resolveDmReplyRouting(db, { jobId: work.workId, organizationId, channelId: work.channelId,
+        deviceId, workerId, claimTokenHash: sha256(work.claimToken), observedAt: new Date().toISOString(),
+        decision: { action, targetJobId, response } });
+
+    it("admits three independent sessions with full regular slots, and answers without steering", async () => {
+      await enableRouting();
+      await db.prepare("update briar_execution_workers set readiness_state = 'busy' where id = ?")
+        .bind(workerId).run();
+      const channelId = await freshConversation("dm");
+      // A temporarily offline capable Worker must not fall back to legacy folding.
+      await db.prepare("update briar_execution_workers set last_heartbeat_at = '2000-01-01T00:00:00.000Z', accepting_work = 0, readiness_state = 'needs_attention' where id = ?")
+        .bind(workerId).run();
+      const waiting = await send(channelId, "메시지 구조를 C로 변경해줘");
+      expect(await getChannelAgentReplyJob(db, organizationId, waiting.job.id))
+        .toMatchObject({ status: "queued", routing_action: "pending" });
+      await expect(claim()).rejects.toThrow("Worker is not ready to claim replies");
+      expect(await getChannelAgentReplyJob(db, organizationId, waiting.job.id))
+        .toMatchObject({ status: "queued", routing_action: "pending" });
+      await db.prepare("update briar_execution_workers set last_heartbeat_at = ?, accepting_work = 1, readiness_state = 'busy' where id = ?")
+        .bind(new Date().toISOString(), workerId).run();
+      await stopTyping(waiting.job.id);
+      const first = (await claim())!;
+      expect(first.workId).toBe(waiting.job.id);
+      expect(await getDmPublicMessageClaim(db, { jobId: first.workId, organizationId,
+        workerId, deviceId, claimTokenHash: sha256(first.claimToken), observedAt: new Date().toISOString() })).toBeNull();
+      expect(await finish(first)).toBeNull();
+      const requestRouting = (token: string) => apiWorker.fetch(new Request(
+        "https://briar.example/briar.worker.v1.WorkerQueueService/ResolveDmReplyRouting", {
+          method: "POST", headers: { authorization: `Bearer ${workerToken}`,
+            "connect-protocol-version": "1", "content-type": "application/json" },
+          body: JSON.stringify({ projectId, workerId, work: { workId: first.workId,
+            runId: channelId, claimToken: token, channelReply: { organizationId } },
+            decision: { action: "new" } }),
+        }), env());
+      expect((await requestRouting("stale-token")).status).toBe(400);
+      const routed = await requestRouting(first.claimToken);
+      expect(routed.status).toBe(200);
+      expect(await routed.json()).toMatchObject({ decision: { action: "new" } });
+      const second = await incoming(channelId, "별도로 로그를 조사해줘");
+      await route(second, "new");
+      const third = await incoming(channelId, "별도로 문서를 작성해줘");
+      await route(third, "new");
+      expect(new Set([first.session!.id, second.session!.id, third.session!.id]).size).toBe(3);
+      expect((await db.prepare("select count(*) as count from briar_channel_agent_reply_jobs where channel_id = ? and status = 'running'")
+        .bind(channelId).first<{ count: number }>())?.count).toBe(3);
+      const question = await incoming(channelId, "어디까지 됐어?");
+      expect(await route(question, "answer", null, "세 작업이 실행 중입니다.")).toMatchObject({ action: "answer" });
+      await finish(question, { body: "세 작업이 실행 중입니다." });
+      for (const work of [first, second, third]) {
+        expect(await getChannelAgentReplyJob(db, organizationId, work.workId))
+          .toMatchObject({ status: "running", steer_revision: 0 });
+      }
+    });
+
+    it("stores C to D to E in receive order, retries once, and resumes the same job after stop acknowledgement", async () => {
+      await enableRouting();
+      const channelId = await freshConversation("dm");
+      const first = await incoming(channelId, "C로 변경해줘");
+      await route(first, "new");
+      await checkpointChannelReplySession(db, { jobId: first.workId, deviceId, workerId,
+        claimTokenHash: sha256(first.claimToken), conversationId: "routing-conversation",
+        observedAt: new Date().toISOString() });
+      await db.prepare("update briar_channel_agent_reply_jobs set last_input_at = ? where id = ?")
+        .bind(new Date(Date.now() - 61_000).toISOString(), first.workId).run();
+      const d = await incoming(channelId, "그냥 D로 바꿔줘");
+      const e = await incoming(channelId, "D 대신 E로 바꿔줘");
+      expect(await route(e, "steer", first.workId)).toMatchObject({ action: "pending" });
+      const independent = await incoming(channelId, "별도로 로그 조사");
+      expect(await route(independent, "new")).toMatchObject({ action: "new" });
+      await route(d, "steer", first.workId);
+      // A resend cannot replace a committed target or increment twice.
+      expect(await route(d, "cancel", independent.workId)).toMatchObject({ action: "steer", targetJobId: first.workId });
+      await db.prepare("update briar_channel_agent_reply_jobs set lease_expires_at = ? where id = ?")
+        .bind(new Date(Date.now() - 1000).toISOString(), e.workId).run();
+      const recovered = (await claim())!;
+      expect(recovered).toMatchObject({ workId: e.workId, routing: {
+        action: "pending", proposedAction: "steer", targetJobId: first.workId,
+      } });
+      // Reclaim retains the already classified intent even if a retry submits another target.
+      await route(recovered, "cancel", independent.workId);
+      expect(await getChannelAgentReplyJob(db, organizationId, first.workId))
+        .toMatchObject({ status: "running", steer_revision: 2 });
+      expect(await finish(first)).toBeNull();
+      expect(await acknowledgeSteer(first)).toBe(true);
+      const resumed = (await claim())!;
+      expect(resumed).toMatchObject({ workId: first.workId,
+        session: { id: first.session!.id, conversationId: "routing-conversation" } });
+      expect(resumed.pendingTriggerMessageIds).toEqual([first.triggerMessageId, d.triggerMessageId, e.triggerMessageId]);
+      expect(await getChannelAgentReplyJob(db, organizationId, independent.workId))
+        .toMatchObject({ status: "running", steer_revision: 0 });
+      expect(await listDmPublicMessagesForReply(db, { jobId: d.workId, organizationId })).toHaveLength(1);
+    });
+
+    it("cancels only the selected running job and publishes stop confirmation only after acknowledgement", async () => {
+      await enableRouting();
+      const channelId = await freshConversation("dm");
+      const first = await incoming(channelId, "C로 변경해줘");
+      await route(first, "new");
+      const logs = await incoming(channelId, "별도로 로그 조사");
+      await route(logs, "new");
+      const cancel = await incoming(channelId, "로그 조사만 취소해줘");
+      await route(cancel, "cancel", logs.workId);
+      expect(await getChannelAgentReplyJob(db, organizationId, logs.workId))
+        .toMatchObject({ status: "completed", stop_confirmed_at: null });
+      await expect(finish(logs)).rejects.toThrow();
+      expect(await listDmPublicMessagesForReply(db, { jobId: logs.workId, organizationId })).toHaveLength(0);
+      expect(await acknowledgeSteer(logs)).toBe(true);
+      expect(await acknowledgeSteer(logs)).toBe(true);
+      expect(await listDmPublicMessagesForReply(db, { jobId: logs.workId, organizationId })).toHaveLength(1);
+      expect(await getChannelAgentReplyJob(db, organizationId, first.workId))
+        .toMatchObject({ status: "running", steer_revision: 0 });
+      expect(await claim()).toBeNull();
+      const change = await incoming(channelId, "C 대신 D로 변경해줘");
+      await route(change, "steer", first.workId);
+      expect(await acknowledgeSteer(first, true)).toBe(false);
+      await db.prepare("update briar_channel_agent_reply_jobs set lease_expires_at = ? where id = ?")
+        .bind(new Date(Date.now() - 1000).toISOString(), first.workId).run();
+      expect(await getChannelAgentReplyJob(db, organizationId, first.workId))
+        .toMatchObject({ error: "dm_reply_stop_unconfirmed", status: "running" });
+      expect(await claim()).toBeNull();
+      const progress = await listDmPublicMessagesForReply(db, { jobId: first.workId, organizationId });
+      const explicitStop = await send(channelId, "stop", { parentMessageId: progress[0]!.messageIds[0]! });
+      expect(explicitStop.job).toBeUndefined();
+      expect(await getChannelAgentReplyJob(db, organizationId, first.workId)).toMatchObject({ status: "completed" });
+    });
+
+    it("refuses another DM target and preserves a completed target instead of cancelling a different job", async () => {
+      await enableRouting();
+      const other = await incoming(await freshConversation("dm"), "다른 DM 작업");
+      await route(other, "new");
+      const channelId = await freshConversation("dm", false);
+      const first = await incoming(channelId, "C로 변경해줘");
+      await route(first, "new");
+      await finish(first);
+      const cancel = await incoming(channelId, "방금 작업 취소해");
+      await expect(route(cancel, "cancel", other.workId)).rejects.toThrow();
+      expect(await route(cancel, "cancel", first.workId)).toMatchObject({ action: "answer", targetJobId: first.workId });
+      expect(await getChannelAgentReplyJob(db, organizationId, other.workId)).toMatchObject({ status: "running" });
+    });
+
+    it("serializes completion against steering without losing the incoming request", async () => {
+      await enableRouting();
+      const channelId = await freshConversation("dm");
+      const first = await incoming(channelId, "C로 변경해줘");
+      await route(first, "new");
+      const next = await incoming(channelId, "D로 변경해줘");
+      const [decision, completed] = await Promise.all([route(next, "steer", first.workId), finish(first)]);
+      if (decision.action === "steer") {
+        expect(completed).toBeNull();
+        expect(await acknowledgeSteer(first)).toBe(true);
+      } else {
+        expect(decision.action).toBe("new");
+        expect(completed).not.toBeNull();
+        expect(await getChannelAgentReplyJob(db, organizationId, next.workId))
+          .toMatchObject({ status: "running", superseded_by_reply_job_id: null });
+      }
+    });
+  });
+
 });

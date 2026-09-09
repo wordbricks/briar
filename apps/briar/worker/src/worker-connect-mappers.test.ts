@@ -36,6 +36,7 @@ const agent = {
 const channelReply = {
   ...common,
   workType: "channelReply" as const,
+  routing: null,
   organizationId: "77777777-7777-4777-8777-777777777777",
   channelId: common.runId,
   projectId: "88888888-8888-4888-8888-888888888888",
@@ -81,6 +82,7 @@ const channelReply = {
   inputRevision: 0,
   publishedMessageBatches: [],
   snapshot: {
+    dmRoutingContext: null, dmScheduleContext: null,
     channel: {
       id: common.runId,
       kind: "channel" as const,
@@ -126,7 +128,7 @@ describe("Worker claim protobuf mapper", () => {
 
     const executionClaim = claimedWorkFromProto(message);
     expect(executionClaim).toMatchObject({
-      workType: "channelReply",
+      workType: "channelReply", routing: null,
       projectId: channelReply.projectId,
       scope: channelReply.scope,
       session: {

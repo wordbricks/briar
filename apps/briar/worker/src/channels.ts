@@ -1,5 +1,9 @@
-import { channelAcknowledgementFallbackStatement } from "./channel-acknowledgement-reaction";
+import { dmScheduleReplyFenceCurrent } from "./dm-schedule-fence";
+import { dmReplyRoutingAvailable } from "./dm-reply-routing-admission";
 import { dmReplySteerStatements } from "./dm-reply-steer";
+import { workerAgentProviderFromProto } from "./worker-runtime-mappers";
+import { channelAcknowledgementFallbackStatement } from "./channel-acknowledgement-reaction";
+
 import { dmReplyStopStatements, type DmReplyStop } from "./dm-reply-stop";
 import * as Schema from "effect/Schema";
 import {
@@ -297,13 +301,7 @@ export type ChannelAgentReplyEnqueueInput = {
     skillId?: string | null;
     provider: AgentProvider;
     unavailableReason?: ChannelReplyUnavailableReason | null;
-    /**
-     * The message the Agent's reply session is anchored to. A channel thread
-     * always anchors on its root, so this is `parentMessageId` there. A direct
-     * message anchors on the Agent's live session instead, which is how a burst
-     * of short messages stays one conversation with one provider session rather
-     * than one isolated session per message.
-     */
+    /** Channel/legacy DM root. Routed plain DMs use their own trigger instead. */
     sessionRootMessageId?: string | null;
   }>;
   preferredDeviceId?: string | null;
@@ -365,6 +363,13 @@ export type ChannelReplyJobRow = {
   origin_reply_job_id: string | null;
   execution_target_ids_json?: string;
   session_id: string | null;
+  dm_schedule_id?: string | null;
+  routing_action?: string | null;
+  routing_decision_action?: string | null;
+  routing_target_job_id?: string | null;
+  routing_response?: string | null;
+  stop_requested_at?: string | null;
+  stop_confirmed_at?: string | null;
   approved_skill_execution_proposal_id?: string | null;
 };
 
@@ -460,7 +465,7 @@ export const liveChannelReplyRuntime = (job: string) => `coalesce((
         )
       )
   )
-), 0) = 1`;
+), 0) = 1 and ${dmScheduleReplyFenceCurrent(job)}`;
 
 const channelSelectColumns = `
   select channel.id, channel.organization_id, channel.kind, channel.dm_key,
@@ -3007,6 +3012,15 @@ export async function getClaimedChannelReplyAttachment(
           where absorbed.superseded_by_reply_job_id = job.id
             and absorbed.channel_id = job.channel_id and absorbed.agent_id = job.agent_id
             and absorbed.trigger_message_id = attachment.message_id
+        ) or exists (
+          select 1 from briar_dm_schedules schedule
+          join briar_channel_agent_reply_jobs previous on previous.id = schedule.previous_job_id
+            and previous.organization_id = job.organization_id and previous.channel_id = job.channel_id
+            and previous.agent_id = job.agent_id
+          join briar_channel_messages previous_message on previous_message.id = previous.reply_message_id
+            and previous_message.deleted_at is null
+          where schedule.id = job.dm_schedule_id and schedule.current_job_id = job.id
+            and previous.reply_message_id = attachment.message_id
         ))
        where job.id = ? and job.organization_id = ?
          and job.claimed_device_id = ? and job.claim_token_hash = ?
@@ -3083,11 +3097,16 @@ async function channelAgentReplyEnqueueStatements(
        current_skill.provider,
        current_skill.model, current_skill.effort,
        case when current_skill.id is null then null else trigger_message.body end`;
+  const routingAgents = new Set((await Promise.all(input.agents.map(async (agent) =>
+    input.channelKind === "dm" && !agent.skillId && await dmReplyRoutingAvailable(db, {
+      organizationId: input.organizationId, channelId: input.channelId, provider: agent.provider, preferredDeviceId: input.preferredDeviceId,
+    }) ? agent.id : null))).filter((id) => id !== null));
   return input.agents.flatMap((agent) => {
+      const routed = routingAgents.has(agent.id);
       const sessionId = crypto.randomUUID();
       const jobId = crypto.randomUUID();
-      const sessionRootMessageId = agent.sessionRootMessageId ??
-        input.parentMessageId;
+      const sessionRootMessageId = routed
+        ? input.triggerMessageId : agent.sessionRootMessageId ?? input.parentMessageId;
       return [
         db.prepare(
           `insert into briar_channel_reply_sessions (
@@ -3260,9 +3279,9 @@ async function channelAgentReplyEnqueueStatements(
           input.parentMessageId,
           crypto.randomUUID(),
           input.preferredDeviceId ?? null,
-          agent.unavailableReason ? "failed" : "queued",
-          agent.unavailableReason ?? null,
-          agent.unavailableReason ? input.createdAt : null,
+          !routed && agent.unavailableReason ? "failed" : "queued",
+          routed ? null : agent.unavailableReason ?? null,
+          !routed && agent.unavailableReason ? input.createdAt : null,
           input.createdAt,
           input.createdAt,
           agent.skillId ?? null,
@@ -3277,7 +3296,17 @@ async function channelAgentReplyEnqueueStatements(
           agent.skillId ?? null,
           agent.provider,
         ),
-        ...dmReplySteerStatements(db, jobId),
+        ...(routed ? [db.prepare(`update briar_channel_agent_reply_jobs
+          set routing_action = 'pending'
+          where id = ? and skill_id is null and agent_message_hop = 0
+            and delegated_by_reply_job_id is null
+            and exists (select 1 from briar_channels channel
+              join briar_channel_messages message on message.channel_id = channel.id
+              where channel.id = briar_channel_agent_reply_jobs.channel_id
+                and channel.kind = 'dm' and message.id = trigger_message_id
+                and message.author_user_id is not null)
+            and (select count(*) from briar_channel_agents roster
+              where roster.channel_id = briar_channel_agent_reply_jobs.channel_id) = 1`).bind(jobId)] : dmReplySteerStatements(db, jobId)),
         db.prepare(
           `insert into briar_channel_reply_session_events (
              id, session_id, reply_job_id, event_type, reason,
@@ -3779,6 +3808,7 @@ export async function claimNextChannelAgentReply(
      left join briar_agent_skills current_skill
        on current_skill.id = job.skill_id and current_skill.agent_id = job.agent_id
      where job.organization_id = ? and session.owner_worker_id is not null
+       and coalesce(job.routing_action, 'new') <> 'pending'
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))`,
   ).bind(organizationId, input.claimedAt).all<{
@@ -3866,6 +3896,7 @@ export async function claimNextChannelAgentReply(
      where job.organization_id = ? and (job.attempts < (? + job.memory_restart_count + job.steer_restart_count) or job.steer_revision > job.applied_steer_revision)
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))
+       and coalesce(job.error, '') <> 'dm_reply_stop_unconfirmed'
        and ${channelReplySettled("job")}
        and not exists (
          select 1 from briar_channel_agent_reply_jobs active_job
@@ -3942,6 +3973,10 @@ export async function claimNextChannelAgentReply(
       candidate.runtime_effort,
     );
     if (!supportsSelection) continue;
+    if (candidate.routing_action != null &&
+      !(input.runtime.dmPublicMessages?.providers.includes(candidate.agent_provider) &&
+        input.runtime.proto.capabilities?.dmReplyRouting?.protocol === 1 &&
+        input.runtime.proto.capabilities.dmReplyRouting.providers.map(workerAgentProviderFromProto).includes(candidate.agent_provider))) continue;
 
     const sessionExpired = candidate.session_retained_until <= input.claimedAt;
     if (
@@ -4008,6 +4043,7 @@ export async function claimNextChannelAgentReply(
          and session_id = ?
          and (status = 'queued'
            or (status = 'running' and lease_expires_at <= ?))
+         and coalesce(error, '') <> 'dm_reply_stop_unconfirmed'
          and ${channelReplySettled("briar_channel_agent_reply_jobs")}
          and not exists (
            select 1 from briar_channel_agent_reply_jobs active_job
@@ -4763,6 +4799,10 @@ export async function completeChannelReply(
     input.document || input.issueProposal || input.issueBatchProposal ||
       input.executionProposal || input.skillExecutionProposal,
   );
+  if ((job.routing_action === "answer" || job.routing_action === "clarify") &&
+    (artifactRequested || delegation || agentMessage || input.attachments?.length || input.memorySaveRequest)) {
+    throw new Error("A conversational DM routing decision cannot perform work");
+  }
   if (
     input.publishedFinalBatchId &&
     (artifactRequested || delegation || agentMessage ||
@@ -5082,6 +5122,7 @@ export async function completeChannelReply(
          set status = 'completed', completed_at = ?, updated_at = ?
          where id = ? and claimed_device_id = ? and claimed_worker_id = ?
            and claim_token_hash = ? and status = 'running'
+           and coalesce(routing_action, 'new') <> 'pending'
            and steer_revision = applied_steer_revision
            and lease_expires_at > ?
            and exists (

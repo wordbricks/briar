@@ -10,7 +10,8 @@ import {
   LookupDmMemoryResponseSchema,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   DmMemoryInvocation,
@@ -84,6 +85,49 @@ const queue = (epoch = 0) => ({
 });
 
 describe("DM memory Connect invocation", () => {
+  it("renders complete profile items and refreshes corrections and deletions from the server", async () => {
+    const client = queue();
+    const item = (body: string) => ({ documentId: crypto.randomUUID(), version: 1, body,
+      observedAt: null, validUntil: null, protectedByUser: true });
+    const role = item("User characteristic: I am a PM."), language = item("Response preference: Use Korean."),
+      depth = item("Response preference: For product questions, give the conclusion first.\nKeep explanations short unless I ask for details.");
+    let profile = [role, language, depth], revision = 1;
+    client.getDmMemoryBrief.mockImplementation(async () => create(GetDmMemoryBriefResponseSchema, {
+      memory: { ...wireDescriptor(), memoryRevision: BigInt(revision) },
+      brief: jsonValue({ memorySpaceId, memoryRevision: revision, revocationEpoch: 0,
+        policyVersion: "test-v1", validThrough: null, profile, progress: [], omitted: false, notice: "" }),
+    }));
+    client.checkDmMemoryClaim.mockImplementation(async () => create(CheckDmMemoryClaimResponseSchema, {
+      memory: { ...wireDescriptor(), memoryRevision: BigInt(revision) },
+    }));
+    const invocation = await DmMemoryInvocation.create({ queue: client,
+      projectId: crypto.randomUUID(), workerId: "worker-1", work, memory: descriptor });
+    try {
+      const path = join(invocation.directory, "profile.md");
+      const markdown = await readFile(path, "utf8");
+      expect(markdown).toContain("# Profile\n");
+      for (const entry of profile) {
+        expect(markdown).toContain(`- ${entry.body.replace(/\n/gu, "\n  ")}`);
+        expect(markdown).toContain(`source: ${entry.documentId} version: 1`);
+      }
+      expect((await stat(path)).mode & 0o777).toBe(0o600);
+      await writeFile(path, "locally forged preference", "utf8");
+      expect(invocation.prompt()).not.toContain("locally forged preference");
+      expect(invocation.prompt()).toContain(language.body);
+      profile = [role, { ...language, version: 2, body: "Response preference: Use English." }];
+      revision++;
+      expect(await invocation.check()).toBe(true);
+      const refreshed = await readFile(path, "utf8");
+      expect(refreshed).toContain(role.body);
+      expect(refreshed).toContain("Use English.");
+      expect(refreshed).toContain(`source: ${language.documentId} version: 2`);
+      for (const stale of [language.body, depth.documentId]) {
+        expect(refreshed).not.toContain(stale);
+        expect(invocation.prompt()).not.toContain(stale);
+      }
+    } finally { await invocation.cleanup(); }
+  });
+
   it("uses generated Worker Queue RPCs and removes private files", async () => {
     const client = queue();
     const invocation = await DmMemoryInvocation.create({
