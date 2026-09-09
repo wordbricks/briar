@@ -763,7 +763,7 @@ describe("DM reply worktree allocation", () => {
     const observed = await exercise({
       prewarm: true,
       memory: true,
-      memoryBriefFails: true,
+      memoryBriefFails: "revoked",
       provider: async () => turnResult(answer),
     });
 
