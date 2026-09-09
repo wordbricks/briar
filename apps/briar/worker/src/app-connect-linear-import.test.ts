@@ -179,7 +179,7 @@ describe("LinearImportService", () => {
       viewer: {
         name: "Linear Owner",
         email: "owner@linear.example",
-        workspaceName: "Briar",
+        organizationName: "Briar",
       },
       teams: [{ id: "team-1", name: "Core", key: "CORE" }],
     });

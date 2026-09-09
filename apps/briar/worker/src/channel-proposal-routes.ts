@@ -108,7 +108,7 @@ async function createApprovedChannelProposalIssue(input: {
   // Reject an unresolvable id before the run exists, so a proposal that names
   // a deleted file fails cleanly instead of creating an issue without it.
   await resolveChannelIssueAttachmentSources(input.db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     attachmentIds: input.attachmentIds,
   });
@@ -119,7 +119,7 @@ async function createApprovedChannelProposalIssue(input: {
   const attachmentStatements = await channelIssueAttachmentStatements(input.db, {
     projectId: input.project.id,
     runId,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     attachmentIds: input.attachmentIds,
     createdAt: input.occurredAt,

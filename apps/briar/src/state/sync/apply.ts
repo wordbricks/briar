@@ -598,7 +598,7 @@ function applyChannelRemoved(
   registry.update(channelsByIdAtom, (stored) => removeMany(stored, [channelId]));
 }
 
-/** Forgets an workspace's catalog entirely, summaries and messages included. */
+/** Forgets a workspace's catalog entirely, summaries and messages included. */
 function clearChannelCatalog(registry: AtomRegistry, workspaceId: string) {
   const ids = registry.get(organizationChannelIdsAtom(workspaceId));
   registry.set(organizationChannelIdsAtom(workspaceId), null);

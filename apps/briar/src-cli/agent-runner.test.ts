@@ -1061,7 +1061,7 @@ describe("detached Agent runner", () => {
           "/private/project/.briar-workspace-context/manifest.json",
         agentBinary: "/bin/codex",
       })
-    ).toThrow("only be attached to an Workspace Agent");
+    ).toThrow("only be attached to a Workspace Agent");
     expect(() =>
       detachedProviderRequest({
         agent: projectAgent,

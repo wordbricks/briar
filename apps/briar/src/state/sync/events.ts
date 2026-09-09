@@ -87,7 +87,7 @@ export type SyncEvent =
       readonly removedChannelIds: readonly string[];
       readonly reset: boolean;
     }
-  /** One channel is gone from an workspace. */
+  /** One channel is gone from a workspace. */
   | {
       readonly kind: "channel-removed";
       readonly workspaceId: string;
@@ -237,7 +237,7 @@ export type SyncEvent =
   /** The team's entities and per-team state are dropped. */
   | { readonly kind: "team-cleared"; readonly teamId: string }
   /**
-   * The account left an workspace, so every team outside
+   * The account left a workspace, so every team outside
    * `retainedWorkspaceId` drops its entities. `null` retains nothing.
    */
   | { readonly kind: "workspace-left"; readonly retainedWorkspaceId: string | null }

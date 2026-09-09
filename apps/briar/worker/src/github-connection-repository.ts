@@ -135,7 +135,7 @@ export async function getGithubConnectionByInstallation(
     .first<GithubConnectionRow>();
 }
 
-export async function getGithubConnectionForOrganization(
+export async function getGithubConnectionForWorkspace(
   db: D1Database,
   workspaceId: string,
 ) {
@@ -369,7 +369,7 @@ export async function connectGithubInstallation(
   if (connection?.status === "connected") {
     return { outcome: "installation_conflict" as const };
   }
-  const activeForWorkspace = await getGithubConnectionForOrganization(
+  const activeForWorkspace = await getGithubConnectionForWorkspace(
     db,
     input.workspaceId,
   );
@@ -387,7 +387,7 @@ export async function disconnectGithubInstallation(
   workspaceId: string,
   observedAt: string,
 ) {
-  const connection = await getGithubConnectionForOrganization(
+  const connection = await getGithubConnectionForWorkspace(
     db,
     workspaceId,
   );

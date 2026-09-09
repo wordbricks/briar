@@ -33,7 +33,8 @@ const parseRelatedMessageReference = (value: unknown) => {
     return null;
   }
   const reference = value as Record<string, unknown>;
-  const workspaceId = reference.workspaceId;
+  // Stored under the pre-rename key; see `channelRelatedMessageReference`.
+  const workspaceId = reference.organizationId;
   const channelId = reference.channelId;
   const messageId = reference.messageId;
   const rootMessageId = reference.rootMessageId;

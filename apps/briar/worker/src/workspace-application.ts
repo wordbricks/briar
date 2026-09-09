@@ -37,7 +37,7 @@ import { trimmedText, UuidString } from "./schema-codecs";
  * The Workspace application layer.
  *
  * "Workspace" is the product name for the top of the hierarchy. Storage and
- * protobuf still call the same value an workspace -- `briar_organizations`,
+ * protobuf still call the same value a workspace -- `briar_organizations`,
  * `organization_id`, `WorkspaceService` -- so the repository symbols this
  * module imports keep their storage names, and the `workspaceId` ->
  * `workspaceId` mapping happens once, at the Connect handler in

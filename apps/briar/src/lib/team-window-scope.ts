@@ -45,7 +45,7 @@ export function visibleWorkspaces(
 /**
  * Teams of the selected workspace, plus the selected team even when the
  * workspace switch has not reached it yet — which is what keeps the issue
- * board from blanking for a frame during an workspace change.
+ * board from blanking for a frame during a workspace change.
  */
 export function activeWorkspaceTeams(
   teams: Project[],

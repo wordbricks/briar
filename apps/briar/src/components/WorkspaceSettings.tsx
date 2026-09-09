@@ -91,7 +91,8 @@ export function WorkspaceSettings({
   connectedTeamIds = null,
   projects = [],
   userId = "",
-}: { organization: Workspace;
+}: {
+  workspace: Workspace;
   token: string;
   onBack: () => void;
   onLogoChange: (

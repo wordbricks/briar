@@ -39,7 +39,7 @@ import {
   dispatch back into the session that started it.
 
   It is a hook rather than a subscription atom because the lifecycle is a chain
-  of `useEffect` teardowns over three different sources — an workspace
+  of `useEffect` teardowns over three different sources — a workspace
   socket, a Tauri event stream and a one-shot recovery pass — and because the
   reconciliation at the end subscribes to whichever team is on screen. Nothing
   here renders, so `AppEffects` is the only component that commits for it.

@@ -37,7 +37,7 @@ export interface AppSettingsSidebarProps {
   readonly onBack: () => void;
   /** Records the chosen section in history, still the shell's. */
   readonly onNavigate: (location: AppNavigationLocation) => void;
-  /** Selecting an workspace, still the session facade's. */
+  /** Selecting a workspace, still the session facade's. */
   readonly onSelectWorkspace: (workspaceId: string) => void;
   /** Selecting a team, still the session facade's. */
   readonly onSelectTeam: (teamId: string) => void;

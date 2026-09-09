@@ -203,7 +203,7 @@ export function createIntegrationActions(
           viewer: {
             name: "Demo User",
             email: "demo@example.com",
-            workspaceName: "Demo Org",
+            organizationName: "Demo Org",
           },
           teams: [
             { id: "team-demo", name: "Demo Team", key: "DEMO" },

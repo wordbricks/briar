@@ -1046,7 +1046,7 @@ export async function completeChannelReplyApplication(
       ) {
         throw new ReplyCompletionApplicationError(
           "invalid_request",
-          "Only an Workspace Agent can delegate",
+          "Only a Workspace Agent can delegate",
         );
       }
       const defaultProject = (value: string | null) => value ?? agent.project_id;

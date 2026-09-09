@@ -91,7 +91,7 @@ describe("active workspace persistence", () => {
     });
   });
 
-  it("restores an workspace without selecting another workspace's project", () => {
+  it("restores a workspace without selecting another workspace's project", () => {
     writeActiveWorkspaceId("user-1", "workspace-2");
 
     expect(

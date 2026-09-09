@@ -3662,7 +3662,7 @@ export async function nextChannelReplySettleWaitMs(
 }
 
 /**
- * Any enabled binding may host an workspace job. A Project Agent job may
+ * Any enabled binding may host a workspace job. A Project Agent job may
  * only be claimed by the exact binding for that project; device identity alone
  * is insufficient because one device can run several project loops.
  */

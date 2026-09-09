@@ -184,7 +184,7 @@ describe("createWorkspaceActions", () => {
     expect(reconnectBumps()).toBe(1);
   });
 
-  it("refuses to create an workspace without a session", async () => {
+  it("refuses to create a workspace without a session", async () => {
     const { actions, registry, server } = harness();
     registry.set(tokenAtom, null);
 
@@ -218,7 +218,7 @@ describe("createWorkspaceActions", () => {
       .toBe("Org A renamed");
   });
 
-  it("rejects renaming an workspace the account does not have", async () => {
+  it("rejects renaming a workspace the account does not have", async () => {
     const { actions, server } = harness();
 
     await expect(actions.renameWorkspace("org-missing", "x")).rejects.toThrow(
@@ -251,7 +251,7 @@ describe("createWorkspaceActions", () => {
     expect(server.handleChecks).toEqual(["free", "taken"]);
   });
 
-  it("selects an workspace together with its first team", () => {
+  it("selects a workspace together with its first team", () => {
     const { actions, registry, healthResets, reconnectBumps } = harness();
 
     actions.selectWorkspace(organizationB.id);
@@ -275,7 +275,7 @@ describe("createWorkspaceActions", () => {
     expect(registry.get(staleTeamIdAtom)).toBe(teamB.id);
   });
 
-  it("ignores an workspace the account is not a member of", () => {
+  it("ignores a workspace the account is not a member of", () => {
     const { actions, registry, healthResets, reconnectBumps } = harness();
 
     actions.selectWorkspace("org-missing");

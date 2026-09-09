@@ -23,7 +23,7 @@ export type ChannelIssueAttachmentSource = {
 async function readChannelAttachmentSources(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     attachmentIds: readonly string[];
   },
@@ -36,7 +36,7 @@ async function readChannelAttachmentSources(
          and id in (select value from json_each(?))`,
     )
     .bind(
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       JSON.stringify([...input.attachmentIds]),
     )
@@ -55,7 +55,7 @@ async function readChannelAttachmentSources(
 export async function resolveChannelIssueAttachmentSources(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     attachmentIds: readonly string[];
   },
@@ -89,7 +89,7 @@ export async function channelIssueAttachmentStatements(
   input: {
     projectId: string;
     runId: string;
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     attachmentIds: readonly string[];
     createdAt: string;
@@ -121,7 +121,7 @@ export async function channelIssueAttachmentStatements(
           input.projectId,
           attachmentId,
           input.channelId,
-          input.organizationId,
+          input.workspaceId,
         )
     ),
   );

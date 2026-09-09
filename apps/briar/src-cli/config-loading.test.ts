@@ -263,7 +263,9 @@ describe("CLI config loading", () => {
       managedComputer: {
         managedComputerId,
         deviceId: `managed-${managedComputerId}`,
-        workspaceId,
+        // Written straight to `config.json`, so this is the persisted
+        // ProtoJSON shape, which keeps the pre-rename `organizationId`.
+        organizationId: workspaceId,
         credentialFile: "/tmp/briar-managed-credential-placeholder.json",
       },
       teams: [],

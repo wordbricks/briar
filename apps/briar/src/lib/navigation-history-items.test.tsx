@@ -187,7 +187,7 @@ describe("buildNavigationHistoryItems", () => {
     expect(organizationItem?.eyebrow).toBe(workspace.name);
   });
 
-  it("names an workspace page after the workspace", () => {
+  it("names a workspace page after the workspace", () => {
     const [item] = build([
       organizationNavigationLocation(workspace.id, "inbox"),
     ]);

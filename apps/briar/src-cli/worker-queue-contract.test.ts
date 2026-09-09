@@ -79,7 +79,7 @@ const channelReplyClaim = (overrides: {
         claimToken: "briar_channel_claim_test",
         claimedAt: timestampFromDate(new Date("2026-09-06T08:00:00.000Z")),
         leaseExpiresAt: timestampFromDate(new Date("2026-09-06T08:15:00.000Z")),
-        // Only an workspace claim carries the manifest, and the decoder
+        // Only a workspace claim carries the manifest, and the decoder
         // requires it for that scope.
         ...(overrides.scope === "workspace"
           ? {
@@ -125,7 +125,7 @@ const decodeChannelReply = (
 describe("claimed channel reply Agent message decoding", () => {
   it("accepts Agent message targets in both reply scopes", () => {
     // Agent messages start in a DM, so a Project Agent claim carries targets
-    // even though delegation stays an Workspace Agent path.
+    // even though delegation stays a Workspace Agent path.
     for (const scope of ["workspace", "project"] as const) {
       const claim = decodeChannelReply({ scope, agentMessageTargets: true });
       expect(claim.agentMessageTargets).toEqual([{

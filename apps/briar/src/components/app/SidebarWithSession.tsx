@@ -46,7 +46,7 @@ export interface SidebarSessionState {
 /**
  * Subscribes to the session, workspace, team and planning atoms the sidebar
  * renders from. Only this component re-renders when one of them changes, so
- * adding an workspace or a planning project no longer re-renders the app
+ * adding a workspace or a planning project no longer re-renders the app
  * shell that owns the sidebar's callbacks.
  */
 export function SidebarSessionBoundary({

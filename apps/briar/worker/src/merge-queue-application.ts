@@ -5,7 +5,7 @@ import {
   decodeStoredMergeQueueValidationCommands,
 } from "../../src/lib/merge-queue-validation-contract";
 import {
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
 } from "./github-connection-repository";
 import { configureMergeQueueProfile, getMergeQueueProfile } from "./merge-queue-profile";
@@ -43,7 +43,7 @@ export class MergeQueueApplicationError extends Error {
 
 export type MergeQueueApplicationServices = {
   readonly configureMergeQueueProfile: typeof configureMergeQueueProfile;
-  readonly getGithubConnectionForOrganization: typeof getGithubConnectionForOrganization;
+  readonly getGithubConnectionForWorkspace: typeof getGithubConnectionForWorkspace;
   readonly getMergeQueueProfile: typeof getMergeQueueProfile;
   readonly getMergeQueueStatus: typeof getMergeQueueStatus;
   readonly getTeam: typeof getTeam;
@@ -53,7 +53,7 @@ export type MergeQueueApplicationServices = {
 
 export const mergeQueueApplicationServices: MergeQueueApplicationServices = {
   configureMergeQueueProfile,
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   getMergeQueueProfile,
   getMergeQueueStatus,
   getTeam,
@@ -171,7 +171,7 @@ export async function updateMergeQueueProfileApplication(
               "Connect one GitHub repository before configuring its merge queue",
             );
           }
-          const connection = await services.getGithubConnectionForOrganization(
+          const connection = await services.getGithubConnectionForWorkspace(
             input.db,
             project.organization_id,
           );

@@ -748,7 +748,14 @@ const configToProto = (input: Config): LocalConfig => {
     workerDeviceIdentity: value.workerDeviceIdentity,
     managedComputer: value.managedComputer === undefined
       ? undefined
-      : { ...value.managedComputer },
+      : {
+        managedComputerId: value.managedComputer.managedComputerId,
+        deviceId: value.managedComputer.deviceId,
+        // The persisted config keeps the pre-rename spelling: it is the
+        // on-disk shape of every installed `config.json`.
+        organizationId: value.managedComputer.workspaceId,
+        credentialFile: value.managedComputer.credentialFile,
+      },
     teams: value.teams.map(teamToProto),
   });
 };

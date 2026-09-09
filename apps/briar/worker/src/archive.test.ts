@@ -1097,7 +1097,7 @@ describe("D1 to R2 log archives", () => {
     expect(replayDeletes).toBe(1);
   });
 
-  it("protects an workspace Agent sprite that shares a queued object key", async () => {
+  it("protects a workspace Agent sprite that shares a queued object key", async () => {
     const agentId = "workspace-agent-cleanup-reference";
     const objectKey =
       `project-agent-spritesheets/${projectId}/${agentId}/sprites.webp`;

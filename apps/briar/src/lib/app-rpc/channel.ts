@@ -90,7 +90,7 @@ import {
   agentProviderToProto,
   optionalAgentProviderFromProto,
   optionalTimestamp,
-  organizationMemberFromProto,
+  workspaceMemberFromProto,
   requiredMessage,
   requiredTimestamp,
   safeNumber,
@@ -894,7 +894,7 @@ export async function listDirectMessageRecipients(
     appCallOptions(token),
   );
   return {
-    members: response.members.map(organizationMemberFromProto),
+    members: response.members.map(workspaceMemberFromProto),
     agents: response.agents.map(workspaceAgentFromMessage),
   };
 }

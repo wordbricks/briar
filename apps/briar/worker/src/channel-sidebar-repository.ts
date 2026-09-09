@@ -53,7 +53,7 @@ export const channelSidebarSectionJson = (
  * Records that one channel's summary changed and moves the workspace's
  * channel cursor forward, so `SyncChannels` hands the channel back to every
  * device that asks. `version` is the change table's autoincrement id, and the
- * greatest one an workspace has is exactly what `last_insert_rowid()` gives
+ * greatest one a workspace has is exactly what `last_insert_rowid()` gives
  * the triggers that do this in SQL.
  */
 export async function recordChannelSummaryChange(

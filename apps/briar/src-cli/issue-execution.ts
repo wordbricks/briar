@@ -254,7 +254,7 @@ async function runClaimedIssueInRuntime(
   const workspaceId = activeProject.executionWorker?.workspaceId;
   if (!workspaceId) {
     await failInvalidExecutionProfile(
-      "The active Worker configuration does not bind the claimed project to an workspace.",
+      "The active Worker configuration does not bind the claimed project to a workspace.",
     );
     return;
   }

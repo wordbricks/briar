@@ -330,7 +330,7 @@ export function buildInboxFeedMessages(
     });
   }
 
-  // Channel messages belong to an workspace rather than a project. A
+  // Channel messages belong to a workspace rather than a project. A
   // stable first-project association preserves the existing navigation and
   // project-filter contract while the feed itself remains workspace scoped.
   const channelProject = projectData[0]?.project;

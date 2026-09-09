@@ -160,7 +160,8 @@ describe("WhatsApp DM bridge D1 integration", () => {
       verifyTokenHash: await sha256("replacement-verify-token"),
       connectedByUserId: ownerId,
       observedAt: "2026-09-06T00:01:00.000Z",
-    })).rejects.toThrow("Workspace Agent");
+    // The D1 trigger message is a SQL string, so it keeps the pre-rename wording.
+    })).rejects.toThrow("Organization Agent");
     await expect(getWhatsAppConnectionForWorkspace(db, workspaceId))
       .resolves.toMatchObject({ agent_id: organizationAgentId });
   });

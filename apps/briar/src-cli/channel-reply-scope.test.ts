@@ -18,7 +18,7 @@ describe("channel reply workspace scope", () => {
     ).toThrow("does not match local worker project");
   });
 
-  it("allows an Workspace Agent to run without opening a repository", () => {
+  it("allows a Workspace Agent to run without opening a repository", () => {
     expect(() =>
       assertChannelReplyWorkspaceScope(
         {

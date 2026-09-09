@@ -1168,7 +1168,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
   });
 
-  it("loads uncapped lightweight usage runs across an workspace", async () => {
+  it("loads uncapped lightweight usage runs across a workspace", async () => {
     const usageProject = await createTeam(db, {
       ownerUserId: "owner",
       workspaceId: projectId,

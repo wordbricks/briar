@@ -651,7 +651,8 @@ describe("channel issue proposal approval route", () => {
     expect(JSON.parse(created?.context_json ?? "null")).toMatchObject({
       origin: "briar-channel",
       relatedMessage: {
-        workspaceId,
+        // Stored context_json, validated key by key by a D1 trigger.
+        organizationId: workspaceId,
         channelId,
         messageId: "60000000-0000-4000-8000-000000000002",
         rootMessageId: "50000000-0000-4000-8000-000000000002",
@@ -2093,7 +2094,7 @@ describe("channel issue proposal approval route", () => {
        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       input.id,
-      organizationId,
+      workspaceId,
       input.channelId ?? channelId,
       input.messageId,
       `channel-attachments/${input.id}`,
@@ -2228,7 +2229,7 @@ describe("channel issue proposal approval route", () => {
     const claimWorker = await registerExecutionWorker(db, projectAId, {
       id: "channel-attachment-claim-worker",
       deviceId: "channel-attachment-claim-device",
-      organizationId,
+      workspaceId,
       ownerUserId: ownerId,
       label: "Channel Attachment Claim Worker",
       deviceIdentityHash: createHash("sha256")
@@ -2387,7 +2388,7 @@ describe("channel issue proposal approval route", () => {
     const foreignAttachmentId = "80000000-0000-4000-8000-000000000005";
     await createChannel(db, {
       id: otherChannelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "elsewhere",

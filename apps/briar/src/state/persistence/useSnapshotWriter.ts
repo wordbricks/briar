@@ -176,7 +176,7 @@ export function startSnapshotWriter(
       */
       cancelTimer();
       if (persisted && account && account.userId === persisted.userId) {
-        // Leaving an workspace drops its teams from the store; its record
+        // Leaving a workspace drops its teams from the store; its record
         // goes with them. A change of *account* is not handled here — signing
         // out clears every record, which is stricter.
         void deleteSnapshotSafely(

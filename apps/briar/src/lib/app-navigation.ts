@@ -252,7 +252,7 @@ function projectNavigationSegments(
   );
 }
 
-function organizationNavigationSegments(
+function workspaceNavigationSegments(
   location: AppNavigationLocation,
 ): Option.Option<readonly [workspaceId: string, page: WorkspaceNavigationPage]> {
   return decodeWorkspaceSegments(location.split("/")).pipe(
@@ -382,7 +382,7 @@ export function pageFromNavigationLocation(
       ),
     ),
     Option.orElse(() =>
-      organizationNavigationSegments(location).pipe(
+      workspaceNavigationSegments(location).pipe(
         Option.map(([, page]) => page),
       ),
     ),
@@ -447,7 +447,7 @@ export function channelIdFromNavigationLocation(
   );
 }
 
-export function organizationIdFromNavigationLocation(
+export function workspaceIdFromNavigationLocation(
   location: AppNavigationLocation,
 ): string | null {
   return channelNavigationSegments(location).pipe(
@@ -458,7 +458,7 @@ export function organizationIdFromNavigationLocation(
       ),
     ),
     Option.orElse(() =>
-      organizationNavigationSegments(location).pipe(
+      workspaceNavigationSegments(location).pipe(
         Option.map(([workspaceId]) => workspaceId),
       ),
     ),

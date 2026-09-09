@@ -3193,7 +3193,7 @@ describe("workspace channels", () => {
     ).toBeNull();
   });
 
-  it("keeps an workspace reply on an available preferred device", async () => {
+  it("keeps a workspace reply on an available preferred device", async () => {
     const channelId = "e0000000-0000-4000-8000-000000000111";
     const agentId = "aa000000-0000-4000-8000-000000000111";
     const triggerId = "f0000000-0000-4000-8000-000000000111";

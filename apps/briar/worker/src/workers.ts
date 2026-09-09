@@ -1115,7 +1115,7 @@ const executionWorkerIcon = (input: {
     : null;
 
 /**
- * Enroll an workspace-scoped device and bind it to one project.
+ * Enroll a workspace-scoped device and bind it to one project.
  *
  * Re-enrollment is explicit and rotates the device credential. A device may be
  * bound to several projects in the same workspace, while runs continue to

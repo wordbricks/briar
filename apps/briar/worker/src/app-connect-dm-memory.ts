@@ -276,12 +276,12 @@ const checkedNumber = (value: bigint, field: string) => {
 
 const ownerFor = async (
   input: AppConnectDmMemoryInput,
-  organizationIdValue: string,
+  workspaceIdValue: string,
   channelIdValue: string,
 ): Promise<DmMemoryOwner> => {
   const session = await requireSession(input.auth, input.request);
   const owner = {
-    workspaceId: canonicalUuid(organizationIdValue),
+    workspaceId: canonicalUuid(workspaceIdValue),
     channelId: canonicalUuid(channelIdValue),
     userId: session.user.id,
   };

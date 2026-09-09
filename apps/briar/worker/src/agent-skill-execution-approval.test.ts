@@ -1777,7 +1777,7 @@ describe("conversational Agent Skill execution approval", () => {
       .toBe("failed");
 
     // Migration 0074's existing channel-delete sync trigger reinserts a row
-    // with the old workspace during an workspace FK cascade. Remove the
+    // with the old workspace during a workspace FK cascade. Remove the
     // test channel explicitly so this assertion isolates the 0092 cascade.
     await db.prepare(`delete from briar_channels where id = ?`)
       .bind(channelId).run();

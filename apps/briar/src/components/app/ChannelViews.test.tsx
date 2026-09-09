@@ -188,7 +188,7 @@ describe("ChannelsWithCatalog", () => {
     await view.cleanup();
   });
 
-  it("renders nothing before an workspace is selected", async () => {
+  it("renders nothing before a workspace is selected", async () => {
     const registry = harness();
     registry.set(activeWorkspaceIdAtom, null);
     const view = createReactTestRoot();

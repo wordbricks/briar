@@ -396,7 +396,7 @@ export const resultReviewFromProto = (value: ResultReviewMessage): IssueResultRe
   completedAt: requiredTimestamp(value.completedAt, "resultReview.completedAt"),
 });
 
-export const organizationMemberFromProto = (
+export const workspaceMemberFromProto = (
   value: WorkspaceMemberMessage,
 ): WorkspaceMember => ({
   userId: value.userId,

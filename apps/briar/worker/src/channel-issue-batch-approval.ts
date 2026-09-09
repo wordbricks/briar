@@ -117,7 +117,7 @@ export async function materializeChannelIssueBatch(input: {
     // D1 transaction, so a bad item must stop the whole approval rather than
     // leave the other issues holding files this one could not find.
     await resolveChannelIssueAttachmentSources(input.db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       channelId: input.channelId,
       attachmentIds: item.issue.attachmentIds,
     });
@@ -223,7 +223,7 @@ export async function materializeChannelIssueBatch(input: {
       ...await channelIssueAttachmentStatements(input.db, {
         projectId: input.project.id,
         runId: item.runId,
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         channelId: input.channelId,
         attachmentIds: item.issue.attachmentIds,
         createdAt: input.proposalCreatedAt,

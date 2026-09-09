@@ -235,7 +235,7 @@ export type DetachedDelegationTarget = {
 /**
  * An Agent this reply may start an Agent-to-Agent conversation with. Unlike a
  * delegation target this is not restricted to Project Agents, so the project
- * pair is absent for an Workspace Agent.
+ * pair is absent for a Workspace Agent.
  */
 export type DetachedAgentMessageTarget = {
   agentId: string;
@@ -276,7 +276,7 @@ export function detachedAgentContext(
     agent.scope?.kind !== "workspace"
   ) {
     throw new Error(
-      "Workspace context can only be attached to an Workspace Agent",
+      "Workspace context can only be attached to a Workspace Agent",
     );
   }
   if (
@@ -284,7 +284,7 @@ export function detachedAgentContext(
     agent.scope?.kind !== "workspace"
   ) {
     throw new Error(
-      "Project Agent delegation targets can only be attached to an Workspace Agent",
+      "Project Agent delegation targets can only be attached to a Workspace Agent",
     );
   }
   const skills = detachedAgentSkills(agent);
@@ -761,7 +761,7 @@ or, only for a Project Agent with an exact server-supplied target,
 {"body":"explain execution settings must be approved","attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":null,"executionProposal":{"projectId":"authoritative project UUID","runId":"exact executionTargets run UUID"},"skillExecutionProposal":null,"delegation":null,"agentMessage":null,"contextRequests":null,"memoryRequests":null,"memoryCitations":null,"memorySaveRequest":null,"acknowledgementReaction":null}
 or, only for a Project Agent with the saved Skill target above,
 {"body":"explain that the saved Skill requires approval before it runs","attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":{"type":"request_agent_skill_execute"},"delegation":null,"agentMessage":null,"contextRequests":null,"memoryRequests":null,"memoryCitations":null,"memorySaveRequest":null,"acknowledgementReaction":null}
-or, only for an Workspace Agent with an eligible target,
+or, only for a Workspace Agent with an eligible target,
 {"body":"explain which Project Agent will handle the project request","attachments":[],"document":null,"issueProposal":null,"issueBatchProposal":null,"executionProposal":null,"skillExecutionProposal":null,"delegation":{"projectId":"eligible project UUID","agentId":"eligible Agent UUID","request":"the user's bounded project question"},"agentMessage":null,"contextRequests":null,"memoryRequests":null,"memoryCitations":null,"memorySaveRequest":null,"acknowledgementReaction":null}`,
     canSendAgentMessage
       ? `or, only for one Agent from the message allowlist above,

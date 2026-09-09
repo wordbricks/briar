@@ -6,7 +6,7 @@ import {
   decodeStoredMergeQueueValidationCommands,
 } from "../../src/lib/merge-queue-validation-contract";
 import {
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
 } from "./github-connection-repository";
 import { getMergeQueueProfile } from "./merge-queue-profile";
@@ -58,8 +58,8 @@ export class TeamConfigurationApplicationError extends Error {
 export type TeamConfigurationApplicationServices = {
   readonly assertStoredCheckpointPoliciesCompatible:
     typeof assertStoredCheckpointPoliciesCompatible;
-  readonly getGithubConnectionForOrganization:
-    typeof getGithubConnectionForOrganization;
+  readonly getGithubConnectionForWorkspace:
+    typeof getGithubConnectionForWorkspace;
   readonly getMergeQueueProfile: typeof getMergeQueueProfile;
   readonly getTeam: typeof getTeam;
   readonly getProjectExecutionWorkerPolicy:
@@ -80,7 +80,7 @@ export type TeamConfigurationApplicationServices = {
 const teamConfigurationApplicationServices:
   TeamConfigurationApplicationServices = {
     assertStoredCheckpointPoliciesCompatible,
-    getGithubConnectionForOrganization,
+    getGithubConnectionForWorkspace,
     getMergeQueueProfile,
     getTeam,
     getProjectExecutionWorkerPolicy,
@@ -202,7 +202,7 @@ export async function updateTeamSettingsApplication(
 
   const githubRepository = input.settings.githubRepository
     ? await (async () => {
-        const connection = await services.getGithubConnectionForOrganization(
+        const connection = await services.getGithubConnectionForWorkspace(
           input.db,
           project.organization_id,
         );

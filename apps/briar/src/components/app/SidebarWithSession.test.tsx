@@ -71,7 +71,7 @@ beforeEach(() => {
 });
 
 describe("SidebarWithSession", () => {
-  it("re-renders on an workspace change without re-rendering the shell", async () => {
+  it("re-renders on a workspace change without re-rendering the shell", async () => {
     const registry = createTestRegistry([
       [userAtom, user],
       [tokenAtom, "token-1"],

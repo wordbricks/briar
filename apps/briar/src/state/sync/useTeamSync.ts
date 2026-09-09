@@ -52,7 +52,7 @@ export function useTeamSync() {
     applySyncEvent(registry, { kind: "session-cleared" });
   }, [registry, token]);
 
-  // …and workspace scoped: leaving an workspace drops every team that
+  // …and workspace scoped: leaving a workspace drops every team that
   // belongs to it. Demo mode has no workspace switch to follow.
   useEffect(() => {
     if (demoMode) return;

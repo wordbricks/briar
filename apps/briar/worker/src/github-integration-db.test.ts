@@ -11,7 +11,7 @@ import {
   disconnectGithubInstallationById,
   disconnectGithubInstallationsByAuthorizedUser,
   getGithubConnectionByInstallation,
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
   syncGithubConnectionRepositories,
 } from "./db";
@@ -174,7 +174,7 @@ describe("GitHub integration D1 state", () => {
     });
     expect(connected.outcome).toBe("connected");
     await expect(
-      getGithubConnectionForOrganization(db, firstWorkspaceId),
+      getGithubConnectionForWorkspace(db, firstWorkspaceId),
     ).resolves.toMatchObject({
       installation_id: 201,
       status: "connected",
@@ -242,7 +242,7 @@ describe("GitHub integration D1 state", () => {
       ),
     ).resolves.toBe(true);
     await expect(
-      getGithubConnectionForOrganization(db, firstWorkspaceId),
+      getGithubConnectionForWorkspace(db, firstWorkspaceId),
     ).resolves.toBeNull();
     await expect(getGithubConnectionByInstallation(db, 201)).resolves
       .toMatchObject({
@@ -521,7 +521,7 @@ describe("GitHub integration D1 state", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.text()).toContain("GitHub 연결 완료");
     await expect(
-      getGithubConnectionForOrganization(db, firstWorkspaceId),
+      getGithubConnectionForWorkspace(db, firstWorkspaceId),
     ).resolves.toMatchObject({
       installation_id: 902,
       account_login: "wordbricks",

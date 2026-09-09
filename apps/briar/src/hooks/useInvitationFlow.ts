@@ -34,7 +34,7 @@ import { useWorkspaceActions } from "../state/workspace/actions";
 import { useLocalWorkspaceActions } from "../state/local-workspace/actions";
 
 /*
-  Joining an workspace from an invitation link, and the setup step that
+  Joining a workspace from an invitation link, and the setup step that
   follows it.
 
   The token comes off the URL, the progress marker survives the reload the

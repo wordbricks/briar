@@ -5,7 +5,7 @@ import {
   channelPageNavigationLocation,
   issueNavigationLocation,
   organizationNavigationLocation,
-  organizationIdFromNavigationLocation,
+  workspaceIdFromNavigationLocation,
   pageFromNavigationLocation,
   projectIdFromNavigationLocation,
   projectNavigationLocation,
@@ -68,7 +68,7 @@ describe("app navigation locations", () => {
         `${page}/workspace%2Fone/channel%2Fwith%20spaces`,
       );
       expect(pageFromNavigationLocation(location)).toBe(page);
-      expect(organizationIdFromNavigationLocation(location)).toBe(
+      expect(workspaceIdFromNavigationLocation(location)).toBe(
         "workspace/one",
       );
       expect(channelIdFromNavigationLocation(location)).toBe(
@@ -77,7 +77,7 @@ describe("app navigation locations", () => {
     },
   );
 
-  it("retains the active project while visiting an workspace channel", () => {
+  it("retains the active project while visiting a workspace channel", () => {
     const location = channelNavigationLocation(
       "channels",
       "workspace",
@@ -89,7 +89,7 @@ describe("app navigation locations", () => {
       "channels/workspace/channel/project%2Fone",
     );
     expect(projectIdFromNavigationLocation(location)).toBe("project/one");
-    expect(organizationIdFromNavigationLocation(location)).toBe(
+    expect(workspaceIdFromNavigationLocation(location)).toBe(
       "workspace",
     );
     expect(channelIdFromNavigationLocation(location)).toBe("channel");
@@ -106,7 +106,7 @@ describe("app navigation locations", () => {
       "channel-pages/dms/workspace%2Fone/project%2Fone",
     );
     expect(pageFromNavigationLocation(location)).toBe("dms");
-    expect(organizationIdFromNavigationLocation(location)).toBe(
+    expect(workspaceIdFromNavigationLocation(location)).toBe(
       "workspace/one",
     );
     expect(projectIdFromNavigationLocation(location)).toBe("project/one");
@@ -118,7 +118,7 @@ describe("app navigation locations", () => {
 
     expect(location).toBe("workspaces/workspace%2Fone/inbox");
     expect(pageFromNavigationLocation(location)).toBe("inbox");
-    expect(organizationIdFromNavigationLocation(location)).toBe(
+    expect(workspaceIdFromNavigationLocation(location)).toBe(
       "workspace/one",
     );
   });
@@ -131,7 +131,7 @@ describe("app navigation locations", () => {
 
     expect(location).toBe("workspaces/workspace%2Fone/my-issues");
     expect(pageFromNavigationLocation(location)).toBe("my-issues");
-    expect(organizationIdFromNavigationLocation(location)).toBe(
+    expect(workspaceIdFromNavigationLocation(location)).toBe(
       "workspace/one",
     );
   });
@@ -140,7 +140,7 @@ describe("app navigation locations", () => {
     const location = "workspaces/workspace%2Fone/projects" as never;
 
     expect(pageFromNavigationLocation(location)).toBe("lobby");
-    expect(organizationIdFromNavigationLocation(location)).toBeNull();
+    expect(workspaceIdFromNavigationLocation(location)).toBeNull();
     expect(projectIdFromNavigationLocation(location)).toBeNull();
   });
 
@@ -164,7 +164,7 @@ describe("app navigation locations", () => {
     expect(projectIdFromNavigationLocation(location)).toBe(
       target.scope === "project" ? target.projectId : null,
     );
-    expect(organizationIdFromNavigationLocation(location)).toBe(
+    expect(workspaceIdFromNavigationLocation(location)).toBe(
       target.scope === "workspace" ? target.workspaceId : null,
     );
   });
@@ -200,7 +200,7 @@ describe("app navigation locations", () => {
       "channels/%E0%A4%A/channel/project" as never;
 
     expect(pageFromNavigationLocation(invalidWorkspace)).toBe("lobby");
-    expect(organizationIdFromNavigationLocation(invalidWorkspace)).toBeNull();
+    expect(workspaceIdFromNavigationLocation(invalidWorkspace)).toBeNull();
     expect(channelIdFromNavigationLocation(invalidWorkspace)).toBeNull();
     expect(projectIdFromNavigationLocation(invalidWorkspace)).toBeNull();
 
@@ -247,7 +247,7 @@ describe("app navigation locations", () => {
     );
 
     expect(channelIdFromNavigationLocation(issue)).toBeNull();
-    expect(organizationIdFromNavigationLocation(issue)).toBeNull();
+    expect(workspaceIdFromNavigationLocation(issue)).toBeNull();
     expect(runIdFromNavigationLocation(channel)).toBeNull();
     expect(projectIdFromNavigationLocation(channel)).toBeNull();
   });

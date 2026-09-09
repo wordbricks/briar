@@ -17,21 +17,21 @@ import { briarWebAppOrigin } from "../api-config";
 import { appCallOptions, appTransport } from "./core";
 import {
   optionalTimestamp,
-  organizationMemberFromProto,
+  workspaceMemberFromProto,
   teamRoleFromProto,
   requiredMessage,
   requiredTimestamp,
 } from "./mappers";
 
-const organizationClient = appTransport
+const workspaceClient = appTransport
   ? createClient(WorkspaceService, appTransport)
   : undefined;
 
 const requireWorkspaceClient = () => {
-  if (!organizationClient) {
+  if (!workspaceClient) {
     throw new Error("Briar API URL이 설정되지 않았습니다.");
   }
-  return organizationClient;
+  return workspaceClient;
 };
 
 const assignableRoleToProto = (
@@ -113,7 +113,7 @@ const invitationDetailsFromMessage = (
   ),
 });
 
-const organizationFromMessage = (
+const workspaceFromMessage = (
   workspace: WorkspaceMessage,
 ): Workspace => ({
   id: workspace.id,
@@ -146,18 +146,18 @@ export async function loadWorkspaces(
     {},
     appCallOptions(token, signal),
   );
-  return response.workspaces.map(organizationFromMessage);
+  return response.workspaces.map(workspaceFromMessage);
 }
 
 export async function createWorkspace(
   token: string,
   input: { readonly name: string; readonly handle: string },
-): Promise<{ organization: Workspace }> {
+): Promise<{ workspace: Workspace }> {
   const response = await requireWorkspaceClient().createWorkspace(
     input,
     appCallOptions(token),
   );
-  return { organization: organizationFromMessage(
+  return { workspace: workspaceFromMessage(
       requiredMessage(response.workspace, "createWorkspace.workspace"),
     ),
   };
@@ -177,12 +177,12 @@ export async function updateWorkspace(
   token: string,
   workspaceId: string,
   name: string,
-): Promise<{ organization: Workspace }> {
+): Promise<{ workspace: Workspace }> {
   const response = await requireWorkspaceClient().updateWorkspace(
     { workspaceId: workspaceId, name },
     appCallOptions(token),
   );
-  return { organization: organizationFromMessage(
+  return { workspace: workspaceFromMessage(
       requiredMessage(response.workspace, "updateWorkspace.workspace"),
     ),
   };
@@ -192,7 +192,7 @@ export async function updateWorkspaceLogo(
   token: string,
   workspaceId: string,
   logo: string | null,
-): Promise<{ organization: Workspace }> {
+): Promise<{ workspace: Workspace }> {
   const response = await requireWorkspaceClient().updateWorkspaceLogo(
     {
       workspaceId: workspaceId,
@@ -202,7 +202,7 @@ export async function updateWorkspaceLogo(
     },
     appCallOptions(token),
   );
-  return { organization: organizationFromMessage(
+  return { workspace: workspaceFromMessage(
       requiredMessage(
         response.workspace,
         "updateWorkspaceLogo.workspace",
@@ -307,7 +307,7 @@ export async function loadWorkspaceMembers(
     { workspaceId: workspaceId },
     appCallOptions(token),
   );
-  return response.members.map(organizationMemberFromProto);
+  return response.members.map(workspaceMemberFromProto);
 }
 
 export async function updateWorkspaceMemberRole(
@@ -321,7 +321,7 @@ export async function updateWorkspaceMemberRole(
       { workspaceId: workspaceId, userId, role: assignableRoleToProto(role) },
       appCallOptions(token),
     );
-  return { members: response.members.map(organizationMemberFromProto) };
+  return { members: response.members.map(workspaceMemberFromProto) };
 }
 
 export async function updateWorkspaceMemberProjects(
@@ -335,7 +335,7 @@ export async function updateWorkspaceMemberProjects(
       { workspaceId: workspaceId, userId, projectIds },
       appCallOptions(token),
     );
-  return { members: response.members.map(organizationMemberFromProto) };
+  return { members: response.members.map(workspaceMemberFromProto) };
 }
 
 export async function removeWorkspaceMember(

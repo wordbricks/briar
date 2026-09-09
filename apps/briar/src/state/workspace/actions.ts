@@ -37,7 +37,7 @@ export const liveWorkspaceActionApi: WorkspaceActionApi = {
 };
 
 /**
- * The health probe is the only piece of an workspace switch these actions do
+ * The health probe is the only piece of a workspace switch these actions do
  * not own: it belongs to `state/workspace`. The dashboard
  * half is read and written here, through the entity store.
  */

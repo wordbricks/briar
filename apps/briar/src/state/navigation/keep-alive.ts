@@ -194,7 +194,7 @@ function resolveCompanionKeptPage(get: Atom.AtomContext): KeptPage | null {
  * A kept page holds the rows of one account inside one workspace, so a
  * different account or a different workspace invalidates all of them —
  * including the ones whose key happens to survive, such as an inbox opened
- * before an workspace resolved. The pinned window's team is here for the
+ * before a workspace resolved. The pinned window's team is here for the
  * same reason: a project window is scoped to one team for its whole life, and a
  * change to that scope means this is not the same window's content any more.
  */
@@ -306,7 +306,7 @@ interface KeptPagesState {
   is this atom's own previous value, which is what makes an LRU out of a
   derivation, and `Atom.keepAlive` is what keeps that previous value around
   between visits. A scope change is read here rather than reset by a caller for
-  the same reason — sign-out and an workspace switch are already writes to
+  the same reason — sign-out and a workspace switch are already writes to
   atoms this one depends on.
 */
 const keptPagesStateAtom = Atom.make((get): KeptPagesState => {

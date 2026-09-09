@@ -191,7 +191,7 @@ type ChannelAgentReplyProviderSource =
 
 /**
  * One codec owns both provider-visible structured output and the application
- * turn: a normal reply or an workspace-context lookup, never both.
+ * turn: a normal reply or a workspace-context lookup, never both.
  */
 export const ChannelAgentReplyProviderOutputSchema =
   ChannelAgentReplyProviderSourceSchema.pipe(

@@ -18,7 +18,7 @@ import type { MessageKey } from "../i18n/messages";
 import {
   channelIdFromNavigationLocation,
   isProjectNavigationPage,
-  organizationIdFromNavigationLocation,
+  workspaceIdFromNavigationLocation,
   pageFromNavigationLocation,
   projectIdFromNavigationLocation,
   runIdFromNavigationLocation,
@@ -123,7 +123,7 @@ export function buildNavigationHistoryItems({
     const project = projectId
       ? teams.find((candidate) => candidate.id === projectId)
       : undefined;
-    const workspaceId = organizationIdFromNavigationLocation(location);
+    const workspaceId = workspaceIdFromNavigationLocation(location);
     const workspace = workspaceId
       ? workspaces.find((candidate) => candidate.id === workspaceId)
       : undefined;

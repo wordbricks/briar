@@ -72,6 +72,12 @@ export function approvedIssueCreation<T extends Record<string, unknown>>(
   };
 }
 
+/**
+ * Builds the `relatedMessage` object stored in `briar_hunt_runs.context_json`.
+ * A D1 trigger validates that payload key by key, so the persisted key stays
+ * the pre-rename `organizationId`; `parseRelatedMessageReference` translates it
+ * back to `workspaceId` on the way out.
+ */
 export function channelRelatedMessageReference(input: {
   workspaceId: string;
   channelId: string;
@@ -79,7 +85,7 @@ export function channelRelatedMessageReference(input: {
   rootMessageId: string | null;
 }) {
   return {
-    workspaceId: input.workspaceId,
+    organizationId: input.workspaceId,
     channelId: input.channelId,
     messageId: input.messageId,
     // A root message is required by the in-app deep-link handler. A proposal

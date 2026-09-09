@@ -281,7 +281,7 @@ describe("useDeepLinks", () => {
     await view.cleanup();
   });
 
-  it("ignores a link to an workspace the account is not in", async () => {
+  it("ignores a link to a workspace the account is not in", async () => {
     const { input, registry } = harness();
     const view = await mount(registry, input);
 

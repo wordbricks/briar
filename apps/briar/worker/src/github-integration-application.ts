@@ -2,7 +2,7 @@ import { hasWorkspaceCapability } from "./workspace-access";
 import { getWorkspaceRole } from "./workspace-repository";
 import {
   createGithubOAuthState,
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
   syncGithubConnectionRepositories,
 } from "./db";
@@ -50,7 +50,7 @@ export const githubConfigAvailable = (env: Env) =>
 export const githubOAuthRedirectUri = (origin: string) =>
   `${origin}/github/oauth/callback`;
 
-type OrganizationGithubApplicationInput = {
+type WorkspaceGithubApplicationInput = {
   readonly db: D1Database;
   readonly env: Env;
   readonly workspaceId: string;
@@ -64,7 +64,7 @@ type OrganizationGithubApplicationInput = {
  * created repository over the installation_repositories webhook, so without
  * this every caller that checks the snapshot rejects repositories the App does
  * have access to. A GitHub failure leaves the snapshot as it was rather than
- * emptying an workspace's repository list.
+ * emptying a workspace's repository list.
  */
 async function refreshedInstallationRepositories(
   input: {
@@ -113,7 +113,7 @@ async function refreshedInstallationRepositories(
 }
 
 export async function getGithubIntegrationApplication(
-  input: OrganizationGithubApplicationInput,
+  input: WorkspaceGithubApplicationInput,
 ) {
   const role = await getWorkspaceRole(
     input.db,
@@ -123,7 +123,7 @@ export async function getGithubIntegrationApplication(
   if (!hasWorkspaceCapability(role, "workspace:read")) {
     throw new HttpError(404, "Workspace not found");
   }
-  const connection = await getGithubConnectionForOrganization(
+  const connection = await getGithubConnectionForWorkspace(
     input.db,
     input.workspaceId,
   );
@@ -155,7 +155,7 @@ export async function getGithubIntegrationApplication(
 }
 
 export async function beginGithubInstallationApplication(
-  input: OrganizationGithubApplicationInput,
+  input: WorkspaceGithubApplicationInput,
 ) {
   const role = await getWorkspaceRole(
     input.db,
@@ -169,7 +169,7 @@ export async function beginGithubInstallationApplication(
     throw new HttpError(503, "GitHub integration is not configured");
   }
   if (
-    await getGithubConnectionForOrganization(input.db, input.workspaceId)
+    await getGithubConnectionForWorkspace(input.db, input.workspaceId)
   ) {
     throw new HttpError(409, "GitHub integration is already connected");
   }

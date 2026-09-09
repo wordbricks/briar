@@ -128,7 +128,7 @@ export async function handleWhatsAppSettingsRoute(input: {
     const request = decodeConnectionInput(await requestJson(input.request));
     const agent = await getWorkspaceAgent(input.db, workspaceId, request.agentId);
     if (!agent || agent.project_id !== null) {
-      throw new HttpError(400, "Representative must be an Workspace Agent");
+      throw new HttpError(400, "Representative must be a Workspace Agent");
     }
     const encrypted = await encryptWhatsAppToken(request.accessToken, encryptionKey);
     try {

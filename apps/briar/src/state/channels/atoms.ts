@@ -24,7 +24,7 @@ const noChannels: ChannelSummary[] = [];
   initial value under any other one — the reset is the workspace key
   changing, not a statement someone has to remember to write.
 
-  Returning to an workspace must not resurrect what was selected there
+  Returning to a workspace must not resurrect what was selected there
   before, though, so `resetChannelSelection` still drops the stored stamps. It
   is the one imperative step, and it happens inside a single batch.
 */

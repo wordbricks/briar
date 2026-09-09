@@ -634,7 +634,7 @@ const channelReplyFromProto = (
       throw new Error("Worker workspace reply has inconsistent scope data");
     }
   } else if (mapped.organizationContext || mapped.delegationTargets.length > 0) {
-    // Delegation stays an Workspace Agent path inside a channel thread.
+    // Delegation stays a Workspace Agent path inside a channel thread.
     // Agent messages are a DM feature open to both scopes, so
     // agentMessageTargets is deliberately absent from this rule.
     throw new Error("Worker project reply has inconsistent scope data");

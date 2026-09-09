@@ -13,7 +13,7 @@ import {
   updateProjectGithubPullRequest,
 } from "./github-app-api";
 import {
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
 } from "./github-connection-repository";
 import { HttpError } from "./http-response";
@@ -136,7 +136,7 @@ export async function teamGithubIdentity(
 ): Promise<TeamGithubIdentity> {
   const [settings, connection] = await Promise.all([
     getTeamSettings(db, project.id),
-    getGithubConnectionForOrganization(db, project.organization_id),
+    getGithubConnectionForWorkspace(db, project.organization_id),
   ]);
   if (!settings?.github_repository || settings.github_repository_id === null) {
     throw new HttpError(409, "Connect a GitHub repository to this project");

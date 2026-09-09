@@ -401,7 +401,7 @@ describe("navigation reconciliation", () => {
     await view.cleanup();
   });
 
-  it("falls back when the location names an workspace the account lost", async () => {
+  it("falls back when the location names a workspace the account lost", async () => {
     const registry = harness([teamA, teamB], [workspace, otherWorkspace]);
     const view = await mount(registry);
 

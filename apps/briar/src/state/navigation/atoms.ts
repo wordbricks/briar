@@ -5,7 +5,7 @@ import type { UnifiedSettingsTarget } from "../../components/UnifiedSettingsSide
 import type { InboxNotificationTarget } from "../../generated/tauri";
 import {
   channelIdFromNavigationLocation,
-  organizationIdFromNavigationLocation,
+  workspaceIdFromNavigationLocation,
   pageFromNavigationLocation,
   projectIdFromNavigationLocation,
   runIdFromNavigationLocation,
@@ -265,7 +265,7 @@ export const lastWorkLocationAtom = Atom.make(
     const teams = get(teamsAtom);
     const inActiveWorkspace = (location: AppNavigationLocation) => {
       const locationWorkspaceId =
-        organizationIdFromNavigationLocation(location);
+        workspaceIdFromNavigationLocation(location);
       if (locationWorkspaceId !== null) {
         return locationWorkspaceId === workspaceId;
       }
@@ -304,7 +304,7 @@ export const lastDirectMessageChannelIdAtom = Atom.make(
       if (
         location === undefined ||
         pageFromNavigationLocation(location) !== "dms" ||
-        organizationIdFromNavigationLocation(location) !== workspaceId
+        workspaceIdFromNavigationLocation(location) !== workspaceId
       ) {
         continue;
       }
@@ -338,7 +338,7 @@ export const navigationTeamIdAtom = Atom.map(
 /** The workspace the location names. */
 export const navigationWorkspaceIdAtom = Atom.map(
   navigationLocationAtom,
-  organizationIdFromNavigationLocation,
+  workspaceIdFromNavigationLocation,
 ).pipe(Atom.keepAlive, Atom.withLabel("navigation/workspaceId"));
 
 /** The channel the location names, on a channel location. */
@@ -354,7 +354,7 @@ export const navigationSettingsTargetAtom = Atom.map(
 ).pipe(Atom.keepAlive, Atom.withLabel("navigation/locationSettingsTarget"));
 
 /**
- * The location is a channel page carrying an workspace, which is what makes
+ * The location is a channel page carrying a workspace, which is what makes
  * the location — rather than the selection — the source of the open channel on
  * the desktop.
  */

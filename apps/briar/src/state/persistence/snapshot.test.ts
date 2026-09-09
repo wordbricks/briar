@@ -198,7 +198,7 @@ describe("client snapshot", () => {
     ).toBe(true);
   });
 
-  it("has nothing to write without an account or an workspace", () => {
+  it("has nothing to write without an account or a workspace", () => {
     const registry = loadedRegistry();
     registry.set(activeWorkspaceIdAtom, null);
     expect(collectSnapshot(registry)).toBeNull();

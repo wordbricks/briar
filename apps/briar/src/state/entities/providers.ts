@@ -6,7 +6,7 @@ import { demoMode } from "../platform";
 import { shallowArrayEqual } from "./upsert";
 
 /*
-  The agent providers an workspace has enabled, as the team dashboard payload
+  The agent providers a workspace has enabled, as the team dashboard payload
   reports them.
 
   `AgentProvider` is a string union, not an identified record, so there is no

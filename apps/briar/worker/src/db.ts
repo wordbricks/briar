@@ -33,7 +33,7 @@ export {
   consumeGithubInstallState,
   consumeGithubOAuthState,
   getGithubConnectionByInstallation,
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
   syncGithubConnectionRepositories,
   connectGithubInstallation,

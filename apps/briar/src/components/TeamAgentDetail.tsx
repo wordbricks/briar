@@ -211,7 +211,7 @@ export function TeamAgentDetail({
   };
 
   const isTaskStarting = isExternalStartPending || isStarting;
-  // Agent-to-Agent conversations are an workspace's, so the section only
+  // Agent-to-Agent conversations are a workspace's, so the section only
   // shows once the board has told this page which workspace it belongs to.
   const agentWorkspaceId = board?.team.workspaceId ?? null;
   /*
