@@ -724,7 +724,7 @@ private final class ChannelConnectScenario: @unchecked Sendable {
     private func listChannels(
         _ request: BriarAPI_ListChannelsRequest
     ) -> BriarAPI_ListChannelsResponse {
-        precondition(request.organizationID == channel.organizationId.uuidString.lowercased())
+        precondition(request.workspaceID == channel.organizationId.uuidString.lowercased())
         var response = BriarAPI_ListChannelsResponse()
         response.channels = [wireSummary(channel)]
         response.cursor = 10
@@ -736,7 +736,7 @@ private final class ChannelConnectScenario: @unchecked Sendable {
     ) -> BriarAPI_SyncChannelsResponse {
         lock.lock()
         defer { lock.unlock() }
-        precondition(request.organizationID == channel.organizationId.uuidString.lowercased())
+        precondition(request.workspaceID == channel.organizationId.uuidString.lowercased())
         precondition(!queuedSyncResponses.isEmpty)
         return wireDelta(queuedSyncResponses.removeFirst())
     }
@@ -835,7 +835,7 @@ private final class ChannelConnectScenario: @unchecked Sendable {
     private func wireSummary(_ value: ChannelSummary) -> BriarAPI_ChannelSummary {
         var message = BriarAPI_ChannelSummary()
         message.id = value.id.uuidString.lowercased()
-        message.organizationID = value.organizationId.uuidString.lowercased()
+        message.workspaceID = value.organizationId.uuidString.lowercased()
         message.slug = value.slug
         message.name = value.name
         message.visibility = value.visibility == .org ? .public : .private

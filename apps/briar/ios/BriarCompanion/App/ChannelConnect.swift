@@ -77,7 +77,7 @@ extension ChannelSummary {
         }
         self.init(
             id: try channelUUID(message.id),
-            organizationId: try channelUUID(message.organizationID),
+            organizationId: try channelUUID(message.workspaceID),
             slug: message.slug,
             name: message.name,
             topic: message.hasTopic ? message.topic : nil,

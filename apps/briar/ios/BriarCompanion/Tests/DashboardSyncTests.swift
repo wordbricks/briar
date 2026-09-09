@@ -167,7 +167,7 @@ final class DashboardSyncTests: XCTestCase {
         projectMessage.name = project.name
         projectMessage.issueKeyPrefix = project.issueKeyPrefix
         projectMessage.scheduleTabEnabled = project.scheduleTabEnabled
-        projectMessage.organizationID = project.organizationId.uuidString.lowercased()
+        projectMessage.workspaceID = project.organizationId.uuidString.lowercased()
         projectMessage.organizationName = project.organizationName
         projectMessage.role = .owner
         projectMessage.createdAt = Google_Protobuf_Timestamp(date: project.createdAt)

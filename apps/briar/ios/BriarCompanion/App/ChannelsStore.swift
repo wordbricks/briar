@@ -376,7 +376,7 @@ final class ChannelsStore: ObservableObject {
         }
         do {
             var request = BriarAPI_ListChannelsRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             let wireResponse = await channelService.listChannels(
                 request: request,
                 headers: [:]
@@ -414,7 +414,7 @@ final class ChannelsStore: ObservableObject {
             throw MobileAPIError.invalidRequest
         }
         var request = BriarAPI_ListDirectMessageRecipientsRequest()
-        request.organizationID = coreUUIDString(organizationID)
+        request.workspaceID = coreUUIDString(organizationID)
         let response = try await channelService.listDirectMessageRecipients(
             request: request,
             headers: [:]
@@ -434,7 +434,7 @@ final class ChannelsStore: ObservableObject {
             throw MobileAPIError.invalidRequest
         }
         var request = BriarAPI_CreateDirectMessageRequest()
-        request.organizationID = coreUUIDString(organizationID)
+        request.workspaceID = coreUUIDString(organizationID)
         request.memberIds = memberIDs
         request.agentIds = agentIDs.map(coreUUIDString)
         let response = try await channelService.createDirectMessage(
@@ -455,7 +455,7 @@ final class ChannelsStore: ObservableObject {
             throw MobileAPIError.invalidRequest
         }
         var request = BriarAPI_ListAgentDirectMessagesRequest()
-        request.organizationID = coreUUIDString(organizationID)
+        request.workspaceID = coreUUIDString(organizationID)
         request.agentID = coreUUIDString(agentID)
         let response = try await channelService.listAgentDirectMessages(
             request: request,
@@ -471,7 +471,7 @@ final class ChannelsStore: ObservableObject {
         guard let organizationID, token != nil, let channelService else { return nil }
         do {
             var request = BriarAPI_GetChannelRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.messageLimit = 1
             let response = try await channelService.getChannel(
@@ -546,7 +546,7 @@ final class ChannelsStore: ObservableObject {
         do {
             guard let channelService else { throw MobileAPIError.invalidRequest }
             var request = BriarAPI_GetChannelRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.messageLimit = UInt32(Self.messagePageSize)
             let wireResponse = await channelService.getChannel(
@@ -673,7 +673,7 @@ final class ChannelsStore: ObservableObject {
         do {
             guard let channelService else { throw MobileAPIError.invalidRequest }
             var request = BriarAPI_ListChannelMessagesRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.cursor = coreUUIDString(cursor)
             request.limit = UInt32(Self.messagePageSize)
@@ -741,7 +741,7 @@ final class ChannelsStore: ObservableObject {
         do {
             guard let channelService else { throw MobileAPIError.invalidRequest }
             var request = BriarAPI_ListChannelMessagesRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.parentMessageID = coreUUIDString(messageID)
             let wireResponse = await channelService.listChannelMessages(
@@ -839,7 +839,7 @@ final class ChannelsStore: ObservableObject {
         do {
             guard let channelService else { throw MobileAPIError.invalidRequest }
             var request = BriarAPI_ListChannelMessagesRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.parentMessageID = coreUUIDString(parentMessageID)
             let wireResponse = await channelService.listChannelMessages(
@@ -911,7 +911,7 @@ final class ChannelsStore: ObservableObject {
                       wireCursor <= 9_007_199_254_740_991
                 else { throw MobileAPIError.invalidRequest }
                 var request = BriarAPI_SyncChannelsRequest()
-                request.organizationID = coreUUIDString(organizationID)
+                request.workspaceID = coreUUIDString(organizationID)
                 request.cursor = wireCursor
                 let wireResponse = await channelService.syncChannels(
                     request: request,
@@ -1073,7 +1073,7 @@ final class ChannelsStore: ObservableObject {
                 $0.kind == .agent ? UUID(uuidString: $0.recipientId) : nil
             }
             var request = BriarAPI_CreateChannelMessageRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.clientMessageID = coreUUIDString(clientMessageID)
             request.body = payload?.body ?? trimmed
@@ -1093,7 +1093,7 @@ final class ChannelsStore: ObservableObject {
                 guard let payload else { throw MobileAPIError.invalidRequest }
                 var prepareRequest = BriarAPI_PrepareChannelMessageAttachmentsRequest()
                 prepareRequest.requestID = coreUUIDString(UUID())
-                prepareRequest.organizationID = coreUUIDString(organizationID)
+                prepareRequest.workspaceID = coreUUIDString(organizationID)
                 prepareRequest.channelID = coreUUIDString(channelID)
                 prepareRequest.clientMessageID = coreUUIDString(clientMessageID)
                 prepareRequest.attachments = try PreparedUploadPipeline.metadata(
@@ -1165,7 +1165,7 @@ final class ChannelsStore: ObservableObject {
         defer { subscriptionPending = false }
         do {
             var request = BriarAPI_SetChannelThreadSubscriptionRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.rootMessageID = coreUUIDString(messageID)
             request.subscribed = subscribed
@@ -1200,7 +1200,7 @@ final class ChannelsStore: ObservableObject {
         guard !trimmed.isEmpty else { return }
         do {
             var request = BriarAPI_ToggleChannelMessageReactionRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.messageID = coreUUIDString(messageID)
             request.emoji = trimmed
@@ -1253,7 +1253,7 @@ final class ChannelsStore: ObservableObject {
         }
         do {
             var request = BriarAPI_DeleteChannelMessageRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.messageID = coreUUIDString(messageID)
             let wireResponse = await channelService.deleteChannelMessage(
@@ -1385,7 +1385,7 @@ final class ChannelsStore: ObservableObject {
             }
             guard let channelService else { throw MobileAPIError.invalidRequest }
             var request = BriarAPI_AcceptChannelProposalRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.proposalID = coreUUIDString(proposalID)
             request.projectID = coreUUIDString(projectID)
@@ -1552,7 +1552,7 @@ final class ChannelsStore: ObservableObject {
         do {
             guard let channelService else { throw MobileAPIError.invalidRequest }
             var request = BriarAPI_DeclineChannelProposalRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.proposalID = coreUUIDString(proposalID)
             let response = await channelService.declineChannelProposal(
@@ -1655,7 +1655,7 @@ final class ChannelsStore: ObservableObject {
 
             guard let channelService else { throw MobileAPIError.invalidRequest }
             var approvalRequest = BriarAPI_AcceptChannelExecutionProposalRequest()
-            approvalRequest.organizationID = coreUUIDString(organizationID)
+            approvalRequest.workspaceID = coreUUIDString(organizationID)
             approvalRequest.channelID = coreUUIDString(channelID)
             approvalRequest.proposalID = coreUUIDString(proposalID)
             approvalRequest.approval = try request.channelApprovalMessage()
@@ -1968,7 +1968,7 @@ final class ChannelsStore: ObservableObject {
 
             guard let channelService else { throw MobileAPIError.invalidRequest }
             var approvalRequest = BriarAPI_AcceptChannelSkillExecutionProposalRequest()
-            approvalRequest.organizationID = coreUUIDString(organizationID)
+            approvalRequest.workspaceID = coreUUIDString(organizationID)
             approvalRequest.channelID = coreUUIDString(channelID)
             approvalRequest.proposalID = coreUUIDString(proposalID)
             if let workerID = request.workerId { approvalRequest.workerID = workerID }
@@ -2667,7 +2667,7 @@ final class ChannelsStore: ObservableObject {
             guard let self else { return }
             do {
                 var request = BriarAPI_MarkChannelReadRequest()
-                request.organizationID = coreUUIDString(organizationID)
+                request.workspaceID = coreUUIDString(organizationID)
                 request.channelID = coreUUIDString(channelID)
                 request.lastReadAt = Google_Protobuf_Timestamp(date: Date())
                 let response = try await channelService.markChannelRead(
@@ -2897,7 +2897,7 @@ final class ChannelsStore: ObservableObject {
         let expectedLoadRevision = authoritativeLoadRevision
         do {
             var request = BriarAPI_ListChannelMessagesRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.channelID = coreUUIDString(channelID)
             request.limit = UInt32(Self.agentConversationMessageLimit)
             let response = try await channelService.listChannelMessages(

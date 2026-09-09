@@ -40,7 +40,7 @@ const selectedChannel: ChannelSummary = {
 
 const channelSummaryWire = (channel: ChannelSummary) => ({
   id: channel.id,
-  organizationId: channel.organizationId,
+  workspaceId: channel.organizationId,
   slug: channel.slug,
   name: channel.name,
   visibility: 1,

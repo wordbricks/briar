@@ -122,7 +122,7 @@ describe("DirectMessages", () => {
 /** The conversation the catalog does not hold, as the wire sends it. */
 const agentConversationWire = {
   id: "agent-dm-1",
-  organizationId: "org-1",
+  workspaceId: "org-1",
   slug: "agent-dm-1",
   name: "Ava, Bay",
   visibility: 2,
@@ -297,7 +297,7 @@ describe("DirectMessages, opening an Agent conversation", () => {
 
   const originDirectMessageWire = {
     id: originDirectMessage.id,
-    organizationId: "org-1",
+    workspaceId: "org-1",
     slug: originDirectMessage.slug,
     name: originDirectMessage.name,
     visibility: 2,
