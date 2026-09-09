@@ -13,6 +13,7 @@ export type DmMessageMcpConfig = {
   readonly capability: string;
   readonly expiresAt: string;
   readonly scheduleTools?: boolean;
+  readonly relayDirectory?: string;
 };
 
 export type PreparedDmMessageMcp = {
@@ -33,10 +34,12 @@ const decodeConfig = (value: unknown): DmMessageMcpConfig => {
       typeof config.socketPath !== "string" || typeof config.capability !== "string" ||
       !/^[A-Za-z0-9_-]{22,128}$/u.test(config.capability) ||
       typeof config.expiresAt !== "string" ||
-      (config.scheduleTools !== undefined && typeof config.scheduleTools !== "boolean")) {
+      (config.scheduleTools !== undefined && typeof config.scheduleTools !== "boolean") ||
+      (config.relayDirectory !== undefined && typeof config.relayDirectory !== "string")) {
     throw new Error("DM message MCP config is invalid");
   }
   assertAbsolutePath(config.socketPath, "socketPath");
+  if (typeof config.relayDirectory === "string") assertAbsolutePath(config.relayDirectory, "relayDirectory");
   const expiresAt = new Date(config.expiresAt);
   if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
     throw new Error("DM message MCP config is expired");
@@ -45,7 +48,7 @@ const decodeConfig = (value: unknown): DmMessageMcpConfig => {
 };
 
 export const prepareDmMessageMcp = async (
-  request: RunnerRequest,
+  request: Pick<RunnerRequest, "dmMessageMcpServerPath" | "dmMessagePublicationBinding">,
 ): Promise<PreparedDmMessageMcp> => {
   const serverPath = request.dmMessageMcpServerPath?.trim() ?? "";
   const binding = request.dmMessagePublicationBinding;
@@ -78,8 +81,6 @@ export const prepareDmMessageMcp = async (
   return {
     servers: [{
       name: "briar-dm-message",
-      // These operations already require this invocation capability and a live scoped server claim.
-      approvedTools: config.scheduleTools ? ["create_dm_schedule", "list_dm_schedules", "cancel_dm_schedule"] : [],
       command: process.execPath,
       args: [serverPath, "--config", configPath],
       env: {},

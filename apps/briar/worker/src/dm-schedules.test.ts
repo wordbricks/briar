@@ -6,6 +6,7 @@ import { captureDmPublicMessageClaim, getDmPublicMessageClaim } from "./dm-publi
 import { dmScheduleTime, executeDmScheduleTool, getDmScheduleContext, runDueDmSchedules } from "./dm-schedules";
 import { getChannelAgentReplyJob, liveChannelReplyRuntime } from "./channels";
 import { dmReplyRoutingContext, resolveDmReplyRouting } from "./dm-reply-routing";
+import { agentProviders } from "../../src/lib/agent-provider";
 import { dmScheduleFixture } from "./test-helpers/dm-schedule-fixture";
 const plus = (at: string, seconds: number) => new Date(Date.parse(at) + seconds * 1000).toISOString();
 const op = (action: string, scheduleId = "") => create(DmScheduleToolOperationSchema, { action, scheduleId });
@@ -21,6 +22,34 @@ const markRunning = async (f: Awaited<ReturnType<typeof dmScheduleFixture>>, job
 };
 
 describe("DM schedules", () => {
+  it.each(agentProviders)("supports the same schedule lifecycle for %s", async (provider) => {
+    const f = await dmScheduleFixture(db, undefined, provider);
+    const schedule = (await executeDmScheduleTool(db, f)).schedules[0]!;
+    expect((await executeDmScheduleTool(db, { ...f, operation: op("list") })).schedules.map((row) => row.id)).toContain(schedule.id);
+    await runDueDmSchedules(db, schedule.nextRunAt);
+    const occurrence = (await jobs(schedule.id))[0]!;
+    const job = await getChannelAgentReplyJob(db, f.organizationId, occurrence.id);
+    expect(job?.agent_provider).toBe(provider);
+    expect((await getDmScheduleContext(db, occurrence.id))?.instruction).toBe(f.operation.instruction);
+    const identity = await markRunning(f, occurrence.id);
+    expect(await getDmPublicMessageClaim(db, identity)).not.toBeNull();
+    const cancelled = await executeDmScheduleTool(db, { ...f, operation: op("cancel", schedule.id) });
+    expect(cancelled.schedules[0]?.stopState).toBe("requested");
+    expect(await getDmPublicMessageClaim(db, identity)).toBeNull();
+  });
+  it.each(["missing", "different-provider"])("rejects %s routing capability even with a valid public claim", async (capability) => {
+    const f = await dmScheduleFixture(db, undefined, "claude");
+    const schedule = (await executeDmScheduleTool(db, f)).schedules[0]!;
+    if (capability === "missing") delete f.runtime.capabilities.dmReplyRouting;
+    else f.runtime.capabilities.dmReplyRouting.providers = ["AGENT_PROVIDER_CODEX"];
+    await db.prepare(`update briar_execution_workers set runtime_proto_json = ? where id = ?`)
+      .bind(JSON.stringify(f.runtime), f.workerId).run();
+    expect(await getDmPublicMessageClaim(db, f)).not.toBeNull();
+    for (const operation of [f.operation, op("list"), op("cancel", schedule.id)]) {
+      await expect(executeDmScheduleTool(db, { ...f, operation })).rejects.toThrow("active supported execution");
+    }
+    await db.prepare(`update briar_dm_schedules set enabled = 0 where id = ?`).bind(schedule.id).run();
+  });
   it("uses receipt time, confirmed absolute zones, and fixed intervals", () => {
     const received = "2026-09-09T00:00:00.000Z", now = "2026-09-09T00:02:00.000Z";
     const relative = { delaySeconds: 300, timeZone: "", timeZoneConfirmed: false };

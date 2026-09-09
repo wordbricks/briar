@@ -105,9 +105,11 @@ Agent 도구는 기존 DM publication socket을 통한 `create_dm_schedule`, `li
 200자로 제한하고 실제 실행 지시는 8,000자까지 보존한다. 상대 시간은 원래 메시지의 서버 접수
 시각에서 계산한다. 절대 시간은 명시적으로 확인한 IANA 시간대를 요구한다.
 
-초기 지원은 SPEC 2의 도구 비활성화·구조화 출력 capability를 광고하는 macOS/Linux Codex Worker다.
-다른 provider와 미지원 Worker는 새 예약 도구를 받지 않는다. 도구별 Codex 승인 설정은 현재
-private invocation의 세 예약 도구에만 적용하며 전역 승인 정책이나 다른 MCP 도구를 변경하지 않는다.
+현재 등록된 모든 provider에서 SPEC 2의 공통 실행 경로와 같은 예약 명령을 사용한다.
+Briar가 제공하는 명령을 일반 shell/terminal 도구로 호출한다. 명령은 작업 폴더의 요청·응답
+파일을 사용하고, Briar 부모 프로세스가 고정된 invocation socket으로 중계한다. private capability와
+기존 서버 검증이 생성·조회·취소 권한을 제한한다. 특정 provider의 MCP·스케줄·승인 API는
+사용하지 않는다. capability를 광고하지 않는 구버전 Worker는 새 예약을 실행하지 않는다.
 원본 메시지 version, DM roster epoch, 조직·프로젝트 접근 권한, Agent provider를 실행·갱신·게시에서
 검사한다. 예약 회차에 대한 후속 steering도 기존 SPEC 2의 같은 작업 경로로 전달한다.
 
@@ -115,7 +117,9 @@ private invocation의 세 예약 도구에만 적용하며 전역 승인 정책�
 제외하고, 첨부는 기존 인증 다운로드 경로로 전달한다. 이전 프로세스나 provider conversation을
 새 회차에서 재사용하지 않는다. Worker 작업 용량 확인과 슬롯 집계에서 제외하는 SPEC 2 동작을 유지한다.
 
-### 검증 범위
+### 최초 구현 검증 기록
+
+아래는 Codex 전용 경로였던 최초 구현의 기록이다. 공통 provider 경로 변경 검증은 아래에 별도로 기록한다.
 
 - D1 핵심 테스트 6개: 서버 접수 시각/절대 시간대, 생성 재시도, 일회성/중복 tick,
   두 번의 반복과 지연·오프라인 합치기, 취소 경합과 중단 확인, 예약 회차 steering,
@@ -153,3 +157,17 @@ private invocation의 세 예약 도구에만 적용하며 전역 승인 정책�
 로컬 증거는 `/Users/jay/Documents/Codex/dm-minimal-implementation/`의
 `spec3-result.md`, `spec3-cost.json`, `schedule-provider-smoke.json`,
 `spec3-d1-tests.log`, `spec3-unit-tests.log`에 기록했다.
+
+
+### 공통 provider 경로 검증 (2026-09-09)
+
+- 등록된 9개 provider 모두 예약 생성·실행·완료의 서버 계약 테스트를 통과했다.
+  capability 누락·provider 불일치 차단을 포함한 D1 테스트 17개가 통과했다.
+- 실제 Codex (`gpt-6-astra`, `medium`)와 Claude (`sonnet`, `medium`) 각각에서
+  실제 분류 → 공통 파일 명령으로 예약 저장 → due tick → Worker claim → 원래 Agent 결과 게시·완료를
+  7개 항목으로 검증했다. 두 실행 모두 `fullAccess:false`, `readOnly:false`를 유지했다.
+- 격리된 로컬 D1과 합성 사용자·Worker를 사용했고 realtime hub는 stub이었다.
+  나머지 7개 provider의 실제 모델 실행, 운영·UI는 검증하지 않았다.
+  Claude 실험의 본문 전용 테스트 schema에서는 본문에 JSON이 중첩되어 응답 표시 품질의 증거로 사용하지 않는다.
+- 증거: `neutral-schedule-provider-smoke-{codex,claude}.json` 및 같은 이름의 로그.
+  `claude-main-only` 파일은 분류를 생략한 중간 실험이며 최종 통과 근거에서 제외한다.

@@ -1,4 +1,4 @@
-import { supportsInstalledCodexClassification } from "./codex-classification-turn";
+import { supportsOwnedProcessSupervisor } from "./owned-process-supervisor";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
@@ -148,9 +148,9 @@ const workerRuntime = async ({
   computerUse?: WorkerRuntimeInput["computerUse"];
 }): Promise<WorkerRuntimeInput> => ({
   ...input,
-  dmReplyRouting: { protocol: 1, providers: (await Promise.all(Object.entries(input.providerHealth)
-    .map(async ([provider]) => provider === "codex" && await supportsInstalledCodexClassification(process.env)
-      ? provider as WorkerRuntimeInput["agentProvider"] : null))).filter((provider) => provider !== null) },
+  dmReplyRouting: { protocol: 1, providers: Object.entries(input.providerHealth)
+    .filter(([, health]) => health.installed && supportsOwnedProcessSupervisor())
+    .map(([provider]) => provider as WorkerRuntimeInput["agentProvider"]) },
   dmPublicMessages: (() => {
     const bundle = agentBundleCandidates(
       import.meta.dir,
@@ -158,7 +158,7 @@ const workerRuntime = async ({
     ).find((path) => Bun.file(path).size > 0);
     const providers = Object.entries(input.providerHealth).flatMap(
       ([provider]) => supportsDmMessagePublicationProvider(provider as WorkerRuntimeInput["agentProvider"])
-        ? [provider as "codex" | "claude"]
+        ? [provider as WorkerRuntimeInput["agentProvider"]]
         : [],
     );
     return bundle && providers.length > 0

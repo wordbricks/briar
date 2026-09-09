@@ -1,3 +1,4 @@
+import { DmExecutionContext } from "./dm-execution-context";
 import { classifyDmReply } from "./dm-reply-routing";
 import { dmAcknowledgementPrompt, startDmAcknowledgement } from "./dm-acknowledgement";
 import { normalizeChannelAcknowledgementReaction } from "../src/lib/channel-acknowledgement-reaction";
@@ -739,7 +740,7 @@ async function runClaimedChannelReply(
       throw new DetachedProviderStopUnconfirmedError();
     }
     const retained = await lstat(retainedPath).catch(() => null);
-    if (reply.session.conversationId && (!retained?.isDirectory() || retained.isSymbolicLink())) {
+    if ((reply.inputRevision > 0 || reply.session.conversationId) && (!retained?.isDirectory() || retained.isSymbolicLink())) {
       throw new Error("DM 작업 디렉터리를 복구할 수 없어 이전 작업을 다시 시작하지 않았습니다.");
     }
   }
@@ -805,6 +806,7 @@ async function runClaimedChannelReply(
   const invocationSignal = AbortSignal.any([signal, memoryAbort.signal]);
   let memoryInvocation: DmMemoryInvocation | null = null;
   let messageInvocation: DmMessageInvocation | null = null;
+  let executionContext: DmExecutionContext | null = null;
   let publicationTerminal = false;
   let stopAcknowledgement: (() => void) | undefined;
   let organizationContextCleaned = false;
@@ -893,6 +895,7 @@ async function runClaimedChannelReply(
         : []),
     ]);
   try {
+    executionContext = reply.routing && reply.session ? await DmExecutionContext.open(workspacePath) : null;
     const agent = detachedReplyAgent({
       workId: reply.workId,
       provider: reply.provider,
@@ -1024,16 +1027,16 @@ async function runClaimedChannelReply(
       pendingTriggerMessageIds: reply.pendingTriggerMessageIds,
     });
     let conversationId: string | null =
-      reply.session?.conversationId ?? reply.handoffContext?.conversationId ?? null;
+      reply.routing ? null : reply.session?.conversationId ?? reply.handoffContext?.conversationId ?? null;
     if (conversationId) reportCheckpoint?.({ conversationId });
     let lookupRounds = 0;
     let repairRounds = 0;
     const decodeReplyJson = repairableDecoder(outputContract.decodeJson);
     let turnPrompt = [
-      reply.session?.conversationId && reply.pendingTriggerMessageIds.length > 1
+      !reply.routing && reply.session?.conversationId && reply.pendingTriggerMessageIds.length > 1
         ? "Continue the interrupted response in this same conversation with the updated user inputs below. Preserve completed work and tool results from the transcript; do not repeat completed actions unless the new input requires it."
         : null,
-      prompt, memoryInvocation?.prompt(), messageInvocation?.prompt()]
+      prompt, reply.routing ? null : memoryInvocation?.prompt(), reply.routing ? null : messageInvocation?.prompt()]
       .filter(Boolean)
       .join("\n\n");
     let result: ParsedChannelReplyAgentResult["result"] | null = null;
@@ -1045,8 +1048,8 @@ async function runClaimedChannelReply(
         conversationId = null;
         turnPrompt = [
           prompt,
-          currentMemoryInvocation.prompt(),
-          messageInvocation?.prompt(),
+          reply.routing ? null : currentMemoryInvocation.prompt(),
+          reply.routing ? null : messageInvocation?.prompt(),
           organizationContext
             ? "Re-read the organization context manifest for previously loaded context."
             : null,
@@ -1054,10 +1057,10 @@ async function runClaimedChannelReply(
       }
       const turn = await runtime.runProviderTurn({
         agent,
-        prompt: turnPrompt,
+        prompt: reply.routing ? [turnPrompt, executionContext?.prompt(), memoryInvocation?.prompt(), messageInvocation?.prompt()].filter(Boolean).join("\n\n") : turnPrompt,
         workspacePath,
         fullAccess: project.autoHunt?.sandbox?.fullAccess ?? true,
-        conversationId,
+        conversationId: reply.routing ? null : conversationId,
         attachments: lookupRounds === 0 && repairRounds === 0
           ? downloadedAttachments.attachments
           : undefined,
@@ -1106,7 +1109,7 @@ async function runClaimedChannelReply(
           }
         },
         onConversationId: async (nextConversationId) => {
-          conversationId = nextConversationId;
+          conversationId = reply.routing ? null : nextConversationId;
           reportCheckpoint?.({ conversationId: nextConversationId });
           if (reply.session) {
             const checkpoint = await workerQueue.checkpointChannelReplySession({
@@ -1131,7 +1134,8 @@ async function runClaimedChannelReply(
             }
           }
         },
-        onPayload: (payload) => {
+        onPayload: async (payload) => {
+          await executionContext?.observe(payload);
           activityPublisher.observePayload(payload);
           generatedImages.observePayload(payload);
         },
@@ -1148,10 +1152,10 @@ async function runClaimedChannelReply(
           error,
           rounds: repairRounds,
           basePrompt: prompt,
-          conversationId: turn.conversationId,
+          conversationId: reply.routing ? null : turn.conversationId,
         });
         repairRounds += 1;
-        conversationId = turn.conversationId;
+        conversationId = reply.routing ? null : turn.conversationId;
         continue;
       }
       if (decodedTurn.case === "reply") {
@@ -1167,7 +1171,7 @@ async function runClaimedChannelReply(
         if (lookupRounds >= 3) throw new Error("lookup_budget_exhausted");
         const memoryPrompt = await memoryInvocation.lookup(decodedTurn.request);
         lookupRounds += 1;
-        conversationId = turn.conversationId;
+        conversationId = reply.routing ? null : turn.conversationId;
         const continuation =
           `The memory lookup is complete. Use only supported evidence and return the next structured result.\n${memoryPrompt}`;
         turnPrompt = conversationId
@@ -1199,7 +1203,7 @@ async function runClaimedChannelReply(
         throw new Error("Organization Agent repeated a loaded context query");
       }
       lookupRounds += 1;
-      conversationId = turn.conversationId;
+      conversationId = reply.routing ? null : turn.conversationId;
       const continuation = [
         `Briar loaded ${hydrated.loaded} requested organization context file(s).`,
         `Re-read the manifest at ${JSON.stringify(hydrated.manifestPath)} and the newly referenced lookup files.`,

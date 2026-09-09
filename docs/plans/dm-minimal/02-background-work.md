@@ -77,11 +77,11 @@ reply job을 기존 job의 입력으로 흡수했다면 독립 실행으로도 c
 - DM 실행은 Worker의 작업 용량과 무관하게 배정·claim·실행한다. Worker 작업 슬롯이 모두 사용 중이어도
   독립 DM 요청을 용량 때문에 대기시키지 않는다. DM 실행 수는 Worker 작업 슬롯 사용량에 포함하지 않는다.
 - DM당 고정 동시 실행 상한이나 장기 작업·짧은 입력 전용 슬롯 수를 두지 않는다. 단일 Worker에서도
-  독립 작업은 서로 다른 provider conversation으로 동시에 실행한다. 질문·steering·취소는 장기 작업의 완료를 기다리지 않는다.
+  독립 작업은 서로 다른 Briar session과 작업 디렉터리에서 동시에 실행한다. 질문·steering·취소는 장기 작업의 완료를 기다리지 않는다.
 - 실행 가능한 Worker의 연결·권한은 필요하다. Worker 부재나 실제 provider 오류는 기존 대기·실패·재시도 규칙으로 처리한다.
   Worker 용량 설정을 DM 실행 제한으로 다시 적용하지 않는다.
 - 새 독립 작업마다 기존 session 구조에 작업별 실행 식별자를 사용한다. 같은 DM이라는 이유로 session을 공유하지 않는다.
-  같은 작업의 steering·재시도만 그 session을 이어받는다. 같은 provider conversation ID를 동시에 호출하지 않는다.
+  같은 작업의 steering·재시도만 그 Briar session을 이어받는다. 실행할 때마다 새 provider turn을 시작한다.
 - 현재 session 단위 동시 claim 방지는 유지한다. DM 전체를 직렬화하던 session 공유를 작업 단위로 바꾼다.
   화면에서는 기존 DM에 계속 표시하고 작업을 새 채널이나 스레드로 강제로 옮기지 않는다.
 - 파일을 수정하는 작업은 기존 작업 디렉터리 격리 방식을 사용한다. 같은 checkout을 여러 실행이 동시에 수정하지 않는다.
@@ -98,7 +98,7 @@ reply job을 기존 job의 입력으로 흡수했다면 독립 실행으로도 c
    확인할 수 있어야 한다. Worker가 최종 답변을 낼 때까지 입력 전달을 미루지 않는다.
 3. Worker가 현재 provider 실행과 관리 중인 도구 프로세스의 중단을 확인한 뒤 steering을 acknowledge한다.
    중단 전에는 재실행을 시작하지 않는다. 프로세스를 즉시 멈출 수 없다면 적용 대기 상태로 남긴다.
-4. 같은 작업 ID, 기존 작업 디렉터리, 저장된 conversation/checkpoint를 유지하고 새 claim으로 이어간다.
+4. 같은 작업 ID와 작업 디렉터리, Briar가 저장한 실행 기록을 유지하고 새 claim의 새 provider turn으로 이어간다.
    기존 Worker 배정을 우선한다. Worker가 끊기면 기존 lease 만료·복구 규칙을 따르며, 필요한 문맥이나
    작업 디렉터리를 복구할 수 없으면 실패를 알린다. 다른 Worker가 원래 C 지시부터 다시 실행하지 않는다.
 5. Agent는 원래 요청, 이미 수행한 작업, 새 사용자 입력을 함께 읽고 D를 적용한다.
@@ -165,7 +165,7 @@ DM Agent는 이 실행에 사용하는 Agent 설정이며, 항상 켜져 있는 
    답장은 대상을 정하는 근거다. 답장했다는 이유만으로 steering으로 확정하지 않는다.
    정확한 전체 취소 명령과 유효한 대상이 함께 있으면 기존 `dm-reply-stop.ts`로 바로 연결한다.
 2. 의미 판단이 필요한 incoming job은 Worker에서 같은 DM Agent 설정으로 별도 provider turn을 실행한다.
-   기존 작업의 conversation ID를 재사용하지 않는다. 분류 호출에는 작업 도구·메시지 게시 도구를 제공하지 않는다.
+   기존 작업의 conversation ID를 재사용하지 않는다. 분류 호출에는 Briar 작업 변경·메시지 게시 도구 권한을 제공하지 않는다. 어댑터에서 도구 사용이 관찰되면 결과를 폐기한다.
 3. 입력은 새 메시지, 최근 DM 문맥, 접근 가능한 작업의 ID·원본 요청·상태·최근 진행 요약이다.
    명시 답장의 대상은 반드시 포함한다. 후보 목록을 잘랐다면 누락 여부를 표시하고, 후보가 하나라는 이유만으로 단정하지 않는다.
 4. 출력 schema는 `action: new | steer | cancel | answer | clarify`, `targetJobId`,
@@ -200,7 +200,7 @@ claim token을 사용하므로 분류 전용 status를 추가하려고 기존 CH
 
 `new`이면 incoming job과 임시 session을 해당 작업의 실행 ID로 확정하고 실제 작업을 시작한다.
 분류용 conversation은 작업 conversation으로 재사용하지 않는다. 실행 프롬프트에는 원본 요청과
-확정된 라우팅, 필요한 DM 문맥을 넣는다. 작업 재시도와 steering에서만 그 작업의 conversation을 이어간다.
+확정된 라우팅, 필요한 DM 문맥을 넣는다. 작업 재시도와 steering도 provider conversation 재개 기능을 사용하지 않는다. 원본·변경 요청, 보존된 파일과 Briar 실행 기록으로 새 turn을 시작한다.
 
 `answer`와 `clarify`는 incoming job의 기존 public batch 게시·완료 경로로 한 번 회신하고 종료한다.
 상태 답변은 서버가 제공한 작업 상태를 근거로 하며, 진행 중인 작업을 멈추거나 revision을 올리지 않는다.
@@ -227,7 +227,7 @@ claim token을 사용하므로 분류 전용 status를 추가하려고 기존 CH
 실행 측은 기존 명령 확인·lease 갱신에서 revision 차이를 감지하고 해당 실행의 abort controller만 중단한다.
 `src-cli/worker-commands.ts`의 중단 후 acknowledge 경로와 `acknowledgeDmReplySteer()`를 재사용한다.
 provider와 관리 중인 도구 프로세스가 멈춘 뒤 대상 job을 queued로 돌린다.
-새 claim은 같은 session·작업 디렉터리·conversation과 미적용 입력을 읽고 재개한다.
+새 claim은 같은 Briar session·작업 디렉터리·실행 기록과 미적용 입력을 읽고 새 provider turn을 시작한다.
 중단 확인 전에는 다음 provider 실행을 시작하거나 변경 적용 완료를 게시하지 않는다.
 
 ### 특정 작업 취소
@@ -282,4 +282,35 @@ Worker 테스트에서는 일반 슬롯이 가득 찬 상태와 같은 DM의 세
 
 ## 구현 범위
 
-신규 입력 분류·작업별 steering·취소 기능은 macOS/Linux에서 설치된 Codex의 도구 비활성화 및 구조화 출력 지원을 확인한 Worker가 광고한다. 현재 Claude와 이 capability를 광고하지 않는 Worker/provider는 기존 DM 처리 경로를 유지한다. 지원 Worker의 일시적인 오프라인·준비 지연에는 분류 입력을 큐에 보관한다.
+현재 등록된 모든 provider에 같은 실행 규칙을 적용한다. Worker가 설치된 provider와 공통 호스트
+프로세스 관리 기능을 광고하며, 특정 provider의 중단·steering·대화 재개 API를 요구하지 않는다.
+지원 호스트는 macOS/Linux다. 미설치 provider와 구버전 Worker는 기존 경로를 유지하고,
+설치된 provider의 일시적인 오프라인·준비 지연에는 입력을 큐에 보관한다.
+
+분류는 선택된 Agent의 기존 실행 어댑터를 읽기 전용 격리 환경에서 호출한다. 실행 세션·첨부·Skill·
+Briar 도구 권한을 제공하지 않고, 정규화된 도구 실행이나 승인 요청이 관찰되면 중단하고 분류 결과를
+채택하지 않는다. 외부 CLI 내부에서 도구가 제거되었다고 가정하지 않는다. 특정 provider의 도구 제거
+API나 다른 provider로의 우회 호출은 사용하지 않는다.
+
+중단은 Briar 부모 프로세스가 실행별 runner와 자식 프로세스의 신원을 추적해서 처리한다.
+대상 프로세스를 정지시켜 추가 실행을 막고 종료한 뒤, 사라졌는지 확인해야 acknowledge한다.
+추적·종료 확인에 실패하면 기존 stop-unconfirmed fence를 유지해 후속 실행을 막는다.
+
+steering·재시도는 provider conversation ID를 재개하지 않는다. 같은 작업 디렉터리와 현재 입력,
+최대 48,000자의 최근 정규화 실행 기록을 새 turn에 제공한다. 기록은 불완전할 수 있으므로
+실제 파일과 외부 작업 상태를 확인하고, 이미 완료한 외부 효과를 반복하지 않도록 지시한다.
+provider의 실시간 토큰 steering·네이티브 checkpoint는 사용하지 않는다.
+
+예약·DM 게시 도구는 모든 provider에서 같은 Briar 로컬 명령을 호출한다. 명령은 작업 폴더의 요청·응답 파일을 사용한다. Briar 부모 프로세스만 실행별 private
+capability와 기존 인증 socket으로 서버에 요청한다. provider의 MCP 지원 여부나 MCP 승인 설정,
+Unix socket 연결 권한 예외에 의존하지 않는다. 서버의 job·revision·DM 권한 검사는 그대로 적용한다.
+
+
+### 공통 provider 경로 검증 (2026-09-09)
+
+실제 Codex Worker loop에서 A/B 동시 작업, 짧은 질문의 선행 답변, C 작업 중 D 입력,
+작업 폴더와 기록을 보존한 새 provider turn, B만 취소하는 흐름을 10개 항목으로 확인했다.
+최대 슬롯 1에서도 DM 작업이 겹쳤고, 원래 90/100초 완료 시각 이후까지 기다려 이전 실행의
+늦은 파일 쓰기·최종 게시가 없음을 확인했다. 증거는 로컬 `neutral-execution-provider-smoke.json`에 있다.
+모든 9개 provider의 분류 어댑터 계약과 공통 중단·실행 기록·파일 중계 단위 테스트를 별도로 검증했다.
+이는 모든 provider의 실제 모델·모든 호스트에서 동일 동작을 관찰했다는 뜻은 아니다.
