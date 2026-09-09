@@ -14,6 +14,8 @@ import { DmMemoryBriefState, DmMemoryDescriptorSchema } from "@briar/contracts/g
 import {
   ChannelReplyScopeSchema,
   ChannelReplyScope_ProjectSchema,
+  ClaimedChannelReplySchema,
+  RefreshChannelReplyClaimResponseSchema,
   ChannelReplySessionSchema,
   ChannelReplySessionClaimReason,
   ClaimedWorkSchema,
@@ -95,15 +97,17 @@ const turnResult = (
   runnerError: null,
 });
 
-const dmSnapshot = (triggerMessageId: string) => ({
+const dmMessage = (id: string, body: string) => ({
+  id,
+  author: { type: "user", id: crypto.randomUUID(), name: "Person" },
+  body,
+  mentionedUserIds: [],
+  attachments: [],
+});
+
+const dmSnapshot = (...messages: readonly (readonly [string, string])[]) => ({
   channel: { kind: "dm", id: crypto.randomUUID() },
-  messages: [{
-    id: triggerMessageId,
-    author: { type: "user", id: crypto.randomUUID(), name: "Person" },
-    body: "hi",
-    mentionedUserIds: [],
-    attachments: [],
-  }],
+  messages: messages.map(([id, body]) => dmMessage(id, body)),
 });
 
 /**
@@ -166,6 +170,11 @@ type Exercise = {
    * deliberately off the reply's critical path, so nothing else waits for it.
    */
   expectReactions?: number;
+  /**
+   * What the pre-turn steer fold answers. Absent registers no handler at all,
+   * which is exactly what an older server does: the RPC is unimplemented.
+   */
+  steerFold?: "none" | "folded";
   /** Runs once the reply has returned, while the server is still listening. */
   afterRun?: () => Promise<void>;
   provider: (
@@ -212,6 +221,8 @@ describe("DM reply worktree allocation", () => {
     const workId = crypto.randomUUID();
     const sessionId = input.sessionId ?? crypto.randomUUID();
     const triggerMessageId = crypto.randomUUID();
+    // The message the person sends while this reply is still being set up.
+    const steerMessageId = crypto.randomUUID();
     const activities: string[] = [];
     // Every server call this reply makes, in the order the server saw it.
     const calls: string[] = [];
@@ -278,6 +289,32 @@ describe("DM reply worktree allocation", () => {
             events.push("memory-check:end");
             return create(CheckDmMemoryClaimResponseSchema, { memory });
           },
+          ...(input.steerFold === undefined ? {} : {
+            /*
+              The reply asks once, right before its first provider turn. An
+              older server has no such method at all, which is why the default
+              here is to register none.
+            */
+            refreshChannelReplyClaim: () => {
+              calls.push("steer-fold");
+              if (input.steerFold !== "folded") {
+                return create(RefreshChannelReplyClaimResponseSchema, {
+                  steered: false,
+                });
+              }
+              return create(RefreshChannelReplyClaimResponseSchema, {
+                steered: true,
+                reply: create(ClaimedChannelReplySchema, replyValue({
+                  pendingTriggerMessageIds: [triggerMessageId, steerMessageId],
+                  inputRevision: 1n,
+                  snapshot: dmSnapshot(
+                    [triggerMessageId, "hi"],
+                    [steerMessageId, "and one more thing"],
+                  ),
+                })),
+              });
+            },
+          }),
           completeChannelReply: (request) => {
             calls.push("complete");
             completed = JSON.stringify(request);
@@ -354,63 +391,71 @@ describe("DM reply worktree allocation", () => {
       },
     } as unknown as TeamConfig;
 
-    const claim = claimedWorkFromProto(create(ClaimedWorkSchema, {
-      work: {
-        case: "channelReply",
-        value: {
-          workId,
-          channelId: crypto.randomUUID(),
-          scope: create(ChannelReplyScopeSchema, {
-            scope: {
-              case: "project",
-              value: create(ChannelReplyScope_ProjectSchema, {
-                workspaceId: organizationId,
-                projectId,
-              }),
-            },
+    const channelId = crypto.randomUUID();
+    const runId = crypto.randomUUID();
+    const parentMessageId = crypto.randomUUID();
+    const agentId = crypto.randomUUID();
+    const threadId = crypto.randomUUID();
+    /* One claim shape, so the steer fold answers with the same claim the loop
+       started from and cannot drift away from it. */
+    const replyValue = (overrides: Record<string, unknown> = {}) => ({
+      workId,
+      channelId,
+      scope: create(ChannelReplyScopeSchema, {
+        scope: {
+          case: "project" as const,
+          value: create(ChannelReplyScope_ProjectSchema, {
+            workspaceId: organizationId,
+            projectId,
           }),
-          runId: crypto.randomUUID(),
-          sourceKey: "synthetic",
-          title: "Reply",
-          triggerMessageId,
-          parentMessageId: crypto.randomUUID(),
-          provider: AgentProvider.CLAUDE,
-          agent: create(DetachedAgentClaimSchema, {
-            id: crypto.randomUUID(),
-            name: "Synthetic Agent",
-            provider: AgentProvider.CLAUDE,
-            responsibility: "Answer the person directly.",
-            skills: [],
-          }),
-          agentMessageHop: input.agentMessageHop ?? 0,
-          session: create(ChannelReplySessionSchema, {
-            id: sessionId,
-            threadId: crypto.randomUUID(),
-            retainedUntil: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
-            claimReason: ChannelReplySessionClaimReason.SESSION_CREATED,
-          }),
-          activity: {
-            token: "synthetic-activity",
-            expiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
-          },
-          claimToken: `briar_channel_claim_${"a".repeat(64)}`,
-          claimedAt: timestampFromDate(new Date("2026-09-09T00:00:00Z")),
-          leaseExpiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
-          acknowledgementReaction: input.acknowledgementReaction,
-          memory: input.memory ? create(DmMemoryDescriptorSchema, memory) : undefined,
-          dmPublicMessageProtocol: input.publicMessages ? 1 : 0,
-          triggerAttachments: input.attachment
-            ? [{
-                id: attachmentId,
-                filename: "note.txt",
-                contentType: "text/plain",
-                byteSize: Buffer.byteLength(attachmentBody, "utf8"),
-                url: attachmentUrl,
-              }]
-            : [],
-          snapshot: dmSnapshot(triggerMessageId),
         },
+      }),
+      runId,
+      sourceKey: "synthetic",
+      title: "Reply",
+      triggerMessageId,
+      parentMessageId,
+      provider: AgentProvider.CLAUDE,
+      agent: create(DetachedAgentClaimSchema, {
+        id: agentId,
+        name: "Synthetic Agent",
+        provider: AgentProvider.CLAUDE,
+        responsibility: "Answer the person directly.",
+        skills: [],
+      }),
+      agentMessageHop: input.agentMessageHop ?? 0,
+      session: create(ChannelReplySessionSchema, {
+        id: sessionId,
+        threadId,
+        retainedUntil: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
+        claimReason: ChannelReplySessionClaimReason.SESSION_CREATED,
+      }),
+      activity: {
+        token: "synthetic-activity",
+        expiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
       },
+      claimToken: `briar_channel_claim_${"a".repeat(64)}`,
+      claimedAt: timestampFromDate(new Date("2026-09-09T00:00:00Z")),
+      leaseExpiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
+      acknowledgementReaction: input.acknowledgementReaction,
+      memory: input.memory ? create(DmMemoryDescriptorSchema, memory) : undefined,
+      dmPublicMessageProtocol: input.publicMessages ? 1 : 0,
+      triggerAttachments: input.attachment
+        ? [{
+            id: attachmentId,
+            filename: "note.txt",
+            contentType: "text/plain",
+            byteSize: Buffer.byteLength(attachmentBody, "utf8"),
+            url: attachmentUrl,
+          }]
+        : [],
+      pendingTriggerMessageIds: [triggerMessageId],
+      snapshot: dmSnapshot([triggerMessageId, "hi"]),
+      ...overrides,
+    });
+
+    const claim = claimedWorkFromProto(create(ClaimedWorkSchema, {
+      work: { case: "channelReply", value: replyValue() },
     })) as ClaimedChannelReply;
 
     let failure: unknown;
@@ -462,6 +507,8 @@ describe("DM reply worktree allocation", () => {
     return {
       failure,
       turns,
+      steerMessageId,
+      triggerMessageId,
       completed,
       activities,
       calls,
@@ -498,6 +545,61 @@ describe("DM reply worktree allocation", () => {
     );
     await expect(stat(observed.workspacePaths[0]!)).resolves.toBeDefined();
     expect(observed.prompts[0]).toContain("it is not checked out for this turn");
+    expect(observed.completed).toContain("A synthetic answer");
+  });
+
+  /*
+    A second message sent while the reply was still being set up used to be
+    noticed only when the finished answer was refused: the whole provider turn
+    was thrown away and a second claim ran the whole setup again. Folded before
+    the turn it costs one RPC, and the single turn answers both messages.
+  */
+  it("folds a steer into the turn it is about to run, without a second claim", async () => {
+    const observed = await exercise({
+      steerFold: "folded",
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(1);
+    expect(observed.calls.filter((call) => call === "steer-fold")).toHaveLength(1);
+    // The fold happens before the provider runs, never after it.
+    expect(observed.calls.indexOf("steer-fold"))
+      .toBeLessThan(observed.calls.indexOf("turn:1"));
+    const prompt = observed.prompts[0]!;
+    expect(prompt).toContain("none of them has been answered yet");
+    expect(prompt).toContain(observed.triggerMessageId);
+    expect(prompt).toContain(observed.steerMessageId);
+    expect(prompt).toContain("and one more thing");
+    expect(prompt).toContain('"unanswered": true');
+    // The turn never started, so there is no interrupted response to continue.
+    expect(prompt).not.toContain("Continue the interrupted response");
+    expect(observed.completed).toContain("A synthetic answer");
+  });
+
+  it("asks once and changes nothing when no steer is pending", async () => {
+    const observed = await exercise({
+      steerFold: "none",
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(1);
+    expect(observed.calls.filter((call) => call === "steer-fold")).toHaveLength(1);
+    const prompt = observed.prompts[0]!;
+    expect(prompt).not.toContain("none of them has been answered yet");
+    expect(prompt).not.toContain(observed.steerMessageId);
+    expect(observed.completed).toContain("A synthetic answer");
+  });
+
+  it("answers normally against a server that does not implement the fold", async () => {
+    const observed = await exercise({
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(1);
+    expect(observed.calls).not.toContain("steer-fold");
     expect(observed.completed).toContain("A synthetic answer");
   });
 

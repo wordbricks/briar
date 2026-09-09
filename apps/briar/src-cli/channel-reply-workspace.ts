@@ -34,6 +34,19 @@ const record = (value: unknown): Record<string, unknown> | null =>
     : null;
 
 /**
+ * The channel kind carried by a claim's untrusted prompt snapshot, or null when
+ * the snapshot does not name one. Read by the worktree gate below and by the
+ * Worker loop, which renews a direct message's lease on a short interval so a
+ * steer is noticed while the turn can still absorb it.
+ */
+export function channelReplySnapshotChannelKind(
+  snapshot: unknown,
+): string | null {
+  const kind = record(record(snapshot)?.channel)?.kind;
+  return typeof kind === "string" ? kind : null;
+}
+
+/**
  * Whether this reply starts with no repository checkout.
  *
  * A channel reply is never where code changes: project-changing work goes
@@ -50,7 +63,7 @@ const record = (value: unknown): Record<string, unknown> | null =>
 export function channelReplyStartsWithoutWorktree(
   reply: ChannelReplyWorktreeGateInput,
 ): boolean {
-  if (record(reply.snapshot.channel)?.kind !== "dm") return false;
+  if (channelReplySnapshotChannelKind(reply.snapshot) !== "dm") return false;
   if (reply.activeSkill !== null) return false;
   if (reply.skillExecutionTarget !== null) return false;
   if (reply.delegation !== null) return false;

@@ -8,6 +8,7 @@ import {
   DEFAULT_MAX_ERROR_DELAY_MS,
   DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS,
   DEFAULT_MAX_IDLE_DELAY_MS,
+  DM_REPLY_STEER_POLL_MS,
   createWorkerDeviceIdentity,
   createWorkerLoopHeartbeat,
   defaultWorkerLabel,
@@ -325,6 +326,145 @@ describe("briar worker loop", () => {
     const result = await runWorkerLoop(test.dependencies, { maxIssues: 1 });
     expect(order).toEqual(["provider stopped", "acknowledged", "resumed"]);
     expect(result).toMatchObject({ processed: 1, failures: 0 });
+  });
+
+  /*
+    The wake that says "this job just absorbed another message" is sent while
+    the claim RPC is still in flight. Reading the counter inside the execution
+    swallowed it, and the renewal then waited a whole interval before asking
+    again — five minutes for a plain direct message.
+  */
+  it.each([true, false])(
+    "renews before waiting when a wake landed during the claim: %s",
+    async (wakeDuringClaim) => {
+      let notify: ((reason: WorkerWakeReason) => void) | undefined;
+      const events: string[] = [];
+      const test = harness([], {
+        wake: { subscribe: (listener) => { notify = listener; return () => {}; } },
+        claim: async () => {
+          if (wakeDuringClaim) notify?.("channel_reply_enqueued");
+          return issue("wake-during-claim");
+        },
+        sleep: async (milliseconds, signal) => {
+          if (!signal) return;
+          events.push(`wait:${milliseconds}`);
+          if (signal.aborted) return;
+          await new Promise<void>((resolve) =>
+            signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+        },
+        renewLease: async () => { events.push("renew"); },
+        runIssue: async () => {
+          // The renewal loop is scheduled synchronously with the execution, so
+          // one macrotask is enough for it to have asked or waited.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        },
+      });
+      await runWorkerLoop(test.dependencies, {
+        once: true,
+        leaseRenewIntervalMs: 600_000,
+      });
+      expect(events[0]).toBe(wakeDuringClaim ? "renew" : "wait:600000");
+    },
+  );
+
+  it.each([
+    ["a direct message reply", { workType: "channelReply" as const, workId: "dm-work",
+      routing: null, snapshot: { channel: { kind: "dm" } } }, DM_REPLY_STEER_POLL_MS],
+    ["an issue", {}, 5 * 60_000],
+  ])("renews %s on its own interval", async (_label, extra, expected) => {
+    const renewalWaits: number[] = [];
+    const test = harness([{ ...issue("renewal-interval"), ...extra }], {
+      sleep: async (milliseconds, signal) => {
+        if (!signal) return;
+        renewalWaits.push(milliseconds);
+        if (signal.aborted) return;
+        await new Promise<void>((resolve) =>
+          signal.addEventListener("abort", () => resolve(), { once: true }),
+        );
+      },
+      runIssue: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      },
+    });
+    await runWorkerLoop(test.dependencies, {
+      once: true,
+      leaseRenewIntervalMs: 5 * 60_000,
+    });
+    // Jitter is pinned by the harness random, so this is the interval itself.
+    expect(renewalWaits[0]).toBe(expected);
+  });
+
+  /*
+    With the short interval the steer now reaches the renewal while the reply is
+    still being set up. Aborting there would trade the wasted provider turn for
+    a wasted setup; the reply folds the steer into this same claim right before
+    its first turn instead.
+  */
+  it("defers a pre-turn lease conflict on a direct message to the steer fold", async () => {
+    let abortedDuringRun = false;
+    const dmReply = {
+      ...issue("dm-steered"),
+      workType: "channelReply" as const,
+      workId: "dm-work",
+      routing: null,
+      snapshot: { channel: { kind: "dm" } },
+    };
+    const test = harness(
+      [dmReply],
+      {
+        replyTurnStarted: () => false,
+        renewLease: async () => { throw new Error("Reply claim is no longer active"); },
+        runIssue: async (_work, signal) => {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          abortedDuringRun = signal.aborted;
+        },
+      },
+      { renewalTicks: 2 },
+    );
+    const result = await runWorkerLoop(test.dependencies, {
+      once: true,
+      leaseRenewIntervalMs: 5 * 60_000,
+    });
+    expect(abortedDuringRun).toBe(false);
+    expect(result).toMatchObject({ processed: 1, failures: 0 });
+    expect(test.logs.some((line) => line.includes("deferred to the steer fold")))
+      .toBe(true);
+    expect(test.logs.some((line) => line.includes("lease renewal failed")))
+      .toBe(false);
+  });
+
+  it("still aborts a direct message once its provider turn has started", async () => {
+    let aborted = false;
+    const dmReply = {
+      ...issue("dm-running"),
+      workType: "channelReply" as const,
+      workId: "dm-work",
+      routing: null,
+      snapshot: { channel: { kind: "dm" } },
+    };
+    const test = harness(
+      [dmReply],
+      {
+        replyTurnStarted: () => true,
+        renewLease: async () => { throw new Error("Reply claim is no longer active"); },
+        runIssue: async (_work, signal) => {
+          await new Promise<void>((resolve) => {
+            if (signal.aborted) { aborted = true; resolve(); return; }
+            signal.addEventListener("abort", () => { aborted = true; resolve(); }, { once: true });
+          });
+        },
+      },
+      { renewalTicks: 1 },
+    );
+    const result = await runWorkerLoop(test.dependencies, {
+      once: true,
+      leaseRenewIntervalMs: 5 * 60_000,
+    });
+    expect(aborted).toBe(true);
+    expect(result.failures).toBe(1);
+    expect(test.logs.some((line) => line.includes("lease renewal failed"))).toBe(true);
   });
 
   it("polls exactly as before when no wake source is attached", async () => {

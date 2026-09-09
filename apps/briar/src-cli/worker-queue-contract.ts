@@ -529,7 +529,7 @@ const sessionClaimReason = (
   }
 };
 
-const channelReplyFromProto = (
+export const channelReplyFromProto = (
   value: ProtoClaimedChannelReply,
 ) => {
   const scope = channelScope(value);
