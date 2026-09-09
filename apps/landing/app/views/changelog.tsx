@@ -30,6 +30,22 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.228",
+        date: "2026년 9월 9일",
+        title: "DM 답장이 더 빨리 시작되고 잠깐의 서버 지연에도 끊기지 않습니다",
+        summary:
+          "에이전트에게 보낸 DM에 확인 이모지가 바로 붙고, 답장 준비 단계가 동시에 진행돼 첫 응답까지 걸리는 시간이 줄었습니다. 저장된 기억을 불러오는 요청이 잠시 지연되더라도 답장을 포기하지 않고 계속 진행합니다.",
+        items: [
+          "DM을 받자마자 확인 이모지를 붙이고, 모델이 고른 이모지로 곧 바꿉니다.",
+          "코드 저장소가 필요 없는 일반 대화 답장은 작업 폴더를 만들지 않아 더 빨리 시작합니다.",
+          "기억 요약, 첨부 파일, 스킬 목록 같은 답장 준비 단계를 한꺼번에 진행합니다.",
+          "답장을 준비하는 동안 새 메시지가 오면 처음부터 다시 시작하지 않고 같은 답장에 합칩니다.",
+          "기억 서버 응답이 잠시 늦으면 몇 차례 다시 시도하고, 그래도 안 되면 저장된 기억 없이 답장을 이어갑니다. 진행 중이던 컴퓨터 작업도 이 때문에 중단되지 않습니다.",
+          "워커의 주기적 상태 점검이 답장 처리를 기다리게 하지 않도록 뒤로 뺐습니다.",
+          "DM에 첨부한 파일이 승인된 제안으로 만들어지는 이슈에도 함께 전달됩니다.",
+        ],
+      },
+      {
         version: "1.2.227",
         date: "2026년 9월 9일",
         title: "조직이라는 이름이 워크스페이스로 정리됐습니다",
@@ -2015,6 +2031,22 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.228",
+        date: "September 9, 2026",
+        title: "DM replies start sooner and survive brief server hiccups",
+        summary:
+          "A DM to an agent gets its acknowledgement reaction right away, and the reply setup steps now run together, so the first response arrives sooner. If loading stored memory stalls for a moment, the reply keeps going instead of giving up.",
+        items: [
+          "The acknowledgement reaction lands as soon as the DM is picked up and is swapped for the model's own choice shortly after.",
+          "Plain conversation replies that need no repository skip creating a working folder and start faster.",
+          "Memory brief, attachments and the skill catalog are prepared at the same time instead of one after another.",
+          "A message that arrives while a reply is being prepared is folded into the same reply rather than restarting it.",
+          "A slow memory server is retried a few times; if it still does not answer, the reply continues without stored memory, and an in-progress computer task is no longer cut short because of it.",
+          "The Worker's periodic health probes no longer sit in front of reply handling.",
+          "Files attached to a DM are carried over to the issue created from an approved proposal.",
+        ],
+      },
       {
         version: "1.2.227",
         date: "September 9, 2026",
