@@ -18,6 +18,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { channelReplyAttachmentPath } from "../../src/lib/channel-reply-attachment-path";
 import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provider-contract";
 import {
+  channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
   channelReplyProviderUsageExhaustedError,
 } from "../../src/lib/channels-contract";
@@ -91,7 +92,10 @@ import {
   getOrganizationChannelDetail,
   listOrganizationChannels,
 } from "./organization-channel-routes";
-import { channelReplyWorkerAvailability } from "./workers";
+import {
+  channelReplyWorkerAvailability,
+  requestExecutionWorkerUpdate,
+} from "./workers";
 import {
   workerClaimRuntimeFixture,
   workerRuntimeProtoJsonFixture,
@@ -3315,6 +3319,243 @@ describe("organization channels", () => {
     });
     expect(job.preferred_device_id).toBe(deviceId);
     expect(claimed).toBeNull();
+  });
+
+  /**
+   * One queued reply whose session owner lives on its own device, so a planned
+   * update drain in these tests cannot disturb the shared Workers.
+   */
+  const seedPlannedUpdateReply = async (suffix: string, observedAt: string) => {
+    const ownerDeviceId = `c0000000-0000-4000-8000-000000000${suffix}`;
+    const ownerWorkerId = `d0000000-0000-4000-8000-000000000${suffix}`;
+    const ownerWorkerLabel = `Planned update Worker ${suffix}`;
+    const channelId = `e0000000-0000-4000-8000-000000000${suffix}`;
+    const agentId = `aa000000-0000-4000-8000-000000000${suffix}`;
+    const triggerId = `f0000000-0000-4000-8000-000000000${suffix}`;
+    const claimRuntime = workerClaimRuntimeFixture({
+      agentProvider: "claude",
+      providers: ["claude"],
+    });
+    await db.batch([
+      db.prepare(
+        `insert into briar_execution_worker_devices (
+           id, organization_id, owner_user_id, label, device_identity_hash,
+           state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, 'online', ?, ?, ?)`,
+      ).bind(
+        ownerDeviceId,
+        organizationId,
+        ownerId,
+        `Planned update device ${suffix}`,
+        suffix.padEnd(64, "0"),
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+      db.prepare(
+        `insert into briar_execution_worker_credentials (
+           device_id, token_hash, created_at
+         ) values (?, ?, ?)`,
+      ).bind(ownerDeviceId, suffix.padEnd(64, "2"), observedAt),
+      db.prepare(
+        `insert into briar_execution_workers (
+           id, project_id, device_id, label, host_fingerprint,
+           runtime_proto_json, state, accepting_work,
+           readiness_state, last_heartbeat_at, created_at, updated_at
+         ) values (?, ?, ?, ?, ?, ?, 'online', 1, 'ready', ?, ?, ?)`,
+      ).bind(
+        ownerWorkerId,
+        otherProjectId,
+        ownerDeviceId,
+        ownerWorkerLabel,
+        suffix.padEnd(64, "1"),
+        claimRuntime.runtimeProtoJson,
+        observedAt,
+        observedAt,
+        observedAt,
+      ),
+    ]);
+    await createChannel(db, {
+      id: channelId,
+      organizationId,
+      kind: "channel",
+      dmKey: null,
+      slug: `planned-update-${suffix}`,
+      name: `Planned update ${suffix}`,
+      topic: null,
+      visibility: "public",
+      defaultProjectId: null,
+      createdByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await createOrganizationAgent(db, {
+      id: agentId,
+      organizationId,
+      name: `Planned Update ${suffix}`,
+      provider: "claude",
+      model: null,
+      responsibility: "Resume after a planned Worker update",
+      effort: null,
+      createdAt: observedAt,
+    });
+    await addChannelAgent(db, {
+      channelId,
+      agentId,
+      addedByUserId: ownerId,
+      createdAt: observedAt,
+    });
+    await createChannelMessage(db, {
+      id: triggerId,
+      channelId,
+      parentMessageId: null,
+      authorUserId: ownerId,
+      authorAgentId: null,
+      authorAgentName: null,
+      authorAgentProvider: null,
+      body: `@Planned-Update-${suffix} answer`,
+      mentionedUserIds: [],
+      mentionedAgentIds: [agentId],
+      createdAt: observedAt,
+    });
+    const [job] = await enqueueChannelAgentReplies(db, {
+      organizationId,
+      channelId,
+      triggerMessageId: triggerId,
+      parentMessageId: triggerId,
+      agents: [{ id: agentId, projectId: null, provider: "claude" }],
+      createdAt: observedAt,
+    });
+    await db.prepare(
+      `update briar_channel_reply_sessions
+       set owner_device_id = ?, owner_worker_id = ?, owner_worker_label = ?,
+           updated_at = ?
+       where id = ?`,
+    ).bind(
+      ownerDeviceId,
+      ownerWorkerId,
+      ownerWorkerLabel,
+      observedAt,
+      job.session_id,
+    ).run();
+    const claim = (
+      worker: { deviceId: string; workerId: string },
+      claimTokenHash: string,
+      claimedAt: string,
+    ) => claimNextChannelAgentReply(db, organizationId, {
+      deviceId: worker.deviceId,
+      workerId: worker.workerId,
+      ...claimRuntime,
+      claimTokenHash,
+      claimedAt,
+      leaseExpiresAt: new Date(Date.parse(claimedAt) + 60_000).toISOString(),
+    });
+    return {
+      agentId,
+      channelId,
+      claim,
+      job,
+      owner: { deviceId: ownerDeviceId, workerId: ownerWorkerId },
+      ownerWorkerLabel,
+      sweeper: { deviceId, workerId: otherWorkerId },
+    };
+  };
+
+  /** The planned update completes before its drained Worker rows report back. */
+  const completePlannedUpdate = (requestId: string, completedAt: string) =>
+    db.prepare(
+      `update briar_execution_worker_update_requests
+       set status = 'completed', completed_at = ?, updated_at = ?
+       where id = ?`,
+    ).bind(completedAt, completedAt, requestId).run();
+
+  it("keeps a reply parked by a planned update queued until its Worker returns", async () => {
+    const seeded = await seedPlannedUpdateReply("301", at(300));
+    // The CLI hands the running reply back when the update starts draining.
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set planned_update_resume = 1, updated_at = ? where id = ?`,
+    ).bind(at(301), seeded.job.id).run();
+    await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777301",
+      organizationId,
+      deviceId: seeded.owner.deviceId,
+      requestedByUserId: ownerId,
+      targetVersion: "1.2.226",
+      requestedAt: at(301),
+    });
+    await expect(db.prepare(
+      `select accepting_work, readiness_state from briar_execution_workers
+       where id = ?`,
+    ).bind(seeded.owner.workerId).first()).resolves.toMatchObject({
+      accepting_work: 0,
+      readiness_state: "busy",
+    });
+    await completePlannedUpdate("77777777-7777-4777-8777-777777777301", at(302));
+
+    await seeded.claim(seeded.sweeper, "a3".repeat(32), at(302));
+    await expect(getChannelAgentReplyJob(db, organizationId, seeded.job.id))
+      .resolves.toMatchObject({
+        status: "queued",
+        planned_update_resume: 1,
+        error: null,
+      });
+    // The Worker comes back and resumes its own reply without an extra attempt.
+    await expect(seeded.claim(seeded.owner, "b3".repeat(32), at(303)))
+      .resolves.toMatchObject({
+        id: seeded.job.id,
+        attempts: 0,
+        planned_update_resume: 0,
+      });
+  });
+
+  it("fails a parked reply once the planned update grace elapses", async () => {
+    const seeded = await seedPlannedUpdateReply("302", at(300));
+    await db.prepare(
+      `update briar_channel_agent_reply_jobs
+       set planned_update_resume = 1, updated_at = ? where id = ?`,
+    ).bind(at(301), seeded.job.id).run();
+    await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777302",
+      organizationId,
+      deviceId: seeded.owner.deviceId,
+      requestedByUserId: ownerId,
+      targetVersion: "1.2.226",
+      requestedAt: at(301),
+    });
+    await completePlannedUpdate("77777777-7777-4777-8777-777777777302", at(302));
+
+    // The Worker never came back, so the sweep applies as it always has.
+    await seeded.claim(seeded.sweeper, "c3".repeat(32), at(310));
+    await expect(getChannelAgentReplyJob(db, organizationId, seeded.job.id))
+      .resolves.toMatchObject({
+        status: "failed",
+        error: channelReplyAssignedWorkerUnavailableError(
+          seeded.ownerWorkerLabel,
+        ),
+      });
+  });
+
+  it("fails an assigned reply that was not parked for a planned update", async () => {
+    const seeded = await seedPlannedUpdateReply("303", at(300));
+    await requestExecutionWorkerUpdate(db, {
+      id: "77777777-7777-4777-8777-777777777303",
+      organizationId,
+      deviceId: seeded.owner.deviceId,
+      requestedByUserId: ownerId,
+      targetVersion: "1.2.226",
+      requestedAt: at(301),
+    });
+    await completePlannedUpdate("77777777-7777-4777-8777-777777777303", at(302));
+
+    await seeded.claim(seeded.sweeper, "d3".repeat(32), at(303));
+    await expect(getChannelAgentReplyJob(db, organizationId, seeded.job.id))
+      .resolves.toMatchObject({
+        status: "failed",
+        planned_update_resume: 0,
+        error: channelReplyAssignedWorkerUnavailableError(
+          seeded.ownerWorkerLabel,
+        ),
+      });
   });
 
   it("gives every mentioned Agent its own reply job", async () => {

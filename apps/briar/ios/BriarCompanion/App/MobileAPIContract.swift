@@ -311,7 +311,7 @@ enum ChannelRealtimeNotification: Equatable, Sendable {
     case projectChanged(projectID: String, cursor: Int)
     case projectAgentSessionsChanged(projectID: String, version: Int)
 
-    init(protobuf message: BriarRealtime_OrganizationNotification) throws {
+    init(protobuf message: BriarRealtime_WorkspaceNotification) throws {
         guard let notification = message.notification else {
             throw MobileAPIError.invalidResponse
         }

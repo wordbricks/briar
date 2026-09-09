@@ -30,7 +30,7 @@ final class DashboardSyncTests: XCTestCase {
         var response = BriarAPI_SyncDashboardResponse()
         response.cursor = 42
         response.reset = true
-        response.members = BriarAPI_OrganizationMembersPatch()
+        response.members = BriarAPI_WorkspaceMembersPatch()
         response.settings = settings
         response.generatedAt = Google_Protobuf_Timestamp(
             date: Date(timeIntervalSince1970: 1_700_000_100)

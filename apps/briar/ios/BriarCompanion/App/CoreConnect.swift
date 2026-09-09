@@ -162,7 +162,7 @@ extension DashboardSnapshot {
             settings: try TeamSettings(connectMessage: message.settings),
             runs: try message.runs.map(DashboardRun.init(connectMessage:)),
             workers: try message.workers.map(DashboardWorker.init(connectMessage:)),
-            organizationProviders: try message.organizationProviders.map(coreProvider),
+            organizationProviders: try message.workspaceProviders.map(coreProvider),
             executionPolicy: message.hasExecutionPolicy
                 ? try .init(connectMessage: message.executionPolicy)
                 : nil,
@@ -191,7 +191,7 @@ extension DashboardDelta {
             project: message.hasTeam ? try .init(connectMessage: message.team) : nil,
             settings: message.hasSettings ? try .init(connectMessage: message.settings) : nil,
             workers: try message.workers.map(DashboardWorker.init(connectMessage:)),
-            organizationProviders: try message.organizationProviders.map(coreProvider),
+            organizationProviders: try message.workspaceProviders.map(coreProvider),
             executionPolicy: message.hasExecutionPolicy
                 ? try .init(connectMessage: message.executionPolicy)
                 : nil,
@@ -501,7 +501,7 @@ extension WorkflowCheckpoint {
 extension RelatedMessageReference {
     init(connectMessage message: BriarAPI_RelatedMessageReference) throws {
         self.init(
-            organizationId: try coreUUID(message.organizationID),
+            organizationId: try coreUUID(message.workspaceID),
             channelId: try coreUUID(message.channelID),
             messageId: try coreUUID(message.messageID),
             rootMessageId: try coreUUID(message.rootMessageID)
@@ -1057,7 +1057,7 @@ private func coreStructuredImpact(
     switch value {
     case .issue: "issue"
     case .project: "project"
-    case .organization: "organization"
+    case .workspace: "organization"
     case .unspecified, .UNRECOGNIZED: throw MobileAPIError.invalidResponse
     }
 }

@@ -311,7 +311,7 @@ private final class InboxFeedMockScenario: @unchecked Sendable {
     func next(request: BriarAPI_GetInboxFeedRequest) -> BriarAPI_GetInboxFeedResponse {
         lock.lock()
         defer { lock.unlock() }
-        precondition(!request.organizationID.isEmpty)
+        precondition(!request.workspaceID.isEmpty)
         requestedVersions.append(request.hasKnownVersion ? request.knownVersion : nil)
         precondition(!responses.isEmpty)
         return responses.removeFirst()
