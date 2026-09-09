@@ -13,6 +13,15 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import { channelShareUrl } from "../lib/issue-links";
+import { cn } from "../lib/utils";
+import {
+  sidebarContextMenuClass,
+  sidebarContextMenuDangerClass,
+  sidebarContextMenuItemClass,
+  sidebarContextMenuSeparatorClass,
+  sidebarFocusRing,
+  sidebarNestedToggleClass,
+} from "./sidebar-classes";
 import { useToast } from "./ui/toast";
 import {
   organizationSidebarChannels,
@@ -29,6 +38,29 @@ type ChannelCreateStep = 1 | 2;
 
 type ChannelOpenHandler = (channelId: string) => void;
 
+/* The sidebar rows share a hit area, radius, and hover treatment; only the left
+   inset changes with nesting depth, so callers pass that in. */
+const sectionToggleClass = cn(
+  "flex h-8.5 w-full cursor-pointer items-center rounded-[8px] bg-transparent pr-2.5 text-left",
+  /* No type utilities here on purpose: the rule this replaces declared
+     `font:500 var(--text-sm)/1 inherit`, which is invalid at computed-value
+     time, so the row has always inherited the sidebar's type. See
+     styles.css for the other 14 declarations with the same defect. */
+  "text-sidebar-foreground",
+  "hover:bg-sidebar-hover hover:text-sidebar-accent-foreground",
+  sidebarFocusRing,
+);
+
+const channelRowClass = cn(
+  "flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-[8px] bg-transparent pr-2.5 text-left",
+  /* Same dead `font:` shorthand as the toggle above — inherited type is what
+     ships today, so the migration keeps inheriting it. */
+  "text-sidebar-foreground-secondary",
+  "hover:bg-sidebar-hover hover:text-sidebar-accent-foreground",
+  "[&>svg]:flex-none [&>svg]:text-sidebar-foreground-muted",
+  sidebarFocusRing,
+);
+
 export function SidebarCollapsibleSection({
   active = false,
   ariaLabel,
@@ -38,8 +70,8 @@ export function SidebarCollapsibleSection({
   icon,
   label,
   listId,
+  nested = false,
   onToggle,
-  toggleClassName,
 }: {
   active?: boolean;
   ariaLabel: string;
@@ -53,8 +85,8 @@ export function SidebarCollapsibleSection({
   icon: ReactNode;
   label: string;
   listId: string;
+  nested?: boolean;
   onToggle: () => void;
-  toggleClassName?: string;
 }) {
   return (
     <>
@@ -64,17 +96,24 @@ export function SidebarCollapsibleSection({
             aria-controls={listId}
             aria-expanded={expanded}
             aria-label={ariaLabel}
-            className={`sidebar-channels-toggle${active ? " active" : ""}${
-              toggleClassName ? ` ${toggleClassName}` : ""
-            }`}
+            className={cn(
+              sectionToggleClass,
+              nested ? sidebarNestedToggleClass : "gap-2.5 pl-2.5",
+              active && "text-sidebar-accent-foreground",
+            )}
+            data-briar-sidebar-section-toggle={nested ? "nested" : "root"}
             onClick={onToggle}
             type="button"
           >
             {icon}
-            <span>{label}</span>
+            <span className="min-w-0 flex-1 truncate">{label}</span>
             <ChevronRight
               aria-hidden="true"
-              className={`sidebar-channels-chevron${expanded ? " open" : ""}`}
+              className={cn(
+                "ml-auto flex-none text-sidebar-foreground-icon transition-[transform] duration-[140ms] ease-[ease]",
+                expanded && "rotate-90",
+              )}
+              data-briar-sidebar-section-chevron=""
               size={14}
               strokeWidth={1.8}
             />
@@ -82,10 +121,10 @@ export function SidebarCollapsibleSection({
         </ContextMenu.Trigger>
         {contextMenuItems && contextMenuItems.length > 0 ? (
           <ContextMenu.Portal>
-            <ContextMenu.Content className="sidebar-channel-context-menu">
+            <ContextMenu.Content className={sidebarContextMenuClass}>
               {contextMenuItems.map((item) => (
                 <ContextMenu.Item
-                  className="sidebar-channel-context-menu-item"
+                  className={sidebarContextMenuItemClass}
                   key={item.label}
                   onSelect={item.onSelect}
                 >
@@ -332,7 +371,7 @@ export function SidebarWorkspaceChannels({
   }, [activePage]);
 
   return (
-    <div className="sidebar-channels">
+    <div className="min-w-0">
       <SidebarCollapsibleSection
         active={viewingUnlinkedChannel}
         ariaLabel={
@@ -357,13 +396,14 @@ export function SidebarWorkspaceChannels({
         listId="sidebar-channel-list"
         onToggle={() => setExpanded((current) => !current)}
       >
-        <div className="sidebar-channel-list" id="sidebar-channel-list">
+        <div className="grid gap-px pt-0.5 pb-1" id="sidebar-channel-list">
           {unlinkedChannels.map((channel) => (
             <SidebarChannelButton
               activeChannelId={activeChannelId}
               activePage={activePage}
               channel={channel}
               currentUserId={currentUserId}
+              indentClassName="pl-9"
               key={channel.id}
               onDeleteChannel={onChannelDelete}
               onOpen={onChannelOpen}
@@ -372,7 +412,9 @@ export function SidebarWorkspaceChannels({
             />
           ))}
           {!channelsLoading && unlinkedChannels.length === 0 ? (
-            <p>{t("sidebar.noChannels")}</p>
+            <p className="mt-[3px] mr-2.5 mb-1 ml-9 text-2xs/[1.45] text-sidebar-foreground-muted">
+              {t("sidebar.noChannels")}
+            </p>
           ) : null}
         </div>
       </SidebarCollapsibleSection>
@@ -433,9 +475,8 @@ export function SidebarProjectChannels({
   const listId = `project-channel-list-${projectId}`;
   return (
     <div
-      className={`sidebar-project-channels${
-        topLevel ? " sidebar-project-channels-top-level" : ""
-      }`}
+      className="min-w-0"
+      data-briar-sidebar-project-channels={topLevel ? "top-level" : "nested"}
     >
       <SidebarCollapsibleSection
         active={hasActiveChannel}
@@ -460,15 +501,16 @@ export function SidebarProjectChannels({
         label={t("sidebar.channels")}
         listId={listId}
         onToggle={() => setExpanded((current) => !current)}
-        toggleClassName="sidebar-project-channels-toggle"
+        nested={!topLevel}
       >
-        <div className="sidebar-channel-list sidebar-project-channel-list" id={listId}>
+        <div className="grid gap-px pt-0.5 pb-1" id={listId}>
           {projectChannels.map((channel) => (
             <SidebarChannelButton
               activeChannelId={activeChannelId}
               activePage={activePage}
               channel={channel}
               currentUserId={currentUserId}
+              indentClassName={topLevel ? "pl-9" : "pl-13"}
               key={channel.id}
               onDeleteChannel={onDeleteChannel}
               onOpen={onOpen}
@@ -477,7 +519,14 @@ export function SidebarProjectChannels({
             />
           ))}
           {!channelsLoading && projectChannels.length === 0 ? (
-            <p>{t("sidebar.noChannels")}</p>
+            <p
+              className={cn(
+                "mt-[3px] mr-2.5 mb-1 text-2xs/[1.45] text-sidebar-foreground-muted",
+                topLevel ? "ml-9" : "ml-13",
+              )}
+            >
+              {t("sidebar.noChannels")}
+            </p>
           ) : null}
         </div>
       </SidebarCollapsibleSection>
@@ -500,6 +549,7 @@ function SidebarChannelButton({
   activePage,
   channel,
   currentUserId,
+  indentClassName,
   onDeleteChannel,
   onOpen,
   onSettings,
@@ -509,6 +559,7 @@ function SidebarChannelButton({
   activePage: SidebarChannelPage;
   channel: ChannelSummary;
   currentUserId?: string | null;
+  indentClassName: string;
   onDeleteChannel?: (channelId: string) => Promise<void>;
   onOpen: ChannelOpenHandler;
   onSettings?: (channelId: string) => void;
@@ -571,9 +622,12 @@ function SidebarChannelButton({
         <ContextMenu.Trigger asChild>
           <button
             aria-current={isActive ? "page" : undefined}
-            className={[isActive ? "active" : "", unread ? "unread" : ""]
-              .filter(Boolean)
-              .join(" ")}
+            className={cn(
+              channelRowClass,
+              indentClassName,
+              isActive && "bg-sidebar-active font-semibold text-sidebar-accent-foreground",
+              unread && "font-bold text-sidebar-accent-foreground",
+            )}
             onClick={() => onOpen(channel.id)}
             type="button"
           >
@@ -582,16 +636,18 @@ function SidebarChannelButton({
             ) : (
               <Hash aria-hidden="true" size={14} strokeWidth={1.7} />
             )}
-            <span>{channel.name}</span>
+            <span className={cn("min-w-0 truncate", unread && "font-bold")}>
+              {channel.name}
+            </span>
           </button>
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content
             aria-label={t("channel.contextMenu")}
-            className="sidebar-channel-context-menu"
+            className={sidebarContextMenuClass}
           >
             <ContextMenu.Item
-              className="sidebar-channel-context-menu-item"
+              className={sidebarContextMenuItemClass}
               onSelect={() => {
                 void copyText(channel.id, t("channel.channelIdCopied"));
               }}
@@ -600,7 +656,7 @@ function SidebarChannelButton({
               <span>{t("channel.copyChannelId")}</span>
             </ContextMenu.Item>
             <ContextMenu.Item
-              className="sidebar-channel-context-menu-item"
+              className={sidebarContextMenuItemClass}
               onSelect={() => {
                 void copyText(
                   channelShareUrl({
@@ -616,7 +672,7 @@ function SidebarChannelButton({
             </ContextMenu.Item>
             {canDelete ? (
               <ContextMenu.Item
-                className="sidebar-channel-context-menu-item danger"
+                className={cn(sidebarContextMenuItemClass, sidebarContextMenuDangerClass)}
                 onSelect={() => {
                   setDeleteError(null);
                   setDeleteOpen(true);
@@ -626,9 +682,9 @@ function SidebarChannelButton({
                 <span>{t("channel.delete")}</span>
               </ContextMenu.Item>
             ) : null}
-            <ContextMenu.Separator className="sidebar-channel-context-menu-separator" />
+            <ContextMenu.Separator className={sidebarContextMenuSeparatorClass} />
             <ContextMenu.Item
-              className="sidebar-channel-context-menu-item"
+              className={sidebarContextMenuItemClass}
               onSelect={() => onSettings?.(channel.id)}
             >
               <Settings2 aria-hidden="true" size={15} strokeWidth={1.7} />

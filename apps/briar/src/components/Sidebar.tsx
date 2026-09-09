@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { collapseLinkedAutoHuntSessions } from "../state/agent-sessions/model";
 import type { AutoHuntSession } from "../types";
 import { useI18n, type Locale } from "../i18n";
+import { cn } from "../lib/utils";
 import {
   isLocalTeamRepositoryReady,
   localTeamConnectionState,
@@ -52,6 +53,13 @@ import {
 } from "./SidebarDirectMessages";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import { TeamIcon, teamIconComponent } from "./TeamIcon";
+import {
+  sidebarModeOptionActiveClass,
+  sidebarModeOptionClass,
+  sidebarUnreadDotClass,
+  sidebarWorkspaceMenuClass,
+  sidebarWorkspaceMenuItemClass,
+} from "./sidebar-classes";
 import {
   SidebarCollapsibleSection,
   SidebarWorkspaceChannels,
@@ -446,7 +454,10 @@ export function Sidebar({
       inert={!isOpen ? true : undefined}
       id="app-sidebar"
     >
-      <div className="sidebar-toolbar" data-tauri-drag-region />
+      <div
+        className="flex h-[46px] flex-none basis-[46px] items-center pl-[var(--traffic-light-safe-inset)]"
+        data-tauri-drag-region
+      />
 
       {isProjectWindow ? (
         <button
@@ -455,7 +466,14 @@ export function Sidebar({
               ? t("sidebar.openProjectHome", { name: projectWindowProject.name })
               : t("sidebar.projectUnavailable")
           }
-          className="sidebar-project-window-brand"
+          className={cn(
+            "mx-2.5 flex h-[42px] w-[calc(100%-20px)] shrink-0 grow-0 basis-[42px] items-center gap-[9px]",
+            "cursor-pointer rounded-[9px] bg-transparent px-2 text-left text-sidebar-foreground-strong",
+            "not-disabled:hover:bg-sidebar-hover not-disabled:active:scale-[.985] disabled:cursor-default",
+            "[&>img]:flex-none [&>svg]:flex-none",
+            "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sidebar-focus",
+          )}
+          data-briar-sidebar-project-brand=""
           disabled={!projectWindowProject}
           onClick={onLobbyOpen}
           type="button"
@@ -463,20 +481,30 @@ export function Sidebar({
           {projectWindowProject ? (
             <TeamIcon className="size-5" project={projectWindowProject} />
           ) : null}
-          <span>
+          <span className="min-w-0 truncate text-md/[20px] font-bold tracking-[-.25px]">
             {projectWindowProject?.name ?? t("sidebar.projectUnavailable")}
           </span>
         </button>
       ) : (
         <div
-          className="sidebar-workspace-switcher"
+          className="relative flex h-[42px] flex-none basis-[42px] items-center gap-1.5 px-2.5"
+          data-briar-sidebar-workspace-switcher=""
           ref={organizationMenuRef}
         >
         <button
           aria-expanded={isWorkspaceMenuOpen}
           aria-haspopup="menu"
           aria-label={t("sidebar.workspaceSwitcher")}
-          className="sidebar-brand"
+          className={cn(
+            "flex h-8.5 min-w-0 flex-auto cursor-pointer items-center gap-[5px] rounded-[8px] px-[7px]",
+            "bg-transparent text-left text-md/[20px] font-bold tracking-[-.25px] text-sidebar-foreground-strong",
+            "hover:bg-sidebar-hover aria-expanded:bg-sidebar-hover active:scale-[.985]",
+            "[&>span]:min-w-0 [&>span]:truncate",
+            "[&>svg]:flex-none [&>svg]:text-sidebar-foreground-muted",
+            "[&>svg]:transition-[transform] [&>svg]:duration-[160ms] [&>svg]:ease-[cubic-bezier(.2,.8,.2,1)]",
+            "motion-reduce:[&>svg]:transition-none",
+            "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sidebar-focus",
+          )}
           onClick={() => {
             setOpenProjectMenuId(null);
             setIsAccountMenuOpen(false);
@@ -488,14 +516,14 @@ export function Sidebar({
           {activeWorkspace?.logo ? (
             <img
               alt=""
-              className="sidebar-workspace-logo"
+              className="size-5 flex-none rounded-[5px] object-cover"
               src={activeWorkspace.logo}
             />
           ) : null}
           <span>{activeWorkspace?.name ?? "Briar"}</span>
           <ChevronDown
             aria-hidden="true"
-            className={isWorkspaceMenuOpen ? "open" : ""}
+            className={isWorkspaceMenuOpen ? "rotate-180" : ""}
             size={14}
             strokeWidth={1.8}
           />
@@ -503,7 +531,7 @@ export function Sidebar({
         {isWorkspaceMenuOpen && (
           <div
             aria-label={t("sidebar.workspaceMenu")}
-            className="sidebar-workspace-menu"
+            className={sidebarWorkspaceMenuClass}
             onKeyDown={(event) => {
               if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
               event.preventDefault();
@@ -523,7 +551,7 @@ export function Sidebar({
           >
             <div
               aria-label={t("sidebar.workspaceList")}
-              className="sidebar-workspace-menu-group workspace-list"
+              className="grid gap-px"
               role="group"
             >
               {workspaces.map((workspace) => (
@@ -534,31 +562,45 @@ export function Sidebar({
                     onWorkspaceChange(workspace.id);
                     setIsWorkspaceMenuOpen(false);
                   }}
+                  className={sidebarWorkspaceMenuItemClass}
                   role="menuitemradio"
                   type="button"
                 >
                   {workspace.logo ? (
                     <img
                       alt=""
-                      className="sidebar-workspace-list-logo"
+                      className="size-4 rounded-[4px] object-cover"
                       src={workspace.logo}
                     />
                   ) : (
-                    <Building2 aria-hidden="true" size={15} strokeWidth={1.7} />
+                    <Building2
+                      aria-hidden="true"
+                      className="text-sidebar-foreground-muted"
+                      size={15}
+                      strokeWidth={1.7}
+                    />
                   )}
                   <span>{workspace.name}</span>
                   {workspace.id === activeWorkspace?.id ? (
-                    <Check aria-hidden="true" size={15} strokeWidth={1.8} />
+                    <Check
+                      aria-hidden="true"
+                      className="text-sidebar-icon-accent"
+                      size={15}
+                      strokeWidth={1.8}
+                    />
                   ) : null}
                 </button>
               ))}
             </div>
             <div
-              className="sidebar-workspace-menu-separator"
+              className="-mx-[7px] my-1.5 h-px bg-sidebar-border"
               role="separator"
             />
             <button
-              className="sidebar-workspace-add"
+              className={cn(
+                sidebarWorkspaceMenuItemClass,
+                "grid-cols-[18px_minmax(0,1fr)] font-semibold",
+              )}
               onClick={() => {
                 setIsWorkspaceMenuOpen(false);
                 onAddWorkspace();
@@ -566,20 +608,27 @@ export function Sidebar({
               role="menuitem"
               type="button"
             >
-              <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
+              <Plus
+                aria-hidden="true"
+                className="text-sidebar-icon-accent"
+                size={15}
+                strokeWidth={1.7}
+              />
               <span>{t("sidebar.addWorkspace")}</span>
             </button>
           </div>
         )}
         <div
           aria-label={t("sidebar.modeToggle")}
-          className="sidebar-mode-toggle"
+          className="ml-auto inline-flex flex-none items-center gap-0.5 rounded-[9px] bg-sidebar-accent p-0.5"
+          data-briar-sidebar-mode-toggle=""
           role="group"
         >
           <button
             aria-label={t("sidebar.modeChats")}
             aria-pressed={sidebarMode === "dms"}
-            className={`sidebar-mode-option${sidebarMode === "dms" ? " active" : ""}`}
+            className={cn(sidebarModeOptionClass, sidebarMode === "dms" && sidebarModeOptionActiveClass)}
+            data-briar-sidebar-mode-option=""
             onClick={() => {
               if (sidebarMode !== "dms") onDmsOpen();
             }}
@@ -590,14 +639,16 @@ export function Sidebar({
             {sidebarMode !== "dms" && unreadDmCount > 0 ? (
               <i
                 aria-label={t("dm.unreadCount", { count: unreadDmCount })}
-                className="sidebar-mode-unread"
+                className="absolute top-[3px] right-[3px] size-[7px] rounded-full bg-sidebar-icon-accent shadow-[0_0_0_2px_var(--sidebar-fallback)]"
+                data-briar-sidebar-mode-unread=""
               />
             ) : null}
           </button>
           <button
             aria-label={t("sidebar.modeWork")}
             aria-pressed={sidebarMode === "work"}
-            className={`sidebar-mode-option${sidebarMode === "work" ? " active" : ""}`}
+            className={cn(sidebarModeOptionClass, sidebarMode === "work" && sidebarModeOptionActiveClass)}
+            data-briar-sidebar-mode-option=""
             onClick={() => {
               if (sidebarMode !== "work") onWorkOpen();
             }}
@@ -639,7 +690,8 @@ export function Sidebar({
           {unreadInboxCount > 0 && (
             <i
               aria-label={t("inbox.unreadCount", { count: unreadInboxCount })}
-              className="sidebar-unread-dot"
+              className={sidebarUnreadDotClass}
+              data-briar-sidebar-unread=""
             />
           )}
         </a>
@@ -1038,7 +1090,7 @@ export function Sidebar({
                             return next;
                           });
                         }}
-                        toggleClassName="sidebar-project-channels-toggle"
+                        nested
                       >
                         <div
                           className="sidebar-planning-project-list"

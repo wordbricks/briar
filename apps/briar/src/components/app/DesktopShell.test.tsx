@@ -274,11 +274,11 @@ describe("DesktopShell", () => {
       },
     });
     await settle(
-      () => view.container.querySelector(".sidebar-dm-row") !== null,
+      () => view.container.querySelector("[data-briar-sidebar-dm-row]") !== null,
       { description: "the DM row" },
     );
 
-    const row = view.container.querySelector<HTMLElement>(".sidebar-dm-row")!;
+    const row = view.container.querySelector<HTMLElement>("[data-briar-sidebar-dm-row]")!;
     await act(async () => {
       row.dispatchEvent(
         new MouseEvent("contextmenu", {
@@ -292,7 +292,7 @@ describe("DesktopShell", () => {
     });
     const editProfile = [
       ...document.body.querySelectorAll<HTMLElement>(
-        ".sidebar-channel-context-menu [role=menuitem]",
+        '[role="menu"] [role=menuitem]',
       ),
     ].find((item) => item.textContent?.includes("Edit Profile"));
     expect(editProfile).toBeTruthy();
