@@ -845,7 +845,7 @@ private extension ProjectAgentSession.Event {
 }
 
 extension ChannelAgentSummary {
-    init(connectMessage message: BriarAPI_OrganizationAgent) throws {
+    init(connectMessage message: BriarAPI_WorkspaceAgent) throws {
         guard
             let agentID = UUID(uuidString: message.agentID),
             message.hasCreatedAt

@@ -12,16 +12,16 @@ import SwiftProtobuf
 public protocol BriarAPI_AgentServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
-    func `listOrganizationAgents`(request: BriarAPI_ListOrganizationAgentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListOrganizationAgentsResponse>
+    func `listWorkspaceAgents`(request: BriarAPI_ListWorkspaceAgentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListWorkspaceAgentsResponse>
 
     @available(iOS 13, *)
-    func `createOrganizationAgent`(request: BriarAPI_CreateOrganizationAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateOrganizationAgentResponse>
+    func `createWorkspaceAgent`(request: BriarAPI_CreateWorkspaceAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_CreateWorkspaceAgentResponse>
 
     @available(iOS 13, *)
-    func `updateOrganizationAgent`(request: BriarAPI_UpdateOrganizationAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateOrganizationAgentResponse>
+    func `updateWorkspaceAgent`(request: BriarAPI_UpdateWorkspaceAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateWorkspaceAgentResponse>
 
     @available(iOS 13, *)
-    func `deleteOrganizationAgent`(request: BriarAPI_DeleteOrganizationAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteOrganizationAgentResponse>
+    func `deleteWorkspaceAgent`(request: BriarAPI_DeleteWorkspaceAgentRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_DeleteWorkspaceAgentResponse>
 
     @available(iOS 13, *)
     func `listProjectAgents`(request: BriarAPI_ListProjectAgentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListProjectAgentsResponse>
@@ -93,23 +93,23 @@ public final class BriarAPI_AgentServiceClient: BriarAPI_AgentServiceClientInter
     }
 
     @available(iOS 13, *)
-    public func `listOrganizationAgents`(request: BriarAPI_ListOrganizationAgentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListOrganizationAgentsResponse> {
-        return await self.client.unary(path: "/briar.app.v1.AgentService/ListOrganizationAgents", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `listWorkspaceAgents`(request: BriarAPI_ListWorkspaceAgentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListWorkspaceAgentsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/ListWorkspaceAgents", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `createOrganizationAgent`(request: BriarAPI_CreateOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateOrganizationAgentResponse> {
-        return await self.client.unary(path: "/briar.app.v1.AgentService/CreateOrganizationAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `createWorkspaceAgent`(request: BriarAPI_CreateWorkspaceAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateWorkspaceAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/CreateWorkspaceAgent", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `updateOrganizationAgent`(request: BriarAPI_UpdateOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateOrganizationAgentResponse> {
-        return await self.client.unary(path: "/briar.app.v1.AgentService/UpdateOrganizationAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `updateWorkspaceAgent`(request: BriarAPI_UpdateWorkspaceAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateWorkspaceAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/UpdateWorkspaceAgent", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `deleteOrganizationAgent`(request: BriarAPI_DeleteOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteOrganizationAgentResponse> {
-        return await self.client.unary(path: "/briar.app.v1.AgentService/DeleteOrganizationAgent", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `deleteWorkspaceAgent`(request: BriarAPI_DeleteWorkspaceAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteWorkspaceAgentResponse> {
+        return await self.client.unary(path: "/briar.app.v1.AgentService/DeleteWorkspaceAgent", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -214,10 +214,10 @@ public final class BriarAPI_AgentServiceClient: BriarAPI_AgentServiceClientInter
 
     public enum Metadata {
         public enum Methods {
-            public static let listOrganizationAgents = Connect.MethodSpec(name: "ListOrganizationAgents", service: "briar.app.v1.AgentService", type: .unary)
-            public static let createOrganizationAgent = Connect.MethodSpec(name: "CreateOrganizationAgent", service: "briar.app.v1.AgentService", type: .unary)
-            public static let updateOrganizationAgent = Connect.MethodSpec(name: "UpdateOrganizationAgent", service: "briar.app.v1.AgentService", type: .unary)
-            public static let deleteOrganizationAgent = Connect.MethodSpec(name: "DeleteOrganizationAgent", service: "briar.app.v1.AgentService", type: .unary)
+            public static let listWorkspaceAgents = Connect.MethodSpec(name: "ListWorkspaceAgents", service: "briar.app.v1.AgentService", type: .unary)
+            public static let createWorkspaceAgent = Connect.MethodSpec(name: "CreateWorkspaceAgent", service: "briar.app.v1.AgentService", type: .unary)
+            public static let updateWorkspaceAgent = Connect.MethodSpec(name: "UpdateWorkspaceAgent", service: "briar.app.v1.AgentService", type: .unary)
+            public static let deleteWorkspaceAgent = Connect.MethodSpec(name: "DeleteWorkspaceAgent", service: "briar.app.v1.AgentService", type: .unary)
             public static let listProjectAgents = Connect.MethodSpec(name: "ListProjectAgents", service: "briar.app.v1.AgentService", type: .unary)
             public static let createProjectAgent = Connect.MethodSpec(name: "CreateProjectAgent", service: "briar.app.v1.AgentService", type: .unary)
             public static let updateProjectAgent = Connect.MethodSpec(name: "UpdateProjectAgent", service: "briar.app.v1.AgentService", type: .unary)

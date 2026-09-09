@@ -99,7 +99,7 @@ describe("TeamService mutations", () => {
   it("owns the full project control lifecycle and enforces capabilities", async () => {
     const owner = client(tokens.owner);
     const created = await owner.createTeam(
-      { name: "  Connect Project  ", organizationId },
+      { name: "  Connect Project  ", workspaceId: organizationId },
       options(tokens.owner),
     );
     expect(created.agentToken).toMatch(/^briar_agent_/u);
@@ -107,7 +107,7 @@ describe("TeamService mutations", () => {
       name: "Connect Project",
       issueKeyPrefix: "AH",
       scheduleTabEnabled: true,
-      organizationId,
+      workspaceId: organizationId,
     });
     const projectId = created.team?.id;
     expect(projectId).toBeTruthy();
@@ -238,7 +238,7 @@ describe("TeamService mutations", () => {
   it("guards configuration capabilities, revisions, and worker references", async () => {
     const owner = client(tokens.owner);
     const created = await owner.createTeam(
-      { name: "Configured Project", organizationId },
+      { name: "Configured Project", workspaceId: organizationId },
       options(tokens.owner),
     );
     const projectId = created.team?.id;
@@ -358,7 +358,7 @@ describe("TeamService mutations", () => {
   it("deletes a planning project without orphaning its issues", async () => {
     const owner = client(tokens.owner);
     const createdTeam = await owner.createTeam(
-      { name: "Planning lifecycle", organizationId },
+      { name: "Planning lifecycle", workspaceId: organizationId },
       options(tokens.owner),
     );
     const teamId = createdTeam.team?.id;

@@ -12,10 +12,10 @@ import "google/protobuf/timestamp.proto";
 option swift_prefix = "BriarAPI_";
 
 service AgentService {
-  rpc ListOrganizationAgents(ListOrganizationAgentsRequest) returns (ListOrganizationAgentsResponse);
-  rpc CreateOrganizationAgent(CreateOrganizationAgentRequest) returns (CreateOrganizationAgentResponse);
-  rpc UpdateOrganizationAgent(UpdateOrganizationAgentRequest) returns (UpdateOrganizationAgentResponse);
-  rpc DeleteOrganizationAgent(DeleteOrganizationAgentRequest) returns (DeleteOrganizationAgentResponse);
+  rpc ListWorkspaceAgents(ListWorkspaceAgentsRequest) returns (ListWorkspaceAgentsResponse);
+  rpc CreateWorkspaceAgent(CreateWorkspaceAgentRequest) returns (CreateWorkspaceAgentResponse);
+  rpc UpdateWorkspaceAgent(UpdateWorkspaceAgentRequest) returns (UpdateWorkspaceAgentResponse);
+  rpc DeleteWorkspaceAgent(DeleteWorkspaceAgentRequest) returns (DeleteWorkspaceAgentResponse);
   rpc ListProjectAgents(ListProjectAgentsRequest) returns (ListProjectAgentsResponse);
   rpc CreateProjectAgent(CreateProjectAgentRequest) returns (CreateProjectAgentResponse);
   rpc UpdateProjectAgent(UpdateProjectAgentRequest) returns (UpdateProjectAgentResponse);
@@ -38,17 +38,17 @@ service AgentService {
   rpc ListProjectAgentTranscriptSessions(ListProjectAgentTranscriptSessionsRequest) returns (ListProjectAgentTranscriptSessionsResponse);
 }
 
-message ListOrganizationAgentsRequest {
-  string organization_id = 1;
+message ListWorkspaceAgentsRequest {
+  string workspace_id = 1;
 }
 
-message ListOrganizationAgentsResponse {
-  repeated OrganizationAgent agents = 1;
+message ListWorkspaceAgentsResponse {
+  repeated WorkspaceAgent agents = 1;
   bool can_manage = 2;
 }
 
-message CreateOrganizationAgentRequest {
-  string organization_id = 1;
+message CreateWorkspaceAgentRequest {
+  string workspace_id = 1;
   string name = 2;
   briar.types.v1.AgentProvider provider = 3;
   optional string model = 4;
@@ -59,12 +59,12 @@ message CreateOrganizationAgentRequest {
   optional briar.types.v1.ComputerUsePolicy computer_use_policy = 9;
 }
 
-message CreateOrganizationAgentResponse {
-  OrganizationAgent agent = 1;
+message CreateWorkspaceAgentResponse {
+  WorkspaceAgent agent = 1;
 }
 
-message UpdateOrganizationAgentRequest {
-  string organization_id = 1;
+message UpdateWorkspaceAgentRequest {
+  string workspace_id = 1;
   string agent_id = 2;
   string name = 3;
   briar.types.v1.AgentProvider provider = 4;
@@ -76,16 +76,16 @@ message UpdateOrganizationAgentRequest {
   optional briar.types.v1.ComputerUsePolicy computer_use_policy = 10;
 }
 
-message UpdateOrganizationAgentResponse {
-  OrganizationAgent agent = 1;
+message UpdateWorkspaceAgentResponse {
+  WorkspaceAgent agent = 1;
 }
 
-message DeleteOrganizationAgentRequest {
-  string organization_id = 1;
+message DeleteWorkspaceAgentRequest {
+  string workspace_id = 1;
   string agent_id = 2;
 }
 
-message DeleteOrganizationAgentResponse {
+message DeleteWorkspaceAgentResponse {
   bool deleted = 1;
 }
 
@@ -460,7 +460,7 @@ message ProjectAgent {
   briar.types.v1.ComputerUsePolicy computer_use_policy = 18;
 }
 
-message OrganizationAgent {
+message WorkspaceAgent {
   string agent_id = 1;
   string name = 2;
   optional string avatar = 3;

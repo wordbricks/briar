@@ -85,7 +85,7 @@ message ListDirectMessageRecipientsRequest {
 
 message ListDirectMessageRecipientsResponse {
   repeated OrganizationMember members = 1;
-  repeated OrganizationAgent agents = 2;
+  repeated WorkspaceAgent agents = 2;
 }
 
 message CreateDirectMessageRequest {
@@ -170,7 +170,7 @@ message SetChannelAgentRequest {
 }
 
 message SetChannelAgentResponse {
-  repeated OrganizationAgent agents = 1;
+  repeated WorkspaceAgent agents = 1;
 }
 
 message SetChannelMemberRequest {
@@ -251,7 +251,7 @@ message GetChannelRequest {
 message GetChannelResponse {
   ChannelSummary channel = 1;
   repeated ChannelMember members = 2;
-  repeated OrganizationAgent agents = 3;
+  repeated WorkspaceAgent agents = 3;
   repeated ChannelMessage messages = 4;
   repeated ChannelAgentReply agent_replies = 5;
   optional string next_cursor = 6;

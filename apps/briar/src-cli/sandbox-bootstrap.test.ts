@@ -108,7 +108,7 @@ const bootstrapStubs = (
 const credential = (id: string) =>
   create(ProjectGitHubCredentialSchema, {
     projectId: id,
-    organizationId,
+    workspaceId: organizationId,
     repositoryId: 42n,
     repository: "wordbricks/briar",
     cloneUrl: "https://github.com/wordbricks/briar.git",

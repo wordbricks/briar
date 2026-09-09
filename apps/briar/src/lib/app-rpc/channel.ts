@@ -84,7 +84,7 @@ import type {
   DirectMessageParticipant,
 } from "../channels-contract";
 import {
-  organizationAgentFromMessage,
+  workspaceAgentFromMessage,
   projectAgentSessionFromMessage,
   skillApprovalPolicyFromProto,
   skillExecutionModeFromProto,
@@ -898,7 +898,7 @@ export async function listDirectMessageRecipients(
   );
   return {
     members: response.members.map(organizationMemberFromProto),
-    agents: response.agents.map(organizationAgentFromMessage),
+    agents: response.agents.map(workspaceAgentFromMessage),
   };
 }
 
@@ -1038,7 +1038,7 @@ export async function setChannelAgent(
     },
     appCallOptions(token),
   );
-  return { agents: response.agents.map(organizationAgentFromMessage) };
+  return { agents: response.agents.map(workspaceAgentFromMessage) };
 }
 
 export async function setChannelMember(
@@ -1172,7 +1172,7 @@ export async function loadChannel(
       "getChannel.channel",
     )),
     members: response.members.map(channelMemberFromMessage),
-    agents: response.agents.map(organizationAgentFromMessage),
+    agents: response.agents.map(workspaceAgentFromMessage),
     messages: response.messages.map(channelMessageFromMessage),
     agentReplies: response.agentReplies.map(channelAgentReplyFromMessage),
     nextCursor: response.nextCursor ?? null,

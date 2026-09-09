@@ -18,7 +18,7 @@ service DmMemoryService {
 }
 
 message ListDmMemoriesRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   optional string memory_space_id = 3;
   optional string cursor = 4;
@@ -76,7 +76,7 @@ message DmMemoryLearningRetryableJob {
 }
 
 message RetryDmMemoryLearningRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string job_id = 3;
   string request_id = 4;
@@ -128,7 +128,7 @@ enum DmMemoryLearningFailureCode {
 }
 
 message GetDmMemoryDocumentRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string document_id = 3;
   optional uint32 version = 4;
@@ -139,7 +139,7 @@ message GetDmMemoryDocumentResponse {
 }
 
 message ListDmMemoryRevisionsRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string document_id = 3;
   optional uint32 cursor = 4;
@@ -162,7 +162,7 @@ message DmMemoryRevision {
 }
 
 message CreateDmMemoryDocumentRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string request_id = 3;
   optional string memory_space_id = 4;
@@ -176,7 +176,7 @@ message CreateDmMemoryDocumentRequest {
 }
 
 message UpdateDmMemoryDocumentRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string document_id = 3;
   string request_id = 4;
@@ -204,7 +204,7 @@ message UpdateDmMemoryDocumentResponse {
 }
 
 message DeleteDmMemoryDocumentRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string document_id = 3;
 }
@@ -215,7 +215,7 @@ message DeleteDmMemoryDocumentResponse {
 }
 
 message UpdateDmMemorySettingsRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
   string channel_id = 2;
   string request_id = 3;
   optional string memory_space_id = 4;

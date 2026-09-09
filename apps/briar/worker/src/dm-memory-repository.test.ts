@@ -291,7 +291,7 @@ describe("DM memory authoritative storage", () => {
       headers: { authorization: `Bearer memory-test-${actor}` },
     });
     const created = await client.createDmMemoryDocument({
-      organizationId,
+      workspaceId: organizationId,
       channelId: owner.channelId,
       requestId: crypto.randomUUID(),
       title: "Connect memory",
@@ -302,7 +302,7 @@ describe("DM memory authoritative storage", () => {
     expect(created).toMatchObject({ version: 1, replayed: false });
 
     const read = await client.getDmMemoryDocument({
-      organizationId,
+      workspaceId: organizationId,
       channelId: owner.channelId,
       documentId: created.documentId,
     }, options(userId));
@@ -312,17 +312,17 @@ describe("DM memory authoritative storage", () => {
       protectedByUser: true,
     });
     await expect(client.getDmMemoryDocument({
-      organizationId,
+      workspaceId: organizationId,
       channelId: owner.channelId,
       documentId: created.documentId,
     }, options(otherUserId))).rejects.toMatchObject({ code: Code.NotFound });
     await client.deleteDmMemoryDocument({
-      organizationId,
+      workspaceId: organizationId,
       channelId: owner.channelId,
       documentId: created.documentId,
     }, options(userId));
     await expect(client.getDmMemoryDocument({
-      organizationId,
+      workspaceId: organizationId,
       channelId: owner.channelId,
       documentId: created.documentId,
     }, options(userId))).rejects.toMatchObject({ code: Code.NotFound });

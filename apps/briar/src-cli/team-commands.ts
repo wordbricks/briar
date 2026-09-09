@@ -106,8 +106,8 @@ async function listTeamsCommand(
   const teams = response.map((team) => ({
     id: team.id,
     name: team.name,
-    organizationId: team.organizationId,
-    organizationName: team.organizationName,
+    organizationId: team.workspaceId,
+    organizationName: team.workspaceName,
     role: teamRoleFromProto(team.role),
   }));
   if (resolved.jsonOutput()) {

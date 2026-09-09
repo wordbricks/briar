@@ -302,7 +302,7 @@ export function createWorkspaceActions(
       try {
         const result = await remote.createTeam(token, {
           ...input,
-          organizationId: registry.get(activeOrganizationIdAtom) ?? undefined,
+          workspaceId: registry.get(activeOrganizationIdAtom) ?? undefined,
         });
         const nextOrganizations = await remote
           .loadOrganizations(token)

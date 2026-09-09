@@ -286,7 +286,7 @@ export async function loadDmMemory(
   signal?: AbortSignal,
 ): Promise<DmMemoryPage> {
   const response = await requireClient().listDmMemories({
-    organizationId: scope.organizationId,
+    workspaceId: scope.organizationId,
     channelId: scope.channelId,
     memorySpaceId: spaceId,
     cursor,
@@ -314,7 +314,7 @@ export async function loadDmMemoryDocument(
   version?: number,
 ): Promise<DmMemoryDocumentDetail> {
   const response = await requireClient().getDmMemoryDocument({
-    organizationId: scope.organizationId,
+    workspaceId: scope.organizationId,
     channelId: scope.channelId,
     documentId,
     version,
@@ -343,7 +343,7 @@ export async function loadDmMemoryHistory(
   signal?: AbortSignal,
 ): Promise<DmMemoryRevisionPage> {
   const response = await requireClient().listDmMemoryRevisions({
-    organizationId: scope.organizationId,
+    workspaceId: scope.organizationId,
     channelId: scope.channelId,
     documentId,
     cursor,
@@ -369,7 +369,7 @@ export async function saveDmMemoryDocument(
   documentId?: string,
 ) {
   const common = {
-    organizationId: scope.organizationId,
+    workspaceId: scope.organizationId,
     channelId: scope.channelId,
     ...writeInput(input),
   };
@@ -392,7 +392,7 @@ export async function setDmMemorySettings(
   input: DmMemorySettingsInput,
 ) {
   const response = await requireClient().updateDmMemorySettings({
-    organizationId: scope.organizationId,
+    workspaceId: scope.organizationId,
     channelId: scope.channelId,
     requestId: input.requestId,
     memorySpaceId: input.memorySpaceId,
@@ -411,7 +411,7 @@ export async function removeDmMemoryDocument(
   documentId: string,
 ) {
   return requireClient().deleteDmMemoryDocument({
-    organizationId: scope.organizationId,
+    workspaceId: scope.organizationId,
     channelId: scope.channelId,
     documentId,
   }, appCallOptions(scope.token));
@@ -423,7 +423,7 @@ export async function retryDmMemoryLearning(
   revocationEpoch: number,
 ) {
   const response = await requireClient().retryDmMemoryLearning({
-    organizationId: scope.organizationId,
+    workspaceId: scope.organizationId,
     channelId: scope.channelId,
     jobId,
     requestId: crypto.randomUUID(),

@@ -15,7 +15,7 @@ import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
   AgentSkillKind,
-  type CreateOrganizationAgentRequest,
+  type CreateWorkspaceAgentRequest,
   type CreateProjectAgentRequest,
   ProjectAgentScheduleIntervalUnit as ProtoProjectAgentScheduleIntervalUnit,
   ProjectAgentScheduleNotificationLevel
@@ -30,7 +30,7 @@ import {
   ProjectAgentSessionTrigger,
   ProjectAgentSessionType,
   type ProjectAgentSkillInput,
-  type UpdateOrganizationAgentRequest,
+  type UpdateWorkspaceAgentRequest,
   type UpdateProjectAgentRequest,
 } from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import {
@@ -77,7 +77,7 @@ import {
   listOrganizationAgents,
   updateOrganizationAgent,
 } from "./organization-agents";
-import { appOrganizationAgent } from "./app-connect-agent-mappers";
+import { appWorkspaceAgent } from "./app-connect-agent-mappers";
 import {
   createTeamAgentApplication,
   deleteTeamAgentApplication,
@@ -884,7 +884,7 @@ const updateProjectWrite = (input: UpdateProjectAgentRequest) =>
   });
 
 const organizationWrite = (
-  input: CreateOrganizationAgentRequest | UpdateOrganizationAgentRequest,
+  input: CreateWorkspaceAgentRequest | UpdateWorkspaceAgentRequest,
 ) =>
   decodeOrganizationAgentWrite({
     name: input.name,
@@ -1077,9 +1077,9 @@ export const createAppAgentService = (
   { request, auth, db, env, context }: AppConnectAgentInput,
   services: AppConnectAgentServices = appConnectAgentServices,
 ): ServiceImpl<typeof AgentService> => ({
-  createOrganizationAgent: async (input) => {
+  createWorkspaceAgent: async (input) => {
     const session = await services.requireSession(auth, request);
-    const organizationId = decodeUuid(input.organizationId);
+    const organizationId = decodeUuid(input.workspaceId);
     const role = await getOrganizationRole(
       db,
       organizationId,
@@ -1103,12 +1103,12 @@ export const createAppAgentService = (
       createdAt: new Date().toISOString(),
     });
     if (!agent) throw new HttpError(500, "Agent was not created");
-    return { agent: appOrganizationAgent(agent) };
+    return { agent: appWorkspaceAgent(agent) };
   },
 
-  updateOrganizationAgent: async (input) => {
+  updateWorkspaceAgent: async (input) => {
     const session = await services.requireSession(auth, request);
-    const organizationId = decodeUuid(input.organizationId);
+    const organizationId = decodeUuid(input.workspaceId);
     const role = await getOrganizationRole(
       db,
       organizationId,
@@ -1132,12 +1132,12 @@ export const createAppAgentService = (
       updatedAt: new Date().toISOString(),
     });
     if (!agent) throw new HttpError(404, "Organization agent not found");
-    return { agent: appOrganizationAgent(agent) };
+    return { agent: appWorkspaceAgent(agent) };
   },
 
-  deleteOrganizationAgent: async (input) => {
+  deleteWorkspaceAgent: async (input) => {
     const session = await services.requireSession(auth, request);
-    const organizationId = decodeUuid(input.organizationId);
+    const organizationId = decodeUuid(input.workspaceId);
     const role = await getOrganizationRole(
       db,
       organizationId,
@@ -1155,9 +1155,9 @@ export const createAppAgentService = (
     return { deleted: true };
   },
 
-  listOrganizationAgents: async (input) => {
+  listWorkspaceAgents: async (input) => {
     const session = await services.requireSession(auth, request);
-    const organizationId = decodeUuid(input.organizationId);
+    const organizationId = decodeUuid(input.workspaceId);
     const role = await getOrganizationRole(
       db,
       organizationId,
@@ -1168,7 +1168,7 @@ export const createAppAgentService = (
     }
     return {
       agents: (await listOrganizationAgents(db, organizationId)).map(
-        appOrganizationAgent,
+        appWorkspaceAgent,
       ),
       canManage: hasOrganizationCapability(role, "development:manage"),
     };

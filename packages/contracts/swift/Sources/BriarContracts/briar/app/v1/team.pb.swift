@@ -95,20 +95,20 @@ public nonisolated struct BriarAPI_CreateTeamRequest: Sendable {
 
   public var name: String = String()
 
-  public var organizationID: String {
-    get {_organizationID ?? String()}
-    set {_organizationID = newValue}
+  public var workspaceID: String {
+    get {_workspaceID ?? String()}
+    set {_workspaceID = newValue}
   }
-  /// Returns true if `organizationID` has been explicitly set.
-  public var hasOrganizationID: Bool {self._organizationID != nil}
-  /// Clears the value of `organizationID`. Subsequent reads from it will return its default value.
-  public mutating func clearOrganizationID() {self._organizationID = nil}
+  /// Returns true if `workspaceID` has been explicitly set.
+  public var hasWorkspaceID: Bool {self._workspaceID != nil}
+  /// Clears the value of `workspaceID`. Subsequent reads from it will return its default value.
+  public mutating func clearWorkspaceID() {self._workspaceID = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _organizationID: String? = nil
+  fileprivate var _workspaceID: String? = nil
 }
 
 public nonisolated struct BriarAPI_CreateTeamResponse: Sendable {
@@ -786,9 +786,9 @@ public nonisolated struct BriarAPI_Team: Sendable {
   /// Clears the value of `icon`. Subsequent reads from it will return its default value.
   public mutating func clearIcon() {self._icon = nil}
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
-  public var organizationName: String = String()
+  public var workspaceName: String = String()
 
   public var role: BriarAPI_ProjectRole = .unspecified
 
@@ -1459,7 +1459,7 @@ nonisolated extension BriarAPI_ListTeamsResponse: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension BriarAPI_CreateTeamRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateTeamRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1468,7 +1468,7 @@ nonisolated extension BriarAPI_CreateTeamRequest: SwiftProtobuf.Message, SwiftPr
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._workspaceID) }()
       default: break
       }
     }
@@ -1482,7 +1482,7 @@ nonisolated extension BriarAPI_CreateTeamRequest: SwiftProtobuf.Message, SwiftPr
     if !self.name.isEmpty {
       try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
     }
-    try { if let v = self._organizationID {
+    try { if let v = self._workspaceID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
     try unknownFields.traverse(visitor: &visitor)
@@ -1490,7 +1490,7 @@ nonisolated extension BriarAPI_CreateTeamRequest: SwiftProtobuf.Message, SwiftPr
 
   public static func ==(lhs: BriarAPI_CreateTeamRequest, rhs: BriarAPI_CreateTeamRequest) -> Bool {
     if lhs.name != rhs.name {return false}
-    if lhs._organizationID != rhs._organizationID {return false}
+    if lhs._workspaceID != rhs._workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2484,7 +2484,7 @@ nonisolated extension BriarAPI_UpdateTeamExecutionWorkerPolicyResponse: SwiftPro
 
 nonisolated extension BriarAPI_Team: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Team"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}issue_key_prefix\0\u{3}schedule_tab_enabled\0\u{1}icon\0\u{3}organization_id\0\u{3}organization_name\0\u{1}role\0\u{3}created_at\0\u{3}icon_name\0\u{3}icon_color\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}issue_key_prefix\0\u{3}schedule_tab_enabled\0\u{1}icon\0\u{3}workspace_id\0\u{3}workspace_name\0\u{1}role\0\u{3}created_at\0\u{3}icon_name\0\u{3}icon_color\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2497,8 +2497,8 @@ nonisolated extension BriarAPI_Team: SwiftProtobuf.Message, SwiftProtobuf._Messa
       case 3: try { try decoder.decodeSingularStringField(value: &self.issueKeyPrefix) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.scheduleTabEnabled) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._icon) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.organizationName) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self.workspaceName) }()
       case 8: try { try decoder.decodeSingularEnumField(value: &self.role) }()
       case 9: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self._iconName) }()
@@ -2528,11 +2528,11 @@ nonisolated extension BriarAPI_Team: SwiftProtobuf.Message, SwiftProtobuf._Messa
     try { if let v = self._icon {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 6)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 6)
     }
-    if !self.organizationName.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationName, fieldNumber: 7)
+    if !self.workspaceName.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceName, fieldNumber: 7)
     }
     if self.role != .unspecified {
       try visitor.visitSingularEnumField(value: self.role, fieldNumber: 8)
@@ -2555,8 +2555,8 @@ nonisolated extension BriarAPI_Team: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if lhs.issueKeyPrefix != rhs.issueKeyPrefix {return false}
     if lhs.scheduleTabEnabled != rhs.scheduleTabEnabled {return false}
     if lhs._icon != rhs._icon {return false}
-    if lhs.organizationID != rhs.organizationID {return false}
-    if lhs.organizationName != rhs.organizationName {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
+    if lhs.workspaceName != rhs.workspaceName {return false}
     if lhs.role != rhs.role {return false}
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._iconName != rhs._iconName {return false}

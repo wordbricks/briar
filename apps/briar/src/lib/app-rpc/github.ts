@@ -50,11 +50,11 @@ export async function loadProjectMergeActivity(
 
 export async function loadGithubIntegration(
   token: string,
-  organizationId: string,
+  workspaceId: string,
 ) {
   return githubIntegrationFromProto(
     await requireIntegrationClient().getGitHubIntegration(
-      { organizationId },
+      { workspaceId },
       appCallOptions(token),
     ),
   );
@@ -62,10 +62,10 @@ export async function loadGithubIntegration(
 
 export async function createGithubInstallUrl(
   token: string,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const response = await requireIntegrationClient().beginGitHubInstallation(
-    { organizationId },
+    { workspaceId },
     appCallOptions(token),
   );
   return { installUrl: response.installUrl };

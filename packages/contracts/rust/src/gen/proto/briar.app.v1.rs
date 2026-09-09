@@ -15507,41 +15507,41 @@ impl ::buffa::Enumeration for AgentSkillExecutionStatus {
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ListOrganizationAgentsRequest {
-    /// Field 1: `organization_id`
+pub struct ListWorkspaceAgentsRequest {
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ListOrganizationAgentsRequest {
+impl ::core::fmt::Debug for ListWorkspaceAgentsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListOrganizationAgentsRequest")
-            .field("organization_id", &self.organization_id)
+        f.debug_struct("ListWorkspaceAgentsRequest")
+            .field("workspace_id", &self.workspace_id)
             .finish()
     }
 }
-impl ListOrganizationAgentsRequest {
+impl ListWorkspaceAgentsRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationAgentsRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceAgentsRequest";
 }
-::buffa::impl_default_instance!(ListOrganizationAgentsRequest);
-impl ::buffa::MessageName for ListOrganizationAgentsRequest {
+::buffa::impl_default_instance!(ListWorkspaceAgentsRequest);
+impl ::buffa::MessageName for ListWorkspaceAgentsRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ListOrganizationAgentsRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationAgentsRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationAgentsRequest";
+    const NAME: &'static str = "ListWorkspaceAgentsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.ListWorkspaceAgentsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceAgentsRequest";
 }
-impl ::buffa::Message for ListOrganizationAgentsRequest {
+impl ::buffa::Message for ListWorkspaceAgentsRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -15554,10 +15554,8 @@ impl ::buffa::Message for ListOrganizationAgentsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -15569,8 +15567,8 @@ impl ::buffa::Message for ListOrganizationAgentsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -15590,7 +15588,7 @@ impl ::buffa::Message for ListOrganizationAgentsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -15600,12 +15598,12 @@ impl ::buffa::Message for ListOrganizationAgentsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ListOrganizationAgentsRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationAgentsRequest";
+impl ::buffa::ExtensionSet for ListWorkspaceAgentsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListWorkspaceAgentsRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -15613,7 +15611,7 @@ impl ::buffa::ExtensionSet for ListOrganizationAgentsRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationAgentsRequest {
+impl ::buffa::json_helpers::ProtoElemJson for ListWorkspaceAgentsRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -15627,23 +15625,23 @@ impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationAgentsRequest {
     }
 }
 #[doc(hidden)]
-pub const __LIST_ORGANIZATION_AGENTS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationAgentsRequest",
-    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationAgentsRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationAgentsRequest>,
+pub const __LIST_WORKSPACE_AGENTS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListWorkspaceAgentsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListWorkspaceAgentsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListWorkspaceAgentsRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ListOrganizationAgentsResponse {
+pub struct ListWorkspaceAgentsResponse {
     /// Field 1: `agents`
     #[serde(
         rename = "agents",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub agents: ::buffa::alloc::vec::Vec<OrganizationAgent>,
+    pub agents: ::buffa::alloc::vec::Vec<WorkspaceAgent>,
     /// Field 2: `can_manage`
     #[serde(
         rename = "canManage",
@@ -15656,29 +15654,29 @@ pub struct ListOrganizationAgentsResponse {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ListOrganizationAgentsResponse {
+impl ::core::fmt::Debug for ListWorkspaceAgentsResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListOrganizationAgentsResponse")
+        f.debug_struct("ListWorkspaceAgentsResponse")
             .field("agents", &self.agents)
             .field("can_manage", &self.can_manage)
             .finish()
     }
 }
-impl ListOrganizationAgentsResponse {
+impl ListWorkspaceAgentsResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationAgentsResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceAgentsResponse";
 }
-::buffa::impl_default_instance!(ListOrganizationAgentsResponse);
-impl ::buffa::MessageName for ListOrganizationAgentsResponse {
+::buffa::impl_default_instance!(ListWorkspaceAgentsResponse);
+impl ::buffa::MessageName for ListWorkspaceAgentsResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ListOrganizationAgentsResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationAgentsResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationAgentsResponse";
+    const NAME: &'static str = "ListWorkspaceAgentsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.ListWorkspaceAgentsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceAgentsResponse";
 }
-impl ::buffa::Message for ListOrganizationAgentsResponse {
+impl ::buffa::Message for ListWorkspaceAgentsResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -15768,8 +15766,8 @@ impl ::buffa::Message for ListOrganizationAgentsResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ListOrganizationAgentsResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationAgentsResponse";
+impl ::buffa::ExtensionSet for ListWorkspaceAgentsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListWorkspaceAgentsResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -15777,7 +15775,7 @@ impl ::buffa::ExtensionSet for ListOrganizationAgentsResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationAgentsResponse {
+impl ::buffa::json_helpers::ProtoElemJson for ListWorkspaceAgentsResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -15791,24 +15789,24 @@ impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationAgentsResponse {
     }
 }
 #[doc(hidden)]
-pub const __LIST_ORGANIZATION_AGENTS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationAgentsResponse",
-    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationAgentsResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationAgentsResponse>,
+pub const __LIST_WORKSPACE_AGENTS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListWorkspaceAgentsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListWorkspaceAgentsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListWorkspaceAgentsResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateOrganizationAgentRequest {
-    /// Field 1: `organization_id`
+pub struct CreateWorkspaceAgentRequest {
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `name`
     #[serde(
         rename = "name",
@@ -15863,10 +15861,10 @@ pub struct CreateOrganizationAgentRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateOrganizationAgentRequest {
+impl ::core::fmt::Debug for CreateWorkspaceAgentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateOrganizationAgentRequest")
-            .field("organization_id", &self.organization_id)
+        f.debug_struct("CreateWorkspaceAgentRequest")
+            .field("workspace_id", &self.workspace_id)
             .field("name", &self.name)
             .field("provider", &self.provider)
             .field("model", &self.model)
@@ -15878,14 +15876,14 @@ impl ::core::fmt::Debug for CreateOrganizationAgentRequest {
             .finish()
     }
 }
-impl CreateOrganizationAgentRequest {
+impl CreateWorkspaceAgentRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationAgentRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateWorkspaceAgentRequest";
 }
-impl CreateOrganizationAgentRequest {
+impl CreateWorkspaceAgentRequest {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::model`] to `Some(value)`, consuming and returning `self`.
@@ -15927,14 +15925,14 @@ impl CreateOrganizationAgentRequest {
         self
     }
 }
-::buffa::impl_default_instance!(CreateOrganizationAgentRequest);
-impl ::buffa::MessageName for CreateOrganizationAgentRequest {
+::buffa::impl_default_instance!(CreateWorkspaceAgentRequest);
+impl ::buffa::MessageName for CreateWorkspaceAgentRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "CreateOrganizationAgentRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationAgentRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationAgentRequest";
+    const NAME: &'static str = "CreateWorkspaceAgentRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateWorkspaceAgentRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateWorkspaceAgentRequest";
 }
-impl ::buffa::Message for CreateOrganizationAgentRequest {
+impl ::buffa::Message for CreateWorkspaceAgentRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -15947,10 +15945,8 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
@@ -15996,8 +15992,8 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.name, buf);
@@ -16049,7 +16045,7 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -16135,7 +16131,7 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.name.clear();
         self.provider = ::buffa::EnumValue::from(0);
         self.model = ::core::option::Option::None;
@@ -16147,8 +16143,8 @@ impl ::buffa::Message for CreateOrganizationAgentRequest {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CreateOrganizationAgentRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.CreateOrganizationAgentRequest";
+impl ::buffa::ExtensionSet for CreateWorkspaceAgentRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateWorkspaceAgentRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -16156,7 +16152,7 @@ impl ::buffa::ExtensionSet for CreateOrganizationAgentRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for CreateOrganizationAgentRequest {
+impl ::buffa::json_helpers::ProtoElemJson for CreateWorkspaceAgentRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -16170,51 +16166,48 @@ impl ::buffa::json_helpers::ProtoElemJson for CreateOrganizationAgentRequest {
     }
 }
 #[doc(hidden)]
-pub const __CREATE_ORGANIZATION_AGENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.CreateOrganizationAgentRequest",
-    to_json: ::buffa::type_registry::any_to_json::<CreateOrganizationAgentRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<CreateOrganizationAgentRequest>,
+pub const __CREATE_WORKSPACE_AGENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateWorkspaceAgentRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateWorkspaceAgentRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateWorkspaceAgentRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateOrganizationAgentResponse {
+pub struct CreateWorkspaceAgentResponse {
     /// Field 1: `agent`
     #[serde(
         rename = "agent",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub agent: ::buffa::MessageField<
-        OrganizationAgent,
-        ::buffa::Inline<OrganizationAgent>,
-    >,
+    pub agent: ::buffa::MessageField<WorkspaceAgent, ::buffa::Inline<WorkspaceAgent>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateOrganizationAgentResponse {
+impl ::core::fmt::Debug for CreateWorkspaceAgentResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateOrganizationAgentResponse")
+        f.debug_struct("CreateWorkspaceAgentResponse")
             .field("agent", &self.agent)
             .finish()
     }
 }
-impl CreateOrganizationAgentResponse {
+impl CreateWorkspaceAgentResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationAgentResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateWorkspaceAgentResponse";
 }
-::buffa::impl_default_instance!(CreateOrganizationAgentResponse);
-impl ::buffa::MessageName for CreateOrganizationAgentResponse {
+::buffa::impl_default_instance!(CreateWorkspaceAgentResponse);
+impl ::buffa::MessageName for CreateWorkspaceAgentResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "CreateOrganizationAgentResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationAgentResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationAgentResponse";
+    const NAME: &'static str = "CreateWorkspaceAgentResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.CreateWorkspaceAgentResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateWorkspaceAgentResponse";
 }
-impl ::buffa::Message for CreateOrganizationAgentResponse {
+impl ::buffa::Message for CreateWorkspaceAgentResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -16289,8 +16282,8 @@ impl ::buffa::Message for CreateOrganizationAgentResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CreateOrganizationAgentResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.CreateOrganizationAgentResponse";
+impl ::buffa::ExtensionSet for CreateWorkspaceAgentResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.CreateWorkspaceAgentResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -16298,7 +16291,7 @@ impl ::buffa::ExtensionSet for CreateOrganizationAgentResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for CreateOrganizationAgentResponse {
+impl ::buffa::json_helpers::ProtoElemJson for CreateWorkspaceAgentResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -16312,24 +16305,24 @@ impl ::buffa::json_helpers::ProtoElemJson for CreateOrganizationAgentResponse {
     }
 }
 #[doc(hidden)]
-pub const __CREATE_ORGANIZATION_AGENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.CreateOrganizationAgentResponse",
-    to_json: ::buffa::type_registry::any_to_json::<CreateOrganizationAgentResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<CreateOrganizationAgentResponse>,
+pub const __CREATE_WORKSPACE_AGENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.CreateWorkspaceAgentResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateWorkspaceAgentResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateWorkspaceAgentResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateOrganizationAgentRequest {
-    /// Field 1: `organization_id`
+pub struct UpdateWorkspaceAgentRequest {
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `agent_id`
     #[serde(
         rename = "agentId",
@@ -16392,10 +16385,10 @@ pub struct UpdateOrganizationAgentRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateOrganizationAgentRequest {
+impl ::core::fmt::Debug for UpdateWorkspaceAgentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateOrganizationAgentRequest")
-            .field("organization_id", &self.organization_id)
+        f.debug_struct("UpdateWorkspaceAgentRequest")
+            .field("workspace_id", &self.workspace_id)
             .field("agent_id", &self.agent_id)
             .field("name", &self.name)
             .field("provider", &self.provider)
@@ -16408,14 +16401,14 @@ impl ::core::fmt::Debug for UpdateOrganizationAgentRequest {
             .finish()
     }
 }
-impl UpdateOrganizationAgentRequest {
+impl UpdateWorkspaceAgentRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationAgentRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateWorkspaceAgentRequest";
 }
-impl UpdateOrganizationAgentRequest {
+impl UpdateWorkspaceAgentRequest {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::model`] to `Some(value)`, consuming and returning `self`.
@@ -16457,14 +16450,14 @@ impl UpdateOrganizationAgentRequest {
         self
     }
 }
-::buffa::impl_default_instance!(UpdateOrganizationAgentRequest);
-impl ::buffa::MessageName for UpdateOrganizationAgentRequest {
+::buffa::impl_default_instance!(UpdateWorkspaceAgentRequest);
+impl ::buffa::MessageName for UpdateWorkspaceAgentRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateOrganizationAgentRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationAgentRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationAgentRequest";
+    const NAME: &'static str = "UpdateWorkspaceAgentRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateWorkspaceAgentRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateWorkspaceAgentRequest";
 }
-impl ::buffa::Message for UpdateOrganizationAgentRequest {
+impl ::buffa::Message for UpdateWorkspaceAgentRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -16477,10 +16470,8 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.agent_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
@@ -16529,8 +16520,8 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.agent_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
@@ -16585,7 +16576,7 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -16678,7 +16669,7 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.agent_id.clear();
         self.name.clear();
         self.provider = ::buffa::EnumValue::from(0);
@@ -16691,8 +16682,8 @@ impl ::buffa::Message for UpdateOrganizationAgentRequest {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateOrganizationAgentRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationAgentRequest";
+impl ::buffa::ExtensionSet for UpdateWorkspaceAgentRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateWorkspaceAgentRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -16700,7 +16691,7 @@ impl ::buffa::ExtensionSet for UpdateOrganizationAgentRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationAgentRequest {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateWorkspaceAgentRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -16714,51 +16705,48 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationAgentRequest {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_ORGANIZATION_AGENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationAgentRequest",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateOrganizationAgentRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<UpdateOrganizationAgentRequest>,
+pub const __UPDATE_WORKSPACE_AGENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateWorkspaceAgentRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateWorkspaceAgentRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateWorkspaceAgentRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct UpdateOrganizationAgentResponse {
+pub struct UpdateWorkspaceAgentResponse {
     /// Field 1: `agent`
     #[serde(
         rename = "agent",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub agent: ::buffa::MessageField<
-        OrganizationAgent,
-        ::buffa::Inline<OrganizationAgent>,
-    >,
+    pub agent: ::buffa::MessageField<WorkspaceAgent, ::buffa::Inline<WorkspaceAgent>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for UpdateOrganizationAgentResponse {
+impl ::core::fmt::Debug for UpdateWorkspaceAgentResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateOrganizationAgentResponse")
+        f.debug_struct("UpdateWorkspaceAgentResponse")
             .field("agent", &self.agent)
             .finish()
     }
 }
-impl UpdateOrganizationAgentResponse {
+impl UpdateWorkspaceAgentResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationAgentResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateWorkspaceAgentResponse";
 }
-::buffa::impl_default_instance!(UpdateOrganizationAgentResponse);
-impl ::buffa::MessageName for UpdateOrganizationAgentResponse {
+::buffa::impl_default_instance!(UpdateWorkspaceAgentResponse);
+impl ::buffa::MessageName for UpdateWorkspaceAgentResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "UpdateOrganizationAgentResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationAgentResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationAgentResponse";
+    const NAME: &'static str = "UpdateWorkspaceAgentResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.UpdateWorkspaceAgentResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateWorkspaceAgentResponse";
 }
-impl ::buffa::Message for UpdateOrganizationAgentResponse {
+impl ::buffa::Message for UpdateWorkspaceAgentResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -16833,8 +16821,8 @@ impl ::buffa::Message for UpdateOrganizationAgentResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for UpdateOrganizationAgentResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.UpdateOrganizationAgentResponse";
+impl ::buffa::ExtensionSet for UpdateWorkspaceAgentResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.UpdateWorkspaceAgentResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -16842,7 +16830,7 @@ impl ::buffa::ExtensionSet for UpdateOrganizationAgentResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationAgentResponse {
+impl ::buffa::json_helpers::ProtoElemJson for UpdateWorkspaceAgentResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -16856,24 +16844,24 @@ impl ::buffa::json_helpers::ProtoElemJson for UpdateOrganizationAgentResponse {
     }
 }
 #[doc(hidden)]
-pub const __UPDATE_ORGANIZATION_AGENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.UpdateOrganizationAgentResponse",
-    to_json: ::buffa::type_registry::any_to_json::<UpdateOrganizationAgentResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<UpdateOrganizationAgentResponse>,
+pub const __UPDATE_WORKSPACE_AGENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.UpdateWorkspaceAgentResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UpdateWorkspaceAgentResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<UpdateWorkspaceAgentResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct DeleteOrganizationAgentRequest {
-    /// Field 1: `organization_id`
+pub struct DeleteWorkspaceAgentRequest {
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `agent_id`
     #[serde(
         rename = "agentId",
@@ -16886,29 +16874,29 @@ pub struct DeleteOrganizationAgentRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for DeleteOrganizationAgentRequest {
+impl ::core::fmt::Debug for DeleteWorkspaceAgentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("DeleteOrganizationAgentRequest")
-            .field("organization_id", &self.organization_id)
+        f.debug_struct("DeleteWorkspaceAgentRequest")
+            .field("workspace_id", &self.workspace_id)
             .field("agent_id", &self.agent_id)
             .finish()
     }
 }
-impl DeleteOrganizationAgentRequest {
+impl DeleteWorkspaceAgentRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteOrganizationAgentRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteWorkspaceAgentRequest";
 }
-::buffa::impl_default_instance!(DeleteOrganizationAgentRequest);
-impl ::buffa::MessageName for DeleteOrganizationAgentRequest {
+::buffa::impl_default_instance!(DeleteWorkspaceAgentRequest);
+impl ::buffa::MessageName for DeleteWorkspaceAgentRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "DeleteOrganizationAgentRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.DeleteOrganizationAgentRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteOrganizationAgentRequest";
+    const NAME: &'static str = "DeleteWorkspaceAgentRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.DeleteWorkspaceAgentRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteWorkspaceAgentRequest";
 }
-impl ::buffa::Message for DeleteOrganizationAgentRequest {
+impl ::buffa::Message for DeleteWorkspaceAgentRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -16921,10 +16909,8 @@ impl ::buffa::Message for DeleteOrganizationAgentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.agent_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
@@ -16939,8 +16925,8 @@ impl ::buffa::Message for DeleteOrganizationAgentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.agent_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
@@ -16963,7 +16949,7 @@ impl ::buffa::Message for DeleteOrganizationAgentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -16980,13 +16966,13 @@ impl ::buffa::Message for DeleteOrganizationAgentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.agent_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for DeleteOrganizationAgentRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.DeleteOrganizationAgentRequest";
+impl ::buffa::ExtensionSet for DeleteWorkspaceAgentRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.DeleteWorkspaceAgentRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -16994,7 +16980,7 @@ impl ::buffa::ExtensionSet for DeleteOrganizationAgentRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for DeleteOrganizationAgentRequest {
+impl ::buffa::json_helpers::ProtoElemJson for DeleteWorkspaceAgentRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -17008,16 +16994,16 @@ impl ::buffa::json_helpers::ProtoElemJson for DeleteOrganizationAgentRequest {
     }
 }
 #[doc(hidden)]
-pub const __DELETE_ORGANIZATION_AGENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.DeleteOrganizationAgentRequest",
-    to_json: ::buffa::type_registry::any_to_json::<DeleteOrganizationAgentRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<DeleteOrganizationAgentRequest>,
+pub const __DELETE_WORKSPACE_AGENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DeleteWorkspaceAgentRequest",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteWorkspaceAgentRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteWorkspaceAgentRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct DeleteOrganizationAgentResponse {
+pub struct DeleteWorkspaceAgentResponse {
     /// Field 1: `deleted`
     #[serde(
         rename = "deleted",
@@ -17029,28 +17015,28 @@ pub struct DeleteOrganizationAgentResponse {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for DeleteOrganizationAgentResponse {
+impl ::core::fmt::Debug for DeleteWorkspaceAgentResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("DeleteOrganizationAgentResponse")
+        f.debug_struct("DeleteWorkspaceAgentResponse")
             .field("deleted", &self.deleted)
             .finish()
     }
 }
-impl DeleteOrganizationAgentResponse {
+impl DeleteWorkspaceAgentResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteOrganizationAgentResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteWorkspaceAgentResponse";
 }
-::buffa::impl_default_instance!(DeleteOrganizationAgentResponse);
-impl ::buffa::MessageName for DeleteOrganizationAgentResponse {
+::buffa::impl_default_instance!(DeleteWorkspaceAgentResponse);
+impl ::buffa::MessageName for DeleteWorkspaceAgentResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "DeleteOrganizationAgentResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.DeleteOrganizationAgentResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteOrganizationAgentResponse";
+    const NAME: &'static str = "DeleteWorkspaceAgentResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.DeleteWorkspaceAgentResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteWorkspaceAgentResponse";
 }
-impl ::buffa::Message for DeleteOrganizationAgentResponse {
+impl ::buffa::Message for DeleteWorkspaceAgentResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -17111,8 +17097,8 @@ impl ::buffa::Message for DeleteOrganizationAgentResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for DeleteOrganizationAgentResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.DeleteOrganizationAgentResponse";
+impl ::buffa::ExtensionSet for DeleteWorkspaceAgentResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.DeleteWorkspaceAgentResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -17120,7 +17106,7 @@ impl ::buffa::ExtensionSet for DeleteOrganizationAgentResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for DeleteOrganizationAgentResponse {
+impl ::buffa::json_helpers::ProtoElemJson for DeleteWorkspaceAgentResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -17134,10 +17120,10 @@ impl ::buffa::json_helpers::ProtoElemJson for DeleteOrganizationAgentResponse {
     }
 }
 #[doc(hidden)]
-pub const __DELETE_ORGANIZATION_AGENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.DeleteOrganizationAgentResponse",
-    to_json: ::buffa::type_registry::any_to_json::<DeleteOrganizationAgentResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<DeleteOrganizationAgentResponse>,
+pub const __DELETE_WORKSPACE_AGENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.DeleteWorkspaceAgentResponse",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteWorkspaceAgentResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteWorkspaceAgentResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -28193,7 +28179,7 @@ pub const __PROJECT_AGENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct OrganizationAgent {
+pub struct WorkspaceAgent {
     /// Field 1: `agent_id`
     #[serde(
         rename = "agentId",
@@ -28283,9 +28269,9 @@ pub struct OrganizationAgent {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for OrganizationAgent {
+impl ::core::fmt::Debug for WorkspaceAgent {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("OrganizationAgent")
+        f.debug_struct("WorkspaceAgent")
             .field("agent_id", &self.agent_id)
             .field("name", &self.name)
             .field("avatar", &self.avatar)
@@ -28302,14 +28288,14 @@ impl ::core::fmt::Debug for OrganizationAgent {
             .finish()
     }
 }
-impl OrganizationAgent {
+impl WorkspaceAgent {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationAgent";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.WorkspaceAgent";
 }
-impl OrganizationAgent {
+impl WorkspaceAgent {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::avatar`] to `Some(value)`, consuming and returning `self`.
@@ -28371,14 +28357,14 @@ impl OrganizationAgent {
         self
     }
 }
-::buffa::impl_default_instance!(OrganizationAgent);
-impl ::buffa::MessageName for OrganizationAgent {
+::buffa::impl_default_instance!(WorkspaceAgent);
+impl ::buffa::MessageName for WorkspaceAgent {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "OrganizationAgent";
-    const FULL_NAME: &'static str = "briar.app.v1.OrganizationAgent";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationAgent";
+    const NAME: &'static str = "WorkspaceAgent";
+    const FULL_NAME: &'static str = "briar.app.v1.WorkspaceAgent";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.WorkspaceAgent";
 }
-impl ::buffa::Message for OrganizationAgent {
+impl ::buffa::Message for WorkspaceAgent {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -28678,8 +28664,8 @@ impl ::buffa::Message for OrganizationAgent {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for OrganizationAgent {
-    const PROTO_FQN: &'static str = "briar.app.v1.OrganizationAgent";
+impl ::buffa::ExtensionSet for WorkspaceAgent {
+    const PROTO_FQN: &'static str = "briar.app.v1.WorkspaceAgent";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -28687,7 +28673,7 @@ impl ::buffa::ExtensionSet for OrganizationAgent {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for OrganizationAgent {
+impl ::buffa::json_helpers::ProtoElemJson for WorkspaceAgent {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -28701,10 +28687,10 @@ impl ::buffa::json_helpers::ProtoElemJson for OrganizationAgent {
     }
 }
 #[doc(hidden)]
-pub const __ORGANIZATION_AGENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.OrganizationAgent",
-    to_json: ::buffa::type_registry::any_to_json::<OrganizationAgent>,
-    from_json: ::buffa::type_registry::any_from_json::<OrganizationAgent>,
+pub const __WORKSPACE_AGENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.WorkspaceAgent",
+    to_json: ::buffa::type_registry::any_to_json::<WorkspaceAgent>,
+    from_json: ::buffa::type_registry::any_from_json::<WorkspaceAgent>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -57397,14 +57383,14 @@ impl ::buffa::Enumeration for DmMemoryBriefState {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListDmMemoriesRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -57430,7 +57416,7 @@ pub struct ListDmMemoriesRequest {
 impl ::core::fmt::Debug for ListDmMemoriesRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListDmMemoriesRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("memory_space_id", &self.memory_space_id)
             .field("cursor", &self.cursor)
@@ -57486,10 +57472,8 @@ impl ::buffa::Message for ListDmMemoriesRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -57510,8 +57494,8 @@ impl ::buffa::Message for ListDmMemoriesRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -57540,7 +57524,7 @@ impl ::buffa::Message for ListDmMemoriesRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -57579,7 +57563,7 @@ impl ::buffa::Message for ListDmMemoriesRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.memory_space_id = ::core::option::Option::None;
         self.cursor = ::core::option::Option::None;
@@ -59226,14 +59210,14 @@ pub const __DM_MEMORY_LEARNING_RETRYABLE_JOB_JSON_ANY: ::buffa::type_registry::J
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct RetryDmMemoryLearningRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -59273,7 +59257,7 @@ pub struct RetryDmMemoryLearningRequest {
 impl ::core::fmt::Debug for RetryDmMemoryLearningRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("RetryDmMemoryLearningRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("job_id", &self.job_id)
             .field("request_id", &self.request_id)
@@ -59308,10 +59292,8 @@ impl ::buffa::Message for RetryDmMemoryLearningRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -59337,8 +59319,8 @@ impl ::buffa::Message for RetryDmMemoryLearningRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -59370,7 +59352,7 @@ impl ::buffa::Message for RetryDmMemoryLearningRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -59408,7 +59390,7 @@ impl ::buffa::Message for RetryDmMemoryLearningRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.job_id.clear();
         self.request_id.clear();
@@ -59597,14 +59579,14 @@ pub const __RETRY_DM_MEMORY_LEARNING_RESPONSE_JSON_ANY: ::buffa::type_registry::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetDmMemoryDocumentRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -59635,7 +59617,7 @@ pub struct GetDmMemoryDocumentRequest {
 impl ::core::fmt::Debug for GetDmMemoryDocumentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetDmMemoryDocumentRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("document_id", &self.document_id)
             .field("version", &self.version)
@@ -59678,10 +59660,8 @@ impl ::buffa::Message for GetDmMemoryDocumentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -59702,8 +59682,8 @@ impl ::buffa::Message for GetDmMemoryDocumentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -59732,7 +59712,7 @@ impl ::buffa::Message for GetDmMemoryDocumentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -59765,7 +59745,7 @@ impl ::buffa::Message for GetDmMemoryDocumentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.document_id.clear();
         self.version = ::core::option::Option::None;
@@ -59947,14 +59927,14 @@ pub const __GET_DM_MEMORY_DOCUMENT_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListDmMemoryRevisionsRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -59985,7 +59965,7 @@ pub struct ListDmMemoryRevisionsRequest {
 impl ::core::fmt::Debug for ListDmMemoryRevisionsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListDmMemoryRevisionsRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("document_id", &self.document_id)
             .field("cursor", &self.cursor)
@@ -60028,10 +60008,8 @@ impl ::buffa::Message for ListDmMemoryRevisionsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -60052,8 +60030,8 @@ impl ::buffa::Message for ListDmMemoryRevisionsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -60082,7 +60060,7 @@ impl ::buffa::Message for ListDmMemoryRevisionsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -60115,7 +60093,7 @@ impl ::buffa::Message for ListDmMemoryRevisionsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.document_id.clear();
         self.cursor = ::core::option::Option::None;
@@ -60666,14 +60644,14 @@ pub const __DM_MEMORY_REVISION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateDmMemoryDocumentRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -60764,7 +60742,7 @@ pub struct CreateDmMemoryDocumentRequest {
 impl ::core::fmt::Debug for CreateDmMemoryDocumentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateDmMemoryDocumentRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("request_id", &self.request_id)
             .field("memory_space_id", &self.memory_space_id)
@@ -60817,10 +60795,8 @@ impl ::buffa::Message for CreateDmMemoryDocumentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -60882,8 +60858,8 @@ impl ::buffa::Message for CreateDmMemoryDocumentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -60951,7 +60927,7 @@ impl ::buffa::Message for CreateDmMemoryDocumentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -61050,7 +61026,7 @@ impl ::buffa::Message for CreateDmMemoryDocumentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.request_id.clear();
         self.memory_space_id = ::core::option::Option::None;
@@ -61097,14 +61073,14 @@ pub const __CREATE_DM_MEMORY_DOCUMENT_REQUEST_JSON_ANY: ::buffa::type_registry::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct UpdateDmMemoryDocumentRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -61211,7 +61187,7 @@ pub struct UpdateDmMemoryDocumentRequest {
 impl ::core::fmt::Debug for UpdateDmMemoryDocumentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateDmMemoryDocumentRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("document_id", &self.document_id)
             .field("request_id", &self.request_id)
@@ -61266,10 +61242,8 @@ impl ::buffa::Message for UpdateDmMemoryDocumentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -61339,8 +61313,8 @@ impl ::buffa::Message for UpdateDmMemoryDocumentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -61414,7 +61388,7 @@ impl ::buffa::Message for UpdateDmMemoryDocumentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -61527,7 +61501,7 @@ impl ::buffa::Message for UpdateDmMemoryDocumentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.document_id.clear();
         self.request_id.clear();
@@ -61918,14 +61892,14 @@ pub const __UPDATE_DM_MEMORY_DOCUMENT_RESPONSE_JSON_ANY: ::buffa::type_registry:
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct DeleteDmMemoryDocumentRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -61949,7 +61923,7 @@ pub struct DeleteDmMemoryDocumentRequest {
 impl ::core::fmt::Debug for DeleteDmMemoryDocumentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("DeleteDmMemoryDocumentRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("document_id", &self.document_id)
             .finish()
@@ -61982,10 +61956,8 @@ impl ::buffa::Message for DeleteDmMemoryDocumentRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -62003,8 +61975,8 @@ impl ::buffa::Message for DeleteDmMemoryDocumentRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -62030,7 +62002,7 @@ impl ::buffa::Message for DeleteDmMemoryDocumentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -62054,7 +62026,7 @@ impl ::buffa::Message for DeleteDmMemoryDocumentRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.document_id.clear();
         self.__buffa_unknown_fields.clear();
@@ -62242,14 +62214,14 @@ pub const __DELETE_DM_MEMORY_DOCUMENT_RESPONSE_JSON_ANY: ::buffa::type_registry:
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct UpdateDmMemorySettingsRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `channel_id`
     #[serde(
         rename = "channelId",
@@ -62304,7 +62276,7 @@ pub struct UpdateDmMemorySettingsRequest {
 impl ::core::fmt::Debug for UpdateDmMemorySettingsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateDmMemorySettingsRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("channel_id", &self.channel_id)
             .field("request_id", &self.request_id)
             .field("memory_space_id", &self.memory_space_id)
@@ -62353,10 +62325,8 @@ impl ::buffa::Message for UpdateDmMemorySettingsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if !self.channel_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.channel_id) as u64;
@@ -62389,8 +62359,8 @@ impl ::buffa::Message for UpdateDmMemorySettingsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         if !self.channel_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -62428,7 +62398,7 @@ impl ::buffa::Message for UpdateDmMemorySettingsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -62485,7 +62455,7 @@ impl ::buffa::Message for UpdateDmMemorySettingsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.channel_id.clear();
         self.request_id.clear();
         self.memory_space_id = ::core::option::Option::None;
@@ -66202,7 +66172,7 @@ pub struct ListDirectMessageRecipientsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub agents: ::buffa::alloc::vec::Vec<OrganizationAgent>,
+    pub agents: ::buffa::alloc::vec::Vec<WorkspaceAgent>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -69331,7 +69301,7 @@ pub struct SetChannelAgentResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub agents: ::buffa::alloc::vec::Vec<OrganizationAgent>,
+    pub agents: ::buffa::alloc::vec::Vec<WorkspaceAgent>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -72068,7 +72038,7 @@ pub struct GetChannelResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub agents: ::buffa::alloc::vec::Vec<OrganizationAgent>,
+    pub agents: ::buffa::alloc::vec::Vec<WorkspaceAgent>,
     /// Field 4: `messages`
     #[serde(
         rename = "messages",
@@ -88274,13 +88244,13 @@ pub struct CreateTeamRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub name: ::buffa::alloc::string::String,
-    /// Field 2: `organization_id`
+    /// Field 2: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         skip_serializing_if = "::core::option::Option::is_none"
     )]
-    pub organization_id: ::core::option::Option<::buffa::alloc::string::String>,
+    pub workspace_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -88289,7 +88259,7 @@ impl ::core::fmt::Debug for CreateTeamRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateTeamRequest")
             .field("name", &self.name)
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .finish()
     }
 }
@@ -88303,12 +88273,12 @@ impl CreateTeamRequest {
 impl CreateTeamRequest {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
-    ///Sets [`Self::organization_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_organization_id(
+    ///Sets [`Self::workspace_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_workspace_id(
         mut self,
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
-        self.organization_id = Some(value.into());
+        self.workspace_id = Some(value.into());
         self
     }
 }
@@ -88335,7 +88305,7 @@ impl ::buffa::Message for CreateTeamRequest {
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
         }
-        if let Some(ref v) = self.organization_id {
+        if let Some(ref v) = self.workspace_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -88351,7 +88321,7 @@ impl ::buffa::Message for CreateTeamRequest {
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.name, buf);
         }
-        if let Some(ref v) = self.organization_id {
+        if let Some(ref v) = self.workspace_id {
             ::buffa::types::put_string_field(2u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -88381,7 +88351,7 @@ impl ::buffa::Message for CreateTeamRequest {
                 )?;
                 ::buffa::types::merge_string(
                     self
-                        .organization_id
+                        .workspace_id
                         .get_or_insert_with(::buffa::alloc::string::String::new),
                     buf,
                 )?;
@@ -88395,7 +88365,7 @@ impl ::buffa::Message for CreateTeamRequest {
     }
     fn clear(&mut self) {
         self.name.clear();
-        self.organization_id = ::core::option::Option::None;
+        self.workspace_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -92940,22 +92910,22 @@ pub struct Team {
     /// Field 5: `icon`
     #[serde(rename = "icon", skip_serializing_if = "::core::option::Option::is_none")]
     pub icon: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 6: `organization_id`
+    /// Field 6: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
-    /// Field 7: `organization_name`
+    pub workspace_id: ::buffa::alloc::string::String,
+    /// Field 7: `workspace_name`
     #[serde(
-        rename = "organizationName",
-        alias = "organization_name",
+        rename = "workspaceName",
+        alias = "workspace_name",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_name: ::buffa::alloc::string::String,
+    pub workspace_name: ::buffa::alloc::string::String,
     /// Field 8: `role`
     #[serde(
         rename = "role",
@@ -92999,8 +92969,8 @@ impl ::core::fmt::Debug for Team {
             .field("issue_key_prefix", &self.issue_key_prefix)
             .field("schedule_tab_enabled", &self.schedule_tab_enabled)
             .field("icon", &self.icon)
-            .field("organization_id", &self.organization_id)
-            .field("organization_name", &self.organization_name)
+            .field("workspace_id", &self.workspace_id)
+            .field("workspace_name", &self.workspace_name)
             .field("role", &self.role)
             .field("created_at", &self.created_at)
             .field("icon_name", &self.icon_name)
@@ -93084,15 +93054,13 @@ impl ::buffa::Message for Team {
         if let Some(ref v) = self.icon {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
-        if !self.organization_name.is_empty() {
+        if !self.workspace_name.is_empty() {
             size
                 += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_name) as u64;
+                    + ::buffa::types::string_encoded_len(&self.workspace_name) as u64;
         }
         {
             let val = self.role.to_i32();
@@ -93139,11 +93107,11 @@ impl ::buffa::Message for Team {
         if let Some(ref v) = self.icon {
             ::buffa::types::put_string_field(5u32, v, buf);
         }
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(6u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.workspace_id, buf);
         }
-        if !self.organization_name.is_empty() {
-            ::buffa::types::put_string_field(7u32, &self.organization_name, buf);
+        if !self.workspace_name.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.workspace_name, buf);
         }
         {
             let val = self.role.to_i32();
@@ -93221,14 +93189,14 @@ impl ::buffa::Message for Team {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_name, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_name, buf)?;
             }
             8u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -93285,8 +93253,8 @@ impl ::buffa::Message for Team {
         self.issue_key_prefix.clear();
         self.schedule_tab_enabled = false;
         self.icon = ::core::option::Option::None;
-        self.organization_id.clear();
-        self.organization_name.clear();
+        self.workspace_id.clear();
+        self.workspace_name.clear();
         self.role = ::buffa::EnumValue::from(0);
         self.created_at = ::buffa::MessageField::none();
         self.icon_name = ::core::option::Option::None;
@@ -122629,14 +122597,14 @@ pub const __GIT_HUB_INSTALLATION_REPOSITORY_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetGitHubIntegrationRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -122644,7 +122612,7 @@ pub struct GetGitHubIntegrationRequest {
 impl ::core::fmt::Debug for GetGitHubIntegrationRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetGitHubIntegrationRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .finish()
     }
 }
@@ -122675,10 +122643,8 @@ impl ::buffa::Message for GetGitHubIntegrationRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -122690,8 +122656,8 @@ impl ::buffa::Message for GetGitHubIntegrationRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -122711,7 +122677,7 @@ impl ::buffa::Message for GetGitHubIntegrationRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -122721,7 +122687,7 @@ impl ::buffa::Message for GetGitHubIntegrationRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -123113,14 +123079,14 @@ pub const __GET_GIT_HUB_INTEGRATION_RESPONSE_JSON_ANY: ::buffa::type_registry::J
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct BeginGitHubInstallationRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -123128,7 +123094,7 @@ pub struct BeginGitHubInstallationRequest {
 impl ::core::fmt::Debug for BeginGitHubInstallationRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("BeginGitHubInstallationRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .finish()
     }
 }
@@ -123159,10 +123125,8 @@ impl ::buffa::Message for BeginGitHubInstallationRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -123174,8 +123138,8 @@ impl ::buffa::Message for BeginGitHubInstallationRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -123195,7 +123159,7 @@ impl ::buffa::Message for BeginGitHubInstallationRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -123205,7 +123169,7 @@ impl ::buffa::Message for BeginGitHubInstallationRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -123377,14 +123341,14 @@ pub struct ProjectGitHubCredential {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub project_id: ::buffa::alloc::string::String,
-    /// Field 2: `organization_id`
+    /// Field 2: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 3: `repository_id`
     #[serde(
         rename = "repositoryId",
@@ -123440,7 +123404,7 @@ impl ::core::fmt::Debug for ProjectGitHubCredential {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ProjectGitHubCredential")
             .field("project_id", &self.project_id)
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .field("repository_id", &self.repository_id)
             .field("repository", &self.repository)
             .field("clone_url", &self.clone_url)
@@ -123480,10 +123444,8 @@ impl ::buffa::Message for ProjectGitHubCredential {
         if !self.project_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
         }
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         if self.repository_id != 0u64 {
             size += 1u64 + ::buffa::types::uint64_encoded_len(self.repository_id) as u64;
@@ -123521,8 +123483,8 @@ impl ::buffa::Message for ProjectGitHubCredential {
         if !self.project_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.project_id, buf);
         }
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.workspace_id, buf);
         }
         if self.repository_id != 0u64 {
             ::buffa::types::put_uint64_field(3u32, self.repository_id, buf);
@@ -123572,7 +123534,7 @@ impl ::buffa::Message for ProjectGitHubCredential {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -123629,7 +123591,7 @@ impl ::buffa::Message for ProjectGitHubCredential {
     }
     fn clear(&mut self) {
         self.project_id.clear();
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.repository_id = 0u64;
         self.repository.clear();
         self.clone_url.clear();
@@ -167891,13 +167853,13 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ListOrganizationAgentsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+        pub struct ListWorkspaceAgentsRequestView<'a> {
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ListOrganizationAgentsRequestView<'a> {
-            type Owned = super::super::ListOrganizationAgentsRequest;
+        impl<'a> ::buffa::MessageView<'a> for ListWorkspaceAgentsRequestView<'a> {
+            type Owned = super::super::ListWorkspaceAgentsRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -167933,7 +167895,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -167947,7 +167909,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ListOrganizationAgentsRequest,
+                super::super::ListWorkspaceAgentsRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -167957,14 +167919,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ListOrganizationAgentsRequest,
+                super::super::ListWorkspaceAgentsRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ListOrganizationAgentsRequest {
-                    organization_id: self.organization_id.to_string(),
+                ::core::result::Result::Ok(super::super::ListWorkspaceAgentsRequest {
+                    workspace_id: self.workspace_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -167973,16 +167935,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationAgentsRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for ListWorkspaceAgentsRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -167996,8 +167958,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -168013,37 +167975,37 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ListOrganizationAgentsRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for ListWorkspaceAgentsRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ListOrganizationAgentsRequestView<'a> {
+        impl<'a> ::buffa::MessageName for ListWorkspaceAgentsRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ListOrganizationAgentsRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationAgentsRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationAgentsRequest";
+            const NAME: &'static str = "ListWorkspaceAgentsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.ListWorkspaceAgentsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceAgentsRequest";
         }
-        ::buffa::impl_default_view_instance!(ListOrganizationAgentsRequestView);
-        ::buffa::impl_view_reborrow!(ListOrganizationAgentsRequestView);
-        /** Self-contained, `'static` owned view of a `ListOrganizationAgentsRequest` message.
+        ::buffa::impl_default_view_instance!(ListWorkspaceAgentsRequestView);
+        ::buffa::impl_view_reborrow!(ListWorkspaceAgentsRequestView);
+        /** Self-contained, `'static` owned view of a `ListWorkspaceAgentsRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationAgentsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`ListWorkspaceAgentsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationAgentsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListWorkspaceAgentsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ListOrganizationAgentsRequestOwnedView(
-            ::buffa::OwnedView<ListOrganizationAgentsRequestView<'static>>,
+        pub struct ListWorkspaceAgentsRequestOwnedView(
+            ::buffa::OwnedView<ListWorkspaceAgentsRequestView<'static>>,
         );
-        impl ListOrganizationAgentsRequestOwnedView {
+        impl ListWorkspaceAgentsRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -168057,7 +168019,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationAgentsRequestOwnedView(
+                    ListWorkspaceAgentsRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -168074,7 +168036,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationAgentsRequestOwnedView(
+                    ListWorkspaceAgentsRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -168088,17 +168050,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ListOrganizationAgentsRequest,
+                msg: &super::super::ListWorkspaceAgentsRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationAgentsRequestOwnedView(
+                    ListWorkspaceAgentsRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`ListOrganizationAgentsRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`ListWorkspaceAgentsRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ListOrganizationAgentsRequestView<'_> {
+            pub fn view(&self) -> &ListWorkspaceAgentsRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -168109,9 +168071,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::ListOrganizationAgentsRequest {
+            pub fn to_owned_message(&self) -> super::super::ListWorkspaceAgentsRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -168124,41 +168084,41 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<ListOrganizationAgentsRequestView<'static>>,
-        > for ListOrganizationAgentsRequestOwnedView {
+            ::buffa::OwnedView<ListWorkspaceAgentsRequestView<'static>>,
+        > for ListWorkspaceAgentsRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<ListOrganizationAgentsRequestView<'static>>,
+                inner: ::buffa::OwnedView<ListWorkspaceAgentsRequestView<'static>>,
             ) -> Self {
-                ListOrganizationAgentsRequestOwnedView(inner)
+                ListWorkspaceAgentsRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ListOrganizationAgentsRequestOwnedView>
-        for ::buffa::OwnedView<ListOrganizationAgentsRequestView<'static>> {
-            fn from(wrapper: ListOrganizationAgentsRequestOwnedView) -> Self {
+        impl ::core::convert::From<ListWorkspaceAgentsRequestOwnedView>
+        for ::buffa::OwnedView<ListWorkspaceAgentsRequestView<'static>> {
+            fn from(wrapper: ListWorkspaceAgentsRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ListOrganizationAgentsRequestView<'static>>,
-        > for ListOrganizationAgentsRequestOwnedView {
+            ::buffa::OwnedView<ListWorkspaceAgentsRequestView<'static>>,
+        > for ListWorkspaceAgentsRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<ListOrganizationAgentsRequestView<'static>> {
+            ) -> &::buffa::OwnedView<ListWorkspaceAgentsRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::ListOrganizationAgentsRequest {
-            type View<'a> = ListOrganizationAgentsRequestView<'a>;
-            type ViewHandle = ListOrganizationAgentsRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::ListWorkspaceAgentsRequest {
+            type View<'a> = ListWorkspaceAgentsRequestView<'a>;
+            type ViewHandle = ListWorkspaceAgentsRequestOwnedView;
         }
-        impl ::serde::Serialize for ListOrganizationAgentsRequestOwnedView {
+        impl ::serde::Serialize for ListWorkspaceAgentsRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -168167,18 +168127,18 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ListOrganizationAgentsResponseView<'a> {
+        pub struct ListWorkspaceAgentsResponseView<'a> {
             /// Field 1: `agents`
             pub agents: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::OrganizationAgentView<'a>,
+                super::super::__buffa::view::WorkspaceAgentView<'a>,
             >,
             /// Field 2: `can_manage`
             pub can_manage: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ListOrganizationAgentsResponseView<'a> {
-            type Owned = super::super::ListOrganizationAgentsResponse;
+        impl<'a> ::buffa::MessageView<'a> for ListWorkspaceAgentsResponseView<'a> {
+            type Owned = super::super::ListWorkspaceAgentsResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -168225,12 +168185,12 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         ctx.register_element_memory(
                             ::core::mem::size_of::<
-                                super::super::__buffa::view::OrganizationAgentView,
+                                super::super::__buffa::view::WorkspaceAgentView,
                             >(),
                         )?;
                         view.agents
                             .push(
-                                <super::super::__buffa::view::OrganizationAgentView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::WorkspaceAgentView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -168248,7 +168208,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ListOrganizationAgentsResponse,
+                super::super::ListWorkspaceAgentsResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -168258,13 +168218,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ListOrganizationAgentsResponse,
+                super::super::ListWorkspaceAgentsResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ListOrganizationAgentsResponse {
+                ::core::result::Result::Ok(super::super::ListWorkspaceAgentsResponse {
                     agents: self
                         .agents
                         .iter()
@@ -168279,7 +168239,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationAgentsResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for ListWorkspaceAgentsResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -168332,7 +168292,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ListOrganizationAgentsResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for ListWorkspaceAgentsResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -168348,24 +168308,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ListOrganizationAgentsResponseView<'a> {
+        impl<'a> ::buffa::MessageName for ListWorkspaceAgentsResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ListOrganizationAgentsResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationAgentsResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationAgentsResponse";
+            const NAME: &'static str = "ListWorkspaceAgentsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.ListWorkspaceAgentsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceAgentsResponse";
         }
-        ::buffa::impl_default_view_instance!(ListOrganizationAgentsResponseView);
-        ::buffa::impl_view_reborrow!(ListOrganizationAgentsResponseView);
-        /** Self-contained, `'static` owned view of a `ListOrganizationAgentsResponse` message.
+        ::buffa::impl_default_view_instance!(ListWorkspaceAgentsResponseView);
+        ::buffa::impl_view_reborrow!(ListWorkspaceAgentsResponseView);
+        /** Self-contained, `'static` owned view of a `ListWorkspaceAgentsResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationAgentsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`ListWorkspaceAgentsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationAgentsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListWorkspaceAgentsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ListOrganizationAgentsResponseOwnedView(
-            ::buffa::OwnedView<ListOrganizationAgentsResponseView<'static>>,
+        pub struct ListWorkspaceAgentsResponseOwnedView(
+            ::buffa::OwnedView<ListWorkspaceAgentsResponseView<'static>>,
         );
-        impl ListOrganizationAgentsResponseOwnedView {
+        impl ListWorkspaceAgentsResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -168379,7 +168339,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationAgentsResponseOwnedView(
+                    ListWorkspaceAgentsResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -168396,7 +168356,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationAgentsResponseOwnedView(
+                    ListWorkspaceAgentsResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -168410,17 +168370,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ListOrganizationAgentsResponse,
+                msg: &super::super::ListWorkspaceAgentsResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationAgentsResponseOwnedView(
+                    ListWorkspaceAgentsResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`ListOrganizationAgentsResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`ListWorkspaceAgentsResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ListOrganizationAgentsResponseView<'_> {
+            pub fn view(&self) -> &ListWorkspaceAgentsResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -168431,9 +168391,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::ListOrganizationAgentsResponse {
+            pub fn to_owned_message(&self) -> super::super::ListWorkspaceAgentsResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -168452,7 +168410,7 @@ pub mod __buffa {
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::OrganizationAgentView<'_>,
+                super::super::__buffa::view::WorkspaceAgentView<'_>,
             > {
                 &self.0.reborrow().agents
             }
@@ -168463,34 +168421,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<ListOrganizationAgentsResponseView<'static>>,
-        > for ListOrganizationAgentsResponseOwnedView {
+            ::buffa::OwnedView<ListWorkspaceAgentsResponseView<'static>>,
+        > for ListWorkspaceAgentsResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<ListOrganizationAgentsResponseView<'static>>,
+                inner: ::buffa::OwnedView<ListWorkspaceAgentsResponseView<'static>>,
             ) -> Self {
-                ListOrganizationAgentsResponseOwnedView(inner)
+                ListWorkspaceAgentsResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ListOrganizationAgentsResponseOwnedView>
-        for ::buffa::OwnedView<ListOrganizationAgentsResponseView<'static>> {
-            fn from(wrapper: ListOrganizationAgentsResponseOwnedView) -> Self {
+        impl ::core::convert::From<ListWorkspaceAgentsResponseOwnedView>
+        for ::buffa::OwnedView<ListWorkspaceAgentsResponseView<'static>> {
+            fn from(wrapper: ListWorkspaceAgentsResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ListOrganizationAgentsResponseView<'static>>,
-        > for ListOrganizationAgentsResponseOwnedView {
+            ::buffa::OwnedView<ListWorkspaceAgentsResponseView<'static>>,
+        > for ListWorkspaceAgentsResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<ListOrganizationAgentsResponseView<'static>> {
+            ) -> &::buffa::OwnedView<ListWorkspaceAgentsResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::ListOrganizationAgentsResponse {
-            type View<'a> = ListOrganizationAgentsResponseView<'a>;
-            type ViewHandle = ListOrganizationAgentsResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::ListWorkspaceAgentsResponse {
+            type View<'a> = ListWorkspaceAgentsResponseView<'a>;
+            type ViewHandle = ListWorkspaceAgentsResponseOwnedView;
         }
-        impl ::serde::Serialize for ListOrganizationAgentsResponseOwnedView {
+        impl ::serde::Serialize for ListWorkspaceAgentsResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -168499,9 +168457,9 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct CreateOrganizationAgentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+        pub struct CreateWorkspaceAgentRequestView<'a> {
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `name`
             pub name: &'a str,
             /// Field 3: `provider`
@@ -168529,8 +168487,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for CreateOrganizationAgentRequestView<'a> {
-            type Owned = super::super::CreateOrganizationAgentRequest;
+        impl<'a> ::buffa::MessageView<'a> for CreateWorkspaceAgentRequestView<'a> {
+            type Owned = super::super::CreateWorkspaceAgentRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -168566,7 +168524,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -168655,7 +168613,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateOrganizationAgentRequest,
+                super::super::CreateWorkspaceAgentRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -168665,14 +168623,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::CreateOrganizationAgentRequest,
+                super::super::CreateWorkspaceAgentRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::CreateOrganizationAgentRequest {
-                    organization_id: self.organization_id.to_string(),
+                ::core::result::Result::Ok(super::super::CreateWorkspaceAgentRequest {
+                    workspace_id: self.workspace_id.to_string(),
                     name: self.name.to_string(),
                     provider: self.provider,
                     model: self.model.map(|s| s.to_string()),
@@ -168693,16 +168651,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for CreateOrganizationAgentRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for CreateWorkspaceAgentRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.name.is_empty() {
@@ -168751,8 +168709,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.name.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.name, buf);
@@ -168800,15 +168758,15 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for CreateOrganizationAgentRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for CreateWorkspaceAgentRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
                     __map.serialize_entry("name", self.name)?;
@@ -168839,24 +168797,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for CreateOrganizationAgentRequestView<'a> {
+        impl<'a> ::buffa::MessageName for CreateWorkspaceAgentRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "CreateOrganizationAgentRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationAgentRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationAgentRequest";
+            const NAME: &'static str = "CreateWorkspaceAgentRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateWorkspaceAgentRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateWorkspaceAgentRequest";
         }
-        ::buffa::impl_default_view_instance!(CreateOrganizationAgentRequestView);
-        ::buffa::impl_view_reborrow!(CreateOrganizationAgentRequestView);
-        /** Self-contained, `'static` owned view of a `CreateOrganizationAgentRequest` message.
+        ::buffa::impl_default_view_instance!(CreateWorkspaceAgentRequestView);
+        ::buffa::impl_view_reborrow!(CreateWorkspaceAgentRequestView);
+        /** Self-contained, `'static` owned view of a `CreateWorkspaceAgentRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CreateOrganizationAgentRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`CreateWorkspaceAgentRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateOrganizationAgentRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateWorkspaceAgentRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct CreateOrganizationAgentRequestOwnedView(
-            ::buffa::OwnedView<CreateOrganizationAgentRequestView<'static>>,
+        pub struct CreateWorkspaceAgentRequestOwnedView(
+            ::buffa::OwnedView<CreateWorkspaceAgentRequestView<'static>>,
         );
-        impl CreateOrganizationAgentRequestOwnedView {
+        impl CreateWorkspaceAgentRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -168870,7 +168828,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateOrganizationAgentRequestOwnedView(
+                    CreateWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -168887,7 +168845,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateOrganizationAgentRequestOwnedView(
+                    CreateWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -168901,17 +168859,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::CreateOrganizationAgentRequest,
+                msg: &super::super::CreateWorkspaceAgentRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateOrganizationAgentRequestOwnedView(
+                    CreateWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`CreateOrganizationAgentRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`CreateWorkspaceAgentRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &CreateOrganizationAgentRequestView<'_> {
+            pub fn view(&self) -> &CreateWorkspaceAgentRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -168922,9 +168880,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::CreateOrganizationAgentRequest {
+            pub fn to_owned_message(&self) -> super::super::CreateWorkspaceAgentRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -168937,10 +168893,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `name`
             #[must_use]
@@ -168999,34 +168955,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<CreateOrganizationAgentRequestView<'static>>,
-        > for CreateOrganizationAgentRequestOwnedView {
+            ::buffa::OwnedView<CreateWorkspaceAgentRequestView<'static>>,
+        > for CreateWorkspaceAgentRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<CreateOrganizationAgentRequestView<'static>>,
+                inner: ::buffa::OwnedView<CreateWorkspaceAgentRequestView<'static>>,
             ) -> Self {
-                CreateOrganizationAgentRequestOwnedView(inner)
+                CreateWorkspaceAgentRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<CreateOrganizationAgentRequestOwnedView>
-        for ::buffa::OwnedView<CreateOrganizationAgentRequestView<'static>> {
-            fn from(wrapper: CreateOrganizationAgentRequestOwnedView) -> Self {
+        impl ::core::convert::From<CreateWorkspaceAgentRequestOwnedView>
+        for ::buffa::OwnedView<CreateWorkspaceAgentRequestView<'static>> {
+            fn from(wrapper: CreateWorkspaceAgentRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<CreateOrganizationAgentRequestView<'static>>,
-        > for CreateOrganizationAgentRequestOwnedView {
+            ::buffa::OwnedView<CreateWorkspaceAgentRequestView<'static>>,
+        > for CreateWorkspaceAgentRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<CreateOrganizationAgentRequestView<'static>> {
+            ) -> &::buffa::OwnedView<CreateWorkspaceAgentRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::CreateOrganizationAgentRequest {
-            type View<'a> = CreateOrganizationAgentRequestView<'a>;
-            type ViewHandle = CreateOrganizationAgentRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::CreateWorkspaceAgentRequest {
+            type View<'a> = CreateWorkspaceAgentRequestView<'a>;
+            type ViewHandle = CreateWorkspaceAgentRequestOwnedView;
         }
-        impl ::serde::Serialize for CreateOrganizationAgentRequestOwnedView {
+        impl ::serde::Serialize for CreateWorkspaceAgentRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -169035,15 +168991,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct CreateOrganizationAgentResponseView<'a> {
+        pub struct CreateWorkspaceAgentResponseView<'a> {
             /// Field 1: `agent`
             pub agent: ::buffa::MessageFieldView<
-                super::super::__buffa::view::OrganizationAgentView<'a>,
+                super::super::__buffa::view::WorkspaceAgentView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for CreateOrganizationAgentResponseView<'a> {
-            type Owned = super::super::CreateOrganizationAgentResponse;
+        impl<'a> ::buffa::MessageView<'a> for CreateWorkspaceAgentResponseView<'a> {
+            type Owned = super::super::CreateWorkspaceAgentResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -169091,7 +169047,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.agent = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::OrganizationAgentView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::WorkspaceAgentView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -169111,7 +169067,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateOrganizationAgentResponse,
+                super::super::CreateWorkspaceAgentResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -169121,18 +169077,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::CreateOrganizationAgentResponse,
+                super::super::CreateWorkspaceAgentResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::CreateOrganizationAgentResponse {
+                ::core::result::Result::Ok(super::super::CreateWorkspaceAgentResponse {
                     agent: match self.agent.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::OrganizationAgent,
-                                ::buffa::Inline<super::super::OrganizationAgent>,
+                                super::super::WorkspaceAgent,
+                                ::buffa::Inline<super::super::WorkspaceAgent>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -169145,7 +169101,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for CreateOrganizationAgentResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for CreateWorkspaceAgentResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -169192,7 +169148,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for CreateOrganizationAgentResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for CreateWorkspaceAgentResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -169207,24 +169163,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for CreateOrganizationAgentResponseView<'a> {
+        impl<'a> ::buffa::MessageName for CreateWorkspaceAgentResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "CreateOrganizationAgentResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.CreateOrganizationAgentResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateOrganizationAgentResponse";
+            const NAME: &'static str = "CreateWorkspaceAgentResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.CreateWorkspaceAgentResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.CreateWorkspaceAgentResponse";
         }
-        ::buffa::impl_default_view_instance!(CreateOrganizationAgentResponseView);
-        ::buffa::impl_view_reborrow!(CreateOrganizationAgentResponseView);
-        /** Self-contained, `'static` owned view of a `CreateOrganizationAgentResponse` message.
+        ::buffa::impl_default_view_instance!(CreateWorkspaceAgentResponseView);
+        ::buffa::impl_view_reborrow!(CreateWorkspaceAgentResponseView);
+        /** Self-contained, `'static` owned view of a `CreateWorkspaceAgentResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CreateOrganizationAgentResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`CreateWorkspaceAgentResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateOrganizationAgentResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateWorkspaceAgentResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct CreateOrganizationAgentResponseOwnedView(
-            ::buffa::OwnedView<CreateOrganizationAgentResponseView<'static>>,
+        pub struct CreateWorkspaceAgentResponseOwnedView(
+            ::buffa::OwnedView<CreateWorkspaceAgentResponseView<'static>>,
         );
-        impl CreateOrganizationAgentResponseOwnedView {
+        impl CreateWorkspaceAgentResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -169238,7 +169194,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateOrganizationAgentResponseOwnedView(
+                    CreateWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -169255,7 +169211,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateOrganizationAgentResponseOwnedView(
+                    CreateWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -169269,17 +169225,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::CreateOrganizationAgentResponse,
+                msg: &super::super::CreateWorkspaceAgentResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateOrganizationAgentResponseOwnedView(
+                    CreateWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`CreateOrganizationAgentResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`CreateWorkspaceAgentResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &CreateOrganizationAgentResponseView<'_> {
+            pub fn view(&self) -> &CreateWorkspaceAgentResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -169292,7 +169248,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::CreateOrganizationAgentResponse {
+            ) -> super::super::CreateWorkspaceAgentResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -169310,40 +169266,40 @@ pub mod __buffa {
             pub fn agent(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::OrganizationAgentView<'_>,
+                super::super::__buffa::view::WorkspaceAgentView<'_>,
             > {
                 &self.0.reborrow().agent
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<CreateOrganizationAgentResponseView<'static>>,
-        > for CreateOrganizationAgentResponseOwnedView {
+            ::buffa::OwnedView<CreateWorkspaceAgentResponseView<'static>>,
+        > for CreateWorkspaceAgentResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<CreateOrganizationAgentResponseView<'static>>,
+                inner: ::buffa::OwnedView<CreateWorkspaceAgentResponseView<'static>>,
             ) -> Self {
-                CreateOrganizationAgentResponseOwnedView(inner)
+                CreateWorkspaceAgentResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<CreateOrganizationAgentResponseOwnedView>
-        for ::buffa::OwnedView<CreateOrganizationAgentResponseView<'static>> {
-            fn from(wrapper: CreateOrganizationAgentResponseOwnedView) -> Self {
+        impl ::core::convert::From<CreateWorkspaceAgentResponseOwnedView>
+        for ::buffa::OwnedView<CreateWorkspaceAgentResponseView<'static>> {
+            fn from(wrapper: CreateWorkspaceAgentResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<CreateOrganizationAgentResponseView<'static>>,
-        > for CreateOrganizationAgentResponseOwnedView {
+            ::buffa::OwnedView<CreateWorkspaceAgentResponseView<'static>>,
+        > for CreateWorkspaceAgentResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<CreateOrganizationAgentResponseView<'static>> {
+            ) -> &::buffa::OwnedView<CreateWorkspaceAgentResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::CreateOrganizationAgentResponse {
-            type View<'a> = CreateOrganizationAgentResponseView<'a>;
-            type ViewHandle = CreateOrganizationAgentResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::CreateWorkspaceAgentResponse {
+            type View<'a> = CreateWorkspaceAgentResponseView<'a>;
+            type ViewHandle = CreateWorkspaceAgentResponseOwnedView;
         }
-        impl ::serde::Serialize for CreateOrganizationAgentResponseOwnedView {
+        impl ::serde::Serialize for CreateWorkspaceAgentResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -169352,9 +169308,9 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateOrganizationAgentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+        pub struct UpdateWorkspaceAgentRequestView<'a> {
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `agent_id`
             pub agent_id: &'a str,
             /// Field 3: `name`
@@ -169384,8 +169340,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for UpdateOrganizationAgentRequestView<'a> {
-            type Owned = super::super::UpdateOrganizationAgentRequest;
+        impl<'a> ::buffa::MessageView<'a> for UpdateWorkspaceAgentRequestView<'a> {
+            type Owned = super::super::UpdateWorkspaceAgentRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -169421,7 +169377,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -169517,7 +169473,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateOrganizationAgentRequest,
+                super::super::UpdateWorkspaceAgentRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -169527,14 +169483,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateOrganizationAgentRequest,
+                super::super::UpdateWorkspaceAgentRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateOrganizationAgentRequest {
-                    organization_id: self.organization_id.to_string(),
+                ::core::result::Result::Ok(super::super::UpdateWorkspaceAgentRequest {
+                    workspace_id: self.workspace_id.to_string(),
                     agent_id: self.agent_id.to_string(),
                     name: self.name.to_string(),
                     provider: self.provider,
@@ -169556,16 +169512,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateOrganizationAgentRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateWorkspaceAgentRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.agent_id.is_empty() {
@@ -169619,8 +169575,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.agent_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
@@ -169671,15 +169627,15 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateOrganizationAgentRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateWorkspaceAgentRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_id) {
                     __map.serialize_entry("agentId", self.agent_id)?;
@@ -169713,24 +169669,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateOrganizationAgentRequestView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateWorkspaceAgentRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateOrganizationAgentRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationAgentRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationAgentRequest";
+            const NAME: &'static str = "UpdateWorkspaceAgentRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateWorkspaceAgentRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateWorkspaceAgentRequest";
         }
-        ::buffa::impl_default_view_instance!(UpdateOrganizationAgentRequestView);
-        ::buffa::impl_view_reborrow!(UpdateOrganizationAgentRequestView);
-        /** Self-contained, `'static` owned view of a `UpdateOrganizationAgentRequest` message.
+        ::buffa::impl_default_view_instance!(UpdateWorkspaceAgentRequestView);
+        ::buffa::impl_view_reborrow!(UpdateWorkspaceAgentRequestView);
+        /** Self-contained, `'static` owned view of a `UpdateWorkspaceAgentRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationAgentRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateWorkspaceAgentRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationAgentRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateWorkspaceAgentRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateOrganizationAgentRequestOwnedView(
-            ::buffa::OwnedView<UpdateOrganizationAgentRequestView<'static>>,
+        pub struct UpdateWorkspaceAgentRequestOwnedView(
+            ::buffa::OwnedView<UpdateWorkspaceAgentRequestView<'static>>,
         );
-        impl UpdateOrganizationAgentRequestOwnedView {
+        impl UpdateWorkspaceAgentRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -169744,7 +169700,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateOrganizationAgentRequestOwnedView(
+                    UpdateWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -169761,7 +169717,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateOrganizationAgentRequestOwnedView(
+                    UpdateWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -169775,17 +169731,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateOrganizationAgentRequest,
+                msg: &super::super::UpdateWorkspaceAgentRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateOrganizationAgentRequestOwnedView(
+                    UpdateWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`UpdateOrganizationAgentRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateWorkspaceAgentRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateOrganizationAgentRequestView<'_> {
+            pub fn view(&self) -> &UpdateWorkspaceAgentRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -169796,9 +169752,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::UpdateOrganizationAgentRequest {
+            pub fn to_owned_message(&self) -> super::super::UpdateWorkspaceAgentRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -169811,10 +169765,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `agent_id`
             #[must_use]
@@ -169878,34 +169832,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateOrganizationAgentRequestView<'static>>,
-        > for UpdateOrganizationAgentRequestOwnedView {
+            ::buffa::OwnedView<UpdateWorkspaceAgentRequestView<'static>>,
+        > for UpdateWorkspaceAgentRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<UpdateOrganizationAgentRequestView<'static>>,
+                inner: ::buffa::OwnedView<UpdateWorkspaceAgentRequestView<'static>>,
             ) -> Self {
-                UpdateOrganizationAgentRequestOwnedView(inner)
+                UpdateWorkspaceAgentRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateOrganizationAgentRequestOwnedView>
-        for ::buffa::OwnedView<UpdateOrganizationAgentRequestView<'static>> {
-            fn from(wrapper: UpdateOrganizationAgentRequestOwnedView) -> Self {
+        impl ::core::convert::From<UpdateWorkspaceAgentRequestOwnedView>
+        for ::buffa::OwnedView<UpdateWorkspaceAgentRequestView<'static>> {
+            fn from(wrapper: UpdateWorkspaceAgentRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateOrganizationAgentRequestView<'static>>,
-        > for UpdateOrganizationAgentRequestOwnedView {
+            ::buffa::OwnedView<UpdateWorkspaceAgentRequestView<'static>>,
+        > for UpdateWorkspaceAgentRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<UpdateOrganizationAgentRequestView<'static>> {
+            ) -> &::buffa::OwnedView<UpdateWorkspaceAgentRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::UpdateOrganizationAgentRequest {
-            type View<'a> = UpdateOrganizationAgentRequestView<'a>;
-            type ViewHandle = UpdateOrganizationAgentRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateWorkspaceAgentRequest {
+            type View<'a> = UpdateWorkspaceAgentRequestView<'a>;
+            type ViewHandle = UpdateWorkspaceAgentRequestOwnedView;
         }
-        impl ::serde::Serialize for UpdateOrganizationAgentRequestOwnedView {
+        impl ::serde::Serialize for UpdateWorkspaceAgentRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -169914,15 +169868,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct UpdateOrganizationAgentResponseView<'a> {
+        pub struct UpdateWorkspaceAgentResponseView<'a> {
             /// Field 1: `agent`
             pub agent: ::buffa::MessageFieldView<
-                super::super::__buffa::view::OrganizationAgentView<'a>,
+                super::super::__buffa::view::WorkspaceAgentView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for UpdateOrganizationAgentResponseView<'a> {
-            type Owned = super::super::UpdateOrganizationAgentResponse;
+        impl<'a> ::buffa::MessageView<'a> for UpdateWorkspaceAgentResponseView<'a> {
+            type Owned = super::super::UpdateWorkspaceAgentResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -169970,7 +169924,7 @@ pub mod __buffa {
                             }
                             None => {
                                 view.agent = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::OrganizationAgentView as ::buffa::MessageView>::decode_view_ctx(
+                                    <super::super::__buffa::view::WorkspaceAgentView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -169990,7 +169944,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::UpdateOrganizationAgentResponse,
+                super::super::UpdateWorkspaceAgentResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -170000,18 +169954,18 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::UpdateOrganizationAgentResponse,
+                super::super::UpdateWorkspaceAgentResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::UpdateOrganizationAgentResponse {
+                ::core::result::Result::Ok(super::super::UpdateWorkspaceAgentResponse {
                     agent: match self.agent.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::OrganizationAgent,
-                                ::buffa::Inline<super::super::OrganizationAgent>,
+                                super::super::WorkspaceAgent,
+                                ::buffa::Inline<super::super::WorkspaceAgent>,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -170024,7 +169978,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for UpdateOrganizationAgentResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for UpdateWorkspaceAgentResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -170071,7 +170025,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for UpdateOrganizationAgentResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for UpdateWorkspaceAgentResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -170086,24 +170040,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for UpdateOrganizationAgentResponseView<'a> {
+        impl<'a> ::buffa::MessageName for UpdateWorkspaceAgentResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "UpdateOrganizationAgentResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.UpdateOrganizationAgentResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateOrganizationAgentResponse";
+            const NAME: &'static str = "UpdateWorkspaceAgentResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.UpdateWorkspaceAgentResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.UpdateWorkspaceAgentResponse";
         }
-        ::buffa::impl_default_view_instance!(UpdateOrganizationAgentResponseView);
-        ::buffa::impl_view_reborrow!(UpdateOrganizationAgentResponseView);
-        /** Self-contained, `'static` owned view of a `UpdateOrganizationAgentResponse` message.
+        ::buffa::impl_default_view_instance!(UpdateWorkspaceAgentResponseView);
+        ::buffa::impl_view_reborrow!(UpdateWorkspaceAgentResponseView);
+        /** Self-contained, `'static` owned view of a `UpdateWorkspaceAgentResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`UpdateOrganizationAgentResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`UpdateWorkspaceAgentResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateOrganizationAgentResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UpdateWorkspaceAgentResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct UpdateOrganizationAgentResponseOwnedView(
-            ::buffa::OwnedView<UpdateOrganizationAgentResponseView<'static>>,
+        pub struct UpdateWorkspaceAgentResponseOwnedView(
+            ::buffa::OwnedView<UpdateWorkspaceAgentResponseView<'static>>,
         );
-        impl UpdateOrganizationAgentResponseOwnedView {
+        impl UpdateWorkspaceAgentResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -170117,7 +170071,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateOrganizationAgentResponseOwnedView(
+                    UpdateWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -170134,7 +170088,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateOrganizationAgentResponseOwnedView(
+                    UpdateWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -170148,17 +170102,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::UpdateOrganizationAgentResponse,
+                msg: &super::super::UpdateWorkspaceAgentResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    UpdateOrganizationAgentResponseOwnedView(
+                    UpdateWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`UpdateOrganizationAgentResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`UpdateWorkspaceAgentResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &UpdateOrganizationAgentResponseView<'_> {
+            pub fn view(&self) -> &UpdateWorkspaceAgentResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -170171,7 +170125,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::UpdateOrganizationAgentResponse {
+            ) -> super::super::UpdateWorkspaceAgentResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -170189,40 +170143,40 @@ pub mod __buffa {
             pub fn agent(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::OrganizationAgentView<'_>,
+                super::super::__buffa::view::WorkspaceAgentView<'_>,
             > {
                 &self.0.reborrow().agent
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<UpdateOrganizationAgentResponseView<'static>>,
-        > for UpdateOrganizationAgentResponseOwnedView {
+            ::buffa::OwnedView<UpdateWorkspaceAgentResponseView<'static>>,
+        > for UpdateWorkspaceAgentResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<UpdateOrganizationAgentResponseView<'static>>,
+                inner: ::buffa::OwnedView<UpdateWorkspaceAgentResponseView<'static>>,
             ) -> Self {
-                UpdateOrganizationAgentResponseOwnedView(inner)
+                UpdateWorkspaceAgentResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<UpdateOrganizationAgentResponseOwnedView>
-        for ::buffa::OwnedView<UpdateOrganizationAgentResponseView<'static>> {
-            fn from(wrapper: UpdateOrganizationAgentResponseOwnedView) -> Self {
+        impl ::core::convert::From<UpdateWorkspaceAgentResponseOwnedView>
+        for ::buffa::OwnedView<UpdateWorkspaceAgentResponseView<'static>> {
+            fn from(wrapper: UpdateWorkspaceAgentResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<UpdateOrganizationAgentResponseView<'static>>,
-        > for UpdateOrganizationAgentResponseOwnedView {
+            ::buffa::OwnedView<UpdateWorkspaceAgentResponseView<'static>>,
+        > for UpdateWorkspaceAgentResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<UpdateOrganizationAgentResponseView<'static>> {
+            ) -> &::buffa::OwnedView<UpdateWorkspaceAgentResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::UpdateOrganizationAgentResponse {
-            type View<'a> = UpdateOrganizationAgentResponseView<'a>;
-            type ViewHandle = UpdateOrganizationAgentResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::UpdateWorkspaceAgentResponse {
+            type View<'a> = UpdateWorkspaceAgentResponseView<'a>;
+            type ViewHandle = UpdateWorkspaceAgentResponseOwnedView;
         }
-        impl ::serde::Serialize for UpdateOrganizationAgentResponseOwnedView {
+        impl ::serde::Serialize for UpdateWorkspaceAgentResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -170231,15 +170185,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct DeleteOrganizationAgentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+        pub struct DeleteWorkspaceAgentRequestView<'a> {
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `agent_id`
             pub agent_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for DeleteOrganizationAgentRequestView<'a> {
-            type Owned = super::super::DeleteOrganizationAgentRequest;
+        impl<'a> ::buffa::MessageView<'a> for DeleteWorkspaceAgentRequestView<'a> {
+            type Owned = super::super::DeleteWorkspaceAgentRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -170275,7 +170229,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -170296,7 +170250,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::DeleteOrganizationAgentRequest,
+                super::super::DeleteWorkspaceAgentRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -170306,14 +170260,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::DeleteOrganizationAgentRequest,
+                super::super::DeleteWorkspaceAgentRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::DeleteOrganizationAgentRequest {
-                    organization_id: self.organization_id.to_string(),
+                ::core::result::Result::Ok(super::super::DeleteWorkspaceAgentRequest {
+                    workspace_id: self.workspace_id.to_string(),
                     agent_id: self.agent_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -170323,16 +170277,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for DeleteOrganizationAgentRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteWorkspaceAgentRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.agent_id.is_empty() {
@@ -170351,8 +170305,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.agent_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
@@ -170371,15 +170325,15 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for DeleteOrganizationAgentRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for DeleteWorkspaceAgentRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_id) {
                     __map.serialize_entry("agentId", self.agent_id)?;
@@ -170387,24 +170341,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for DeleteOrganizationAgentRequestView<'a> {
+        impl<'a> ::buffa::MessageName for DeleteWorkspaceAgentRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "DeleteOrganizationAgentRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.DeleteOrganizationAgentRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteOrganizationAgentRequest";
+            const NAME: &'static str = "DeleteWorkspaceAgentRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.DeleteWorkspaceAgentRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteWorkspaceAgentRequest";
         }
-        ::buffa::impl_default_view_instance!(DeleteOrganizationAgentRequestView);
-        ::buffa::impl_view_reborrow!(DeleteOrganizationAgentRequestView);
-        /** Self-contained, `'static` owned view of a `DeleteOrganizationAgentRequest` message.
+        ::buffa::impl_default_view_instance!(DeleteWorkspaceAgentRequestView);
+        ::buffa::impl_view_reborrow!(DeleteWorkspaceAgentRequestView);
+        /** Self-contained, `'static` owned view of a `DeleteWorkspaceAgentRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`DeleteOrganizationAgentRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteWorkspaceAgentRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteOrganizationAgentRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteWorkspaceAgentRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct DeleteOrganizationAgentRequestOwnedView(
-            ::buffa::OwnedView<DeleteOrganizationAgentRequestView<'static>>,
+        pub struct DeleteWorkspaceAgentRequestOwnedView(
+            ::buffa::OwnedView<DeleteWorkspaceAgentRequestView<'static>>,
         );
-        impl DeleteOrganizationAgentRequestOwnedView {
+        impl DeleteWorkspaceAgentRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -170418,7 +170372,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteOrganizationAgentRequestOwnedView(
+                    DeleteWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -170435,7 +170389,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteOrganizationAgentRequestOwnedView(
+                    DeleteWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -170449,17 +170403,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::DeleteOrganizationAgentRequest,
+                msg: &super::super::DeleteWorkspaceAgentRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteOrganizationAgentRequestOwnedView(
+                    DeleteWorkspaceAgentRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`DeleteOrganizationAgentRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`DeleteWorkspaceAgentRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &DeleteOrganizationAgentRequestView<'_> {
+            pub fn view(&self) -> &DeleteWorkspaceAgentRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -170470,9 +170424,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(
-                &self,
-            ) -> super::super::DeleteOrganizationAgentRequest {
+            pub fn to_owned_message(&self) -> super::super::DeleteWorkspaceAgentRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -170485,10 +170437,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `agent_id`
             #[must_use]
@@ -170497,34 +170449,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<DeleteOrganizationAgentRequestView<'static>>,
-        > for DeleteOrganizationAgentRequestOwnedView {
+            ::buffa::OwnedView<DeleteWorkspaceAgentRequestView<'static>>,
+        > for DeleteWorkspaceAgentRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<DeleteOrganizationAgentRequestView<'static>>,
+                inner: ::buffa::OwnedView<DeleteWorkspaceAgentRequestView<'static>>,
             ) -> Self {
-                DeleteOrganizationAgentRequestOwnedView(inner)
+                DeleteWorkspaceAgentRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<DeleteOrganizationAgentRequestOwnedView>
-        for ::buffa::OwnedView<DeleteOrganizationAgentRequestView<'static>> {
-            fn from(wrapper: DeleteOrganizationAgentRequestOwnedView) -> Self {
+        impl ::core::convert::From<DeleteWorkspaceAgentRequestOwnedView>
+        for ::buffa::OwnedView<DeleteWorkspaceAgentRequestView<'static>> {
+            fn from(wrapper: DeleteWorkspaceAgentRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<DeleteOrganizationAgentRequestView<'static>>,
-        > for DeleteOrganizationAgentRequestOwnedView {
+            ::buffa::OwnedView<DeleteWorkspaceAgentRequestView<'static>>,
+        > for DeleteWorkspaceAgentRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<DeleteOrganizationAgentRequestView<'static>> {
+            ) -> &::buffa::OwnedView<DeleteWorkspaceAgentRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::DeleteOrganizationAgentRequest {
-            type View<'a> = DeleteOrganizationAgentRequestView<'a>;
-            type ViewHandle = DeleteOrganizationAgentRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::DeleteWorkspaceAgentRequest {
+            type View<'a> = DeleteWorkspaceAgentRequestView<'a>;
+            type ViewHandle = DeleteWorkspaceAgentRequestOwnedView;
         }
-        impl ::serde::Serialize for DeleteOrganizationAgentRequestOwnedView {
+        impl ::serde::Serialize for DeleteWorkspaceAgentRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -170533,13 +170485,13 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct DeleteOrganizationAgentResponseView<'a> {
+        pub struct DeleteWorkspaceAgentResponseView<'a> {
             /// Field 1: `deleted`
             pub deleted: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for DeleteOrganizationAgentResponseView<'a> {
-            type Owned = super::super::DeleteOrganizationAgentResponse;
+        impl<'a> ::buffa::MessageView<'a> for DeleteWorkspaceAgentResponseView<'a> {
+            type Owned = super::super::DeleteWorkspaceAgentResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -170589,7 +170541,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::DeleteOrganizationAgentResponse,
+                super::super::DeleteWorkspaceAgentResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -170599,13 +170551,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::DeleteOrganizationAgentResponse,
+                super::super::DeleteWorkspaceAgentResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::DeleteOrganizationAgentResponse {
+                ::core::result::Result::Ok(super::super::DeleteWorkspaceAgentResponse {
                     deleted: self.deleted,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -170615,7 +170567,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for DeleteOrganizationAgentResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteWorkspaceAgentResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -170652,7 +170604,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for DeleteOrganizationAgentResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for DeleteWorkspaceAgentResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -170665,24 +170617,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for DeleteOrganizationAgentResponseView<'a> {
+        impl<'a> ::buffa::MessageName for DeleteWorkspaceAgentResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "DeleteOrganizationAgentResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.DeleteOrganizationAgentResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteOrganizationAgentResponse";
+            const NAME: &'static str = "DeleteWorkspaceAgentResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.DeleteWorkspaceAgentResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.DeleteWorkspaceAgentResponse";
         }
-        ::buffa::impl_default_view_instance!(DeleteOrganizationAgentResponseView);
-        ::buffa::impl_view_reborrow!(DeleteOrganizationAgentResponseView);
-        /** Self-contained, `'static` owned view of a `DeleteOrganizationAgentResponse` message.
+        ::buffa::impl_default_view_instance!(DeleteWorkspaceAgentResponseView);
+        ::buffa::impl_view_reborrow!(DeleteWorkspaceAgentResponseView);
+        /** Self-contained, `'static` owned view of a `DeleteWorkspaceAgentResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`DeleteOrganizationAgentResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteWorkspaceAgentResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteOrganizationAgentResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteWorkspaceAgentResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct DeleteOrganizationAgentResponseOwnedView(
-            ::buffa::OwnedView<DeleteOrganizationAgentResponseView<'static>>,
+        pub struct DeleteWorkspaceAgentResponseOwnedView(
+            ::buffa::OwnedView<DeleteWorkspaceAgentResponseView<'static>>,
         );
-        impl DeleteOrganizationAgentResponseOwnedView {
+        impl DeleteWorkspaceAgentResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -170696,7 +170648,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteOrganizationAgentResponseOwnedView(
+                    DeleteWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -170713,7 +170665,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteOrganizationAgentResponseOwnedView(
+                    DeleteWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -170727,17 +170679,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::DeleteOrganizationAgentResponse,
+                msg: &super::super::DeleteWorkspaceAgentResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DeleteOrganizationAgentResponseOwnedView(
+                    DeleteWorkspaceAgentResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`DeleteOrganizationAgentResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`DeleteWorkspaceAgentResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &DeleteOrganizationAgentResponseView<'_> {
+            pub fn view(&self) -> &DeleteWorkspaceAgentResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -170750,7 +170702,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::DeleteOrganizationAgentResponse {
+            ) -> super::super::DeleteWorkspaceAgentResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -170770,34 +170722,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<DeleteOrganizationAgentResponseView<'static>>,
-        > for DeleteOrganizationAgentResponseOwnedView {
+            ::buffa::OwnedView<DeleteWorkspaceAgentResponseView<'static>>,
+        > for DeleteWorkspaceAgentResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<DeleteOrganizationAgentResponseView<'static>>,
+                inner: ::buffa::OwnedView<DeleteWorkspaceAgentResponseView<'static>>,
             ) -> Self {
-                DeleteOrganizationAgentResponseOwnedView(inner)
+                DeleteWorkspaceAgentResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<DeleteOrganizationAgentResponseOwnedView>
-        for ::buffa::OwnedView<DeleteOrganizationAgentResponseView<'static>> {
-            fn from(wrapper: DeleteOrganizationAgentResponseOwnedView) -> Self {
+        impl ::core::convert::From<DeleteWorkspaceAgentResponseOwnedView>
+        for ::buffa::OwnedView<DeleteWorkspaceAgentResponseView<'static>> {
+            fn from(wrapper: DeleteWorkspaceAgentResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<DeleteOrganizationAgentResponseView<'static>>,
-        > for DeleteOrganizationAgentResponseOwnedView {
+            ::buffa::OwnedView<DeleteWorkspaceAgentResponseView<'static>>,
+        > for DeleteWorkspaceAgentResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<DeleteOrganizationAgentResponseView<'static>> {
+            ) -> &::buffa::OwnedView<DeleteWorkspaceAgentResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::DeleteOrganizationAgentResponse {
-            type View<'a> = DeleteOrganizationAgentResponseView<'a>;
-            type ViewHandle = DeleteOrganizationAgentResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::DeleteWorkspaceAgentResponse {
+            type View<'a> = DeleteWorkspaceAgentResponseView<'a>;
+            type ViewHandle = DeleteWorkspaceAgentResponseOwnedView;
         }
-        impl ::serde::Serialize for DeleteOrganizationAgentResponseOwnedView {
+        impl ::serde::Serialize for DeleteWorkspaceAgentResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -189372,7 +189324,7 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct OrganizationAgentView<'a> {
+        pub struct WorkspaceAgentView<'a> {
             /// Field 1: `agent_id`
             pub agent_id: &'a str,
             /// Field 2: `name`
@@ -189410,8 +189362,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for OrganizationAgentView<'a> {
-            type Owned = super::super::OrganizationAgent;
+        impl<'a> ::buffa::MessageView<'a> for WorkspaceAgentView<'a> {
+            type Owned = super::super::WorkspaceAgent;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -189580,7 +189532,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::OrganizationAgent,
+                super::super::WorkspaceAgent,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -189590,13 +189542,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::OrganizationAgent,
+                super::super::WorkspaceAgent,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::OrganizationAgent {
+                ::core::result::Result::Ok(super::super::WorkspaceAgent {
                     agent_id: self.agent_id.to_string(),
                     name: self.name.to_string(),
                     avatar: self.avatar.map(|s| s.to_string()),
@@ -189630,7 +189582,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for OrganizationAgentView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for WorkspaceAgentView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -189776,7 +189728,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for OrganizationAgentView<'__a> {
+        impl<'__a> ::serde::Serialize for WorkspaceAgentView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -189838,24 +189790,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for OrganizationAgentView<'a> {
+        impl<'a> ::buffa::MessageName for WorkspaceAgentView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "OrganizationAgent";
-            const FULL_NAME: &'static str = "briar.app.v1.OrganizationAgent";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.OrganizationAgent";
+            const NAME: &'static str = "WorkspaceAgent";
+            const FULL_NAME: &'static str = "briar.app.v1.WorkspaceAgent";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.WorkspaceAgent";
         }
-        ::buffa::impl_default_view_instance!(OrganizationAgentView);
-        ::buffa::impl_view_reborrow!(OrganizationAgentView);
-        /** Self-contained, `'static` owned view of a `OrganizationAgent` message.
+        ::buffa::impl_default_view_instance!(WorkspaceAgentView);
+        ::buffa::impl_view_reborrow!(WorkspaceAgentView);
+        /** Self-contained, `'static` owned view of a `WorkspaceAgent` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`OrganizationAgentView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`WorkspaceAgentView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OrganizationAgentView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`WorkspaceAgentView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct OrganizationAgentOwnedView(
-            ::buffa::OwnedView<OrganizationAgentView<'static>>,
+        pub struct WorkspaceAgentOwnedView(
+            ::buffa::OwnedView<WorkspaceAgentView<'static>>,
         );
-        impl OrganizationAgentOwnedView {
+        impl WorkspaceAgentOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -189869,7 +189821,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    OrganizationAgentOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    WorkspaceAgentOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -189884,7 +189836,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    OrganizationAgentOwnedView(
+                    WorkspaceAgentOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -189898,15 +189850,15 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::OrganizationAgent,
+                msg: &super::super::WorkspaceAgent,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    OrganizationAgentOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    WorkspaceAgentOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`OrganizationAgentView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`WorkspaceAgentView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &OrganizationAgentView<'_> {
+            pub fn view(&self) -> &WorkspaceAgentView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -189917,7 +189869,7 @@ pub mod __buffa {
             /// whose contract also governs handles converted from a raw
             /// [`::buffa::OwnedView`].
             #[must_use]
-            pub fn to_owned_message(&self) -> super::super::OrganizationAgent {
+            pub fn to_owned_message(&self) -> super::super::WorkspaceAgent {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -190013,29 +189965,29 @@ pub mod __buffa {
                 self.0.reborrow().computer_use_policy
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<OrganizationAgentView<'static>>>
-        for OrganizationAgentOwnedView {
-            fn from(inner: ::buffa::OwnedView<OrganizationAgentView<'static>>) -> Self {
-                OrganizationAgentOwnedView(inner)
+        impl ::core::convert::From<::buffa::OwnedView<WorkspaceAgentView<'static>>>
+        for WorkspaceAgentOwnedView {
+            fn from(inner: ::buffa::OwnedView<WorkspaceAgentView<'static>>) -> Self {
+                WorkspaceAgentOwnedView(inner)
             }
         }
-        impl ::core::convert::From<OrganizationAgentOwnedView>
-        for ::buffa::OwnedView<OrganizationAgentView<'static>> {
-            fn from(wrapper: OrganizationAgentOwnedView) -> Self {
+        impl ::core::convert::From<WorkspaceAgentOwnedView>
+        for ::buffa::OwnedView<WorkspaceAgentView<'static>> {
+            fn from(wrapper: WorkspaceAgentOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<::buffa::OwnedView<OrganizationAgentView<'static>>>
-        for OrganizationAgentOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<OrganizationAgentView<'static>> {
+        impl ::core::convert::AsRef<::buffa::OwnedView<WorkspaceAgentView<'static>>>
+        for WorkspaceAgentOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<WorkspaceAgentView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::OrganizationAgent {
-            type View<'a> = OrganizationAgentView<'a>;
-            type ViewHandle = OrganizationAgentOwnedView;
+        impl ::buffa::HasMessageView for super::super::WorkspaceAgent {
+            type View<'a> = WorkspaceAgentView<'a>;
+            type ViewHandle = WorkspaceAgentOwnedView;
         }
-        impl ::serde::Serialize for OrganizationAgentOwnedView {
+        impl ::serde::Serialize for WorkspaceAgentOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -228507,8 +228459,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListDmMemoriesRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `memory_space_id`
@@ -228554,7 +228506,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -228608,7 +228560,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListDmMemoriesRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     memory_space_id: self.memory_space_id.map(|s| s.to_string()),
                     cursor: self.cursor.map(|s| s.to_string()),
@@ -228626,10 +228578,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -228655,8 +228607,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -228688,8 +228640,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -228795,10 +228747,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -231680,8 +231632,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct RetryDmMemoryLearningRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `job_id`
@@ -231729,7 +231681,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -231788,7 +231740,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::RetryDmMemoryLearningRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     job_id: self.job_id.to_string(),
                     request_id: self.request_id.to_string(),
@@ -231807,10 +231759,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -231847,8 +231799,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -231883,8 +231835,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -232003,10 +231955,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -232364,8 +232316,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GetDmMemoryDocumentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `document_id`
@@ -232411,7 +232363,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -232463,7 +232415,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetDmMemoryDocumentRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     document_id: self.document_id.to_string(),
                     version: self.version,
@@ -232481,10 +232433,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -232513,8 +232465,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -232546,8 +232498,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -232661,10 +232613,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -233036,8 +232988,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListDmMemoryRevisionsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `document_id`
@@ -233083,7 +233035,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -233135,7 +233087,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListDmMemoryRevisionsRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     document_id: self.document_id.to_string(),
                     cursor: self.cursor,
@@ -233153,10 +233105,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -233185,8 +233137,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -233218,8 +233170,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -233335,10 +233287,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -234293,8 +234245,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct CreateDmMemoryDocumentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `request_id`
@@ -234360,7 +234312,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -234519,7 +234471,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateDmMemoryDocumentRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     request_id: self.request_id.to_string(),
                     memory_space_id: self.memory_space_id.map(|s| s.to_string()),
@@ -234568,10 +234520,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -234643,8 +234595,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -234715,8 +234667,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -234866,10 +234818,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -234974,8 +234926,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct UpdateDmMemoryDocumentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `document_id`
@@ -235045,7 +234997,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -235218,7 +235170,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateDmMemoryDocumentRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     document_id: self.document_id.to_string(),
                     request_id: self.request_id.to_string(),
@@ -235269,10 +235221,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -235356,8 +235308,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -235434,8 +235386,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -235595,10 +235547,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -236373,8 +236325,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct DeleteDmMemoryDocumentRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `document_id`
@@ -236418,7 +236370,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -236463,7 +236415,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::DeleteDmMemoryDocumentRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     document_id: self.document_id.to_string(),
                     __buffa_unknown_fields: self
@@ -236480,10 +236432,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -236509,8 +236461,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -236539,8 +236491,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -236649,10 +236601,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -237003,8 +236955,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct UpdateDmMemorySettingsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `channel_id`
             pub channel_id: &'a str,
             /// Field 3: `request_id`
@@ -237056,7 +237008,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -237133,7 +237085,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateDmMemorySettingsRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     channel_id: self.channel_id.to_string(),
                     request_id: self.request_id.to_string(),
                     memory_space_id: self.memory_space_id.map(|s| s.to_string()),
@@ -237154,10 +237106,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if !self.channel_id.is_empty() {
@@ -237199,8 +237151,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 if !self.channel_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.channel_id, buf);
@@ -237245,8 +237197,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.channel_id) {
                     __map.serialize_entry("channelId", self.channel_id)?;
@@ -237375,10 +237327,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `channel_id`
             #[must_use]
@@ -242785,7 +242737,7 @@ pub mod __buffa {
             /// Field 2: `agents`
             pub agents: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::OrganizationAgentView<'a>,
+                super::super::__buffa::view::WorkspaceAgentView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -242851,12 +242803,12 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         ctx.register_element_memory(
                             ::core::mem::size_of::<
-                                super::super::__buffa::view::OrganizationAgentView,
+                                super::super::__buffa::view::WorkspaceAgentView,
                             >(),
                         )?;
                         view.agents
                             .push(
-                                <super::super::__buffa::view::OrganizationAgentView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::WorkspaceAgentView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -243103,7 +243055,7 @@ pub mod __buffa {
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::OrganizationAgentView<'_>,
+                super::super::__buffa::view::WorkspaceAgentView<'_>,
             > {
                 &self.0.reborrow().agents
             }
@@ -248113,7 +248065,7 @@ pub mod __buffa {
             /// Field 1: `agents`
             pub agents: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::OrganizationAgentView<'a>,
+                super::super::__buffa::view::WorkspaceAgentView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -248158,12 +248110,12 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         ctx.register_element_memory(
                             ::core::mem::size_of::<
-                                super::super::__buffa::view::OrganizationAgentView,
+                                super::super::__buffa::view::WorkspaceAgentView,
                             >(),
                         )?;
                         view.agents
                             .push(
-                                <super::super::__buffa::view::OrganizationAgentView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::WorkspaceAgentView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -248371,7 +248323,7 @@ pub mod __buffa {
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::OrganizationAgentView<'_>,
+                super::super::__buffa::view::WorkspaceAgentView<'_>,
             > {
                 &self.0.reborrow().agents
             }
@@ -253287,7 +253239,7 @@ pub mod __buffa {
             /// Field 3: `agents`
             pub agents: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::OrganizationAgentView<'a>,
+                super::super::__buffa::view::WorkspaceAgentView<'a>,
             >,
             /// Field 4: `messages`
             pub messages: ::buffa::RepeatedView<
@@ -253396,12 +253348,12 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         ctx.register_element_memory(
                             ::core::mem::size_of::<
-                                super::super::__buffa::view::OrganizationAgentView,
+                                super::super::__buffa::view::WorkspaceAgentView,
                             >(),
                         )?;
                         view.agents
                             .push(
-                                <super::super::__buffa::view::OrganizationAgentView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::WorkspaceAgentView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -253778,7 +253730,7 @@ pub mod __buffa {
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::OrganizationAgentView<'_>,
+                super::super::__buffa::view::WorkspaceAgentView<'_>,
             > {
                 &self.0.reborrow().agents
             }
@@ -280100,8 +280052,8 @@ pub mod __buffa {
         pub struct CreateTeamRequestView<'a> {
             /// Field 1: `name`
             pub name: &'a str,
-            /// Field 2: `organization_id`
-            pub organization_id: ::core::option::Option<&'a str>,
+            /// Field 2: `workspace_id`
+            pub workspace_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateTeamRequestView<'a> {
@@ -280148,9 +280100,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = Some(
-                            ::buffa::types::borrow_str(&mut cur)?,
-                        );
+                        view.workspace_id = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -280182,7 +280132,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateTeamRequest {
                     name: self.name.to_string(),
-                    organization_id: self.organization_id.map(|s| s.to_string()),
+                    workspace_id: self.workspace_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -280200,7 +280150,7 @@ pub mod __buffa {
                 if !self.name.is_empty() {
                     size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
                 }
-                if let Some(ref v) = self.organization_id {
+                if let Some(ref v) = self.workspace_id {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -280217,7 +280167,7 @@ pub mod __buffa {
                 if !self.name.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.name, buf);
                 }
-                if let Some(ref v) = self.organization_id {
+                if let Some(ref v) = self.workspace_id {
                     ::buffa::types::put_string_field(2u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -280244,8 +280194,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
                     __map.serialize_entry("name", self.name)?;
                 }
-                if let ::core::option::Option::Some(__v) = self.organization_id {
-                    __map.serialize_entry("organizationId", __v)?;
+                if let ::core::option::Option::Some(__v) = self.workspace_id {
+                    __map.serialize_entry("workspaceId", __v)?;
                 }
                 __map.end()
             }
@@ -280347,10 +280297,10 @@ pub mod __buffa {
             pub fn name(&self) -> &'_ str {
                 self.0.reborrow().name
             }
-            /// Field 2: `organization_id`
+            /// Field 2: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().workspace_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<CreateTeamRequestView<'static>>>
@@ -288210,10 +288160,10 @@ pub mod __buffa {
             pub schedule_tab_enabled: bool,
             /// Field 5: `icon`
             pub icon: ::core::option::Option<&'a str>,
-            /// Field 6: `organization_id`
-            pub organization_id: &'a str,
-            /// Field 7: `organization_name`
-            pub organization_name: &'a str,
+            /// Field 6: `workspace_id`
+            pub workspace_id: &'a str,
+            /// Field 7: `workspace_name`
+            pub workspace_name: &'a str,
             /// Field 8: `role`
             pub role: ::buffa::EnumValue<super::super::ProjectRole>,
             /// Field 9: `created_at`
@@ -288300,14 +288250,14 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_name = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_name = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -288385,8 +288335,8 @@ pub mod __buffa {
                     issue_key_prefix: self.issue_key_prefix.to_string(),
                     schedule_tab_enabled: self.schedule_tab_enabled,
                     icon: self.icon.map(|s| s.to_string()),
-                    organization_id: self.organization_id.to_string(),
-                    organization_name: self.organization_name.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
+                    workspace_name: self.workspace_name.to_string(),
                     role: self.role,
                     created_at: match self.created_at.as_option() {
                         Some(v) => {
@@ -288431,16 +288381,16 @@ pub mod __buffa {
                 if let Some(ref v) = self.icon {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
-                if !self.organization_name.is_empty() {
+                if !self.workspace_name.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_name)
+                            + ::buffa::types::string_encoded_len(&self.workspace_name)
                                 as u64;
                 }
                 {
@@ -288489,11 +288439,11 @@ pub mod __buffa {
                 if let Some(ref v) = self.icon {
                     ::buffa::types::put_string_field(5u32, v, buf);
                 }
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(6u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.workspace_id, buf);
                 }
-                if !self.organization_name.is_empty() {
-                    ::buffa::types::put_string_field(7u32, &self.organization_name, buf);
+                if !self.workspace_name.is_empty() {
+                    ::buffa::types::put_string_field(7u32, &self.workspace_name, buf);
                 }
                 {
                     let val = self.role.to_i32();
@@ -288555,13 +288505,11 @@ pub mod __buffa {
                 if let ::core::option::Option::Some(__v) = self.icon {
                     __map.serialize_entry("icon", __v)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(
-                    self.organization_name,
-                ) {
-                    __map.serialize_entry("organizationName", self.organization_name)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_name) {
+                    __map.serialize_entry("workspaceName", self.workspace_name)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
                     __map.serialize_entry("role", &self.role)?;
@@ -288696,15 +288644,15 @@ pub mod __buffa {
             pub fn icon(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().icon
             }
-            /// Field 6: `organization_id`
+            /// Field 6: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
-            /// Field 7: `organization_name`
+            /// Field 7: `workspace_name`
             #[must_use]
-            pub fn organization_name(&self) -> &'_ str {
-                self.0.reborrow().organization_name
+            pub fn workspace_name(&self) -> &'_ str {
+                self.0.reborrow().workspace_name
             }
             /// Field 8: `role`
             #[must_use]
@@ -331453,8 +331401,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GetGitHubIntegrationRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetGitHubIntegrationRequestView<'a> {
@@ -331494,7 +331442,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -331525,7 +331473,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetGitHubIntegrationRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -331540,10 +331488,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -331557,8 +331505,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -331581,8 +331529,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 __map.end()
             }
@@ -331683,10 +331631,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
         }
         impl ::core::convert::From<
@@ -332258,8 +332206,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct BeginGitHubInstallationRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BeginGitHubInstallationRequestView<'a> {
@@ -332299,7 +332247,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -332330,7 +332278,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::BeginGitHubInstallationRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -332345,10 +332293,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -332362,8 +332310,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -332386,8 +332334,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 __map.end()
             }
@@ -332490,10 +332438,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
         }
         impl ::core::convert::From<
@@ -332812,8 +332760,8 @@ pub mod __buffa {
         pub struct ProjectGitHubCredentialView<'a> {
             /// Field 1: `project_id`
             pub project_id: &'a str,
-            /// Field 2: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 2: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 3: `repository_id`
             pub repository_id: u64,
             /// Field 4: `repository`
@@ -332874,7 +332822,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -332966,7 +332914,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ProjectGitHubCredential {
                     project_id: self.project_id.to_string(),
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     repository_id: self.repository_id,
                     repository: self.repository.to_string(),
                     clone_url: self.clone_url.to_string(),
@@ -333001,10 +332949,10 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.project_id)
                                 as u64;
                 }
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 if self.repository_id != 0u64 {
@@ -333056,8 +333004,8 @@ pub mod __buffa {
                 if !self.project_id.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.project_id, buf);
                 }
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.workspace_id, buf);
                 }
                 if self.repository_id != 0u64 {
                     ::buffa::types::put_uint64_field(3u32, self.repository_id, buf);
@@ -333106,8 +333054,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
                     __map.serialize_entry("projectId", self.project_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.repository_id) {
                     __map
@@ -333238,10 +333186,10 @@ pub mod __buffa {
             pub fn project_id(&self) -> &'_ str {
                 self.0.reborrow().project_id
             }
-            /// Field 2: `organization_id`
+            /// Field 2: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 3: `repository_id`
             #[must_use]
@@ -379933,14 +379881,14 @@ pub mod __buffa {
         reg.register_json_any(super::__PROJECT_AGENT_WORK_LOG_ENTRY_JSON_ANY);
         reg.register_json_any(super::__PROJECT_AGENT_WORK_LOG_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__PROJECT_AGENT_WORK_LOG_ACTIVITY_JSON_ANY);
-        reg.register_json_any(super::__LIST_ORGANIZATION_AGENTS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_ORGANIZATION_AGENTS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__CREATE_ORGANIZATION_AGENT_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__CREATE_ORGANIZATION_AGENT_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__UPDATE_ORGANIZATION_AGENT_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__UPDATE_ORGANIZATION_AGENT_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__DELETE_ORGANIZATION_AGENT_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__DELETE_ORGANIZATION_AGENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_WORKSPACE_AGENTS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_WORKSPACE_AGENTS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_WORKSPACE_AGENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_WORKSPACE_AGENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_WORKSPACE_AGENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_WORKSPACE_AGENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_WORKSPACE_AGENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_WORKSPACE_AGENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROJECT_AGENTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROJECT_AGENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_PROJECT_AGENT_REQUEST_JSON_ANY);
@@ -380017,7 +379965,7 @@ pub mod __buffa {
         reg.register_json_any(super::__CODEX_PET_SELECTION_JSON_ANY);
         reg.register_json_any(super::__CODEX_PET_JSON_ANY);
         reg.register_json_any(super::__PROJECT_AGENT_JSON_ANY);
-        reg.register_json_any(super::__ORGANIZATION_AGENT_JSON_ANY);
+        reg.register_json_any(super::__WORKSPACE_AGENT_JSON_ANY);
         reg.register_json_any(super::__PROJECT_AGENT_SCHEDULE_JSON_ANY);
         reg.register_json_any(super::__PROJECT_AGENT_SCHEDULE_RUN_AGENT_JSON_ANY);
         reg.register_json_any(super::__PROJECT_AGENT_SCHEDULE_RUN_JSON_ANY);
@@ -380709,37 +380657,37 @@ pub use self::__buffa::view::ProjectAgentWorkLogActivityView;
 #[doc(inline)]
 pub use self::__buffa::view::ProjectAgentWorkLogActivityOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ListOrganizationAgentsRequestView;
+pub use self::__buffa::view::ListWorkspaceAgentsRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::ListOrganizationAgentsRequestOwnedView;
+pub use self::__buffa::view::ListWorkspaceAgentsRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ListOrganizationAgentsResponseView;
+pub use self::__buffa::view::ListWorkspaceAgentsResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::ListOrganizationAgentsResponseOwnedView;
+pub use self::__buffa::view::ListWorkspaceAgentsResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateOrganizationAgentRequestView;
+pub use self::__buffa::view::CreateWorkspaceAgentRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateOrganizationAgentRequestOwnedView;
+pub use self::__buffa::view::CreateWorkspaceAgentRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateOrganizationAgentResponseView;
+pub use self::__buffa::view::CreateWorkspaceAgentResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::CreateOrganizationAgentResponseOwnedView;
+pub use self::__buffa::view::CreateWorkspaceAgentResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateOrganizationAgentRequestView;
+pub use self::__buffa::view::UpdateWorkspaceAgentRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateOrganizationAgentRequestOwnedView;
+pub use self::__buffa::view::UpdateWorkspaceAgentRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateOrganizationAgentResponseView;
+pub use self::__buffa::view::UpdateWorkspaceAgentResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::UpdateOrganizationAgentResponseOwnedView;
+pub use self::__buffa::view::UpdateWorkspaceAgentResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::DeleteOrganizationAgentRequestView;
+pub use self::__buffa::view::DeleteWorkspaceAgentRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::DeleteOrganizationAgentRequestOwnedView;
+pub use self::__buffa::view::DeleteWorkspaceAgentRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::DeleteOrganizationAgentResponseView;
+pub use self::__buffa::view::DeleteWorkspaceAgentResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::DeleteOrganizationAgentResponseOwnedView;
+pub use self::__buffa::view::DeleteWorkspaceAgentResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListProjectAgentsRequestView;
 #[doc(inline)]
@@ -380909,9 +380857,9 @@ pub use self::__buffa::view::ProjectAgentView;
 #[doc(inline)]
 pub use self::__buffa::view::ProjectAgentOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::OrganizationAgentView;
+pub use self::__buffa::view::WorkspaceAgentView;
 #[doc(inline)]
-pub use self::__buffa::view::OrganizationAgentOwnedView;
+pub use self::__buffa::view::WorkspaceAgentOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ProjectAgentScheduleView;
 #[doc(inline)]

@@ -238,7 +238,7 @@ public nonisolated struct BriarAPI_GetGitHubIntegrationRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -309,7 +309,7 @@ public nonisolated struct BriarAPI_BeginGitHubInstallationRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -335,7 +335,7 @@ public nonisolated struct BriarAPI_ProjectGitHubCredential: Sendable {
 
   public var projectID: String = String()
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var repositoryID: UInt64 = 0
 
@@ -945,7 +945,7 @@ nonisolated extension BriarAPI_GitHubInstallationRepository: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_GetGitHubIntegrationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetGitHubIntegrationRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -953,21 +953,21 @@ nonisolated extension BriarAPI_GetGitHubIntegrationRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_GetGitHubIntegrationRequest, rhs: BriarAPI_GetGitHubIntegrationRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1044,7 +1044,7 @@ nonisolated extension BriarAPI_GetGitHubIntegrationResponse: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_BeginGitHubInstallationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".BeginGitHubInstallationRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1052,21 +1052,21 @@ nonisolated extension BriarAPI_BeginGitHubInstallationRequest: SwiftProtobuf.Mes
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_BeginGitHubInstallationRequest, rhs: BriarAPI_BeginGitHubInstallationRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1104,7 +1104,7 @@ nonisolated extension BriarAPI_BeginGitHubInstallationResponse: SwiftProtobuf.Me
 
 nonisolated extension BriarAPI_ProjectGitHubCredential: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ProjectGitHubCredential"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}organization_id\0\u{3}repository_id\0\u{1}repository\0\u{3}clone_url\0\u{1}username\0\u{1}password\0\u{3}expires_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}workspace_id\0\u{3}repository_id\0\u{1}repository\0\u{3}clone_url\0\u{1}username\0\u{1}password\0\u{3}expires_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1113,7 +1113,7 @@ nonisolated extension BriarAPI_ProjectGitHubCredential: SwiftProtobuf.Message, S
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 3: try { try decoder.decodeSingularUInt64Field(value: &self.repositoryID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.repository) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.cloneURL) }()
@@ -1133,8 +1133,8 @@ nonisolated extension BriarAPI_ProjectGitHubCredential: SwiftProtobuf.Message, S
     if !self.projectID.isEmpty {
       try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
     }
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 2)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 2)
     }
     if self.repositoryID != 0 {
       try visitor.visitSingularUInt64Field(value: self.repositoryID, fieldNumber: 3)
@@ -1159,7 +1159,7 @@ nonisolated extension BriarAPI_ProjectGitHubCredential: SwiftProtobuf.Message, S
 
   public static func ==(lhs: BriarAPI_ProjectGitHubCredential, rhs: BriarAPI_ProjectGitHubCredential) -> Bool {
     if lhs.projectID != rhs.projectID {return false}
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.repositoryID != rhs.repositoryID {return false}
     if lhs.repository != rhs.repository {return false}
     if lhs.cloneURL != rhs.cloneURL {return false}

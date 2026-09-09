@@ -312,7 +312,7 @@ const createAppDmMemoryService = (
   input: AppConnectDmMemoryInput,
 ): ServiceImpl<typeof DmMemoryService> => ({
   listDmMemories: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const page = await listDmMemories(
       input.db,
       owner,
@@ -338,7 +338,7 @@ const createAppDmMemoryService = (
   },
 
   getDmMemoryDocument: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const document = await getDmMemory(
       input.db,
       owner,
@@ -351,7 +351,7 @@ const createAppDmMemoryService = (
   },
 
   listDmMemoryRevisions: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const page = await listDmMemoryRevisions(
       input.db,
       owner,
@@ -374,7 +374,7 @@ const createAppDmMemoryService = (
   },
 
   createDmMemoryDocument: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const result = await saveDmMemory(input.db, owner, decodeCreate({
       requestId: canonicalUuid(request.requestId),
       memorySpaceId: request.memorySpaceId === undefined
@@ -396,7 +396,7 @@ const createAppDmMemoryService = (
   },
 
   updateDmMemoryDocument: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const documentId = canonicalUuid(request.documentId);
     const result = await saveDmMemory(input.db, owner, decodeEdit({
       requestId: canonicalUuid(request.requestId),
@@ -420,7 +420,7 @@ const createAppDmMemoryService = (
   },
 
   deleteDmMemoryDocument: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const result = await deleteDmMemory(
       input.db,
       owner,
@@ -430,7 +430,7 @@ const createAppDmMemoryService = (
   },
 
   updateDmMemorySettings: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const space = await updateDmMemorySettings(input.db, owner, decodeSettings({
       requestId: canonicalUuid(request.requestId),
       memorySpaceId: request.memorySpaceId === undefined
@@ -449,7 +449,7 @@ const createAppDmMemoryService = (
   },
 
   retryDmMemoryLearning: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const result = await retryDmLearningJob(
       input.db,
       owner,

@@ -94,7 +94,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
     private func fetchPage(spaceID: String?, cursor: String? = nil) async throws -> DmMemoryPage {
         try requireScope()
         var request = BriarAPI_ListDmMemoriesRequest()
-        request.organizationID = organizationID
+        request.workspaceID = organizationID
         request.channelID = channelID
         if let spaceID { request.memorySpaceID = spaceID }
         if let cursor { request.cursor = cursor }
@@ -118,7 +118,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
     func document(_ id: String, version: Int? = nil) async throws -> DmMemoryDocument {
         try requireScope()
         var request = BriarAPI_GetDmMemoryDocumentRequest()
-        request.organizationID = organizationID
+        request.workspaceID = organizationID
         request.channelID = channelID
         request.documentID = id
         if let version {
@@ -136,7 +136,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
     func history(_ id: String, cursor: UInt32? = nil) async throws -> DmMemoryRevisionPage {
         try requireScope()
         var request = BriarAPI_ListDmMemoryRevisionsRequest()
-        request.organizationID = organizationID
+        request.workspaceID = organizationID
         request.channelID = channelID
         request.documentID = id
         if let cursor { request.cursor = cursor }
@@ -188,7 +188,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
                     throw MobileAPIError.invalidRequest
                 }
                 var request = BriarAPI_UpdateDmMemoryDocumentRequest()
-                request.organizationID = organizationID
+                request.workspaceID = organizationID
                 request.channelID = channelID
                 request.documentID = documentID
                 request.requestID = input.requestId
@@ -203,7 +203,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
                 _ = try await service.updateDmMemoryDocument(request: request, headers: [:]).briarValue()
             } else {
                 var request = BriarAPI_CreateDmMemoryDocumentRequest()
-                request.organizationID = organizationID
+                request.workspaceID = organizationID
                 request.channelID = channelID
                 request.requestID = input.requestId
                 if let memorySpaceID = input.memorySpaceId { request.memorySpaceID = memorySpaceID }
@@ -226,7 +226,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
         do {
             try requireScope()
             var request = BriarAPI_UpdateDmMemorySettingsRequest()
-            request.organizationID = organizationID
+            request.workspaceID = organizationID
             request.channelID = channelID
             request.requestID = UUID().uuidString.lowercased()
             if !newSpace, let space { request.memorySpaceID = space.id }
@@ -245,7 +245,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
         do {
             try requireScope()
             var request = BriarAPI_DeleteDmMemoryDocumentRequest()
-            request.organizationID = organizationID
+            request.workspaceID = organizationID
             request.channelID = channelID
             request.documentID = id
             _ = try await service.deleteDmMemoryDocument(request: request, headers: [:]).briarValue()
@@ -259,7 +259,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
         do {
             try requireScope()
             var request = BriarAPI_RetryDmMemoryLearningRequest()
-            request.organizationID = organizationID
+            request.workspaceID = organizationID
             request.channelID = channelID
             request.jobID = jobID
             request.requestID = UUID().uuidString.lowercased()

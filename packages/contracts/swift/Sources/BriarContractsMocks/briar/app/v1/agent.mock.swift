@@ -21,14 +21,14 @@ import SwiftProtobuf
 /// `@unchecked Sendable` conformance to simplify testing and mocking.
 @available(iOS 13, *)
 open class BriarAPI_AgentServiceClientMock: BriarAPI_AgentServiceClientInterface, @unchecked Sendable {
-    /// Mocked for async calls to `listOrganizationAgents()`.
-    public var mockAsyncListOrganizationAgents = { (_: BriarAPI_ListOrganizationAgentsRequest) -> ResponseMessage<BriarAPI_ListOrganizationAgentsResponse> in .init(result: .success(.init())) }
-    /// Mocked for async calls to `createOrganizationAgent()`.
-    public var mockAsyncCreateOrganizationAgent = { (_: BriarAPI_CreateOrganizationAgentRequest) -> ResponseMessage<BriarAPI_CreateOrganizationAgentResponse> in .init(result: .success(.init())) }
-    /// Mocked for async calls to `updateOrganizationAgent()`.
-    public var mockAsyncUpdateOrganizationAgent = { (_: BriarAPI_UpdateOrganizationAgentRequest) -> ResponseMessage<BriarAPI_UpdateOrganizationAgentResponse> in .init(result: .success(.init())) }
-    /// Mocked for async calls to `deleteOrganizationAgent()`.
-    public var mockAsyncDeleteOrganizationAgent = { (_: BriarAPI_DeleteOrganizationAgentRequest) -> ResponseMessage<BriarAPI_DeleteOrganizationAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `listWorkspaceAgents()`.
+    public var mockAsyncListWorkspaceAgents = { (_: BriarAPI_ListWorkspaceAgentsRequest) -> ResponseMessage<BriarAPI_ListWorkspaceAgentsResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `createWorkspaceAgent()`.
+    public var mockAsyncCreateWorkspaceAgent = { (_: BriarAPI_CreateWorkspaceAgentRequest) -> ResponseMessage<BriarAPI_CreateWorkspaceAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `updateWorkspaceAgent()`.
+    public var mockAsyncUpdateWorkspaceAgent = { (_: BriarAPI_UpdateWorkspaceAgentRequest) -> ResponseMessage<BriarAPI_UpdateWorkspaceAgentResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `deleteWorkspaceAgent()`.
+    public var mockAsyncDeleteWorkspaceAgent = { (_: BriarAPI_DeleteWorkspaceAgentRequest) -> ResponseMessage<BriarAPI_DeleteWorkspaceAgentResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listProjectAgents()`.
     public var mockAsyncListProjectAgents = { (_: BriarAPI_ListProjectAgentsRequest) -> ResponseMessage<BriarAPI_ListProjectAgentsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createProjectAgent()`.
@@ -72,20 +72,20 @@ open class BriarAPI_AgentServiceClientMock: BriarAPI_AgentServiceClientInterface
 
     public init() {}
 
-    open func `listOrganizationAgents`(request: BriarAPI_ListOrganizationAgentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListOrganizationAgentsResponse> {
-        return self.mockAsyncListOrganizationAgents(request)
+    open func `listWorkspaceAgents`(request: BriarAPI_ListWorkspaceAgentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListWorkspaceAgentsResponse> {
+        return self.mockAsyncListWorkspaceAgents(request)
     }
 
-    open func `createOrganizationAgent`(request: BriarAPI_CreateOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateOrganizationAgentResponse> {
-        return self.mockAsyncCreateOrganizationAgent(request)
+    open func `createWorkspaceAgent`(request: BriarAPI_CreateWorkspaceAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_CreateWorkspaceAgentResponse> {
+        return self.mockAsyncCreateWorkspaceAgent(request)
     }
 
-    open func `updateOrganizationAgent`(request: BriarAPI_UpdateOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateOrganizationAgentResponse> {
-        return self.mockAsyncUpdateOrganizationAgent(request)
+    open func `updateWorkspaceAgent`(request: BriarAPI_UpdateWorkspaceAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_UpdateWorkspaceAgentResponse> {
+        return self.mockAsyncUpdateWorkspaceAgent(request)
     }
 
-    open func `deleteOrganizationAgent`(request: BriarAPI_DeleteOrganizationAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteOrganizationAgentResponse> {
-        return self.mockAsyncDeleteOrganizationAgent(request)
+    open func `deleteWorkspaceAgent`(request: BriarAPI_DeleteWorkspaceAgentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_DeleteWorkspaceAgentResponse> {
+        return self.mockAsyncDeleteWorkspaceAgent(request)
     }
 
     open func `listProjectAgents`(request: BriarAPI_ListProjectAgentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListProjectAgentsResponse> {
