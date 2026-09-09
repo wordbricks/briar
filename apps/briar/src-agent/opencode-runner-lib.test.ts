@@ -23,6 +23,7 @@ import {
   installOpenCodeRunnerSignalHandlers,
   normalizeOpenCodeEvent,
   openCodeBlockedRetry,
+  openCodeResponseText,
   openCodeSessionErrorMessage,
   openCodeSystemPrompt,
   openCodeTerminalOutcome,
@@ -608,6 +609,28 @@ describe("OpenCode runner helpers", () => {
         text: "최종 전체 응답",
       }),
     ]);
+  });
+});
+
+describe("OpenCode response text", () => {
+  const textPart = (id: string, text: string) =>
+    ({ id, messageID: "message-1", type: "text", text }) as never;
+
+  it("joins the assistant text parts of the turn", () => {
+    expect(openCodeResponseText([
+      textPart("part-1", "Here is "),
+      textPart("part-2", "the answer."),
+    ])).toBe("Here is the answer.");
+  });
+
+  it("never concatenates a typed progress message onto the answer", () => {
+    // OpenCode returns every text part of the turn, so an unfiltered progress
+    // update would corrupt the reply envelope it is prepended to.
+    expect(openCodeResponseText([
+      textPart("part-1", '{"progress":"저장소 구조를 확인하겠습니다"}'),
+      textPart("part-2", '```json\n{"progress":"Running the tests"}\n```'),
+      textPart("part-3", '{"body":"The answer.","attachments":[]}'),
+    ])).toBe('{"body":"The answer.","attachments":[]}');
   });
 });
 

@@ -255,6 +255,39 @@ describe("Codex App Server runner", () => {
     expect(codexFinalMessage(state)).toBe("Done");
   });
 
+  it("never answers with a typed progress message", () => {
+    const state = createCodexAppServerState();
+    state.threadId = "thread-1";
+    state.turnId = "turn-1";
+
+    // Codex does not phase these as commentary, so only the progress shape
+    // keeps them out of the answer.
+    const completed = consumeCodexAppServerMessage(state, request, {
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-1",
+          status: "completed",
+          items: [
+            {
+              type: "agentMessage",
+              text: '{"progress":"현재 랜딩 구조를 확인하겠습니다"}',
+            },
+            {
+              type: "agentMessage",
+              phase: "final_answer",
+              text: '```json\n{"progress":"테스트를 실행하겠습니다"}\n```',
+            },
+          ],
+        },
+      },
+    });
+
+    expect(completed.completed).toBe(true);
+    expect(codexFinalMessage(state)).toBeNull();
+  });
+
   it("maps App Server messages to the shared Agent event contract", () => {
     expect(
       normalizeCodexAppServerMessage({

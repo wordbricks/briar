@@ -211,7 +211,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await typeInto(input, "@");
 
     expect(container.textContent).toContain("Builder · Team agent");
-    expect(container.textContent).toContain("Helper · Organization agent");
+    expect(container.textContent).toContain("Helper · Workspace agent");
     expect(container.textContent).toContain("Jay · You · jay@example.com");
     expect(
       [...container.querySelectorAll<HTMLButtonElement>("ul button")].map(
@@ -355,6 +355,33 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await typeInto(input, "Ask / for help");
     expect(container.querySelectorAll('[data-testid="skills"] button'))
       .toHaveLength(0);
+    await cleanup();
+  });
+
+  it("filters DM skills and closes suggestions when the query or selection changes", async () => {
+    const onSend = vi.fn<OnSend>();
+    const { cleanup, container } = await renderHarness({ enableSkillCommands: true, onSend });
+    const input = container.querySelector<HTMLInputElement>('[data-testid="composer"]')!;
+    await typeInto(input, "/REVIEW");
+    expect(container.querySelectorAll('[data-testid="skills"] button')).toHaveLength(1);
+    await typeInto(input, "/missing");
+    expect(container.querySelectorAll('[data-testid="skills"] button')).toHaveLength(0);
+    await typeInto(input, "/Review");
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="skills"] button')!.click());
+    expect(input.value).toBe("/Review code ");
+    expect(container.querySelectorAll('[data-testid="skills"] button')).toHaveLength(0);
+    await typeInto(input, "ordinary message");
+    await act(async () => container.querySelector("form")?.requestSubmit());
+    expect(onSend).toHaveBeenCalledWith("ordinary message", [], [], []);
+    await cleanup();
+  });
+
+  it("leaves slash input unchanged outside DMs", async () => {
+    const { cleanup, container } = await renderHarness({ onSend: vi.fn<OnSend>() });
+    const input = container.querySelector<HTMLInputElement>('[data-testid="composer"]')!;
+    await typeInto(input, "/");
+    expect(container.querySelectorAll('[data-testid="skills"] button')).toHaveLength(0);
+    expect(input.value).toBe("/");
     await cleanup();
   });
 

@@ -129,7 +129,7 @@ export function createOrganizationActions(
         .get(organizationsAtom)
         .find((organization) => organization.id === organizationId);
       if (!currentOrganization) {
-        throw new Error("변경할 조직을 찾을 수 없습니다.");
+        throw new Error("변경할 워크스페이스를 찾을 수 없습니다.");
       }
       const token = registry.get(tokenAtom);
       if (!demoMode && !token) throw new Error("로그인이 필요합니다.");
@@ -158,7 +158,7 @@ export function createOrganizationActions(
         .get(organizationsAtom)
         .find((organization) => organization.id === organizationId);
       if (!currentOrganization) {
-        throw new Error("변경할 조직을 찾을 수 없습니다.");
+        throw new Error("변경할 워크스페이스를 찾을 수 없습니다.");
       }
       const token = registry.get(tokenAtom);
       if (!demoMode && !token) throw new Error("로그인이 필요합니다.");

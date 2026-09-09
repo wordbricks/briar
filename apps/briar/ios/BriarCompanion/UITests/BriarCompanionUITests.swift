@@ -445,6 +445,30 @@ final class BriarCompanionUITests: XCTestCase {
         )
     }
 
+    func testDirectMessageSkillSuggestions() {
+        let app = launchInsideCompanion()
+        app.tabBars.buttons["DMs"].tap()
+        let conversation = app.buttons["dm-row-12121212-1212-4212-8212-121212121212"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+        let field = app.textFields["channel-composer-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: channelTransitionTimeout))
+        field.tap()
+        field.typeText("/Rev")
+        let skill = app.buttons["channel-skill-51515151-5151-4151-8151-515151515151"]
+        XCTAssertTrue(skill.waitForExistence(timeout: transitionTimeout))
+        XCTAssertGreaterThanOrEqual(skill.frame.height, 48)
+        captureScreenshot(named: "companion-dm-skill-suggestions")
+        skill.tap()
+        XCTAssertEqual(field.value as? String, "/Review code ")
+        XCTAssertFalse(skill.exists)
+        XCTAssertTrue(waitForKeyboardFocus(on: field))
+        field.typeText("Check auth")
+        captureScreenshot(named: "companion-dm-skill-selected")
+        app.buttons["channel-composer-send"].tap()
+        XCTAssertTrue(waitForKeyboardFocus(on: field))
+    }
+
     func testDirectMessageKeepsComposerFocusedAfterSend() {
         let app = launchInsideCompanion(
             additionalArguments: ["--ui-testing-delayed-message-send"]

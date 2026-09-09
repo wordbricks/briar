@@ -70,7 +70,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => findButton("Delete permanently")?.click());
 
     expect(document.body.textContent).toContain(
-      "You still own an organization, project, Worker, or Slack connection",
+      "You still own a workspace, project, Worker, or Slack connection",
     );
     await cleanup();
   });

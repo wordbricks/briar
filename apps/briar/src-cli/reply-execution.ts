@@ -1005,6 +1005,7 @@ async function runClaimedChannelReply(
         ...reply.snapshot,
         downloadedImagePaths: downloadedAttachments.imagePaths,
         downloadedFilePaths: downloadedAttachments.filePaths,
+        unreadableAttachments: downloadedAttachments.unreadable,
       },
       workspaceAvailable: Boolean(analysisWorktree),
       workspaceRetained: Boolean(reply.routing && reply.session),

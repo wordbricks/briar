@@ -33,6 +33,8 @@ describe("Antigravity runner helpers", () => {
       structured_output: { body: "4" },
     } };
     expect(agyFinalMessage(raw, "earlier text")).toBe('{"body":"4"}');
+    expect(agyFinalMessage({ event: "result", result: { structured_output: { progress: "checking" } } }, "earlier text"))
+      .toBe("earlier text");
     const events = normalizeAgyEvent(raw, createAgyEventState());
     expect(JSON.stringify(events)).not.toContain("toolAction");
     expect(agyFinalMessage({ event: "result", result: { response: "plain answer" } }, "earlier"))
@@ -161,6 +163,31 @@ describe("Antigravity runner helpers", () => {
         usage: { input_tokens: 5_222, output_tokens: 503, total_tokens: 5_725 },
       },
     })).toBeNull();
+  });
+
+  it("never answers with a typed progress message", () => {
+    // Antigravity overwrites the running final message from any line that
+    // carries assistant text, and phases every assistant step "final", so
+    // only the progress shape keeps an update out of the answer.
+    let message = "";
+    message = agyFinalMessage(
+      { type: "agent_response", text: '{"progress":"저장소 구조를 확인하겠습니다"}' },
+      message,
+    );
+    expect(message).toBe("");
+
+    message = agyFinalMessage(
+      { type: "result", result: "The real answer." },
+      message,
+    );
+    expect(message).toBe("The real answer.");
+
+    // A later progress update never overwrites the answer either.
+    message = agyFinalMessage(
+      { type: "agent_response", text: '```json\n{"progress":"Running the tests"}\n```' },
+      message,
+    );
+    expect(message).toBe("The real answer.");
   });
 
   it("forces local Google subscription auth instead of API-key or ADC auth", () => {

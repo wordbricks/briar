@@ -734,6 +734,7 @@ export function CompanionChannels({
         <ChannelThreadTypingStrip
           channelId={channel.id}
           className="companion-channel-thread-typing"
+          showPendingReplyNames={channel.kind !== "dm"}
         />
         <CompanionChannelComposer
           agents={agents}

@@ -15,6 +15,7 @@ import {
   normalizedTurnCompleted,
 } from "./normalized-agent-event";
 import type { RunnerRequest } from "./runner-request";
+import { agentProgressMessage } from "../src/lib/agent-progress-message";
 import {
   classifyProviderFailure,
   type ProviderBlock,
@@ -355,8 +356,11 @@ export function agyFinalMessage(raw: unknown, fallback: string) {
   const root = recordValue(raw);
   const result = recordValue(root?.result);
   const structured = result?.structured_output ?? root?.structured_output;
-  if (structured !== undefined && structured !== null) return JSON.stringify(structured);
-  return (root ? textFrom(root.result) ?? textFrom(root) : undefined) ?? fallback;
+  const text = structured !== undefined && structured !== null
+    ? JSON.stringify(structured)
+    : root ? textFrom(root.result) ?? textFrom(root) : undefined;
+  if (text === undefined) return fallback;
+  return agentProgressMessage(text) ? fallback : text;
 }
 
 const transientUpstreamStatusCodes = new Set([502, 503, 504]);

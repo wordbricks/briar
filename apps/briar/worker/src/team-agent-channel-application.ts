@@ -98,12 +98,15 @@ export async function listTeamAgentChannelMessagesApplication(
     );
   }
 
+  // An Agent reads the conversation as it works, so it still sees the answers
+  // an older round trip copied back, which the person's own view leaves out.
   const page = await services.listChannelMessagePage(input.db, {
     channelId: channel.id,
     parentMessageId: input.parentMessageId,
     cursor: input.cursor,
     limit: input.limit,
     includeRepliesInTimeline: channel.kind === "dm",
+    includeAgentAnswerCopies: true,
   });
   if (!page) {
     return applicationError(
@@ -168,12 +171,15 @@ export async function listClaimedChannelReplyMessagesApplication(
     );
   }
 
+  // An Agent reads the conversation as it works, so it still sees the answers
+  // an older round trip copied back, which the person's own view leaves out.
   const page = await services.listChannelMessagePage(input.db, {
     channelId: channel.id,
     parentMessageId: input.parentMessageId,
     cursor: input.cursor,
     limit: input.limit,
     includeRepliesInTimeline: channel.kind === "dm",
+    includeAgentAnswerCopies: true,
   });
   if (!page) {
     return applicationError(

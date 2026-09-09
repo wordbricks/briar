@@ -153,6 +153,31 @@ export const removeReplySummary = (
 });
 
 /**
+ * The distinct agent names replying under any of `messageIds`.
+ *
+ * Durable reply state, not the activity socket: a queued or running reply is
+ * named here from the moment it exists. A channel's typing strip needs that,
+ * because a runner may publish no commentary at all and its silence must not
+ * read as nothing happening. A DM surface deliberately does not call this.
+ */
+export const typingAgentNamesForReplies = (
+  replies: readonly ChannelAgentReply[],
+  agents: readonly ChannelAgentSummary[],
+  messageIds: ReadonlySet<string>,
+  fallbackName: string,
+): string[] => [
+  ...new Set(
+    replies
+      .filter((reply) => messageIds.has(reply.parentMessageId))
+      .map(
+        (reply) =>
+          agents.find((agent) => agent.agentId === reply.agentId)?.name ??
+          fallbackName,
+      ),
+  ),
+];
+
+/**
  * What this module reads of a live activity frame. Narrower than
  * `ChannelAgentActivityFrame` on purpose: the typing strip needs the headline
  * and the attempt it belongs to, not the transport envelope around them.

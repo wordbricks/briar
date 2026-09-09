@@ -145,7 +145,7 @@ export function useChannelComposer<T extends ComposerInput>({
     [agents, enableSkillCommands],
   );
   const skillQuery =
-    body.startsWith("/") && caret >= 1 && selectedSkill === null
+    body.startsWith("/") && !/[\r\n]/u.test(body) && caret >= 1 && selectedSkill === null
       ? body.slice(1, caret)
       : null;
   const normalizedSkillQuery = skillQuery?.trim().toLocaleLowerCase() ?? null;

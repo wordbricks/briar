@@ -393,6 +393,19 @@ export type ChannelReplySessionRow = {
   updated_at: string;
 };
 
+/*
+  A round trip used to copy the other Agent's answer into the person's own
+  conversation, which put B's words in A's mouth; the relaying turn now reads
+  that answer where it was written and speaks for itself, so no copy is made.
+  The copies already sitting in people's conversations stay in the database —
+  a relaying turn queued before this change is still triggered by one — and
+  every person-facing read leaves them out.
+*/
+export const agentAnswerCopySql = (message: string) => `exists (
+  select 1 from briar_channel_message_relays copy
+  where copy.message_id = ${message}.id and copy.direction = 'inbound'
+)`;
+
 const MAX_REPLY_ATTEMPTS = 3;
 export const CHANNEL_REPLY_FAILURE_MESSAGE =
   "답변을 생성하지 못했습니다. 다시 시도해 주세요.";
@@ -466,9 +479,11 @@ const channelSelectColumns = `
          channel.created_by_user_id,
          channel.created_at, channel.updated_at,
          (select max(message.created_at) from briar_channel_messages message
-          where message.channel_id = channel.id) as last_message_at,
+          where message.channel_id = channel.id
+            and not ${agentAnswerCopySql("message")}) as last_message_at,
          (select message.body from briar_channel_messages message
           where message.channel_id = channel.id
+            and not ${agentAnswerCopySql("message")}
           order by message.created_at desc, message.id desc limit 1)
            as last_message_preview,
          case when channel.kind = 'dm' then (
@@ -515,7 +530,8 @@ const channelSelectForUser = `${channelSelectColumns},
            as last_read_at,
          (select max(message.created_at) from briar_channel_messages message
           where message.channel_id = channel.id
-            and ifnull(message.author_user_id, '') != ?)
+            and ifnull(message.author_user_id, '') != ?
+            and not ${agentAnswerCopySql("message")})
            as last_unread_message_at,
          sidebar.pinned_at as sidebar_pinned_at,
          sidebar.section_id as sidebar_section_id,
@@ -1146,6 +1162,7 @@ export async function listAgentDirectMessages(
        order by coalesce((
          select max(message.created_at) from briar_channel_messages message
          where message.channel_id = channel.id
+           and not ${agentAnswerCopySql("message")}
        ), channel.created_at) desc, channel.id`,
     )
     .bind(userId, userId, userId, organizationId, agentId, userId)
@@ -2136,14 +2153,19 @@ export async function listChannelRootMessages(
     limit?: number;
     createdAfter?: string;
     createdBefore?: string;
+    includeAgentAnswerCopies?: boolean;
   } = {},
 ) {
   const limit = options.limit ?? 200;
   const select = messageSelect;
+  const visible = options.includeAgentAnswerCopies
+    ? ""
+    : `and not ${agentAnswerCopySql("message")}`;
   const rows = await db
     .prepare(
       `${select}
        where message.channel_id = ? and message.parent_message_id is null
+         ${visible}
          ${options.createdAfter ? "and message.created_at > ?" : ""}
          ${options.createdBefore ? "and message.created_at <= ?" : ""}
        order by message.created_at desc,
@@ -2164,13 +2186,18 @@ export async function listChannelThreadMessages(
   db: D1Database,
   channelId: string,
   parentMessageId: string,
+  options: { includeAgentAnswerCopies?: boolean } = {},
 ) {
   const select = messageSelect;
+  const visible = options.includeAgentAnswerCopies
+    ? ""
+    : `and not ${agentAnswerCopySql("message")}`;
   const rows = await db
     .prepare(
       `${select}
        where message.channel_id = ?
          and (message.id = ? or message.parent_message_id = ?)
+         ${visible}
        order by message.created_at,
                 coalesce(message.dm_sequence, 0), message.id`,
     )
@@ -2199,6 +2226,7 @@ export async function listChannelMessagePage(
     cursor: string | null;
     limit: number;
     includeRepliesInTimeline?: boolean;
+    includeAgentAnswerCopies?: boolean;
   },
 ): Promise<ChannelMessagePage | null> {
   const includesReplies =
@@ -2234,6 +2262,9 @@ export async function listChannelMessagePage(
     : includesReplies
       ? "1 = 1"
       : "message.parent_message_id is null";
+  const visible = input.includeAgentAnswerCopies
+    ? ""
+    : `and not ${agentAnswerCopySql("message")}`;
   const before = cursor
     ? `and (message.created_at < ?
             or (message.created_at = ? and (
@@ -2245,6 +2276,7 @@ export async function listChannelMessagePage(
     .prepare(
       `${select}
        where message.channel_id = ? and ${scope}
+         ${visible}
          ${before}
        order by message.created_at desc,
                 coalesce(message.dm_sequence, 0) desc, message.id desc
@@ -6094,55 +6126,8 @@ export async function completeChannelReply(
     );
   }
   if (job.agent_message_hop === 1 && originJob) {
-    const inboundMessageId = crypto.randomUUID();
     const relayJobId = crypto.randomUUID();
     statements.push(
-      /*
-        Copied under the answering Agent's name so the person's timeline can
-        say who spoke, with the relay row carrying the link back to the
-        original message.
-      */
-      db.prepare(
-        `insert into briar_channel_messages (
-           id, channel_id, parent_message_id, author_user_id, author_agent_id,
-           author_agent_name, author_agent_provider, body, created_at,
-           updated_at
-         )
-         select ?, origin.channel_id,
-                case when origin_channel.kind = 'dm' then null
-                  else coalesce(origin.parent_message_id,
-                                origin.trigger_message_id) end,
-                null, claim.agent_id, ?, ?, ?, ?, ?
-         from briar_channel_agent_reply_jobs claim
-         join briar_channel_agent_reply_jobs origin
-           on origin.id = claim.origin_reply_job_id
-          and origin.organization_id = claim.organization_id
-          and origin.agent_message_hop = 0
-         join briar_channels origin_channel on origin_channel.id = origin.channel_id
-         where ${claimedCompletion} and claim.agent_message_hop = 1`,
-      ).bind(
-        inboundMessageId,
-        input.agentName,
-        input.agentProvider,
-        input.body,
-        input.completedAt,
-        input.completedAt,
-        ...claimedCompletionBindings(),
-      ),
-      db.prepare(
-        `insert into briar_channel_message_relays (
-           message_id, direction, peer_channel_id, peer_message_id,
-           origin_reply_job_id, created_at
-         )
-         select ?, 'inbound', claim.channel_id, claim.reply_message_id,
-                claim.origin_reply_job_id, ?
-         from briar_channel_agent_reply_jobs claim
-         where ${claimedCompletion} and claim.agent_message_hop = 1`,
-      ).bind(
-        inboundMessageId,
-        input.completedAt,
-        ...claimedCompletionBindings(),
-      ),
       /*
         The sending Agent picks its own thread back up: the relay turn joins the
         origin job's own session, and with it the provider conversation, so the
@@ -6167,6 +6152,12 @@ export async function completeChannelReply(
         input.completedAt,
         ...claimedCompletionBindings(),
       ),
+      /*
+        The turn is triggered by the notice the sending Agent already left in
+        the person's conversation ("메시지 보냄 → B"), so the answer needs no
+        copy of its own: it stays the one message it always was, in the
+        Agent-to-Agent conversation, and the claim reads it from there.
+      */
       db.prepare(
         `insert into briar_channel_agent_reply_jobs (
            id, organization_id, channel_id, project_id, agent_id, skill_id,
@@ -6175,12 +6166,16 @@ export async function completeChannelReply(
            origin_reply_job_id, created_at, updated_at
          )
          select ?, origin.organization_id, origin.channel_id,
-                origin.project_id, origin.agent_id, null, session.id, ?,
+                origin.project_id, origin.agent_id, null, session.id,
+                notice.message_id,
                 origin.parent_message_id, ?, session.provider, 'queued', 2,
                 origin.id, ?, ?
          from briar_channel_agent_reply_jobs claim
          join briar_channel_agent_reply_jobs origin
            on origin.id = claim.origin_reply_job_id
+         join briar_channel_message_relays notice
+           on notice.origin_reply_job_id = origin.id
+          and notice.direction = 'outbound'
          join briar_channel_reply_sessions session
            on session.id = origin.session_id
           and session.channel_id = origin.channel_id
@@ -6189,7 +6184,6 @@ export async function completeChannelReply(
          on conflict (channel_id, trigger_message_id, agent_id) do nothing`,
       ).bind(
         relayJobId,
-        inboundMessageId,
         crypto.randomUUID(),
         input.completedAt,
         input.completedAt,
@@ -6921,7 +6915,7 @@ export async function loadChannelDelta(
           .prepare(
             `${messageSelect} where message.id in (${[...messageIds]
               .map(() => "?")
-              .join(", ")})`,
+              .join(", ")}) and not ${agentAnswerCopySql("message")}`,
           )
           .bind(...messageIds)
           .all<ChannelMessageRow>()

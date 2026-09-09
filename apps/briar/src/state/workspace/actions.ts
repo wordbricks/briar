@@ -238,14 +238,14 @@ export function createWorkspaceActions(
       const token = requireToken();
       const organizationId = registry.get(activeOrganizationIdAtom);
       if (!organizationId) {
-        throw new Error("GitHub App을 연결할 조직을 먼저 선택해 주세요.");
+        throw new Error("GitHub App을 연결할 워크스페이스를 먼저 선택해 주세요.");
       }
       const integration = await api().loadGithubIntegration(
         token,
         organizationId,
       );
       if (!integration.connected) {
-        throw new Error("조직 설정에서 GitHub App을 먼저 연결해 주세요.");
+        throw new Error("워크스페이스 설정에서 GitHub App을 먼저 연결해 주세요.");
       }
       const repository = integration.repositories.find(
         (candidate) =>
@@ -253,7 +253,7 @@ export function createWorkspaceActions(
       );
       if (!repository) {
         throw new Error(
-          "입력한 저장소가 조직 GitHub App의 저장소 접근 범위에 없습니다.",
+          "입력한 저장소가 워크스페이스에 연결된 GitHub App의 저장소 접근 범위에 없습니다.",
         );
       }
       return repository.fullName;
