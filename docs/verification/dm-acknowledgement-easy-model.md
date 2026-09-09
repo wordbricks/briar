@@ -63,7 +63,7 @@ successful live easy-model selection or improved cost/latency.
 
 ## Automated verification
 
-Focused Vitest coverage passes 32 tests across acknowledgement lifecycle,
+Focused Vitest coverage passes 37 tests across acknowledgement lifecycle,
 actual channel reply execution, and central recommendation policy. The actual
 reply runner tests verify distinct selection/body provider/model/effort, Agent
 fallback, context, fresh session, isolated workspace and selection permissions.
@@ -71,10 +71,38 @@ Policy tests cover unavailable providers and absence of an eligible candidate.
 Lifecycle tests cover normal output, malformed output, selection/publication
 failure, timeout, late output and cancellation. Workspace typechecks pass.
 
-Follow-up AGY diagnostics returned `auth_required`: authentication failed or
-timed out, with an instruction to log in using `agy`. A new single gratitude
-call ended in 723 ms with the same failure. This identifies a provider login
-blocker, not a completed contextual selection. Restoring AGY authentication is
-the preferred way to finish live acceptance without opting into a new hosting
-region. Re-run the same fresh-session samples after login, then finish merge
-and execution-runtime deployment; neither is claimed by this report.
+## Resumed live verification — 2026-09-09 11:03 KST
+
+The earlier attempt did not establish why Luna was excluded. Its conclusion
+that AGY login was needed was too narrow. No AGY login or hosting-region opt-in
+is required for this acceptance test.
+
+After merging origin/main e6cefcd2, fresh Codex app-server discovery advertised
+`gpt-5.6-luna` with `max` effort. The unchanged central easy policy selected that
+exact pair when given the discovered Codex catalog. This controlled comparison
+enables only Codex in memory; it does not change saved provider availability or
+force production workers to prefer Codex over other eligible easy providers.
+The latest main policy now prefers Gemini 3.8 Flash High and OpenCode GLM 5.3
+Flash before Luna; the preceding AGY/OpenCode observations describe the old
+policy at the time they ran.
+
+The same three synthetic messages, production prompt and real detached runner
+were used. Every sample used a new workspace and session, disabled computer use,
+no skills, read-only access and the production 15-second deadline. Timing starts
+before workspace creation, includes runner and provider session startup, and
+ends before cleanup. All six calls completed with exit code 0, no runner error,
+and no provider block. The benchmark did not publish messages or reactions.
+
+| Input | Astra low elapsed | Astra result | Luna max elapsed | Luna result |
+| --- | ---: | --- | ---: | --- |
+| Gratitude | 6,224 ms | ❤️ | 6,851 ms | 🙏 |
+| Celebration | 5,340 ms | 🎉 | 5,446 ms | 🎉 |
+| Empathy | 6,046 ms | 🫂 | 6,279 ms | 🫂 |
+
+Both variants produced contextually appropriate reactions in all three samples.
+Mean elapsed time was 5,870 ms for Astra and 6,192 ms for Luna (322 ms / 5.5%
+slower). These small sequential samples establish successful easy-model use,
+not a latency improvement or a production percentile. No token price or billed
+cost was measured. Production selection still uses the shared easy policy and
+healthy provider snapshot, with Agent fallback if no eligible candidate exists;
+turn failure or timeout retains the neutral reaction fallback.
