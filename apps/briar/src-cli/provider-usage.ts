@@ -8,6 +8,7 @@ import {
   type OpenCodeUpstreamDescriptor,
 } from "../src/lib/agent-provider";
 import { isProviderUsageExhausted } from "../src/lib/agent-usage";
+import { cachedProviderAuthentication } from "./provider-auth-cache";
 import {
   agyAuthenticated,
   claudeTokenState,
@@ -936,7 +937,12 @@ async function loadAgyUsage(
   if (!binary) {
     return providerWithoutUsage("unavailable", providerMissingBinaryMessage.agy);
   }
-  const authenticated = await agyAuthenticated(binary);
+  // Provider health asked the very same question moments ago on the worker's
+  // probe path; the cache keeps that to one `agy models` spawn per round.
+  const authenticated = await cachedProviderAuthentication(
+    `agy:${binary}`,
+    () => agyAuthenticated(binary),
+  );
   const cli = authenticated
     ? fetchAgyUsageCli(binary, timeoutMs)
     : { usage: null, error: "Antigravity CLI가 인증되지 않았습니다." } satisfies

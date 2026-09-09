@@ -16,6 +16,7 @@ import {
   parseCursorAboutEmail,
   piAuthenticated,
 } from "./provider-credentials";
+import { cachedProviderAuthentication } from "./provider-auth-cache";
 import {
   probeWorkerProviderUsage,
   type ProviderUsageProbe,
@@ -124,6 +125,8 @@ const defaultDependencies: ProviderHealthDependencies = {
     return companions.every((name) => Bun.which(name)) ? resolved : null;
   },
   runtimeBlock: (provider, now) => activeProviderBlock(provider, () => now),
+  // The usage probe below asks the same question for some providers, so the
+  // spawning checks go through the shared short-lived cache and answer once.
   authenticated: async (provider, binary, home, now, upstreamConfigured) => {
     if (openCodeUpstreamOf(provider)) {
       return upstreamConfigured;
@@ -132,16 +135,25 @@ const defaultDependencies: ProviderHealthDependencies = {
       return codexAuthenticated(home);
     }
     if (provider === "claude") {
-      return claudeAuthenticated(binary);
+      return cachedProviderAuthentication(
+        `claude:${binary}`,
+        () => claudeAuthenticated(binary),
+      );
     }
     if (provider === "cursor") {
-      return cursorAuthenticated(binary);
+      return cachedProviderAuthentication(
+        `cursor:${binary}`,
+        () => cursorAuthenticated(binary),
+      );
     }
     if (provider === "opencode") {
       return opencodeAuthenticated(home);
     }
     if (provider === "agy") {
-      return agyAuthenticated(binary);
+      return cachedProviderAuthentication(
+        `agy:${binary}`,
+        () => agyAuthenticated(binary),
+      );
     }
     if (provider === "pi") {
       return piAuthenticated(home);

@@ -28,6 +28,10 @@ import {
   runWorkerLoop,
   type WorkerLoopUpdateDirective,
 } from "./worker";
+import {
+  createBackgroundSweep,
+  createWorkerRuntimeProbes,
+} from "./worker-runtime-probes";
 import { executeClaimedMergeBatch } from "./merge-queue";
 import {
   supportsRemoteWorkerUpdates,
@@ -177,6 +181,45 @@ const workerRuntime = async ({
     protocol: process.env.BRIAR_SANDBOX_UPDATER === "1" ? 2 : 1,
   },
 });
+
+type WorkerRuntimeProbeResult = {
+  providerHealth: Awaited<ReturnType<typeof inspectWorkerProviderHealth>>;
+  providerCapabilities: Awaited<
+    ReturnType<typeof discoverWorkerProviderCapabilities>
+  >;
+  providerVersions: Awaited<ReturnType<typeof discoverWorkerProviderVersions>>;
+  providers: ReturnType<typeof healthyWorkerProviders>;
+  computerUse: WorkerRuntimeInput["computerUse"];
+};
+
+/**
+ * Everything the runtime snapshot has to learn from this machine. Each call
+ * spawns the provider CLIs, so the worker loop refreshes it in the background
+ * instead of on the heartbeat - and therefore the claim - path.
+ */
+const probeWorkerRuntime = async (
+  config: Config,
+): Promise<WorkerRuntimeProbeResult> => {
+  const providerHealth = await inspectWorkerProviderHealth(
+    enabledAgentProviders(config),
+    {
+      upstreamConfigured: (provider) =>
+        openCodeUpstreamConfigured(config, provider),
+    },
+  );
+  const providerCapabilities = await discoverWorkerProviderCapabilities(
+    enabledAgentProviders(config),
+  );
+  const providerVersions = await discoverWorkerProviderVersions();
+  const providers = healthyWorkerProviders(providerHealth);
+  return {
+    providerHealth,
+    providerCapabilities,
+    providerVersions,
+    providers,
+    computerUse: await inspectComputerUseCapability(config, providers),
+  };
+};
 
 const dmMemoryLearningCapability = (
   providers: ReturnType<typeof healthyWorkerProviders>,
@@ -678,19 +721,14 @@ async function workerCommand() {
   console.log(`worker ${label} starting as ${workerId}`);
 
   if (readinessProblem) {
-    const providerHealth = await inspectWorkerProviderHealth(
-      enabledAgentProviders(config),
-      {
-        upstreamConfigured: (provider) =>
-          openCodeUpstreamConfigured(config, provider),
-      },
-    );
-    const providerCapabilities = await discoverWorkerProviderCapabilities(
-      enabledAgentProviders(config),
-    );
-    const providerVersions = await discoverWorkerProviderVersions();
-    const providers = healthyWorkerProviders(providerHealth);
-    const computerUse = await inspectComputerUseCapability(config, providers);
+    // This branch reports once and exits, so it still probes synchronously.
+    const {
+      providerHealth,
+      providerCapabilities,
+      providerVersions,
+      providers,
+      computerUse,
+    } = await probeWorkerRuntime(config);
     const configuredProvider = project.llm?.provider ?? "codex";
     const heartbeat = await workerControl.heartbeat({
       workerId,
@@ -735,11 +773,77 @@ async function workerCommand() {
     (line) => console.log(line),
   );
   wakeClient.start();
-  let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
-  let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let acknowledgementExecution: IssueExecutionRecommendation | null = null;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
+  // Provider probes cost seconds; the heartbeat reports the last reading and
+  // this scheduler refreshes it in the background for the next one.
+  const runtimeProbes = createWorkerRuntimeProbes({
+    probe: async () => {
+      const probed = await probeWorkerRuntime(config);
+      // The DM acknowledgement emoji picks its model from this same reading,
+      // so recompute it whenever the capability snapshot changes; the reply
+      // path must never start a discovery of its own.
+      acknowledgementExecution = recommendIssueExecution(
+        "easy",
+        probed.providerCapabilities,
+        null,
+        (selection) => probed.providers.includes(selection.provider),
+      );
+      return probed;
+    },
+    log: (line) => console.log(line),
+  });
+  const analysisWorktreeSweep = createBackgroundSweep({
+    intervalMs: 5 * 60_000,
+    run: async () => {
+      try {
+        await cleanupOrphanedWorkspaceAgentWorkspaces({
+          workerSessionsDirectory: join(configDirectory, "worker-sessions"),
+        });
+        const maintenance = await maintainIdleAnalysisWorktrees(
+          runGit,
+          project.repositoryPath,
+          projectWorktreeRoot(worktreeSettings(project).root, project.id),
+          { activePaths: [...activeCachedAnalysisWorktreePaths.keys()] },
+        );
+        const reportable = maintenance.filter(
+          (item) => item.status === "removed" || item.reason !== "active",
+        );
+        if (reportable.length > 0) {
+          console.log(
+            `analysis worktree maintenance: ${JSON.stringify(reportable)}`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `analysis worktree maintenance failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    },
+  });
+  const completedWorktreeSweep = createBackgroundSweep({
+    intervalMs: 60 * 60 * 1_000,
+    run: async () => {
+      try {
+        await syncCompletedWorktreeRecordsFromDashboard(config, project);
+        const maintenance = await maintainRecordedCompletedWorktrees(project);
+        if (maintenance.length > 0) {
+          console.log(
+            `completed worktree maintenance: ${JSON.stringify(maintenance)}`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `completed worktree maintenance failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    },
+  });
   const result = await runWorkerLoop<ClaimedWork>(
     {
       claim: async (_options) => workerQueue.claimWork({
@@ -801,71 +905,22 @@ async function workerCommand() {
         }
       },
       heartbeat: async (readinessState = "ready") => {
-        if (Date.now() - lastAnalysisWorktreeSweepAt >= 5 * 60_000) {
-          lastAnalysisWorktreeSweepAt = Date.now();
-          try {
-            await cleanupOrphanedWorkspaceAgentWorkspaces({
-              workerSessionsDirectory: join(configDirectory, "worker-sessions"),
-            });
-            const maintenance = await maintainIdleAnalysisWorktrees(
-              runGit,
-              project.repositoryPath,
-              projectWorktreeRoot(worktreeSettings(project).root, project.id),
-              { activePaths: [...activeCachedAnalysisWorktreePaths.keys()] },
-            );
-            const reportable = maintenance.filter(
-              (item) => item.status === "removed" || item.reason !== "active",
-            );
-            if (reportable.length > 0) {
-              console.log(
-                `analysis worktree maintenance: ${JSON.stringify(reportable)}`,
-              );
-            }
-          } catch (error) {
-            console.error(
-              `analysis worktree maintenance failed: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
-          }
-        }
-        if (Date.now() - lastWorktreeSweepAt >= 60 * 60 * 1_000) {
-          lastWorktreeSweepAt = Date.now();
-          try {
-            await syncCompletedWorktreeRecordsFromDashboard(config, project);
-            const maintenance = await maintainRecordedCompletedWorktrees(project);
-            if (maintenance.length > 0) {
-              console.log(`completed worktree maintenance: ${JSON.stringify(maintenance)}`);
-            }
-          } catch (error) {
-            console.error(
-              `completed worktree maintenance failed: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
-          }
-        }
-        const providerHealth = await inspectWorkerProviderHealth(
-          enabledAgentProviders(config),
-          {
-            upstreamConfigured: (provider) =>
-              openCodeUpstreamConfigured(config, provider),
-          },
-        );
-        const providerCapabilities = await discoverWorkerProviderCapabilities(
-          enabledAgentProviders(config),
-        );
-        const providerVersions = await discoverWorkerProviderVersions();
-        const providers = healthyWorkerProviders(providerHealth);
-        // Reuse this worker's heartbeat snapshot; never start discovery on the DM path.
-        acknowledgementExecution = recommendIssueExecution(
-          "easy", providerCapabilities, null,
-          (selection) => providers.includes(selection.provider),
-        );
-        const computerUse = await inspectComputerUseCapability(
-          config,
+        // Maintenance and provider probes are not liveness data. Kick them and
+        // move on: the loop awaits this heartbeat before every claim.
+        analysisWorktreeSweep.kick();
+        completedWorktreeSweep.kick();
+        const cached = runtimeProbes.snapshot();
+        // Only the very first heartbeat has nothing to report yet, and it runs
+        // before the loop's first claim.
+        const {
+          providerHealth,
+          providerCapabilities,
+          providerVersions,
           providers,
-        );
+          computerUse,
+        } = cached === null
+          ? (await runtimeProbes.refreshNow()).value
+          : cached.value;
         const hasHealthyProvider = providers.length > 0;
         // Shared project workflow tools must be ready on this worker machine.
         // Prefer the requirements returned by the previous heartbeat (server is
@@ -1172,7 +1227,12 @@ async function workerCommand() {
       maxConcurrentSessions: registered.maxConcurrentSessions,
       ...(Number.isInteger(maxIssues) && maxIssues > 0 ? { maxIssues } : {}),
     },
-  ).finally(() => wakeClient.stop());
+  ).finally(() => {
+    wakeClient.stop();
+    runtimeProbes.stop();
+    analysisWorktreeSweep.stop();
+    completedWorktreeSweep.stop();
+  });
   console.log(JSON.stringify(result));
 }
 

@@ -1,7 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { clearProviderAuthenticationCache } from "./provider-auth-cache";
+import { clearProviderUsageCache } from "./provider-usage";
 import {
   claudeAuthenticated,
   grokAuthenticated,
@@ -398,6 +400,46 @@ describe("inspectWorkerProviderHealth", () => {
       );
       await expect(opencodeAuthenticated(home)).resolves.toBe(true);
     } finally {
+      await rm(home, { recursive: true });
+    }
+  });
+
+  it("spawns the agy sign-in check once per probe round", async () => {
+    const home = await mkdtemp(join(tmpdir(), "briar-agy-health-"));
+    const binary = join(home, "agy");
+    const invocations = join(home, "invocations.log");
+    clearProviderUsageCache();
+    clearProviderAuthenticationCache();
+    try {
+      await writeFile(
+        binary,
+        `#!/bin/sh\nprintf '%s\\n' "$*" >> ${invocations}\nprintf '%s' '{}'\n`,
+        { mode: 0o755 },
+      );
+      const health = await inspectWorkerProviderHealth(
+        { ...enabled, agy: true },
+        {
+          home,
+          now: () => Date.parse("2026-09-09T00:00:00Z"),
+          which: (provider) => (provider === "agy" ? binary : null),
+        },
+      );
+
+      expect(health.agy).toMatchObject({
+        installed: true,
+        authenticated: true,
+      });
+      const calls = (await readFile(invocations, "utf8"))
+        .split("\n")
+        .filter((line) => line.length > 0);
+      // The auth check (`agy … models`) must not be repeated by the usage
+      // loader, which spawns its own `/quota` command.
+      expect(calls.filter((line) => !line.includes("/quota"))).toEqual([
+        "--output-format json models",
+      ]);
+    } finally {
+      clearProviderUsageCache();
+      clearProviderAuthenticationCache();
       await rm(home, { recursive: true });
     }
   });
