@@ -33,6 +33,7 @@ const request: RunnerRequest = {
   networkAccess: false,
   attachments: [],
   additionalDirectories: [],
+  toolInheritance: "inherit",
   providerBinaryPath: "/usr/local/bin/claude",
 };
 
@@ -111,6 +112,50 @@ describe("Claude runner", () => {
       allowUnsandboxedCommands: false,
       network: { allowedDomains: ["*"] },
     });
+  });
+
+  it("loads only Briar's MCP servers for a Briar-owned turn", () => {
+    const mcpServers = {
+      "briar-dm-message": {
+        type: "stdio" as const,
+        command: "/usr/bin/bun",
+        args: ["/bundles/dm-message-mcp-server.js"],
+      },
+    };
+    const options = claudeOptions(
+      {
+        ...request,
+        sandboxMode: "workspaceWrite",
+        networkAccess: true,
+        toolInheritance: "briar",
+      },
+      vi.fn(),
+      mcpServers,
+    );
+
+    // The user's settings sources are where their own MCP servers live, and
+    // strictMcpConfig also drops project `.mcp.json`, plugin and frontmatter
+    // servers.
+    expect(options.settingSources).toEqual([]);
+    expect(options.strictMcpConfig).toBe(true);
+    expect(options.mcpServers).toEqual(mcpServers);
+    // Everything else stays as an inheriting workspace-write turn has it.
+    expect(options.skills).toBe("all");
+    expect(options.permissionMode).toBe("acceptEdits");
+    expect(options.disallowedTools).toBeUndefined();
+    expect(options.sandbox).toMatchObject({
+      network: { allowedDomains: ["*"] },
+    });
+  });
+
+  it("keeps the user's tool catalog for an inheriting turn", () => {
+    const options = claudeOptions(
+      { ...request, sandboxMode: "workspaceWrite", networkAccess: true },
+      vi.fn(),
+    );
+
+    expect(options.settingSources).toEqual(["user", "project", "local"]);
+    expect(options.strictMcpConfig).toBeUndefined();
   });
 
   it("opens every Claude permission for unrestricted project replies", () => {

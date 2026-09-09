@@ -521,6 +521,167 @@ impl ::buffa::Enumeration for RunErrorCode {
         ]
     }
 }
+/// Whether a turn may load the tools the host user configured for the provider
+/// CLI, independently of `external_tools`. `external_tools=false` is a full
+/// lockdown (read-only permissions, no web search, no skills); this axis only
+/// decides whose tool catalog the provider loads.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ToolInheritance {
+    /// Treated as INHERIT so a request written before this field keeps its
+    /// behaviour.
+    TOOL_INHERITANCE_UNSPECIFIED = 0i32,
+    /// The provider loads the host user's MCP servers, apps and plugins.
+    TOOL_INHERITANCE_INHERIT = 1i32,
+    /// The provider loads only the MCP servers Briar passes for this turn. The
+    /// sandbox mode, network setting, skills and web search stay as requested.
+    TOOL_INHERITANCE_BRIAR = 2i32,
+}
+impl ToolInheritance {
+    ///Idiomatic alias for [`Self::TOOL_INHERITANCE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::TOOL_INHERITANCE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::TOOL_INHERITANCE_INHERIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Inherit: Self = Self::TOOL_INHERITANCE_INHERIT;
+    ///Idiomatic alias for [`Self::TOOL_INHERITANCE_BRIAR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Briar: Self = Self::TOOL_INHERITANCE_BRIAR;
+}
+impl ::core::default::Default for ToolInheritance {
+    fn default() -> Self {
+        Self::TOOL_INHERITANCE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ToolInheritance {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ToolInheritance {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ToolInheritance;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(ToolInheritance)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ToolInheritance, E> {
+                <ToolInheritance as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ToolInheritance, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ToolInheritance as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ToolInheritance, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ToolInheritance as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ToolInheritance, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ToolInheritance {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ToolInheritance {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::TOOL_INHERITANCE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::TOOL_INHERITANCE_INHERIT),
+            2i32 => ::core::option::Option::Some(Self::TOOL_INHERITANCE_BRIAR),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::TOOL_INHERITANCE_UNSPECIFIED => "TOOL_INHERITANCE_UNSPECIFIED",
+            Self::TOOL_INHERITANCE_INHERIT => "TOOL_INHERITANCE_INHERIT",
+            Self::TOOL_INHERITANCE_BRIAR => "TOOL_INHERITANCE_BRIAR",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "TOOL_INHERITANCE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::TOOL_INHERITANCE_UNSPECIFIED)
+            }
+            "TOOL_INHERITANCE_INHERIT" => {
+                ::core::option::Option::Some(Self::TOOL_INHERITANCE_INHERIT)
+            }
+            "TOOL_INHERITANCE_BRIAR" => {
+                ::core::option::Option::Some(Self::TOOL_INHERITANCE_BRIAR)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::TOOL_INHERITANCE_UNSPECIFIED,
+            Self::TOOL_INHERITANCE_INHERIT,
+            Self::TOOL_INHERITANCE_BRIAR,
+        ]
+    }
+}
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum AgentRunKind {
@@ -3568,6 +3729,18 @@ pub struct RunRequest {
     pub dm_message_mcp_server_path: ::core::option::Option<
         ::buffa::alloc::string::String,
     >,
+    /// Independent of `external_tools`: a normal channel reply keeps its sandbox,
+    /// network access, skills and web search while refusing the host user's own
+    /// MCP servers, apps and plugins, whose startup cost lands on every turn.
+    ///
+    /// Field 21: `tool_inheritance`
+    #[serde(
+        rename = "toolInheritance",
+        alias = "tool_inheritance",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub tool_inheritance: ::buffa::EnumValue<ToolInheritance>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3598,6 +3771,7 @@ impl ::core::fmt::Debug for RunRequest {
                 &self.dm_message_publication_binding,
             )
             .field("dm_message_mcp_server_path", &self.dm_message_mcp_server_path)
+            .field("tool_inheritance", &self.tool_inheritance)
             .finish()
     }
 }
@@ -3794,6 +3968,12 @@ impl ::buffa::Message for RunRequest {
         if let Some(ref v) = self.dm_message_mcp_server_path {
             size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        {
+            let val = self.tool_inheritance.to_i32();
+            if val != 0 {
+                size += 2u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3896,6 +4076,12 @@ impl ::buffa::Message for RunRequest {
         }
         if let Some(ref v) = self.dm_message_mcp_server_path {
             ::buffa::types::put_string_field(20u32, v, buf);
+        }
+        {
+            let val = self.tool_inheritance.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(21u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4105,6 +4291,15 @@ impl ::buffa::Message for RunRequest {
                     buf,
                 )?;
             }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.tool_inheritance = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4133,6 +4328,7 @@ impl ::buffa::Message for RunRequest {
         self.computer_use_mcp_server_path = ::core::option::Option::None;
         self.dm_message_publication_binding = ::buffa::MessageField::none();
         self.dm_message_mcp_server_path = ::core::option::Option::None;
+        self.tool_inheritance = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9777,6 +9973,12 @@ pub mod __buffa {
             >,
             /// Field 20: `dm_message_mcp_server_path`
             pub dm_message_mcp_server_path: ::core::option::Option<&'a str>,
+            /// Independent of `external_tools`: a normal channel reply keeps its sandbox,
+            /// network access, skills and web search while refusing the host user's own
+            /// MCP servers, apps and plugins, whose startup cost lands on every turn.
+            ///
+            /// Field 21: `tool_inheritance`
+            pub tool_inheritance: ::buffa::EnumValue<super::super::ToolInheritance>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for RunRequestView<'a> {
@@ -10009,6 +10211,15 @@ pub mod __buffa {
                             ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
+                    21u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.tool_inheritance = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     11u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -10122,6 +10333,7 @@ pub mod __buffa {
                     dm_message_mcp_server_path: self
                         .dm_message_mcp_server_path
                         .map(|s| s.to_string()),
+                    tool_inheritance: self.tool_inheritance,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -10240,6 +10452,12 @@ pub mod __buffa {
                 if let Some(ref v) = self.dm_message_mcp_server_path {
                     size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                {
+                    let val = self.tool_inheritance.to_i32();
+                    if val != 0 {
+                        size += 2u64 + ::buffa::types::int32_encoded_len(val) as u64;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -10347,6 +10565,12 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.dm_message_mcp_server_path {
                     ::buffa::types::put_string_field(20u32, v, buf);
+                }
+                {
+                    let val = self.tool_inheritance.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(21u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -10469,6 +10693,11 @@ pub mod __buffa {
                     .dm_message_mcp_server_path
                 {
                     __map.serialize_entry("dmMessageMcpServerPath", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.tool_inheritance,
+                ) {
+                    __map.serialize_entry("toolInheritance", &self.tool_inheritance)?;
                 }
                 __map.end()
             }
@@ -10692,6 +10921,17 @@ pub mod __buffa {
             #[must_use]
             pub fn dm_message_mcp_server_path(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().dm_message_mcp_server_path
+            }
+            /// Independent of `external_tools`: a normal channel reply keeps its sandbox,
+            /// network access, skills and web search while refusing the host user's own
+            /// MCP servers, apps and plugins, whose startup cost lands on every turn.
+            ///
+            /// Field 21: `tool_inheritance`
+            #[must_use]
+            pub fn tool_inheritance(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ToolInheritance> {
+                self.0.reborrow().tool_inheritance
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<RunRequestView<'static>>>

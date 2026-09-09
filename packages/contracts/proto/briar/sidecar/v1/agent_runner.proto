@@ -41,6 +41,21 @@ enum RunErrorCode {
   RUN_ERROR_CODE_INTERNAL = 5;
 }
 
+// Whether a turn may load the tools the host user configured for the provider
+// CLI, independently of `external_tools`. `external_tools=false` is a full
+// lockdown (read-only permissions, no web search, no skills); this axis only
+// decides whose tool catalog the provider loads.
+enum ToolInheritance {
+  // Treated as INHERIT so a request written before this field keeps its
+  // behaviour.
+  TOOL_INHERITANCE_UNSPECIFIED = 0;
+  // The provider loads the host user's MCP servers, apps and plugins.
+  TOOL_INHERITANCE_INHERIT = 1;
+  // The provider loads only the MCP servers Briar passes for this turn. The
+  // sandbox mode, network setting, skills and web search stay as requested.
+  TOOL_INHERITANCE_BRIAR = 2;
+}
+
 enum AgentRunKind {
   AGENT_RUN_KIND_UNSPECIFIED = 0;
   AGENT_RUN_KIND_PARENT = 1;
@@ -163,6 +178,11 @@ message RunRequest {
   optional string computer_use_mcp_server_path = 18;
   optional DmMessagePublicationBinding dm_message_publication_binding = 19;
   optional string dm_message_mcp_server_path = 20;
+
+  // Independent of `external_tools`: a normal channel reply keeps its sandbox,
+  // network access, skills and web search while refusing the host user's own
+  // MCP servers, apps and plugins, whose startup cost lands on every turn.
+  ToolInheritance tool_inheritance = 21;
 }
 
 message JsonSchema {

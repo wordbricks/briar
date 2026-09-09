@@ -43,6 +43,7 @@ const request: RunnerRequest = {
   networkAccess: false,
   attachments: [],
   additionalDirectories: [],
+  toolInheritance: "inherit",
   providerBinaryPath: "/usr/local/bin/acp-agent",
 };
 

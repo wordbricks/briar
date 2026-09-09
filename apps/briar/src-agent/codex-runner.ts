@@ -77,6 +77,7 @@ async function runCodexAttempt(
   isolation: CodexMcpIsolation,
   emittedSessions: Set<string>,
   computerUseArguments: readonly string[],
+  briarMcpServers: readonly string[],
 ): Promise<CodexAttemptResult> {
   const child = spawn(
     request.providerBinaryPath,
@@ -99,7 +100,7 @@ async function runCodexAttempt(
     stderr = `${stderr}${chunk}`.slice(-8_000);
   });
   const exitPromise = childExit(child);
-  const state = createCodexAppServerState(isolation);
+  const state = createCodexAppServerState(isolation, briarMcpServers);
   let completed = false;
   let mcpFailure: CodexMcpTurnFailure | null = null;
 
@@ -213,10 +214,20 @@ async function main() {
     await computerUseMcp.cleanup();
     throw error;
   }
-  const computerUseArguments = codexComputerUseArgs([
-    ...computerUseMcp.servers,
-    ...dmMessageMcp.servers,
-  ]);
+  const briarServers = [...computerUseMcp.servers, ...dmMessageMcp.servers];
+  const computerUseArguments = codexComputerUseArgs(briarServers);
+  /*
+    The names a Briar-owned turn must keep when it refuses the host user's MCP
+    servers. `aside` is passed on the command line by `codexAppServerArgs`
+    under the same condition.
+  */
+  const briarMcpServers = [
+    ...briarServers.map((server) => server.name),
+    ...(request.externalTools !== false &&
+        process.env.BRIAR_BROWSER_AUTOMATION_PROVIDER === "aside"
+      ? ["aside"]
+      : []),
+  ];
   try {
     const emittedSessions = new Set<string>();
     let isolation: CodexMcpIsolation = {
@@ -234,6 +245,7 @@ async function main() {
         isolation,
         emittedSessions,
         computerUseArguments,
+        briarMcpServers,
       );
       if (result.type === "completed") {
         emit.result({
