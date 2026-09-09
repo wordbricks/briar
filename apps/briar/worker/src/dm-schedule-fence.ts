@@ -1,7 +1,7 @@
 /** The existing live-roster view includes organization and Project Agent access. */
 export const dmScheduleScopeCurrent = (schedule: string) => `exists (
   select 1 from briar_dm_memory_live_rosters live
-  join briar_project_agents agent on agent.id = live.agent_id and agent.provider = 'codex'
+  join briar_project_agents agent on agent.id = live.agent_id
   join briar_channel_messages source on source.id = ${schedule}.source_message_id
     and source.channel_id = live.channel_id and source.deleted_at is null
     and source.memory_source_version = ${schedule}.source_version

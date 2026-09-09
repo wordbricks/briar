@@ -60,7 +60,7 @@ export async function executeDmScheduleTool(db: D1Database, input: {
   claimTokenHash: string; observedAt: string; operation: DmScheduleToolOperation;
 }) {
   const scope = await getDmPublicMessageClaim(db, input);
-  if (!scope || scope.channel_id !== input.channelId || scope.agent_provider !== "codex") {
+  if (!scope || scope.channel_id !== input.channelId) {
     throw new HttpError(409, "The DM schedule claim is unavailable");
   }
   const operation = input.operation;
@@ -85,7 +85,7 @@ export async function executeDmScheduleTool(db: D1Database, input: {
           and live.agent_id = job.agent_id and live.owner_user_id = ?)
       and (binding.state <> 'disabled' and device.state <> 'disabled'
       and json_extract(binding.runtime_proto_json, '$.capabilities.dmReplyRouting.protocol') = 1
-      and exists (select 1 from json_each(binding.runtime_proto_json, '$.capabilities.dmReplyRouting.providers') where value = 'AGENT_PROVIDER_CODEX'))
+      and exists (select 1 from json_each(binding.runtime_proto_json, '$.capabilities.dmReplyRouting.providers') where value = 'AGENT_PROVIDER_' || upper(replace(job.agent_provider, '-', '_'))))
       and (${dmScheduleReplyFenceCurrent("job")} and ${dmMemoryReplyFenceCurrent("job")}))`;
   const claimArgs = [input.jobId, input.organizationId, input.channelId, input.workerId, input.deviceId,
     input.claimTokenHash, input.observedAt, scope.input_revision, scope.input_revision,

@@ -1,3 +1,4 @@
+import { agentProviders } from "../src/lib/agent-provider";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { chmod, mkdir, mkdtemp, open, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { createServer, type Server, type Socket } from "node:net";
@@ -88,7 +89,7 @@ export type DmMessageInvocationInput = {
 
 export const supportsDmMessagePublicationProvider = (
   provider: AgentProvider,
-): provider is "codex" | "claude" => provider === "codex" || provider === "claude";
+): boolean => agentProviders.includes(provider);
 
 const journalRoot = () => join("/tmp", "briar-dm-publication-journals");
 const journalDirectory = (workId: string) => join(
@@ -657,7 +658,7 @@ export class DmMessageInvocation {
     });
   }
 
-  private scheduleTools() { return Boolean(this.input.queue.executeDmScheduleTool && this.input.work.provider === "codex" && this.input.work.routing?.action === "new"); }
+  private scheduleTools() { return Boolean(this.input.queue.executeDmScheduleTool && this.input.work.routing?.action === "new"); }
 
   binding(): DmMessagePublicationBinding {
     return create(DmMessagePublicationBindingSchema, {
@@ -680,7 +681,7 @@ export class DmMessageInvocation {
     const batches = this.publishedBatchIds();
     return [
       ...(this.scheduleTools() ? ["For an explicit later or repeating request use create_dm_schedule; inspect with list_dm_schedules and cancel by its returned ID with cancel_dm_schedule. Do not merely promise to remember a timer. Relative delays start at the original user message's server receipt time. Use a confirmed IANA time zone for absolute times; ask only if the time zone or target is unclear. For relative delays an unknown display zone can remain UTC. Repeats are fixed whole minutes (minimum five minutes); daily means every 24 hours, not a calendar appointment. Only confirm after a successful server result, include its nextRunDisplay/timeZone, and say execution may be delayed. Every occurrence reports normally. Preserve the requestKey when retrying the same request. A cancel result with stopState=requested means stop requested, not stopped; never claim past external effects were undone. A previousJobId carries result/artifact references into a new execution, not permission to repeat completed side effects."] : []),
-      "This direct-message reply supports durable public progress updates through the publish_dm_message MCP tool.",
+      "This direct-message reply supports durable public progress updates through the publish_dm_message command documented below.",
       "Skip a starting update for an immediate answer. For longer work, publish a short concrete update before the first long-running tool call, then publish only when there is a real discovery, changed expectation, or required input.",
       "A successful tool result is the only proof that an update was published. Keep the same operationKey and clientId values when retrying the same ordered batch. Use new values only for a new fact or correction.",
       "Do not repeat published progress in the final reply. Briar publishes the final reply as one durable final batch and completion references that receipt without creating another message.",

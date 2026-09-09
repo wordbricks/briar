@@ -10,8 +10,6 @@ import {
   codexMcpRecoveryPrompt,
   codexProviderBlock,
   codexServerRequestResponse,
-  codexTurnInterruptRequest,
-  codexActiveTurnStopped,
   consumeCodexAppServerMessage,
   createCodexAppServerState,
   normalizeCodexAppServerMessage,
@@ -25,42 +23,30 @@ import type { RunnerRequest } from "./runner-request";
 import { prepareComputerUseMcp } from "./computer-use-mcp-config";
 import { prepareDmMessageMcp } from "./dm-message-mcp-config";
 import { codexComputerUseArgs } from "./computer-use-provider-adapters";
-import { CodexOwnedProcesses } from "./codex-owned-processes";
 import { ProviderBlockedError } from "./provider-block";
 
 let activeChild: ChildProcessWithoutNullStreams | null = null;
-let cancelActiveAttempt: (() => void) | null = null;
-let providerStarted = false;
-const cancellation = new AbortController();
-const confirmCancellation = () => process.stderr.write(`${JSON.stringify({
-  event: "briar.runner", phase: "codex.cancellation_confirmed",
-})}\n`);
-function cancelRunner() {
-  cancellation.abort();
-  cancelActiveAttempt?.();
-}
 const runnerIo = createRunnerIo({
   closeError: "Briar closed the Codex runner input.",
-  onClose: cancelRunner,
-  // Keep App Server alive long enough to interrupt its own detached tool processes.
-  terminate: cancelRunner,
+  onClose: () => {
+    if (activeChild && activeChild.exitCode === null) {
+      activeChild.kill("SIGTERM");
+    }
+  },
 });
 const { emit, request: requestPromise, waitForApproval } = runnerIo;
 
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.once(signal, () => {
+    if (activeChild && activeChild.exitCode === null) activeChild.kill(signal);
     process.exitCode = signal === "SIGINT" ? 130 : 143;
-    cancelRunner();
-    if (!activeChild) {
-      if (!providerStarted) confirmCancellation();
-      runnerIo.close();
-    }
+    if (!activeChild) runnerIo.close();
   });
 }
 
 function send(child: ChildProcessWithoutNullStreams, message: CodexRpcMessage) {
   child.stdin.write(`${JSON.stringify(message)}\n`);
-  if (!cancellation.signal.aborted) emit.event({ direction: AgentEventDirection.CLIENT, raw: message });
+  emit.event({ direction: AgentEventDirection.CLIENT, raw: message });
 }
 
 function childExit(
@@ -106,7 +92,6 @@ async function runCodexAttempt(
     },
   );
   activeChild = child;
-  providerStarted = true;
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
   let stderr = "";
@@ -117,48 +102,8 @@ async function runCodexAttempt(
   const state = createCodexAppServerState(isolation);
   let completed = false;
   let mcpFailure: CodexMcpTurnFailure | null = null;
-  let interruptSent = false;
-  let cancellationSettled = false;
-  const ownedProcesses = child.pid ? new CodexOwnedProcesses(child.pid) : null;
-  let capturedProcesses: Promise<void> | null = null;
-  let stoppingProcesses: Promise<void> | null = null;
-  let stopTimeout: ReturnType<typeof setTimeout> | null = null;
-  const stopOwnedProcesses = () => {
-    stoppingProcesses ??= (async () => {
-      try {
-        await capturedProcesses;
-        if (!ownedProcesses) throw new Error("codex_process_owner_missing");
-        await ownedProcesses.stopAndVerify();
-        cancellationSettled = true;
-      } catch {
-        cancellationSettled = false;
-      } finally {
-        child.stdin.end();
-        child.kill("SIGTERM");
-      }
-    })();
-    return stoppingProcesses;
-  };
-  const interrupt = () => {
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    if (!stopTimeout) stopTimeout = setTimeout(() => child.kill("SIGTERM"), 8_000);
-    capturedProcesses ??= ownedProcesses?.capture() ?? Promise.reject(new Error("codex_process_owner_missing"));
-    void capturedProcesses.then(() => {
-      const message = codexTurnInterruptRequest(state);
-      if (message && !interruptSent) {
-        interruptSent = true;
-        send(child, message);
-      } else if (!message && state.phase !== "startingTurn") {
-        // A turn request already sent needs its turn ID before it can be interrupted.
-        void stopOwnedProcesses();
-      }
-    }).catch(() => { void stopOwnedProcesses(); });
-  };
-  cancelActiveAttempt = interrupt;
-  child.stdin.on("error", () => { /* A cancelled App Server may close its input first. */ });
 
   try {
-    cancellation.signal.throwIfAborted();
     send(child, codexInitializeRequest());
     const serverLines = createInterface({
       input: child.stdout,
@@ -175,27 +120,21 @@ async function runCodexAttempt(
       const message: CodexRpcMessage = decoded.success;
 
       const normalized = normalizeCodexAppServerMessage(message);
-      if (!cancellation.signal.aborted) emit.event({
+      emit.event({
         direction: AgentEventDirection.SERVER,
         raw: message,
         ...(normalized ? { event: normalized } : {}),
       });
 
-      if (cancellation.signal.aborted && codexActiveTurnStopped(state, message)) {
-        // Turn completion does not stop yielded exec sessions. Stop our captured tools too.
-        await stopOwnedProcesses();
-        break;
-      }
-
       const approval = codexApprovalRequest(message);
       if (approval) {
-        if (!cancellation.signal.aborted) emit.approval({
+        emit.approval({
           id: approval.id,
           toolName: approval.toolName,
           input: approval.input,
           ...(approval.title ? { title: approval.title } : {}),
         });
-        const approved = await waitForApproval(approval.id, cancellation.signal);
+        const approved = await waitForApproval(approval.id);
         const response = codexServerRequestResponse(message, approved);
         if (response) send(child, response);
         continue;
@@ -208,10 +147,6 @@ async function runCodexAttempt(
       }
 
       const transition = consumeCodexAppServerMessage(state, request, message);
-      if (cancellation.signal.aborted) {
-        interrupt();
-        continue;
-      }
       if (state.threadId && !emittedSessions.has(state.threadId)) {
         emittedSessions.add(state.threadId);
         emit.session(state.threadId);
@@ -236,8 +171,6 @@ async function runCodexAttempt(
     serverLines.close();
 
     const exitCode = await exitPromise;
-    if (cancellation.signal.aborted && cancellationSettled) confirmCancellation();
-    cancellation.signal.throwIfAborted();
     if (mcpFailure) {
       return {
         type: "mcpFailure",
@@ -261,8 +194,6 @@ async function runCodexAttempt(
       message,
     };
   } finally {
-    if (stopTimeout) clearTimeout(stopTimeout);
-    if (cancelActiveAttempt === interrupt) cancelActiveAttempt = null;
     if (activeChild === child) activeChild = null;
     if (child.exitCode === null) child.kill("SIGTERM");
   }
@@ -381,7 +312,6 @@ function isolationKey(value: CodexMcpIsolation): string {
 
 void main()
   .catch((caught) => {
-    if (cancellation.signal.aborted) return;
     if (caught instanceof ProviderBlockedError) {
       emit.blocked(caught.block);
       return;

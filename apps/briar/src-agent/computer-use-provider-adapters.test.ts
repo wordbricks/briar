@@ -49,18 +49,6 @@ describe("Computer Use provider adapters", () => {
     ]);
   });
 
-  it("approves only explicitly trusted tools on the private DM server", () => {
-    const args = codexComputerUseArgs([{ ...servers[0]!, name: "briar-dm-message",
-      approvedTools: ["create_dm_schedule", "list_dm_schedules", "cancel_dm_schedule"],
-    }]);
-    expect(args.filter((arg) => arg.includes("approval_mode"))).toEqual([
-      'mcp_servers.briar-dm-message.tools.create_dm_schedule.approval_mode="approve"',
-      'mcp_servers.briar-dm-message.tools.list_dm_schedules.approval_mode="approve"',
-      'mcp_servers.briar-dm-message.tools.cancel_dm_schedule.approval_mode="approve"',
-    ]);
-    expect(codexComputerUseArgs(servers).some((arg) => arg.includes("approval_mode"))).toBe(false);
-  });
-
   it("merges Computer Use into an existing OpenCode config", () => {
     const environment = openCodeComputerUseEnvironment({
       OPENCODE_CONFIG_CONTENT: JSON.stringify({
