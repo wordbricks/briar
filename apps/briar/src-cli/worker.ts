@@ -560,12 +560,14 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
             A steer makes the server refuse the renewal, and before the first
             provider turn that is not a reason to throw the claim away: the
             reply's own setup asks for the folded claim right before it runs the
-            provider, inside this same claim. Keep renewing until it does. A
-            routing reply is excluded: its classification turn owns the decision
-            the server is waiting on, and it still aborts as it always has.
+            provider, inside this same claim. Keep renewing until it does. Only
+            a direct message is ever steered, so any other channel reply keeps
+            aborting at once: its conflict is a real claim loss. A routing reply
+            is excluded too: its classification turn owns the decision the
+            server is waiting on, and it still aborts as it always has.
           */
           if (
-            issue.workType === "channelReply" && !issue.routing &&
+            isDirectMessageReply(issue) && !issue.routing &&
             dependencies.replyTurnStarted?.(issue) === false
           ) {
             dependencies.log(

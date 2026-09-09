@@ -435,6 +435,38 @@ describe("briar worker loop", () => {
       .toBe(false);
   });
 
+  it("still aborts a channel reply that is not a direct message before its turn", async () => {
+    let aborted = false;
+    const channelReply = {
+      ...issue("channel-lost"),
+      workType: "channelReply" as const,
+      workId: "channel-work",
+      routing: null,
+      snapshot: { channel: { kind: "channel" } },
+    };
+    const test = harness(
+      [channelReply],
+      {
+        replyTurnStarted: () => false,
+        renewLease: async () => { throw new Error("Reply claim is no longer active"); },
+        runIssue: async (_work, signal) => {
+          await new Promise<void>((resolve) => {
+            if (signal.aborted) { aborted = true; resolve(); return; }
+            signal.addEventListener("abort", () => { aborted = true; resolve(); }, { once: true });
+          });
+        },
+      },
+      { renewalTicks: 1 },
+    );
+    const result = await runWorkerLoop(test.dependencies, {
+      once: true,
+      leaseRenewIntervalMs: 5 * 60_000,
+    });
+    expect(aborted).toBe(true);
+    expect(result.failures).toBe(1);
+    expect(test.logs.some((line) => line.includes("deferred to the steer fold"))).toBe(false);
+  });
+
   it("still aborts a direct message once its provider turn has started", async () => {
     let aborted = false;
     const dmReply = {
