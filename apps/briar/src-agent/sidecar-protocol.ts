@@ -23,6 +23,7 @@ import {
   RunErrorCode,
   RunErrorSchema,
   RunResultSchema,
+  RunnerPreparedSchema,
   RunnerToParentSchema,
   SessionStartedSchema,
   type ApprovalRequest as ProtoApprovalRequest,
@@ -95,7 +96,7 @@ function assertProtocolFingerprint(actual: Uint8Array) {
 }
 
 export function decodeSidecarRunRequest(message: ParentToRunner): RunRequest {
-  if (message.payload.case !== "run") {
+  if (message.payload.case !== "run" && message.payload.case !== "prepare") {
     throw new Error("The first sidecar frame must contain a run request.");
   }
   assertProtocolFingerprint(message.payload.value.protocolFingerprint);
@@ -112,6 +113,30 @@ export function encodeSidecarRunRequest(
     }),
   );
 }
+
+/**
+ * The optional first frame of a two-phase turn. It carries the same request
+ * shape so a runner reads one decoder, with the prompt-dependent fields left
+ * empty until the `run` frame arrives.
+ */
+export function encodeSidecarPrepareRequest(
+  request: RunRequest,
+): Uint8Array {
+  return sizeDelimitedEncode(
+    ParentToRunnerSchema,
+    create(ParentToRunnerSchema, {
+      payload: { case: "prepare", value: request },
+    }),
+  );
+}
+
+export const sidecarRunnerPrepared = (): RunnerToParent =>
+  create(RunnerToParentSchema, {
+    payload: {
+      case: "prepared",
+      value: create(RunnerPreparedSchema, {}),
+    },
+  });
 
 export function encodeSidecarApprovalResponse(
   id: string,

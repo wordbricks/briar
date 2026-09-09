@@ -129,7 +129,7 @@ const git: GitRunner = (args, options = {}) => {
 };
 
 /** The setup steps this harness can observe from the server side. */
-type HeldSetupStep = "memory-brief" | "memory-check" | "attachment";
+type HeldSetupStep = "memory-brief" | "memory-check" | "attachment" | "prewarm";
 
 /** Where `DmMessageInvocation` keeps the journal it owns for a work item. */
 const publicationJournalDirectory = (workId: string) => join(
@@ -181,6 +181,12 @@ type Exercise = {
   steerFold?: "none" | "folded";
   /** Runs once the reply has returned, while the server is still listening. */
   afterRun?: () => Promise<void>;
+  /**
+   * Pre-warm the provider process at claim time. The fake stands in for a real
+   * prepared runner: it records what the reply asked for and what it did with
+   * the handle, without spawning anything.
+   */
+  prewarm?: boolean;
   provider: (
     turn: DetachedProviderTurnInput,
     number: number,
@@ -473,6 +479,14 @@ describe("DM reply worktree allocation", () => {
     const prompts: string[] = [];
     const toolInheritances: (string | undefined)[] = [];
     const acknowledgementToolInheritances: (string | undefined)[] = [];
+    // What the reply asked the pre-warm for, and what it did with the handle.
+    const prewarmRequests: {
+      workspacePath: string;
+      conversationId: string | null;
+    }[] = [];
+    const prewarmDiscards: string[] = [];
+    /** Whether each reply round was handed the pre-warmed process. */
+    const preparedRounds: boolean[] = [];
     try {
       await runClaimedChannelReply(
         config,
@@ -486,7 +500,26 @@ describe("DM reply worktree allocation", () => {
           git,
           // `findAgentBundle` reads `import.meta.dir`, which only Bun defines.
           dmMessageMcpServerPath: join(root, "dm-message-mcp-server.js"),
-          runProviderTurn: ((turn: DetachedProviderTurnInput) => {
+          prepareProviderTurn: (async (turn: DetachedProviderTurnInput) => {
+            if (!input.prewarm) return null;
+            prewarmRequests.push({
+              workspacePath: turn.workspacePath,
+              conversationId: turn.conversationId ?? null,
+            });
+            await holdStep("prewarm");
+            events.push("prewarm:end");
+            return {
+              provider: turn.agent.provider,
+              run: () => { throw new Error("unused by this harness"); },
+              discard: async (reason: string) => {
+                prewarmDiscards.push(reason);
+              },
+            };
+          }) as never,
+          runProviderTurn: ((
+            turn: DetachedProviderTurnInput,
+            prepared?: unknown,
+          ) => {
             // Briar picks the acknowledgement emoji on its own track; it is
             // not one of this reply's rounds.
             if (turn.agent.name === "DM acknowledgement") {
@@ -501,6 +534,9 @@ describe("DM reply worktree allocation", () => {
             workspacePaths.push(turn.workspacePath);
             prompts.push(turn.prompt);
             toolInheritances.push(turn.toolInheritance);
+            preparedRounds.push(
+              prepared !== null && prepared !== undefined,
+            );
             return input.provider(turn, ++turns);
           }) as never,
         },
@@ -532,6 +568,9 @@ describe("DM reply worktree allocation", () => {
       prompts,
       toolInheritances,
       acknowledgementToolInheritances,
+      prewarmRequests,
+      prewarmDiscards,
+      preparedRounds,
       sessionId,
       workId,
     };
@@ -671,6 +710,76 @@ describe("DM reply worktree allocation", () => {
     expect(observed.turns).toBe(2);
     expect(observed.toolInheritances).toEqual(["briar", "briar"]);
     expect(observed.acknowledgementToolInheritances).toEqual([undefined]);
+  });
+
+  /*
+    The provider process is what a "hi" waits on after the setup, and starting
+    it needs nothing the setup produces. These hold the shape of that: it runs
+    beside the memory brief, only the first round may use it, and it never
+    outlives the reply.
+  */
+  it("pre-warms the provider process against the rest of the setup", async () => {
+    const observed = await exercise({
+      prewarm: true,
+      memory: true,
+      hold: ["memory-brief", "prewarm"],
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    // The barrier only opens when both have started, so a setup that waited
+    // for the brief before pre-warming could not have got here.
+    expect(observed.events).toContain("prewarm:end");
+    expect(observed.events).toContain("memory-brief:end");
+    expect(observed.prewarmRequests).toEqual([
+      {
+        workspacePath: join(root, "worker-sessions", `channel-${observed.sessionId}`),
+        conversationId: null,
+      },
+    ]);
+    expect(observed.preparedRounds).toEqual([true]);
+    // The reply owns the process end to end, however it finishes.
+    expect(observed.prewarmDiscards).toEqual(["reply_finished"]);
+  });
+
+  it("keeps the pre-warmed process off every round after the first", async () => {
+    const conversationId = crypto.randomUUID();
+    const observed = await exercise({
+      prewarm: true,
+      provider: async (_turn, number) =>
+        number === 1
+          ? turnResult(repositoryRequest, conversationId)
+          : turnResult(answer, conversationId),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(2);
+    // The repository round runs in a different workspace and continues the
+    // conversation the first round started; the warm process fits neither.
+    expect(observed.preparedRounds).toEqual([true, false]);
+  });
+
+  it("kills the pre-warmed process when the reply fails before its turn", async () => {
+    const observed = await exercise({
+      prewarm: true,
+      memory: true,
+      memoryBriefFails: true,
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeDefined();
+    expect(observed.turns).toBe(0);
+    expect(observed.prewarmDiscards).toEqual(["reply_finished"]);
+  });
+
+  it("asks for no pre-warm when the runtime cannot prepare one", async () => {
+    const observed = await exercise({
+      provider: async () => turnResult(answer),
+    });
+
+    expect(observed.failure).toBeUndefined();
+    expect(observed.prewarmRequests).toEqual([]);
+    expect(observed.preparedRounds).toEqual([false]);
   });
 
   it("reuses a session checkout that already exists without asking again", async () => {

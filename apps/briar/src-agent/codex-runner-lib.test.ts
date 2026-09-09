@@ -19,6 +19,7 @@ import {
   codexFinalMessage,
   codexInitializeRequest,
   codexModelListRequest,
+  codexPreparedRequestMismatch,
   codexServerRequestResponse,
   codexThreadRequest,
   codexTurnRequest,
@@ -321,6 +322,58 @@ describe("Codex App Server runner", () => {
     expect(transition.outgoing[0]).toMatchObject({ method: "thread/start" });
     expect((transition.outgoing[0]?.params as { config?: unknown }).config)
       .toBeUndefined();
+  });
+
+  it("lets a prepared process serve only the turn it was prepared for", () => {
+    // What the App Server was started with, and what its thread is started
+    // with. The prompt, its instructions, the attachments and the output
+    // schema arrive with the turn and are none of this list's business.
+    const prepared: RunnerRequest = { ...request, message: "" };
+
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        message: "Answer the DM",
+        instructions: "A prompt-shaped instruction block",
+        attachments: [{ type: "image", path: "/tmp/a.png", name: "a.png", mimeType: "image/png" }],
+        outputSchema: { type: "object" },
+      }),
+    ).toBeNull();
+
+    // A memory-changed refresh drops the conversation the process resumed.
+    expect(
+      codexPreparedRequestMismatch(
+        { ...prepared, conversationId: "thread-1" },
+        { ...request, conversationId: undefined },
+      ),
+    ).toBe("conversationId");
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        workspaceRoot: "/worktree/checked-out",
+      }),
+    ).toBe("workspaceRoot");
+    expect(
+      codexPreparedRequestMismatch(prepared, { ...request, model: "gpt-5.1" }),
+    ).toBe("model");
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        toolInheritance: "briar",
+      }),
+    ).toBe("toolInheritance");
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        sandboxMode: "readOnly",
+      }),
+    ).toBe("sandboxMode");
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        networkAccess: false,
+      }),
+    ).toBe("networkAccess");
   });
 
   it("keeps the desktop sandbox, resume, and structured-output contract", () => {

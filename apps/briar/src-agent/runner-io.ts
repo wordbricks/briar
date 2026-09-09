@@ -5,6 +5,7 @@ import {
   decodeSidecarRunRequest,
   encodeSidecarRunnerOutput,
   sidecarApprovalRequest,
+  sidecarRunnerPrepared,
   sidecarProviderEvent,
   sidecarRunBlocked,
   sidecarRunError,
@@ -33,6 +34,18 @@ export type RunnerIoOptions = {
   onClose?: () => void;
   output?: Pick<NodeJS.WritableStream, "write">;
   terminate?: (error: Error) => void;
+  /**
+   * Accept the optional `prepare` first frame. Only a runner that can start
+   * its provider before the prompt exists sets this; for every other runner a
+   * `prepare` frame is a protocol error rather than a silent hang.
+   */
+  acceptPrepare?: boolean;
+};
+
+/** The first frame a runner received, and the request it carried. */
+export type RunnerFirstFrame = {
+  phase: "prepare" | "run";
+  request: RunnerRequest;
 };
 
 const maxSidecarFrameBytes = 16 * 1024 * 1024;
@@ -47,6 +60,7 @@ export function createRunnerIo({
   onClose,
   output = process.stdout,
   terminate = () => process.exit(1),
+  acceptPrepare = false,
 }: RunnerIoOptions) {
   let resolveRequest: ((request: RunnerRequest) => void) | undefined;
   let rejectRequest: ((error: Error) => void) | undefined;
@@ -54,10 +68,23 @@ export function createRunnerIo({
     resolveRequest = resolve;
     rejectRequest = reject;
   });
+  let resolveFirstFrame: ((frame: RunnerFirstFrame) => void) | undefined;
+  let rejectFirstFrame: ((error: Error) => void) | undefined;
+  const firstFrame = new Promise<RunnerFirstFrame>((resolve, reject) => {
+    resolveFirstFrame = resolve;
+    rejectFirstFrame = reject;
+  });
+  /*
+    Only a runner that can start before the prompt awaits this one, so on every
+    other runner a protocol failure would reject it with nobody listening —
+    fatal under Bun. The rejection still reaches whoever does await it.
+  */
+  firstFrame.catch(() => undefined);
   const approvals = new Map<string, PendingApproval>();
   let closed = false;
   let locallyClosed = false;
   let runReceived = false;
+  let prepareReceived = false;
   let terminalEmitted = false;
   let protocolFailed = false;
 
@@ -75,8 +102,11 @@ export function createRunnerIo({
     if (closed) return;
     closed = true;
     rejectRequest?.(new Error(closeError));
+    rejectFirstFrame?.(new Error(closeError));
     rejectRequest = undefined;
     resolveRequest = undefined;
+    rejectFirstFrame = undefined;
+    resolveFirstFrame = undefined;
     for (const id of approvals.keys()) settleApproval(id, false);
     onClose?.();
   }
@@ -86,6 +116,7 @@ export function createRunnerIo({
     if (!protocolFailed) {
       protocolFailed = true;
       rejectRequest?.(error);
+      rejectFirstFrame?.(error);
       process.stderr.write(`[briar.runner] ${error.message}\n`);
       input.destroy?.();
       settleClosed();
@@ -118,6 +149,30 @@ export function createRunnerIo({
           );
           continue;
         }
+        if (message.payload.case === "prepare") {
+          if (!acceptPrepare) {
+            throw new Error("This runner does not accept a prepare request.");
+          }
+          if (prepareReceived || runReceived) {
+            throw new Error(
+              "A prepare request must be the first sidecar frame.",
+            );
+          }
+          prepareReceived = true;
+          const decodedPrepare = decodeRunnerRequest(
+            decodeSidecarRunRequest(message),
+          );
+          if (Result.isFailure(decodedPrepare)) {
+            throw decodedPrepare.failure;
+          }
+          resolveFirstFrame?.({
+            phase: "prepare",
+            request: decodedPrepare.success,
+          });
+          resolveFirstFrame = undefined;
+          rejectFirstFrame = undefined;
+          continue;
+        }
         if (message.payload.case !== "run") {
           throw new Error("Sidecar input frame does not contain a payload.");
         }
@@ -129,6 +184,9 @@ export function createRunnerIo({
         if (Result.isFailure(decoded)) {
           throw decoded.failure;
         }
+        resolveFirstFrame?.({ phase: "run", request: decoded.success });
+        resolveFirstFrame = undefined;
+        rejectFirstFrame = undefined;
         resolveRequest?.(decoded.success);
         resolveRequest = undefined;
         rejectRequest = undefined;
@@ -205,7 +263,10 @@ export function createRunnerIo({
       blocked: (input: SidecarBlockedInput) =>
         emitFrame(sidecarRunBlocked(input)),
       error: (message: string) => emitFrame(sidecarRunError(message)),
+      prepared: () => emitFrame(sidecarRunnerPrepared()),
     },
+    /** The first frame the parent sent, so a runner knows which phase it is in. */
+    firstFrame,
     request,
     waitForApproval,
   };

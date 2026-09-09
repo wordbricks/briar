@@ -319,6 +319,8 @@ describe("DM memory in the actual channel reply runner", () => {
           workspaceRoot: root,
           runProviderTurn: ((turn: DetachedProviderTurnInput) =>
             input.provider(turn, ++turns)) as never,
+          // No pre-warm: these turns are spawned by the reply itself.
+          prepareProviderTurn: (async () => null) as never,
         },
         input.acknowledgement?.execution ?? null,
       );

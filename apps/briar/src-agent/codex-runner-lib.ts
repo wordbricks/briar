@@ -101,6 +101,13 @@ const THREAD_REQUEST_ID = 4;
 const TURN_REQUEST_ID = 5;
 const APPS_INSTALLED_REQUEST_ID = 6;
 
+/**
+ * The last request of the prepare phase. Its response is the point where a
+ * two-phase turn stops and waits for the prompt: the thread request that
+ * follows carries the turn's developer instructions.
+ */
+export const CODEX_APPS_INSTALLED_REQUEST_ID = APPS_INSTALLED_REQUEST_ID;
+
 const approvalMethods = new Set([
   "item/commandExecution/requestApproval",
   "item/fileChange/requestApproval",
@@ -215,6 +222,41 @@ export function codexAppServerArgs(
     );
   }
   return argumentsList;
+}
+
+/**
+ * Everything a Codex App Server process is fixed to at spawn, or that its
+ * thread is started with. A prepared process may only serve a turn whose
+ * request agrees on all of it; the parent discards the process otherwise, so
+ * this list is the contract between the two phases rather than a warning.
+ */
+export function codexPreparedRequestMismatch(
+  prepared: RunnerRequest,
+  turn: RunnerRequest,
+): string | null {
+  const comparable = (request: RunnerRequest) => ({
+    providerBinaryPath: request.providerBinaryPath,
+    workspaceRoot: request.workspaceRoot,
+    conversationId: request.conversationId?.trim() ?? "",
+    model: request.model?.trim() ?? "",
+    effort: request.effort ?? "",
+    approvalPolicy: request.approvalPolicy,
+    sandboxMode: request.sandboxMode,
+    networkAccess: request.networkAccess,
+    externalTools: request.externalTools ?? null,
+    toolInheritance: request.toolInheritance,
+    runKind: request.runKind ?? "parent",
+    additionalDirectories: (request.additionalDirectories ?? []).join(" "),
+    computerUseMcpServerPath: request.computerUseMcpServerPath?.trim() ?? "",
+    computerUseBinding: request.computerUseBinding === undefined ? "" : "bound",
+    dmMessageMcpServerPath: request.dmMessageMcpServerPath?.trim() ?? "",
+  });
+  const before = comparable(prepared);
+  const after = comparable(turn);
+  for (const key of Object.keys(before) as Array<keyof typeof before>) {
+    if (before[key] !== after[key]) return key;
+  }
+  return null;
 }
 
 export function codexMcpRecoveryPrompt(): string {

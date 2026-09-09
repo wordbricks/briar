@@ -134,6 +134,13 @@ message ParentToRunner {
   oneof payload {
     RunRequest run = 1;
     ApprovalResponse approval_response = 2;
+    // Optional first frame. A runner that accepts it starts the provider
+    // process and everything the request below already decides, answers
+    // `RunnerPrepared`, and then waits for the `run` frame that carries the
+    // prompt. Only the fields a provider needs before the prompt exists are
+    // read from it; `message`, `instructions`, `attachments` and
+    // `output_schema` are empty here and arrive with `run`.
+    RunRequest prepare = 3;
   }
 }
 
@@ -145,8 +152,14 @@ message RunnerToParent {
     RunResult result = 4;
     RunBlocked blocked = 5;
     RunError error = 6;
+    RunnerPrepared prepared = 7;
   }
 }
+
+// Emitted once, and only for a two-phase turn: the provider process is up and
+// everything the `prepare` frame decided is done. The parent may now send the
+// `run` frame, or kill the process.
+message RunnerPrepared {}
 
 message RunRequest {
   string message = 1;
