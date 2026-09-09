@@ -6,7 +6,7 @@ import type {
   DashboardPayload,
   ExecutionWorker,
   HuntRun,
-  OrganizationMember,
+  WorkspaceMember,
 } from "../../types";
 import {
   agentSessionIdsAtom,
@@ -29,7 +29,7 @@ import {
   writeChannelThreadSnapshot,
 } from "../channel-conversation/write";
 import {
-  channelCatalogOrganizationIdsAtom,
+  channelCatalogWorkspaceIdsAtom,
   channelsByIdAtom,
   organizationChannelIdsAtom,
   organizationChannelsAtom,
@@ -46,7 +46,7 @@ import {
   teamMemberIdsAtom,
   teamMembersAtom,
 } from "../entities/members";
-import { teamOrganizationProvidersAtom } from "../entities/providers";
+import { teamWorkspaceProvidersAtom } from "../entities/providers";
 import {
   pinnedTeamIdsAtom,
   retainedTeamIdsAtom,
@@ -103,8 +103,8 @@ type TeamIndexAtom = (teamId: string) => Atom.Writable<string[] | null>;
 
 /**
  * Removes `droppedIds` from a shared entity map unless another retained team
- * still lists them. Members in particular are organization scoped and appear in
- * every team of that organization.
+ * still lists them. Members in particular are workspace scoped and appear in
+ * every team of that workspace.
  */
 function releaseSharedIds<T>(
   registry: AtomRegistry,
@@ -179,7 +179,7 @@ const writeTeamWorkers = (
 const writeTeamMembers = (
   registry: AtomRegistry,
   teamId: string,
-  members: readonly OrganizationMember[] | null,
+  members: readonly WorkspaceMember[] | null,
 ) =>
   writeTeamSlice(
     registry,
@@ -231,7 +231,7 @@ function clearTeamState(registry: AtomRegistry, teamId: string) {
   registry.update(teamsByIdAtom, (teams) => removeMany(teams, [teamId]));
   registry.set(teamSettingsAtom(teamId), null);
   registry.set(teamExecutionPolicyAtom(teamId), null);
-  registry.set(teamOrganizationProvidersAtom(teamId), null);
+  registry.set(teamWorkspaceProvidersAtom(teamId), null);
   registry.set(teamNotificationsAtom(teamId), {
     conversation: null,
     channel: null,
@@ -277,7 +277,7 @@ function applyTeamSnapshot(
   writeTeamWorkers(registry, teamId, payload.workers ?? null);
   writeTeamMembers(registry, teamId, payload.members ?? null);
   registry.set(
-    teamOrganizationProvidersAtom(teamId),
+    teamWorkspaceProvidersAtom(teamId),
     payload.organizationProviders ?? null,
   );
   registry.set(teamExecutionPolicyAtom(teamId), payload.executionPolicy ?? null);
@@ -351,7 +351,7 @@ function applyTeamMetadata(
   writeTeamWorkers(registry, teamId, payload.workers ?? null);
   writeTeamMembers(registry, teamId, payload.members ?? null);
   registry.set(
-    teamOrganizationProvidersAtom(teamId),
+    teamWorkspaceProvidersAtom(teamId),
     payload.organizationProviders ?? null,
   );
   registry.set(teamExecutionPolicyAtom(teamId), payload.executionPolicy ?? null);
@@ -386,7 +386,7 @@ function applyTeamDelta(
     ? currentWorkers
     : replaceEntities(currentWorkers ?? [], delta.workers);
 
-  const currentProviders = registry.get(teamOrganizationProvidersAtom(teamId));
+  const currentProviders = registry.get(teamWorkspaceProvidersAtom(teamId));
   const organizationProviders = sameValue(
     currentProviders ?? [],
     delta.organizationProviders,
@@ -437,7 +437,7 @@ function applyTeamDelta(
   if (workers !== currentWorkers) writeTeamWorkers(registry, teamId, workers);
   if (members !== currentMembers) writeTeamMembers(registry, teamId, members);
   if (organizationProviders !== currentProviders) {
-    registry.set(teamOrganizationProvidersAtom(teamId), organizationProviders);
+    registry.set(teamWorkspaceProvidersAtom(teamId), organizationProviders);
   }
   if (team !== currentTeam && team) {
     registry.update(teamsByIdAtom, (teams) =>
@@ -517,29 +517,29 @@ function applyRunDeleted(
 }
 
 /**
- * Replaces one organization's ordered channel list. Summaries that did not
+ * Replaces one workspace's ordered channel list. Summaries that did not
  * change keep their stored reference, and ids the new list dropped leave the
- * shared map — channels belong to exactly one organization, so nothing else can
+ * shared map — channels belong to exactly one workspace, so nothing else can
  * still be referencing them.
  */
 function writeChannelCatalog(
   registry: AtomRegistry,
-  organizationId: string,
+  workspaceId: string,
   channels: readonly ChannelSummary[],
 ) {
-  const previousIds = registry.get(organizationChannelIdsAtom(organizationId));
+  const previousIds = registry.get(organizationChannelIdsAtom(workspaceId));
   const nextIds = channels.map((channel) => channel.id);
   registry.update(channelsByIdAtom, (stored) => upsertMany(stored, channels));
-  registry.set(organizationChannelIdsAtom(organizationId), nextIds);
+  registry.set(organizationChannelIdsAtom(workspaceId), nextIds);
   const kept = new Set(nextIds);
   const dropped = (previousIds ?? []).filter((id) => !kept.has(id));
   if (dropped.length > 0) {
     registry.update(channelsByIdAtom, (stored) => removeMany(stored, dropped));
   }
-  registry.update(channelCatalogOrganizationIdsAtom, (organizationIds) =>
-    organizationIds.includes(organizationId)
-      ? organizationIds
-      : [...organizationIds, organizationId],
+  registry.update(channelCatalogWorkspaceIdsAtom, (workspaceIds) =>
+    workspaceIds.includes(workspaceId)
+      ? workspaceIds
+      : [...workspaceIds, workspaceId],
   );
 }
 
@@ -550,13 +550,13 @@ function writeChannelCatalog(
  */
 function applyChannelCatalogDelta(
   registry: AtomRegistry,
-  organizationId: string,
+  workspaceId: string,
   channels: readonly ChannelSummary[],
   removedChannelIds: readonly string[],
   reset: boolean,
 ) {
   if (!reset && channels.length === 0 && removedChannelIds.length === 0) return;
-  const current = registry.get(organizationChannelsAtom(organizationId));
+  const current = registry.get(organizationChannelsAtom(workspaceId));
   const byId = new Map(
     (reset ? [] : current).map((channel) => [channel.id, channel] as const),
   );
@@ -564,20 +564,20 @@ function applyChannelCatalogDelta(
   for (const id of removedChannelIds) byId.delete(id);
   writeChannelCatalog(
     registry,
-    organizationId,
+    workspaceId,
     [...byId.values()].sort((left, right) => left.name.localeCompare(right.name)),
   );
 }
 
 /**
- * Upserts one summary. The organization's list is left in place unless the
+ * Upserts one summary. The workspace's list is left in place unless the
  * channel is new to it, which keeps a read receipt from reordering anything.
  */
 function applyChannelChanged(registry: AtomRegistry, channel: ChannelSummary) {
   registry.update(channelsByIdAtom, (stored) => upsertMany(stored, [channel]));
-  const ids = registry.get(organizationChannelIdsAtom(channel.organizationId));
+  const ids = registry.get(organizationChannelIdsAtom(channel.workspaceId));
   if (!ids || ids.includes(channel.id)) return;
-  registry.set(organizationChannelIdsAtom(channel.organizationId), [
+  registry.set(organizationChannelIdsAtom(channel.workspaceId), [
     ...ids,
     channel.id,
   ]);
@@ -585,31 +585,31 @@ function applyChannelChanged(registry: AtomRegistry, channel: ChannelSummary) {
 
 function applyChannelRemoved(
   registry: AtomRegistry,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
 ) {
-  const ids = registry.get(organizationChannelIdsAtom(organizationId));
+  const ids = registry.get(organizationChannelIdsAtom(workspaceId));
   if (ids?.includes(channelId)) {
     registry.set(
-      organizationChannelIdsAtom(organizationId),
+      organizationChannelIdsAtom(workspaceId),
       ids.filter((candidate) => candidate !== channelId),
     );
   }
   registry.update(channelsByIdAtom, (stored) => removeMany(stored, [channelId]));
 }
 
-/** Forgets an organization's catalog entirely, summaries and messages included. */
-function clearChannelCatalog(registry: AtomRegistry, organizationId: string) {
-  const ids = registry.get(organizationChannelIdsAtom(organizationId));
-  registry.set(organizationChannelIdsAtom(organizationId), null);
+/** Forgets a workspace's catalog entirely, summaries and messages included. */
+function clearChannelCatalog(registry: AtomRegistry, workspaceId: string) {
+  const ids = registry.get(organizationChannelIdsAtom(workspaceId));
+  registry.set(organizationChannelIdsAtom(workspaceId), null);
   if (ids && ids.length > 0) {
     registry.update(channelsByIdAtom, (stored) => removeMany(stored, ids));
     for (const channelId of ids) clearChannelConversation(registry, channelId);
   }
-  registry.update(channelCatalogOrganizationIdsAtom, (organizationIds) =>
-    organizationIds.includes(organizationId)
-      ? organizationIds.filter((candidate) => candidate !== organizationId)
-      : organizationIds,
+  registry.update(channelCatalogWorkspaceIdsAtom, (workspaceIds) =>
+    workspaceIds.includes(workspaceId)
+      ? workspaceIds.filter((candidate) => candidate !== workspaceId)
+      : workspaceIds,
   );
 }
 
@@ -621,12 +621,12 @@ function applySessionCleared(registry: AtomRegistry) {
   registry.set(workersByIdAtom, new Map());
   registry.set(membersByIdAtom, new Map());
   registry.set(teamsByIdAtom, new Map());
-  for (const organizationId of [
-    ...registry.get(channelCatalogOrganizationIdsAtom),
+  for (const workspaceId of [
+    ...registry.get(channelCatalogWorkspaceIdsAtom),
   ]) {
-    registry.set(organizationChannelIdsAtom(organizationId), null);
+    registry.set(organizationChannelIdsAtom(workspaceId), null);
   }
-  registry.set(channelCatalogOrganizationIdsAtom, []);
+  registry.set(channelCatalogWorkspaceIdsAtom, []);
   registry.set(channelsByIdAtom, new Map());
   for (const channelId of [
     ...registry.get(retainedConversationChannelIdsAtom),
@@ -705,22 +705,22 @@ export function applySyncEvent(registry: AtomRegistry, event: SyncEvent): void {
         applyChannelChanged(registry, event.channel);
         return;
       case "channel-catalog-snapshot":
-        writeChannelCatalog(registry, event.organizationId, event.channels);
+        writeChannelCatalog(registry, event.workspaceId, event.channels);
         return;
       case "channel-catalog-delta":
         applyChannelCatalogDelta(
           registry,
-          event.organizationId,
+          event.workspaceId,
           event.channels,
           event.removedChannelIds,
           event.reset,
         );
         return;
       case "channel-removed":
-        applyChannelRemoved(registry, event.organizationId, event.channelId);
+        applyChannelRemoved(registry, event.workspaceId, event.channelId);
         return;
       case "channel-catalog-cleared":
-        clearChannelCatalog(registry, event.organizationId);
+        clearChannelCatalog(registry, event.workspaceId);
         return;
       case "channel-conversation-snapshot":
         applyChannelConversationSnapshot(
@@ -824,10 +824,10 @@ export function applySyncEvent(registry: AtomRegistry, event: SyncEvent): void {
       case "team-cleared":
         clearTeamState(registry, event.teamId);
         return;
-      case "organization-left": {
+      case "workspace-left": {
         for (const teamId of [...registry.get(retainedTeamIdsAtom)]) {
           const team = registry.get(teamEntityAtom(teamId));
-          if (team?.organizationId === event.retainedOrganizationId) continue;
+          if (team?.workspaceId === event.retainedWorkspaceId) continue;
           clearTeamState(registry, teamId);
         }
         return;

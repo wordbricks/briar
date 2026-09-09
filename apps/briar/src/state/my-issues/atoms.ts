@@ -1,6 +1,6 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
-import type { HuntRun, OrganizationMember, Project } from "../../types";
+import type { HuntRun, WorkspaceMember, Project } from "../../types";
 import {
   emptyIssuePropertyFilters,
   runMatchesIssuePropertyFilters,
@@ -31,7 +31,7 @@ import {
   What "내 이슈" shows, derived from the store instead of from a record of
   payloads.
 
-  The page loaded a `DashboardPayload` per project of the organization into a
+  The page loaded a `DashboardPayload` per project of the workspace into a
   `useState` record and rendered run objects out of it, so a realtime edit to one
   issue rebuilt every list on the page and a run it had already drawn once lived
   in two places at the same time. `useMyIssuesSync` applies those responses
@@ -89,7 +89,7 @@ export const myIssuesSelectedProjectIdsAtom = Atom.make<string[]>([]).pipe(
 );
 
 /**
- * The organization's project ids the page covers, in the order the sidebar
+ * The workspace's project ids the page covers, in the order the sidebar
  * lists them. Written by `useMyIssuesSync`, which also pins them against the
  * entity retention limit while the page is mounted.
  */
@@ -349,8 +349,8 @@ export const myIssuesGroupedRunIdsAtom = Atom.make(
  * Every member of every visible project, deduplicated by user id. The page
  * resolves assignee names against it and the property filter menu offers it.
  */
-export const myIssuesMembersAtom = Atom.make((get): OrganizationMember[] => {
-  const byUserId = new Map<string, OrganizationMember>();
+export const myIssuesMembersAtom = Atom.make((get): WorkspaceMember[] => {
+  const byUserId = new Map<string, WorkspaceMember>();
   for (const teamId of get(myIssuesVisibleTeamIdsAtom)) {
     for (const member of get(teamMembersAtom(teamId)) ?? []) {
       byUserId.set(member.userId, member);
@@ -359,7 +359,7 @@ export const myIssuesMembersAtom = Atom.make((get): OrganizationMember[] => {
   return [...byUserId.values()];
 }).pipe(
   Atom.keepAlive,
-  Atom.withEquality<OrganizationMember[]>(shallowArrayEqual),
+  Atom.withEquality<WorkspaceMember[]>(shallowArrayEqual),
   Atom.withLabel("myIssues/members"),
 );
 

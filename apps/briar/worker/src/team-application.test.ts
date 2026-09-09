@@ -46,8 +46,8 @@ const setup = () => {
     getTeamRunChildMismatch,
     issueProjectAgentToken:
       vi.fn<TeamApplicationServices["issueProjectAgentToken"]>(),
-    listOrganizations:
-      vi.fn<TeamApplicationServices["listOrganizations"]>(),
+    listWorkspaces:
+      vi.fn<TeamApplicationServices["listWorkspaces"]>(),
     updateTeamIcon:
       vi.fn<TeamApplicationServices["updateTeamIcon"]>(),
     updateTeamIssueKeyPrefix:

@@ -10,9 +10,9 @@ import * as SchemaIssue from "effect/SchemaIssue";
 import { agentSkillConflictMessage } from "./agent-skills";
 import { HttpError } from "./http-response";
 import {
-  OrganizationAgentContextCursorError,
-  OrganizationAgentContextPageTooLargeError,
-} from "./organization-agent-context";
+  WorkspaceAgentContextCursorError,
+  WorkspaceAgentContextPageTooLargeError,
+} from "./workspace-agent-context";
 import { RequestDecodeError } from "./request-schema";
 import { ProjectWorkflowInputError } from "./run-request-contract";
 import { TranscriptLimitError, WorkerConflictError } from "./workers";
@@ -87,7 +87,7 @@ export const toConnectError = (error: unknown): ConnectError => {
       error,
     );
   }
-  if (error instanceof OrganizationAgentContextCursorError) {
+  if (error instanceof WorkspaceAgentContextCursorError) {
     return new ConnectError(
       error.message,
       Code.InvalidArgument,
@@ -96,7 +96,7 @@ export const toConnectError = (error: unknown): ConnectError => {
       error,
     );
   }
-  if (error instanceof OrganizationAgentContextPageTooLargeError) {
+  if (error instanceof WorkspaceAgentContextPageTooLargeError) {
     return new ConnectError(
       error.message,
       Code.ResourceExhausted,

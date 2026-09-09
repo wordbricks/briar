@@ -29,7 +29,7 @@ export async function replayDmLearningCommit(db: D1Database, input: {
       and call.stage = ? and call.input_hash = job.input_hash and ledger.payload_hash = proposal.proposal_hash
       and job.updated_at > ? and space.revocation_epoch = json_extract(applied.result_json, '$.revocationEpoch')
       and ${dmLearningLiveSpaceSql} and ${dmLearningWorkerCurrentSql}`)
-    .bind(identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.organizationId,
+    .bind(identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.workspaceId,
       input.inputHash, input.callId, "proposal" in input ? "proposing" : "verifying",
       new Date(Date.parse(input.now) - 86_400_000).toISOString(), input.now)
     .first<{ result_json: string; proposal_id: string; proposal_hash: string; proposal_json: string | null;

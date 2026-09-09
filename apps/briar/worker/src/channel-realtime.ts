@@ -1,14 +1,14 @@
 import {
   ChannelsChangedSchema,
   InboxChangedSchema,
-  type WorkspaceNotification as OrganizationNotification,
-  WorkspaceNotificationSchema as OrganizationNotificationSchema,
+  type WorkspaceNotification as WorkspaceNotification,
+  WorkspaceNotificationSchema as WorkspaceNotificationSchema,
   ProjectAgentSessionsChangedSchema,
   ProjectChangedSchema,
   ReadySchema} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 
-type OrganizationRealtimeSocketAttachment = {
+type WorkspaceRealtimeSocketAttachment = {
   cursors: Record<string, number>;
 };
 
@@ -25,10 +25,10 @@ type NotificationCursor = {
   version: number;
 };
 
-const encodeNotification = (notification: OrganizationNotification) =>
-  toBinary(OrganizationNotificationSchema, notification);
+const encodeNotification = (notification: WorkspaceNotification) =>
+  toBinary(WorkspaceNotificationSchema, notification);
 
-const readyNotification = () => create(OrganizationNotificationSchema, {
+const readyNotification = () => create(WorkspaceNotificationSchema, {
   notification: {
     case: "ready",
     value: create(ReadySchema),
@@ -36,7 +36,7 @@ const readyNotification = () => create(OrganizationNotificationSchema, {
 });
 
 const channelsNotification = (cursor: number) =>
-  create(OrganizationNotificationSchema, {
+  create(WorkspaceNotificationSchema, {
     notification: {
       case: "channelsChanged",
       value: create(ChannelsChangedSchema, { cursor: BigInt(cursor) }),
@@ -44,7 +44,7 @@ const channelsNotification = (cursor: number) =>
   });
 
 const inboxNotification = (version: number) =>
-  create(OrganizationNotificationSchema, {
+  create(WorkspaceNotificationSchema, {
     notification: {
       case: "inboxChanged",
       value: create(InboxChangedSchema, { version: BigInt(version) }),
@@ -54,7 +54,7 @@ const inboxNotification = (version: number) =>
 const projectNotification = (
   projectId: string,
   cursor: number,
-) => create(OrganizationNotificationSchema, {
+) => create(WorkspaceNotificationSchema, {
   notification: {
     case: "projectChanged",
     value: create(ProjectChangedSchema, {
@@ -67,7 +67,7 @@ const projectNotification = (
 const projectAgentSessionsNotification = (
   projectId: string,
   version: number,
-) => create(OrganizationNotificationSchema, {
+) => create(WorkspaceNotificationSchema, {
   notification: {
     case: "projectAgentSessionsChanged",
     value: create(ProjectAgentSessionsChangedSchema, {
@@ -78,7 +78,7 @@ const projectAgentSessionsNotification = (
 });
 
 function notificationCursor(
-  message: OrganizationNotification,
+  message: WorkspaceNotification,
 ): NotificationCursor | null {
   const notification = message.notification;
   let key: string;
@@ -113,7 +113,7 @@ function notificationCursor(
 async function decodeNotificationRequest(request: Request) {
   try {
     return fromBinary(
-      OrganizationNotificationSchema,
+      WorkspaceNotificationSchema,
       new Uint8Array(await request.arrayBuffer()),
     );
   } catch {
@@ -122,7 +122,7 @@ async function decodeNotificationRequest(request: Request) {
 }
 
 /**
- * Organization-scoped fan-out for channel, Inbox, and project notifications.
+ * Workspace-scoped fan-out for channel, Inbox, and project notifications.
  *
  * D1's change logs and Inbox revision stay authoritative. The Durable Object
  * owns only hibernatable sockets and persists each topic's last version as an
@@ -164,7 +164,7 @@ export class ChannelRealtimeHub {
     server.serializeAttachment(
       {
         cursors,
-      } satisfies OrganizationRealtimeSocketAttachment,
+      } satisfies WorkspaceRealtimeSocketAttachment,
     );
     server.send(encodeNotification(readyNotification()));
     server.send(encodeNotification(channelsNotification(cursors.channels)));
@@ -176,13 +176,13 @@ export class ChannelRealtimeHub {
   }
 
   private publish(
-    notification: OrganizationNotification,
+    notification: WorkspaceNotification,
     cursor: NotificationCursor,
   ) {
     const payload = encodeNotification(notification);
     for (const client of this.state.getWebSockets()) {
       const attachment = client.deserializeAttachment() as
-        | OrganizationRealtimeSocketAttachment
+        | WorkspaceRealtimeSocketAttachment
         | null;
       if (!attachment?.cursors) {
         client.close(1011, "Realtime socket state is invalid");
@@ -194,7 +194,7 @@ export class ChannelRealtimeHub {
         client.send(payload);
         client.serializeAttachment({
           cursors: { ...cursors, [cursor.key]: cursor.version },
-        } satisfies OrganizationRealtimeSocketAttachment);
+        } satisfies WorkspaceRealtimeSocketAttachment);
       } catch {
         client.close(1011, "Realtime delivery failed");
       }
@@ -220,12 +220,12 @@ export class ChannelRealtimeHub {
   }
 }
 
-export async function subscribeToOrganizationRealtime(
+export async function subscribeToWorkspaceRealtime(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   cursors: { channels: number; inbox: number },
 ) {
-  const hub = env.CHANNEL_REALTIME.getByName(organizationId);
+  const hub = env.CHANNEL_REALTIME.getByName(workspaceId);
   return hub.fetch(
     `https://channel-realtime.internal/subscribe?cursor=${cursors.channels}` +
       `&inboxVersion=${cursors.inbox}`,
@@ -235,11 +235,11 @@ export async function subscribeToOrganizationRealtime(
 
 export async function publishInboxRealtime(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   version: number,
 ) {
   const notification = inboxNotification(version);
-  const hub = env.CHANNEL_REALTIME.getByName(organizationId);
+  const hub = env.CHANNEL_REALTIME.getByName(workspaceId);
   const response = await hub.fetch("https://channel-realtime.internal/notify", {
     method: "POST",
     headers: { "Content-Type": "application/protobuf" },
@@ -252,11 +252,11 @@ export async function publishInboxRealtime(
 
 export async function publishChannelRealtime(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   cursor: number,
 ) {
   const notification = channelsNotification(cursor);
-  const hub = env.CHANNEL_REALTIME.getByName(organizationId);
+  const hub = env.CHANNEL_REALTIME.getByName(workspaceId);
   const response = await hub.fetch("https://channel-realtime.internal/notify", {
     method: "POST",
     headers: { "Content-Type": "application/protobuf" },
@@ -269,12 +269,12 @@ export async function publishChannelRealtime(
 
 export async function publishProjectRealtime(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   projectId: string,
   cursor: number,
 ) {
   const notification = projectNotification(projectId, cursor);
-  const hub = env.CHANNEL_REALTIME.getByName(organizationId);
+  const hub = env.CHANNEL_REALTIME.getByName(workspaceId);
   const response = await hub.fetch("https://channel-realtime.internal/notify", {
     method: "POST",
     headers: { "Content-Type": "application/protobuf" },
@@ -287,12 +287,12 @@ export async function publishProjectRealtime(
 
 export async function publishProjectAgentSessionRealtime(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   projectId: string,
   version: number,
 ) {
   const notification = projectAgentSessionsNotification(projectId, version);
-  const hub = env.CHANNEL_REALTIME.getByName(organizationId);
+  const hub = env.CHANNEL_REALTIME.getByName(workspaceId);
   const response = await hub.fetch("https://channel-realtime.internal/notify", {
     method: "POST",
     headers: { "Content-Type": "application/protobuf" },

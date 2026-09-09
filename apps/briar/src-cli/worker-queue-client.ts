@@ -63,7 +63,7 @@ export const workClaimIdentityToProto = (
             case: "channelReply",
             value: {
               $typeName: "briar.worker.v1.ChannelReplyClaimIdentity",
-              workspaceId: work.organizationId,
+              workspaceId: work.workspaceId,
             },
           }
         : work.workType === "projectAgentTask"
@@ -78,7 +78,7 @@ export const workClaimIdentityToProto = (
                 case: "dmMemory",
                 value: {
                   $typeName: "briar.worker.v1.DmMemoryLearningClaimIdentity",
-                  workspaceId: work.organizationId,
+                  workspaceId: work.workspaceId,
                   inputHash: work.inputHash,
                 },
               }
@@ -108,7 +108,7 @@ export function createWorkerQueueClient(
 export function createWorkerQueueOperations(client: WorkerQueueClient) {
   return {
     claimWork: async (input: {
-      organizationId: string;
+      workspaceId: string;
       projectId: string;
       workerId: string;
       claimedBy: string;
@@ -123,13 +123,13 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
           const raw = response.work.work;
           if (raw.case !== "channelReply") throw cause;
           const scope = raw.value.scope?.scope;
-          const organizationId = scope?.case === "workspace"
+          const workspaceId = scope?.case === "workspace"
             ? scope.value.workspaceId
             : scope?.case === "project"
             ? scope.value.workspaceId
             : "";
           if (
-            organizationId !== input.organizationId ||
+            workspaceId !== input.workspaceId ||
             !raw.value.workId ||
             !raw.value.runId ||
             !raw.value.claimToken
@@ -150,7 +150,7 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
                 claimToken: raw.value.claimToken,
                 work: {
                   case: "channelReply",
-                  value: { workspaceId: organizationId },
+                  value: { workspaceId: workspaceId },
                 },
               },
               outcome: {

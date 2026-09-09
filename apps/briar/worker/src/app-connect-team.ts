@@ -39,7 +39,7 @@ import {
   appProjectSettings,
 } from "./app-connect-mappers";
 import { HttpError } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import {
   createPlanningProject,
   deletePlanningProject,
@@ -219,7 +219,7 @@ const nullableUpdate = (value: NullableStringUpdate | undefined) => {
 };
 
 const requirePlanningWrite = (value: keyof typeof role) => {
-  if (!hasOrganizationCapability(value, "issues:write")) {
+  if (!hasWorkspaceCapability(value, "issues:write")) {
     throw new HttpError(403, "Team project editing permission required");
   }
 };
@@ -477,7 +477,7 @@ export const createAppTeamService = (
         db,
         user: session.user,
         name: input.name,
-        organizationId: input.workspaceId,
+        workspaceId: input.workspaceId,
         locale: normalizeTeamAgentLocale(
           request.headers.get("accept-language"),
         ),

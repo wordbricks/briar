@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { deleteChannelApplication } from "./channel-administration-application";
 import { decodeChannelMessageApplicationInput } from "./app-mutation-request-mappers";
-import { createOrganizationChannelMessage } from "./channel-message-routes";
+import { createWorkspaceChannelMessage } from "./channel-message-routes";
 import {
   createChannelSidebarSectionApplication,
   deleteChannelSidebarSectionApplication,
@@ -14,10 +14,10 @@ import {
 } from "./channel-sidebar-application";
 import { getChannelSyncCursor } from "./channels";
 import {
-  createOrganizationDirectMessage,
-  listOrganizationChannels,
-  markOrganizationChannelRead,
-} from "./organization-channel-routes";
+  createWorkspaceDirectMessage,
+  listWorkspaceChannels,
+  markWorkspaceChannelRead,
+} from "./workspace-channel-routes";
 import { HttpError } from "./http-response";
 
 /*
@@ -26,8 +26,8 @@ import { HttpError } from "./http-response";
   member's own devices agreeing through the channel change feed.
 */
 
-const organizationId = "a1000000-0000-4000-8000-000000000001";
-const otherOrganizationId = "a1000000-0000-4000-8000-000000000002";
+const workspaceId = "a1000000-0000-4000-8000-000000000001";
+const otherWorkspaceId = "a1000000-0000-4000-8000-000000000002";
 const ownerId = "sidebar-owner";
 const partnerId = "sidebar-partner";
 const outsiderId = "sidebar-outsider";
@@ -51,7 +51,7 @@ describe("channel sidebar preferences", () => {
         .bind(id, name, `${id}@example.com`, at(0), at(0))
         .run();
     }
-    for (const id of [organizationId, otherOrganizationId]) {
+    for (const id of [workspaceId, otherWorkspaceId]) {
       await db
         .prepare(
           `insert into briar_organizations (id, name, handle, created_at, updated_at)
@@ -64,7 +64,7 @@ describe("channel sidebar preferences", () => {
       [ownerId, "owner"],
       [partnerId, "owner"],
       // An editor may start conversations but does not administer the
-      // organization, so nothing but participation can let them delete a DM.
+      // workspace, so nothing but participation can let them delete a DM.
       [outsiderId, "editor"],
     ]) {
       await db
@@ -73,7 +73,7 @@ describe("channel sidebar preferences", () => {
              organization_id, user_id, role, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
         )
-        .bind(organizationId, userId, role, at(0), at(0))
+        .bind(workspaceId, userId, role, at(0), at(0))
         .run();
     }
     await db
@@ -82,14 +82,14 @@ describe("channel sidebar preferences", () => {
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
       )
-      .bind(otherOrganizationId, ownerId, at(0), at(0))
+      .bind(otherWorkspaceId, ownerId, at(0), at(0))
       .run();
   }, 60_000);
 
   const createConversation = async (userId = ownerId, withUserId = partnerId) => {
-    const result = await createOrganizationDirectMessage({
+    const result = await createWorkspaceDirectMessage({
       db,
-      organizationId,
+      workspaceId,
       userId,
       request: { memberIds: [withUserId], agentIds: [] },
     });
@@ -97,9 +97,9 @@ describe("channel sidebar preferences", () => {
   };
 
   const sendMessage = (channelId: string, userId: string, body: string) =>
-    createOrganizationChannelMessage({
+    createWorkspaceChannelMessage({
       db,
-      organizationId,
+      workspaceId,
       channelId,
       userId,
       request: {
@@ -110,9 +110,9 @@ describe("channel sidebar preferences", () => {
     });
 
   const catalogEntry = async (userId: string, channelId: string) => {
-    const catalog = await listOrganizationChannels({
+    const catalog = await listWorkspaceChannels({
       db,
-      organizationId,
+      workspaceId,
       userId,
     });
     return catalog.channels.find((channel) => channel.id === channelId) ?? null;
@@ -122,7 +122,7 @@ describe("channel sidebar preferences", () => {
     const conversation = await createConversation();
     const section = await createChannelSidebarSectionApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       name: "  Team  ",
     });
@@ -131,14 +131,14 @@ describe("channel sidebar preferences", () => {
 
     await updateChannelSidebarPreferenceApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
       update: { pinned: true, section: { case: "set", sectionId: section.section.id } },
     });
     const hidden = await updateChannelSidebarPreferenceApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
       update: { hidden: true },
@@ -161,7 +161,7 @@ describe("channel sidebar preferences", () => {
     // Unpinning clears the stamp without disturbing the section.
     const unpinned = await updateChannelSidebarPreferenceApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
       update: { pinned: false },
@@ -173,21 +173,21 @@ describe("channel sidebar preferences", () => {
   it("carries the member's own sections with their catalog", async () => {
     const created = await createChannelSidebarSectionApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: partnerId,
       name: "Partner only",
     });
-    const catalog = await listOrganizationChannels({
+    const catalog = await listWorkspaceChannels({
       db,
-      organizationId,
+      workspaceId,
       userId: partnerId,
     });
     expect(catalog.sidebarSections.map((section) => section.id)).toContain(
       created.section.id,
     );
-    const outsiderCatalog = await listOrganizationChannels({
+    const outsiderCatalog = await listWorkspaceChannels({
       db,
-      organizationId,
+      workspaceId,
       userId: outsiderId,
     });
     expect(outsiderCatalog.sidebarSections).toHaveLength(0);
@@ -195,15 +195,15 @@ describe("channel sidebar preferences", () => {
 
   it("advances the channel cursor so the member's other devices refetch", async () => {
     const conversation = await createConversation();
-    const before = await getChannelSyncCursor(db, organizationId);
+    const before = await getChannelSyncCursor(db, workspaceId);
     await updateChannelSidebarPreferenceApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
       update: { pinned: true },
     });
-    const after = await getChannelSyncCursor(db, organizationId);
+    const after = await getChannelSyncCursor(db, workspaceId);
     expect(after).toBeGreaterThan(before);
   });
 
@@ -212,7 +212,7 @@ describe("channel sidebar preferences", () => {
     await expect(
       updateChannelSidebarPreferenceApplication({
         db,
-        organizationId,
+        workspaceId,
         userId: outsiderId,
         channelId: conversation.id,
         update: { pinned: true },
@@ -221,7 +221,7 @@ describe("channel sidebar preferences", () => {
     await expect(
       markChannelUnreadApplication({
         db,
-        organizationId,
+        workspaceId,
         userId: outsiderId,
         channelId: conversation.id,
       }),
@@ -231,14 +231,14 @@ describe("channel sidebar preferences", () => {
   it("scopes sections to the member who created them", async () => {
     const mine = await createChannelSidebarSectionApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       name: "Scoped",
     });
     await expect(
       renameChannelSidebarSectionApplication({
         db,
-        organizationId,
+        workspaceId,
         userId: partnerId,
         sectionId: mine.section.id,
         name: "Stolen",
@@ -247,7 +247,7 @@ describe("channel sidebar preferences", () => {
     await expect(
       deleteChannelSidebarSectionApplication({
         db,
-        organizationId,
+        workspaceId,
         userId: partnerId,
         sectionId: mine.section.id,
       }),
@@ -257,7 +257,7 @@ describe("channel sidebar preferences", () => {
     await expect(
       updateChannelSidebarPreferenceApplication({
         db,
-        organizationId,
+        workspaceId,
         userId: partnerId,
         channelId: conversation.id,
         update: { section: { case: "set", sectionId: mine.section.id } },
@@ -269,20 +269,20 @@ describe("channel sidebar preferences", () => {
     const conversation = await createConversation();
     const section = await createChannelSidebarSectionApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       name: "Temporary",
     });
     await updateChannelSidebarPreferenceApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
       update: { section: { case: "set", sectionId: section.section.id } },
     });
     const renamed = await renameChannelSidebarSectionApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       sectionId: section.section.id,
       name: "Renamed",
@@ -291,7 +291,7 @@ describe("channel sidebar preferences", () => {
 
     const remaining = await deleteChannelSidebarSectionApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       sectionId: section.section.id,
     });
@@ -302,7 +302,7 @@ describe("channel sidebar preferences", () => {
     expect(entry?.sidebarSectionId).toBeNull();
     const listed = await listChannelSidebarSectionsApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
     });
     expect(listed.sections.map((item) => item.id)).not.toContain(
@@ -315,16 +315,16 @@ describe("channel sidebar preferences", () => {
     // Nothing anybody else wrote: there is nothing to be unread about.
     const empty = await markChannelUnreadApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
     });
     expect(empty.channel.hasUnread).toBe(false);
 
     await sendMessage(conversation.id, partnerId, "Are we still on?");
-    await markOrganizationChannelRead({
+    await markWorkspaceChannelRead({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
       request: {},
@@ -333,7 +333,7 @@ describe("channel sidebar preferences", () => {
 
     const unread = await markChannelUnreadApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
     });
@@ -345,9 +345,9 @@ describe("channel sidebar preferences", () => {
       false,
     );
 
-    await markOrganizationChannelRead({
+    await markWorkspaceChannelRead({
       db,
-      organizationId,
+      workspaceId,
       userId: ownerId,
       channelId: conversation.id,
       request: {},
@@ -360,14 +360,14 @@ describe("channel sidebar preferences", () => {
     await expect(
       deleteChannelApplication({
         db,
-        organizationId,
+        workspaceId,
         userId: outsiderId,
         channelId: conversation.id,
       }),
     ).rejects.toBeInstanceOf(HttpError);
     await deleteChannelApplication({
       db,
-      organizationId,
+      workspaceId,
       userId: partnerId,
       channelId: conversation.id,
     });

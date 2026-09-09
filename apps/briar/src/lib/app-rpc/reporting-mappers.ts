@@ -292,7 +292,7 @@ export const organizationUsageReportFromProto = (
   runs: response.runs.map(usageRunFromProto),
   generatedAt: requiredTimestamp(
     response.generatedAt,
-    "organizationUsageReport.generatedAt",
+    "workspaceUsageReport.generatedAt",
   ),
   pricing: agentUsagePricingFromProto(response.pricing),
 });

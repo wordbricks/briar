@@ -41,7 +41,7 @@ describe("cascade erasure", () => {
     expect(rejected).toEqual([]);
   });
 
-  it("erases a channel, a team, an organization and its owner", async () => {
+  it("erases a channel, a team, a workspace and its owner", async () => {
     const now = "2026-09-05T00:00:00.000Z";
     const runtimeProtoJson = workerRuntimeProtoJsonFixture().replaceAll(
       "'",

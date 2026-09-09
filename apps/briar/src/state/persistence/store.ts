@@ -10,7 +10,7 @@ import {
 /*
   Where a snapshot lives between runs.
 
-  One record per account and organization, in IndexedDB in all three modes:
+  One record per account and workspace, in IndexedDB in all three modes:
   localStorage is synchronous (a multi-megabyte write would block the frame that
   schedules it) and capped far below what a few thousand runs need. The
   interface is small on purpose — the writer and the hydration are the only
@@ -22,9 +22,9 @@ import {
   way it did before this existed.
 */
 
-/** The record for one account in one organization. */
-export const snapshotKey = (userId: string, organizationId: string) =>
-  `${userId}:${organizationId}`;
+/** The record for one account in one workspace. */
+export const snapshotKey = (userId: string, workspaceId: string) =>
+  `${userId}:${workspaceId}`;
 
 export interface SnapshotStore {
   readonly read: (key: string) => Promise<ClientSnapshot | null>;
@@ -80,7 +80,7 @@ const requestResult = <T>(request: IDBRequest<T>) =>
 
 /**
  * The IndexedDB implementation, thin by design: one object store of serialized
- * snapshots keyed by `${userId}:${organizationId}`, and four operations over it.
+ * snapshots keyed by `${userId}:${workspaceId}`, and four operations over it.
  * The factory is a parameter so a test can drive it with a stand-in.
  */
 export function createIndexedDbSnapshotStore(

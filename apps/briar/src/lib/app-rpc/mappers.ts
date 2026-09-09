@@ -12,7 +12,7 @@ import {
   StructuredRunResultSchema,
   type IssueAttachment as IssueAttachmentMessage,
   type MessageAuthor as MessageAuthorMessage,
-  type WorkspaceMember as OrganizationMemberMessage,
+  type WorkspaceMember as WorkspaceMemberMessage,
   type RelatedMessageReference as RelatedMessageReferenceMessage,
   type ResultReview as ResultReviewMessage,
   type StructuredRunResult} from "@briar/contracts/gen/briar/app/v1/common_pb";
@@ -30,7 +30,7 @@ import type {
   IssueAttachment,
   IssueMessageAuthor,
   IssueResultReview,
-  OrganizationMember,
+  WorkspaceMember,
   Project,
   RelatedMessageReference,
 } from "../../types";
@@ -374,7 +374,7 @@ export const issueAttachmentFromProto = (value: IssueAttachmentMessage): IssueAt
 export const relatedMessageFromProto = (
   value: RelatedMessageReferenceMessage,
 ): RelatedMessageReference => ({
-  organizationId: value.workspaceId,
+  workspaceId: value.workspaceId,
   channelId: value.channelId,
   messageId: value.messageId,
   rootMessageId: value.rootMessageId,
@@ -396,14 +396,14 @@ export const resultReviewFromProto = (value: ResultReviewMessage): IssueResultRe
   completedAt: requiredTimestamp(value.completedAt, "resultReview.completedAt"),
 });
 
-export const organizationMemberFromProto = (
-  value: OrganizationMemberMessage,
-): OrganizationMember => ({
+export const workspaceMemberFromProto = (
+  value: WorkspaceMemberMessage,
+): WorkspaceMember => ({
   userId: value.userId,
   name: value.name,
   email: value.email,
   image: value.image ?? null,
   role: teamRoleFromProto(value.role),
   projectIds: value.projectIds,
-  createdAt: requiredTimestamp(value.createdAt, "organizationMember.createdAt"),
+  createdAt: requiredTimestamp(value.createdAt, "workspaceMember.createdAt"),
 });

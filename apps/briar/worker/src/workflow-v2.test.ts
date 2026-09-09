@@ -135,14 +135,14 @@ describe("workflow v2 D1 persistence and transitions", () => {
         at(0),
       )
       .run();
-    const organization = await createWorkspace(db, {
+    const workspace = await createWorkspace(db, {
       name: "Workflow Org",
       handle: "workflow-org",
       ownerUserId: "workflow-owner",
     });
     const project = await createTeam(db, {
       ownerUserId: "workflow-owner",
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       name: "Workflow Project",
       agentTokenHash: "a".repeat(64),
     });

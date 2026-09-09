@@ -56,7 +56,7 @@ import {
 import { retryDmLearningJob } from "./dm-memory-learning-retry";
 import { readDmLearningStatus } from "./dm-memory-learning-status";
 import { HttpError } from "./http-response";
-import { getOrganizationRole } from "./organization-repository";
+import { getWorkspaceRole } from "./workspace-repository";
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
@@ -276,22 +276,22 @@ const checkedNumber = (value: bigint, field: string) => {
 
 const ownerFor = async (
   input: AppConnectDmMemoryInput,
-  organizationIdValue: string,
+  workspaceIdValue: string,
   channelIdValue: string,
 ): Promise<DmMemoryOwner> => {
   const session = await requireSession(input.auth, input.request);
   const owner = {
-    organizationId: canonicalUuid(organizationIdValue),
+    workspaceId: canonicalUuid(workspaceIdValue),
     channelId: canonicalUuid(channelIdValue),
     userId: session.user.id,
   };
-  if (!await getOrganizationRole(input.db, owner.organizationId, owner.userId)) {
-    throw new HttpError(404, "Organization not found");
+  if (!await getWorkspaceRole(input.db, owner.workspaceId, owner.userId)) {
+    throw new HttpError(404, "Workspace not found");
   }
   if ((await listDmMemorySpaces(input.db, owner)).length === 0) {
     await requireChannelAccess(
       input.db,
-      owner.organizationId,
+      owner.workspaceId,
       owner.channelId,
       owner.userId,
     );

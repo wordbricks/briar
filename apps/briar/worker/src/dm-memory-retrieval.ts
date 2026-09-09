@@ -92,7 +92,7 @@ async function searchWithinDeadline(
   const lookup = async (): Promise<DmMemorySearchResponse> => {
     const embeddings = await store.embed(queries);
     const candidates = await Promise.all(embeddings.map((vector) => store.query(vector, {
-      topK: 20, namespace: access.organizationId, filter: { memorySpaceId: access.spaceId },
+      topK: 20, namespace: access.workspaceId, filter: { memorySpaceId: access.spaceId },
       returnMetadata: "none", returnValues: false,
     })));
     const scores = new Map<string, number>();

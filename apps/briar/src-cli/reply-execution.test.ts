@@ -19,7 +19,7 @@ import type {
 import type { GitRunner } from "./worktree";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
-const organizationId = "22222222-2222-4222-8222-222222222222";
+const workspaceId = "22222222-2222-4222-8222-222222222222";
 const deviceId = "33333333-3333-4333-8333-333333333333";
 const workId = "44444444-4444-4444-8444-444444444444";
 const runId = "55555555-5555-4555-8555-555555555555";
@@ -60,7 +60,7 @@ const project: TeamConfig = {
   executionWorker: {
     deviceId,
     workerId: "worker-1",
-    organizationId,
+    workspaceId,
     token: "briar_worker_test",
     label: "Worker 1",
     maxConcurrentSessions: 1,
@@ -332,7 +332,7 @@ describe("Project Agent task worktrees", () => {
       detachedProjectAgentPrompt({
         agent: {
           ...task.agent,
-          scope: { kind: "project", organizationId, projectId },
+          scope: { kind: "project", workspaceId, projectId },
         },
         request: task.request,
         workspacePath: isolatedPath,
@@ -394,7 +394,7 @@ describe("Project Agent task worktrees", () => {
       detachedProjectAgentPrompt({
         agent: {
           ...task.agent,
-          scope: { kind: "project", organizationId, projectId },
+          scope: { kind: "project", workspaceId, projectId },
         },
         request: task.request,
         workspacePath: isolatedPath,

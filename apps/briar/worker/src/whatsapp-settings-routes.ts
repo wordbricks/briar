@@ -1,9 +1,9 @@
 import * as Schema from "effect/Schema";
 import type { BriarAuth } from "./auth";
 import { HttpError, json } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationAgent } from "./organization-agents";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceAgent } from "./workspace-agents";
+import { getWorkspaceRole } from "./workspace-repository";
 import { decodeRequestSync } from "./request-schema";
 import { strictSchema, trimmedText, UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
@@ -11,7 +11,7 @@ import { encryptWhatsAppToken, normalizeWhatsAppPhoneNumber } from "./whatsapp";
 import {
   deleteWhatsAppUserLink,
   disconnectWhatsAppConnection,
-  getWhatsAppConnectionForOrganization,
+  getWhatsAppConnectionForWorkspace,
   listWhatsAppUserLinks,
   upsertWhatsAppConnection,
   upsertWhatsAppUserLink,
@@ -45,7 +45,7 @@ const connectionJson = (connection: WhatsAppConnectionRow | null) =>
   connection
     ? {
         id: connection.id,
-        organizationId: connection.organization_id,
+        workspaceId: connection.organization_id,
         agentId: connection.agent_id,
         phoneNumberId: connection.phone_number_id,
         wabaId: connection.waba_id,
@@ -59,15 +59,15 @@ async function requireWhatsAppSettingsAccess(
   auth: BriarAuth,
   db: D1Database,
   request: Request,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const session = await requireSession(auth, request);
-  const role = await getOrganizationRole(db, organizationId, session.user.id);
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    throw new HttpError(404, "Organization not found");
+  const role = await getWorkspaceRole(db, workspaceId, session.user.id);
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    throw new HttpError(404, "Workspace not found");
   }
-  if (!hasOrganizationCapability(role, "organization:update")) {
-    throw new HttpError(403, "Organization settings permission required");
+  if (!hasWorkspaceCapability(role, "workspace:update")) {
+    throw new HttpError(403, "Workspace settings permission required");
   }
   return session.user.id;
 }
@@ -85,27 +85,27 @@ export async function handleWhatsAppSettingsRoute(input: {
   env: Env;
 }): Promise<Response | undefined> {
   const collectionMatch = input.url.pathname.match(
-    /^\/organizations\/([0-9a-f-]{36})\/integrations\/whatsapp$/iu,
+    /^\/workspaces\/([0-9a-f-]{36})\/integrations\/whatsapp$/iu,
   );
   const linksMatch = input.url.pathname.match(
-    /^\/organizations\/([0-9a-f-]{36})\/integrations\/whatsapp\/links$/iu,
+    /^\/workspaces\/([0-9a-f-]{36})\/integrations\/whatsapp\/links$/iu,
   );
   const linkMatch = input.url.pathname.match(
-    /^\/organizations\/([0-9a-f-]{36})\/integrations\/whatsapp\/links\/([^/]+)$/iu,
+    /^\/workspaces\/([0-9a-f-]{36})\/integrations\/whatsapp\/links\/([^/]+)$/iu,
   );
-  const organizationId = collectionMatch?.[1] ?? linksMatch?.[1] ?? linkMatch?.[1];
-  if (!organizationId) return undefined;
+  const workspaceId = collectionMatch?.[1] ?? linksMatch?.[1] ?? linkMatch?.[1];
+  if (!workspaceId) return undefined;
   const userId = await requireWhatsAppSettingsAccess(
     input.auth,
     input.db,
     input.request,
-    organizationId,
+    workspaceId,
   );
 
   if (collectionMatch && input.request.method === "GET") {
     const [connection, links] = await Promise.all([
-      getWhatsAppConnectionForOrganization(input.db, organizationId),
-      listWhatsAppUserLinks(input.db, organizationId),
+      getWhatsAppConnectionForWorkspace(input.db, workspaceId),
+      listWhatsAppUserLinks(input.db, workspaceId),
     ]);
     return json({
       connection: connectionJson(connection),
@@ -126,14 +126,14 @@ export async function handleWhatsAppSettingsRoute(input: {
       throw new HttpError(503, "WhatsApp token encryption is not configured");
     }
     const request = decodeConnectionInput(await requestJson(input.request));
-    const agent = await getOrganizationAgent(input.db, organizationId, request.agentId);
+    const agent = await getWorkspaceAgent(input.db, workspaceId, request.agentId);
     if (!agent || agent.project_id !== null) {
-      throw new HttpError(400, "Representative must be an Organization Agent");
+      throw new HttpError(400, "Representative must be a Workspace Agent");
     }
     const encrypted = await encryptWhatsAppToken(request.accessToken, encryptionKey);
     try {
       const connection = await upsertWhatsAppConnection(input.db, {
-        organizationId,
+        workspaceId,
         agentId: request.agentId,
         phoneNumberId: request.phoneNumberId,
         wabaId: request.wabaId,
@@ -155,7 +155,7 @@ export async function handleWhatsAppSettingsRoute(input: {
   if (collectionMatch && input.request.method === "DELETE") {
     const disconnected = await disconnectWhatsAppConnection(
       input.db,
-      organizationId,
+      workspaceId,
       new Date().toISOString(),
     );
     return json({ disconnected });
@@ -165,12 +165,12 @@ export async function handleWhatsAppSettingsRoute(input: {
     const request = decodeUserLinkInput(await requestJson(input.request));
     const phoneNumber = normalizeWhatsAppPhoneNumber(request.phoneNumber);
     if (!phoneNumber) throw new HttpError(400, "Invalid WhatsApp phone number");
-    if (!(await getOrganizationRole(input.db, organizationId, request.userId))) {
-      throw new HttpError(404, "Organization member not found");
+    if (!(await getWorkspaceRole(input.db, workspaceId, request.userId))) {
+      throw new HttpError(404, "Workspace member not found");
     }
     try {
       const link = await upsertWhatsAppUserLink(input.db, {
-        organizationId,
+        workspaceId,
         userId: request.userId,
         phoneNumber,
         createdByUserId: userId,
@@ -199,7 +199,7 @@ export async function handleWhatsAppSettingsRoute(input: {
     return json({
       deleted: await deleteWhatsAppUserLink(
         input.db,
-        organizationId,
+        workspaceId,
         decodeURIComponent(linkMatch[2]!),
       ),
     });

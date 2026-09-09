@@ -1,5 +1,5 @@
 /** Durable inputs remain queued; only an expired attempt and its copies are retired. */
-export async function reapDmLearningClaims(db: D1Database, now: string, organizationId: string | null = null) {
+export async function reapDmLearningClaims(db: D1Database, now: string, workspaceId: string | null = null) {
   const expired = (await db.prepare(`select job.id, job.lease_token_hash, job.attempt, job.calls_used,
       exists (select 1 from briar_dm_memory_verifications verification where verification.job_id = job.id
         and verification.approved = 0) as rejected
@@ -7,7 +7,7 @@ export async function reapDmLearningClaims(db: D1Database, now: string, organiza
     where job.kind in ('extract', 'explicit_request', 'consolidate') and job.status = 'running'
       and job.lease_expires_at <= ? and (? is null or space.organization_id = ?)
     order by job.lease_expires_at, job.id limit 100`)
-    .bind(now, organizationId, organizationId)
+    .bind(now, workspaceId, workspaceId)
     .all<{ id: string; lease_token_hash: string; attempt: number; calls_used: number; rejected: number }>()).results;
   let reaped = 0;
   for (const job of expired) {

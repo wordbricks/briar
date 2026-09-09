@@ -106,14 +106,14 @@ export function channelReplyAttachments(
 
 function channelReplyAttachmentUrl(input: {
   apiUrl: string;
-  organizationId: string;
+  workspaceId: string;
   workId: string;
   attachment: QueuedAttachment;
 }) {
   const match = matchChannelReplyAttachmentPath(input.attachment.url);
   if (
     !match ||
-    match.organizationId !== input.organizationId ||
+    match.workspaceId !== input.workspaceId ||
     match.workId !== input.workId ||
     match.attachmentId !== input.attachment.id
   ) {
@@ -156,7 +156,7 @@ const unreadableSummary = (
 export async function downloadChannelReplyAttachments(input: {
   apiUrl: string;
   workerToken: string;
-  organizationId: string;
+  workspaceId: string;
   workId: string;
   claimToken: string;
   triggerAttachments: readonly QueuedAttachment[];
@@ -184,7 +184,7 @@ export async function downloadChannelReplyAttachments(input: {
       const response = await fetcher(
         channelReplyAttachmentUrl({
           apiUrl: input.apiUrl,
-          organizationId: input.organizationId,
+          workspaceId: input.workspaceId,
           workId: input.workId,
           attachment,
         }),

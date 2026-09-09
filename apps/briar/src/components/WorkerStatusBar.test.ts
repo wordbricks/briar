@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ExecutionWorker, ManagedComputer } from "../types";
 import { managedComputerShortcutTarget, workerRemoteUpdateSupported, workerSandboxUpdateSupported } from "./WorkerStatusBar";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 
 it("allows sandbox provider updates independently of the Briar version", () => {
   const sandbox = { ...worker, capabilities: { remoteUpdates: { supported: true, protocol: 2 } } };
@@ -36,7 +36,7 @@ const worker: ExecutionWorker = {
 
 const computer: ManagedComputer = {
   id: "22222222-2222-4222-8222-222222222222",
-  organizationId,
+  workspaceId,
   requesterUserId: ownerUserId,
   state: "ready",
   provider: "aws",
@@ -65,7 +65,7 @@ const target = ({
   managedComputersByDeviceId: candidate.deviceId
     ? { [candidate.deviceId]: candidate }
     : {},
-  organizationId,
+  workspaceId,
   remoteDesktopEnabled: enabled,
   userId,
   worker,
@@ -79,26 +79,26 @@ describe("managedComputerShortcutTarget", () => {
   });
 
   it("hides the shortcut outside the owner boundary", () => {
-    expect(target({ userId: "organization-member" })).toBeNull();
+    expect(target({ userId: "workspace-member" })).toBeNull();
     expect(target({ candidate: {
       ...computer,
       requesterUserId: "another-requester",
     } })).toBeNull();
     expect(managedComputerShortcutTarget({
       managedComputersByDeviceId: { [worker.deviceId]: computer },
-      organizationId,
+      workspaceId,
       remoteDesktopEnabled: true,
       userId: ownerUserId,
       worker: { ...worker, ownerUserId: "another-owner" },
     })).toBeNull();
   });
 
-  it("requires the feature, organization, eligible state, and matching device", () => {
+  it("requires the feature, workspace, eligible state, and matching device", () => {
     expect(target({ enabled: false })).toBeNull();
     expect(target({ candidate: { ...computer, state: "failed" } })).toBeNull();
     expect(target({ candidate: {
       ...computer,
-      organizationId: "another-organization",
+      workspaceId: "another-workspace",
     } })).toBeNull();
     expect(target({ candidate: { ...computer, deviceId: "another-device" } }))
       .toBeNull();

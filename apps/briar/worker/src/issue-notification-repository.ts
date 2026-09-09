@@ -106,9 +106,9 @@ export async function listIssueSubscriptions(
   return result.results;
 }
 
-export async function listOrganizationIssueSubscriptionRunIds(
+export async function listWorkspaceIssueSubscriptionRunIds(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ) {
   const result = await db
@@ -131,7 +131,7 @@ export async function listOrganizationIssueSubscriptionRunIds(
          )
        order by subscription.created_at, subscription.run_id`,
     )
-    .bind(organizationId, userId)
+    .bind(workspaceId, userId)
     .all<{ run_id: string }>();
   return result.results.map((row) => row.run_id);
 }
@@ -192,13 +192,13 @@ export async function unsubscribeIssue(
 }
 
 /**
- * Returns channel messages that require this organization member's attention:
+ * Returns channel messages that require this workspace member's attention:
  * direct mentions and replies to root messages they authored. Public channels
- * are organization-visible; private channels require explicit membership.
+ * are workspace-visible; private channels require explicit membership.
  */
 export async function listChannelConversationNotifications(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ) {
   const result = await db
@@ -232,7 +232,7 @@ export async function listChannelConversationNotifications(
        order by notification.created_at desc, notification.message_id desc
        limit 500`,
     )
-    .bind(userId, organizationId, userId)
+    .bind(userId, workspaceId, userId)
     .all<ChannelConversationNotificationRow>();
   return result.results;
 }

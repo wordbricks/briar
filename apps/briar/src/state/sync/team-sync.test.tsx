@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactTestRoot, type ReactTestRoot } from "../../test/react";
 import { demoDashboard } from "../../lib/demo-data";
-import { createOrganizationActions } from "../organization/actions";
+import { createWorkspaceActions } from "../workspace/actions";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import {
   setSessionDataSources,
@@ -19,7 +19,7 @@ import { dashboardStaleAtom } from "../team/atoms";
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
-  Organization,
+  Workspace,
   PlanningProject,
   Project,
   SessionUser,
@@ -50,7 +50,7 @@ function Harness() {
   because none of them was ever about the facade: each one fixes an invariant of
   the entity store and the loader — a visited team renders before the network
   answers, a never visited one does not, a late or misaddressed response is
-  dropped, and a credential or organization change discards what the previous
+  dropped, and a credential or workspace change discards what the previous
   one loaded. They outlived the reassembled payload view for the same reason.
 */
 
@@ -60,7 +60,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organizationA: Organization = {
+const organizationA: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -69,19 +69,19 @@ const organizationA: Organization = {
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
-const organizationB: Organization = {
+const organizationB: Workspace = {
   ...organizationA,
   id: "org-b",
   name: "Org B",
   handle: "org-b",
 };
 
-const projectOf = (id: string, organization: Organization): Project => ({
+const projectOf = (id: string, workspace: Workspace): Project => ({
   ...demoDashboard.team,
   id,
   name: id,
-  organizationId: organization.id,
-  organizationName: organization.name,
+  workspaceId: workspace.id,
+  workspaceName: workspace.name,
 });
 
 const projectA1 = projectOf("project-a1", organizationA);
@@ -111,7 +111,7 @@ class DashboardServer {
 
   constructor(
     private projects: Project[],
-    private organizations: Organization[],
+    private workspaces: Workspace[],
   ) {}
 
   readonly dataSources: SessionDataSources = {
@@ -126,7 +126,7 @@ class DashboardServer {
       this.deltaRequests.push(projectId);
       return new Promise<DashboardDeltaPayload>(() => undefined);
     },
-    loadOrganizations: async () => this.organizations,
+    loadWorkspaces: async () => this.workspaces,
     loadSession: async () => user,
     loadTeamProjects: async () => [] as PlanningProject[],
     loadTeams: async () => this.projects,
@@ -169,9 +169,9 @@ const selectTeam = async (teamId: string) => {
     createTeamActions(registry).selectTeam(teamId);
   });
 };
-const selectOrganization = async (organizationId: string) => {
+const selectWorkspace = async (workspaceId: string) => {
   await act(async () => {
-    createOrganizationActions(registry, {}).selectOrganization(organizationId);
+    createWorkspaceActions(registry, {}).selectWorkspace(workspaceId);
   });
 };
 
@@ -193,8 +193,8 @@ const settleDashboard = async (project: Project, revision: number) => {
   return payload;
 };
 
-const mount = async (projects: Project[], organizations: Organization[]) => {
-  server = new DashboardServer(projects, organizations);
+const mount = async (projects: Project[], workspaces: Workspace[]) => {
+  server = new DashboardServer(projects, workspaces);
   view = createReactTestRoot();
   // The domain state lives in module level atoms, so a registry per test is
   // what keeps one test's session out of the next one.
@@ -311,21 +311,21 @@ describe("team sync", () => {
     expect(dashboard()).toEqual(freshA2);
   });
 
-  it("drops the stored dashboards of organizations the user left", async () => {
+  it("drops the stored dashboards of workspaces the user left", async () => {
     await mount(
       [projectA1, projectA2, projectB1],
       [organizationA, organizationB],
     );
     await settleDashboard(projectA1, 1);
 
-    await selectOrganization(organizationB.id);
+    await selectWorkspace(organizationB.id);
     expect(dashboard()).toBeNull();
     await settleDashboard(projectB1, 2);
     expect(dashboard()?.team.id).toBe(projectB1.id);
 
-    // Organization A's stored teams were pruned when the active organization
+    // Workspace A's stored teams were pruned when the active workspace
     // changed.
-    await selectOrganization(organizationA.id);
+    await selectWorkspace(organizationA.id);
     expect(dashboard()).toBeNull();
     expect(dashboardStale()).toBe(false);
   });
@@ -339,7 +339,7 @@ describe("team sync", () => {
     await settleDashboard(projectA1, 3);
     expect(dashboard()?.team.id).toBe(projectA1.id);
 
-    // A different credential for the same organization: only the token change
+    // A different credential for the same workspace: only the token change
     // can invalidate what the previous session loaded.
     server.dropPending();
     await act(async () => {

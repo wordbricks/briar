@@ -48,7 +48,7 @@ const ticketScope = (
     case "workspaceNotifications":
       return {
         type: "workspaceNotifications",
-        organizationId: canonicalUuid(request.scope.value.workspaceId),
+        workspaceId: canonicalUuid(request.scope.value.workspaceId),
       };
     case "issueActivity":
       return {
@@ -59,7 +59,7 @@ const ticketScope = (
     case "channelActivity":
       return {
         type: "channelActivity",
-        organizationId: canonicalUuid(request.scope.value.workspaceId),
+        workspaceId: canonicalUuid(request.scope.value.workspaceId),
         channelId: canonicalUuid(request.scope.value.channelId),
       };
     case undefined:

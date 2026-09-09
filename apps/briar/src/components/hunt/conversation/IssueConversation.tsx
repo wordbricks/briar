@@ -14,7 +14,7 @@ import { issueExecutionApprovalUnavailable } from "@/lib/issue-execution-approva
 import type { ChannelAgentActivityDescriptor } from "@/lib/channel-agent-activity";
 import { useIssueAgentActivity } from "@/hooks/use-issue-agent-activity";
 import { mergeIssueMessages } from "@/lib/issue-message-merge";
-import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, ExecutionWorker, HuntRun, IssueAttachment, IssueAgentReplyState, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, OrganizationMember, ProjectAgent, ProjectExecutionWorkerPolicy } from "@/types";
+import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, ExecutionWorker, HuntRun, IssueAttachment, IssueAgentReplyState, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, WorkspaceMember, ProjectAgent, ProjectExecutionWorkerPolicy } from "@/types";
 import { useI18n } from "@/i18n";
 import { AgentReplyState } from "./AgentReplyState";
 import { IssueMessageItem } from "./IssueMessageItem";
@@ -40,7 +40,7 @@ export function IssueConversation({
   onLoad,
   onSend,
   onUpdateSubscription,
-  organizationId,
+  workspaceId,
   projectId,
   run,
   highlightedMessageId = null,
@@ -52,7 +52,7 @@ export function IssueConversation({
   executionRuns: HuntRun[];
   executionWorkers: ExecutionWorker[];
   inboxSyncSignal?: string;
-  mentionMembers: OrganizationMember[];
+  mentionMembers: WorkspaceMember[];
   mentionAgents: ProjectAgent[];
   onAcceptIssueAction?: (proposal: IssueProposedAction) => Promise<IssueProposedAction>;
   onAcceptIssueExecution?: (proposal: IssueExecutionProposal, input: IssueExecutionApprovalInput) => Promise<IssueExecutionProposal>;
@@ -75,7 +75,7 @@ export function IssueConversation({
     attachmentReferences?: string[];
   }) => Promise<IssueMessageSendResult>;
   onUpdateSubscription?: (subscribed: boolean) => Promise<unknown>;
-  organizationId: string | null;
+  workspaceId: string | null;
   projectId: string;
   run: HuntRun;
   highlightedMessageId?: string | null;
@@ -218,7 +218,7 @@ export function IssueConversation({
     setLoading(true);
     setLoadError(null);
     try {
-      const snapshot = token && organizationId && projectId ? await loadIssueConversationSnapshot(token, projectId, requestedRunId) : null;
+      const snapshot = token && workspaceId && projectId ? await loadIssueConversationSnapshot(token, projectId, requestedRunId) : null;
       const loaded = snapshot?.messages ?? (await onLoadRef.current());
       if (mountedRef.current && activeRunIdRef.current === requestedRunId && messageLoadVersion.current === requestedVersion) {
         setMessages(current => mergeIssueMessages(current, loaded));
@@ -237,7 +237,7 @@ export function IssueConversation({
         setLoading(false);
       }
     }
-  }, [organizationId, projectId, reconcileAgentReplies, t, token]);
+  }, [workspaceId, projectId, reconcileAgentReplies, t, token]);
   const loadSkillExecutionContext = useCallback(async (proposal: AgentSkillExecutionProposal) => {
     if (!token) {
       return {
@@ -255,7 +255,7 @@ export function IssueConversation({
     void loadMessages();
   }, [loadMessages, run.id]);
   useEffect(() => {
-    if (!token || !organizationId || conversationCursor === null) return;
+    if (!token || !workspaceId || conversationCursor === null) return;
     let disposed = false;
     let syncing = false;
     let pending = false;
@@ -304,7 +304,7 @@ export function IssueConversation({
         continuationTimer = window.setTimeout(() => void sync(), 0);
       }
     };
-    const transport = createProjectRealtimeTransport(token, organizationId);
+    const transport = createProjectRealtimeTransport(token, workspaceId);
     const unsubscribe = transport.subscribe(notification => {
       if (notification.topic === "project" && notification.projectId === projectId && notification.cursor > (conversationCursorRef.current ?? -1)) {
         void sync();
@@ -334,7 +334,7 @@ export function IssueConversation({
       unsubscribe();
       transport.stop();
     };
-  }, [conversationCursor, inboxSyncSignal, loadMessages, organizationId, projectId, reconcileAgentReplies, run.id, token]);
+  }, [conversationCursor, inboxSyncSignal, loadMessages, workspaceId, projectId, reconcileAgentReplies, run.id, token]);
   const executionProposalStates = useMemo(() => {
     const runsById = new Map(executionRuns.map(candidate => [candidate.id, candidate]));
     runsById.set(run.id, run);
@@ -450,7 +450,7 @@ export function IssueConversation({
         email: member.email,
         image: member.image,
         role: member.role,
-        roleContext: "organization",
+        roleContext: "workspace",
         createdAt: member.createdAt
       });
     }

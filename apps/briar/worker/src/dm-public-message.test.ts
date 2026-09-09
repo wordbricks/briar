@@ -18,7 +18,7 @@ import { completeChannelReplyApplication } from "./worker-reply-completion-appli
 import type { ChannelReplyCompletionInput } from "./worker-reply-completion-mappers";
 import { executionWorkerBindingById } from "./workers";
 
-const organizationId = "da100000-0000-4000-8000-000000000001";
+const workspaceId = "da100000-0000-4000-8000-000000000001";
 const projectId = "da200000-0000-4000-8000-000000000001";
 const deviceId = "da300000-0000-4000-8000-000000000001";
 const workerId = "da400000-0000-4000-8000-000000000001";
@@ -45,14 +45,14 @@ describe("durable DM public messages", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'DM Public Message', 'dm-public-message-test', ?, ?)`,
-      ).bind(organizationId, createdAt, createdAt),
+      ).bind(workspaceId, createdAt, createdAt),
     ]);
     await db.batch([
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, createdAt, createdAt),
+      ).bind(workspaceId, ownerId, createdAt, createdAt),
       db.prepare(
         `insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
@@ -61,7 +61,7 @@ describe("durable DM public messages", () => {
       ).bind(
         projectId,
         ownerId,
-        organizationId,
+        workspaceId,
         "a".repeat(64),
         createdAt,
         createdAt,
@@ -73,7 +73,7 @@ describe("durable DM public messages", () => {
          ) values (?, ?, ?, 'DM Device', ?, 'online', ?, ?, ?)`,
       ).bind(
         deviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         "b".repeat(64),
         createdAt,
@@ -131,7 +131,7 @@ describe("durable DM public messages", () => {
     const triggerId = "db200000-0000-4000-8000-000000000001";
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "dm",
       dmKey: `dm:${ownerId}:${agentId}`,
       slug: "dm-public-message",
@@ -157,7 +157,7 @@ describe("durable DM public messages", () => {
       createdAt,
     });
     const [job] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       channelKind: "dm",
       triggerMessageId: triggerId,
@@ -178,11 +178,11 @@ describe("durable DM public messages", () => {
     const binding = await executionWorkerBindingById(db, deviceId, workerId);
     expect(binding).not.toBeNull();
     const worker = {
-      principal: { organizationId, deviceId, ownerUserId: ownerId },
+      principal: { workspaceId, deviceId, ownerUserId: ownerId },
       binding: binding!,
     };
     const claim = await claimNextChannelReplyWork({
-      input: { organizationId, workerId },
+      input: { workspaceId, workerId },
       db,
       env,
       authenticatedWorker: worker,
@@ -199,7 +199,7 @@ describe("durable DM public messages", () => {
       workerId,
       claim: {
         replyKind: "channel",
-        organizationId,
+        workspaceId,
         workId: job.id,
         runId: channelId,
         claimToken: claim!.claimToken,
@@ -297,7 +297,7 @@ describe("durable DM public messages", () => {
       workerId,
       claim: {
         replyKind: "channel",
-        organizationId,
+        workspaceId,
         workId: job.id,
         runId: channelId,
         claimToken: claim!.claimToken,

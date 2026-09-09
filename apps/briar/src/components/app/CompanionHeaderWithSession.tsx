@@ -2,10 +2,7 @@ import { useAtom, useAtomValue } from "@effect/atom-react";
 
 import { useI18n } from "../../i18n";
 import { companionPageAtom } from "../../state/navigation/atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { loadingAtom, userAtom } from "../../state/session/atoms";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 import { CompanionHeader } from "../CompanionHeader";
@@ -16,14 +13,14 @@ export interface CompanionHeaderWithSessionProps {
   readonly unreadInboxCount: number;
   readonly onMarkAllRead: () => void;
   readonly onLogout: () => void;
-  readonly onOrganizationChange: (organizationId: string) => void;
+  readonly onWorkspaceChange: (workspaceId: string) => void;
   readonly onTeamChange: (teamId: string) => void;
   readonly onRefresh: () => void;
   readonly onSettings: () => void;
 }
 
 /**
- * The companion header, wired to the store. The account, the organizations, the
+ * The companion header, wired to the store. The account, the workspaces, the
  * teams and the page the phone is on are all atoms, so switching tabs re-renders
  * this row instead of the shell that owns its callbacks.
  */
@@ -32,16 +29,16 @@ export function CompanionHeaderWithSession({
   unreadInboxCount,
   onMarkAllRead,
   onLogout,
-  onOrganizationChange,
+  onWorkspaceChange,
   onTeamChange,
   onRefresh,
   onSettings,
 }: CompanionHeaderWithSessionProps) {
   const { t } = useI18n();
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
   const loading = useAtomValue(loadingAtom);
-  const organizations = useAtomValue(organizationsAtom);
+  const workspaces = useAtomValue(workspacesAtom);
   const teams = useAtomValue(teamsAtom);
   const user = useAtomValue(userAtom);
   const [companionPage] = useAtom(companionPageAtom);
@@ -49,7 +46,7 @@ export function CompanionHeaderWithSession({
 
   return (
     <CompanionHeader
-      activeOrganizationId={activeOrganizationId}
+      activeWorkspaceId={activeWorkspaceId}
       activeProjectId={activeTeamId}
       loading={loading}
       onLogout={onLogout}
@@ -58,11 +55,11 @@ export function CompanionHeaderWithSession({
           ? onMarkAllRead
           : undefined
       }
-      onOrganizationChange={onOrganizationChange}
+      onWorkspaceChange={onWorkspaceChange}
       onProjectChange={onTeamChange}
       onRefresh={onRefresh}
       onSettings={onSettings}
-      organizations={organizations}
+      workspaces={workspaces}
       pageTitle={
         companionPage === "issues" && !hasOpenAgentSession
           ? t("companion.navTasks")

@@ -13,7 +13,7 @@ import { DmLearningError } from "./dm-memory-learning-validation";
 import { executionWorkerBindingById, executionWorkerDeviceSessionBindings, executionWorkerRuntime,
   executionWorkerDeviceSessionsQuery, workerStateAt } from "./workers";
 
-export type DmLearningClaimIdentity = { organizationId: string; workerId: string; deviceId: string; claimTokenHash: string; jobId: string };
+export type DmLearningClaimIdentity = { workspaceId: string; workerId: string; deviceId: string; claimTokenHash: string; jobId: string };
 const decodePolicy = Schema.decodeUnknownSync(DmLearningPolicy);
 /** Only the code-listed verified Agent providers are learnable; OpenRouter never is. */
 export const dmLearningVerifiedProviderSql = dmMemoryLearningVerifiedProviders
@@ -68,14 +68,14 @@ export async function requireDmLearningClaim(db: D1Database, identity: DmLearnin
       and space.organization_id = ? and ${dmLearningClaimCurrentSql}
       and job.expected_memory_revision = space.memory_revision
       and job.input_json is not null and job.input_hash is not null and ${dmLearningInputsCurrentSql}`)
-    .bind(identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.organizationId,
+    .bind(identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.workspaceId,
       now, now).first<DmLearningJobRow>();
   if (!row) {
     const stillAuthorized = await db.prepare(`select 1 from briar_dm_memory_jobs job
       join briar_dm_memory_spaces space on space.id = job.space_id
       where job.id = ? and job.claimed_worker_id = ? and job.claimed_device_id = ? and job.lease_token_hash = ?
         and space.organization_id = ? and ${dmLearningClaimCurrentSql}`)
-      .bind(identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.organizationId, now, now).first();
+      .bind(identity.jobId, identity.workerId, identity.deviceId, identity.claimTokenHash, identity.workspaceId, now, now).first();
     throw new DmLearningError(stillAuthorized ? "stale" : "scope_revoked");
   }
   const snapshot = Schema.decodeUnknownSync(DmLearningSnapshot)(JSON.parse(row.input_json!));
@@ -91,7 +91,7 @@ export async function failDmLearningClaim(db: D1Database, identity: DmLearningCl
     join briar_dm_memory_spaces space on space.id = job.space_id
     where job.id = ? and job.status = 'running' and job.lease_token_hash = ?
       and job.claimed_worker_id = ? and job.claimed_device_id = ? and space.organization_id = ?`)
-    .bind(identity.jobId, identity.claimTokenHash, identity.workerId, identity.deviceId, identity.organizationId)
+    .bind(identity.jobId, identity.claimTokenHash, identity.workerId, identity.deviceId, identity.workspaceId)
     .first<{ attempt: number; calls_used: number }>();
   if (!row) return false;
   // A spent daily budget is a calendar limit, not a defect: the job waits for
@@ -155,7 +155,7 @@ export async function renewDmLearningClaim(
 }
 
 export async function claimDmLearningJob(db: D1Database, input: {
-  organizationId: string; deviceId: string; workerId: string; projectId: string; now: string;
+  workspaceId: string; deviceId: string; workerId: string; projectId: string; now: string;
 }): Promise<ClaimedDmMemory | null> {
   const worker = await executionWorkerBindingById(db, input.deviceId, input.workerId);
   const capabilities = worker === null ? undefined : executionWorkerRuntime(worker).proto.capabilities;
@@ -163,8 +163,8 @@ export async function claimDmLearningJob(db: D1Database, input: {
   if (!worker || worker.project_id !== input.projectId || providers.length === 0 ||
     workerStateAt(worker.last_heartbeat_at, input.now, worker.state) !== "online" || worker.accepting_work !== 1 ||
     worker.readiness_state === "needs_attention") return null;
-  await scheduleDmLearningJobs(db, input.organizationId, input.now);
-  await reapDmLearningClaims(db, input.now, input.organizationId);
+  await scheduleDmLearningJobs(db, input.workspaceId, input.now);
+  await reapDmLearningClaims(db, input.now, input.workspaceId);
   const claimToken = `briar_memory_claim_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
   const claimTokenHash = await sha256(claimToken);
   const leaseExpiresAt = new Date(Date.parse(input.now) + 5 * 60_000).toISOString();
@@ -199,11 +199,11 @@ export async function claimDmLearningJob(db: D1Database, input: {
     returning *`)
     .bind(claimTokenHash, leaseExpiresAt, input.workerId, input.deviceId, ...providers, ...providers,
       dmMemoryCanonicalJson(dmLearningAgentPolicy(providers[0]!)), input.now, input.now,
-      input.organizationId, input.projectId, input.workerId, input.deviceId, input.organizationId,
+      input.workspaceId, input.projectId, input.workerId, input.deviceId, input.workspaceId,
       ...executionWorkerDeviceSessionBindings(input.deviceId, input.now)).all<DmLearningJobRow>();
   const claimed = result.results[0];
   if (!claimed) return null;
-  const identity = { organizationId: input.organizationId, deviceId: input.deviceId, workerId: input.workerId,
+  const identity = { workspaceId: input.workspaceId, deviceId: input.deviceId, workerId: input.workerId,
     claimTokenHash, jobId: claimed.id };
   try {
     const space = (await db.prepare("select * from briar_dm_memory_spaces where id = ?")
@@ -238,7 +238,7 @@ export async function claimDmLearningJob(db: D1Database, input: {
     ]);
     if (prepared.results.length !== 1) throw new DmLearningError("stale");
     await requireDmLearningClaim(db, identity, input.now);
-    return { workType: "dmMemory", workId: claimed.id, runId: claimed.id, organizationId: input.organizationId,
+    return { workType: "dmMemory", workId: claimed.id, runId: claimed.id, workspaceId: input.workspaceId,
       workerId: input.workerId, sourceKey: "dm-memory", title: "DM memory learning", claimToken,
       claimedAt: input.now, leaseExpiresAt, inputHash, snapshot };
   } catch (error) {

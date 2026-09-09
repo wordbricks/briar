@@ -7,7 +7,7 @@ import {
   MAX_CHANNEL_DELTA_PAGES_PER_SYNC,
 } from "../../lib/channel-realtime";
 import { channelInboxSyncSignalAtom } from "../inbox/atoms";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { adoptsHydratedCatalog } from "../persistence/hydration";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
@@ -26,8 +26,8 @@ import {
 export const CHANNEL_CATALOG_RETRY_MS = 3_000;
 
 /**
- * Keeps the active organization's channel catalog current: one snapshot per
- * organization, then a realtime subscription that pulls cursor deltas, with a
+ * Keeps the active workspace's channel catalog current: one snapshot per
+ * workspace, then a realtime subscription that pulls cursor deltas, with a
  * polling fallback while the subscription is down and a pause while the window
  * is hidden.
  *
@@ -44,7 +44,7 @@ export const CHANNEL_CATALOG_RETRY_MS = 3_000;
  */
 export function useChannelCatalogSync(): void {
   const registry = useRegistry();
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
   const token = useAtomValue(tokenAtom);
   const retry = useAtomValue(channelCatalogRetryAtom);
   const catalogLoaded = useAtomValue(channelCatalogCursorAtom) !== null;
@@ -63,39 +63,39 @@ export function useChannelCatalogSync(): void {
     that no view displays would defeat the point of the split.
   */
   const cursorRef = useRef(0);
-  /** The organization whose catalog is currently in the store, if any. */
-  const catalogOrganizationRef = useRef<string | null>(null);
+  /** The workspace whose catalog is currently in the store, if any. */
+  const catalogWorkspaceRef = useRef<string | null>(null);
 
   useEffect(() => {
     Atom.batch(() => {
-      const previousOrganizationId = catalogOrganizationRef.current;
+      const previousWorkspaceId = catalogWorkspaceRef.current;
       /*
         The catalog this run inherits is the one a stored snapshot put in the
-        store, so it is this organization's own list rather than the leftovers
+        store, so it is this workspace's own list rather than the leftovers
         of the previous one. Only the first run can inherit anything: after that
-        the ref names whichever organization the store holds.
+        the ref names whichever workspace the store holds.
       */
       const hydrated =
-        previousOrganizationId === null &&
-        adoptsHydratedCatalog(registry, organizationId);
+        previousWorkspaceId === null &&
+        adoptsHydratedCatalog(registry, workspaceId);
       for (const staleId of new Set(
-        [previousOrganizationId, organizationId].filter(
+        [previousWorkspaceId, workspaceId].filter(
           (value): value is string => value !== null,
         ),
       )) {
-        if (hydrated && staleId === organizationId) continue;
+        if (hydrated && staleId === workspaceId) continue;
         applySyncEvent(registry, {
           kind: "channel-catalog-cleared",
-          organizationId: staleId,
+          workspaceId: staleId,
         });
       }
-      catalogOrganizationRef.current = organizationId;
+      catalogWorkspaceRef.current = workspaceId;
       // Drops the open channel, the pending invite and the requested settings
       // dialog together with the catalog they referred to.
       resetChannelSelection(registry);
     });
     cursorRef.current = 0;
-    if (!organizationId || !token) {
+    if (!workspaceId || !token) {
       registry.set(channelsLoadingAtom, false);
       return;
     }
@@ -105,7 +105,7 @@ export function useChannelCatalogSync(): void {
     const api = resolveChannelApi(registry);
     registry.set(channelsLoadingAtom, true);
     void api
-      .listChannels(token, organizationId)
+      .listChannels(token, workspaceId)
       .then((result) => {
         if (cancelled) return;
         cursorRef.current = result.cursor;
@@ -116,7 +116,7 @@ export function useChannelCatalogSync(): void {
           registry.set(channelSidebarSectionsAtom, result.sidebarSections);
           applySyncEvent(registry, {
             kind: "channel-catalog-snapshot",
-            organizationId,
+            workspaceId,
             channels: result.channels,
           });
         });
@@ -137,17 +137,17 @@ export function useChannelCatalogSync(): void {
       cancelled = true;
       if (retryTimer !== null) window.clearTimeout(retryTimer);
     };
-  }, [organizationId, registry, retry, token]);
+  }, [workspaceId, registry, retry, token]);
 
   useEffect(() => {
-    if (!organizationId || !token || !catalogLoaded) return;
+    if (!workspaceId || !token || !catalogLoaded) return;
 
     let stopped = false;
     let inFlight = false;
     let pending = false;
     const abortController = new AbortController();
     const api = resolveChannelApi(registry);
-    const transport = api.createChannelRealtimeTransport(token, organizationId);
+    const transport = api.createChannelRealtimeTransport(token, workspaceId);
     const sync = async () => {
       pending = true;
       if (stopped || inFlight || document.hidden) return;
@@ -163,7 +163,7 @@ export function useChannelCatalogSync(): void {
             const requestedCursor = cursorRef.current;
             const delta = await api.loadChannelDelta(
               token,
-              organizationId,
+              workspaceId,
               requestedCursor,
               abortController.signal,
             );
@@ -171,7 +171,7 @@ export function useChannelCatalogSync(): void {
             cursorRef.current = delta.cursor;
             applySyncEvent(registry, {
               kind: "channel-catalog-delta",
-              organizationId,
+              workspaceId,
               channels: delta.channels,
               removedChannelIds: delta.removedChannelIds,
               reset: delta.reset,
@@ -219,5 +219,5 @@ export function useChannelCatalogSync(): void {
       document.removeEventListener("visibilitychange", updateVisibility);
       window.clearInterval(interval);
     };
-  }, [catalogLoaded, inboxSyncSignal, organizationId, registry, token]);
+  }, [catalogLoaded, inboxSyncSignal, workspaceId, registry, token]);
 }

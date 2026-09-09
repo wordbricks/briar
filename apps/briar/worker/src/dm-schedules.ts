@@ -56,7 +56,7 @@ export function dmScheduleTime(input: Pick<DmScheduleToolOperation,
 }
 
 export async function executeDmScheduleTool(db: D1Database, input: {
-  jobId: string; organizationId: string; channelId: string; workerId: string; deviceId: string;
+  jobId: string; workspaceId: string; channelId: string; workerId: string; deviceId: string;
   claimTokenHash: string; observedAt: string; operation: DmScheduleToolOperation;
 }) {
   const scope = await getDmPublicMessageClaim(db, input);
@@ -87,7 +87,7 @@ export async function executeDmScheduleTool(db: D1Database, input: {
       and json_extract(binding.runtime_proto_json, '$.capabilities.dmReplyRouting.protocol') = 1
       and exists (select 1 from json_each(binding.runtime_proto_json, '$.capabilities.dmReplyRouting.providers') where value = 'AGENT_PROVIDER_' || upper(replace(job.agent_provider, '-', '_'))))
       and (${dmScheduleReplyFenceCurrent("job")} and ${dmMemoryReplyFenceCurrent("job")}))`;
-  const claimArgs = [input.jobId, input.organizationId, input.channelId, input.workerId, input.deviceId,
+  const claimArgs = [input.jobId, input.workspaceId, input.channelId, input.workerId, input.deviceId,
     input.claimTokenHash, input.observedAt, scope.input_revision, scope.input_revision,
     scope.trigger_source_version, scope.roster_epoch, scope.owner_user_id];
   const permission = `with permission as materialized (select 1 where ${claim})`;

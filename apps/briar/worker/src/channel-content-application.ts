@@ -5,7 +5,7 @@ import { fetchChannelLinkPreview } from "./link-preview";
 
 type ChannelContentApplicationInput = {
   readonly db: D1Database;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly channelId: string;
   readonly userId: string;
 };
@@ -15,7 +15,7 @@ export async function getChannelMessageDocumentApplication(
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -33,7 +33,7 @@ export async function getChannelLinkPreviewApplication(
 ) {
   await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );

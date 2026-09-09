@@ -125,7 +125,14 @@ const persistCredential = async (
 ) => {
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporary, `${JSON.stringify(credential)}\n`, {
+    const stored = {
+      credential: credential.credential,
+      deviceId: credential.deviceId,
+      organizationId: credential.workspaceId,
+      managedComputerId: credential.managedComputerId,
+      apiOrigin: credential.apiOrigin,
+    };
+    await writeFile(temporary, `${JSON.stringify(stored)}\n`, {
       flag: "wx",
       mode: 0o600,
     });
@@ -170,6 +177,7 @@ export async function enrollManagedComputerFromInstance(
   const credential = decodeManagedComputerCredential({
     credential: response.credential,
     deviceId: response.deviceId,
+    // decodeManagedComputerCredential parses the on-disk shape.
     organizationId: response.workspaceId,
     managedComputerId: response.managedComputerId,
     apiOrigin: config.apiOrigin.origin,

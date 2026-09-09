@@ -11,7 +11,7 @@ import {
   disconnectGithubInstallationById,
   disconnectGithubInstallationsByAuthorizedUser,
   getGithubConnectionByInstallation,
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
   syncGithubConnectionRepositories,
 } from "./db";
@@ -55,10 +55,10 @@ const installationRepositoriesFetch = (
 
 describe("GitHub integration D1 state", () => {
   const db = env.DB;
-  const firstOrganizationId = "11111111-1111-4111-8111-111111111111";
-  const secondOrganizationId = "22222222-2222-4222-8222-222222222222";
-  const thirdOrganizationId = "33333333-3333-4333-8333-333333333333";
-  const fourthOrganizationId = "44444444-4444-4444-8444-444444444444";
+  const firstWorkspaceId = "11111111-1111-4111-8111-111111111111";
+  const secondWorkspaceId = "22222222-2222-4222-8222-222222222222";
+  const thirdWorkspaceId = "33333333-3333-4333-8333-333333333333";
+  const fourthWorkspaceId = "44444444-4444-4444-8444-444444444444";
   const ownerId = "github-integration-owner";
   const now = "2026-08-05T00:00:00.000Z";
 
@@ -74,10 +74,10 @@ describe("GitHub integration D1 state", () => {
                  'github-integration-session-token', ?, ?, ?)`,
     ).bind(now, now, ownerId).run();
     for (const [id, handle] of [
-      [firstOrganizationId, "github-first"],
-      [secondOrganizationId, "github-second"],
-      [thirdOrganizationId, "github-third"],
-      [fourthOrganizationId, "github-fourth"],
+      [firstWorkspaceId, "github-first"],
+      [secondWorkspaceId, "github-second"],
+      [thirdWorkspaceId, "github-third"],
+      [fourthWorkspaceId, "github-fourth"],
     ]) {
       await db.prepare(
         `insert into briar_organizations (
@@ -100,7 +100,7 @@ describe("GitHub integration D1 state", () => {
     const installHash = "a".repeat(64);
     await createGithubOAuthState(db, {
       stateHash: installHash,
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       userId: ownerId,
       pkceVerifier: "v".repeat(64),
       createdAt: now,
@@ -113,7 +113,7 @@ describe("GitHub integration D1 state", () => {
         "2026-08-05T00:05:00.000Z",
       ),
     ).resolves.toMatchObject({
-      organization_id: firstOrganizationId,
+      organization_id: firstWorkspaceId,
       installation_id: null,
     });
     await expect(
@@ -127,7 +127,7 @@ describe("GitHub integration D1 state", () => {
     const oauthHash = "b".repeat(64);
     await createGithubOAuthState(db, {
       stateHash: oauthHash,
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       userId: ownerId,
       pkceVerifier: "w".repeat(64),
       installationId: 101,
@@ -141,7 +141,7 @@ describe("GitHub integration D1 state", () => {
         "2026-08-05T00:05:00.000Z",
       ),
     ).resolves.toMatchObject({
-      organization_id: firstOrganizationId,
+      organization_id: firstWorkspaceId,
       installation_id: 101,
       pkce_verifier: "w".repeat(64),
     });
@@ -156,7 +156,7 @@ describe("GitHub integration D1 state", () => {
 
   it("stores a verified installation and fails closed on mapping conflicts", async () => {
     const connected = await connectGithubInstallation(db, {
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       installationId: 201,
       installationAccountId: 301,
       accountLogin: "example-org",
@@ -174,7 +174,7 @@ describe("GitHub integration D1 state", () => {
     });
     expect(connected.outcome).toBe("connected");
     await expect(
-      getGithubConnectionForOrganization(db, firstOrganizationId),
+      getGithubConnectionForWorkspace(db, firstWorkspaceId),
     ).resolves.toMatchObject({
       installation_id: 201,
       status: "connected",
@@ -207,7 +207,7 @@ describe("GitHub integration D1 state", () => {
     ]);
 
     await expect(connectGithubInstallation(db, {
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       installationId: 202,
       installationAccountId: 302,
       accountLogin: "other-org",
@@ -220,7 +220,7 @@ describe("GitHub integration D1 state", () => {
     })).resolves.toEqual({ outcome: "organization_conflict" });
 
     await expect(connectGithubInstallation(db, {
-      organizationId: secondOrganizationId,
+      workspaceId: secondWorkspaceId,
       installationId: 201,
       installationAccountId: 301,
       accountLogin: "example-org",
@@ -237,12 +237,12 @@ describe("GitHub integration D1 state", () => {
     await expect(
       disconnectGithubInstallation(
         db,
-        firstOrganizationId,
+        firstWorkspaceId,
         "2026-08-05T00:06:00.000Z",
       ),
     ).resolves.toBe(true);
     await expect(
-      getGithubConnectionForOrganization(db, firstOrganizationId),
+      getGithubConnectionForWorkspace(db, firstWorkspaceId),
     ).resolves.toBeNull();
     await expect(getGithubConnectionByInstallation(db, 201)).resolves
       .toMatchObject({
@@ -261,7 +261,7 @@ describe("GitHub integration D1 state", () => {
             if (!conflictInjected) {
               conflictInjected = true;
               await connectGithubInstallation(db, {
-                organizationId: fourthOrganizationId,
+                workspaceId: fourthWorkspaceId,
                 installationId: 230,
                 installationAccountId: 330,
                 accountLogin: "race-winner",
@@ -288,7 +288,7 @@ describe("GitHub integration D1 state", () => {
     }) as D1Database;
 
     await expect(connectGithubInstallation(racingDb, {
-      organizationId: thirdOrganizationId,
+      workspaceId: thirdWorkspaceId,
       installationId: 230,
       installationAccountId: 330,
       accountLogin: "race-loser",
@@ -306,7 +306,7 @@ describe("GitHub integration D1 state", () => {
     })).resolves.toEqual({ outcome: "installation_conflict" });
     await expect(getGithubConnectionByInstallation(db, 230)).resolves
       .toMatchObject({
-        organization_id: fourthOrganizationId,
+        organization_id: fourthWorkspaceId,
         account_login: "race-winner",
         status: "connected",
       });
@@ -320,7 +320,7 @@ describe("GitHub integration D1 state", () => {
 
   it("does not restore repository access when disconnect wins the race", async () => {
     await connectGithubInstallation(db, {
-      organizationId: thirdOrganizationId,
+      workspaceId: thirdWorkspaceId,
       installationId: 231,
       installationAccountId: 331,
       accountLogin: "disconnect-race",
@@ -375,12 +375,12 @@ describe("GitHub integration D1 state", () => {
   });
 
   it("tombstones every connection when a GitHub user revokes authorization", async () => {
-    for (const [organizationId, installationId] of [
-      [firstOrganizationId, 211],
-      [secondOrganizationId, 212],
+    for (const [workspaceId, installationId] of [
+      [firstWorkspaceId, 211],
+      [secondWorkspaceId, 212],
     ] as const) {
       await connectGithubInstallation(db, {
-        organizationId,
+        workspaceId,
         installationId,
         installationAccountId: installationId + 100,
         accountLogin: `account-${installationId}`,
@@ -409,7 +409,7 @@ describe("GitHub integration D1 state", () => {
     const createdAt = new Date();
     await createGithubOAuthState(db, {
       stateHash: await githubSha256Hex(state),
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       userId: ownerId,
       pkceVerifier: "x".repeat(64),
       createdAt: createdAt.toISOString(),
@@ -457,7 +457,7 @@ describe("GitHub integration D1 state", () => {
     const createdAt = new Date();
     await createGithubOAuthState(db, {
       stateHash: await githubSha256Hex(state),
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       userId: ownerId,
       pkceVerifier: "y".repeat(64),
       installationId: 902,
@@ -521,7 +521,7 @@ describe("GitHub integration D1 state", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.text()).toContain("GitHub 연결 완료");
     await expect(
-      getGithubConnectionForOrganization(db, firstOrganizationId),
+      getGithubConnectionForWorkspace(db, firstWorkspaceId),
     ).resolves.toMatchObject({
       installation_id: 902,
       account_login: "wordbricks",
@@ -556,7 +556,7 @@ describe("GitHub integration D1 state", () => {
     const integration = await getGithubIntegrationApplication({
       db,
       env: env as never,
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       userId: ownerId,
       fetchImpl: fetchImpl as never,
     });
@@ -586,7 +586,7 @@ describe("GitHub integration D1 state", () => {
     const integration = await getGithubIntegrationApplication({
       db,
       env: env as never,
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       userId: ownerId,
       fetchImpl: installationRepositoriesFetch([{
         id: 503,
@@ -609,7 +609,7 @@ describe("GitHub integration D1 state", () => {
     const integration = await getGithubIntegrationApplication({
       db,
       env: env as never,
-      organizationId: firstOrganizationId,
+      workspaceId: firstWorkspaceId,
       userId: ownerId,
       fetchImpl: vi.fn(async () =>
         Response.json({ message: "Bad credentials" }, { status: 401 })

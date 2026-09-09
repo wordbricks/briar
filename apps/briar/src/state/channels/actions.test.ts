@@ -5,7 +5,7 @@ import type {
   ChannelSidebarSection,
   ChannelSummary,
 } from "../../lib/channels-contract";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
@@ -17,7 +17,7 @@ import {
 } from "./actions";
 import {
   activeChannelIdAtom,
-  activeOrganizationChannelsAtom,
+  activeWorkspaceChannelsAtom,
   channelSidebarSectionsAtom,
   directMessageComposeAtom,
   initialChannelInviteIdAtom,
@@ -32,7 +32,7 @@ const channel = (
   overrides: Partial<ChannelSummary> = {},
 ): ChannelSummary => ({
   id,
-  organizationId: "org-a",
+  workspaceId: "org-a",
   kind: "channel",
   slug: id,
   name: id,
@@ -62,7 +62,7 @@ const section = (
   overrides: Partial<ChannelSidebarSection> = {},
 ): ChannelSidebarSection => ({
   id,
-  organizationId: "org-a",
+  workspaceId: "org-a",
   name: id,
   position: 0,
   createdAt: "2026-01-01T00:00:00.000Z",
@@ -178,7 +178,7 @@ interface Navigations {
   readonly channels: {
     channelId: string;
     page: ChannelNavigationPage;
-    organizationId?: string | null;
+    workspaceId?: string | null;
   }[];
   readonly pages: ActivePage[];
 }
@@ -189,20 +189,20 @@ const harness = (
 ) => {
   const server = new ChannelServer();
   const registry: AtomRegistry = createTestRegistry([
-    [activeOrganizationIdAtom, "org-a"],
+    [activeWorkspaceIdAtom, "org-a"],
     [tokenAtom, "token-1"],
     [lockedTeamIdAtom, lockedTeamId],
     [channelApiAtom, server.api],
   ]);
   applySyncEvent(registry, {
     kind: "channel-catalog-snapshot",
-    organizationId: "org-a",
+    workspaceId: "org-a",
     channels,
   });
   const navigations: Navigations = { channels: [], pages: [] };
   setChannelNavigationBridge(registry, {
-    navigateToChannel: (channelId, page, organizationId) =>
-      navigations.channels.push({ channelId, page, organizationId }),
+    navigateToChannel: (channelId, page, workspaceId) =>
+      navigations.channels.push({ channelId, page, workspaceId }),
     navigateToPage: (page) => navigations.pages.push(page),
   });
   return {
@@ -219,9 +219,9 @@ describe("channel actions", () => {
       channel("general", { hasUnread: true, lastMessageAt: "2026-02-01T00:00:00.000Z" }),
     ]);
 
-    actions.markOrganizationChannelRead("general");
+    actions.markWorkspaceChannelRead("general");
 
-    const [read] = registry.get(activeOrganizationChannelsAtom);
+    const [read] = registry.get(activeWorkspaceChannelsAtom);
     expect(read?.hasUnread).toBe(false);
     expect(read?.lastReadAt).not.toBeNull();
     expect(server.reads).toHaveLength(1);
@@ -229,21 +229,21 @@ describe("channel actions", () => {
 
   it("does nothing for a channel that carries no unread", () => {
     const { actions, server } = harness([channel("general")]);
-    actions.markOrganizationChannelRead("general");
+    actions.markWorkspaceChannelRead("general");
     expect(server.reads).toEqual([]);
   });
 
   it("creates a channel, sorts it into the list and opens it", async () => {
     const { actions, navigations, registry } = harness([channel("zeta")]);
 
-    await actions.createOrganizationChannel("alpha", "public", null);
+    await actions.createWorkspaceChannel("alpha", "public", null);
 
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["alpha", "zeta"]);
     expect(registry.get(initialChannelInviteIdAtom)).toBe("alpha");
     expect(navigations.channels).toEqual([
-      { channelId: "alpha", page: "channels", organizationId: "org-a" },
+      { channelId: "alpha", page: "channels", workspaceId: "org-a" },
     ]);
   });
 
@@ -253,8 +253,8 @@ describe("channel actions", () => {
       channel("dm-1", { kind: "dm" }),
     ]);
 
-    actions.openOrganizationChannel("general");
-    actions.openOrganizationChannel("dm-1");
+    actions.openWorkspaceChannel("general");
+    actions.openWorkspaceChannel("dm-1");
 
     expect(navigations.channels.map((item) => item.page)).toEqual([
       "channels",
@@ -302,16 +302,16 @@ describe("channel actions", () => {
       { lockedTeamId: "team-a" },
     );
 
-    actions.openOrganizationChannel("other");
+    actions.openWorkspaceChannel("other");
     expect(navigations.channels).toEqual([]);
 
-    actions.openOrganizationChannel("pinned");
+    actions.openWorkspaceChannel("pinned");
     expect(navigations.channels).toHaveLength(1);
   });
 
   it("arms the settings dialog before opening a channel", () => {
     const { actions, registry } = harness([channel("general")]);
-    actions.openOrganizationChannelSettings("general");
+    actions.openWorkspaceChannelSettings("general");
     expect(registry.get(requestedChannelSettingsIdAtom)).toBe("general");
   });
 
@@ -328,11 +328,11 @@ describe("channel actions", () => {
       rootMessageId: "message-1",
     });
 
-    await actions.deleteOrganizationChannel("general");
+    await actions.deleteWorkspaceChannel("general");
 
     expect(server.deleted).toEqual(["general"]);
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["other"]);
     expect(registry.get(activeChannelIdAtom)).toBeNull();
     expect(registry.get(requestedChannelSettingsIdAtom)).toBeNull();
@@ -347,7 +347,7 @@ describe("channel actions", () => {
     ]);
     registry.set(activeChannelIdAtom, "other");
 
-    await actions.deleteOrganizationChannel("general");
+    await actions.deleteWorkspaceChannel("general");
 
     expect(registry.get(activeChannelIdAtom)).toBe("other");
     expect(navigations.pages).toEqual([]);
@@ -370,11 +370,11 @@ describe("channel actions", () => {
       channel("general", { hasUnread: true }),
     ]);
 
-    actions.replaceOrganizationChannels((current) =>
+    actions.replaceWorkspaceChannels((current) =>
       current.map((item) => ({ ...item, hasUnread: false })),
     );
 
-    expect(registry.get(activeOrganizationChannelsAtom)[0]?.hasUnread).toBe(
+    expect(registry.get(activeWorkspaceChannelsAtom)[0]?.hasUnread).toBe(
       false,
     );
   });
@@ -389,7 +389,7 @@ describe("direct message sidebar actions", () => {
 
     await actions.setDirectMessagePinned("dm-1", true);
     expect(server.preferences).toEqual([{ channelId: "dm-1", pinned: true }]);
-    expect(registry.get(activeOrganizationChannelsAtom)[0]?.pinnedAt).not
+    expect(registry.get(activeWorkspaceChannelsAtom)[0]?.pinnedAt).not
       .toBeNull();
 
     await actions.setDirectMessageHidden("dm-1", true);
@@ -397,7 +397,7 @@ describe("direct message sidebar actions", () => {
       channelId: "dm-1",
       hidden: true,
     });
-    expect(registry.get(activeOrganizationChannelsAtom)[0]?.hiddenAt).not
+    expect(registry.get(activeWorkspaceChannelsAtom)[0]?.hiddenAt).not
       .toBeNull();
 
     await actions.moveDirectMessageToSection("dm-1", "section-1");
@@ -406,7 +406,7 @@ describe("direct message sidebar actions", () => {
       section: "section-1",
     });
     expect(
-      registry.get(activeOrganizationChannelsAtom)[0]?.sidebarSectionId,
+      registry.get(activeWorkspaceChannelsAtom)[0]?.sidebarSectionId,
     ).toBe("section-1");
 
     // Unassigned is an explicit null rather than an omitted field, so the
@@ -442,7 +442,7 @@ describe("direct message sidebar actions", () => {
     // The conversation that was filed there is Unassigned now.
     expect(
       registry
-        .get(activeOrganizationChannelsAtom)
+        .get(activeWorkspaceChannelsAtom)
         .map((item) => item.sidebarSectionId),
     ).toEqual([null, null]);
   });
@@ -453,7 +453,7 @@ describe("direct message sidebar actions", () => {
     await actions.markDirectMessageUnread("dm-1");
 
     expect(server.unread).toEqual(["dm-1"]);
-    expect(registry.get(activeOrganizationChannelsAtom)[0]?.hasUnread).toBe(
+    expect(registry.get(activeWorkspaceChannelsAtom)[0]?.hasUnread).toBe(
       true,
     );
   });
@@ -469,7 +469,7 @@ describe("direct message sidebar actions", () => {
 
     expect(server.deleted).toEqual(["dm-1"]);
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["dm-2"]);
     expect(registry.get(activeChannelIdAtom)).toBeNull();
     // The DM page opens the next conversation by itself, so the lobby is the

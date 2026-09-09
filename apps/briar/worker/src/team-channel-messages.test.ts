@@ -13,7 +13,7 @@ import {
 } from "./channels";
 
 describe("Project Agent channel message history", () => {
-  const organizationId = "11000000-0000-4000-8000-000000000001";
+  const workspaceId = "11000000-0000-4000-8000-000000000001";
   const projectId = "22000000-0000-4000-8000-000000000001";
   const otherProjectId = "22000000-0000-4000-8000-000000000002";
   const ownerId = "project-channel-history-owner";
@@ -47,19 +47,19 @@ describe("Project Agent channel message history", () => {
       ).bind(ownerId, at(0), at(0)),
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
-         values (?, 'History Organization', 'history-organization', ?, ?)`,
-      ).bind(organizationId, at(0), at(0)),
+         values (?, 'History Workspace', 'history-workspace', ?, ?)`,
+      ).bind(workspaceId, at(0), at(0)),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, at(0), at(0)),
+      ).bind(workspaceId, ownerId, at(0), at(0)),
       db.prepare(
         `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'History Project', ?, ?, ?)`,
-      ).bind(projectId, ownerId, organizationId, tokenHash(token), at(0), at(0)),
+      ).bind(projectId, ownerId, workspaceId, tokenHash(token), at(0), at(0)),
       db.prepare(
         `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
@@ -68,7 +68,7 @@ describe("Project Agent channel message history", () => {
       ).bind(
         otherProjectId,
         ownerId,
-        organizationId,
+        workspaceId,
         "f".repeat(64),
         at(0),
         at(0),
@@ -79,11 +79,11 @@ describe("Project Agent channel message history", () => {
            responsibility, created_at, updated_at
          ) values (?, ?, ?, 'History Agent', 'codex',
                    'Read authorized history', ?, ?)`,
-      ).bind(agentId, organizationId, projectId, at(0), at(0)),
+      ).bind(agentId, workspaceId, projectId, at(0), at(0)),
     ]);
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "agent-history",
@@ -159,10 +159,10 @@ describe("Project Agent channel message history", () => {
            ) values (?, ?, ?, ?, ?, 'history.png', 'image/png', 42, ?)`,
       ).bind(
         "88000000-0000-4000-8000-000000000001",
-        organizationId,
+        workspaceId,
         channelId,
         rootIds[3],
-        `channel-attachments/${organizationId}/${channelId}/${rootIds[3]}/history.png`,
+        `channel-attachments/${workspaceId}/${channelId}/${rootIds[3]}/history.png`,
         at(4),
       ),
     ]);

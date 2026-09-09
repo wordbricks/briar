@@ -25,7 +25,7 @@ import {
   createManagedComputerRemoteSession,
   endManagedComputerRemoteSession,
   loadManagedComputers,
-  loadOrganizationExecutionWorkers,
+  loadWorkspaceExecutionWorkers,
   loadProjectAgents,
 } from "../lib/api";
 import { findApiError } from "../lib/api/errors";
@@ -84,7 +84,7 @@ export type DmComputerPanelServices = {
   loadComputers: typeof loadManagedComputers;
   loadProjectAgents: typeof loadProjectAgents;
   loadRfbClient: () => Promise<DmComputerRfbConstructor>;
-  loadWorkers: typeof loadOrganizationExecutionWorkers;
+  loadWorkers: typeof loadWorkspaceExecutionWorkers;
 };
 
 const defaultServices: DmComputerPanelServices = {
@@ -93,12 +93,12 @@ const defaultServices: DmComputerPanelServices = {
   loadComputers: loadManagedComputers,
   loadProjectAgents,
   loadRfbClient: async () => (await import("@novnc/novnc")).default,
-  loadWorkers: loadOrganizationExecutionWorkers,
+  loadWorkers: loadWorkspaceExecutionWorkers,
 };
 
 function useDmAgentComputerTarget(input: {
   agents: readonly ChannelAgentSummary[];
-  organizationId: string;
+  workspaceId: string;
   services: DmComputerPanelServices;
   token: string;
 }) {
@@ -126,8 +126,8 @@ function useDmAgentComputerTarget(input: {
       eligibleAgents.flatMap((agent) => agent.projectId ?? []),
     )];
     void Promise.all([
-      input.services.loadWorkers(input.token, input.organizationId),
-      input.services.loadComputers(input.token, input.organizationId),
+      input.services.loadWorkers(input.token, input.workspaceId),
+      input.services.loadComputers(input.token, input.workspaceId),
       Promise.all(projectIds.map((projectId) =>
         input.services.loadProjectAgents(input.token, projectId)
       )),
@@ -148,7 +148,7 @@ function useDmAgentComputerTarget(input: {
     return () => {
       cancelled = true;
     };
-  }, [eligibleAgents, input.organizationId, input.services, input.token]);
+  }, [eligibleAgents, input.workspaceId, input.services, input.token]);
 
   return target;
 }
@@ -157,7 +157,7 @@ function DmComputerScreen({
   id,
   onClose,
   open,
-  organizationId,
+  workspaceId,
   services,
   target,
   token,
@@ -165,7 +165,7 @@ function DmComputerScreen({
   id?: string;
   onClose?: () => void;
   open: boolean;
-  organizationId: string;
+  workspaceId: string;
   services: DmComputerPanelServices;
   target: DmAgentComputerTarget;
   token: string;
@@ -268,7 +268,7 @@ function DmComputerScreen({
         try {
           ticket = await services.createRemoteSession(
             token,
-            organizationId,
+            workspaceId,
             target.computer.id,
             {
               requestId: crypto.randomUUID(),
@@ -293,7 +293,7 @@ function DmComputerScreen({
       if (generation !== generationRef.current || !targetRef.current) {
         void services.endRemoteSession(
           token,
-          organizationId,
+          workspaceId,
           target.computer.id,
           ticket.session.id,
         ).catch(() => undefined);
@@ -348,7 +348,7 @@ function DmComputerScreen({
   }, [
     clipboardController,
     destroyRfb,
-    organizationId,
+    workspaceId,
     services,
     releaseControl,
     storageKey,
@@ -372,7 +372,7 @@ function DmComputerScreen({
       if (sessionId) {
         void services.endRemoteSession(
           token,
-          organizationId,
+          workspaceId,
           target.computer.id,
           sessionId,
         ).catch(() => undefined);
@@ -381,7 +381,7 @@ function DmComputerScreen({
   }, [
     connect,
     destroyRfb,
-    organizationId,
+    workspaceId,
     services,
     storageKey,
     target.computer.id,
@@ -735,7 +735,7 @@ export function DmComputerPanel({
   onAvailabilityChange,
   onClose,
   open = true,
-  organizationId,
+  workspaceId,
   services = defaultServices,
   token,
 }: {
@@ -744,13 +744,13 @@ export function DmComputerPanel({
   onAvailabilityChange?: (available: boolean) => void;
   onClose?: () => void;
   open?: boolean;
-  organizationId: string;
+  workspaceId: string;
   services?: DmComputerPanelServices;
   token: string;
 }) {
   const target = useDmAgentComputerTarget({
     agents,
-    organizationId,
+    workspaceId,
     services,
     token,
   });
@@ -764,7 +764,7 @@ export function DmComputerPanel({
       id={id}
       onClose={onClose}
       open={open}
-      organizationId={organizationId}
+      workspaceId={workspaceId}
       services={services}
       target={target}
       token={token}

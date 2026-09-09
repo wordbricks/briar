@@ -38,7 +38,7 @@ import {
   notificationReasonFromProto,
   optionalAgentProviderFromProto,
   optionalTimestamp,
-  organizationMemberFromProto,
+  workspaceMemberFromProto,
   relatedMessageFromProto,
   requiredMessage,
   requiredTimestamp,
@@ -416,7 +416,7 @@ export async function getDashboard(
       agentProviderFromProto,
     ),
     executionPolicy: executionPolicyFromProto(response.executionPolicy),
-    members: response.members.map(organizationMemberFromProto),
+    members: response.members.map(workspaceMemberFromProto),
     conversationNotifications: response.conversationNotifications.map(
       conversationNotificationFromProto,
     ),
@@ -520,7 +520,7 @@ export async function syncDashboard(
       agentProviderFromProto,
     ),
     executionPolicy: executionPolicyFromProto(response.executionPolicy),
-    members: response.members?.values.map(organizationMemberFromProto),
+    members: response.members?.values.map(workspaceMemberFromProto),
     conversationNotifications: response.conversationNotifications?.values.map(
       conversationNotificationFromProto,
     ),

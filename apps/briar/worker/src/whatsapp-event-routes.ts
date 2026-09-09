@@ -1,7 +1,7 @@
-import { createOrganizationChannelMessage } from "./channel-message-routes";
+import { createWorkspaceChannelMessage } from "./channel-message-routes";
 import { HttpError, json } from "./http-response";
-import { createOrganizationDirectMessage } from "./organization-channel-routes";
-import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
+import { createWorkspaceDirectMessage } from "./workspace-channel-routes";
+import { flushWorkspaceInboxRealtimeOutbox } from "./realtime-scheduling";
 import { sha256 } from "./crypto-digest";
 import {
   decodeWhatsAppWebhookMessages,
@@ -88,17 +88,17 @@ async function processWhatsAppMessage(
       await completeWhatsAppEvent(env.DB, connection.id, message.wamid, observedAt);
       return;
     }
-    const directMessage = await createOrganizationDirectMessage({
+    const directMessage = await createWorkspaceDirectMessage({
       db: env.DB,
-      organizationId: connection.organization_id,
+      workspaceId: connection.organization_id,
       userId: link.user_id,
       request: { memberIds: [], agentIds: [connection.agent_id] },
     });
-    await createOrganizationChannelMessage({
+    await createWorkspaceChannelMessage({
       db: env.DB,
       env,
       context,
-      organizationId: connection.organization_id,
+      workspaceId: connection.organization_id,
       channelId: directMessage.channel.id,
       userId: link.user_id,
       request: {
@@ -133,7 +133,7 @@ async function processWhatsAppMessages(
     messages.map((message) => processWhatsAppMessage(env, message, context)),
   );
   await Promise.all([
-    flushOrganizationInboxRealtimeOutbox(env, env.DB),
+    flushWorkspaceInboxRealtimeOutbox(env, env.DB),
     flushWhatsAppOutbox(env, env.DB),
   ]);
 }

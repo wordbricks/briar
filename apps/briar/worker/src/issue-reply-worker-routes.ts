@@ -221,7 +221,7 @@ export async function claimNextIssueReplyWork(input: {
         activity: env.CHANNEL_ACTIVITY_REALTIME
           ? await issueActivityCredential(
               env,
-              authenticatedWorker.principal.organizationId,
+              authenticatedWorker.principal.workspaceId,
               job,
               {
                 workerId: authenticatedWorker.binding.id,

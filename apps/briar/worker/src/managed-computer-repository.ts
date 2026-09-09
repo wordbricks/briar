@@ -59,37 +59,37 @@ const computerWithDeviceLabelSql = `select computer.*, device.label as device_la
 
 export async function organizationManagedComputer(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   managedComputerId: string,
 ) {
   return db.prepare(
     `${computerWithDeviceLabelSql}
      where computer.id = ? and computer.organization_id = ?`,
-  ).bind(managedComputerId, organizationId).first<ManagedComputerRow>();
+  ).bind(managedComputerId, workspaceId).first<ManagedComputerRow>();
 }
 
-export async function listOrganizationManagedComputers(
+export async function listWorkspaceManagedComputers(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const result = await db.prepare(
     `${computerWithDeviceLabelSql}
      where computer.organization_id = ? and computer.state != 'terminated'
      order by computer.created_at desc, computer.id`,
-  ).bind(organizationId).all<ManagedComputerRow>();
+  ).bind(workspaceId).all<ManagedComputerRow>();
   return result.results ?? [];
 }
 
 export async function sandboxManagedComputerByDevice(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   deviceId: string,
 ) {
   return db.prepare(
     `${computerWithDeviceLabelSql}
      where computer.organization_id = ? and computer.briar_device_id = ?
        and computer.provider = 'sandbox'`,
-  ).bind(organizationId, deviceId).first<ManagedComputerRow>();
+  ).bind(workspaceId, deviceId).first<ManagedComputerRow>();
 }
 
 /**
@@ -105,7 +105,7 @@ export async function createSandboxManagedComputer(
   input: {
     managedComputerId: string;
     entitlementId: string;
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     deviceId: string;
     apiOrigin: string;
@@ -118,12 +118,12 @@ export async function createSandboxManagedComputer(
   const owned = await db.prepare(
     `select 1 as present from briar_execution_worker_devices
      where id = ? and organization_id = ? and owner_user_id = ?`,
-  ).bind(input.deviceId, input.organizationId, input.userId)
+  ).bind(input.deviceId, input.workspaceId, input.userId)
     .first<{ present: number }>();
   if (owned?.present !== 1) return null;
   const existing = await sandboxManagedComputerByDevice(
     db,
-    input.organizationId,
+    input.workspaceId,
     input.deviceId,
   );
   if (existing) {
@@ -142,7 +142,7 @@ export async function createSandboxManagedComputer(
       input.observedAt,
       existing.id,
     ).run();
-    return sandboxManagedComputerByDevice(db, input.organizationId, input.deviceId);
+    return sandboxManagedComputerByDevice(db, input.workspaceId, input.deviceId);
   }
   const requestId = `sandbox:${input.deviceId}`;
   const farFuture = "9999-12-31T00:00:00.000Z";
@@ -154,7 +154,7 @@ export async function createSandboxManagedComputer(
        ) values (?, ?, ?, 'free_promotion', ?, ?, 'approved', ?, null, ?, ?)`,
     ).bind(
       input.entitlementId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       requestId,
       requestId,
@@ -179,7 +179,7 @@ export async function createSandboxManagedComputer(
        )`,
     ).bind(
       input.managedComputerId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.entitlementId,
       input.apiOrigin,
@@ -193,19 +193,19 @@ export async function createSandboxManagedComputer(
       farFuture,
       input.observedAt,
       input.deviceId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
     ),
   ]);
-  return sandboxManagedComputerByDevice(db, input.organizationId, input.deviceId);
+  return sandboxManagedComputerByDevice(db, input.workspaceId, input.deviceId);
 }
 
 export async function deleteSandboxManagedComputer(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   deviceId: string,
 ) {
-  const existing = await sandboxManagedComputerByDevice(db, organizationId, deviceId);
+  const existing = await sandboxManagedComputerByDevice(db, workspaceId, deviceId);
   if (!existing) return null;
   await db.batch([
     db.prepare(`delete from briar_managed_computers where id = ?`).bind(existing.id),
@@ -217,7 +217,7 @@ export async function deleteSandboxManagedComputer(
 
 export async function managedComputerApplicationByRequest(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   requestId: string,
 ) {
   return db.prepare(
@@ -226,13 +226,13 @@ export async function managedComputerApplicationByRequest(
      join briar_managed_computers computer
        on computer.entitlement_id = entitlement.id
      where entitlement.organization_id = ? and entitlement.request_id = ?`,
-  ).bind(organizationId, requestId).first<ManagedComputerRow>();
+  ).bind(workspaceId, requestId).first<ManagedComputerRow>();
 }
 
 export async function managedComputerCapacity(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     campaignId: string;
     organizationLimit: number;
@@ -255,12 +255,12 @@ export async function managedComputerCapacity(
          where organization_id = ? and campaign_id = ?
        ) as organization_redeemed`,
   ).bind(
-    input.organizationId,
+    input.workspaceId,
     ...activeStates,
     ...activeStates,
     input.userId,
     input.campaignId,
-    input.organizationId,
+    input.workspaceId,
     input.campaignId,
   ).first<{
     organization_count: number;
@@ -291,7 +291,7 @@ export async function recordManagedComputerAuditEvent(
   db: D1Database,
   input: {
     id?: string;
-    organizationId: string;
+    workspaceId: string;
     managedComputerId?: string | null;
     actorUserId?: string | null;
     action:
@@ -322,7 +322,7 @@ export async function recordManagedComputerAuditEvent(
      ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     input.id ?? crypto.randomUUID(),
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId ?? null,
     input.actorUserId ?? null,
     input.action,
@@ -339,7 +339,7 @@ export async function createPromotionalManagedComputer(
     managedComputerId: string;
     provisioningJobId: string;
     workflowInstanceId: string;
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     campaignId: string;
     requestId: string;
@@ -382,7 +382,7 @@ export async function createPromotionalManagedComputer(
        on conflict (organization_id, request_id) do nothing`,
     ).bind(
       input.entitlementId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.campaignId,
       input.requestId,
@@ -391,14 +391,14 @@ export async function createPromotionalManagedComputer(
       input.observedAt,
       input.observedAt,
       input.campaignId,
-      input.organizationId,
+      input.workspaceId,
       ...activeStates,
       input.organizationLimit,
       ...activeStates,
       input.fleetLimit,
       input.userId,
       input.campaignId,
-      input.organizationId,
+      input.workspaceId,
       input.campaignId,
     ),
     db.prepare(
@@ -416,7 +416,7 @@ export async function createPromotionalManagedComputer(
        )`,
     ).bind(
       input.managedComputerId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.entitlementId,
       input.region,
@@ -432,7 +432,7 @@ export async function createPromotionalManagedComputer(
       input.expiresAt,
       input.observedAt,
       input.entitlementId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
     ),
     db.prepare(
@@ -444,7 +444,7 @@ export async function createPromotionalManagedComputer(
        where exists (select 1 from briar_managed_computers where id = ?)`,
     ).bind(
       crypto.randomUUID(),
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.managedComputerId,
       input.campaignId,
@@ -463,7 +463,7 @@ export async function createPromotionalManagedComputer(
       input.provisioningJobId,
       input.managedComputerId,
       input.workflowInstanceId,
-      `application:${input.organizationId}:${input.requestId}`,
+      `application:${input.workspaceId}:${input.requestId}`,
       input.observedAt,
       input.observedAt,
       input.managedComputerId,
@@ -478,7 +478,7 @@ export async function createPromotionalManagedComputer(
          where exists (select 1 from briar_managed_computers where id = ?)`,
       ).bind(
         crypto.randomUUID(),
-        input.organizationId,
+        input.workspaceId,
         input.managedComputerId,
         input.userId,
         action,
@@ -639,7 +639,7 @@ export async function failManagedComputerProvisioning(
   ]);
   if ((computerResult.meta.changes ?? 0) > 0) {
     await recordManagedComputerAuditEvent(db, {
-      organizationId: computer.organization_id,
+      workspaceId: computer.organization_id,
       managedComputerId: computer.id,
       action: "provisioning_failed",
       detail: { code: input.code, detail },
@@ -652,7 +652,7 @@ export async function createManagedComputerRetry(
   db: D1Database,
   input: {
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     actorUserId: string;
     requestId: string;
     provisioningJobId: string;
@@ -683,7 +683,7 @@ export async function createManagedComputerRetry(
   }
   const computer = await organizationManagedComputer(
     db,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
   );
   if (!computer || computer.state !== "failed") {
@@ -719,7 +719,7 @@ export async function createManagedComputerRetry(
       input.enrollmentExpiresAt,
       input.observedAt,
       input.managedComputerId,
-      input.organizationId,
+      input.workspaceId,
       computer.retry_count,
     ),
     db.prepare(
@@ -747,7 +747,7 @@ export async function createManagedComputerRetry(
   const job = await managedComputerProvisioningJob(db, input.provisioningJobId);
   if (!job) return null;
   await recordManagedComputerAuditEvent(db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     managedComputerId: input.managedComputerId,
     actorUserId: input.actorUserId,
     action: "retry_requested",
@@ -878,7 +878,7 @@ export async function enrollManagedComputerDevice(
   ]);
   if (newEnrollmentIdentity) {
     await recordManagedComputerAuditEvent(db, {
-      organizationId: computer.organization_id,
+      workspaceId: computer.organization_id,
       managedComputerId: computer.id,
       action: "enrolled",
       detail: {
@@ -930,7 +930,7 @@ export async function createManagedComputerSetupSessionRecord(
   input: {
     id: string;
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     requestedByUserId: string;
     requestId: string;
@@ -957,7 +957,7 @@ export async function createManagedComputerSetupSessionRecord(
   ).bind(
     input.id,
     input.managedComputerId,
-    input.organizationId,
+    input.workspaceId,
     input.projectId,
     input.requestedByUserId,
     input.requestId,
@@ -967,7 +967,7 @@ export async function createManagedComputerSetupSessionRecord(
     input.observedAt,
     input.projectId,
     input.managedComputerId,
-    input.organizationId,
+    input.workspaceId,
   ).run();
   return managedComputerSetupSessionByRequest(
     db,
@@ -982,7 +982,7 @@ export async function bindManagedComputerSetupSession(
     setupSessionId: string;
     setupTokenHash: string;
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     runtime: WorkerRuntimeMetadata;
     observedAt: string;
@@ -1031,8 +1031,8 @@ export async function bindManagedComputerSetupSession(
       input.setupTokenHash,
       input.observedAt,
       input.managedComputerId,
-      input.organizationId,
-      input.organizationId,
+      input.workspaceId,
+      input.workspaceId,
       input.deviceId,
     ),
     db.prepare(
@@ -1058,7 +1058,7 @@ export async function bindManagedComputerSetupSession(
       input.setupTokenHash,
       input.observedAt,
       input.managedComputerId,
-      input.organizationId,
+      input.workspaceId,
       input.deviceId,
     ),
   ]);
@@ -1113,7 +1113,7 @@ export async function refreshManagedComputerReadiness(
   const computer = await managedComputerById(db, managedComputerId);
   if (computer && (result.meta.changes ?? 0) > 0) {
     await recordManagedComputerAuditEvent(db, {
-      organizationId: computer.organization_id,
+      workspaceId: computer.organization_id,
       managedComputerId: computer.id,
       action: "ready",
       detail: { deviceId: computer.briar_device_id },
@@ -1181,15 +1181,15 @@ async function transitionManagedComputerToDraining(
   db: D1Database,
   input: {
     managedComputerId: string;
-    organizationId?: string;
+    workspaceId?: string;
     fromStates: readonly ManagedComputerState[];
     observedAt: string;
   },
 ) {
   const stateSql = input.fromStates.map(() => "?").join(", ");
-  const organizationSql = input.organizationId ? "and organization_id = ?" : "";
-  const organizationBindings = input.organizationId
-    ? [input.organizationId]
+  const organizationSql = input.workspaceId ? "and organization_id = ?" : "";
+  const organizationBindings = input.workspaceId
+    ? [input.workspaceId]
     : [];
   const [computer] = await db.batch([
     db.prepare(
@@ -1235,7 +1235,7 @@ export function beginManagedComputerRetirement(
   db: D1Database,
   input: {
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     observedAt: string;
   },
 ) {

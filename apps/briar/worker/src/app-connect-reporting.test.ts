@@ -9,7 +9,7 @@ import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
 const hiddenProjectId = "33333333-3333-4333-8333-333333333333";
 const runId = "44444444-4444-4444-8444-444444444444";
@@ -72,17 +72,17 @@ describe("ReportingService", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Reporting', 'reporting', ?, ?)`,
-      ).bind(organizationId, observedAt, observedAt),
+      ).bind(workspaceId, observedAt, observedAt),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, observedAt, observedAt),
+      ).bind(workspaceId, ownerId, observedAt, observedAt),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'developer', ?, ?)`,
-      ).bind(organizationId, developerId, observedAt, observedAt),
+      ).bind(workspaceId, developerId, observedAt, observedAt),
       db.prepare(
         `insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
@@ -91,7 +91,7 @@ describe("ReportingService", () => {
       ).bind(
         projectId,
         ownerId,
-        organizationId,
+        workspaceId,
         "a".repeat(64),
         observedAt,
         observedAt,
@@ -104,7 +104,7 @@ describe("ReportingService", () => {
       ).bind(
         hiddenProjectId,
         ownerId,
-        organizationId,
+        workspaceId,
         "b".repeat(64),
         observedAt,
         observedAt,
@@ -115,7 +115,7 @@ describe("ReportingService", () => {
          ) values (?, ?, ?, ?, ?)`,
       ).bind(
         projectId,
-        organizationId,
+        workspaceId,
         developerId,
         observedAt,
         observedAt,
@@ -172,7 +172,7 @@ describe("ReportingService", () => {
          ) values (?, ?, ?, ?, 1, 1, 'reporting-worker', 'worker', ?, ?)`,
       ).bind(
         executionId,
-        organizationId,
+        workspaceId,
         projectId,
         runId,
         observedAt,
@@ -223,7 +223,7 @@ describe("ReportingService", () => {
   it("reports only project-scoped status and usage through generated messages", async () => {
     const reporting = client(tokens.developer);
     const status = await reporting.listStatusTrayRuns(
-      { workspaceId: organizationId },
+      { workspaceId: workspaceId },
       options(tokens.developer),
     );
     expect(status.runs).toEqual([
@@ -261,7 +261,7 @@ describe("ReportingService", () => {
     ))).toBe(Code.NotFound);
   });
 
-  it("rejects invalid date invariants and missing organization capability", async () => {
+  it("rejects invalid date invariants and missing workspace capability", async () => {
     const reporting = client(tokens.developer);
     expect(await errorCode(reporting.getProjectUsageSummary(
       {
@@ -290,7 +290,7 @@ describe("ReportingService", () => {
       options(tokens.developer),
     ))).toBe(Code.InvalidArgument);
     expect(await errorCode(client(tokens.outsider).listStatusTrayRuns(
-      { workspaceId: organizationId },
+      { workspaceId: workspaceId },
       options(tokens.outsider),
     ))).toBe(Code.NotFound);
   });

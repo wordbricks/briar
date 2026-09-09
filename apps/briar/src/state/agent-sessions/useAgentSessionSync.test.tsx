@@ -21,7 +21,7 @@ import {
 import { useAgentSessionSync } from "./useAgentSessionSync";
 
 const team = (id: string): Project =>
-  ({ id, name: id, organizationId: "org-1" }) as Project;
+  ({ id, name: id, workspaceId: "org-1" }) as Project;
 
 const run = (id: string, overrides: Partial<HuntRun> = {}) =>
   ({

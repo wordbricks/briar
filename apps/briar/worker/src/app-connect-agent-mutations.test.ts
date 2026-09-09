@@ -16,7 +16,7 @@ import { emptyAgentProviderCapabilityCatalog } from "../../src/lib/agent-provide
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 
 describe("AgentService mutations", () => {
-  const organizationId = "11111111-1111-4111-8111-111111111111";
+  const workspaceId = "11111111-1111-4111-8111-111111111111";
   const projectId = "22222222-2222-4222-8222-222222222222";
   const otherProjectId = "33333333-3333-4333-8333-333333333333";
   const ownerId = "agent-connect-owner";
@@ -64,7 +64,7 @@ describe("AgentService mutations", () => {
           `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Agent Connect', 'agent-connect', ?, ?)`,
         )
-        .bind(organizationId, now, now),
+        .bind(workspaceId, now, now),
       ...users.map(([userId, _name, _email, role]) =>
         db
           .prepare(
@@ -72,7 +72,7 @@ describe("AgentService mutations", () => {
              organization_id, user_id, role, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(organizationId, userId, role, now, now),
+          .bind(workspaceId, userId, role, now, now),
       ),
       db
         .prepare(
@@ -81,7 +81,7 @@ describe("AgentService mutations", () => {
            created_at, updated_at
          ) values (?, ?, ?, 'Agent Connect', ?, ?, ?)`,
         )
-        .bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+        .bind(projectId, ownerId, workspaceId, "a".repeat(64), now, now),
       db
         .prepare(
           `insert into briar_projects (
@@ -89,7 +89,7 @@ describe("AgentService mutations", () => {
            created_at, updated_at
          ) values (?, ?, ?, 'Other Project', ?, ?, ?)`,
         )
-        .bind(otherProjectId, ownerId, organizationId, "b".repeat(64), now, now),
+        .bind(otherProjectId, ownerId, workspaceId, "b".repeat(64), now, now),
       ...[developerId, editorId, viewerId].map((userId) =>
         db
           .prepare(
@@ -97,7 +97,7 @@ describe("AgentService mutations", () => {
              project_id, organization_id, user_id, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(projectId, organizationId, userId, now, now),
+          .bind(projectId, workspaceId, userId, now, now),
       ),
     ]);
   }, 60_000);
@@ -213,7 +213,7 @@ describe("AgentService mutations", () => {
         )
         .bind(
           deviceId,
-          organizationId,
+          workspaceId,
           ownerId,
           "c".repeat(64),
           observedAt,
@@ -348,7 +348,7 @@ describe("AgentService mutations", () => {
         )
         .bind(
           deviceId,
-          organizationId,
+          workspaceId,
           ownerId,
           "1".repeat(64),
           observedAt,

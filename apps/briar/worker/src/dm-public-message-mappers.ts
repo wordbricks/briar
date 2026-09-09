@@ -64,7 +64,7 @@ export type PublishDmPublicMessageBatchInput = {
   requestId: string;
   projectId: string;
   workerId: string;
-  claim: ReplyWireClaim & { replyKind: "channel"; organizationId: string };
+  claim: ReplyWireClaim & { replyKind: "channel"; workspaceId: string };
   expectedInputRevision: number;
   publicationKind: DmPublicMessagePublicationKind;
   parts: DmPublicMessagePartInput[];
@@ -74,7 +74,7 @@ export function publishDmPublicMessageBatchInputFromProto(
   request: PublishDmMessageBatchRequest,
 ): PublishDmPublicMessageBatchInput {
   const claim = replyWireClaim(request.work, "channel");
-  if (claim.replyKind !== "channel" || claim.organizationId === null) {
+  if (claim.replyKind !== "channel" || claim.workspaceId === null) {
     throw new ReplyCompletionMappingError("Channel reply claim is required");
   }
   const publicationKind = publicationKinds.get(request.publicationKind);
@@ -103,7 +103,7 @@ export function publishDmPublicMessageBatchInputFromProto(
     claim: {
       ...claim,
       replyKind: "channel",
-      organizationId: claim.organizationId,
+      workspaceId: claim.workspaceId,
     },
     expectedInputRevision: safeInteger(
       request.expectedInputRevision,

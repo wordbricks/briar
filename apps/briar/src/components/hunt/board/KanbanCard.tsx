@@ -9,7 +9,7 @@ import { TeamAgentAvatar } from "@/components/TeamAgentAvatar";
 import { runMeta } from "@/lib/stages";
 import { type AutoHuntWorkflowCheckpoint } from "@/lib/auto-hunt-contract";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { ExecutionWorker, HuntRun, HuntRunPlacement, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project, ProjectAgent } from "@/types";
+import type { ExecutionWorker, HuntRun, HuntRunPlacement, IssueExecutionPreferences, WorkspaceMember, PlanningProject, Project, ProjectAgent } from "@/types";
 import { agentProviderLabels, type AgentProvider } from "@/lib/team-llm";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -62,7 +62,7 @@ export function KanbanCard({
 }: {
   availableProviders: AgentProvider[];
   activeAgent: ProjectAgent | null;
-  assignee: OrganizationMember | null;
+  assignee: WorkspaceMember | null;
   assignedWorker: ExecutionWorker | null;
   cardRef?: Ref<HTMLDivElement>;
   hideAssignmentBadges?: boolean;

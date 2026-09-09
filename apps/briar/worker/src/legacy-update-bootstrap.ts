@@ -1,18 +1,18 @@
 import type { BriarAuth } from "./auth";
 import { json } from "./http-response";
-import { listWorkspacesApplication } from "./organization-application";
-import type { OrganizationRow } from "./organization-repository";
+import { listWorkspacesApplication } from "./workspace-application";
+import type { WorkspaceRow } from "./workspace-repository";
 import { teamJson } from "./team-json";
 import { listTeams } from "./team-repository";
 import { requireSession } from "./session-auth";
 
-const legacyOrganizationJson = (organization: OrganizationRow) => ({
-  id: organization.id,
-  name: organization.name,
-  handle: organization.handle,
-  logo: organization.logo,
-  role: organization.role,
-  createdAt: organization.created_at,
+const legacyWorkspaceJson = (workspace: WorkspaceRow) => ({
+  id: workspace.id,
+  name: workspace.name,
+  handle: workspace.handle,
+  logo: workspace.logo,
+  role: workspace.role,
+  createdAt: workspace.created_at,
 });
 
 // TODO(remove after every Briar 1.2.174 installation has run 1.2.179+ once):
@@ -26,7 +26,7 @@ export async function handleLegacyUpdateBootstrapRoute(input: {
   const { request, auth, db } = input;
   if (request.method !== "GET") return undefined;
   const pathname = new URL(request.url).pathname;
-  if (pathname !== "/me" && pathname !== "/organizations" && pathname !== "/projects") {
+  if (pathname !== "/me" && pathname !== "/workspaces" && pathname !== "/projects") {
     return undefined;
   }
 
@@ -35,12 +35,12 @@ export async function handleLegacyUpdateBootstrapRoute(input: {
     const { id, username, name, email, image } = session.user;
     return json({ user: { id, username, name, email, image } });
   }
-  if (pathname === "/organizations") {
-    const organizations = await listWorkspacesApplication({
+  if (pathname === "/workspaces") {
+    const workspaces = await listWorkspacesApplication({
       db,
       userId: session.user.id,
     });
-    return json({ organizations: organizations.map(legacyOrganizationJson) });
+    return json({ workspaces: workspaces.map(legacyWorkspaceJson) });
   }
   const projects = await listTeams(db, session.user.id);
   return json({ projects: projects.map(teamJson) });

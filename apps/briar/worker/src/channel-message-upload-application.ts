@@ -83,7 +83,7 @@ export async function prepareChannelMessageAttachmentsApplication(
   input: {
     db: D1Database;
     signingSecret: string;
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     userId: string;
     messageId: string;
@@ -96,7 +96,7 @@ export async function prepareChannelMessageAttachmentsApplication(
   const services = { ...applicationServices, ...overrides };
   const channel = await services.requireChannelWriteAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -107,7 +107,7 @@ export async function prepareChannelMessageAttachmentsApplication(
   let prepared;
   try {
     prepared = await services.prepareChannelMessageUploadRows(input.db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       channelId: input.channelId,
       userId: input.userId,
       messageId: input.messageId,

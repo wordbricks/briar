@@ -7,14 +7,14 @@ import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { teamEntityAtom } from "../entities/teams";
 import { shallowArrayEqual } from "../entities/upsert";
 import { lockedTeamIdAtom } from "../platform";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { tokenAtom, userAtom } from "../session/atoms";
 import { activeTeamIdAtom, teamNotificationsAtom, teamsAtom } from "../team/atoms";
 import {
   buildCurrentInboxMessages,
   classifyInboxMessage,
   collapseInboxThreadMessages,
-  filterInboxMessagesByOrganization,
+  filterInboxMessagesByWorkspace,
   inboxConversationSyncSignal,
   inboxIssueNotifyingStatuses,
   inboxMessageSnapshotsEqual,
@@ -140,7 +140,7 @@ export type InboxReadSyncIdentity = {
   readonly userId: string;
 };
 
-/** The account and organization one feed refresh belongs to. */
+/** The account and workspace one feed refresh belongs to. */
 export type InboxFeedIdentity = {
   readonly scope: string;
   readonly token: string;
@@ -163,19 +163,19 @@ export const inboxFeedIdentityAtom = Atom.make<InboxFeedIdentity | null>(
 /** The feed scope on screen, or `null` when there is not one yet. */
 export const inboxFeedScopeAtom = Atom.make((get): string | null => {
   const userId = get(inboxUserIdAtom);
-  const organizationId = get(activeOrganizationIdAtom);
-  return userId && organizationId ? `${userId}:${organizationId}` : null;
+  const workspaceId = get(activeWorkspaceIdAtom);
+  return userId && workspaceId ? `${userId}:${workspaceId}` : null;
 }).pipe(Atom.keepAlive, Atom.withLabel("inbox/feedScope"));
 
 /**
  * True once both account responses — the read versions and the authoritative
- * feed — have arrived for the account and organization on screen. Unread
+ * feed — have arrived for the account and workspace on screen. Unread
  * markers, the app badge and system notifications all wait on it.
  */
 export const inboxInitialSyncCompleteAtom = Atom.make((get): boolean => {
   const token = get(tokenAtom);
   const userId = get(inboxUserIdAtom);
-  const organizationId = get(activeOrganizationIdAtom);
+  const workspaceId = get(activeWorkspaceIdAtom);
   const storageKey = get(inboxStorageKeyAtom);
   const feedScope = get(inboxFeedScopeAtom);
   const readSync = get(inboxReadSyncIdentityAtom);
@@ -183,7 +183,7 @@ export const inboxInitialSyncCompleteAtom = Atom.make((get): boolean => {
   return Boolean(
     token &&
       userId &&
-      organizationId &&
+      workspaceId &&
       readSync?.storageKey === storageKey &&
       readSync.token === token &&
       readSync.userId === userId &&
@@ -241,7 +241,7 @@ export const inboxMergeSourcesAtom = Atom.make((get) =>
 
 /**
  * Every message the inbox knows, across the account's teams: the stored record
- * scoped to the open organization, marked read and collapsed into threads.
+ * scoped to the open workspace, marked read and collapsed into threads.
  *
  * A message that would render identically keeps the object it had, so the row
  * atoms below compare equal and the rows they feed do not re-render.
@@ -253,10 +253,10 @@ export const inboxMessagesAtom = Atom.make(
     const initialSyncComplete = get(inboxInitialSyncCompleteAtom);
     const next = state.storageKey === storageKey
       ? collapseInboxThreadMessages(
-          filterInboxMessagesByOrganization(
+          filterInboxMessagesByWorkspace(
             state.messages,
             get(teamsAtom),
-            get(activeOrganizationIdAtom),
+            get(activeWorkspaceIdAtom),
           ).map((message) => ({
             ...message,
             isUnread:

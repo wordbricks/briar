@@ -2,7 +2,7 @@ import { authEmailIdentifierHash } from "./auth-email";
 import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
-} from "./account-organization-request-contract";
+} from "./account-workspace-request-contract";
 import { processArchiveCleanupQueue } from "./archive";
 import {
   deleteAccountData,
@@ -123,10 +123,10 @@ export async function deleteAccountApplication(
     input.db,
     input.session.user.id,
   );
-  if (plan.blockedOrganizations.length > 0) {
+  if (plan.blockedWorkspaces.length > 0) {
     throw new HttpError(
       409,
-      "Account deletion is blocked by shared organization resources",
+      "Account deletion is blocked by shared workspace resources",
     );
   }
 
@@ -171,7 +171,7 @@ export async function deleteAccountApplication(
   if (result === "blocked") {
     throw new HttpError(
       409,
-      "Account deletion state changed; review organization ownership and try again",
+      "Account deletion state changed; review workspace ownership and try again",
       "ACCOUNT_DELETION_STATE_CHANGED",
     );
   }

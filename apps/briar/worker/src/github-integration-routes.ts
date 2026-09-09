@@ -1,6 +1,6 @@
 import * as SchemaIssue from "effect/SchemaIssue";
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceRole } from "./workspace-repository";
 import {
   claimGithubDelivery,
   completeGithubDelivery,
@@ -312,7 +312,7 @@ async function handleGithubWebhookRequest(request: Request, env: Env) {
       linkedIssues: event.briarIssueLinks,
       actor: `github:${event.senderLogin}`,
       observedAt: claimedAt,
-      organizationId: connection?.organization_id ?? null,
+      workspaceId: connection?.organization_id ?? null,
     });
     const mergeQueueReconciliation = await reconcileMergeQueuePullRequest(
       env.DB,
@@ -397,7 +397,7 @@ async function handleGithubInstallCallback(request: Request, env: Env) {
   const createdAt = new Date();
   await createGithubOAuthState(env.DB, {
     stateHash: await githubSha256Hex(oauthState),
-    organizationId: installState.organization_id,
+    workspaceId: installState.organization_id,
     userId: installState.user_id,
     pkceVerifier,
     installationId,
@@ -457,12 +457,12 @@ async function handleGithubOAuthCallback(request: Request, env: Env) {
       400,
     );
   }
-  const role = await getOrganizationRole(
+  const role = await getWorkspaceRole(
     env.DB,
     oauthState.organization_id,
     oauthState.user_id,
   );
-  if (!hasOrganizationCapability(role, "development:manage")) {
+  if (!hasWorkspaceCapability(role, "development:manage")) {
     return html(
       "GitHub 연결 권한 없음",
       "조직 관리자 권한이 없어 GitHub 연결을 완료할 수 없습니다.",
@@ -484,7 +484,7 @@ async function handleGithubOAuthCallback(request: Request, env: Env) {
       appSlug: env.GITHUB_APP_SLUG!,
     });
     const result = await connectGithubInstallation(env.DB, {
-      organizationId: oauthState.organization_id,
+      workspaceId: oauthState.organization_id,
       installationId: verified.installation.id,
       installationAccountId: verified.installation.accountId,
       accountLogin: verified.installation.accountLogin,

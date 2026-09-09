@@ -18,7 +18,7 @@ import {
 } from "../../test/channel-conversation";
 import { createReactTestRoot, renderReactTestRoot } from "../../test/react";
 import { publishChannelDelta } from "../channels/delta";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import {
@@ -83,7 +83,7 @@ async function renderHarness(
   const { cleanup, root } = createReactTestRoot({ attachToDocument: true });
   const registry = createTestRegistry([
     [tokenAtom, "token"],
-    [activeOrganizationIdAtom, "org-1"],
+    [activeWorkspaceIdAtom, "org-1"],
   ]);
   seed?.(registry);
   await renderReactTestRoot(

@@ -50,7 +50,7 @@ const dependencies = (
 });
 
 describe("team list", () => {
-  it("prints team IDs with their organization and role", async () => {
+  it("prints team IDs with their workspace and role", async () => {
     const fetchTeams = vi.fn(async () => teamsResponse.teams);
     const writeOutput = vi.fn();
 
@@ -64,12 +64,12 @@ describe("team list", () => {
       [
         "Briar",
         "  Team ID: 11111111-1111-4111-8111-111111111111",
-        "  Organization: Wordbricks (22222222-2222-4222-8222-222222222222)",
+        "  Workspace: Wordbricks (22222222-2222-4222-8222-222222222222)",
         "  Role: owner",
         "",
         "Velen",
         "  Team ID: 33333333-3333-4333-8333-333333333333",
-        "  Organization: Wordbricks (22222222-2222-4222-8222-222222222222)",
+        "  Workspace: Wordbricks (22222222-2222-4222-8222-222222222222)",
         "  Role: co-owner",
       ].join("\n"),
     );
@@ -88,15 +88,15 @@ describe("team list", () => {
         {
           id: "11111111-1111-4111-8111-111111111111",
           name: "Briar",
-          organizationId: "22222222-2222-4222-8222-222222222222",
-          organizationName: "Wordbricks",
+          workspaceId: "22222222-2222-4222-8222-222222222222",
+          workspaceName: "Wordbricks",
           role: "owner",
         },
         {
           id: "33333333-3333-4333-8333-333333333333",
           name: "Velen",
-          organizationId: "22222222-2222-4222-8222-222222222222",
-          organizationName: "Wordbricks",
+          workspaceId: "22222222-2222-4222-8222-222222222222",
+          workspaceName: "Wordbricks",
           role: "co-owner",
         },
       ],

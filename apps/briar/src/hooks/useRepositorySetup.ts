@@ -13,10 +13,11 @@ import { useRegistry } from "../state/registry";
 import { useTeamActions } from "../state/team/actions";
 import { teamsAtom } from "../state/team/atoms";
 import { useWorkspaceActions } from "../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../state/local-workspace/actions";
 import {
   connectedTeamIdsAtom,
   teamReadinessAtom,
-} from "../state/workspace/atoms";
+} from "../state/local-workspace/atoms";
 
 /*
   Opening a team's repository, and putting the keyboard back where it was.
@@ -55,7 +56,7 @@ export function useRepositorySetup(): RepositorySetup {
   );
   const setSettingsTarget = useAtomSet(settingsTargetAtom);
   const { reconnectProject: reconnectTeam, refreshProjectReadiness } =
-    useWorkspaceActions();
+    useLocalWorkspaceActions();
   const triggerRef = useRef<HTMLElement | null>(null);
   const reconnectRequestRef = useRef(0);
 

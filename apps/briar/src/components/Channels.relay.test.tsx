@@ -25,7 +25,7 @@ import { MessageRow, type MessageRowHandlers } from "./Channels";
 
 const channel: ChannelSummary = {
   id: "channel-1",
-  organizationId: "org-1",
+  workspaceId: "org-1",
   slug: "dm",
   name: "Direct message",
   topic: null,

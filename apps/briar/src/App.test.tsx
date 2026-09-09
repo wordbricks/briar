@@ -14,7 +14,7 @@ import { initialOnboardingStorageKey } from "./lib/initial-onboarding";
 import { launchIntroStorageKey } from "./lib/launch-intro";
 import { createNavigationActions } from "./state/navigation/actions";
 import { createTestRegistry, type AtomRegistry } from "./state/registry";
-import { activeOrganizationIdAtom, organizationsAtom } from "./state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "./state/workspace/atoms";
 import {
   restoringSessionAtom,
   loadingAtom,
@@ -29,7 +29,7 @@ import { createRenderCounter } from "./test/render-count";
 import type {
   DashboardPayload,
   HuntRun,
-  Organization,
+  Workspace,
   Project,
   SessionUser,
 } from "./types";
@@ -53,9 +53,9 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
-  id: demoDashboard.team.organizationId,
-  name: demoDashboard.team.organizationName,
+const workspace: Workspace = {
+  id: demoDashboard.team.workspaceId,
+  name: demoDashboard.team.workspaceName,
   handle: "org-a",
   logo: null,
   role: "owner",
@@ -90,8 +90,8 @@ const harness = (): AtomRegistry => {
     [loadingAtom, false],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
-    [organizationsAtom, [organization]],
-    [activeOrganizationIdAtom, organization.id],
+    [workspacesAtom, [workspace]],
+    [activeWorkspaceIdAtom, workspace.id],
     // The board is already loaded, so no fetch has to settle before the
     // counters mean anything.
     [

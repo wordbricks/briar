@@ -52,7 +52,7 @@ export function dmReplySteerStatements(db: D1Database, jobId: string) {
 /** The Worker calls this only after its provider has stopped. The old token is
  * retained until the next claim so an acknowledgement retry is idempotent. */
 export async function acknowledgeDmReplySteer(db: D1Database, input: {
-  jobId: string; organizationId: string; channelId: string;
+  jobId: string; workspaceId: string; channelId: string;
   deviceId: string; workerId: string; claimTokenHash: string; observedAt: string;
   stopUnconfirmed?: boolean;
 }) {
@@ -71,7 +71,7 @@ export async function acknowledgeDmReplySteer(db: D1Database, input: {
           and claimed_device_id = ? and claimed_worker_id = ? and claim_token_hash = ?
           and (status = 'running' or (status = 'completed' and stop_requested_at is not null))
           and stop_confirmed_at is null`)
-        .bind(input.observedAt, input.jobId, input.organizationId, input.channelId,
+        .bind(input.observedAt, input.jobId, input.workspaceId, input.channelId,
           input.deviceId, input.workerId, input.claimTokenHash),
       ...(publication?.statements ?? []),
     ]);
@@ -81,7 +81,7 @@ export async function acknowledgeDmReplySteer(db: D1Database, input: {
     where id = ? and organization_id = ? and channel_id = ?
       and claimed_device_id = ? and claimed_worker_id = ? and claim_token_hash = ?
       and status = 'completed' and stop_requested_at is not null`)
-    .bind(input.jobId, input.organizationId, input.channelId, input.deviceId,
+    .bind(input.jobId, input.workspaceId, input.channelId, input.deviceId,
       input.workerId, input.claimTokenHash).first<{ id: string }>();
   if (stopped) {
     const requestId = `dm-stop-confirmed:${input.jobId}`;
@@ -111,7 +111,7 @@ export async function acknowledgeDmReplySteer(db: D1Database, input: {
       and claimed_device_id = ? and claimed_worker_id = ? and claim_token_hash = ?
       and status in ('running', 'queued') and lease_expires_at > ?
       and steer_revision > applied_steer_revision
-    returning id`).bind(input.observedAt, input.jobId, input.organizationId,
+    returning id`).bind(input.observedAt, input.jobId, input.workspaceId,
       input.channelId, input.deviceId, input.workerId, input.claimTokenHash,
       input.observedAt).first<{ id: string }>();
   return result !== null;

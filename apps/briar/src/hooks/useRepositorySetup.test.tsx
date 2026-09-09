@@ -19,11 +19,11 @@ import {
   teamConnectionAtom,
   teamsAtom,
 } from "../state/team/atoms";
-import { workspaceApiAtom } from "../state/workspace/api";
+import { workspaceApiAtom } from "../state/local-workspace/api";
 import {
   connectedTeamIdsAtom,
   teamReadinessAtom,
-} from "../state/workspace/atoms";
+} from "../state/local-workspace/atoms";
 import { createReactTestRoot, flush } from "../test/react";
 import type { Project } from "../types";
 import { useRepositorySetup, type RepositorySetup } from "./useRepositorySetup";

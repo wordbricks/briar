@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DmMemoryCreateInput } from "../../src/lib/dm-memory-contract";
 import { createChannel } from "./channels";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import { expireDmMemories, type DmMemoryAccess } from "./dm-memory-access";
 import { getDmMemoryBrief } from "./dm-memory-brief";
 import { processDmMemoryIndexJobs, processDmMemoryVectorCleanup } from "./dm-memory-indexing";
@@ -50,7 +50,7 @@ function vectorStore() {
 
 describe("DM memory retrieval with durable D1 state", () => {
   let db: D1Database;
-  const organizationId = crypto.randomUUID();
+  const workspaceId = crypto.randomUUID();
   const userId = crypto.randomUUID();
   const agentId = crypto.randomUUID();
   const now = "2026-09-01T00:00:00.000Z";
@@ -59,10 +59,10 @@ describe("DM memory retrieval with durable D1 state", () => {
     await db.prepare(`insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values (?, 'Synthetic memory owner', ?, 1, ?, ?)`).bind(userId, `${userId}@example.com`, now, now).run();
     await db.prepare(`insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values (?, 'Memory retrieval test', ?, ?, ?)`).bind(organizationId, organizationId, now, now).run();
+      values (?, 'Memory retrieval test', ?, ?, ?)`).bind(workspaceId, workspaceId, now, now).run();
     await db.prepare(`insert into briar_organization_members (organization_id, user_id, role, created_at, updated_at)
-      values (?, ?, 'owner', ?, ?)`).bind(organizationId, userId, now, now).run();
-    await createOrganizationAgent(db, { id: agentId, organizationId, name: "Synthetic Agent", provider: "claude",
+      values (?, ?, 'owner', ?, ?)`).bind(workspaceId, userId, now, now).run();
+    await createWorkspaceAgent(db, { id: agentId, workspaceId, name: "Synthetic Agent", provider: "claude",
       model: null, responsibility: "Synthetic tests", effort: null, createdAt: now });
   }, 120_000);
   beforeEach(async () => {
@@ -71,10 +71,10 @@ describe("DM memory retrieval with durable D1 state", () => {
 
   async function dm(): Promise<DmMemoryOwner> {
     const channelId = crypto.randomUUID();
-    await createChannel(db, { id: channelId, organizationId, kind: "dm", dmKey: null, slug: channelId, name: "Synthetic DM",
+    await createChannel(db, { id: channelId, workspaceId, kind: "dm", dmKey: null, slug: channelId, name: "Synthetic DM",
       visibility: "private", topic: null, defaultProjectId: null, createdByUserId: userId,
       agentIds: [agentId], createdAt: now });
-    return { organizationId, channelId, userId };
+    return { workspaceId, channelId, userId };
   }
   const input = (changes: Partial<DmMemoryCreateInput> = {}): DmMemoryCreateInput => ({
     requestId: crypto.randomUUID(), title: "설명 선호", body: "조건을 생략하지 않고 한국어로 간결하게 설명한다.",
@@ -82,7 +82,7 @@ describe("DM memory retrieval with durable D1 state", () => {
   });
   async function access(owner: DmMemoryOwner): Promise<DmMemoryAccess> {
     const space = (await listDmMemories(db, owner)).spaces[0]!;
-    return { organizationId, channelId: owner.channelId, ownerUserId: userId, agentId,
+    return { workspaceId, channelId: owner.channelId, ownerUserId: userId, agentId,
       spaceId: space.id, revocationEpoch: space.revocationEpoch };
   }
   const due = async () => {
@@ -116,7 +116,7 @@ describe("DM memory retrieval with durable D1 state", () => {
       version: 1, protectedByUser: true, sourceLanguage: "ko", excerpt: input().body }] });
     expect(result.results[0]!.sourceEventIds).toHaveLength(1);
     expect(backend.store.query).toHaveBeenLastCalledWith(expect.any(Array), expect.objectContaining({
-      topK: 20, namespace: organizationId, filter: { memorySpaceId: scope.spaceId }, returnValues: false,
+      topK: 20, namespace: workspaceId, filter: { memorySpaceId: scope.spaceId }, returnValues: false,
     }));
     expect(backend.store.embed).toHaveBeenLastCalledWith(["설명 방식"]);
     expect(backend.store.queryById).toHaveBeenCalled();

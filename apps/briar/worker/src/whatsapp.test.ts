@@ -83,7 +83,7 @@ describe("WhatsApp Cloud API helpers", () => {
       body: "처리 계획입니다.",
       approvalSummary: "이슈 실행 제안이 도착했습니다.",
       appOrigin: "https://briar.example/",
-      organizationId: "11111111-1111-4111-8111-111111111111",
+      workspaceId: "11111111-1111-4111-8111-111111111111",
       channelId: "22222222-2222-4222-8222-222222222222",
       messageId: "33333333-3333-4333-8333-333333333333",
     });

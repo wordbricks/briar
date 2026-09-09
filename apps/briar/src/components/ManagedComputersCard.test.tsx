@@ -14,7 +14,7 @@ import {
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const deviceId = "managed-device";
 const projects: Project[] = [
   {
@@ -25,8 +25,8 @@ const projects: Project[] = [
     icon: null,
     iconName: null,
     iconColor: null,
-    organizationId,
-    organizationName: "Briar",
+    workspaceId,
+    workspaceName: "Briar",
     role: "owner",
     createdAt: "2026-08-30T00:00:00.000Z",
   },
@@ -38,8 +38,8 @@ const projects: Project[] = [
     icon: null,
     iconName: null,
     iconColor: null,
-    organizationId,
-    organizationName: "Briar",
+    workspaceId,
+    workspaceName: "Briar",
     role: "owner",
     createdAt: "2026-08-30T00:00:00.000Z",
   },
@@ -47,7 +47,7 @@ const projects: Project[] = [
 
 const computer: ManagedComputer = {
   id: "44444444-4444-4444-8444-444444444444",
-  organizationId,
+  workspaceId,
   requesterUserId: "owner",
   state: "ready",
   provider: "aws",
@@ -107,7 +107,7 @@ describe("ManagedComputersCard", () => {
         <ManagedComputersCard
           boundProjectIdsByDeviceId={{ [deviceId]: [projects[0]!.id] }}
           onProjectConnected={() => undefined}
-          organizationId={organizationId}
+          workspaceId={workspaceId}
           projects={projects}
           token="session-token"
           workerBindingsLoaded
@@ -162,7 +162,7 @@ describe("ManagedComputersCard", () => {
         <ManagedComputersCard
           boundProjectIdsByDeviceId={{}}
           onProjectConnected={onProjectConnected}
-          organizationId={organizationId}
+          workspaceId={workspaceId}
           projects={projects}
           token="session-token"
           workerBindingsLoaded
@@ -202,7 +202,7 @@ describe("ManagedComputersCard", () => {
       expect(buttonWithText(document, "Cancel").disabled).toBe(true);
       expect(container.querySelectorAll("article")).toHaveLength(2);
       await act(async () => confirm.click());
-      expect(terminate).toHaveBeenCalledExactlyOnceWith("session-token", organizationId, computer.id);
+      expect(terminate).toHaveBeenCalledExactlyOnceWith("session-token", workspaceId, computer.id);
       await act(async () => pending.resolve({ computer: { ...computer, state: "terminated" }, duplicate: false }));
       expect(container.querySelectorAll("article")).toHaveLength(1);
       expect(container.textContent).not.toContain("44444444");

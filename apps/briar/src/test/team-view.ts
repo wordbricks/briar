@@ -1,6 +1,6 @@
 import type { AtomRegistry } from "../state/registry";
 import { teamMembersAtom } from "../state/entities/members";
-import { teamOrganizationProvidersAtom } from "../state/entities/providers";
+import { teamWorkspaceProvidersAtom } from "../state/entities/providers";
 import { teamRunsAtom } from "../state/entities/runs";
 import { teamEntityAtom } from "../state/entities/teams";
 import { teamWorkersAtom } from "../state/entities/workers";
@@ -44,7 +44,7 @@ export function readTeamView(
     runs,
     workers: registry.get(teamWorkersAtom(teamId)) ?? undefined,
     organizationProviders:
-      registry.get(teamOrganizationProvidersAtom(teamId)) ?? undefined,
+      registry.get(teamWorkspaceProvidersAtom(teamId)) ?? undefined,
     executionPolicy: registry.get(teamExecutionPolicyAtom(teamId)) ?? undefined,
     members: registry.get(teamMembersAtom(teamId)) ?? undefined,
     conversationNotifications: notifications.conversation ?? undefined,

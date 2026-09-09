@@ -18,7 +18,7 @@ import {
   like everything else.
 
   The order is the write order and is load bearing. The poll seeds the list from
-  the open team and then replaces it with the organization's; the merge folds
+  the open team and then replaces it with the workspace's; the merge folds
   the open team back in; the snapshot reads the result. Mounting the snapshot
   first would push one list to Rust and then a second one in the same commit,
   which is the flash this order removes.

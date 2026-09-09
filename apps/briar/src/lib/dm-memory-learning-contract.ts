@@ -102,7 +102,7 @@ export const dmMemoryLearningExtractBatchSources = 8;
 /** A quiet DM is still reviewed once its oldest waiting reply is this old. */
 export const dmMemoryLearningExtractMaxWaitMs = 24 * 60 * 60 * 1000;
 export const dmMemoryLearningSpaceDailyCalls = 48;
-export const dmMemoryLearningOrganizationDailyCalls = 240;
+export const dmMemoryLearningWorkspaceDailyCalls = 240;
 export const dmMemoryLearningProposerMaxOutputTokens = 4096;
 export const dmMemoryLearningVerifierMaxOutputTokens = 2048;
 /**
@@ -131,7 +131,7 @@ export function dmLearningAgentPolicy(provider: AgentProvider): DmLearningPolicy
     verifier: { ...model, maxOutputTokens: dmMemoryLearningVerifierMaxOutputTokens },
     maxInputBytes: dmMemoryLearningMaxInputBytes,
     spaceDailyCalls: dmMemoryLearningSpaceDailyCalls,
-    organizationDailyCalls: dmMemoryLearningOrganizationDailyCalls,
+    organizationDailyCalls: dmMemoryLearningWorkspaceDailyCalls,
     spaceDailyMicroUsd: 0, organizationDailyMicroUsd: 0 };
 }
 
@@ -228,7 +228,7 @@ export type DmLearningInvocation = typeof DmLearningInvocation.Type;
 
 export const ClaimedDmMemory = strict(Schema.Struct({
   workType: Schema.Literal("dmMemory"), workId: id, runId: id,
-  organizationId: id, workerId: Schema.NonEmptyString,
+  workspaceId: id, workerId: Schema.NonEmptyString,
   sourceKey: Schema.Literal("dm-memory"), title: Schema.Literal("DM memory learning"),
   claimToken: Schema.String.check(Schema.isStartsWith("briar_memory_claim_")),
   claimedAt: IsoDateTimeWithOffset, leaseExpiresAt: IsoDateTimeWithOffset,

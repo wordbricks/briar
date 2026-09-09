@@ -6,7 +6,7 @@ import { Code, ConnectError, type ConnectRouter, type ServiceImpl } from "@conne
 import type { BriarAuth } from "./auth";
 
 import {
-  appOrganizationUsageRuns,
+  appWorkspaceUsageRuns,
   appProjectUsageSummary,
   appRunCostEstimate,
   appStatusTrayRuns,
@@ -47,9 +47,9 @@ const organizationUsageDays = (range: WorkspaceUsageRange): 7 | 30 | 90 => {
     case WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_90_DAYS:
       return decodeUsageRangeDays(90);
     case WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_UNSPECIFIED:
-      throw new ConnectError("Organization usage range is required", Code.InvalidArgument);
+      throw new ConnectError("Workspace usage range is required", Code.InvalidArgument);
     default:
-      throw new ConnectError(`Unknown organization usage range: ${range}`, Code.InvalidArgument);
+      throw new ConnectError(`Unknown workspace usage range: ${range}`, Code.InvalidArgument);
   }
 };
 
@@ -98,14 +98,14 @@ export const createAppReportingService = (
       listWorkspaceUsageRunsApplication(
         {
           db,
-          organizationId: decodeUuid(input.workspaceId),
+          workspaceId: decodeUuid(input.workspaceId),
           userId: session.user.id,
           days: organizationUsageDays(input.range),
         },
         services,
       ),
     );
-    return appOrganizationUsageRuns(result);
+    return appWorkspaceUsageRuns(result);
   },
 
   getProjectUsageSummary: async (input) => {
@@ -134,7 +134,7 @@ export const createAppReportingService = (
     const result = await withApplicationErrors(
       listStatusTrayRunsApplication({
         db,
-        organizationId: decodeUuid(input.workspaceId),
+        workspaceId: decodeUuid(input.workspaceId),
         userId: session.user.id,
       }),
     );

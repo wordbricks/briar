@@ -11,7 +11,7 @@ import type {
   HuntRun,
   HuntRunPlacement,
   IssueExecutionPreferences,
-  OrganizationMember,
+  WorkspaceMember,
   PlanningProject,
   Project,
 } from "@/types";
@@ -61,7 +61,7 @@ export function IssueListRow({
   teams = [],
   updatingIssueId,
 }: {
-  assignee: OrganizationMember | null;
+  assignee: WorkspaceMember | null;
   availableProviders: AgentProvider[];
   currentTeamId?: string | null;
   deletingIssueId: string | null;

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { AlertTriangle, FolderKanban, Palette, Trash2 } from "lucide-react";
 import { useI18n } from "../i18n";
-import { hasOrganizationCapability } from "../lib/organization-role";
+import { hasWorkspaceCapability } from "../lib/workspace-role";
 import type { PlanningProject, PlanningProjectStatus } from "../types";
 import { Button } from "./ui/button";
 import {
@@ -74,7 +74,7 @@ export function PlanningProjectDialog({
     project &&
       !project.isDefault &&
       onDelete &&
-      hasOrganizationCapability(project.role, "issues:write"),
+      hasWorkspaceCapability(project.role, "issues:write"),
   );
 
   const submit = async (event: FormEvent) => {

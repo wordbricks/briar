@@ -25,16 +25,16 @@ import {
   the caller — not the browser's storage engine, which is not ours to test.
 */
 
-const snapshotOf = (userId: string, organizationId: string): ClientSnapshot => ({
+const snapshotOf = (userId: string, workspaceId: string): ClientSnapshot => ({
   schemaVersion: SNAPSHOT_SCHEMA_VERSION,
   userId,
-  organizationId,
+  workspaceId,
   savedAt: "2026-09-04T00:00:00.000Z",
   session: {
     user: { id: userId, name: "Tester", email: "tester@briar.local" },
-    organizations: [],
+    workspaces: [],
     teams: [],
-    activeOrganizationId: organizationId,
+    activeWorkspaceId: workspaceId,
     activeTeamId: null,
   },
   entities: { runs: [], teams: [], workers: [], members: [], channels: [] },
@@ -184,7 +184,7 @@ describe.each(contracts)("%s snapshot store", (_name, create) => {
     expect(await store.read(key)).toEqual(snapshot);
   });
 
-  it("keeps one record per account and organization", async () => {
+  it("keeps one record per account and workspace", async () => {
     const store = create();
     const other = snapshotOf("user-1", "org-b");
     await store.write(key, snapshot);

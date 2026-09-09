@@ -35,7 +35,7 @@ type RemoteSocketAttachment = {
 
 type ActiveRemoteSession = {
   sessionId: string;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   controllerUserId: string;
   maxExpiresAt: string;
@@ -324,7 +324,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
     } satisfies RemoteSocketAttachment);
     const active = {
       sessionId,
-      organizationId: connected.organization_id,
+      workspaceId: connected.organization_id,
       managedComputerId: connected.managed_computer_id,
       controllerUserId: connected.controller_user_id,
       maxExpiresAt,
@@ -333,7 +333,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
     await this.ctx.storage.put(activeSessionStorageKey, active);
     await this.ctx.storage.setAlarm(Date.parse(maxExpiresAt));
     await recordManagedComputerRemoteAuditEvent(this.env.DB, {
-      organizationId: connected.organization_id,
+      workspaceId: connected.organization_id,
       managedComputerId: connected.managed_computer_id,
       remoteSessionId: connected.id,
       actorUserId: connected.controller_user_id,
@@ -528,7 +528,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
     );
     if (disconnected) {
       await recordManagedComputerRemoteAuditEvent(this.env.DB, {
-        organizationId: disconnected.organization_id,
+        workspaceId: disconnected.organization_id,
         managedComputerId: disconnected.managed_computer_id,
         remoteSessionId: disconnected.id,
         actorUserId: disconnected.controller_user_id,
@@ -568,7 +568,7 @@ export class ManagedComputerRemoteSessionHub extends DurableObject<Env> {
     );
     if (expired) {
       await recordManagedComputerRemoteAuditEvent(this.env.DB, {
-        organizationId: expired.organization_id,
+        workspaceId: expired.organization_id,
         managedComputerId: expired.managed_computer_id,
         remoteSessionId: expired.id,
         actorUserId: expired.controller_user_id,

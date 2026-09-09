@@ -11,8 +11,8 @@ import {
   teamSettingsAtom,
   teamSyncedSinceBootAtom,
 } from "../team/atoms";
-import { workspaceModes } from "../workspace/api";
-import { connectedTeamIdsAtom } from "../workspace/atoms";
+import { workspaceModes } from "../local-workspace/api";
+import { connectedTeamIdsAtom } from "../local-workspace/atoms";
 import {
   getAutomaticWorkflowGenerations,
   getWorkflowGenerationAttempts,

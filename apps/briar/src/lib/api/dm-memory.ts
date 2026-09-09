@@ -53,12 +53,12 @@ const requireClient = () => {
   return client;
 };
 
-const base = (organizationId: string, channelId: string) =>
-  `/organizations/${encodeURIComponent(organizationId)}/channels/${encodeURIComponent(channelId)}/memory`;
+const base = (workspaceId: string, channelId: string) =>
+  `/workspaces/${encodeURIComponent(workspaceId)}/channels/${encodeURIComponent(channelId)}/memory`;
 
 export type DmMemoryApiScope = {
   token: string;
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
 };
 
@@ -286,7 +286,7 @@ export async function loadDmMemory(
   signal?: AbortSignal,
 ): Promise<DmMemoryPage> {
   const response = await requireClient().listDmMemories({
-    workspaceId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: scope.channelId,
     memorySpaceId: spaceId,
     cursor,
@@ -314,7 +314,7 @@ export async function loadDmMemoryDocument(
   version?: number,
 ): Promise<DmMemoryDocumentDetail> {
   const response = await requireClient().getDmMemoryDocument({
-    workspaceId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: scope.channelId,
     documentId,
     version,
@@ -343,7 +343,7 @@ export async function loadDmMemoryHistory(
   signal?: AbortSignal,
 ): Promise<DmMemoryRevisionPage> {
   const response = await requireClient().listDmMemoryRevisions({
-    workspaceId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: scope.channelId,
     documentId,
     cursor,
@@ -369,7 +369,7 @@ export async function saveDmMemoryDocument(
   documentId?: string,
 ) {
   const common = {
-    workspaceId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: scope.channelId,
     ...writeInput(input),
   };
@@ -392,7 +392,7 @@ export async function setDmMemorySettings(
   input: DmMemorySettingsInput,
 ) {
   const response = await requireClient().updateDmMemorySettings({
-    workspaceId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: scope.channelId,
     requestId: input.requestId,
     memorySpaceId: input.memorySpaceId,
@@ -411,7 +411,7 @@ export async function removeDmMemoryDocument(
   documentId: string,
 ) {
   return requireClient().deleteDmMemoryDocument({
-    workspaceId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: scope.channelId,
     documentId,
   }, appCallOptions(scope.token));
@@ -423,7 +423,7 @@ export async function retryDmMemoryLearning(
   revocationEpoch: number,
 ) {
   const response = await requireClient().retryDmMemoryLearning({
-    workspaceId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: scope.channelId,
     jobId,
     requestId: crypto.randomUUID(),
@@ -434,7 +434,7 @@ export async function retryDmMemoryLearning(
 
 export async function exportDmMemory(scope: DmMemoryApiScope, spaceId: string) {
   const response = await fetch(
-    `${briarApiUrl}${base(scope.organizationId, scope.channelId)}/export?memorySpaceId=${encodeURIComponent(spaceId)}`,
+    `${briarApiUrl}${base(scope.workspaceId, scope.channelId)}/export?memorySpaceId=${encodeURIComponent(spaceId)}`,
     withSessionCredential(scope.token, { cache: "no-store" }),
   );
   if (!response.ok) throw new ApiError(response.status, "Memory export failed");

@@ -35,11 +35,11 @@ import { applySyncEvent, markTeamStale } from "./apply";
 const teamA = "team-a";
 const teamB = "team-b";
 
-const teamOf = (id: string, organizationId = "org-a"): Team => ({
+const teamOf = (id: string, workspaceId = "org-a"): Team => ({
   ...demoDashboard.team,
   id,
   name: id,
-  organizationId,
+  workspaceId,
 });
 
 const snapshotOf = (
@@ -244,7 +244,7 @@ describe("team deltas", () => {
     expect(view?.runs[0]).toBe(payload.runs[0]);
   });
 
-  it("replaces channel notifications from the organization projection", () => {
+  it("replaces channel notifications from the workspace projection", () => {
     const { registry, payload } = loaded();
     const notification = {
       id: "channel-notification-1",
@@ -357,7 +357,7 @@ describe("clearing", () => {
     expect(registry.get(retainedTeamIdsAtom)).toEqual([teamA]);
   });
 
-  it("drops the teams of every organization but the retained one", () => {
+  it("drops the teams of every workspace but the retained one", () => {
     const { registry } = loaded();
     applySyncEvent(registry, {
       kind: "team-snapshot",
@@ -366,8 +366,8 @@ describe("clearing", () => {
     });
 
     applySyncEvent(registry, {
-      kind: "organization-left",
-      retainedOrganizationId: "org-b",
+      kind: "workspace-left",
+      retainedWorkspaceId: "org-b",
     });
 
     expect(readTeamView(registry, teamA)).toBeNull();
@@ -450,7 +450,7 @@ const channelOf = (
   overrides: Partial<ChannelSummary> = {},
 ): ChannelSummary => ({
   id,
-  organizationId: "org-a",
+  workspaceId: "org-a",
   kind: "channel",
   slug: id,
   name: id,
@@ -480,7 +480,7 @@ describe("channel catalog", () => {
     const registry = createTestRegistry();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channelOf("zeta"), channelOf("alpha")],
     });
     expect(registry.get(organizationChannelIdsAtom("org-a"))).toEqual([
@@ -490,7 +490,7 @@ describe("channel catalog", () => {
 
     applySyncEvent(registry, {
       kind: "channel-catalog-delta",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channelOf("mid")],
       removedChannelIds: [],
       reset: false,
@@ -506,13 +506,13 @@ describe("channel catalog", () => {
     const registry = createTestRegistry();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channelOf("alpha"), channelOf("zeta")],
     });
 
     applySyncEvent(registry, {
       kind: "channel-catalog-delta",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channelOf("zeta")],
       removedChannelIds: [],
       reset: true,
@@ -526,7 +526,7 @@ describe("channel catalog", () => {
     const registry = createTestRegistry();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channelOf("zeta"), channelOf("alpha")],
     });
     const before = registry.get(organizationChannelIdsAtom("org-a"));
@@ -540,11 +540,11 @@ describe("channel catalog", () => {
     expect(registry.get(channelAtom("zeta"))?.hasUnread).toBe(true);
   });
 
-  it("appends a channel the organization does not list yet", () => {
+  it("appends a channel the workspace does not list yet", () => {
     const registry = createTestRegistry();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channelOf("zeta")],
     });
 
@@ -563,13 +563,13 @@ describe("channel catalog", () => {
     const registry = createTestRegistry();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channelOf("zeta"), channelOf("alpha")],
     });
 
     applySyncEvent(registry, {
       kind: "channel-removed",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channelId: "alpha",
     });
 
@@ -581,13 +581,13 @@ describe("channel catalog", () => {
     const registry = createTestRegistry();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channelOf("zeta")],
     });
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-b",
-      channels: [channelOf("other", { organizationId: "org-b" })],
+      workspaceId: "org-b",
+      channels: [channelOf("other", { workspaceId: "org-b" })],
     });
 
     applySyncEvent(registry, { kind: "session-cleared" });

@@ -5,12 +5,12 @@ import {
   decodeStoredMergeQueueValidationCommands,
 } from "../../src/lib/merge-queue-validation-contract";
 import {
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
 } from "./github-connection-repository";
 import { configureMergeQueueProfile, getMergeQueueProfile } from "./merge-queue-profile";
 import { getMergeQueueStatus } from "./merge-queue-status";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import { getTeam } from "./team-command-repository";
 import { validationCommandsFromStage } from "./team-configuration-application";
 import { getTeamSettings } from "./team-settings-repository";
@@ -43,7 +43,7 @@ export class MergeQueueApplicationError extends Error {
 
 export type MergeQueueApplicationServices = {
   readonly configureMergeQueueProfile: typeof configureMergeQueueProfile;
-  readonly getGithubConnectionForOrganization: typeof getGithubConnectionForOrganization;
+  readonly getGithubConnectionForWorkspace: typeof getGithubConnectionForWorkspace;
   readonly getMergeQueueProfile: typeof getMergeQueueProfile;
   readonly getMergeQueueStatus: typeof getMergeQueueStatus;
   readonly getTeam: typeof getTeam;
@@ -53,7 +53,7 @@ export type MergeQueueApplicationServices = {
 
 export const mergeQueueApplicationServices: MergeQueueApplicationServices = {
   configureMergeQueueProfile,
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   getMergeQueueProfile,
   getMergeQueueStatus,
   getTeam,
@@ -118,7 +118,7 @@ export async function updateMergeQueueProfileApplication(
   services: MergeQueueApplicationServices = mergeQueueApplicationServices,
 ) {
   const project = await requireProject(input.db, input.projectId, input.userId, services);
-  if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+  if (!hasWorkspaceCapability(project.member_role, "development:manage")) {
     throw new MergeQueueApplicationError(
       "development_management_required",
       "Development management permission required",
@@ -171,7 +171,7 @@ export async function updateMergeQueueProfileApplication(
               "Connect one GitHub repository before configuring its merge queue",
             );
           }
-          const connection = await services.getGithubConnectionForOrganization(
+          const connection = await services.getGithubConnectionForWorkspace(
             input.db,
             project.organization_id,
           );

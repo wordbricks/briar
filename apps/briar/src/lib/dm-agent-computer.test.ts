@@ -7,7 +7,7 @@ import {
 
 const computer = (overrides: Partial<ManagedComputer> = {}): ManagedComputer => ({
   id: "computer-1",
-  organizationId: "organization-1",
+  workspaceId: "workspace-1",
   requesterUserId: "user-1",
   state: "ready",
   provider: "aws",

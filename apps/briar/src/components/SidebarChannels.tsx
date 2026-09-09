@@ -22,7 +22,7 @@ import type {
   ChannelSummary,
   ChannelVisibility,
 } from "../lib/channels-contract";
-import type { OrganizationRole } from "../types";
+import type { WorkspaceRole } from "../types";
 
 type SidebarChannelPage = string;
 type ChannelCreateStep = 1 | 2;
@@ -293,7 +293,7 @@ function ChannelCreateDialog({
   );
 }
 
-export function SidebarOrganizationChannels({
+export function SidebarWorkspaceChannels({
   activeChannelId,
   activePage,
   channels,
@@ -314,7 +314,7 @@ export function SidebarOrganizationChannels({
   onChannelDelete?: (channelId: string) => Promise<void>;
   onChannelOpen: ChannelOpenHandler;
   onChannelSettings?: (channelId: string) => void;
-  organizationRole?: OrganizationRole | null;
+  organizationRole?: WorkspaceRole | null;
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(true);
@@ -412,7 +412,7 @@ export function SidebarProjectChannels({
   onSettings?: (channelId: string) => void;
   projectId: string;
   projectName: string;
-  organizationRole?: OrganizationRole | null;
+  organizationRole?: WorkspaceRole | null;
   topLevel?: boolean;
 }) {
   const { t } = useI18n();
@@ -512,7 +512,7 @@ function SidebarChannelButton({
   onDeleteChannel?: (channelId: string) => Promise<void>;
   onOpen: ChannelOpenHandler;
   onSettings?: (channelId: string) => void;
-  organizationRole?: OrganizationRole | null;
+  organizationRole?: WorkspaceRole | null;
 }) {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -604,7 +604,7 @@ function SidebarChannelButton({
               onSelect={() => {
                 void copyText(
                   channelShareUrl({
-                    organizationId: channel.organizationId,
+                    workspaceId: channel.workspaceId,
                     channelId: channel.id,
                   }),
                   t("channel.linkCopied"),

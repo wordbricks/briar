@@ -9,9 +9,9 @@ import { signJsonToken } from "./signed-json-token";
 describe("channel realtime tickets", () => {
   const now = Date.UTC(2026, 7, 12, 0, 0, 0);
 
-  it("authenticates a short-lived organization-scoped socket URL", async () => {
+  it("authenticates a short-lived workspace-scoped socket URL", async () => {
     const issued = await createChannelRealtimeTicket("test-secret", {
-      organizationId: "organization-a",
+      workspaceId: "workspace-a",
       userId: "user-a",
       now,
     });
@@ -20,19 +20,19 @@ describe("channel realtime tickets", () => {
       verifyChannelRealtimeTicket(
         "test-secret",
         issued.ticket,
-        "organization-a",
+        "workspace-a",
         now + 1,
       ),
     ).resolves.toMatchObject({
-      organizationId: "organization-a",
+      workspaceId: "workspace-a",
       userId: "user-a",
       expiresAt: now + CHANNEL_REALTIME_TICKET_TTL_MS,
     });
   });
 
-  it("rejects tampered, cross-organization, and expired tickets", async () => {
+  it("rejects tampered, cross-workspace, and expired tickets", async () => {
     const issued = await createChannelRealtimeTicket("test-secret", {
-      organizationId: "organization-a",
+      workspaceId: "workspace-a",
       userId: "user-a",
       now,
     });
@@ -41,7 +41,7 @@ describe("channel realtime tickets", () => {
       verifyChannelRealtimeTicket(
         "test-secret",
         `${issued.ticket}x`,
-        "organization-a",
+        "workspace-a",
         now + 1,
       ),
     ).resolves.toBeNull();
@@ -49,7 +49,7 @@ describe("channel realtime tickets", () => {
       verifyChannelRealtimeTicket(
         "test-secret",
         issued.ticket,
-        "organization-b",
+        "workspace-b",
         now + 1,
       ),
     ).resolves.toBeNull();
@@ -57,7 +57,7 @@ describe("channel realtime tickets", () => {
       verifyChannelRealtimeTicket(
         "test-secret",
         issued.ticket,
-        "organization-a",
+        "workspace-a",
         now + CHANNEL_REALTIME_TICKET_TTL_MS,
       ),
     ).resolves.toBeNull();
@@ -68,7 +68,7 @@ describe("channel realtime tickets", () => {
       "briar-channel-realtime",
       "test-secret",
       {
-        organizationId: "organization-a",
+        workspaceId: "workspace-a",
         userId: "user-a",
         expiresAt: now + CHANNEL_REALTIME_TICKET_TTL_MS,
         nonce: "nonce-a",
@@ -80,7 +80,7 @@ describe("channel realtime tickets", () => {
       verifyChannelRealtimeTicket(
         "test-secret",
         ticket,
-        "organization-a",
+        "workspace-a",
         now + 1,
       ),
     ).resolves.toMatchObject({
@@ -94,7 +94,7 @@ describe("channel realtime tickets", () => {
       "briar-channel-realtime",
       "test-secret",
       {
-        organizationId: "organization-a",
+        workspaceId: "workspace-a",
         userId: 42,
         expiresAt: now + CHANNEL_REALTIME_TICKET_TTL_MS,
         nonce: "nonce-a",
@@ -105,7 +105,7 @@ describe("channel realtime tickets", () => {
       verifyChannelRealtimeTicket(
         "test-secret",
         ticket,
-        "organization-a",
+        "workspace-a",
         now + 1,
       ),
     ).resolves.toBeNull();
@@ -116,7 +116,7 @@ describe("channel realtime tickets", () => {
       "briar-channel-activity",
       "test-secret",
       {
-        organizationId: "organization-a",
+        workspaceId: "workspace-a",
         userId: "user-a",
         expiresAt: now + CHANNEL_REALTIME_TICKET_TTL_MS,
         nonce: "nonce-a",
@@ -127,7 +127,7 @@ describe("channel realtime tickets", () => {
       verifyChannelRealtimeTicket(
         "test-secret",
         ticket,
-        "organization-a",
+        "workspace-a",
         now + 1,
       ),
     ).resolves.toBeNull();

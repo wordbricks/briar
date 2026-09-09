@@ -199,7 +199,7 @@ export async function acceptAgentSkillExecutionProposal(
   input: {
     proposalId: string;
     sourceKind: "channel" | "issue";
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     channelId: string | null;
     conversationRunId: string | null;
@@ -238,7 +238,7 @@ export async function acceptAgentSkillExecutionProposal(
       input.materializedSessionPayloadJson,
       input.proposalId,
       input.sourceKind,
-      input.organizationId,
+      input.workspaceId,
       input.projectId,
       input.channelId,
       input.conversationRunId,

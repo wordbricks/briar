@@ -98,7 +98,7 @@ const projectId = (value: string) =>
 
 export type ReplyWireClaim = {
   replyKind: ReplyKind;
-  organizationId: string | null;
+  workspaceId: string | null;
   workId: string;
   runId: string;
   claimToken: string;
@@ -132,7 +132,7 @@ export function replyWireClaim(
     }
     return {
       replyKind: "issue",
-      organizationId: null,
+      workspaceId: null,
       workId,
       runId,
       claimToken: value.claimToken,
@@ -148,13 +148,13 @@ export function replyWireClaim(
     ) {
       throw new ReplyCompletionMappingError("Channel reply claim token is invalid");
     }
-    const organizationId = mapping(
+    const workspaceId = mapping(
       () => canonicalUuid(variant.value.workspaceId).toLowerCase(),
-      "Reply organization ID is invalid",
+      "Reply workspace ID is invalid",
     );
     return {
       replyKind: "channel",
-      organizationId,
+      workspaceId,
       workId,
       runId,
       claimToken: value.claimToken,
@@ -402,7 +402,7 @@ export type ChannelReplyCompletionInput = {
   requestId: string;
   projectId: string;
   workerId: string;
-  claim: ReplyWireClaim & { replyKind: "channel"; organizationId: string };
+  claim: ReplyWireClaim & { replyKind: "channel"; workspaceId: string };
   attachmentIds: string[];
   conversationId: string | null;
   publishedFinalBatchId?: string | null;

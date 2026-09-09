@@ -126,7 +126,7 @@ const textReasons: ReadonlyArray<readonly [RegExp, ProviderBlockReason]> = [
     "context_window_exceeded",
   ],
   [
-    /\b(?:status(?: code)?|http)\s*(?:401|403)\b|\b(?:401|403)\s+(?:unauthorized|forbidden)\b|\bunauthori[sz]ed\b|\bunauthenticated\b|\bnot (?:logged|signed) in\b|\b(?:log|sign) ?in (?:again|required|to continue)\b|\bauthentication (?:failed|required|error|expired)\b|\binvalid (?:api[_ ]?key|token|credentials?)\b|\b(?:token|session|credentials?) (?:has |have )?expired\b|\bplease (?:re-?)?(?:sign|log) ?in\b|\bre-?authenticat(?:e|ion)\b|\bauthentication_failed\b|\boauth[_ ]org[_ ]not[_ ]allowed\b|\bapi key (?:is )?(?:invalid|missing|required)\b|\bpermission denied\b[^.]{0,40}\b(?:api|account|organization)\b/iu,
+    /\b(?:status(?: code)?|http)\s*(?:401|403)\b|\b(?:401|403)\s+(?:unauthorized|forbidden)\b|\bunauthori[sz]ed\b|\bunauthenticated\b|\bnot (?:logged|signed) in\b|\b(?:log|sign) ?in (?:again|required|to continue)\b|\bauthentication (?:failed|required|error|expired)\b|\binvalid (?:api[_ ]?key|token|credentials?)\b|\b(?:token|session|credentials?) (?:has |have )?expired\b|\bplease (?:re-?)?(?:sign|log) ?in\b|\bre-?authenticat(?:e|ion)\b|\bauthentication_failed\b|\boauth[_ ]org[_ ]not[_ ]allowed\b|\bapi key (?:is )?(?:invalid|missing|required)\b|\bpermission denied\b[^.]{0,40}\b(?:api|account|workspace)\b/iu,
     "auth_required",
   ],
   [

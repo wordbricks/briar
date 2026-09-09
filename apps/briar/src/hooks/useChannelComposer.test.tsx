@@ -71,7 +71,7 @@ const agents: ChannelAgentSummary[] = [
     createdAt: "2026-08-01T00:00:00.000Z",
   },
   {
-    agentId: "organization-agent",
+    agentId: "workspace-agent",
     name: "Helper",
     avatar: null,
     provider: "claude",
@@ -230,7 +230,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => container.querySelector("form")?.requestSubmit());
     expect(onSend).toHaveBeenCalledWith(
       "@Helper",
-      [expect.objectContaining({ id: "organization-agent", type: "agent" })],
+      [expect.objectContaining({ id: "workspace-agent", type: "agent" })],
       [],
       [],
     );

@@ -7,8 +7,8 @@ import {
 import { sha256 } from "./crypto-digest";
 import { handleWorkerWakeRoute } from "./worker-wake-routes";
 
-const organizationId = "77777777-7777-4777-8777-777777777777";
-const otherOrganizationId = "88888888-8888-4888-8888-888888888888";
+const workspaceId = "77777777-7777-4777-8777-777777777777";
+const otherWorkspaceId = "88888888-8888-4888-8888-888888888888";
 const ownerId = "worker-wake-owner";
 const deviceId = "99999999-9999-4999-8999-999999999999";
 const credential = "briar_worker_wake_route_credential";
@@ -29,8 +29,8 @@ describe("worker wake route", () => {
     headers: Record<string, string>,
   ) => new Request(`https://briar.example${path}`, { headers });
 
-  const wakeRequest = (token: string, organization = organizationId) =>
-    request(`/organizations/${organization}/worker-wake`, {
+  const wakeRequest = (token: string, workspace = workspaceId) =>
+    request(`/workspaces/${workspace}/worker-wake`, {
       Upgrade: "websocket",
       "Sec-WebSocket-Protocol": workerWakeSubprotocol(token),
     });
@@ -46,18 +46,18 @@ describe("worker wake route", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Worker Wake', 'worker-wake', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
       db.prepare(
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Other Wake', 'other-wake', ?, ?)`,
-      ).bind(otherOrganizationId, now, now),
+      ).bind(otherWorkspaceId, now, now),
     ]);
     await db.prepare(
       `insert into briar_organization_members (
          organization_id, user_id, role, created_at, updated_at
        ) values (?, ?, 'owner', ?, ?)`,
-    ).bind(organizationId, ownerId, now, now).run();
+    ).bind(workspaceId, ownerId, now, now).run();
     await db.batch([
       db.prepare(
         `insert into briar_execution_worker_devices (
@@ -65,7 +65,7 @@ describe("worker wake route", () => {
            state, max_concurrent_sessions, last_heartbeat_at,
            created_at, updated_at
          ) values (?, ?, ?, 'Wake device', ?, 'online', 1, ?, ?, ?)`,
-      ).bind(deviceId, organizationId, ownerId, "b".repeat(64), now, now, now),
+      ).bind(deviceId, workspaceId, ownerId, "b".repeat(64), now, now, now),
       db.prepare(
         `insert into briar_execution_worker_devices (
            id, organization_id, owner_user_id, label, device_identity_hash,
@@ -74,7 +74,7 @@ describe("worker wake route", () => {
          ) values (?, ?, ?, 'Disabled device', ?, 'disabled', 1, ?, ?, ?)`,
       ).bind(
         disabledDeviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         "c".repeat(64),
         now,
@@ -118,9 +118,9 @@ describe("worker wake route", () => {
     ).toBe(workerWakeSubprotocol(credential));
   });
 
-  it("refuses a credential from another organization", async () => {
+  it("refuses a credential from another workspace", async () => {
     await expect(handleWorkerWakeRoute({
-      request: wakeRequest(credential, otherOrganizationId),
+      request: wakeRequest(credential, otherWorkspaceId),
       db,
       env: env(),
     })).rejects.toMatchObject({ status: 403 });
@@ -137,7 +137,7 @@ describe("worker wake route", () => {
     for (const headers of rejected) {
       await expect(handleWorkerWakeRoute({
         request: request(
-          `/organizations/${organizationId}/worker-wake`,
+          `/workspaces/${workspaceId}/worker-wake`,
           headers,
         ),
         db,
@@ -159,14 +159,14 @@ describe("worker wake route", () => {
 
   it("requires a WebSocket upgrade and ignores other paths", async () => {
     await expect(handleWorkerWakeRoute({
-      request: request(`/organizations/${organizationId}/worker-wake`, {
+      request: request(`/workspaces/${workspaceId}/worker-wake`, {
         "Sec-WebSocket-Protocol": workerWakeSubprotocol(credential),
       }),
       db,
       env: env(),
     })).rejects.toMatchObject({ status: 426 });
     await expect(handleWorkerWakeRoute({
-      request: request(`/organizations/${organizationId}/channel-events`, {
+      request: request(`/workspaces/${workspaceId}/channel-events`, {
         Upgrade: "websocket",
       }),
       db,

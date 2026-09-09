@@ -11,7 +11,7 @@ import {
   prepareIssueAttachmentUploadRows,
   type IssueAttachmentUploadPurpose,
 } from "./issue-attachment-upload-repository";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import { getTeam } from "./team-command-repository";
 import { createUploadCapability, UPLOAD_CAPABILITY_MAX_TTL_MS } from "./upload-capability";
 import type { UploadMetadata } from "./upload-repository";
@@ -128,7 +128,7 @@ async function prepareIssueAttachmentsApplication(
   const project = await services.getTeam(input.db, input.projectId, input.userId);
   const capability = purpose === "issue_message" ? "conversations:write" : "issues:write";
   if (!project) throw new HttpError(404, "Project not found");
-  if (!hasOrganizationCapability(project.member_role, capability)) {
+  if (!hasWorkspaceCapability(project.member_role, capability)) {
     throw new HttpError(403, "Issue attachment upload permission required");
   }
   if (
@@ -146,7 +146,7 @@ async function prepareIssueAttachmentsApplication(
   try {
     prepared = await services.prepareIssueAttachmentUploadRows(input.db, {
       purpose,
-      organizationId: project.organization_id,
+      workspaceId: project.organization_id,
       projectId: project.id,
       userId: input.userId,
       mutationId: input.mutationId,

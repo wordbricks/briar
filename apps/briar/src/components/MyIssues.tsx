@@ -47,7 +47,7 @@ import { useRegistry } from "../state/registry";
 /*
   "내 이슈", drawn from the store.
 
-  The page used to load a `DashboardPayload` per project of the organization
+  The page used to load a `DashboardPayload` per project of the workspace
   into a `useState` record and render run objects out of it. Those responses go
   through `applySyncEvent` now (`state/my-issues/useMyIssuesSync.ts`), and what
   is left here is the page's chrome: the project filter, the scope tabs and the
@@ -61,8 +61,8 @@ export type MyIssuesProps = {
   isSidebarOpen: boolean;
   loadProjectDashboard: MyIssuesDashboardLoader;
   onOpenIssue: (projectId: string, runId: string) => void;
-  organizationId: string | null;
-  organizationName?: string | null;
+  workspaceId: string | null;
+  workspaceName?: string | null;
   projects: Project[];
 };
 
@@ -182,8 +182,8 @@ function MyIssuesKanban({
   isLoading,
   isSidebarOpen,
   onOpenIssue,
-  organizationId,
-  organizationName,
+  workspaceId,
+  workspaceName,
   state,
   toolbarAfterSearch,
 }: {
@@ -194,8 +194,8 @@ function MyIssuesKanban({
   isLoading: boolean;
   isSidebarOpen: boolean;
   onOpenIssue: (projectId: string, runId: string) => void;
-  organizationId: string | null;
-  organizationName?: string | null;
+  workspaceId: string | null;
+  workspaceName?: string | null;
   state: IssueCollectionState;
   toolbarAfterSearch: React.ReactNode;
 }) {
@@ -250,7 +250,7 @@ function MyIssuesKanban({
           .join(" ");
       }}
       headerDescription={t("myIssues.description")}
-      headerEyebrow={organizationName}
+      headerEyebrow={workspaceName}
       headerTrailing={headerTrailing}
       isLoading={isLoading}
       isSidebarOpen={isSidebarOpen}
@@ -269,7 +269,7 @@ function MyIssuesKanban({
       scrollClassName="my-issues-scroll"
       searchPlaceholder={t("myIssues.search")}
       state={state}
-      storageScopeId={organizationId ? `my-issues:${organizationId}` : null}
+      storageScopeId={workspaceId ? `my-issues:${workspaceId}` : null}
       title={t("myIssues.title")}
       toolbarAfterSearch={toolbarAfterSearch}
       updatingIssueId={null}
@@ -283,8 +283,8 @@ export function MyIssues({
   isSidebarOpen,
   loadProjectDashboard,
   onOpenIssue,
-  organizationId,
-  organizationName,
+  workspaceId,
+  workspaceName,
   projects,
 }: MyIssuesProps) {
   const { t } = useI18n();
@@ -293,9 +293,9 @@ export function MyIssues({
     () =>
       projects.filter(
         (project) =>
-          organizationId === null || project.organizationId === organizationId,
+          workspaceId === null || project.workspaceId === workspaceId,
       ),
-    [organizationId, projects],
+    [workspaceId, projects],
   );
   const scopedProjectIds = useMemo(
     () => scopedProjects.map((project) => project.id),
@@ -303,7 +303,7 @@ export function MyIssues({
   );
   useMyIssuesSync({
     load: loadProjectDashboard,
-    organizationId,
+    workspaceId,
     teamIds: scopedProjectIds,
   });
   /*
@@ -356,7 +356,7 @@ export function MyIssues({
   );
   const isInitialLoading =
     isLoading &&
-    loadedKey !== myIssuesCompositionKey(organizationId, scopedProjectIds) &&
+    loadedKey !== myIssuesCompositionKey(workspaceId, scopedProjectIds) &&
     scopedRunIds.length === 0;
 
   const bodyBefore = failedProjectIds.length > 0 ? (
@@ -421,8 +421,8 @@ export function MyIssues({
           isLoading={isInitialLoading}
           isSidebarOpen={isSidebarOpen}
           onOpenIssue={onOpenIssue}
-          organizationId={organizationId}
-          organizationName={organizationName}
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
           state={collectionState}
           toolbarAfterSearch={
             <ProjectFilter

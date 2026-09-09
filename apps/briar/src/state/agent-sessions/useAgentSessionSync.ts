@@ -39,7 +39,7 @@ import {
   dispatch back into the session that started it.
 
   It is a hook rather than a subscription atom because the lifecycle is a chain
-  of `useEffect` teardowns over three different sources — an organization
+  of `useEffect` teardowns over three different sources — a workspace
   socket, a Tauri event stream and a one-shot recovery pass — and because the
   reconciliation at the end subscribes to whichever team is on screen. Nothing
   here renders, so `AppEffects` is the only component that commits for it.
@@ -85,11 +85,11 @@ function syncBookkeeping(registry: AtomRegistry): AgentSessionSyncBookkeeping {
 
 /** The targets the account's teams make, as `configureSync` takes them. */
 const realtimeTargets = (
-  teams: readonly { id: string; organizationId?: string | null }[],
+  teams: readonly { id: string; workspaceId?: string | null }[],
 ): TeamRealtimeTarget[] =>
   teams.map((team) => ({
     id: team.id,
-    organizationId: team.organizationId,
+    workspaceId: team.workspaceId,
   }));
 
 export function useAgentSessionSync(deps: AgentSessionSyncDeps = {}): void {
@@ -117,7 +117,7 @@ export function useAgentSessionSync(deps: AgentSessionSyncDeps = {}): void {
   }, [deps.api, registry, teams, token]);
 
   /*
-    One subscription per account: the organization socket says which projects
+    One subscription per account: the workspace socket says which projects
     changed and this pulls their session pages. Requests are coalesced, because
     a burst of publishes for the same project must not become a burst of pages.
   */

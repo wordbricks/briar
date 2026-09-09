@@ -17,7 +17,7 @@ import worker from "./index";
 import { sha256Hex } from "./managed-computer-crypto";
 import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 
-const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const workspaceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const projectId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const secondProjectId = "99999999-9999-4999-8999-999999999999";
 const managedComputerId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -53,31 +53,31 @@ describe("managed computer setup", () => {
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Managed Setup', 'managed-setup', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
     ]);
     await db.batch([
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, now, now),
+      ).bind(workspaceId, ownerId, now, now),
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'developer', ?, ?)`,
-      ).bind(organizationId, memberId, now, now),
+      ).bind(workspaceId, memberId, now, now),
       db.prepare(
         `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Managed project', ?, ?, ?)`,
-      ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+      ).bind(projectId, ownerId, workspaceId, "a".repeat(64), now, now),
       db.prepare(
         `insert into briar_teams (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Second managed project', ?, ?, ?)`,
-      ).bind(secondProjectId, ownerId, organizationId, "e".repeat(64), now, now),
+      ).bind(secondProjectId, ownerId, workspaceId, "e".repeat(64), now, now),
       db.prepare(
         `insert into briar_managed_computer_entitlements (
            id, organization_id, requester_user_id, source, source_reference,
@@ -87,13 +87,13 @@ describe("managed computer setup", () => {
            'managed-setup-application', 'approved', ?,
            '2099-01-01T00:00:00.000Z', ?, ?
          )`,
-      ).bind(organizationId, ownerId, now, now, now),
+      ).bind(workspaceId, ownerId, now, now, now),
       db.prepare(
         `insert into briar_execution_worker_devices (
            id, organization_id, owner_user_id, label, device_identity_hash,
            state, max_concurrent_sessions, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'Managed setup computer', ?, 'online', 1, ?, ?, ?)`,
-      ).bind(deviceId, organizationId, ownerId, "b".repeat(64), now, now, now),
+      ).bind(deviceId, workspaceId, ownerId, "b".repeat(64), now, now, now),
       db.prepare(
         `insert into briar_execution_worker_credentials (
            device_id, token_hash, created_at, last_used_at, expires_at, revoked_at
@@ -117,7 +117,7 @@ describe("managed computer setup", () => {
          )`,
       ).bind(
         managedComputerId,
-        organizationId,
+        workspaceId,
         ownerId,
         deviceId,
         "c".repeat(64),
@@ -168,7 +168,7 @@ describe("managed computer setup", () => {
     const developerRequestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const developerTicket = await fleet().createManagedComputerSetupSession(
       {
-        workspaceId: organizationId,
+        workspaceId: workspaceId,
         managedComputerId,
         projectId,
         requestId: developerRequestId,
@@ -183,7 +183,7 @@ describe("managed computer setup", () => {
     ).bind(developerRequestId).run();
 
     const firstPayload = await fleet().createManagedComputerSetupSession(
-      { workspaceId: organizationId, managedComputerId, projectId, requestId },
+      { workspaceId: workspaceId, managedComputerId, projectId, requestId },
       options(ownerToken),
     );
     if (!firstPayload.session || !firstPayload.socket) {
@@ -208,7 +208,7 @@ describe("managed computer setup", () => {
     expect(stored?.token_hash).not.toContain(firstPayload.setupToken);
 
     await expect(fleet().createManagedComputerSetupSession(
-      { workspaceId: organizationId, managedComputerId, projectId, requestId },
+      { workspaceId: workspaceId, managedComputerId, projectId, requestId },
       options(ownerToken),
     )).resolves.toMatchObject({
       duplicate: true,
@@ -220,7 +220,7 @@ describe("managed computer setup", () => {
     const contextRequestId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
     const { setupToken } = await fleet().createManagedComputerSetupSession(
       {
-        workspaceId: organizationId,
+        workspaceId: workspaceId,
         managedComputerId,
         projectId,
         requestId: contextRequestId,
@@ -253,7 +253,7 @@ describe("managed computer setup", () => {
 
   it("binds the enrolled device once and starts fail-closed", async () => {
     const { setupToken } = await fleet().createManagedComputerSetupSession(
-      { workspaceId: organizationId, managedComputerId, projectId, requestId },
+      { workspaceId: workspaceId, managedComputerId, projectId, requestId },
       options(ownerToken),
     );
     const client = setup();
@@ -273,7 +273,7 @@ describe("managed computer setup", () => {
     expect(responseHeaders?.get("cache-control")).toBe("private, no-store");
     expect(first).toMatchObject({
       managedComputerId,
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
       teamId: projectId,
       deviceId,
       duplicate: false,
@@ -298,7 +298,7 @@ describe("managed computer setup", () => {
     const reconfigureSetupToken = (
       await fleet().createManagedComputerSetupSession(
         {
-          workspaceId: organizationId,
+          workspaceId: workspaceId,
           managedComputerId,
           projectId,
           requestId: reconfigureRequestId,
@@ -324,7 +324,7 @@ describe("managed computer setup", () => {
     expect(counts).toEqual({ sessions: 3, workers: 1 });
 
     await expect(fleet().getManagedComputerSetupStatus(
-      { workspaceId: organizationId, managedComputerId },
+      { workspaceId: workspaceId, managedComputerId },
       options(ownerToken),
     )).resolves.toMatchObject({
       session: {
@@ -347,7 +347,7 @@ describe("managed computer setup", () => {
     const addProjectRequestId = "77777777-7777-4777-8777-777777777777";
     const { setupToken } = await fleet().createManagedComputerSetupSession(
       {
-        workspaceId: organizationId,
+        workspaceId: workspaceId,
         managedComputerId,
         projectId: secondProjectId,
         requestId: addProjectRequestId,

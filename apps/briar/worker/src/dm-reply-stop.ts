@@ -11,7 +11,7 @@ export function isDmReplyStop(body: string, mentionedAgentNames: readonly string
 }
 
 export type DmReplyStop = {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   userId: string;
   rootMessageId: string;
@@ -38,7 +38,7 @@ export function dmReplyStopStatements(db: D1Database, input: DmReplyStop) {
       and request.id = ? and request.parent_message_id = root.id
       and request.author_user_id = member.user_id
   )`;
-  const authorization = [input.channelId, input.organizationId, input.userId,
+  const authorization = [input.channelId, input.workspaceId, input.userId,
     input.rootMessageId, input.requestMessageId];
   return [
     db.prepare(`update briar_channel_agent_reply_jobs
@@ -68,9 +68,9 @@ export function dmReplyStopStatements(db: D1Database, input: DmReplyStop) {
               and original.trigger_message_id = ?
           ) = 1))
         ) and ${authorized}`)
-      .bind(marker, input.createdAt, input.createdAt, input.createdAt, input.createdAt, input.organizationId,
+      .bind(marker, input.createdAt, input.createdAt, input.createdAt, input.createdAt, input.workspaceId,
         input.channelId, input.rootMessageId, input.rootMessageId, input.rootMessageId, input.channelId, input.channelId, input.rootMessageId, mentioned, mentioned, mentioned,
-        input.organizationId, input.channelId, input.rootMessageId, ...authorization),
+        input.workspaceId, input.channelId, input.rootMessageId, ...authorization),
     db.prepare(`insert into briar_channel_messages (
         id, channel_id, parent_message_id, author_agent_name, body, created_at, updated_at
       ) select ?, ?, ?, 'Briar', case

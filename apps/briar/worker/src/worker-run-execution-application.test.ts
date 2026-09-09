@@ -152,7 +152,7 @@ describe("Worker run execution application", () => {
       sha256: vi.fn(async () => claimTokenHash),
       assertQueuedClaim,
       recordEvent,
-      projectOrganizationId: vi.fn(async () => "organization-1"),
+      projectWorkspaceId: vi.fn(async () => "workspace-1"),
       auditEvent,
     });
 
@@ -169,7 +169,7 @@ describe("Worker run execution application", () => {
       expect.any(String),
     );
     expect(auditEvent).toHaveBeenCalledWith(db, expect.objectContaining({
-      organizationId: "organization-1",
+      workspaceId: "workspace-1",
       projectId,
       runId,
       workerId: "worker-1",

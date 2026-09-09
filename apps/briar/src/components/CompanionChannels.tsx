@@ -101,7 +101,7 @@ import { applySyncEvent } from "../state/sync/apply";
 import { useChannelActions } from "../state/channels/actions";
 import {
   channelCatalogCursorAtom,
-  visibleOrganizationChannelsAtom,
+  visibleWorkspaceChannelsAtom,
 } from "../state/channels/atoms";
 import { channelAtom } from "../state/entities/channels";
 import {
@@ -136,7 +136,7 @@ import {
 } from "../state/channel-conversation/write";
 
 type CompanionChannelsProps = {
-  organizationId: string;
+  workspaceId: string;
   activeProjectId: string | null;
   currentUserId: string | null;
   projects: readonly ChannelGroupProject[];
@@ -166,7 +166,7 @@ const mobileChannelMessagePageSize = 20;
  * side panel: a phone has no room for the desktop three-column layout.
  */
 export function CompanionChannels({
-  organizationId,
+  workspaceId,
   activeProjectId,
   currentUserId,
   projects,
@@ -182,16 +182,16 @@ export function CompanionChannels({
 }: CompanionChannelsProps) {
   const { t } = useI18n();
   const registry = useRegistry();
-  const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
+  const imageCache = useChannelMessageImageCache(`${workspaceId}\0${token}`);
   /*
     The catalog is `state/channels`', kept current by the one loop in
     `useChannelCatalogSync`. This screen used to fetch its own first
     `listChannels` snapshot into a `useState` array and merge the delta pages
     into it a second time; what is left is which channel it has open.
   */
-  const channels = useAtomValue(visibleOrganizationChannelsAtom);
+  const channels = useAtomValue(visibleWorkspaceChannelsAtom);
   const channelListReady = useAtomValue(channelCatalogCursorAtom) !== null;
-  const { markOrganizationChannelRead } = useChannelActions();
+  const { markWorkspaceChannelRead } = useChannelActions();
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const channel = useAtomValue(channelAtom(activeChannelId ?? ""));
   /*
@@ -217,7 +217,7 @@ export function CompanionChannels({
   const [loading, setLoading] = useState(true);
   /*
     The channel list is busy while the shared catalog loop has not answered for
-    this organization yet — a cursor read rather than a fetch of its own. A
+    this workspace yet — a cursor read rather than a fetch of its own. A
     conversation load keeps `loading` for the screens below it.
   */
   const listLoading = loading || !channelListReady;
@@ -267,8 +267,8 @@ export function CompanionChannels({
     setLoading(false);
   }, [registry]);
   const handleSelectedChannelSummary = useCallback(
-    (summary: ChannelSummary) => markOrganizationChannelRead(summary.id),
-    [markOrganizationChannelRead],
+    (summary: ChannelSummary) => markWorkspaceChannelRead(summary.id),
+    [markWorkspaceChannelRead],
   );
   /**
    * A channel the conversation loaded, which the catalog may not list yet — a
@@ -396,7 +396,7 @@ export function CompanionChannels({
     requestedMessage?.messageId ?? highlightedMessage?.messageId ?? null;
 
   /*
-    Switching organizations closes whatever this screen had open. The catalog
+    Switching workspaces closes whatever this screen had open. The catalog
     itself is the shared loop's — this used to fetch its own `listChannels`
     snapshot here, a second round trip for a list the store already had.
   */
@@ -406,7 +406,7 @@ export function CompanionChannels({
     conversationLoader.clearProposalHistory(channelRef.current?.id ?? null);
     setActiveChannelId(null);
     setLoading(false);
-  }, [conversationLoader, organizationId, token]);
+  }, [conversationLoader, workspaceId, token]);
 
   const groups = useMemo(
     () =>
@@ -430,7 +430,7 @@ export function CompanionChannels({
       requestStickToBottom();
       const selectionVersion = ++channelSelectionVersion.current;
       setActiveChannelId(summary.id);
-      markOrganizationChannelRead(summary.id);
+      markWorkspaceChannelRead(summary.id);
       resetChannelConversationViewState(registry, summary.id);
       // Reply jobs are live execution state. A stored running job can finish
       // while another screen is open, so restoring it would replay a stale
@@ -447,7 +447,7 @@ export function CompanionChannels({
           !result ||
           selectionVersion !== channelSelectionVersion.current
         ) return;
-        markOrganizationChannelRead(result.channel.id);
+        markWorkspaceChannelRead(result.channel.id);
         requestStickToBottom();
       } finally {
         if (selectionVersion === channelSelectionVersion.current) {
@@ -458,7 +458,7 @@ export function CompanionChannels({
     [
       conversationLoader,
       loadChannelConversation,
-      markOrganizationChannelRead,
+      markWorkspaceChannelRead,
       registry,
       requestStickToBottom,
     ],
@@ -468,7 +468,7 @@ export function CompanionChannels({
     if (!requestedChannelId || requestedMessage) return;
     const summary = channels.find(
       (candidate) =>
-        candidate.organizationId === organizationId &&
+        candidate.workspaceId === workspaceId &&
         candidate.id === requestedChannelId,
     );
     if (!summary) return;
@@ -477,7 +477,7 @@ export function CompanionChannels({
     channels,
     onRequestedChannelOpen,
     openChannel,
-    organizationId,
+    workspaceId,
     requestedChannelId,
     requestedMessage,
   ]);
@@ -518,7 +518,7 @@ export function CompanionChannels({
     if (!requestedMessage) return;
     const summary = channels.find(
       (candidate) =>
-        candidate.organizationId === organizationId &&
+        candidate.workspaceId === workspaceId &&
         candidate.id === requestedMessage.channelId,
     );
     if (!summary) return;
@@ -543,7 +543,7 @@ export function CompanionChannels({
           cancelled ||
           selectionVersion !== channelSelectionVersion.current
         ) return;
-        markOrganizationChannelRead(result.channel.id);
+        markWorkspaceChannelRead(result.channel.id);
         if (requestedMessage.rootMessageId === requestedMessage.messageId) {
           writeChannelOpenThreadId(registry, summary.id, null);
         }
@@ -579,9 +579,9 @@ export function CompanionChannels({
     channels,
     conversationLoader,
     loadChannelConversation,
-    markOrganizationChannelRead,
+    markWorkspaceChannelRead,
     onRequestedMessageOpen,
-    organizationId,
+    workspaceId,
     registry,
     requestedMessage,
     setStickToBottom,
@@ -1157,7 +1157,7 @@ function MessageRow({
         <ChannelLinkPreview
           channelId={message.channelId}
           message={message}
-          organizationId={channel.organizationId}
+          workspaceId={channel.workspaceId}
           token={token}
         />
         <ChannelMessageImages
@@ -1403,7 +1403,7 @@ function MessageRow({
               onClick={() => {
                 setShowingThreadActions(false);
                 void copyChannelShareLink({
-                  organizationId: channel.organizationId,
+                  workspaceId: channel.workspaceId,
                   channelId: message.channelId,
                   messageId: message.id,
                   rootMessageId: message.parentMessageId ?? message.id,

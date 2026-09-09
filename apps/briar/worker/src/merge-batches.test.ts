@@ -555,7 +555,7 @@ describe("repository merge queue coordinator", () => {
     const first = await claimNextMergeBatch(db, lane.projectId, claimInput);
     expect(first).not.toBeNull();
     const request = await requestExecutionWorkerUpdate(db, {
-      id: "77777777-7777-4777-8777-000000000041", organizationId: "merge-org",
+      id: "77777777-7777-4777-8777-000000000041", workspaceId: "merge-org",
       deviceId: lane.deviceId, requestedByUserId: "merge-owner", targetVersion: "1.2.216",
       requestedAt: at(41, 4), requiresRuntimeAck: true,
     });

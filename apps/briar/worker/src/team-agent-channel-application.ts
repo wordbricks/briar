@@ -2,7 +2,7 @@ import {
   channelJson,
   getClaimedChannelReplyChannel,
   getProjectAgentChannel,
-  getProjectOrganizationChannel,
+  getProjectWorkspaceChannel,
   isChannelRootMessage,
   listChannelMessagePage,
 } from "./channels";
@@ -28,7 +28,7 @@ export class TeamAgentChannelApplicationError extends Error {
 export type TeamAgentChannelApplicationServices = {
   readonly getClaimedChannelReplyChannel: typeof getClaimedChannelReplyChannel;
   readonly getProjectAgentChannel: typeof getProjectAgentChannel;
-  readonly getProjectOrganizationChannel: typeof getProjectOrganizationChannel;
+  readonly getProjectWorkspaceChannel: typeof getProjectWorkspaceChannel;
   readonly isChannelRootMessage: typeof isChannelRootMessage;
   readonly listChannelMessagePage: typeof listChannelMessagePage;
 };
@@ -37,7 +37,7 @@ const teamAgentChannelApplicationServices:
   TeamAgentChannelApplicationServices = {
     getClaimedChannelReplyChannel,
     getProjectAgentChannel,
-    getProjectOrganizationChannel,
+    getProjectWorkspaceChannel,
     isChannelRootMessage,
     listChannelMessagePage,
   };
@@ -70,7 +70,7 @@ export async function listTeamAgentChannelMessagesApplication(
     input.channelId,
   );
   if (!channel) {
-    const organizationChannel = await services.getProjectOrganizationChannel(
+    const organizationChannel = await services.getProjectWorkspaceChannel(
       input.db,
       input.projectId,
       input.channelId,
@@ -128,7 +128,7 @@ export async function listTeamAgentChannelMessagesApplication(
 export async function listClaimedChannelReplyMessagesApplication(
   input: {
     readonly db: D1Database;
-    readonly organizationId: string;
+    readonly workspaceId: string;
     readonly deviceId: string;
     readonly jobId: string;
     readonly parentMessageId: string | null;
@@ -143,7 +143,7 @@ export async function listClaimedChannelReplyMessagesApplication(
     ...overrides,
   };
   const channel = await services.getClaimedChannelReplyChannel(input.db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     jobId: input.jobId,
     deviceId: input.deviceId,
     observedAt: input.observedAt,

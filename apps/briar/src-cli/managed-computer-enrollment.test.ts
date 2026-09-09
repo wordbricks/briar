@@ -20,7 +20,7 @@ import {
 import { loadManagedComputerCredential } from "./managed-computer-credential";
 
 const managedComputerId = "11111111-1111-4111-8111-111111111111";
-const organizationId = "22222222-2222-4222-8222-222222222222";
+const workspaceId = "22222222-2222-4222-8222-222222222222";
 
 describe("managed computer enrollment", () => {
   it("persists a validated credential from the generated Connect client", async () => {
@@ -45,7 +45,7 @@ describe("managed computer enrollment", () => {
         managedComputerId,
         credential: `briar_worker_${"c".repeat(43)}`,
         deviceId: `managed-${managedComputerId}`,
-        workspaceId: organizationId,
+        workspaceId: workspaceId,
       });
       const createEnrollmentClient = vi.fn(() => ({
         enrollManagedComputer,
@@ -69,9 +69,13 @@ describe("managed computer enrollment", () => {
       expect(await loadManagedComputerCredential(paths.credential)).toEqual(
         credential,
       );
-      expect(JSON.parse(await readFile(paths.credential, "utf8"))).toEqual(
-        credential,
-      );
+      // The file keeps the pre-rename key so already-enrolled machines can
+      // still read it; only the decoded value carries workspaceId.
+      const { workspaceId: decodedWorkspaceId, ...rest } = credential;
+      expect(JSON.parse(await readFile(paths.credential, "utf8"))).toEqual({
+        ...rest,
+        organizationId: decodedWorkspaceId,
+      });
       expect((await stat(paths.credential)).mode & 0o777).toBe(0o600);
     } finally {
       await rm(directory, { recursive: true, force: true });

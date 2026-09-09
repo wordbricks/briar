@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import type { ChannelSummary } from "../../lib/channels-contract";
 import { organizationChannelIdsAtom } from "../entities/channels";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { createTestRegistry } from "../registry";
 import { applySyncEvent } from "../sync/apply";
 import {
   activeChannelIdAtom,
-  activeOrganizationChannelsAtom,
+  activeWorkspaceChannelsAtom,
   channelCatalogCursorAtom,
   initialChannelInviteIdAtom,
   organizationDirectMessagesAtom,
   requestedChannelSettingsIdAtom,
   resetChannelSelection,
   unreadDirectMessageCountAtom,
-  visibleOrganizationChannelsAtom,
+  visibleWorkspaceChannelsAtom,
 } from "./atoms";
 
 const channel = (
@@ -23,7 +23,7 @@ const channel = (
   overrides: Partial<ChannelSummary> = {},
 ): ChannelSummary => ({
   id,
-  organizationId: "org-a",
+  workspaceId: "org-a",
   kind: "channel",
   slug: id,
   name: id,
@@ -48,14 +48,14 @@ const channel = (
   ...overrides,
 });
 
-const registryWith = (organizationId: string | null) =>
+const registryWith = (workspaceId: string | null) =>
   createTestRegistry([
-    [activeOrganizationIdAtom, organizationId],
+    [activeWorkspaceIdAtom, workspaceId],
     [lockedTeamIdAtom, null],
   ]);
 
 describe("channel selection atoms", () => {
-  it("reads back what was written under the same organization", () => {
+  it("reads back what was written under the same workspace", () => {
     const registry = registryWith("org-a");
     registry.set(activeChannelIdAtom, "channel-1");
     registry.set(requestedChannelSettingsIdAtom, "channel-1");
@@ -66,13 +66,13 @@ describe("channel selection atoms", () => {
     expect(registry.get(channelCatalogCursorAtom)).toBe(7);
   });
 
-  it("resets the selection when the organization changes", () => {
+  it("resets the selection when the workspace changes", () => {
     const registry = registryWith("org-a");
     registry.set(activeChannelIdAtom, "channel-1");
     registry.set(initialChannelInviteIdAtom, "channel-1");
     registry.set(channelCatalogCursorAtom, 7);
 
-    registry.set(activeOrganizationIdAtom, "org-b");
+    registry.set(activeWorkspaceIdAtom, "org-b");
 
     expect(registry.get(activeChannelIdAtom)).toBeNull();
     expect(registry.get(initialChannelInviteIdAtom)).toBeNull();
@@ -89,21 +89,21 @@ describe("channel selection atoms", () => {
       { immediate: true },
     );
 
-    registry.set(activeOrganizationIdAtom, "org-b");
+    registry.set(activeWorkspaceIdAtom, "org-b");
     unsubscribe();
 
     expect(seen).toEqual(["channel-1", null]);
   });
 
-  it("does not restore a selection when the organization comes back", () => {
+  it("does not restore a selection when the workspace comes back", () => {
     const registry = registryWith("org-a");
     registry.set(activeChannelIdAtom, "channel-1");
 
     // The sync hook drops the stamps as part of switching, so returning to an
-    // organization must not reopen what was last open there.
-    registry.set(activeOrganizationIdAtom, "org-b");
+    // workspace must not reopen what was last open there.
+    registry.set(activeWorkspaceIdAtom, "org-b");
     resetChannelSelection(registry);
-    registry.set(activeOrganizationIdAtom, "org-a");
+    registry.set(activeWorkspaceIdAtom, "org-a");
 
     expect(registry.get(activeChannelIdAtom)).toBeNull();
   });
@@ -114,7 +114,7 @@ describe("channel list selectors", () => {
     const registry = registryWith("org-a");
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [
         channel("general"),
         channel("dm-1", { kind: "dm", hasUnread: true }),
@@ -123,10 +123,10 @@ describe("channel list selectors", () => {
     });
 
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["general", "dm-1", "dm-2"]);
     expect(
-      registry.get(visibleOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(visibleWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["general"]);
     expect(
       registry.get(organizationDirectMessagesAtom).map((item) => item.id),
@@ -136,12 +136,12 @@ describe("channel list selectors", () => {
 
   it("shows a project window only the channels pinned to its team", () => {
     const registry = createTestRegistry([
-      [activeOrganizationIdAtom, "org-a"],
+      [activeWorkspaceIdAtom, "org-a"],
       [lockedTeamIdAtom, "team-a"],
     ]);
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [
         channel("pinned", { defaultProjectId: "team-a" }),
         channel("other", { defaultProjectId: "team-b" }),
@@ -150,7 +150,7 @@ describe("channel list selectors", () => {
     });
 
     expect(
-      registry.get(visibleOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(visibleWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["pinned"]);
     expect(registry.get(organizationDirectMessagesAtom)).toEqual([]);
   });
@@ -159,25 +159,25 @@ describe("channel list selectors", () => {
     const registry = registryWith("org-a");
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [channel("general")],
     });
-    const before = registry.get(visibleOrganizationChannelsAtom);
+    const before = registry.get(visibleWorkspaceChannelsAtom);
 
     applySyncEvent(registry, {
       kind: "channel-catalog-delta",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels: [],
       removedChannelIds: [],
       reset: false,
     });
 
-    expect(registry.get(visibleOrganizationChannelsAtom)).toBe(before);
+    expect(registry.get(visibleWorkspaceChannelsAtom)).toBe(before);
   });
 
-  it("reads nothing while no organization is selected", () => {
+  it("reads nothing while no workspace is selected", () => {
     const registry = registryWith(null);
-    expect(registry.get(activeOrganizationChannelsAtom)).toEqual([]);
+    expect(registry.get(activeWorkspaceChannelsAtom)).toEqual([]);
     expect(registry.get(organizationChannelIdsAtom("org-a"))).toBeNull();
   });
 });

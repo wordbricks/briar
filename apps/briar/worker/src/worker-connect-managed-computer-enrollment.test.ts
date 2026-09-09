@@ -17,7 +17,7 @@ import {
 } from "./worker-connect-managed-computer-enrollment";
 
 const managedComputerId = "11111111-1111-4111-8111-111111111111";
-const organizationId = "22222222-2222-4222-8222-222222222222";
+const workspaceId = "22222222-2222-4222-8222-222222222222";
 const nonce = "n".repeat(43);
 const identitySignature = "a".repeat(64);
 
@@ -62,7 +62,7 @@ describe("ManagedComputerEnrollmentService", () => {
       .mockResolvedValue({
         credential: `briar_worker_${"c".repeat(43)}`,
         deviceId: `managed-${managedComputerId}`,
-        organizationId: organizationId,
+        workspaceId: workspaceId,
       });
 
     const response = await enrollmentClient({ enroll })
@@ -72,7 +72,7 @@ describe("ManagedComputerEnrollmentService", () => {
       managedComputerId,
       credential: `briar_worker_${"c".repeat(43)}`,
       deviceId: `managed-${managedComputerId}`,
-      workspaceId: organizationId,
+      workspaceId: workspaceId,
     });
     expect(enroll).toHaveBeenCalledOnce();
     expect(enroll.mock.calls[0]?.[2]).toMatchObject({

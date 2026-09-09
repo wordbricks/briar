@@ -33,12 +33,13 @@ const parseRelatedMessageReference = (value: unknown) => {
     return null;
   }
   const reference = value as Record<string, unknown>;
-  const organizationId = reference.organizationId;
+  // Stored under the pre-rename key; see `channelRelatedMessageReference`.
+  const workspaceId = reference.organizationId;
   const channelId = reference.channelId;
   const messageId = reference.messageId;
   const rootMessageId = reference.rootMessageId;
   if (
-    typeof organizationId !== "string" || !organizationId.trim() ||
+    typeof workspaceId !== "string" || !workspaceId.trim() ||
     typeof channelId !== "string" || !channelId.trim() ||
     typeof messageId !== "string" || !messageId.trim() ||
     typeof rootMessageId !== "string" || !rootMessageId.trim()
@@ -46,7 +47,7 @@ const parseRelatedMessageReference = (value: unknown) => {
     return null;
   }
   return {
-    organizationId: organizationId.trim(),
+    workspaceId: workspaceId.trim(),
     channelId: channelId.trim(),
     messageId: messageId.trim(),
     rootMessageId: rootMessageId.trim(),

@@ -28,7 +28,7 @@ import {
   isSidebarOpenAtom,
   planningProjectEditIdAtom,
   planningProjectTeamIdAtom,
-  requestedOrganizationAgentIdAtom,
+  requestedWorkspaceAgentIdAtom,
   requestedTeamAgentSettingsIdAtom,
 } from "../../state/dialogs/atoms";
 import { useNavigationActions } from "../../state/navigation/actions";
@@ -43,8 +43,9 @@ import {
   settingsTargetAtom,
 } from "../../state/navigation/atoms";
 import { visibleInboxUnreadCountAtom } from "../../state/inbox/atoms";
-import { useOrganizationActions } from "../../state/organization/actions";
-import { activeOrganizationIdAtom } from "../../state/organization/atoms";
+import { useWorkspaceActions } from "../../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../../state/local-workspace/actions";
+import { activeWorkspaceIdAtom } from "../../state/workspace/atoms";
 import { lockedTeamIdAtom } from "../../state/platform";
 import { useRegistry } from "../../state/registry";
 import { useSessionActions } from "../../state/session/actions";
@@ -84,7 +85,7 @@ export function DesktopShell({
   const token = useAtomValue(tokenAtom);
   const projects = useAtomValue(teamsAtom);
   const activeProjectId = useAtomValue(activeTeamIdAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const setIsSidebarOpen = useAtomSet(isSidebarOpenAtom);
   const setSettingsTarget = useAtomSet(settingsTargetAtom);
@@ -97,8 +98,8 @@ export function DesktopShell({
   const setIsIssueDialogOpen = useAtomSet(isIssueDialogOpenAtom);
   const setPlanningProjectTeamId = useAtomSet(planningProjectTeamIdAtom);
   const setPlanningProjectEditId = useAtomSet(planningProjectEditIdAtom);
-  const setRequestedOrganizationAgentId = useAtomSet(
-    requestedOrganizationAgentIdAtom,
+  const setRequestedWorkspaceAgentId = useAtomSet(
+    requestedWorkspaceAgentIdAtom,
   );
   const setRequestedTeamAgentSettingsId = useAtomSet(
     requestedTeamAgentSettingsIdAtom,
@@ -108,15 +109,15 @@ export function DesktopShell({
   const { selectTeam, startTeamCreation } = useTeamActions();
   const {
     createDirectMessageSection,
-    createOrganizationChannel,
+    createWorkspaceChannel,
     deleteDirectMessage,
     deleteDirectMessageSection,
-    deleteOrganizationChannel,
+    deleteWorkspaceChannel,
     markDirectMessageUnread,
-    markOrganizationChannelRead,
+    markWorkspaceChannelRead,
     moveDirectMessageToSection,
-    openOrganizationChannel,
-    openOrganizationChannelSettings,
+    openWorkspaceChannel,
+    openWorkspaceChannelSettings,
     renameDirectMessageSection,
     setDirectMessageHidden,
     setDirectMessagePinned,
@@ -136,8 +137,8 @@ export function DesktopShell({
       /*
         Where the profile lives decides where this goes. A team Agent has a
         profile editor on its team's Agents page, so the request travels with
-        the team switch and that page opens it. An organization Agent has no
-        profile editor at all; organization settings' Agents list, whose skills
+        the team switch and that page opens it. An workspace Agent has no
+        profile editor at all; workspace settings' Agents list, whose skills
         dialog is the only editor it has, is the closest thing to one.
       */
       onEditAgentProfile: (agentId: string) => {
@@ -150,17 +151,17 @@ export function DesktopShell({
           navigateToPage("agents", agent.teamId);
           return;
         }
-        if (!activeOrganizationId) return;
-        setRequestedOrganizationAgentId(agentId);
+        if (!activeWorkspaceId) return;
+        setRequestedWorkspaceAgentId(agentId);
         setSettingsTarget({
-          scope: "organization",
-          organizationId: activeOrganizationId,
+          scope: "workspace",
+          workspaceId: activeWorkspaceId,
           section: "agents",
         });
         setIsSidebarOpen(true);
         navigateToPage("settings");
       },
-      onMarkRead: markOrganizationChannelRead,
+      onMarkRead: markWorkspaceChannelRead,
       onMarkUnread: markDirectMessageUnread,
       onMoveToSection: moveDirectMessageToSection,
       onRenameSection: renameDirectMessageSection,
@@ -168,13 +169,13 @@ export function DesktopShell({
       onSetPinned: setDirectMessagePinned,
     }),
     [
-      activeOrganizationId,
+      activeWorkspaceId,
       agents.all,
       createDirectMessageSection,
       deleteDirectMessage,
       deleteDirectMessageSection,
       markDirectMessageUnread,
-      markOrganizationChannelRead,
+      markWorkspaceChannelRead,
       moveDirectMessageToSection,
       navigateToPage,
       renameDirectMessageSection,
@@ -182,14 +183,14 @@ export function DesktopShell({
       setDirectMessageHidden,
       setDirectMessagePinned,
       setIsSidebarOpen,
-      setRequestedOrganizationAgentId,
+      setRequestedWorkspaceAgentId,
       setRequestedRunId,
       setRequestedSessionId,
       setRequestedTeamAgentSettingsId,
       setSettingsTarget,
     ],
   );
-  const { selectOrganization } = useOrganizationActions();
+  const { selectWorkspace } = useWorkspaceActions();
   const { logout } = useSessionActions();
   const { refreshActiveTeam } = useSyncActions();
   const {
@@ -250,7 +251,7 @@ export function DesktopShell({
           onScheduleOpen={() => navigateToPage("schedule")}
           onInboxOpen={() => navigateToPage("inbox")}
           onMyIssuesOpen={
-            activeOrganizationId
+            activeWorkspaceId
               ? () => navigateToPage("my-issues")
               : undefined
           }
@@ -258,7 +259,7 @@ export function DesktopShell({
             // Back to the conversation this half was left on; otherwise the
             // DM page opens on its latest conversation by itself.
             const channelId = registry.get(lastDirectMessageChannelIdAtom);
-            if (channelId) openOrganizationChannel(channelId);
+            if (channelId) openWorkspaceChannel(channelId);
             else navigateToPage("dms");
           }}
           onWorkOpen={() => {
@@ -267,23 +268,23 @@ export function DesktopShell({
             if (location) navigateToLocation(location);
             else navigateToPage("lobby");
           }}
-          onDirectMessageOpen={openOrganizationChannel}
+          onDirectMessageOpen={openWorkspaceChannel}
           onDirectMessageCompose={startDirectMessageCompose}
           directMessageActions={directMessageActions}
           onChannelCreate={
-            activeOrganizationId && token
-              ? createOrganizationChannel
+            activeWorkspaceId && token
+              ? createWorkspaceChannel
               : undefined
           }
           onChannelDelete={
-            activeOrganizationId && token
-              ? deleteOrganizationChannel
+            activeWorkspaceId && token
+              ? deleteWorkspaceChannel
               : undefined
           }
-          onChannelOpen={activeOrganizationId ? openOrganizationChannel : undefined}
+          onChannelOpen={activeWorkspaceId ? openWorkspaceChannel : undefined}
           onChannelSettings={
-            activeOrganizationId
-              ? openOrganizationChannelSettings
+            activeWorkspaceId
+              ? openWorkspaceChannelSettings
               : undefined
           }
           onIssuesOpen={() => {
@@ -297,15 +298,15 @@ export function DesktopShell({
             navigateToPage("issues");
             setIsIssueDialogOpen(true);
           }}
-          onAddOrganization={() => navigateToPage("organization-create")}
-          onOrganizationChange={(organizationId) => {
+          onAddWorkspace={() => navigateToPage("workspace-create")}
+          onWorkspaceChange={(workspaceId) => {
             const project = projects.find(
-              (candidate) => candidate.organizationId === organizationId,
+              (candidate) => candidate.workspaceId === workspaceId,
             );
-            // Switching organizations keeps the sidebar on the half it was on.
+            // Switching workspaces keeps the sidebar on the half it was on.
             const page =
               registry.get(activePageAtom) === "dms" ? "dms" : "lobby";
-            selectOrganization(organizationId);
+            selectWorkspace(workspaceId);
             setRequestedRunId(null);
             setRequestedSessionId(null);
             navigateToPage(page, project?.id ?? null);
@@ -356,10 +357,10 @@ export function DesktopShell({
         />
         <WorkerStatusBarWithTeam
           onOpenSettings={() => {
-            if (!activeOrganizationId) return;
+            if (!activeWorkspaceId) return;
             setSettingsTarget({
-              scope: "organization",
-              organizationId: activeOrganizationId,
+              scope: "workspace",
+              workspaceId: activeWorkspaceId,
               section: "workers",
             });
             setIsSidebarOpen(true);

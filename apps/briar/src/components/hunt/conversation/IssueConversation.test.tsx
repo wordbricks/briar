@@ -379,7 +379,7 @@ describe("IssueConversation", () => {
     });
     const renderPage = (conversationInboxSyncSignal: string) => <RunPage conversationInboxSyncSignal={conversationInboxSyncSignal} error={null} isRecovering={false} isSidebarOpen onBack={() => undefined} onCancel={async () => undefined} onLoadAttachment={async () => new Blob()} onLoadIssueMessages={async () => []} onLoadRunEvidence={async () => []} onMove={async () => undefined} onRetry={async () => undefined} onSendIssueMessage={async () => {
       throw new Error("message should not be sent");
-    }} organizationId="organization-1" projectId={demoDashboard.team.id} run={run} token="token" />;
+    }} workspaceId="workspace-1" projectId={demoDashboard.team.id} run={run} token="token" />;
     await act(async () => {
       root.render(renderPage("baseline"));
       await Promise.resolve();

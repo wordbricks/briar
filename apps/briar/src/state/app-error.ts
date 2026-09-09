@@ -1,7 +1,7 @@
 import * as Atom from "effect/unstable/reactivity/Atom";
 
 import { sessionErrorAtom } from "./session/atoms";
-import { localInventoryErrorAtom } from "./workspace/atoms";
+import { localInventoryErrorAtom } from "./local-workspace/atoms";
 
 /**
  * The one error line the app shows.

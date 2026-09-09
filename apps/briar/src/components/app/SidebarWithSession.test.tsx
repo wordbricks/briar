@@ -5,16 +5,13 @@ import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { demoDashboard } from "../../lib/demo-data";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { createTestRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 import { createReactTestRoot } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
-import type { Organization, Project, SessionUser } from "../../types";
+import type { Workspace, Project, SessionUser } from "../../types";
 import { SidebarSessionBoundary, SidebarWithSession } from "./SidebarWithSession";
 
 const user: SessionUser = {
@@ -23,7 +20,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -36,8 +33,8 @@ const team: Project = {
   ...demoDashboard.team,
   id: "team-a",
   name: "Team A",
-  organizationId: organization.id,
-  organizationName: organization.name,
+  workspaceId: workspace.id,
+  workspaceName: workspace.name,
 };
 
 const noop = () => undefined;
@@ -47,7 +44,7 @@ const shellProps = {
   agents: [],
   connectedTeamIds: [team.id],
   isOpen: true,
-  onAddOrganization: noop,
+  onAddWorkspace: noop,
   onAddProject: noop,
   onAgentSessionOpen: noop,
   onAgentsOpen: noop,
@@ -56,7 +53,7 @@ const shellProps = {
   onIssuesOpen: noop,
   onLobbyOpen: noop,
   onLogout: noop,
-  onOrganizationChange: noop,
+  onWorkspaceChange: noop,
   onProjectChange: noop,
   onProjectRepositoryOpen: noop,
   onProjectSettings: noop,
@@ -74,12 +71,12 @@ beforeEach(() => {
 });
 
 describe("SidebarWithSession", () => {
-  it("re-renders on an organization change without re-rendering the shell", async () => {
+  it("re-renders on a workspace change without re-rendering the shell", async () => {
     const registry = createTestRegistry([
       [userAtom, user],
       [tokenAtom, "token-1"],
-      [organizationsAtom, [organization]],
-      [activeOrganizationIdAtom, organization.id],
+      [workspacesAtom, [workspace]],
+      [activeWorkspaceIdAtom, workspace.id],
       [teamsAtom, [team]],
       [activeTeamIdAtom, team.id],
     ]);
@@ -97,7 +94,7 @@ describe("SidebarWithSession", () => {
             {(session) =>
               renders.record(
                 "sidebar",
-                <output>{session.organizations.length}</output>,
+                <output>{session.workspaces.length}</output>,
               )}
           </SidebarSessionBoundary>
         </>
@@ -113,8 +110,8 @@ describe("SidebarWithSession", () => {
     expect(view.container.textContent).toContain("Org A");
 
     await act(async () => {
-      registry.set(organizationsAtom, [
-        { ...organization, name: "Org A renamed" },
+      registry.set(workspacesAtom, [
+        { ...workspace, name: "Org A renamed" },
       ]);
     });
 
@@ -127,7 +124,7 @@ describe("SidebarWithSession", () => {
   });
 
   it("renders nothing while signed out", async () => {
-    const registry = createTestRegistry([[organizationsAtom, [organization]]]);
+    const registry = createTestRegistry([[workspacesAtom, [workspace]]]);
     const view = createReactTestRoot();
 
     await view.render(

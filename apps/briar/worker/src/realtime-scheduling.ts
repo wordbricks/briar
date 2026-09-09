@@ -14,10 +14,10 @@ import {
 import { getDashboardSyncCursor } from "./dashboard-change-repository";
 import {
   acknowledgeAgentSkillExecutionRealtimeOutbox,
-  acknowledgeOrganizationInboxRealtimeOutbox,
+  acknowledgeWorkspaceInboxRealtimeOutbox,
   getTeamAgentSessionSyncCursor,
   listAgentSkillExecutionRealtimeOutbox,
-  listOrganizationInboxRealtimeOutbox,
+  listWorkspaceInboxRealtimeOutbox,
   type IssueAgentReplyJobRow,
 } from "./db";
 import { getChannelSyncCursor, type ChannelReplyJobRow } from "./channels";
@@ -40,22 +40,22 @@ import { HttpError } from "./http-response";
 import { mobilePushProvidersConfigured } from "./mobile-push-provider";
 import { flushMobilePushOutbox } from "./mobile-push-service";
 
-type OrganizationInboxFlushServices = {
+type WorkspaceInboxFlushServices = {
   readonly mobilePushProvidersConfigured:
     typeof mobilePushProvidersConfigured;
   readonly flushMobilePushOutbox: typeof flushMobilePushOutbox;
-  readonly listRealtimeOutbox: typeof listOrganizationInboxRealtimeOutbox;
+  readonly listRealtimeOutbox: typeof listWorkspaceInboxRealtimeOutbox;
   readonly publishRealtime: typeof publishInboxRealtime;
   readonly acknowledgeRealtime:
-    typeof acknowledgeOrganizationInboxRealtimeOutbox;
+    typeof acknowledgeWorkspaceInboxRealtimeOutbox;
 };
 
-const organizationInboxFlushServices: OrganizationInboxFlushServices = {
+const organizationInboxFlushServices: WorkspaceInboxFlushServices = {
   mobilePushProvidersConfigured,
   flushMobilePushOutbox,
-  listRealtimeOutbox: listOrganizationInboxRealtimeOutbox,
+  listRealtimeOutbox: listWorkspaceInboxRealtimeOutbox,
   publishRealtime: publishInboxRealtime,
-  acknowledgeRealtime: acknowledgeOrganizationInboxRealtimeOutbox,
+  acknowledgeRealtime: acknowledgeWorkspaceInboxRealtimeOutbox,
 };
 
 type ActivityReplyIdentity = {
@@ -145,10 +145,10 @@ function scheduleActivityClear<Frame>(
   else void publish;
 }
 
-export async function flushOrganizationInboxRealtimeOutbox(
+export async function flushWorkspaceInboxRealtimeOutbox(
   env: Env,
   db: D1Database,
-  services: OrganizationInboxFlushServices = organizationInboxFlushServices,
+  services: WorkspaceInboxFlushServices = organizationInboxFlushServices,
 ) {
   const pushFlush = services.mobilePushProvidersConfigured(env)
     ? services.flushMobilePushOutbox(env, db).catch((error) => {
@@ -178,7 +178,7 @@ export async function flushOrganizationInboxRealtimeOutbox(
       // sweep, or client fallback refresh.
       console.error(JSON.stringify({
         message: "Inbox realtime publish failed",
-        organizationId: row.organization_id,
+        workspaceId: row.organization_id,
         version: row.version,
         error: error instanceof Error ? error.message : String(error),
       }));
@@ -192,7 +192,7 @@ export function scheduleInboxRealtimeFlush(
   db: D1Database,
   context?: ExecutionContext,
 ) {
-  const flush = flushOrganizationInboxRealtimeOutbox(env, db).catch((error) => {
+  const flush = flushWorkspaceInboxRealtimeOutbox(env, db).catch((error) => {
     console.error(JSON.stringify({
       message: "Inbox realtime outbox flush failed",
       error: error instanceof Error ? error.message : String(error),
@@ -261,15 +261,15 @@ export function scheduleAgentSkillExecutionRealtimeFlush(
 export function scheduleChannelRealtimePublish(
   env: Env,
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   context?: ExecutionContext,
 ) {
-  const publish = getChannelSyncCursor(db, organizationId)
-    .then((cursor) => publishChannelRealtime(env, organizationId, cursor))
+  const publish = getChannelSyncCursor(db, workspaceId)
+    .then((cursor) => publishChannelRealtime(env, workspaceId, cursor))
     .catch((error) => {
       console.error(JSON.stringify({
         message: "Channel realtime publish failed",
-        organizationId,
+        workspaceId,
         error: error instanceof Error ? error.message : String(error),
       }));
     });
@@ -303,7 +303,7 @@ export async function channelActivityCredential(
     env,
     job,
     (secret, expiresAt) => createChannelActivityPublishToken(secret, {
-      organizationId: job.organization_id,
+      workspaceId: job.organization_id,
       channelId: job.channel_id,
       replyJobId: job.id,
       claimTokenHash,
@@ -347,7 +347,7 @@ export function scheduleChannelActivityClear(
     publish: (frame) => publishChannelActivity(env, job.organization_id, frame),
     failureMessage: "Channel activity clear failed",
     failureContext: {
-      organizationId: job.organization_id,
+      workspaceId: job.organization_id,
       channelId: job.channel_id,
       replyJobId: job.id,
     },
@@ -367,7 +367,7 @@ type IssueActivityReplyIdentity = Pick<
 
 export async function issueActivityCredential(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   job: IssueActivityReplyIdentity,
   input: { workerId: string; deviceId: string },
 ) {
@@ -375,7 +375,7 @@ export async function issueActivityCredential(
     env,
     job,
     (secret, expiresAt) => createIssueActivityPublishToken(secret, {
-      organizationId,
+      workspaceId,
       projectId: job.project_id,
       runId: job.run_id,
       replyJobId: job.id,
@@ -410,16 +410,16 @@ export function issueActivityFrame(
 
 export function scheduleIssueActivityClear(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   job: IssueActivityReplyIdentity,
   context?: ExecutionContext,
 ) {
   return scheduleActivityClear(env, context, {
     makeFrame: (input) => issueActivityFrame(job, input),
-    publish: (frame) => publishIssueActivity(env, organizationId, frame),
+    publish: (frame) => publishIssueActivity(env, workspaceId, frame),
     failureMessage: "Issue activity clear failed",
     failureContext: {
-      organizationId,
+      workspaceId,
       projectId: job.project_id,
       runId: job.run_id,
       replyJobId: job.id,
@@ -429,18 +429,18 @@ export function scheduleIssueActivityClear(
 
 export function scheduleChannelActivityDisconnect(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   context?: ExecutionContext,
 ) {
   const disconnect = disconnectChannelActivitySubscribers(
     env,
-    organizationId,
+    workspaceId,
     channelId,
   ).catch((error) => {
     console.error(JSON.stringify({
       message: "Channel activity disconnect failed",
-      organizationId,
+      workspaceId,
       channelId,
       error: error instanceof Error ? error.message : String(error),
     }));

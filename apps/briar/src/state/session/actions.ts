@@ -2,14 +2,14 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 import { useMemo } from "react";
 
 import {
-  acceptOrganizationInvitation as acceptRemoteOrganizationInvitation,
+  acceptWorkspaceInvitation as acceptRemoteWorkspaceInvitation,
   beginDeviceAuthorization,
   deleteAccount as deleteRemoteAccount,
   pollDeviceToken,
   updateAccountProfile as updateRemoteAccountProfile,
   type DeviceAuthorizationLaunchOptions,
 } from "../../lib/api";
-import { resolveActiveAccountSelection } from "../../lib/active-organization";
+import { resolveActiveAccountSelection } from "../../lib/active-workspace";
 import {
   isAuthorizationCancelled,
   openAuthorization,
@@ -23,11 +23,8 @@ import type { LocalProjectInventoryObservation } from "../../lib/local-team-conn
 import { browserCookieSessionCredential } from "../../lib/session-credential";
 import { disconnectLocalTeam } from "../../lib/team-connection";
 import { clearSessionToken, writeSessionToken } from "../../lib/token-store";
-import type { Organization, Project, SessionUser } from "../../types";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import type { Workspace, Project, SessionUser } from "../../types";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import {
   demoMode,
   deviceClientId,
@@ -39,12 +36,8 @@ import { useRegistry, type AtomRegistry } from "../registry";
 import {
   bumpReconnectRequest,
   getReadinessCoordinator,
-} from "../workspace/api";
-import {
-  applyInventoryObservation,
-  clearWorkspaceInventory,
-  resetHealth,
-} from "../workspace/atoms";
+} from "../local-workspace/api";
+import { applyInventoryObservation, clearWorkspaceInventory, resetHealth } from "../local-workspace/atoms";
 import { clearSnapshotAccount } from "../persistence/account";
 import { hydratedAccountAtom } from "../persistence/hydration";
 import { clearSnapshotsSafely } from "../persistence/store";
@@ -70,7 +63,7 @@ import {
  * are the calls only a signing-in or signing-out user makes.
  */
 export interface SessionActionApi {
-  readonly acceptOrganizationInvitation: typeof acceptRemoteOrganizationInvitation;
+  readonly acceptWorkspaceInvitation: typeof acceptRemoteWorkspaceInvitation;
   readonly beginDeviceAuthorization: typeof beginDeviceAuthorization;
   readonly clearSessionToken: typeof clearSessionToken;
   readonly deleteAccount: typeof deleteRemoteAccount;
@@ -97,7 +90,7 @@ export interface SessionActionApi {
 }
 
 export const liveSessionActionApi: SessionActionApi = {
-  acceptOrganizationInvitation: acceptRemoteOrganizationInvitation,
+  acceptWorkspaceInvitation: acceptRemoteWorkspaceInvitation,
   beginDeviceAuthorization,
   clearSessionToken,
   deleteAccount: deleteRemoteAccount,
@@ -165,10 +158,10 @@ export interface AccountProfileInput {
 }
 
 export interface SessionActions {
-  /** Joins the organization an invitation token names and opens its team. */
+  /** Joins the workspace an invitation token names and opens its team. */
   readonly acceptInvitation: (
     invitationToken: string,
-  ) => Promise<Awaited<ReturnType<typeof acceptRemoteOrganizationInvitation>>>;
+  ) => Promise<Awaited<ReturnType<typeof acceptRemoteWorkspaceInvitation>>>;
   /** Abandons a sign-in in progress and clears what it put on screen. */
   readonly cancelLogin: () => void;
   /** Exchanges a credential for a session and selects what it can open. */
@@ -206,8 +199,8 @@ export function clearSignedOutSession(registry: AtomRegistry): void {
     registry.set(tokenAtom, null);
     registry.set(userAtom, null);
     registry.set(teamsAtom, []);
-    registry.set(organizationsAtom, []);
-    registry.set(activeOrganizationIdAtom, null);
+    registry.set(workspacesAtom, []);
+    registry.set(activeWorkspaceIdAtom, null);
     registry.set(activeTeamIdAtom, null);
     registry.set(teamConnectionAtom, null);
     registry.set(isCreatingTeamAtom, false);
@@ -274,19 +267,19 @@ export function createSessionActions(
 
   /**
    * Commits a restored or freshly signed-in account and picks what it opens:
-   * the pinned team in a project window, otherwise the stored organization.
+   * the pinned team in a project window, otherwise the stored workspace.
    * One batch, so no subscriber sees a user without their teams.
    */
   const commitAccount = (
     token: string,
     user: SessionUser,
     teams: Project[],
-    organizations: Organization[],
+    workspaces: Workspace[],
     inventory: LocalProjectInventoryObservation,
   ) => {
     const selection = resolveActiveAccountSelection(
       user.id,
-      organizations,
+      workspaces,
       teams,
       registry.get(lockedTeamIdAtom),
     );
@@ -294,19 +287,19 @@ export function createSessionActions(
       registry.set(tokenAtom, token);
       registry.set(userAtom, user);
       registry.set(teamsAtom, teams);
-      registry.set(organizationsAtom, organizations);
+      registry.set(workspacesAtom, workspaces);
       applyInventoryObservation(registry, inventory);
-      registry.set(activeOrganizationIdAtom, selection.activeOrganizationId);
+      registry.set(activeWorkspaceIdAtom, selection.activeWorkspaceId);
       registry.set(activeTeamIdAtom, selection.activeProjectId);
     });
   };
 
   const completeLogin = async (nextToken: string, attempt: number) => {
     const remote = resolveSessionApi(registry);
-    const [nextUser, nextTeams, nextOrganizations] = await Promise.all([
+    const [nextUser, nextTeams, nextWorkspaces] = await Promise.all([
       remote.loadSession(nextToken),
       remote.loadTeams(nextToken),
-      remote.loadOrganizations(nextToken),
+      remote.loadWorkspaces(nextToken),
     ]);
     const inventory = await inspectInventory();
     if (attempt !== poll.attempt) return;
@@ -325,7 +318,7 @@ export function createSessionActions(
       }
       return;
     }
-    commitAccount(nextToken, nextUser, nextTeams, nextOrganizations, inventory);
+    commitAccount(nextToken, nextUser, nextTeams, nextWorkspaces, inventory);
     Atom.batch(() => {
       registry.set(teamConnectionAtom, null);
       setError(null);
@@ -344,20 +337,20 @@ export function createSessionActions(
       setError(null);
       try {
         const remote = resolveSessionApi(registry);
-        const result = await api.acceptOrganizationInvitation(
+        const result = await api.acceptWorkspaceInvitation(
           token,
           invitationToken,
         );
-        const [nextOrganizations, nextTeams] = await Promise.all([
-          remote.loadOrganizations(token),
+        const [nextWorkspaces, nextTeams] = await Promise.all([
+          remote.loadWorkspaces(token),
           remote.loadTeams(token),
         ]);
         Atom.batch(() => {
-          registry.set(organizationsAtom, nextOrganizations);
+          registry.set(workspacesAtom, nextWorkspaces);
           registry.set(teamsAtom, nextTeams);
           registry.set(
-            activeOrganizationIdAtom,
-            result.invitation.organizationId,
+            activeWorkspaceIdAtom,
+            result.invitation.workspaceId,
           );
           registry.set(activeTeamIdAtom, result.invitation.initialProjectId);
           // A joined team starts from the server, never from anything this

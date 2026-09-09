@@ -10,12 +10,9 @@ import { ToastProvider } from "../ui/toast";
 import { TooltipProvider } from "../ui/tooltip";
 import { demoDashboard } from "../../lib/demo-data";
 import { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
-import { demoOrganization, demoUser } from "../../state/demo-fixtures";
+import { demoWorkspace, demoUser } from "../../state/demo-fixtures";
 import { createNavigationActions } from "../../state/navigation/actions";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { runAtom } from "../../state/entities/runs";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
@@ -25,7 +22,7 @@ import {
   teamSettingsAtom,
   teamsAtom,
 } from "../../state/team/atoms";
-import { healthAtom } from "../../state/workspace/atoms";
+import { healthAtom } from "../../state/local-workspace/atoms";
 import {
   createReactTestRoot,
   flush,
@@ -87,7 +84,7 @@ const pageProps: DesktopPagesProps = {
     all: [],
     rememberAgent: noop,
   },
-  loadOrganizationProjectDashboard: async () => null,
+  loadWorkspaceProjectDashboard: async () => null,
   loadProjectHomeMerges: async () => ({
     repository: "wordbricks/briar",
     generatedAt: "2026-09-01T00:00:00.000Z",
@@ -104,7 +101,7 @@ const pageProps: DesktopPagesProps = {
       knownModels: 0,
     },
   }),
-  openOrganizationIssue: noop,
+  openWorkspaceIssue: noop,
   repositorySetup: {
     beginTeamReconnect: noop,
     closeRepositorySetup: noop,
@@ -117,7 +114,7 @@ const pageProps: DesktopPagesProps = {
 
 const sidebarProps = {
   agents: [],
-  onAddOrganization: noop,
+  onAddWorkspace: noop,
   onAddPlanningProject: noop,
   onAddProject: noop,
   onAgentSessionOpen: noop,
@@ -127,7 +124,7 @@ const sidebarProps = {
   onIssuesOpen: noop,
   onLobbyOpen: noop,
   onLogout: noop,
-  onOrganizationChange: noop,
+  onWorkspaceChange: noop,
   onPlanningProjectEdit: noop,
   onPlanningProjectOpen: noop,
   onProjectChange: noop,
@@ -174,8 +171,8 @@ const mountInboxPage = async () => {
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
-    [organizationsAtom, [demoOrganization]],
-    [activeOrganizationIdAtom, demoOrganization.id],
+    [workspacesAtom, [demoWorkspace]],
+    [activeWorkspaceIdAtom, demoWorkspace.id],
   ]);
   applySyncEvent(registry, { kind: "team-snapshot", teamId: team.id, payload });
   createNavigationActions(registry).resetNavigation("inbox");
@@ -221,8 +218,8 @@ describe("desktop page slot", () => {
       [tokenAtom, "token-1"],
       [teamsAtom, [team]],
       [activeTeamIdAtom, team.id],
-      [organizationsAtom, [demoOrganization]],
-      [activeOrganizationIdAtom, demoOrganization.id],
+      [workspacesAtom, [demoWorkspace]],
+      [activeWorkspaceIdAtom, demoWorkspace.id],
     ]);
     applySyncEvent(registry, {
       kind: "team-snapshot",
@@ -375,8 +372,8 @@ describe("desktop page keep-alive", () => {
       [tokenAtom, "token-1"],
       [teamsAtom, [team]],
       [activeTeamIdAtom, team.id],
-      [organizationsAtom, [demoOrganization]],
-      [activeOrganizationIdAtom, demoOrganization.id],
+      [workspacesAtom, [demoWorkspace]],
+      [activeWorkspaceIdAtom, demoWorkspace.id],
     ]);
     applySyncEvent(registry, {
       kind: "team-snapshot",
@@ -475,7 +472,7 @@ describe("desktop page keep-alive", () => {
     await view.cleanup();
   });
 
-  it("bounds the kept pages and drops them all when the organization changes", async () => {
+  it("bounds the kept pages and drops them all when the workspace changes", async () => {
     const renders = createRenderCounter();
     const { actions, view } = await mountIssuesPage(renders);
     const slotKeys = () =>

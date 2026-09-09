@@ -160,7 +160,7 @@ export function createWorkerEnrollmentClient(apiUrl: string, token: string) {
         maxConcurrentSessions: input.maxConcurrentSessions,
       });
       return {
-        organizationId: response.workspaceId,
+        workspaceId: response.workspaceId,
         deviceId: response.deviceId,
         worker: enrollmentWorker(response.worker),
         workerToken: response.workerToken,
@@ -177,7 +177,7 @@ export function createWorkerEnrollmentClient(apiUrl: string, token: string) {
         runtime: workerRuntimeToProto(input.runtime),
       });
       return {
-        organizationId: response.workspaceId,
+        workspaceId: response.workspaceId,
         deviceId: response.deviceId,
         worker: enrollmentWorker(response.worker),
       };

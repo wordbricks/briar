@@ -6,7 +6,7 @@ import { issueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { issueMentionAtCaret, issueMentionHandle, mentionsIssueHandle } from "@/lib/issue-agent-reply";
 import { mentionHandle } from "@/lib/channel-mentions";
 import { MentionComposerField } from "@/components/MentionComposerField";
-import type { OrganizationMember, ProjectAgent } from "@/types";
+import type { WorkspaceMember, ProjectAgent } from "@/types";
 import { useI18n } from "@/i18n";
 import { MessageAttachmentPreview } from "./MessageAttachmentPreview";
 export function MessageComposer({
@@ -25,7 +25,7 @@ export function MessageComposer({
   compact?: boolean;
   disableAttachments?: boolean;
   initialBody?: string;
-  mentionMembers: OrganizationMember[];
+  mentionMembers: WorkspaceMember[];
   mentionAgents: ProjectAgent[];
   onCancel?: () => void;
   onMentionOpen: (handle: string) => void;

@@ -190,7 +190,7 @@ export async function managedComputerSetupCommand() {
   const computer = await fetchManagedComputer(
     credential.apiOrigin,
     userToken,
-    credential.organizationId,
+    credential.workspaceId,
     credential.managedComputerId,
   );
   if (computer.requesterUserId !== user.id) {
@@ -245,7 +245,7 @@ export async function managedComputerSetupCommand() {
   const setup = await createManagedComputerSetupSession(
     credential.apiOrigin,
     userToken,
-    credential.organizationId,
+    credential.workspaceId,
     credential.managedComputerId,
     projectId,
     requestId,
@@ -275,7 +275,7 @@ export async function managedComputerSetupCommand() {
   };
   if (
     binding.managedComputerId !== credential.managedComputerId ||
-    binding.workspaceId !== credential.organizationId ||
+    binding.workspaceId !== credential.workspaceId ||
     binding.teamId !== projectId ||
     binding.deviceId !== credential.deviceId
   ) {
@@ -296,7 +296,7 @@ export async function managedComputerSetupCommand() {
     executionWorker: {
       deviceId: credential.deviceId,
       workerId: binding.worker.id,
-      organizationId: credential.organizationId,
+      workspaceId: credential.workspaceId,
       label: binding.worker.label,
       maxConcurrentSessions: binding.worker.maxConcurrentSessions,
     },
@@ -305,7 +305,7 @@ export async function managedComputerSetupCommand() {
   config.managedComputer = {
     managedComputerId: credential.managedComputerId,
     deviceId: credential.deviceId,
-    organizationId: credential.organizationId,
+    workspaceId: credential.workspaceId,
     credentialFile,
   };
   config.teams = [
@@ -315,7 +315,7 @@ export async function managedComputerSetupCommand() {
   await saveConfig(config);
   console.log(JSON.stringify({
     managedComputerId: credential.managedComputerId,
-    organizationId: credential.organizationId,
+    workspaceId: credential.workspaceId,
     projectId,
     deviceId: credential.deviceId,
     workerId: binding.worker.id,
@@ -334,7 +334,7 @@ export async function managedComputerStatusCommand() {
   const status = await fetchManagedComputerSetupStatus(
     credential.apiOrigin,
     userToken,
-    credential.organizationId,
+    credential.workspaceId,
     credential.managedComputerId,
   );
   console.log(JSON.stringify(status));

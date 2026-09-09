@@ -11,8 +11,8 @@ import { useI18n } from "../i18n";
 import {
   loadManagedComputerProduct,
   loadManagedComputers,
-  loadOrganizationExecutionWorkers,
-  requestOrganizationExecutionWorkerUpdate,
+  loadWorkspaceExecutionWorkers,
+  requestWorkspaceExecutionWorkerUpdate,
 } from "../lib/api";
 import { supportsManagedComputerRemoteDesktop } from "../lib/platform";
 import type { AgentProvider } from "../lib/team-llm";
@@ -23,7 +23,7 @@ import {
 import type {
   ExecutionWorker,
   ManagedComputer,
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
 } from "../types";
 import { ManagedComputerRemoteDesktop } from "./ManagedComputerRemoteDesktop";
 import { WorkerIcon } from "./WorkerIcon";
@@ -84,18 +84,18 @@ export function workerUpdateAvailable({
 
 type DeviceUpdateState = {
   remoteUpdateSupported: boolean;
-  updateRequest: OrganizationExecutionWorker["updateRequest"];
+  updateRequest: WorkspaceExecutionWorker["updateRequest"];
 };
 
 export function managedComputerShortcutTarget({
   managedComputersByDeviceId,
-  organizationId,
+  workspaceId,
   remoteDesktopEnabled,
   userId,
   worker,
 }: {
   managedComputersByDeviceId: Record<string, ManagedComputer>;
-  organizationId?: string | null;
+  workspaceId?: string | null;
   remoteDesktopEnabled: boolean;
   userId?: string | null;
   worker: ExecutionWorker;
@@ -105,7 +105,7 @@ export function managedComputerShortcutTarget({
   if (
     !computer ||
     (computer.state !== "needs_setup" && computer.state !== "ready") ||
-    computer.organizationId !== organizationId ||
+    computer.workspaceId !== workspaceId ||
     computer.requesterUserId !== userId ||
     worker.ownerUserId !== userId
   ) {
@@ -117,14 +117,14 @@ export function managedComputerShortcutTarget({
 export function WorkerStatusBar({
   onOpenSettings,
   onRefresh,
-  organizationId,
+  workspaceId,
   token,
   userId,
   workers,
 }: {
   onOpenSettings: () => void;
   onRefresh?: () => void | Promise<void>;
-  organizationId?: string | null;
+  workspaceId?: string | null;
   token?: string | null;
   userId?: string | null;
   workers: ExecutionWorker[];
@@ -156,11 +156,11 @@ export function WorkerStatusBar({
   const activeCount = activeWorkerCount(workers);
 
   const refreshUpdateMetadata = useCallback(async () => {
-    if (!token || !organizationId) return;
+    if (!token || !workspaceId) return;
     try {
-      const remote = await loadOrganizationExecutionWorkers(
+      const remote = await loadWorkspaceExecutionWorkers(
         token,
-        organizationId,
+        workspaceId,
       );
       setLatestVersion(remote.latestVersion ?? null);
       setCanManage(Boolean(remote.canManage));
@@ -175,18 +175,18 @@ export function WorkerStatusBar({
     } catch {
       // Version display still works from dashboard workers; update controls stay hidden.
     }
-  }, [organizationId, token]);
+  }, [workspaceId, token]);
 
   const refreshManagedComputerMetadata = useCallback(async () => {
-    if (!token || !organizationId || !supportsManagedComputerRemoteDesktop()) {
+    if (!token || !workspaceId || !supportsManagedComputerRemoteDesktop()) {
       setManagedComputerRemoteEnabled(false);
       setManagedComputersByDeviceId({});
       return;
     }
     try {
       const [product, response] = await Promise.all([
-        loadManagedComputerProduct(token, organizationId),
-        loadManagedComputers(token, organizationId),
+        loadManagedComputerProduct(token, workspaceId),
+        loadManagedComputers(token, workspaceId),
       ]);
       const next: Record<string, ManagedComputer> = {};
       for (const computer of response.computers) {
@@ -204,7 +204,7 @@ export function WorkerStatusBar({
       setManagedComputerRemoteEnabled(false);
       setManagedComputersByDeviceId({});
     }
-  }, [organizationId, token]);
+  }, [workspaceId, token]);
 
   const refreshStatus = useCallback(() => {
     if (refreshRequestRef.current) return refreshRequestRef.current;
@@ -264,16 +264,16 @@ export function WorkerStatusBar({
   }, [hasPendingUpdate, isOpen, refreshUpdateMetadata]);
 
   const requestUpdate = async (worker: ExecutionWorker) => {
-    if (!token || !organizationId || !worker.deviceId) return;
+    if (!token || !workspaceId || !worker.deviceId) return;
     setUpdateError(null);
     setUpdatingDeviceIds((current) => ({
       ...current,
       [worker.deviceId]: true,
     }));
     try {
-      await requestOrganizationExecutionWorkerUpdate(
+      await requestWorkspaceExecutionWorkerUpdate(
         token,
-        organizationId,
+        workspaceId,
         worker.deviceId,
       );
       await refreshUpdateMetadata();
@@ -383,7 +383,7 @@ export function WorkerStatusBar({
               });
               const currentVersion = workerBriarVersion(worker);
               const versionLabel = currentVersion
-                ? t("organization.workerVersion", { version: currentVersion })
+                ? t("workspace.workerVersion", { version: currentVersion })
                 : null;
               const deviceState = worker.deviceId
                 ? deviceUpdates[worker.deviceId]
@@ -398,7 +398,7 @@ export function WorkerStatusBar({
                 latestVersion,
               });
               const mayRequestUpdate =
-                Boolean(token && organizationId && worker.deviceId) &&
+                Boolean(token && workspaceId && worker.deviceId) &&
                 (canManage ||
                   userId == null ||
                   worker.ownerUserId == null ||
@@ -413,7 +413,7 @@ export function WorkerStatusBar({
                 (updateAvailable || isPending || updateFailed || isUpdating);
               const managedComputer = managedComputerShortcutTarget({
                 managedComputersByDeviceId,
-                organizationId,
+                workspaceId,
                 remoteDesktopEnabled: managedComputerRemoteEnabled,
                 userId,
                 worker,
@@ -508,20 +508,20 @@ export function WorkerStatusBar({
                         aria-busy={isUpdating || isPending}
                         aria-label={
                           updateFailed
-                            ? t("organization.workerUpdateDelayed", {
+                            ? t("workspace.workerUpdateDelayed", {
                                 version:
                                   updateRequest?.targetVersion ??
                                   latestVersion ??
                                   "",
                               })
                             : isPending
-                              ? t("organization.workerUpdatePending", {
+                              ? t("workspace.workerUpdatePending", {
                                   version:
                                     updateRequest?.targetVersion ??
                                     latestVersion ??
                                     "",
                                 })
-                              : t("organization.workerUpdate", {
+                              : t("workspace.workerUpdate", {
                                   name: worker.label,
                                 })
                         }
@@ -538,27 +538,27 @@ export function WorkerStatusBar({
                         }}
                         title={
                           updateFailed
-                            ? t("organization.workerUpdateDelayedWithReason", {
+                            ? t("workspace.workerUpdateDelayedWithReason", {
                                 version:
                                   updateRequest?.targetVersion ??
                                   latestVersion ??
                                   "",
                                 reason:
                                   updateRequest?.handoffError ??
-                                  t("organization.workerUpdateDelayed"),
+                                  t("workspace.workerUpdateDelayed"),
                               })
                             : isPending
-                              ? t("organization.workerUpdatePending", {
+                              ? t("workspace.workerUpdatePending", {
                                   version:
                                     updateRequest?.targetVersion ??
                                     latestVersion ??
                                     "",
                                 })
                               : remoteUpdateSupported
-                                ? t("organization.workerUpdate", {
+                                ? t("workspace.workerUpdate", {
                                     name: worker.label,
                                   })
-                                : t("organization.workerUpdateUnsupported")
+                                : t("workspace.workerUpdateUnsupported")
                         }
                         type="button"
                       >
@@ -577,14 +577,14 @@ export function WorkerStatusBar({
         </div>
       ) : null}
       {remoteComputer &&
-      organizationId &&
+      workspaceId &&
       token &&
-      remoteComputer.organizationId === organizationId &&
+      remoteComputer.workspaceId === workspaceId &&
       remoteComputer.requesterUserId === userId ? (
         <ManagedComputerRemoteDesktop
           computer={remoteComputer}
           onClose={() => setRemoteComputer(null)}
-          organizationId={organizationId}
+          workspaceId={workspaceId}
           token={token}
         />
       ) : null}

@@ -3,7 +3,7 @@ import { lazy, Suspense, useMemo, type ReactNode } from "react";
 
 import { useI18n } from "../../i18n";
 import { getMobilePlatform } from "../../lib/platform";
-import { activeOrganizationTeams } from "../../lib/team-window-scope";
+import { activeWorkspaceTeams } from "../../lib/team-window-scope";
 import { CompanionBottomNavigation } from "../CompanionBottomNavigation";
 import { CompanionHeaderWithSession } from "./CompanionHeaderWithSession";
 import { CompanionInbox } from "../InboxSelectionBoundary";
@@ -43,11 +43,9 @@ import {
   visibleInboxUnreadCountAtom,
 } from "../../state/inbox/atoms";
 import { useIssueActions } from "../../state/issues/actions";
-import { useOrganizationActions } from "../../state/organization/actions";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { useWorkspaceActions } from "../../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../../state/local-workspace/actions";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { teamWorkersAtom } from "../../state/entities/workers";
 import { demoMode, lockedTeamIdAtom } from "../../state/platform";
 import { useRunDetailActions } from "../../state/run-detail/actions";
@@ -84,7 +82,7 @@ import type { ProjectAgent } from "../../types";
   and the dispatch dialog each had a second mount inside it. Both are hoisted
   above the shell choice now, and what is left here is the page chain itself.
 
-  Everything the pages render from — the session, the selected organization and
+  Everything the pages render from — the session, the selected workspace and
   team, the companion page and status, the requested run, the agent sessions,
   the inbox — is read from the store, and every call goes through a `state/`
   action. What the shell still takes as props is the agent list and the team's
@@ -131,10 +129,10 @@ export function CompanionShell({
   const token = useAtomValue(tokenAtom);
   const loading = useAtomValue(loadingAtom);
   const teams = useAtomValue(teamsAtom);
-  const organizations = useAtomValue(organizationsAtom);
+  const workspaces = useAtomValue(workspacesAtom);
   const activeTeam = useAtomValue(activeTeamAtom) ?? undefined;
   const activeTeamId = useAtomValue(activeTeamIdAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const keptPage = useAtomValue(activeKeptPageAtom);
   const keptPageKeys = useAtomValue(keptPageKeysAtom);
@@ -174,7 +172,7 @@ export function CompanionShell({
   const { selectChannel } = useChannelActions();
   const inbox = useInboxActions();
   const { deleteAccount, logout, updateAccountProfile } = useSessionActions();
-  const { selectOrganization } = useOrganizationActions();
+  const { selectWorkspace } = useWorkspaceActions();
   const { ensureTeamSelected, selectTeam } = useTeamActions();
   const { refreshActiveTeam } = useSyncActions();
   const { removeIssue, transferIssue } = useIssueActions();
@@ -182,13 +180,13 @@ export function CompanionShell({
   const { processIssueNow } = useWorkerDispatch();
   const organizationTeams = useMemo(
     () =>
-      activeOrganizationTeams(
+      activeWorkspaceTeams(
         teams,
         lockedTeamId,
-        activeOrganizationId,
+        activeWorkspaceId,
         activeTeamId,
       ),
-    [activeOrganizationId, activeTeamId, lockedTeamId, teams],
+    [activeWorkspaceId, activeTeamId, lockedTeamId, teams],
   );
   const agentSessions = useAgentSessionActions();
   // Read under the empty id when nothing is open, so a session the phone is not
@@ -377,8 +375,8 @@ export function CompanionShell({
         hasOpenAgentSession={requestedCompanionSession !== null}
         onLogout={() => void logout()}
         onMarkAllRead={inbox.markAllRead}
-        onOrganizationChange={(organizationId) => {
-          selectOrganization(organizationId);
+        onWorkspaceChange={(workspaceId) => {
+          selectWorkspace(workspaceId);
           setCompanionPage("issues");
           setCompanionStatus("all");
           setRequestedRunId(null);

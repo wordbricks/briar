@@ -278,7 +278,7 @@ export const appChannelSummaryJson = (channel: ChannelSummary) => {
   }
   return create(ChannelSummarySchema, {
     id: channel.id,
-    workspaceId: channel.organizationId,
+    workspaceId: channel.workspaceId,
     slug: channel.slug,
     name: channel.name,
     topic: channel.topic ?? undefined,
@@ -864,7 +864,7 @@ export const appCreateChannelMessageResponse = (result: {
 
 type ExecutionApprovalResult = Awaited<
   ReturnType<
-    typeof import("./channel-proposal-routes").acceptOrganizationChannelExecutionProposal
+    typeof import("./channel-proposal-routes").acceptWorkspaceChannelExecutionProposal
   >
 >;
 
@@ -896,7 +896,7 @@ const approvalOutcome = (outcome: "accepted" | "already_accepted") =>
 
 type ProposalApprovalResult = Awaited<
   ReturnType<
-    typeof import("./channel-proposal-routes").acceptOrganizationChannelProposal
+    typeof import("./channel-proposal-routes").acceptWorkspaceChannelProposal
   >
 >;
 
@@ -930,7 +930,7 @@ export const appAcceptChannelExecutionProposal = (
 
 type SkillApprovalResult = Awaited<
   ReturnType<
-    typeof import("./channel-proposal-routes").acceptOrganizationChannelSkillExecutionProposal
+    typeof import("./channel-proposal-routes").acceptWorkspaceChannelSkillExecutionProposal
   >
 >;
 

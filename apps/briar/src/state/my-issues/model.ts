@@ -5,7 +5,7 @@ import type { HuntRun, Project } from "../../types";
   The rules "내 이슈" narrows and groups by, as pure functions.
 
   They were inline `useMemo`s over a `Record<projectId, DashboardPayload>` the
-  page held, which is what made every run edit anywhere in the organization
+  page held, which is what made every run edit anywhere in the workspace
   rebuild the whole list. The derived atoms in `./atoms.ts` apply the same rules
   over the normalized store; nothing here reads an atom.
 */

@@ -112,7 +112,7 @@ export class WebSocketRealtimeTransport implements RealtimeTransport {
       });
     } catch (error) {
       if (!this.active || generation !== this.generation) return;
-      console.warn("Organization realtime socket disconnected", error);
+      console.warn("Workspace realtime socket disconnected", error);
       this.scheduleReconnect(generation);
     } finally {
       if (this.ticketRequest === ticketRequest) this.ticketRequest = null;

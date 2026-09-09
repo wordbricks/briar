@@ -17,8 +17,8 @@ import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
 import type { SessionUser } from "../types";
 
-const sharedOrganizationBlocker =
-  "Account deletion is blocked by shared organization resources";
+const sharedWorkspaceBlocker =
+  "Account deletion is blocked by shared workspace resources";
 const confirmationMismatch = "Confirmation email does not match";
 const recentSignInRequired = "Recent sign-in required for account deletion";
 
@@ -55,7 +55,7 @@ export function AccountDeletionSettings({
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(
-        message === sharedOrganizationBlocker
+        message === sharedWorkspaceBlocker
           ? t("account.deleteBlocked")
           : message === confirmationMismatch
             ? t("account.deleteConfirmationMismatch")

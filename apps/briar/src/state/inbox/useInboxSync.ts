@@ -8,7 +8,7 @@ import {
   INBOX_REALTIME_FALLBACK_MS,
 } from "../../lib/channel-realtime";
 import type { RealtimeTransport } from "../../lib/realtime-transport";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { teamsAtom } from "../team/atoms";
@@ -40,7 +40,7 @@ import { startInboxReadSync } from "./read-sync";
 
   The realtime notification stays a *refresh trigger* rather than a `SyncEvent`.
   A publish on the `inbox` topic carries a version and nothing else; the
-  messages themselves only exist as the organization feed's answer, which is a
+  messages themselves only exist as the workspace feed's answer, which is a
   compact summary that has to be merged against the richer local copy. Turning
   the trigger into an event would mean inventing a payload the server never
   sends. The feed response that follows is what enters the store, and it does so
@@ -57,7 +57,7 @@ const feedBookkeeping = new WeakMap<AtomRegistry, InboxFeedBookkeeping>();
 
 /**
  * Folds the messages the open board implies into the stored record. It is the
- * store's own writer: the feed is authoritative for the organization, and this
+ * store's own writer: the feed is authoritative for the workspace, and this
  * is authoritative for the team whose board is loaded.
  */
 export function mergeCurrentInboxMessages(registry: AtomRegistry): void {
@@ -82,7 +82,7 @@ export function mergeCurrentInboxMessages(registry: AtomRegistry): void {
 
 export interface InboxFeedSyncOptions {
   readonly api?: Partial<InboxApi> | undefined;
-  readonly organizationId: string | null;
+  readonly workspaceId: string | null;
   readonly realtime: RealtimeTransport | null;
   readonly storageKey: string;
   readonly token: string | null;
@@ -90,7 +90,7 @@ export interface InboxFeedSyncOptions {
 }
 
 /**
- * Opens the organization feed for one account and returns the canceller. The
+ * Opens the workspace feed for one account and returns the canceller. The
  * feed is what makes the inbox account-wide rather than a view of the open
  * team, and its first response is half of {@link inboxFeedIdentityAtom}'s job:
  * unread markers stay off until an authoritative answer has arrived.
@@ -99,14 +99,14 @@ export function startInboxFeedSync(
   registry: AtomRegistry,
   {
     api: overrides,
-    organizationId,
+    workspaceId,
     realtime,
     storageKey,
     token,
     userId,
   }: InboxFeedSyncOptions,
 ): () => void {
-  if (!token || !userId || !organizationId) {
+  if (!token || !userId || !workspaceId) {
     if (registry.get(inboxFeedIdentityAtom) !== null) {
       registry.set(inboxFeedIdentityAtom, null);
     }
@@ -114,7 +114,7 @@ export function startInboxFeedSync(
   }
 
   const api = resolveInboxApi(registry, overrides);
-  const feedScope = `${userId}:${organizationId}`;
+  const feedScope = `${userId}:${workspaceId}`;
   let bookkeeping = feedBookkeeping.get(registry);
   if (bookkeeping?.scope !== feedScope) {
     bookkeeping = { scope: feedScope, state: null };
@@ -184,7 +184,7 @@ export function startInboxFeedSync(
     try {
       const result = await api.loadFeed(
         token,
-        organizationId,
+        workspaceId,
         bookkeeping?.scope === feedScope ? bookkeeping.state : null,
         abort.signal,
       );
@@ -230,7 +230,7 @@ export function startInboxFeedSync(
     }, INBOX_REALTIME_DEBOUNCE_MS);
   });
   // Inbox realtime is what lets system notifications arrive while the app
-  // window is hidden. Other organization consumers may pause in the
+  // window is hidden. Other workspace consumers may pause in the
   // background, but this consumer deliberately keeps the shared socket alive
   // until the authenticated Inbox scope is disposed.
   realtime?.start();
@@ -266,7 +266,7 @@ export function useInboxSync(deps: InboxSyncDeps = {}): void {
   const registry = useRegistry();
   const token = useAtomValue(tokenAtom);
   const userId = useAtomValue(inboxUserIdAtom);
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
   const storageKey = useAtomValue(inboxStorageKeyAtom);
   const { api } = deps;
   const createRealtime =
@@ -297,22 +297,22 @@ export function useInboxSync(deps: InboxSyncDeps = {}): void {
 
   const realtime = useMemo(
     () =>
-      token && organizationId && userId && createRealtime
-        ? createRealtime(token, organizationId)
+      token && workspaceId && userId && createRealtime
+        ? createRealtime(token, workspaceId)
         : null,
-    [createRealtime, organizationId, token, userId],
+    [createRealtime, workspaceId, token, userId],
   );
 
   useEffect(
     () =>
       startInboxFeedSync(registry, {
         api,
-        organizationId,
+        workspaceId,
         realtime,
         storageKey,
         token,
         userId,
       }),
-    [api, organizationId, realtime, registry, storageKey, token, userId],
+    [api, workspaceId, realtime, registry, storageKey, token, userId],
   );
 }

@@ -9,9 +9,9 @@ import {
   type AgentProviderKind,
   type PreparedProjectRepository,
 } from "../generated/tauri";
-import type { OrganizationRole, ProjectSettings } from "../types";
+import type { WorkspaceRole, ProjectSettings } from "../types";
 import type { ProjectGithubCredential } from "./api";
-import { hasOrganizationCapability } from "./organization-role";
+import { hasWorkspaceCapability } from "./workspace-role";
 
 export type LocalAutoHuntConfig = {
   velenOrg: string | null;
@@ -69,7 +69,7 @@ export async function preflightThenCreateTeam<T>(
 }
 
 export async function resolveTeamConnectionWorkflow(
-  role: OrganizationRole | undefined,
+  role: WorkspaceRole | undefined,
   existingWorkflow: AutoHuntWorkflow | undefined,
   generateWorkflow: () => Promise<AutoHuntWorkflow>,
   compatiblePreset?: AutoHuntWorkflow,
@@ -83,9 +83,9 @@ export async function resolveTeamConnectionWorkflow(
       shouldPersistTeamSettings: false,
     };
   }
-  if (!hasOrganizationCapability(role, "development:manage")) {
+  if (!hasWorkspaceCapability(role, "development:manage")) {
     throw new Error(
-      "An organization owner, co-owner, or developer must generate the project workflow before connecting a repository.",
+      "An workspace owner, co-owner, or developer must generate the project workflow before connecting a repository.",
     );
   }
   if (

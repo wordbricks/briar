@@ -530,17 +530,17 @@ const channelReply = (
       workId: value.workId,
       channelId: value.channelId,
       scope: create(ChannelReplyScopeSchema, {
-        scope: value.scope.kind === "organization"
+        scope: value.scope.kind === "workspace"
           ? {
               case: "workspace",
               value: create(ChannelReplyScope_WorkspaceSchema, {
-                workspaceId: value.scope.organizationId,
+                workspaceId: value.scope.workspaceId,
               }),
             }
           : {
               case: "project",
               value: create(ChannelReplyScope_ProjectSchema, {
-                workspaceId: value.scope.organizationId,
+                workspaceId: value.scope.workspaceId,
                 projectId: value.scope.projectId,
               }),
             },
@@ -631,7 +631,7 @@ const channelReply = (
         create(ChannelAgentMessageTargetSchema, {
           agentId: target.agentId,
           agentName: target.agentName,
-          // Organization Agents have no repository, so both project fields
+          // Workspace Agents have no repository, so both project fields
           // stay absent rather than being filled with a placeholder.
           projectId: target.projectId ?? undefined,
           projectName: target.projectName ?? undefined,
@@ -780,7 +780,7 @@ const dmMemoryLearning = (
     value: create(ClaimedDmMemoryLearningSchema, {
       workId: value.workId,
       runId: value.runId,
-      workspaceId: value.organizationId,
+      workspaceId: value.workspaceId,
       workerId: value.workerId,
       sourceKey: value.sourceKey,
       title: value.title,

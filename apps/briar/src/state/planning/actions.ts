@@ -6,7 +6,7 @@ import {
   updatePlanningProject as updateRemotePlanningProject,
 } from "../../lib/api";
 import type { PlanningProject, PlanningProjectStatus } from "../../types";
-import { demoOrganization } from "../demo-fixtures";
+import { demoWorkspace } from "../demo-fixtures";
 import { runsByIdAtom, teamRunsAtom } from "../entities/runs";
 import { upsertMany } from "../entities/upsert";
 import { demoMode } from "../platform";
@@ -113,8 +113,8 @@ export function createPlanningActions(
         const observedAt = new Date().toISOString();
         const project: PlanningProject = {
           id: crypto.randomUUID(),
-          workspaceId: team.organizationId ?? demoOrganization.id,
-          workspaceName: team.organizationName ?? demoOrganization.name,
+          workspaceId: team.workspaceId ?? demoWorkspace.id,
+          workspaceName: team.workspaceName ?? demoWorkspace.name,
           teamId,
           teamName: team.name,
           name: input.name.trim(),

@@ -19,7 +19,7 @@ import {
   viewingIssueConversationRunIdAtom,
 } from "../channels/atoms";
 import { pendingInboxNotificationTargetAtom } from "../navigation/atoms";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
@@ -54,7 +54,7 @@ import {
 
 type NotificationBaseline = {
   userId: string;
-  organizationId: string;
+  workspaceId: string;
   baselineId: string;
   versions: Record<string, string>;
 };
@@ -67,7 +67,7 @@ const inboxNotificationInputsAtom = Atom.make((get) => ({
   baselineId: get(inboxNotificationBaselineIdAtom),
   initialSyncComplete: get(inboxInitialSyncCompleteAtom),
   messages: get(inboxMessagesAtom),
-  organizationId: get(activeOrganizationIdAtom),
+  workspaceId: get(activeWorkspaceIdAtom),
   userId: get(inboxUserIdAtom),
   viewingChannelId: get(viewingChannelIdAtom),
   viewingChannelThreadRootMessageId: get(
@@ -151,14 +151,14 @@ export function useInboxNotifications(
         baselineId,
         initialSyncComplete,
         messages,
-        organizationId,
+        workspaceId,
         userId: accountId,
         viewingChannelId,
         viewingChannelThreadRootMessageId,
         viewingIssueConversationRunId,
       } = registry.get(inboxNotificationInputsAtom);
       const userId = lockedTeamId ? null : accountId;
-      if (!userId || !organizationId || !initialSyncComplete) {
+      if (!userId || !workspaceId || !initialSyncComplete) {
         baseline = null;
         return;
       }
@@ -172,10 +172,10 @@ export function useInboxNotifications(
       if (
         !baseline ||
         baseline.userId !== userId ||
-        baseline.organizationId !== organizationId ||
+        baseline.workspaceId !== workspaceId ||
         baseline.baselineId !== baselineId
       ) {
-        baseline = { userId, organizationId, baselineId, versions };
+        baseline = { userId, workspaceId, baselineId, versions };
         return;
       }
 
@@ -183,7 +183,7 @@ export function useInboxNotifications(
         baseline.versions,
         messages,
       );
-      baseline = { userId, organizationId, baselineId, versions };
+      baseline = { userId, workspaceId, baselineId, versions };
       if (changedMessages.length === 0) return;
 
       const preferences = readInboxNotificationPreferences();

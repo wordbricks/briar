@@ -4,7 +4,7 @@ export const firstRunTutorialPendingStorageKey =
 const storageKeyFor = (userId: string) =>
   `${firstRunTutorialPendingStorageKey}:${userId}`;
 
-export function shouldShowFirstOrganizationSetup({
+export function shouldShowFirstWorkspaceSetup({
   hasUser,
   organizationCount,
   projectCount,

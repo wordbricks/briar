@@ -15,7 +15,7 @@ import {
 } from "./app-connect-realtime";
 import { requireConnectHandler } from "./test-helpers/connect";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
 const channelId = "44444444-4444-4444-8444-444444444444";
@@ -74,8 +74,8 @@ describe("app Realtime Connect adapter", () => {
         switch (scope.type) {
           case "workspaceNotifications":
             return {
-              socketPath: `/organizations/${scope.organizationId}/channel-events`,
-              ticket: "organization-ticket",
+              socketPath: `/workspaces/${scope.workspaceId}/channel-events`,
+              ticket: "workspace-ticket",
             };
           case "issueActivity":
             return {
@@ -86,20 +86,20 @@ describe("app Realtime Connect adapter", () => {
           case "channelActivity":
             return {
               socketPath:
-                `/organizations/${scope.organizationId}/channels/${scope.channelId}/agent-activity-events`,
+                `/workspaces/${scope.workspaceId}/channels/${scope.channelId}/agent-activity-events`,
               ticket: "channel-ticket",
             };
         }
       });
     const services = { createTicket, requireSession };
 
-    const organization = await invoke({
-      workspaceNotifications: { workspaceId: organizationId },
+    const workspace = await invoke({
+      workspaceNotifications: { workspaceId: workspaceId },
     }, services);
-    expect(organization.status).toBe(200);
-    expect(await organization.json()).toEqual({
+    expect(workspace.status).toBe(200);
+    expect(await workspace.json()).toEqual({
       url:
-        `wss://api.example.test/organizations/${organizationId}/channel-events?ticket=organization-ticket`,
+        `wss://api.example.test/workspaces/${workspaceId}/channel-events?ticket=workspace-ticket`,
     });
 
     const issue = await invoke({ issueActivity: { projectId, runId } }, services);
@@ -110,17 +110,17 @@ describe("app Realtime Connect adapter", () => {
     });
 
     const channel = await invoke({
-      channelActivity: { workspaceId: organizationId, channelId },
+      channelActivity: { workspaceId: workspaceId, channelId },
     }, services);
     expect(channel.status).toBe(200);
     expect(await channel.json()).toEqual({
       url:
-        `wss://api.example.test/organizations/${organizationId}/channels/${channelId}/agent-activity-events?ticket=channel-ticket`,
+        `wss://api.example.test/workspaces/${workspaceId}/channels/${channelId}/agent-activity-events?ticket=channel-ticket`,
     });
     expect(createTicket.mock.calls.map(([input]) => input.scope)).toEqual([
-      { type: "workspaceNotifications", organizationId },
+      { type: "workspaceNotifications", workspaceId },
       { type: "issueActivity", projectId, runId },
-      { type: "channelActivity", organizationId, channelId },
+      { type: "channelActivity", workspaceId, channelId },
     ]);
   });
 

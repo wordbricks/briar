@@ -15,7 +15,7 @@ import {
 } from "./managed-computer-reconciliation";
 import {
   flushAgentSkillExecutionRealtimeOutbox,
-  flushOrganizationInboxRealtimeOutbox,
+  flushWorkspaceInboxRealtimeOutbox,
 } from "./realtime-scheduling";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
@@ -87,7 +87,7 @@ export async function handleScheduledTask(
           dependencies.runDueDmSchedules(env.DB, new Date().toISOString()),
         ]);
         await Promise.all([
-          flushOrganizationInboxRealtimeOutbox(env, env.DB),
+          flushWorkspaceInboxRealtimeOutbox(env, env.DB),
           flushAgentSkillExecutionRealtimeOutbox(env, env.DB),
         ]);
         console.log(JSON.stringify({
@@ -167,7 +167,7 @@ export async function handleScheduledTask(
         ),
       ]);
       await Promise.all([
-        flushOrganizationInboxRealtimeOutbox(env, env.DB),
+        flushWorkspaceInboxRealtimeOutbox(env, env.DB),
         flushAgentSkillExecutionRealtimeOutbox(env, env.DB),
       ]);
       if (dashboardChangePruneFailure !== null) {

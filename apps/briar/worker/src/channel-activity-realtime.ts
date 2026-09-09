@@ -11,13 +11,13 @@ type ChannelActivitySocketAttachment = {
   authorizationExpiresAt: number;
 };
 
-const activityHubName = (organizationId: string, channelId: string) =>
-  `${organizationId}:${channelId}`;
+const activityHubName = (workspaceId: string, channelId: string) =>
+  `${workspaceId}:${channelId}`;
 const issueActivityHubName = (
-  organizationId: string,
+  workspaceId: string,
   projectId: string,
   runId: string,
-) => `${organizationId}:issue:${projectId}:${runId}`;
+) => `${workspaceId}:issue:${projectId}:${runId}`;
 
 type ActivitySubscription = {
   userId: string;
@@ -185,7 +185,7 @@ export class ChannelActivityHub {
 export async function subscribeToChannelActivity(
   env: Env,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     userId: string;
     authorizationExpiresAt: number;
@@ -193,14 +193,14 @@ export async function subscribeToChannelActivity(
 ) {
   return subscribeToActivity(
     env,
-    activityHubName(input.organizationId, input.channelId),
+    activityHubName(input.workspaceId, input.channelId),
     input,
   );
 }
 
 export async function publishChannelActivity(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   frame: AgentReplyActivityFrame,
 ) {
   if (frame.scope.case !== "channel") {
@@ -208,7 +208,7 @@ export async function publishChannelActivity(
   }
   return publishActivity(
     env,
-    activityHubName(organizationId, frame.scope.value.channelId),
+    activityHubName(workspaceId, frame.scope.value.channelId),
     frame,
     "Channel activity publish failed",
   );
@@ -217,7 +217,7 @@ export async function publishChannelActivity(
 export async function subscribeToIssueActivity(
   env: Env,
   input: {
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     runId: string;
     userId: string;
@@ -226,14 +226,14 @@ export async function subscribeToIssueActivity(
 ) {
   return subscribeToActivity(
     env,
-    issueActivityHubName(input.organizationId, input.projectId, input.runId),
+    issueActivityHubName(input.workspaceId, input.projectId, input.runId),
     input,
   );
 }
 
 export async function publishIssueActivity(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   frame: AgentReplyActivityFrame,
 ) {
   if (frame.scope.case !== "issue") {
@@ -242,7 +242,7 @@ export async function publishIssueActivity(
   return publishActivity(
     env,
     issueActivityHubName(
-      organizationId,
+      workspaceId,
       frame.scope.value.projectId,
       frame.scope.value.runId,
     ),
@@ -253,11 +253,11 @@ export async function publishIssueActivity(
 
 export async function disconnectChannelActivitySubscribers(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
 ) {
   const hub = env.CHANNEL_ACTIVITY_REALTIME.getByName(
-    activityHubName(organizationId, channelId),
+    activityHubName(workspaceId, channelId),
   );
   const response = await hub.fetch("https://channel-activity.internal/disconnect", {
     method: "POST",

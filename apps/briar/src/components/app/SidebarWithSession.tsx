@@ -11,12 +11,9 @@ import {
   channelsLoadingAtom,
   directMessageComposeAtom,
   organizationDirectMessagesAtom,
-  visibleOrganizationChannelsAtom,
+  visibleWorkspaceChannelsAtom,
 } from "../../state/channels/atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import {
   activePageAtom,
   desktopActiveChannelIdAtom,
@@ -29,27 +26,27 @@ import {
   connectedTeamIdsAtom,
   teamReadinessErrorRecordAtom,
   teamReadinessRecordAtom,
-} from "../../state/workspace/atoms";
+} from "../../state/local-workspace/atoms";
 import type {
-  Organization,
+  Workspace,
   PlanningProject,
   SessionUser,
 } from "../../types";
 import { Sidebar } from "../Sidebar";
 
 export interface SidebarSessionState {
-  readonly activeOrganizationId: string | null;
+  readonly activeWorkspaceId: string | null;
   readonly activeProjectId: string | null;
-  readonly organizations: Organization[];
+  readonly workspaces: Workspace[];
   readonly planningProjects: PlanningProject[];
   readonly token: string | null;
   readonly user: SessionUser | null;
 }
 
 /**
- * Subscribes to the session, organization, team and planning atoms the sidebar
+ * Subscribes to the session, workspace, team and planning atoms the sidebar
  * renders from. Only this component re-renders when one of them changes, so
- * adding an organization or a planning project no longer re-renders the app
+ * adding a workspace or a planning project no longer re-renders the app
  * shell that owns the sidebar's callbacks.
  */
 export function SidebarSessionBoundary({
@@ -57,16 +54,16 @@ export function SidebarSessionBoundary({
 }: {
   children: (session: SidebarSessionState) => ReactNode;
 }) {
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const activeProjectId = useAtomValue(activeTeamIdAtom);
-  const organizations = useAtomValue(organizationsAtom);
+  const workspaces = useAtomValue(workspacesAtom);
   const planningProjects = useAtomValue(planningProjectsAtom);
   const token = useAtomValue(tokenAtom);
   const user = useAtomValue(userAtom);
   return children({
-    activeOrganizationId,
+    activeWorkspaceId,
     activeProjectId,
-    organizations,
+    workspaces,
     planningProjects,
     token,
     user,
@@ -75,7 +72,7 @@ export function SidebarSessionBoundary({
 
 /**
  * `Sidebar` wired to the store. Everything it lists — the teams this window may
- * show, the channels of the active organization, where the user is, what this
+ * show, the channels of the active workspace, where the user is, what this
  * device knows about each repository, the agent sessions running on each team —
  * comes from atoms; the shell keeps only the callbacks that navigate.
  *
@@ -107,7 +104,7 @@ export function SidebarWithSession(
   const activeChannelId = useAtomValue(desktopActiveChannelIdAtom);
   const activePage = useAtomValue(activePageAtom);
   const activePlanningProjectId = useAtomValue(activePlanningProjectIdAtom);
-  const channels = useAtomValue(visibleOrganizationChannelsAtom);
+  const channels = useAtomValue(visibleWorkspaceChannelsAtom);
   const channelsLoading = useAtomValue(channelsLoadingAtom);
   const connectedTeamIds = useAtomValue(connectedTeamIdsAtom);
   const directMessages = useAtomValue(organizationDirectMessagesAtom);

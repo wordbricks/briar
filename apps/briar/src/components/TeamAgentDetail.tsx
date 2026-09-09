@@ -165,7 +165,7 @@ export function TeamAgentDetail({
     setRemoteComputerTarget(null);
     if (
       !token ||
-      !board?.team.organizationId ||
+      !board?.team.workspaceId ||
       !agent.designatedWorkerId ||
       agent.computerUsePolicy !== "unattended" ||
       !supportsManagedComputerRemoteDesktop()
@@ -173,7 +173,7 @@ export function TeamAgentDetail({
       return;
     }
     let cancelled = false;
-    void loadManagedComputers(token, board.team.organizationId)
+    void loadManagedComputers(token, board.team.workspaceId)
       .then((response) => {
         if (cancelled) return;
         setRemoteComputerTarget(response.computers.find((computer) =>
@@ -190,7 +190,7 @@ export function TeamAgentDetail({
   }, [
     agent.computerUsePolicy,
     agent.designatedWorkerId,
-    board?.team.organizationId,
+    board?.team.workspaceId,
     token,
   ]);
 
@@ -211,9 +211,9 @@ export function TeamAgentDetail({
   };
 
   const isTaskStarting = isExternalStartPending || isStarting;
-  // Agent-to-Agent conversations are an organization's, so the section only
-  // shows once the board has told this page which organization it belongs to.
-  const agentOrganizationId = board?.team.organizationId ?? null;
+  // Agent-to-Agent conversations are a workspace's, so the section only
+  // shows once the board has told this page which workspace it belongs to.
+  const agentWorkspaceId = board?.team.workspaceId ?? null;
   /*
     Both shells open the conversation on their direct message surface, where the
     read-only fetch takes over. The desktop records the visit; the phone has no
@@ -226,8 +226,8 @@ export function TeamAgentDetail({
       setCompanionPage("dms");
       return;
     }
-    if (agentOrganizationId) {
-      navigateToChannel(channelId, "dms", agentOrganizationId);
+    if (agentWorkspaceId) {
+      navigateToChannel(channelId, "dms", agentWorkspaceId);
     }
   };
 
@@ -406,7 +406,7 @@ export function TeamAgentDetail({
         />
       </div>
 
-      {token && agentOrganizationId ? (
+      {token && agentWorkspaceId ? (
         <AgentConversationsSection
           agentId={agent.id}
           className={cn(
@@ -416,7 +416,7 @@ export function TeamAgentDetail({
               "px-4 pb-[calc(96px_+_env(safe-area-inset-bottom))]",
           )}
           onOpenConversation={openAgentConversation}
-          organizationId={agentOrganizationId}
+          workspaceId={agentWorkspaceId}
           token={token}
         />
       ) : null}
@@ -431,12 +431,12 @@ export function TeamAgentDetail({
         workerSelectionRequired={Boolean(onStartRemoteTask)}
       />
 
-      {remoteComputer && token && board?.team.organizationId ? (
+      {remoteComputer && token && board?.team.workspaceId ? (
         <ManagedComputerRemoteDesktop
           agentId={agent.id}
           computer={remoteComputer}
           onClose={() => setRemoteComputer(null)}
-          organizationId={board.team.organizationId}
+          workspaceId={board.team.workspaceId}
           token={token}
         />
       ) : null}

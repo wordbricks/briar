@@ -6,7 +6,7 @@ import {
   listDmMemorySpaces,
 } from "./dm-memory-repository";
 import { HttpError } from "./http-response";
-import { getOrganizationRole } from "./organization-repository";
+import { getWorkspaceRole } from "./workspace-repository";
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
@@ -22,7 +22,7 @@ export async function handleDmMemoryRoute(input: {
 }): Promise<Response | undefined> {
   const { request, url, auth, db } = input;
   const match = url.pathname.match(
-    /^\/organizations\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/memory\/export$/u,
+    /^\/workspaces\/([0-9a-f-]+)\/channels\/([0-9a-f-]+)\/memory\/export$/u,
   );
   if (!match) return undefined;
   if (request.method !== "GET") {
@@ -31,18 +31,18 @@ export async function handleDmMemoryRoute(input: {
 
   const session = await requireSession(auth, request);
   const owner = {
-    organizationId: decodeId(match[1]).toLowerCase(),
+    workspaceId: decodeId(match[1]).toLowerCase(),
     channelId: decodeId(match[2]).toLowerCase(),
     userId: session.user.id,
   };
-  if (!await getOrganizationRole(db, owner.organizationId, owner.userId)) {
-    throw new HttpError(404, "Organization not found");
+  if (!await getWorkspaceRole(db, owner.workspaceId, owner.userId)) {
+    throw new HttpError(404, "Workspace not found");
   }
   const spaces = await listDmMemorySpaces(db, owner);
   if (spaces.length === 0) {
     await requireChannelAccess(
       db,
-      owner.organizationId,
+      owner.workspaceId,
       owner.channelId,
       owner.userId,
     );

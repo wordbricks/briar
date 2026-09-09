@@ -10,9 +10,9 @@ import {
   channelReplyCompletionSchema,
 } from "./channels-contract";
 import {
-  OrganizationAgentContextRequests,
-  OrganizationAgentContextRequestTurn,
-} from "./organization-agent-context-contract";
+  WorkspaceAgentContextRequests,
+  WorkspaceAgentContextRequestTurn,
+} from "./workspace-agent-context-contract";
 import { dmMemoryRequestSchema } from "./dm-memory-query-contract";
 
 const strictSchemaOptions = {
@@ -43,7 +43,7 @@ const ChannelAgentReplyTurnSchema = Schema.Union([
   })),
   strict(Schema.Struct({
     case: Schema.Literal("context"),
-    requests: OrganizationAgentContextRequestTurn,
+    requests: WorkspaceAgentContextRequestTurn,
   })),
   strict(Schema.Struct({
     case: Schema.Literal("memory"),
@@ -65,7 +65,7 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
   body: Schema.NullOr(channelMessageBodySchema),
   attachments: agentReplyAttachmentPathsProviderSchema,
   ...channelReplyCompletionFields,
-  contextRequests: Schema.NullOr(OrganizationAgentContextRequests),
+  contextRequests: Schema.NullOr(WorkspaceAgentContextRequests),
   memoryRequests: Schema.NullOr(
     mutableArray(dmMemoryRequestSchema).check(Schema.isLengthBetween(1, 1)),
   ),
@@ -191,7 +191,7 @@ type ChannelAgentReplyProviderSource =
 
 /**
  * One codec owns both provider-visible structured output and the application
- * turn: a normal reply or an organization-context lookup, never both.
+ * turn: a normal reply or a workspace-context lookup, never both.
  */
 export const ChannelAgentReplyProviderOutputSchema =
   ChannelAgentReplyProviderSourceSchema.pipe(

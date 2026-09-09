@@ -43,7 +43,7 @@ type ChannelMessageReactionsProps = {
   message: ChannelMessage;
   currentUserId: string | null;
   members?: readonly ChannelMember[];
-  organizationId?: string;
+  workspaceId?: string;
   busy?: boolean;
   /** Compact mobile layout keeps the add control always visible. */
   alwaysShowAdd?: boolean;
@@ -94,7 +94,7 @@ export function ChannelMessageReactions({
   message,
   currentUserId,
   members = [],
-  organizationId,
+  workspaceId,
   busy = false,
   alwaysShowAdd = false,
   showHoverActions = false,
@@ -277,7 +277,7 @@ export function ChannelMessageReactions({
           onOpenThread={onOpenThread}
           onDelete={onDelete}
           onToggle={handleToggle}
-          organizationId={organizationId}
+          workspaceId={workspaceId}
           pickerId={pickerId}
           pickerOpen={pickerOpen}
         />
@@ -342,7 +342,7 @@ function ChannelMessageHoverActions({
   onOpenThread,
   onDelete,
   onToggle,
-  organizationId,
+  workspaceId,
   pickerId,
   pickerOpen,
 }: {
@@ -354,22 +354,22 @@ function ChannelMessageHoverActions({
   onOpenThread?: () => void;
   onDelete?: () => void;
   onToggle: (emoji: string) => void;
-  organizationId?: string;
+  workspaceId?: string;
   pickerId: string;
   pickerOpen: boolean;
 }) {
   const { t } = useI18n();
   const { toast } = useToast();
-  const canCopyLink = Boolean(organizationId) && !message.optimistic;
+  const canCopyLink = Boolean(workspaceId) && !message.optimistic;
 
   const stop = (event: ReactMouseEvent) => {
     event.stopPropagation();
   };
 
   const copyLink = () => {
-    if (!organizationId) return;
+    if (!workspaceId) return;
     void copyChannelShareLink({
-      organizationId,
+      workspaceId,
       channelId: message.channelId,
       messageId: message.id,
       rootMessageId: message.parentMessageId ?? message.id,

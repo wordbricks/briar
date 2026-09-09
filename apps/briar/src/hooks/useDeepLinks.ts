@@ -21,7 +21,7 @@ import {
 } from "../state/deep-links/atoms";
 import { useInboxActions } from "../state/inbox/actions";
 import {
-  activeOrganizationChannelsAtom,
+  activeWorkspaceChannelsAtom,
   channelCatalogCursorAtom,
   channelsLoadingAtom,
   requestedChannelIdAtom,
@@ -42,11 +42,9 @@ import {
   requestedRunMessageIdAtom,
   requestedSessionIdAtom,
 } from "../state/navigation/atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../state/organization/atoms";
-import { useOrganizationActions } from "../state/organization/actions";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../state/workspace/atoms";
+import { useWorkspaceActions } from "../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../state/local-workspace/actions";
 import { companionMode, lockedTeamIdAtom } from "../state/platform";
 import { loadingAtom, tokenAtom, userAtom } from "../state/session/atoms";
 import { useTeamActions } from "../state/team/actions";
@@ -63,13 +61,13 @@ import {
   The listeners themselves are `state/deep-links` atoms: they register on first
   observation and unregister through a finalizer, so this hook only mounts them.
   What is left here is the resolver — it drains `pendingBriarLinkAtom` once the
-  session, the organization and the channel catalog it needs have settled, and
+  session, the workspace and the channel catalog it needs have settled, and
   `pendingInboxNotificationTarget` the same way.
 
   The resolver's shape is what kept it in the app shell: it waits on state it
   does not own and then writes request atoms that a dozen views read. It reads
   the waiting conditions and where the user already is from atoms now, and moves
-  through the navigation actions, the team and organization actions and the
+  through the navigation actions, the team and workspace actions and the
   inbox's own read marker — nothing is handed in at all.
 */
 
@@ -126,14 +124,14 @@ export function useDeepLinks({
   const user = useAtomValue(userAtom);
   const loading = useAtomValue(loadingAtom);
   const token = useAtomValue(tokenAtom);
-  const organizations = useAtomValue(organizationsAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaces = useAtomValue(workspacesAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const teams = useAtomValue(teamsAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
   const loadedTeamId = useAtomValue(loadedTeamIdAtom);
   // Only the id list: a run's own edits never move the fallback below.
   const loadedRunIds = useAtomValue(teamRunIdsAtom(loadedTeamId ?? ""));
-  const organizationChannels = useAtomValue(activeOrganizationChannelsAtom);
+  const organizationChannels = useAtomValue(activeWorkspaceChannelsAtom);
   const channelsLoading = useAtomValue(channelsLoadingAtom);
   const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
   const [pendingBriarLink, setPendingBriarLink] = useAtom(pendingBriarLinkAtom);
@@ -153,7 +151,7 @@ export function useDeepLinks({
   const navigationUserBoundaryChanged = useAtomValue(
     navigationUserBoundaryChangedAtom,
   );
-  const { markOrganizationChannelRead, selectChannel } = useChannelActions();
+  const { markWorkspaceChannelRead, selectChannel } = useChannelActions();
   const {
     navigateToChannel,
     navigateToIssue,
@@ -161,7 +159,7 @@ export function useDeepLinks({
     replaceNavigationLocation,
   } = useNavigationActions();
   const { ensureTeamSelected, selectTeam } = useTeamActions();
-  const { selectOrganization } = useOrganizationActions();
+  const { selectWorkspace } = useWorkspaceActions();
   const { markRead: markInboxRead } = useInboxActions();
   /*
     The notification whose read receipt this window has already sent.
@@ -181,14 +179,14 @@ export function useDeepLinks({
     if (pendingBriarLink.kind === "channel") {
       setRequestedRunMessageId(null);
       if (
-        !organizations.some(
-          (organization) => organization.id === pendingBriarLink.organizationId,
+        !workspaces.some(
+          (workspace) => workspace.id === pendingBriarLink.workspaceId,
         )
       ) {
         return;
       }
-      if (pendingBriarLink.organizationId !== activeOrganizationId) {
-        selectOrganization(pendingBriarLink.organizationId);
+      if (pendingBriarLink.workspaceId !== activeWorkspaceId) {
+        selectWorkspace(pendingBriarLink.workspaceId);
         return;
       }
       if (channelsLoading || channelCatalogCursor === null) {
@@ -213,7 +211,7 @@ export function useDeepLinks({
           : null,
       );
       selectChannel(pendingBriarLink.channelId);
-      markOrganizationChannelRead(pendingBriarLink.channelId);
+      markWorkspaceChannelRead(pendingBriarLink.channelId);
       if (companionMode) {
         setCompanionPage(
           companionChannelPage(organizationChannels, pendingBriarLink.channelId),
@@ -226,7 +224,7 @@ export function useDeepLinks({
           )?.kind === "dm"
             ? "dms"
             : "channels",
-          pendingBriarLink.organizationId,
+          pendingBriarLink.workspaceId,
         );
       }
       setPendingBriarLink(null);
@@ -301,22 +299,22 @@ export function useDeepLinks({
     // when the effect runs, so it is deliberately not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    activeOrganizationId,
+    activeWorkspaceId,
     activeTeamId,
     channelCatalogCursor,
     channelsLoading,
     ensureTeamSelected,
     loading,
-    markOrganizationChannelRead,
+    markWorkspaceChannelRead,
     navigateToChannel,
     navigateToIssue,
     navigateToPage,
     organizationChannels,
-    organizations,
+    workspaces,
     lockedTeamId,
     pendingBriarLink,
     selectChannel,
-    selectOrganization,
+    selectWorkspace,
     selectTeam,
     setActivePlanningProjectId,
     setCompanionPage,
@@ -397,7 +395,7 @@ export function useDeepLinks({
       pendingInboxNotificationTarget.kind === "channel" &&
       (channelsLoading ||
         channelCatalogCursor === null ||
-        activeOrganizationId !== targetProject.organizationId)
+        activeWorkspaceId !== targetProject.workspaceId)
     ) {
       return;
     }
@@ -439,7 +437,7 @@ export function useDeepLinks({
         rootMessageId,
       });
       selectChannel(pendingInboxNotificationTarget.targetId);
-      markOrganizationChannelRead(pendingInboxNotificationTarget.targetId);
+      markWorkspaceChannelRead(pendingInboxNotificationTarget.targetId);
       if (companionMode) {
         setCompanionPage(
           companionChannelPage(
@@ -455,7 +453,7 @@ export function useDeepLinks({
           )?.kind === "dm"
             ? "dms"
             : "channels",
-          targetProject.organizationId,
+          targetProject.workspaceId,
           targetProject.id,
         );
       }
@@ -469,13 +467,13 @@ export function useDeepLinks({
     }
     setPendingInboxNotificationTarget(null);
   }, [
-    activeOrganizationId,
+    activeWorkspaceId,
     activeTeamId,
     channelCatalogCursor,
     channelsLoading,
     loading,
     markInboxRead,
-    markOrganizationChannelRead,
+    markWorkspaceChannelRead,
     navigateToChannel,
     navigateToIssue,
     navigateToPage,

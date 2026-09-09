@@ -127,7 +127,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
           );
         }
         return {
-          organizationId: computer.organization_id,
+          workspaceId: computer.organization_id,
           region: computer.aws_region,
           instanceId: computer.aws_instance_id,
           accountId: computer.aws_account_id,
@@ -211,7 +211,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
           const instanceId = computer.aws_instance_id ??
             await this.services.runManagedInstance(launchConfig, {
               managedComputerId,
-              organizationId: computer.organization_id,
+              workspaceId: computer.organization_id,
               campaignId: "getbriar-pilot",
               clientToken: provisioningJobId,
               nonce: await this.services.managedComputerEnrollmentNonce(
@@ -229,7 +229,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
             observedAt: new Date().toISOString(),
           });
           await this.services.recordManagedComputerAuditEvent(this.env.DB, {
-            organizationId: computer.organization_id,
+            workspaceId: computer.organization_id,
             managedComputerId,
             action: "instance_created",
             detail: { instanceId, region: computer.aws_region },
@@ -272,7 +272,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
             }
             return this.services.verifyManagedInstance(config, {
               managedComputerId,
-              organizationId: computer.organization_id,
+              workspaceId: computer.organization_id,
               campaignId: "getbriar-pilot",
               instanceId: launched.instanceId,
               region: computer.aws_region,
@@ -314,7 +314,7 @@ export class ManagedComputerProvisioningWorkflow extends WorkflowEntrypoint<
           observedAt,
         });
         await this.services.recordManagedComputerAuditEvent(this.env.DB, {
-          organizationId: computer.organization_id,
+          workspaceId: computer.organization_id,
           managedComputerId,
           action: "bootstrapping_started",
           detail: { instanceId: launched.instanceId },

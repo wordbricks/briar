@@ -5,7 +5,7 @@ import type { UnifiedSettingsTarget } from "../../components/UnifiedSettingsSide
 import type { InboxNotificationTarget } from "../../generated/tauri";
 import {
   channelIdFromNavigationLocation,
-  organizationIdFromNavigationLocation,
+  workspaceIdFromNavigationLocation,
   pageFromNavigationLocation,
   projectIdFromNavigationLocation,
   runIdFromNavigationLocation,
@@ -21,7 +21,7 @@ import {
 } from "../channels/atoms";
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { shallowArrayEqual } from "../entities/upsert";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamId, webMode } from "../platform";
 import { userAtom } from "../session/atoms";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
@@ -251,28 +251,28 @@ export const sidebarModeAtom = Atom.map(
 
 /**
  * The work location the Work half returns to: the most recent visit that is not
- * a DM page and still belongs to the active organization. `null` when the stack
+ * a DM page and still belongs to the active workspace. `null` when the stack
  * has none, in which case the caller picks the team home.
  *
- * A location from another organization is skipped rather than returned, because
- * navigating to it would switch the organization back — the reconciliation
- * selects whatever organization a location names.
+ * A location from another workspace is skipped rather than returned, because
+ * navigating to it would switch the workspace back — the reconciliation
+ * selects whatever workspace a location names.
  */
 export const lastWorkLocationAtom = Atom.make(
   (get): AppNavigationLocation | null => {
     const history = get(navigationHistoryAtom);
-    const organizationId = get(activeOrganizationIdAtom);
+    const workspaceId = get(activeWorkspaceIdAtom);
     const teams = get(teamsAtom);
-    const inActiveOrganization = (location: AppNavigationLocation) => {
-      const locationOrganizationId =
-        organizationIdFromNavigationLocation(location);
-      if (locationOrganizationId !== null) {
-        return locationOrganizationId === organizationId;
+    const inActiveWorkspace = (location: AppNavigationLocation) => {
+      const locationWorkspaceId =
+        workspaceIdFromNavigationLocation(location);
+      if (locationWorkspaceId !== null) {
+        return locationWorkspaceId === workspaceId;
       }
       const teamId = projectIdFromNavigationLocation(location);
       if (teamId === null) return true;
       return teams.some(
-        (team) => team.id === teamId && team.organizationId === organizationId,
+        (team) => team.id === teamId && team.workspaceId === workspaceId,
       );
     };
     for (let index = history.index; index >= 0; index -= 1) {
@@ -280,7 +280,7 @@ export const lastWorkLocationAtom = Atom.make(
       if (
         location !== undefined &&
         pageFromNavigationLocation(location) !== "dms" &&
-        inActiveOrganization(location)
+        inActiveWorkspace(location)
       ) {
         return location;
       }
@@ -291,20 +291,20 @@ export const lastWorkLocationAtom = Atom.make(
 
 /**
  * The conversation the DMs half returns to: the most recent DM visit in the
- * active organization whose conversation is still in the catalog. `null` when
+ * active workspace whose conversation is still in the catalog. `null` when
  * there is none, in which case the DM page opens on its latest conversation.
  */
 export const lastDirectMessageChannelIdAtom = Atom.make(
   (get): string | null => {
     const history = get(navigationHistoryAtom);
-    const organizationId = get(activeOrganizationIdAtom);
+    const workspaceId = get(activeWorkspaceIdAtom);
     const directMessages = get(organizationDirectMessagesAtom);
     for (let index = history.index; index >= 0; index -= 1) {
       const location = history.entries[index];
       if (
         location === undefined ||
         pageFromNavigationLocation(location) !== "dms" ||
-        organizationIdFromNavigationLocation(location) !== organizationId
+        workspaceIdFromNavigationLocation(location) !== workspaceId
       ) {
         continue;
       }
@@ -335,11 +335,11 @@ export const navigationTeamIdAtom = Atom.map(
   projectIdFromNavigationLocation,
 ).pipe(Atom.keepAlive, Atom.withLabel("navigation/teamId"));
 
-/** The organization the location names. */
-export const navigationOrganizationIdAtom = Atom.map(
+/** The workspace the location names. */
+export const navigationWorkspaceIdAtom = Atom.map(
   navigationLocationAtom,
-  organizationIdFromNavigationLocation,
-).pipe(Atom.keepAlive, Atom.withLabel("navigation/organizationId"));
+  workspaceIdFromNavigationLocation,
+).pipe(Atom.keepAlive, Atom.withLabel("navigation/workspaceId"));
 
 /** The channel the location names, on a channel location. */
 export const navigationChannelIdAtom = Atom.map(
@@ -354,7 +354,7 @@ export const navigationSettingsTargetAtom = Atom.map(
 ).pipe(Atom.keepAlive, Atom.withLabel("navigation/locationSettingsTarget"));
 
 /**
- * The location is a channel page carrying an organization, which is what makes
+ * The location is a channel page carrying a workspace, which is what makes
  * the location — rather than the selection — the source of the open channel on
  * the desktop.
  */
@@ -362,7 +362,7 @@ const navigationHasChannelPageContextAtom = Atom.make((get) => {
   const page = get(activePageAtom);
   return (
     (page === "channels" || page === "dms") &&
-    get(navigationOrganizationIdAtom) !== null
+    get(navigationWorkspaceIdAtom) !== null
   );
 }).pipe(Atom.keepAlive, Atom.withLabel("navigation/hasChannelPageContext"));
 

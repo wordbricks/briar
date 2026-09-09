@@ -54,15 +54,15 @@ const connectionSelect = `select id, organization_id, agent_id,
        disconnected_at, updated_at
 from briar_whatsapp_connections`;
 
-export async function getWhatsAppConnectionForOrganization(
+export async function getWhatsAppConnectionForWorkspace(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ) {
   return db.prepare(
     `${connectionSelect}
      where organization_id = ? and status = 'connected'
      order by updated_at desc limit 1`,
-  ).bind(organizationId).first<WhatsAppConnectionRow>();
+  ).bind(workspaceId).first<WhatsAppConnectionRow>();
 }
 
 export async function getWhatsAppConnectionByPhoneNumberId(
@@ -88,7 +88,7 @@ export async function getWhatsAppConnectionByVerifyTokenHash(
 export async function upsertWhatsAppConnection(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     agentId: string;
     phoneNumberId: string;
     wabaId: string;
@@ -99,9 +99,9 @@ export async function upsertWhatsAppConnection(
     observedAt: string;
   },
 ) {
-  const current = await getWhatsAppConnectionForOrganization(
+  const current = await getWhatsAppConnectionForWorkspace(
     db,
-    input.organizationId,
+    input.workspaceId,
   );
   const id = current?.id ?? crypto.randomUUID();
   await db.prepare(
@@ -122,7 +122,7 @@ export async function upsertWhatsAppConnection(
        updated_at = excluded.updated_at`,
   ).bind(
     id,
-    input.organizationId,
+    input.workspaceId,
     input.agentId,
     input.phoneNumberId,
     input.wabaId,
@@ -133,12 +133,12 @@ export async function upsertWhatsAppConnection(
     input.observedAt,
     input.observedAt,
   ).run();
-  return getWhatsAppConnectionForOrganization(db, input.organizationId);
+  return getWhatsAppConnectionForWorkspace(db, input.workspaceId);
 }
 
 export async function disconnectWhatsAppConnection(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   observedAt: string,
 ) {
   const results = await db.batch([
@@ -152,20 +152,20 @@ export async function disconnectWhatsAppConnection(
          select id from briar_whatsapp_connections
          where organization_id = ? and status = 'connected'
        ) and status <> 'dead_letter'`,
-    ).bind(observedAt, observedAt, organizationId),
+    ).bind(observedAt, observedAt, workspaceId),
     db.prepare(
       `update briar_whatsapp_connections
        set status = 'disconnected', disconnected_at = ?, updated_at = ?
        where organization_id = ? and status = 'connected'
        returning id`,
-    ).bind(observedAt, observedAt, organizationId),
+    ).bind(observedAt, observedAt, workspaceId),
   ]);
   return results[1]?.results.length === 1;
 }
 
 export async function listWhatsAppUserLinks(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const result = await db.prepare(
     `select link.id, link.connection_id, link.organization_id, link.user_id,
@@ -177,7 +177,7 @@ export async function listWhatsAppUserLinks(
      join "user" user on user.id = link.user_id
      where link.organization_id = ?
      order by lower(user.name), link.user_id`,
-  ).bind(organizationId).all<WhatsAppUserLinkRow>();
+  ).bind(workspaceId).all<WhatsAppUserLinkRow>();
   return result.results;
 }
 
@@ -204,16 +204,16 @@ export async function getWhatsAppUserLinkByPhone(
 export async function upsertWhatsAppUserLink(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     phoneNumber: string;
     createdByUserId: string;
     observedAt: string;
   },
 ) {
-  const connection = await getWhatsAppConnectionForOrganization(
+  const connection = await getWhatsAppConnectionForWorkspace(
     db,
-    input.organizationId,
+    input.workspaceId,
   );
   if (!connection) return null;
   await db.prepare(
@@ -228,7 +228,7 @@ export async function upsertWhatsAppUserLink(
   ).bind(
     crypto.randomUUID(),
     connection.id,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
     input.phoneNumber,
     input.createdByUserId,
@@ -240,7 +240,7 @@ export async function upsertWhatsAppUserLink(
 
 export async function deleteWhatsAppUserLink(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   linkId: string,
 ) {
   const result = await db.prepare(
@@ -249,7 +249,7 @@ export async function deleteWhatsAppUserLink(
        and connection_id in (
          select id from briar_whatsapp_connections where status = 'connected'
        )`,
-  ).bind(organizationId, linkId).run();
+  ).bind(workspaceId, linkId).run();
   return result.meta.changes > 0;
 }
 
@@ -372,7 +372,7 @@ export function enqueueWhatsAppReplyStatements(
     workerId: string;
     claimTokenHash: string;
     completedAt: string;
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     channelMessageId: string;
     body: string;
@@ -384,7 +384,7 @@ export function enqueueWhatsAppReplyStatements(
     body: input.body,
     approvalSummary: input.approvalSummary,
     appOrigin: input.appOrigin,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     messageId: input.channelMessageId,
   });

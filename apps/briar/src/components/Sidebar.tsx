@@ -35,7 +35,7 @@ import type {
   ChannelVisibility,
 } from "../lib/channels-contract";
 import type {
-  Organization,
+  Workspace,
   PlanningProject,
   Project,
   ProjectAgent,
@@ -54,7 +54,7 @@ import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import { TeamIcon, teamIconComponent } from "./TeamIcon";
 import {
   SidebarCollapsibleSection,
-  SidebarOrganizationChannels,
+  SidebarWorkspaceChannels,
   SidebarProjectChannels,
 } from "./SidebarChannels";
 import { UpdateControl } from "./UpdateControl";
@@ -71,8 +71,8 @@ type SidebarPage =
   | "inbox"
   | "my-issues"
   | "project-settings"
-  | "organization-create"
-  | "organization-settings"
+  | "workspace-create"
+  | "workspace-settings"
   | "settings";
 
 const EMPTY_CHANNELS: ChannelSummary[] = [];
@@ -80,7 +80,7 @@ const EMPTY_SIDEBAR_SECTIONS: ChannelSidebarSection[] = [];
 
 export function Sidebar({
   activePage,
-  activeOrganizationId,
+  activeWorkspaceId,
   activeProjectId,
   activePlanningProjectId,
   activeChannelId,
@@ -113,15 +113,15 @@ export function Sidebar({
   onChannelSettings,
   onIssuesOpen,
   onCreateIssue,
-  onAddOrganization,
-  onOrganizationChange,
+  onAddWorkspace,
+  onWorkspaceChange,
   onProjectChange,
   onProjectOpenInNewWindow,
   onProjectRepositoryOpen,
   onProjectSettings,
   onSettings,
   onLogout,
-  organizations,
+  workspaces,
   projects,
   planningProjects = [],
   projectReadiness,
@@ -136,7 +136,7 @@ export function Sidebar({
   user,
 }: {
   activePage: SidebarPage;
-  activeOrganizationId: string | null;
+  activeWorkspaceId: string | null;
   activeProjectId: string | null;
   activePlanningProjectId?: string | null;
   activeChannelId?: string | null;
@@ -144,7 +144,7 @@ export function Sidebar({
   channels?: ChannelSummary[];
   channelsLoading?: boolean;
   connectedTeamIds: string[] | null;
-  /** The active organization's DMs, listed while the DMs half is on. */
+  /** The active workspace's DMs, listed while the DMs half is on. */
   directMessages?: ChannelSummary[];
   /** A new DM is being composed, so the list's New row is the current one. */
   isComposingDirectMessage?: boolean;
@@ -179,15 +179,15 @@ export function Sidebar({
   onChannelSettings?: (channelId: string) => void;
   onIssuesOpen: () => void;
   onCreateIssue: (projectId: string) => void;
-  onAddOrganization: () => void;
-  onOrganizationChange: (organizationId: string) => void;
+  onAddWorkspace: () => void;
+  onWorkspaceChange: (workspaceId: string) => void;
   onProjectChange: (projectId: string) => void;
   onProjectOpenInNewWindow?: (projectId: string) => Promise<void>;
   onProjectRepositoryOpen: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onSettings: () => void;
   onLogout: () => void;
-  organizations: Organization[];
+  workspaces: Workspace[];
   projects: Project[];
   planningProjects?: PlanningProject[];
   projectReadiness: Record<string, RepositoryReadiness>;
@@ -210,7 +210,7 @@ export function Sidebar({
 }) {
   const { locale, setLocale, t } = useI18n();
   const { toast } = useToast();
-  const [isOrganizationMenuOpen, setIsOrganizationMenuOpen] = useState(false);
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const organizationMenuRef = useRef<HTMLDivElement | null>(null);
   // Teams start expanded; only explicitly collapsed IDs are stored.
   const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(
@@ -229,8 +229,8 @@ export function Sidebar({
   const languageTriggerRef = useRef<HTMLButtonElement>(null);
 
   const catalog = channels ?? EMPTY_CHANNELS;
-  const organizationRole = organizations.find(
-    (organization) => organization.id === activeOrganizationId,
+  const organizationRole = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId,
   )?.role ?? null;
   const activeChannelProjectId = catalog.find(
     (channel) => channel.id === activeChannelId,
@@ -247,24 +247,24 @@ export function Sidebar({
   }, [activeChannelProjectId, activePage]);
 
   useEffect(() => {
-    if (!isOrganizationMenuOpen) return;
+    if (!isWorkspaceMenuOpen) return;
     const focusTarget =
       organizationMenuRef.current?.querySelector<HTMLButtonElement>(
         '[role="menuitemradio"][aria-checked="true"]',
       ) ??
       organizationMenuRef.current?.querySelector<HTMLButtonElement>(
-        ".sidebar-organization-menu [role='menuitem']",
+        ".sidebar-workspace-menu [role='menuitem']",
       );
     focusTarget?.focus();
 
     const closeOnOutsidePress = (event: PointerEvent) => {
       if (!organizationMenuRef.current?.contains(event.target as Node)) {
-        setIsOrganizationMenuOpen(false);
+        setIsWorkspaceMenuOpen(false);
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setIsOrganizationMenuOpen(false);
+      setIsWorkspaceMenuOpen(false);
       organizationMenuRef.current
         ?.querySelector<HTMLButtonElement>(".sidebar-brand")
         ?.focus();
@@ -276,7 +276,7 @@ export function Sidebar({
       document.removeEventListener("pointerdown", closeOnOutsidePress);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isOrganizationMenuOpen]);
+  }, [isWorkspaceMenuOpen]);
 
   useEffect(() => {
     if (!openProjectMenuId) return;
@@ -339,23 +339,23 @@ export function Sidebar({
     { locale: "en", label: t("language.en") },
     { locale: "zh", label: t("language.zh") },
   ];
-  const activeOrganization =
-    organizations.find(
-      (organization) =>
-        organization.id ===
+  const activeWorkspace =
+    workspaces.find(
+      (workspace) =>
+        workspace.id ===
         projects.find((project) => project.id === projectWindowProjectId)
-          ?.organizationId,
+          ?.workspaceId,
     ) ??
-    organizations.find(
-      (organization) => organization.id === activeOrganizationId,
+    workspaces.find(
+      (workspace) => workspace.id === activeWorkspaceId,
     ) ??
-    organizations.find(
-      (organization) =>
-        organization.id ===
+    workspaces.find(
+      (workspace) =>
+        workspace.id ===
         projects.find((project) => project.id === activeProjectId)
-          ?.organizationId,
+          ?.workspaceId,
     ) ??
-    organizations[0] ??
+    workspaces[0] ??
     null;
   const isProjectWindow = Boolean(projectWindowProjectId);
   // The toggle has no state of its own: the DM page is the DMs half and every
@@ -364,9 +364,9 @@ export function Sidebar({
   const projectWindowProject = isProjectWindow
     ? projects.find((project) => project.id === projectWindowProjectId) ?? null
     : null;
-  const visibleProjects = activeOrganization
+  const visibleProjects = activeWorkspace
     ? projects.filter(
-        (project) => project.organizationId === activeOrganization.id,
+        (project) => project.workspaceId === activeWorkspace.id,
       )
     : projects;
   useEffect(() => {
@@ -469,47 +469,47 @@ export function Sidebar({
         </button>
       ) : (
         <div
-          className="sidebar-organization-switcher"
+          className="sidebar-workspace-switcher"
           ref={organizationMenuRef}
         >
         <button
-          aria-expanded={isOrganizationMenuOpen}
+          aria-expanded={isWorkspaceMenuOpen}
           aria-haspopup="menu"
-          aria-label={t("sidebar.organizationSwitcher")}
+          aria-label={t("sidebar.workspaceSwitcher")}
           className="sidebar-brand"
           onClick={() => {
             setOpenProjectMenuId(null);
             setIsAccountMenuOpen(false);
             setIsLanguageMenuOpen(false);
-            setIsOrganizationMenuOpen((open) => !open);
+            setIsWorkspaceMenuOpen((open) => !open);
           }}
           type="button"
         >
-          {activeOrganization?.logo ? (
+          {activeWorkspace?.logo ? (
             <img
               alt=""
-              className="sidebar-organization-logo"
-              src={activeOrganization.logo}
+              className="sidebar-workspace-logo"
+              src={activeWorkspace.logo}
             />
           ) : null}
-          <span>{activeOrganization?.name ?? "Briar"}</span>
+          <span>{activeWorkspace?.name ?? "Briar"}</span>
           <ChevronDown
             aria-hidden="true"
-            className={isOrganizationMenuOpen ? "open" : ""}
+            className={isWorkspaceMenuOpen ? "open" : ""}
             size={14}
             strokeWidth={1.8}
           />
         </button>
-        {isOrganizationMenuOpen && (
+        {isWorkspaceMenuOpen && (
           <div
-            aria-label={t("sidebar.organizationMenu")}
-            className="sidebar-organization-menu"
+            aria-label={t("sidebar.workspaceMenu")}
+            className="sidebar-workspace-menu"
             onKeyDown={(event) => {
               if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
               event.preventDefault();
               const items = Array.from(
                 organizationMenuRef.current?.querySelectorAll<HTMLButtonElement>(
-                  ".sidebar-organization-menu button",
+                  ".sidebar-workspace-menu button",
                 ) ?? [],
               );
               const current = Math.max(
@@ -522,52 +522,52 @@ export function Sidebar({
             role="menu"
           >
             <div
-              aria-label={t("sidebar.organizationList")}
-              className="sidebar-organization-menu-group organization-list"
+              aria-label={t("sidebar.workspaceList")}
+              className="sidebar-workspace-menu-group workspace-list"
               role="group"
             >
-              {organizations.map((organization) => (
+              {workspaces.map((workspace) => (
                 <button
-                  aria-checked={organization.id === activeOrganization?.id}
-                  key={organization.id}
+                  aria-checked={workspace.id === activeWorkspace?.id}
+                  key={workspace.id}
                   onClick={() => {
-                    onOrganizationChange(organization.id);
-                    setIsOrganizationMenuOpen(false);
+                    onWorkspaceChange(workspace.id);
+                    setIsWorkspaceMenuOpen(false);
                   }}
                   role="menuitemradio"
                   type="button"
                 >
-                  {organization.logo ? (
+                  {workspace.logo ? (
                     <img
                       alt=""
-                      className="sidebar-organization-list-logo"
-                      src={organization.logo}
+                      className="sidebar-workspace-list-logo"
+                      src={workspace.logo}
                     />
                   ) : (
                     <Building2 aria-hidden="true" size={15} strokeWidth={1.7} />
                   )}
-                  <span>{organization.name}</span>
-                  {organization.id === activeOrganization?.id ? (
+                  <span>{workspace.name}</span>
+                  {workspace.id === activeWorkspace?.id ? (
                     <Check aria-hidden="true" size={15} strokeWidth={1.8} />
                   ) : null}
                 </button>
               ))}
             </div>
             <div
-              className="sidebar-organization-menu-separator"
+              className="sidebar-workspace-menu-separator"
               role="separator"
             />
             <button
-              className="sidebar-organization-add"
+              className="sidebar-workspace-add"
               onClick={() => {
-                setIsOrganizationMenuOpen(false);
-                onAddOrganization();
+                setIsWorkspaceMenuOpen(false);
+                onAddWorkspace();
               }}
               role="menuitem"
               type="button"
             >
               <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
-              <span>{t("sidebar.addOrganization")}</span>
+              <span>{t("sidebar.addWorkspace")}</span>
             </button>
           </div>
         )}
@@ -676,7 +676,7 @@ export function Sidebar({
             topLevel
           />
         ) : !isProjectWindow && onChannelOpen ? (
-          <SidebarOrganizationChannels
+          <SidebarWorkspaceChannels
             activeChannelId={activeChannelId}
             activePage={activePage}
             channels={catalog}

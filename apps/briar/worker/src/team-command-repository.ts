@@ -28,7 +28,7 @@ export async function createTeam(
   db: D1Database,
   input: {
     ownerUserId: string;
-    organizationId: string;
+    workspaceId: string;
     name: string;
     agentTokenHash: string;
     locale?: TeamAgentLocale;
@@ -44,7 +44,7 @@ export async function createTeam(
     icon_name: null,
     icon_color: null,
     // Request edge: the caller's Workspace id arrives as a plain string.
-    organization_id: asWorkspaceId(input.organizationId),
+    organization_id: asWorkspaceId(input.workspaceId),
     organization_name: "",
     member_role: "owner",
     created_at: createdAt,
@@ -53,7 +53,7 @@ export async function createTeam(
   const defaultAgentCopy = defaultTeamAgentCopy(locale);
   const defaultAgent: TeamAgentRow = {
     id: crypto.randomUUID(),
-    organization_id: input.organizationId,
+    organization_id: input.workspaceId,
     project_id: team.id,
     name: defaultAgentCopy.name,
     avatar: null,
@@ -87,7 +87,7 @@ export async function createTeam(
           .bind(
             team.id,
             input.ownerUserId,
-            input.organizationId,
+            input.workspaceId,
             team.name,
             input.agentTokenHash,
             createdAt,
@@ -117,7 +117,7 @@ export async function createTeam(
           )
           .bind(
             defaultAgent.id,
-            input.organizationId,
+            input.workspaceId,
             defaultAgent.project_id,
             defaultAgent.name,
             defaultAgent.provider,
@@ -149,10 +149,10 @@ export async function getTeam(
               coalesce(team.icon_data_url_browser, team.icon_data_url) as icon,
               team.icon_name, team.icon_color,
               team.organization_id,
-              organization.name as organization_name,
+              workspace.name as organization_name,
               membership.role as member_role, team.created_at
        from briar_teams team
-       join briar_organizations organization on organization.id = team.organization_id
+       join briar_organizations workspace on workspace.id = team.organization_id
        join briar_organization_members membership
          on membership.organization_id = team.organization_id
         and membership.user_id = ?
@@ -182,11 +182,11 @@ export async function getTeam(
                 coalesce(team.icon_data_url_browser, team.icon_data_url) as icon,
                 team.icon_name, team.icon_color,
                 team.organization_id,
-                organization.name as organization_name,
+                workspace.name as organization_name,
                 membership.role as member_role, team.created_at
          from briar_teams team
-         join briar_organizations organization
-           on organization.id = team.organization_id
+         join briar_organizations workspace
+           on workspace.id = team.organization_id
          join briar_organization_members membership
            on membership.organization_id = team.organization_id
           and membership.user_id = ?

@@ -94,7 +94,7 @@ function capacityError(capacity: Awaited<ReturnType<typeof managedComputerCapaci
     return new ManagedComputerServiceError(
       409,
       "MANAGED_COMPUTER_ORGANIZATION_LIMIT",
-      "This organization already has a pilot managed computer",
+      "This workspace already has a pilot managed computer",
     );
   }
   return new ManagedComputerServiceError(
@@ -158,7 +158,7 @@ export async function validateManagedComputerPromotion(
   db: D1Database,
   env: Env,
   input: {
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     code: string;
     observedAt: string;
@@ -168,7 +168,7 @@ export async function validateManagedComputerPromotion(
   const campaign = await resolvePromotionCampaign(config, input.code);
   const capacity = campaign
     ? await managedComputerCapacity(db, {
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: input.userId,
         campaignId: campaign.id,
         organizationLimit: config.organizationLimit,
@@ -177,7 +177,7 @@ export async function validateManagedComputerPromotion(
     : null;
   if (campaign && capacity) {
     await recordManagedComputerAuditEvent(db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       actorUserId: input.userId,
       action: "promotion_validated",
       detail: { campaignId: campaign.id, eligible: capacity.eligible },
@@ -201,7 +201,7 @@ export async function validateManagedComputerPromotion(
         ? "user"
         : capacity.organizationRedeemed ||
             capacity.organizationCount >= config.organizationLimit
-          ? "organization"
+          ? "workspace"
           : "fleet",
   };
 }
@@ -210,7 +210,7 @@ export async function applyForPromotionalManagedComputer(
   db: D1Database,
   env: Env,
   input: {
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     code: string;
     requestId: string;
@@ -219,7 +219,7 @@ export async function applyForPromotionalManagedComputer(
 ) {
   const existing = await managedComputerApplicationByRequest(
     db,
-    input.organizationId,
+    input.workspaceId,
     input.requestId,
   );
   if (existing) {
@@ -254,7 +254,7 @@ export async function applyForPromotionalManagedComputer(
     );
   }
   const capacity = await managedComputerCapacity(db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     userId: input.userId,
     campaignId: campaign.id,
     organizationLimit: config.organizationLimit,
@@ -276,7 +276,7 @@ export async function applyForPromotionalManagedComputer(
     managedComputerId,
     provisioningJobId,
     workflowInstanceId,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     userId: input.userId,
     campaignId: campaign.id,
     requestId: input.requestId,
@@ -299,14 +299,14 @@ export async function applyForPromotionalManagedComputer(
   if (!computer) {
     const raced = await managedComputerApplicationByRequest(
       db,
-      input.organizationId,
+      input.workspaceId,
       input.requestId,
     );
     if (raced?.requester_user_id === input.userId) {
       return { computer: raced, duplicate: true };
     }
     throw capacityError(await managedComputerCapacity(db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       userId: input.userId,
       campaignId: campaign.id,
       organizationLimit: config.organizationLimit,
@@ -326,7 +326,7 @@ export async function retryManagedComputerProvisioning(
   env: Env,
   input: {
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     requestId: string;
     observedAt: string;
@@ -449,7 +449,7 @@ export async function enrollManagedComputer(
   }
   await verifyManagedInstance(config, {
     managedComputerId: computer.id,
-    organizationId: computer.organization_id,
+    workspaceId: computer.organization_id,
     campaignId: config.campaignId,
     instanceId: identityDocument.instanceId,
     region: computer.aws_region,
@@ -501,7 +501,7 @@ export async function enrollManagedComputer(
       "Managed computer enrollment is no longer active",
     );
   }
-  return { credential, deviceId, organizationId: computer.organization_id };
+  return { credential, deviceId, workspaceId: computer.organization_id };
 }
 
 function requireSetupSecret(config: ManagedComputerConfig) {
@@ -520,7 +520,7 @@ export async function issueManagedComputerSetupSession(
   env: Env,
   input: {
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     userId: string;
     requestId: string;
@@ -528,7 +528,7 @@ export async function issueManagedComputerSetupSession(
   },
 ) {
   const computer = await managedComputerById(db, input.managedComputerId);
-  if (!computer || computer.organization_id !== input.organizationId) {
+  if (!computer || computer.organization_id !== input.workspaceId) {
     throw new ManagedComputerServiceError(
       404,
       "MANAGED_COMPUTER_NOT_FOUND",
@@ -545,11 +545,11 @@ export async function issueManagedComputerSetupSession(
   const team = await db.prepare(
     `select id, organization_id from briar_teams where id = ?`,
   ).bind(input.projectId).first<{ id: string; organization_id: string }>();
-  if (!team || team.organization_id !== input.organizationId) {
+  if (!team || team.organization_id !== input.workspaceId) {
     throw new ManagedComputerServiceError(
       404,
       "MANAGED_COMPUTER_SETUP_PROJECT_NOT_FOUND",
-      "Project not found in this organization",
+      "Project not found in this workspace",
     );
   }
   const config = managedComputerConfig(env);
@@ -588,7 +588,7 @@ export async function issueManagedComputerSetupSession(
   const session = await createManagedComputerSetupSessionRecord(db, {
     id: crypto.randomUUID(),
     managedComputerId: computer.id,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     projectId: input.projectId,
     requestedByUserId: input.userId,
     requestId: input.requestId,
@@ -623,7 +623,7 @@ export async function bindManagedComputerSetup(
   db: D1Database,
   input: {
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     setupToken: string;
     worker: WorkerRuntimeMetadata;
@@ -649,7 +649,7 @@ export async function bindManagedComputerSetup(
     setupSessionId: session.id,
     setupTokenHash: tokenHash,
     managedComputerId: computer.id,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     deviceId: input.deviceId,
     runtime: input.worker,
     observedAt: input.observedAt,
@@ -668,7 +668,7 @@ export async function authorizeManagedComputerSetup(
   db: D1Database,
   input: {
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId?: string;
     setupToken: string;
     observedAt: string;
@@ -677,7 +677,7 @@ export async function authorizeManagedComputerSetup(
 ) {
   const computer = await managedComputerById(db, input.managedComputerId);
   if (
-    !computer || computer.organization_id !== input.organizationId ||
+    !computer || computer.organization_id !== input.workspaceId ||
     (input.deviceId && computer.briar_device_id !== input.deviceId) ||
     !computer.briar_device_id ||
     !["needs_setup", "ready"].includes(computer.state)
@@ -694,7 +694,7 @@ export async function authorizeManagedComputerSetup(
     computer.id,
     tokenHash,
   );
-  if (!session || session.organization_id !== input.organizationId) {
+  if (!session || session.organization_id !== input.workspaceId) {
     throw new ManagedComputerServiceError(
       403,
       "MANAGED_COMPUTER_SETUP_TOKEN_INVALID",
@@ -722,7 +722,7 @@ export async function managedComputerSetupContext(
   db: D1Database,
   input: {
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     deviceId: string;
     setupToken: string;
     observedAt: string;
@@ -735,7 +735,7 @@ export async function managedComputerSetupContext(
   const team = await db.prepare(
     `select id, name from briar_teams
      where id = ? and organization_id = ?`,
-  ).bind(session.project_id, input.organizationId).first<{
+  ).bind(session.project_id, input.workspaceId).first<{
     id: string;
     name: string;
   }>();
@@ -743,7 +743,7 @@ export async function managedComputerSetupContext(
     throw new ManagedComputerServiceError(
       404,
       "MANAGED_COMPUTER_SETUP_PROJECT_NOT_FOUND",
-      "Project not found in this organization",
+      "Project not found in this workspace",
     );
   }
   return {

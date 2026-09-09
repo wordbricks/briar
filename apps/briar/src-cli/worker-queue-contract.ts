@@ -489,13 +489,13 @@ const channelScope = (
   switch (scope.case) {
     case "workspace":
       return {
-        kind: "organization" as const,
-        organizationId: scope.value.workspaceId,
+        kind: "workspace" as const,
+        workspaceId: scope.value.workspaceId,
       };
     case "project":
       return {
         kind: "project" as const,
-        organizationId: scope.value.workspaceId,
+        workspaceId: scope.value.workspaceId,
         projectId: scope.value.projectId,
       };
     default:
@@ -536,7 +536,7 @@ const channelReplyFromProto = (
   const mapped = {
     ...common({ ...value, claimAttempts: 1 }),
     workType: "channelReply" as const,
-    organizationId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: value.channelId,
     projectId: scope.kind === "project" ? scope.projectId : null,
     scope,
@@ -629,12 +629,12 @@ const channelReplyFromProto = (
       : null,
     agentMessageHop: value.agentMessageHop,
   };
-  if (scope.kind === "organization") {
+  if (scope.kind === "workspace") {
     if (!mapped.organizationContext || mapped.delegation || mapped.skillExecutionTarget) {
-      throw new Error("Worker organization reply has inconsistent scope data");
+      throw new Error("Worker workspace reply has inconsistent scope data");
     }
   } else if (mapped.organizationContext || mapped.delegationTargets.length > 0) {
-    // Delegation stays an Organization Agent path inside a channel thread.
+    // Delegation stays a Workspace Agent path inside a channel thread.
     // Agent messages are a DM feature open to both scopes, so
     // agentMessageTargets is deliberately absent from this rule.
     throw new Error("Worker project reply has inconsistent scope data");
@@ -807,7 +807,7 @@ const claimedDmMemoryFromProto = (value: ProtoClaimedDmMemoryLearning) =>
     workType: "dmMemory",
     workId: value.workId,
     runId: value.runId,
-    organizationId: value.workspaceId,
+    workspaceId: value.workspaceId,
     workerId: value.workerId,
     sourceKey: value.sourceKey,
     title: value.title,

@@ -15,9 +15,9 @@ import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Typography } from "@/components/ui/typography";
 import { useI18n } from "../i18n";
-import { ApiError, loadOrganizationInvitation } from "../lib/api";
+import { ApiError, loadWorkspaceInvitation } from "../lib/api";
 import type { DeviceLoginMethod } from "../lib/api";
-import type { OrganizationInvitationPreview, SessionUser } from "../types";
+import type { WorkspaceInvitationPreview, SessionUser } from "../types";
 import {
   LoginActions,
   type LoginEmailHandlers,
@@ -46,7 +46,7 @@ export function InvitationOnboarding({
   accepting,
   error: loginError,
   loading: loginLoading,
-  loadInvitation = loadOrganizationInvitation,
+  loadInvitation = loadWorkspaceInvitation,
   loginCode,
   onAccept,
   onCancelLogin,
@@ -62,7 +62,7 @@ export function InvitationOnboarding({
   accepting: boolean;
   error: string | null;
   loading: boolean;
-  loadInvitation?: typeof loadOrganizationInvitation;
+  loadInvitation?: typeof loadWorkspaceInvitation;
   loginCode: string | null;
   onAccept: () => Promise<void>;
   onCancelLogin: () => void;
@@ -75,7 +75,7 @@ export function InvitationOnboarding({
 }) {
   const { t } = useI18n();
   const [invitation, setInvitation] =
-    useState<OrganizationInvitationPreview | null>(null);
+    useState<WorkspaceInvitationPreview | null>(null);
   const [loadingInvitation, setLoadingInvitation] = useState(true);
   const [invitationError, setInvitationError] = useState<string | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
@@ -137,8 +137,7 @@ export function InvitationOnboarding({
                 {t("invitation.eyebrow")}
               </Typography>
               <Typography as="h1" variant="title">
-                {t("invitation.title", {
-                  organization: invitation.organizationName,
+                {t("invitation.title", { organization: invitation.workspaceName,
                 })}
               </Typography>
               <Typography className="mt-3" tone="muted" variant="bodySm">
@@ -152,7 +151,7 @@ export function InvitationOnboarding({
               <div className="flex items-center gap-3">
                 <Building2 className="text-primary" size={18} />
                 <Typography as="strong" variant="bodySm">
-                  {invitation.organizationName}
+                  {invitation.workspaceName}
                 </Typography>
               </div>
               <div className="flex items-center gap-3">
@@ -164,11 +163,11 @@ export function InvitationOnboarding({
               <div className="flex items-center gap-3">
                 <ShieldCheck className="text-primary" size={18} />
                 <Typography as="span" variant="bodySm">
-                  {t(`organization.role.${invitation.role}` as
-                    | "organization.role.co-owner"
-                    | "organization.role.developer"
-                    | "organization.role.editor"
-                    | "organization.role.viewer")}
+                  {t(`workspace.role.${invitation.role}` as
+                    | "workspace.role.co-owner"
+                    | "workspace.role.developer"
+                    | "workspace.role.editor"
+                    | "workspace.role.viewer")}
                 </Typography>
               </div>
               {invitation.role === "editor" ||

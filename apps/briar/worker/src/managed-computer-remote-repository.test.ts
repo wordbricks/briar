@@ -11,7 +11,7 @@ import {
 import { createPromotionalManagedComputer } from "./managed-computer-repository";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "remote-owner";
 const computerId = "33333333-3333-4333-8333-333333333333";
 const agentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -25,17 +25,17 @@ describe("managed computer remote session repository", () => {
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${userId}', 'Remote Owner', 'remote@example.com', 1, '${observedAt}', '${observedAt}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values ('${organizationId}', 'Remote Org', 'remote-org', '${observedAt}', '${observedAt}');
+      values ('${workspaceId}', 'Remote Org', 'remote-org', '${observedAt}', '${observedAt}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${userId}', 'owner', '${observedAt}', '${observedAt}');
+      ) values ('${workspaceId}', '${userId}', 'owner', '${observedAt}', '${observedAt}');
     `);
     await createPromotionalManagedComputer(db, {
       entitlementId: "22222222-2222-4222-8222-222222222222",
       managedComputerId: computerId,
       provisioningJobId: "44444444-4444-4444-8444-444444444444",
       workflowInstanceId: `managed-computer-${computerId}`,
-      organizationId,
+      workspaceId,
       userId,
       campaignId: "getbriar-pilot",
       requestId: "55555555-5555-4555-8555-555555555555",
@@ -58,7 +58,7 @@ describe("managed computer remote session repository", () => {
     const firstToken = "first-remote-token";
     const created = await createManagedComputerRemoteSession(db, {
       id: sessionId,
-      organizationId,
+      workspaceId,
       managedComputerId: computerId,
       agentId,
       controllerUserId: userId,
@@ -80,7 +80,7 @@ describe("managed computer remote session repository", () => {
 
     const duplicateController = await createManagedComputerRemoteSession(db, {
       id: "88888888-8888-4888-8888-888888888888",
-      organizationId,
+      workspaceId,
       managedComputerId: computerId,
       agentId,
       controllerUserId: userId,
@@ -113,7 +113,7 @@ describe("managed computer remote session repository", () => {
     const secondToken = "second-remote-token";
     const reconnected = await reconnectManagedComputerRemoteSession(db, {
       sessionId,
-      organizationId,
+      workspaceId,
       managedComputerId: computerId,
       agentId,
       controllerUserId: userId,
@@ -138,14 +138,14 @@ describe("managed computer remote session repository", () => {
   it("ends the active controller without storing screen or input content", async () => {
     const session = await endManagedComputerRemoteSession(db, {
       sessionId: "66666666-6666-4666-8666-666666666666",
-      organizationId,
+      workspaceId,
       managedComputerId: computerId,
       reason: "user_ended",
       observedAt: "2026-08-22T00:02:00.000Z",
     });
     expect(session).toMatchObject({ state: "ended", end_reason: "user_ended" });
     await recordManagedComputerRemoteAuditEvent(db, {
-      organizationId,
+      workspaceId,
       managedComputerId: computerId,
       remoteSessionId: session!.id,
       actorUserId: userId,

@@ -15,7 +15,7 @@ export async function retryDmLearningJob(db: D1Database, owner: DmMemoryOwner, j
       and job.kind in ('extract', 'explicit_request', 'consolidate') and ${dmLearningLiveSpaceSql}
       and exists (select 1 from briar_organization_members member
         where member.organization_id = space.organization_id and member.user_id = space.owner_user_id)`)
-    .bind(jobId, owner.organizationId, owner.channelId, owner.userId)
+    .bind(jobId, owner.workspaceId, owner.channelId, owner.userId)
     .first<{ id: string; revocation_epoch: number; provider: string }>();
   if (!space) throw new HttpError(404, "Memory job not found", "memory_not_found");
   if (space.revocation_epoch !== input.revocationEpoch) throw new HttpError(409, "Memory scope changed", "memory_scope_revoked");

@@ -27,7 +27,7 @@ export async function readDmLearningStatus(db: D1Database, owner: DmMemoryOwner,
     where space.id = ? and space.organization_id = ? and space.channel_id = ? and space.owner_user_id = ?
       and exists (select 1 from briar_organization_members member
         where member.organization_id = space.organization_id and member.user_id = space.owner_user_id)`)
-    .bind(spaceId, owner.organizationId, owner.channelId, owner.userId).first<{ provider: string }>();
+    .bind(spaceId, owner.workspaceId, owner.channelId, owner.userId).first<{ provider: string }>();
   if (!space) return null;
   const policy = dmLearningSpacePolicy(space.provider);
   const displayModel = (model: DmLearningPolicy["proposer"]) => model.transport === "agent"

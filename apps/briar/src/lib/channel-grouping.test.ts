@@ -13,7 +13,7 @@ const channel = (
   overrides: Partial<ChannelSummary> = {},
 ): ChannelSummary => ({
   id,
-  organizationId: "org-1",
+  workspaceId: "org-1",
   slug: name.toLowerCase(),
   name,
   topic: null,
@@ -71,7 +71,7 @@ describe("groupChannels", () => {
     ]);
   });
 
-  it("omits the common group when no channel is organization-wide", () => {
+  it("omits the common group when no channel is workspace-wide", () => {
     const groups = groupChannels([channel("c-1", "Briar dev", "project-1")], {
       activeProjectId: "project-1",
       projects: [{ id: "project-1", name: "Briar" }],
@@ -156,7 +156,7 @@ describe("groupChannels", () => {
 });
 
 describe("sidebar channel split", () => {
-  it("keeps organization-wide channels out of a project's list", () => {
+  it("keeps workspace-wide channels out of a project's list", () => {
     const channels = [
       channel("c-1", "General", null),
       channel("c-2", "Briar dev", "project-1"),

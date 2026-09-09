@@ -100,7 +100,7 @@ export async function reconcileDrainingManagedComputer(
     observedAt,
   });
   await dependencies.recordManagedComputerAuditEvent(db, {
-    organizationId: computer.organization_id,
+    workspaceId: computer.organization_id,
     managedComputerId: computer.id,
     action: "stopped",
     detail: { activeSessions: 0 },
@@ -199,7 +199,7 @@ export async function reconcileManagedComputers(
           observedAt,
         });
         await recordManagedComputerAuditEvent(db, {
-          organizationId: computer.organization_id,
+          workspaceId: computer.organization_id,
           managedComputerId: computer.id,
           action: "draining_started",
           detail: { reason: "expired" },
@@ -251,7 +251,7 @@ export async function reconcileManagedComputers(
           observedAt,
         });
         await recordManagedComputerAuditEvent(db, {
-          organizationId: computer.organization_id,
+          workspaceId: computer.organization_id,
           managedComputerId: computer.id,
           action: "terminated",
           detail: { retentionDays: config.stoppedRetentionDays },
@@ -282,7 +282,7 @@ export async function reconcileManagedComputers(
       }
       await verifyManagedInstance(config, {
         managedComputerId: computer.id,
-        organizationId: computer.organization_id,
+        workspaceId: computer.organization_id,
         campaignId: config.campaignId,
         instanceId: computer.aws_instance_id,
         region: computer.aws_region,
@@ -291,7 +291,7 @@ export async function reconcileManagedComputers(
         instanceType: computer.aws_instance_type,
       });
       await recordManagedComputerAuditEvent(db, {
-        organizationId: computer.organization_id,
+        workspaceId: computer.organization_id,
         managedComputerId: computer.id,
         action: "reconciled",
         detail: {
@@ -320,7 +320,7 @@ export async function reconcileManagedComputers(
           observedAt,
         });
         await recordManagedComputerAuditEvent(db, {
-          organizationId: computer.organization_id,
+          workspaceId: computer.organization_id,
           managedComputerId: computer.id,
           action: "orphan_detected",
           detail: { instanceId: computer.aws_instance_id, reason: detail },

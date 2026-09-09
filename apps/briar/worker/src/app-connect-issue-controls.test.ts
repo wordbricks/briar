@@ -13,7 +13,7 @@ import {
 import worker from "./index";
 
 describe("IssueService controls", () => {
-  const organizationId = "11111111-1111-4111-8111-111111111111";
+  const workspaceId = "11111111-1111-4111-8111-111111111111";
   const projectId = "22222222-2222-4222-8222-222222222222";
   const checkpointRunId = "33333333-3333-4333-8333-333333333333";
   const messageRunId = "44444444-4444-4444-8444-444444444444";
@@ -76,7 +76,7 @@ describe("IssueService controls", () => {
            id, name, handle, created_at, updated_at
          ) values (?, 'Issue Controls', 'issue-controls', ?, ?)`,
         )
-        .bind(organizationId, now, now),
+        .bind(workspaceId, now, now),
       ...users.map(([id, _name, _email, role]) =>
         db
           .prepare(
@@ -84,7 +84,7 @@ describe("IssueService controls", () => {
              organization_id, user_id, role, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(organizationId, id, role, now, now)
+          .bind(workspaceId, id, role, now, now)
       ),
       db
         .prepare(
@@ -93,7 +93,7 @@ describe("IssueService controls", () => {
            created_at, updated_at
          ) values (?, ?, ?, 'Issue Controls', ?, ?, ?)`,
         )
-        .bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+        .bind(projectId, ownerId, workspaceId, "a".repeat(64), now, now),
       ...[developerId, editorId].map((id) =>
         db
           .prepare(
@@ -101,7 +101,7 @@ describe("IssueService controls", () => {
              project_id, organization_id, user_id, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(projectId, organizationId, id, now, now)
+          .bind(projectId, workspaceId, id, now, now)
       ),
     ]);
 

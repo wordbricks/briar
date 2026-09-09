@@ -19,10 +19,10 @@ import {
   enqueueIssueAgentReply,
   failIssueAgentReply,
   listIssueThreadMessages,
-  listOrganizationUsageExecutionAttempts,
-  listOrganizationUsageCostRecords,
-  listOrganizationUsageRecords,
-  listOrganizationUsageRuns,
+  listWorkspaceUsageExecutionAttempts,
+  listWorkspaceUsageCostRecords,
+  listWorkspaceUsageRecords,
+  listWorkspaceUsageRuns,
   recordHuntEvent,
   recordRunCostRecords,
   transferIssue,
@@ -58,8 +58,8 @@ import {
   hasExecutionWorkerReadinessChanged,
   leaseExpiryFrom,
   listExecutionWorkers,
-  listOrganizationExecutionProviders,
-  listOrganizationExecutionWorkers,
+  listWorkspaceExecutionProviders,
+  listWorkspaceExecutionWorkers,
   MAX_CLAIM_ATTEMPTS,
   PLANNED_UPDATE_DRAINING_READINESS_DETAIL,
   PLANNED_UPDATE_HANDOFF_READINESS_DETAIL,
@@ -380,7 +380,7 @@ describe("detached execution workers", () => {
     registerExecutionWorker(db, projectId, {
       id: `worker-${seed}`,
       deviceId: `device-${seed}`,
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       label: `worker ${seed}`,
       deviceIdentityHash: fingerprint(seed),
@@ -649,7 +649,7 @@ describe("detached execution workers", () => {
     const worker = await register("update");
     const requested = await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777777",
-      organizationId: projectId,
+      workspaceId: projectId,
       deviceId: worker.device.id,
       requestedByUserId: "owner",
       targetVersion: "1.2.84",
@@ -664,7 +664,7 @@ describe("detached execution workers", () => {
       runtime: runtimeMetadata({}, "1.2.69"),
       observedAt: atMinute(2),
     });
-    const listed = await listOrganizationExecutionWorkers(
+    const listed = await listWorkspaceExecutionWorkers(
       db,
       projectId,
       atMinute(2),
@@ -711,7 +711,7 @@ describe("detached execution workers", () => {
     );
     await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777776",
-      organizationId: projectId,
+      workspaceId: projectId,
       deviceId: worker.device.id,
       requestedByUserId: "owner",
       targetVersion: "2.0.0",
@@ -797,7 +797,7 @@ describe("detached execution workers", () => {
 
     await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777774",
-      organizationId: projectId,
+      workspaceId: projectId,
       deviceId: worker.device.id,
       requestedByUserId: "owner",
       targetVersion: "1.2.84",
@@ -943,7 +943,7 @@ describe("detached execution workers", () => {
 
     const request = await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777778",
-      organizationId: projectId,
+      workspaceId: projectId,
       deviceId: worker.device.id,
       requestedByUserId: "owner",
       targetVersion: "2.0.0",
@@ -953,7 +953,7 @@ describe("detached execution workers", () => {
       runIds.map((runId, index) =>
         handoffExecutionWorkerClaim(db, {
           requestId: request.id,
-          organizationId: projectId,
+          workspaceId: projectId,
           deviceId: worker.device.id,
           projectId,
           workerId: worker.worker.id,
@@ -1066,7 +1066,7 @@ describe("detached execution workers", () => {
     const worker = await register("handoff-failed", 1);
     const request = await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777779",
-      organizationId: projectId,
+      workspaceId: projectId,
       deviceId: worker.device.id,
       requestedByUserId: "owner",
       targetVersion: "2.0.0",
@@ -1075,7 +1075,7 @@ describe("detached execution workers", () => {
     const workId = "88888888-8888-4888-8888-888888888888";
     await failExecutionWorkerUpdateHandoff(db, {
       requestId: request.id,
-      organizationId: projectId,
+      workspaceId: projectId,
       deviceId: worker.device.id,
       projectId,
       workerId: worker.worker.id,
@@ -1110,7 +1110,7 @@ describe("detached execution workers", () => {
     );
     const request = await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777775",
-      organizationId: projectId,
+      workspaceId: projectId,
       deviceId: worker.device.id,
       requestedByUserId: "owner",
       targetVersion: "2.0.0",
@@ -1154,7 +1154,7 @@ describe("detached execution workers", () => {
         readiness: DashboardWorker_Readiness.NEEDS_ATTENTION,
       },
     });
-    expect((await listOrganizationExecutionWorkers(
+    expect((await listWorkspaceExecutionWorkers(
       db,
       projectId,
       atMinute(3),
@@ -1650,7 +1650,7 @@ describe("detached execution workers", () => {
     const second = await registerExecutionWorker(db, projectId, {
       id: "worker-different-id",
       deviceId: "device-different-id",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       label: "renamed",
       deviceIdentityHash: fingerprint("a"),
@@ -1725,7 +1725,7 @@ describe("detached execution workers", () => {
 
     const second = await bindExecutionWorkerProject(db, secondProjectId, {
       id: "worker-shared-second",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       deviceIdentityHash: fingerprint("shared"),
       runtime: runtimeMetadata({}, "1.1.2"),
@@ -1741,7 +1741,7 @@ describe("detached execution workers", () => {
 
     expect(second.device.id).toBe(first.device.id);
     expect(credentialAfter).toEqual(credentialBefore);
-    const organizationWorkers = await listOrganizationExecutionWorkers(
+    const organizationWorkers = await listWorkspaceExecutionWorkers(
       db,
       projectId,
       atMinute(2),
@@ -1768,14 +1768,14 @@ describe("detached execution workers", () => {
     });
 
     await expect(
-      listOrganizationExecutionProviders(db, projectId)
+      listWorkspaceExecutionProviders(db, projectId)
     ).resolves.toEqual(["grok", "opencode", "codex"]);
   });
 
   it("allows a busy compatible Worker to run a channel Agent reply", async () => {
     const worker = await register("channel-reply", 1);
     const projectReply = {
-      organizationId: projectId,
+      workspaceId: projectId,
       projectId,
       provider: "codex" as const,
       model: "gpt-5.6-sol",
@@ -1826,7 +1826,7 @@ describe("detached execution workers", () => {
       maxUsedPercent: 100,
     });
     const reply = {
-      organizationId: projectId,
+      workspaceId: projectId,
       projectId,
       provider: "grok" as const,
       model: "grok-4.6",
@@ -1874,7 +1874,7 @@ describe("detached execution workers", () => {
     const first = await register("rename");
     const second = await bindExecutionWorkerProject(db, secondProjectId, {
       id: "worker-rename-second",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       deviceIdentityHash: fingerprint("rename"),
       runtime: runtimeMetadata(),
@@ -1900,12 +1900,12 @@ describe("detached execution workers", () => {
     });
   });
 
-  it("binds one organization device to several projects", async () => {
+  it("binds one workspace device to several projects", async () => {
     const first = await register("shared");
     const second = await registerExecutionWorker(db, secondProjectId, {
       id: "worker-shared-second-project",
       deviceId: "unused-device-id",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       label: "shared worker",
       deviceIdentityHash: fingerprint("shared"),
@@ -1943,7 +1943,7 @@ describe("detached execution workers", () => {
     const second = await registerExecutionWorker(db, secondProjectId, {
       id: "worker-capacity-shared-second",
       deviceId: "ignored",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       label: "capacity shared",
       deviceIdentityHash: fingerprint("capacity-shared"),
@@ -2002,7 +2002,7 @@ describe("detached execution workers", () => {
     await registerExecutionWorker(db, secondProjectId, {
       id: "worker-partially-shared-second",
       deviceId: "ignored",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       label: "partially shared",
       deviceIdentityHash: fingerprint("partially-shared"),
@@ -2018,7 +2018,7 @@ describe("detached execution workers", () => {
         atMinute(3),
         {
           requestId: "worker-unlink:partially-shared",
-          organizationId: projectId,
+          workspaceId: projectId,
           workerId: first.worker.id,
           reason: "explicit_user_unlink",
         },
@@ -2056,7 +2056,7 @@ describe("detached execution workers", () => {
         atMinute(4),
         {
           requestId: "worker-unlink:partially-shared",
-          organizationId: projectId,
+          workspaceId: projectId,
           workerId: first.worker.id,
           reason: "explicit_user_unlink",
         },
@@ -2101,7 +2101,7 @@ describe("detached execution workers", () => {
       atMinute(7),
       {
         requestId,
-        organizationId: projectId,
+        workspaceId: projectId,
         workerId: registered.worker.id,
         reason: "explicit_user_unlink",
       },
@@ -2115,13 +2115,13 @@ describe("detached execution workers", () => {
     });
   });
 
-  it("does not let another organization member adopt an enrolled device", async () => {
+  it("does not let another workspace member adopt an enrolled device", async () => {
     await register("owned");
     await expect(
       registerExecutionWorker(db, secondProjectId, {
         id: "worker-owned-by-member",
         deviceId: "device-owned-by-member",
-        organizationId: projectId,
+        workspaceId: projectId,
         ownerUserId: "member",
         label: "member worker",
         deviceIdentityHash: fingerprint("owned"),
@@ -2129,14 +2129,14 @@ describe("detached execution workers", () => {
         runtime: runtimeMetadata(),
         observedAt: atMinute(3),
       }),
-    ).rejects.toThrow("already owned by another organization member");
+    ).rejects.toThrow("already owned by another workspace member");
   });
 
-  it("stops accepting a worker credential when its owner leaves the organization", async () => {
+  it("stops accepting a worker credential when its owner leaves the workspace", async () => {
     const registration = await registerExecutionWorker(db, projectId, {
       id: "worker-departing-member",
       deviceId: "device-departing-member",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "member",
       label: "member worker",
       deviceIdentityHash: fingerprint("departing"),
@@ -2173,7 +2173,7 @@ describe("detached execution workers", () => {
       registerExecutionWorker(db, projectId, {
         id: "worker-bad",
         deviceId: "device-bad",
-        organizationId: projectId,
+        workspaceId: projectId,
         ownerUserId: "owner",
         label: "   ",
         deviceIdentityHash: fingerprint("b"),
@@ -2186,7 +2186,7 @@ describe("detached execution workers", () => {
       registerExecutionWorker(db, projectId, {
         id: "worker-bad",
         deviceId: "device-bad",
-        organizationId: projectId,
+        workspaceId: projectId,
         ownerUserId: "owner",
         label: "ok",
         deviceIdentityHash: "not-a-digest",
@@ -2199,7 +2199,7 @@ describe("detached execution workers", () => {
       registerExecutionWorker(db, projectId, {
         id: "worker-bad",
         deviceId: "device-bad",
-        organizationId: projectId,
+        workspaceId: projectId,
         ownerUserId: "owner",
         label: "ok",
         deviceIdentityHash: fingerprint("b"),
@@ -2238,7 +2238,7 @@ describe("detached execution workers", () => {
     const registered = await register("deleted");
     await bindExecutionWorkerProject(db, secondProjectId, {
       id: "worker-deleted-second-project",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       deviceIdentityHash: fingerprint("deleted"),
       runtime: runtimeMetadata({}, "1.2.69"),
@@ -2246,7 +2246,7 @@ describe("detached execution workers", () => {
     });
     await requestExecutionWorkerUpdate(db, {
       id: "77777777-7777-4777-8777-777777777779",
-      organizationId: projectId,
+      workspaceId: projectId,
       deviceId: registered.device.id,
       requestedByUserId: "owner",
       targetVersion: "1.2.84",
@@ -2256,7 +2256,7 @@ describe("detached execution workers", () => {
     await expect(
       deleteExecutionWorker(db, registered.device.id, atMinute(4), {
         requestId: "worker-deprovision:deleted",
-        organizationId: projectId,
+        workspaceId: projectId,
         projectId: null,
         workerId: null,
         reason: "explicit_user_deprovision",
@@ -2283,7 +2283,7 @@ describe("detached execution workers", () => {
       pendingExecutionWorkerUpdate(db, registered.device.id),
     ).resolves.toBeNull();
     await expect(
-      listOrganizationExecutionWorkers(db, projectId, atMinute(5)),
+      listWorkspaceExecutionWorkers(db, projectId, atMinute(5)),
     ).resolves.toEqual([]);
     await expect(db.prepare(
       `select reason, operation, outcome, hard_delete_rows_written, detail_json
@@ -2332,7 +2332,7 @@ describe("detached execution workers", () => {
     await expect(
       deleteExecutionWorker(db, registered.device.id, atMinute(5), {
         requestId: "worker-deprovision:designated-delete",
-        organizationId: projectId,
+        workspaceId: projectId,
         projectId: null,
         workerId: null,
         reason: "explicit_user_deprovision",
@@ -2355,7 +2355,7 @@ describe("detached execution workers", () => {
     await expect(
       deleteExecutionWorker(db, registered.device.id, atMinute(10), {
         requestId: "worker-deprovision:designated-delete",
-        organizationId: projectId,
+        workspaceId: projectId,
         projectId: null,
         workerId: null,
         reason: "explicit_user_deprovision",
@@ -2375,7 +2375,7 @@ describe("detached execution workers", () => {
     await expect(
       deleteExecutionWorker(db, registered.device.id, atMinute(5), {
         requestId: "worker-deprovision:expired-thread-delete",
-        organizationId: projectId,
+        workspaceId: projectId,
         projectId: null,
         workerId: null,
         reason: "explicit_user_deprovision",
@@ -2411,7 +2411,7 @@ describe("detached execution workers", () => {
     await expect(
       deleteExecutionWorker(db, registered.device.id, atMinute(5), {
         requestId: "worker-deprovision:retained-thread-delete",
-        organizationId: projectId,
+        workspaceId: projectId,
         projectId: null,
         workerId: null,
         reason: "explicit_user_deprovision",
@@ -2444,7 +2444,7 @@ describe("detached execution workers", () => {
     await expect(
       unbindExecutionWorker(db, registered.device.id, projectId, atMinute(5), {
         requestId: "worker-unlink:expired-thread-unbind",
-        organizationId: projectId,
+        workspaceId: projectId,
         workerId: registered.worker.id,
         reason: "explicit_user_unlink",
       }),
@@ -2487,14 +2487,14 @@ describe("detached execution workers", () => {
     await expect(
       deleteExecutionWorker(db, registered.device.id, atMinute(4), {
         requestId: "worker-deprovision:delete-active",
-        organizationId: projectId,
+        workspaceId: projectId,
         projectId: null,
         workerId: null,
         reason: "explicit_user_deprovision",
       }),
     ).rejects.toThrow("active sessions");
     await expect(
-      listOrganizationExecutionWorkers(db, projectId, atMinute(4)),
+      listWorkspaceExecutionWorkers(db, projectId, atMinute(4)),
     ).resolves.toEqual([
       expect.objectContaining({
         deviceId: registered.device.id,
@@ -2750,7 +2750,7 @@ describe("detached execution workers", () => {
     await expect(
       deleteExecutionWorker(db, removed.device.id, atMinute(3), {
         requestId: "worker-deprovision:dispatch-removed",
-        organizationId: projectId,
+        workspaceId: projectId,
         projectId: null,
         workerId: null,
         reason: "explicit_user_deprovision",
@@ -2796,7 +2796,7 @@ describe("detached execution workers", () => {
     const unlinked = await register("dispatch-unlinked");
     await bindExecutionWorkerProject(db, secondProjectId, {
       id: "worker-dispatch-unlinked-second",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       deviceIdentityHash: fingerprint("dispatch-unlinked"),
       runtime: runtimeMetadata(),
@@ -2821,7 +2821,7 @@ describe("detached execution workers", () => {
     await expect(
       unbindExecutionWorker(db, unlinked.device.id, projectId, atMinute(3), {
         requestId: "worker-unlink:dispatch-unlinked",
-        organizationId: projectId,
+        workspaceId: projectId,
         workerId: unlinked.worker.id,
         reason: "explicit_user_unlink",
       }),
@@ -2999,7 +2999,7 @@ describe("detached execution workers", () => {
       worker_id: registered.worker.id,
     });
 
-    const devices = await listOrganizationExecutionWorkers(
+    const devices = await listWorkspaceExecutionWorkers(
       db,
       projectId,
       atMinute(4),
@@ -3676,7 +3676,7 @@ describe("detached execution workers", () => {
     );
     expect(secondClaim?.claim_attempts).toBe(2);
 
-    const attempts = await listOrganizationUsageExecutionAttempts(
+    const attempts = await listWorkspaceUsageExecutionAttempts(
       db,
       projectId,
       atMinute(0),
@@ -3861,10 +3861,10 @@ describe("detached execution workers", () => {
       executionMetrics,
     );
     await expect(
-      listOrganizationUsageRecords(db, projectId, atMinute(0)),
+      listWorkspaceUsageRecords(db, projectId, atMinute(0)),
     ).resolves.toHaveLength(1);
     await expect(
-      listOrganizationUsageCostRecords(db, projectId, atMinute(0)),
+      listWorkspaceUsageCostRecords(db, projectId, atMinute(0)),
     ).resolves.toHaveLength(1);
 
     const ordinaryLateTranscript = await postWorkerRpc(
@@ -3949,12 +3949,12 @@ describe("detached execution workers", () => {
     });
 
     const since = atMinute(50);
-    const attempts = await listOrganizationUsageExecutionAttempts(
+    const attempts = await listWorkspaceUsageExecutionAttempts(
       db,
       projectId,
       since,
     );
-    const runs = await listOrganizationUsageRuns(db, projectId, since);
+    const runs = await listWorkspaceUsageRuns(db, projectId, since);
 
     expect(attempts.some((attempt) => attempt.id === claim!.last_execution_id)).toBe(true);
     expect(runs.some((run) => run.id === runId)).toBe(true);

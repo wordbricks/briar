@@ -98,7 +98,7 @@ export async function uploadReservedFileApplication(
     customMetadata: {
       uploadId: upload.upload_id,
       purpose: upload.purpose,
-      organizationId: upload.organization_id,
+      workspaceId: upload.organization_id,
       ...(upload.project_id ? { projectId: upload.project_id } : {}),
       ...(upload.channel_id ? { channelId: upload.channel_id } : {}),
       ...(upload.work_id ? { workId: upload.work_id } : {}),

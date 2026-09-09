@@ -39,7 +39,7 @@ import {
   saveDmMemory,
   updateDmMemorySettings,
 } from "./dm-memory-repository";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import { syntheticDmLearningChange } from "./test-helpers/dm-memory-learning";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 import { createWorkerQueueService } from "./worker-connect-queue";
@@ -55,7 +55,7 @@ import { requireWorkerProjectBinding } from "./worker-route-auth";
 */
 describe("DM memory in active channel claims", () => {
   const db = cloudflareEnv.DB;
-  const organizationId = crypto.randomUUID();
+  const workspaceId = crypto.randomUUID();
   const projectId = crypto.randomUUID();
   const ownerId = crypto.randomUUID();
   const agentId = crypto.randomUUID();
@@ -85,21 +85,21 @@ describe("DM memory in active channel claims", () => {
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Synthetic memory execution', ?, ?, ?)`,
-      ).bind(organizationId, organizationId, now, now),
+      ).bind(workspaceId, workspaceId, now, now),
       db.prepare(
         `insert into briar_organization_members (organization_id, user_id, role, created_at, updated_at)
          values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, now, now),
+      ).bind(workspaceId, ownerId, now, now),
       db.prepare(
         `insert into briar_teams (id, owner_user_id, organization_id, name, agent_token_hash, created_at, updated_at)
          values (?, ?, ?, 'Synthetic project', ?, ?, ?)`,
-      ).bind(projectId, ownerId, organizationId, "a".repeat(64), now, now),
+      ).bind(projectId, ownerId, workspaceId, "a".repeat(64), now, now),
       db.prepare(
         `insert into briar_execution_worker_devices
            (id, organization_id, owner_user_id, label, device_identity_hash, state,
             last_heartbeat_at, created_at, updated_at)
          values (?, ?, ?, 'Synthetic device', ?, 'online', ?, ?, ?)`,
-      ).bind(deviceId, organizationId, ownerId, "b".repeat(64), now, now, now),
+      ).bind(deviceId, workspaceId, ownerId, "b".repeat(64), now, now, now),
       db.prepare(
         `insert into briar_execution_worker_credentials (device_id, token_hash, created_at)
          values (?, ?, ?)`,
@@ -111,9 +111,9 @@ describe("DM memory in active channel claims", () => {
          values (?, ?, 'Synthetic worker', ?, ?, 'online', 1, 'ready', ?, ?, ?, ?)`,
       ).bind(workerId, projectId, "c".repeat(64), runtimeJson, now, now, now, deviceId),
     ]);
-    await createOrganizationAgent(db, {
+    await createWorkspaceAgent(db, {
       id: agentId,
-      organizationId,
+      workspaceId,
       name: "Synthetic Agent",
       provider: "claude",
       model: null,
@@ -127,7 +127,7 @@ describe("DM memory in active channel claims", () => {
     await db.prepare(
       `update briar_channel_agent_reply_jobs set status = 'failed'
        where status in ('queued', 'running') and organization_id = ?`,
-    ).bind(organizationId).run();
+    ).bind(workspaceId).run();
     await db.prepare(
       `update briar_execution_workers set runtime_proto_json = ? where id = ?`,
     ).bind(runtimeJson, workerId).run();
@@ -140,10 +140,10 @@ describe("DM memory in active channel claims", () => {
     const channelId = crypto.randomUUID();
     const messageId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const owner = { organizationId, channelId, userId: ownerId };
+    const owner = { workspaceId, channelId, userId: ownerId };
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "dm",
       dmKey: `agent:${JSON.stringify([ownerId, channelId])}`,
       slug: channelId,
@@ -181,7 +181,7 @@ describe("DM memory in active channel claims", () => {
         : { sourceMessage: { id: messageId, version: 1 } }),
     });
     const jobs = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: messageId,
       parentMessageId: messageId,
@@ -213,7 +213,7 @@ describe("DM memory in active channel claims", () => {
       workerId,
     );
     return claimNextChannelReplyWork({
-      input: { organizationId, workerId },
+      input: { workspaceId, workerId },
       db,
       env: env(),
       authenticatedWorker,
@@ -237,7 +237,7 @@ describe("DM memory in active channel claims", () => {
       workId: reply!.workId,
       runId: reply!.workId,
       claimToken: reply!.claimToken,
-      work: { case: "channelReply" as const, value: { workspaceId: organizationId } },
+      work: { case: "channelReply" as const, value: { workspaceId: workspaceId } },
     },
     revocationEpoch: BigInt(reply!.memory!.revocationEpoch),
   });
@@ -311,7 +311,7 @@ describe("DM memory in active channel claims", () => {
     expect(resumed.claimToken).not.toBe(reply.claimToken);
   });
 
-  it("M12/M17 counts new turns, replays a lost response once and shares its limit with organization lookups", async () => {
+  it("M12/M17 counts new turns, replays a lost response once and shares its limit with workspace lookups", async () => {
     const f = await fixture();
     const reply = await claim();
     await brief(reply);
@@ -327,7 +327,7 @@ describe("DM memory in active channel claims", () => {
       jobId: reply!.workId,
       claimTokenHash: await sha256(reply!.claimToken),
       requestId: crypto.randomUUID(),
-      kind: "organization",
+      kind: "workspace",
       request: [{ resource: "project-settings", projectId }],
       memoryRevision: reply!.memory!.memoryRevision,
       revocationEpoch: reply!.memory!.revocationEpoch,
@@ -365,9 +365,9 @@ describe("DM memory in active channel claims", () => {
       conversationId: "synthetic-old-provider-session",
       observedAt: new Date().toISOString(),
     });
-    const oldJob = (await getChannelAgentReplyJob(db, organizationId, reply!.workId))!;
+    const oldJob = (await getChannelAgentReplyJob(db, workspaceId, reply!.workId))!;
     await createChannelActivityPublishToken(env().BETTER_AUTH_SECRET, {
-      organizationId,
+      workspaceId,
       channelId: reply!.channelId,
       replyJobId: reply!.workId,
       agentId,
@@ -400,7 +400,7 @@ describe("DM memory in active channel claims", () => {
     ).toBeNull();
     const fresh = await claim();
     expect(fresh!.session?.conversationId).toBeNull();
-    expect((await getChannelAgentReplyJob(db, organizationId, fresh!.workId))!.attempts)
+    expect((await getChannelAgentReplyJob(db, workspaceId, fresh!.workId))!.attempts)
       .toBeGreaterThan(oldJob.attempts);
     expect(fresh!.memory!.revocationEpoch).toBeGreaterThan(reply!.memory!.revocationEpoch);
     expect(fresh!.snapshot.messages).toEqual([]);
@@ -411,7 +411,7 @@ describe("DM memory in active channel claims", () => {
   it("M06/M28 publishes only discovered citations and removes their links when forgotten", async () => {
     const f = await fixture();
     const reply = await claim();
-    const job = (await getChannelAgentReplyJob(db, organizationId, reply!.workId))!;
+    const job = (await getChannelAgentReplyJob(db, workspaceId, reply!.workId))!;
     const completion = {
       jobId: reply!.workId,
       deviceId,
@@ -454,7 +454,7 @@ describe("DM memory in active channel claims", () => {
       autoEnabled: true,
     }, { learningAvailable: true });
     const reply = await claim();
-    const job = (await getChannelAgentReplyJob(db, organizationId, reply!.workId))!;
+    const job = (await getChannelAgentReplyJob(db, workspaceId, reply!.workId))!;
     const completion = {
       jobId: reply!.workId,
       deviceId,
@@ -503,7 +503,7 @@ describe("DM memory in active channel claims", () => {
     const original = await getDmMemory(db, f.owner, f.documentId);
     const reply = await claim();
     await brief(reply);
-    const job = (await getChannelAgentReplyJob(db, organizationId, reply!.workId))!;
+    const job = (await getChannelAgentReplyJob(db, workspaceId, reply!.workId))!;
     expect(
       await completeChannelReply(db, job, {
         jobId: reply!.workId,
@@ -532,9 +532,9 @@ describe("DM memory in active channel claims", () => {
     });
 
     const now = new Date().toISOString();
-    expect(await scheduleDmLearningJobs(db, organizationId, now)).toBe(1);
+    expect(await scheduleDmLearningJobs(db, workspaceId, now)).toBe(1);
     const learning = await claimDmLearningJob(db, {
-      organizationId,
+      workspaceId,
       deviceId,
       workerId,
       projectId,
@@ -547,7 +547,7 @@ describe("DM memory in active channel claims", () => {
       documents: [],
     });
     const claimIdentity = {
-      organizationId,
+      workspaceId,
       workerId,
       deviceId,
       jobId: learning.workId,
@@ -630,7 +630,7 @@ describe("DM memory in active channel claims", () => {
       createdAt: observed,
     });
     const followUp = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId: f.channelId,
       triggerMessageId: trigger,
       parentMessageId: trigger,
@@ -672,7 +672,7 @@ describe("DM memory in active channel claims", () => {
       item.documentId === preference.documentId && item.body.includes("Korean"),
     )).toBe(false);
 
-    const editedJob = (await getChannelAgentReplyJob(db, organizationId, editedReply!.workId))!;
+    const editedJob = (await getChannelAgentReplyJob(db, workspaceId, editedReply!.workId))!;
     expect(await completeChannelReply(db, editedJob, {
       jobId: editedReply!.workId,
       deviceId,
@@ -710,7 +710,7 @@ describe("DM memory in active channel claims", () => {
       createdAt: afterDeleteAt,
     });
     const afterDeleteJobs = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId: f.channelId,
       triggerMessageId: afterDeleteTrigger,
       parentMessageId: afterDeleteTrigger,
@@ -732,7 +732,7 @@ describe("DM memory in active channel claims", () => {
   it("M07 retains an activity revocation until its old attempt is actually cleared", async () => {
     const f = await fixture();
     const reply = await claim();
-    const oldAttempt = (await getChannelAgentReplyJob(db, organizationId, reply!.workId))!.attempts;
+    const oldAttempt = (await getChannelAgentReplyJob(db, workspaceId, reply!.workId))!.attempts;
     await deleteDmMemory(db, f.owner, f.documentId);
     const fresh = await claim();
     const failed = await flushDmMemoryActivityRevocations(db, env(), async () => {
@@ -750,7 +750,7 @@ describe("DM memory in active channel claims", () => {
     expect(revoked).toMatchObject({ attempt: oldAttempt });
     expect(BigInt(revoked!.sequence)).toBe(BigInt(Number.MAX_SAFE_INTEGER));
     expect(revoked!.activity ?? null).toBeNull();
-    expect((await getChannelAgentReplyJob(db, organizationId, fresh!.workId))!.attempts)
+    expect((await getChannelAgentReplyJob(db, workspaceId, fresh!.workId))!.attempts)
       .toBeGreaterThan(oldAttempt);
     expect(
       await db.prepare(
@@ -824,7 +824,7 @@ describe("DM memory in active channel claims", () => {
     ).bind(f.documentId).run();
     await expect(requireDmMemoryReplyFence(db, reply!.workId))
       .rejects.toMatchObject({ code: "memory_scope_revoked" });
-    expect((await getChannelAgentReplyJob(db, organizationId, reply!.workId))?.status)
+    expect((await getChannelAgentReplyJob(db, workspaceId, reply!.workId))?.status)
       .toBe("queued");
   });
 

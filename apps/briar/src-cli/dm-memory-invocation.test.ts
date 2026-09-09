@@ -46,7 +46,7 @@ const work = {
   workId: crypto.randomUUID(),
   runId: crypto.randomUUID(),
   claimToken: `briar_channel_claim_${"a".repeat(64)}`,
-  organizationId: crypto.randomUUID(),
+  workspaceId: crypto.randomUUID(),
 } as ClaimedChannelReply;
 
 const queue = (epoch = 0) => ({

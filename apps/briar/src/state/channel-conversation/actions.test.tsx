@@ -14,7 +14,7 @@ import {
   testChannelMessage,
 } from "../../test/channel-conversation";
 import { createReactTestRoot, renderReactTestRoot } from "../../test/react";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import {
@@ -114,7 +114,7 @@ async function renderHarness(
   const { cleanup, root } = createReactTestRoot({ attachToDocument: true });
   const registry = createTestRegistry([
     [tokenAtom, "token"],
-    [activeOrganizationIdAtom, "org-1"],
+    [activeWorkspaceIdAtom, "org-1"],
     [channelConversationWriteApiAtom, api],
   ]);
   writeChannelParticipants(registry, channelId, {
@@ -359,7 +359,7 @@ describe("channel conversation actions", () => {
       imageHeight: 768,
     });
     const optimisticId = storedMessages(registry)[0]!.id;
-    const serverUrl = `/organizations/org-1/channels/${channelId}/messages/${optimisticId}/attachments/server-upload-1`;
+    const serverUrl = `/workspaces/org-1/channels/${channelId}/messages/${optimisticId}/attachments/server-upload-1`;
 
     await act(async () =>
       pending.resolve({

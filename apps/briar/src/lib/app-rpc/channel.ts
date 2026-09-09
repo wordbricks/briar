@@ -50,7 +50,7 @@ import type { AutoHuntSession } from "../../types";
 import type {
   AgentSkillExecutionApprovalInput,
   IssueExecutionApprovalInput,
-  OrganizationMember,
+  WorkspaceMember,
 } from "../../types";
 import { briarApiUrl } from "../api-config";
 import { readImageDimensions } from "../image-dimensions";
@@ -90,7 +90,7 @@ import {
   agentProviderToProto,
   optionalAgentProviderFromProto,
   optionalTimestamp,
-  organizationMemberFromProto,
+  workspaceMemberFromProto,
   requiredMessage,
   requiredTimestamp,
   safeNumber,
@@ -175,7 +175,7 @@ export const channelSummaryFromMessage = (
   value: ChannelSummaryMessage,
 ): ChannelSummary => ({
   id: value.id,
-  organizationId: value.workspaceId,
+  workspaceId: value.workspaceId,
   kind: channelKindFromProto(value.kind),
   slug: value.slug,
   name: value.name,
@@ -205,7 +205,7 @@ export const channelSidebarSectionFromMessage = (
   value: ChannelSidebarSectionMessage,
 ): ChannelSidebarSection => ({
   id: value.id,
-  organizationId: value.workspaceId,
+  workspaceId: value.workspaceId,
   name: value.name,
   position: value.position,
   createdAt: requiredTimestamp(value.createdAt, "sidebarSection.createdAt"),
@@ -887,14 +887,14 @@ export async function listChannels(token: string, workspaceId: string) {
 export async function listDirectMessageRecipients(
   token: string,
   workspaceId: string,
-): Promise<{ members: OrganizationMember[]; agents: ChannelAgentSummary[] }> {
+): Promise<{ members: WorkspaceMember[]; agents: ChannelAgentSummary[] }> {
   const client = requireChannelClient();
   const response = await client.listDirectMessageRecipients(
     { workspaceId },
     appCallOptions(token),
   );
   return {
-    members: response.members.map(organizationMemberFromProto),
+    members: response.members.map(workspaceMemberFromProto),
     agents: response.agents.map(workspaceAgentFromMessage),
   };
 }

@@ -11,13 +11,22 @@ export type ReplyLookupReservation = {
   memoryRevision: number | null; revocationEpoch: number | null; cachedJson: string | null;
 };
 
+/**
+ * `briar_channel_reply_lookups.kind` is CHECK-constrained to the pre-rename
+ * spelling, so the stored value stays `organization` while the domain calls it
+ * `workspace`. Changing the stored value would be a D1 table rebuild, not a
+ * rename.
+ */
+const storedLookupKind = { memory: "memory", workspace: "organization" } as const;
+
 export async function reserveReplyLookup(db: D1Database, input: {
-  jobId: string; claimTokenHash: string; requestId: string; kind: "memory" | "organization";
+  jobId: string; claimTokenHash: string; requestId: string; kind: "memory" | "workspace";
   request: unknown; queries?: readonly string[]; memoryRevision: number | null; revocationEpoch: number | null;
 }): Promise<ReplyLookupReservation> {
   const now = new Date().toISOString();
   const leaseExpiresAt = new Date(Date.now() + 7_000).toISOString();
   const leaseToken = crypto.randomUUID();
+  const storedKind = storedLookupKind[input.kind];
   // Hashes are claim-salted, never written to logs, and removed on forgetting.
   const salt = `${input.jobId}:${input.claimTokenHash}:`;
   const requestHash = await sha256(salt + JSON.stringify([input.kind, input.request]));
@@ -45,8 +54,8 @@ export async function reserveReplyLookup(db: D1Database, input: {
         union select value from json_each(?)
       )) <= 6
     on conflict (job_id, claim_token_hash, request_id) do nothing`)
-    .bind(...keys, input.kind, requestHash, JSON.stringify(queryHashes), input.memoryRevision, input.revocationEpoch,
-      leaseToken, leaseExpiresAt, input.jobId, input.claimTokenHash, input.kind, requestHash,
+    .bind(...keys, storedKind, requestHash, JSON.stringify(queryHashes), input.memoryRevision, input.revocationEpoch,
+      leaseToken, leaseExpiresAt, input.jobId, input.claimTokenHash, storedKind, requestHash,
       input.memoryRevision, input.revocationEpoch, now, input.jobId, input.claimTokenHash, now,
       input.jobId, input.claimTokenHash, input.jobId, input.claimTokenHash, JSON.stringify(queryHashes)).run();
   let row = await read();

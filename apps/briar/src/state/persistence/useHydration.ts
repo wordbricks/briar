@@ -40,12 +40,12 @@ function hydratedSelection(
   /*
     A project window is pinned to one team, so a record that does not carry it
     is not this window's to render. The pointer is written by the main window,
-    which may well have been in another organization.
+    which may well have been in another workspace.
   */
   const lockedTeam = snapshot.session.teams.find(
     (team) => team.id === lockedTeamId,
   );
-  return lockedTeam && lockedTeam.organizationId === snapshot.organizationId
+  return lockedTeam && lockedTeam.workspaceId === snapshot.workspaceId
     ? { activeTeamId: lockedTeamId }
     : null;
 }
@@ -64,7 +64,7 @@ export function startHydration(registry: AtomRegistry): () => void {
     try {
       const snapshot = await readSnapshotSafely(
         registry,
-        snapshotKey(account.userId, account.organizationId),
+        snapshotKey(account.userId, account.workspaceId),
       );
       // A missing, corrupted or outdated record reads as `null`, and every one
       // of those means the same thing: boot the way the app booted before.
@@ -81,7 +81,7 @@ export function startHydration(registry: AtomRegistry): () => void {
         applySnapshot(registry, snapshot);
         registry.set(activeTeamIdAtom, selection.activeTeamId);
         registry.set(hydratedAccountAtom, {
-          organizationId: snapshot.organizationId,
+          workspaceId: snapshot.workspaceId,
           userId: snapshot.userId,
         });
         /*

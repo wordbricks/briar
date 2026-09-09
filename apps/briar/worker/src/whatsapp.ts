@@ -173,7 +173,7 @@ export function buildWhatsAppReplyChunks(input: {
   body: string;
   approvalSummary?: string | null;
   appOrigin: string;
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   messageId: string;
 }) {
@@ -183,7 +183,7 @@ export function buildWhatsAppReplyChunks(input: {
     sections.push([
       `*${input.approvalSummary}*`,
       "검토와 승인은 보안을 위해 Briar 앱에서만 할 수 있습니다.",
-      `${origin}/open/channels/${input.organizationId}/${input.channelId}/${input.messageId}`,
+      `${origin}/open/channels/${input.workspaceId}/${input.channelId}/${input.messageId}`,
     ].join("\n"));
   }
   const text = sections.filter(Boolean).join("\n\n") || "Briar에서 답변이 도착했습니다.";

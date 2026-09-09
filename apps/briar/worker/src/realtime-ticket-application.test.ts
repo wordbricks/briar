@@ -5,7 +5,7 @@ import {
   type RealtimeTicketApplicationServices,
 } from "./realtime-ticket-application";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
 const channelId = "44444444-4444-4444-8444-444444444444";
@@ -19,14 +19,14 @@ type RealtimeTicketServiceMocks = {
   readonly createIssueActivityTicket: ReturnType<
     typeof vi.fn<RealtimeTicketApplicationServices["createIssueActivityTicket"]>
   >;
-  readonly createOrganizationTicket: ReturnType<
-    typeof vi.fn<RealtimeTicketApplicationServices["createOrganizationTicket"]>
+  readonly createWorkspaceTicket: ReturnType<
+    typeof vi.fn<RealtimeTicketApplicationServices["createWorkspaceTicket"]>
   >;
   readonly getChannel: ReturnType<
     typeof vi.fn<RealtimeTicketApplicationServices["getChannel"]>
   >;
-  readonly getOrganizationRole: ReturnType<
-    typeof vi.fn<RealtimeTicketApplicationServices["getOrganizationRole"]>
+  readonly getWorkspaceRole: ReturnType<
+    typeof vi.fn<RealtimeTicketApplicationServices["getWorkspaceRole"]>
   >;
   readonly getTeam: ReturnType<
     typeof vi.fn<RealtimeTicketApplicationServices["getTeam"]>
@@ -43,40 +43,40 @@ const services = (): RealtimeTicketServiceMocks => {
   const createIssueActivityTicket = vi.fn<
     RealtimeTicketApplicationServices["createIssueActivityTicket"]
   >().mockResolvedValue({ ticket: "issue-ticket", expiresAt: 1 } as never);
-  const createOrganizationTicket = vi.fn<
-    RealtimeTicketApplicationServices["createOrganizationTicket"]
-  >().mockResolvedValue({ ticket: "organization-ticket", expiresAt: 1 } as never);
+  const createWorkspaceTicket = vi.fn<
+    RealtimeTicketApplicationServices["createWorkspaceTicket"]
+  >().mockResolvedValue({ ticket: "workspace-ticket", expiresAt: 1 } as never);
   const getChannel = vi.fn<RealtimeTicketApplicationServices["getChannel"]>()
     .mockResolvedValue({ id: channelId } as never);
-  const getOrganizationRole = vi.fn<
-    RealtimeTicketApplicationServices["getOrganizationRole"]
+  const getWorkspaceRole = vi.fn<
+    RealtimeTicketApplicationServices["getWorkspaceRole"]
   >().mockResolvedValue("viewer");
   const getTeam = vi.fn<RealtimeTicketApplicationServices["getTeam"]>()
-    .mockResolvedValue({ organization_id: organizationId } as never);
+    .mockResolvedValue({ organization_id: workspaceId } as never);
   const getRun = vi.fn<RealtimeTicketApplicationServices["getRun"]>()
     .mockResolvedValue({ id: runId } as never);
   return {
     value: {
       createChannelActivityTicket,
       createIssueActivityTicket,
-      createOrganizationTicket,
+      createWorkspaceTicket,
       getChannel,
-      getOrganizationRole,
+      getWorkspaceRole,
       getTeam,
       getRun,
     },
     createChannelActivityTicket,
     createIssueActivityTicket,
-    createOrganizationTicket,
+    createWorkspaceTicket,
     getChannel,
-    getOrganizationRole,
+    getWorkspaceRole,
     getTeam,
     getRun,
   };
 };
 
 describe("realtime ticket application", () => {
-  it("authorizes each scope and derives the issue organization from the project", async () => {
+  it("authorizes each scope and derives the issue workspace from the project", async () => {
     const mocks = services();
     const common = {
       db: {} as D1Database,
@@ -88,16 +88,16 @@ describe("realtime ticket application", () => {
       ...common,
       scope: {
         type: "workspaceNotifications",
-        organizationId,
+        workspaceId,
       },
     }, mocks.value)).resolves.toEqual({
-      socketPath: `/organizations/${organizationId}/channel-events`,
-      ticket: "organization-ticket",
+      socketPath: `/workspaces/${workspaceId}/channel-events`,
+      ticket: "workspace-ticket",
     });
-    expect(mocks.getOrganizationRole).toHaveBeenNthCalledWith(
+    expect(mocks.getWorkspaceRole).toHaveBeenNthCalledWith(
       1,
       common.db,
-      organizationId,
+      workspaceId,
       userId,
     );
 
@@ -112,26 +112,26 @@ describe("realtime ticket application", () => {
     expect(mocks.getRun).toHaveBeenCalledWith(common.db, projectId, runId);
     expect(mocks.createIssueActivityTicket).toHaveBeenCalledWith(
       "signing-secret",
-      { organizationId, projectId, runId, userId },
+      { workspaceId, projectId, runId, userId },
     );
 
     await expect(createRealtimeTicketApplication({
       ...common,
-      scope: { type: "channelActivity", organizationId, channelId },
+      scope: { type: "channelActivity", workspaceId, channelId },
     }, mocks.value)).resolves.toEqual({
       socketPath:
-        `/organizations/${organizationId}/channels/${channelId}/agent-activity-events`,
+        `/workspaces/${workspaceId}/channels/${channelId}/agent-activity-events`,
       ticket: "channel-ticket",
     });
-    expect(mocks.getOrganizationRole).toHaveBeenNthCalledWith(
+    expect(mocks.getWorkspaceRole).toHaveBeenNthCalledWith(
       2,
       common.db,
-      organizationId,
+      workspaceId,
       userId,
     );
     expect(mocks.getChannel).toHaveBeenCalledWith(
       common.db,
-      organizationId,
+      workspaceId,
       channelId,
       userId,
     );

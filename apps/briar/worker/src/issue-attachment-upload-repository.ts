@@ -14,7 +14,7 @@ export type IssueAttachmentUploadPurpose =
 
 export type IssueAttachmentUploadScope = {
   purpose: IssueAttachmentUploadPurpose;
-  organizationId: string;
+  workspaceId: string;
   projectId: string;
   userId: string;
   mutationId: string;
@@ -23,7 +23,7 @@ export type IssueAttachmentUploadScope = {
 
 const uploadScope = (scope: IssueAttachmentUploadScope): UploadScope => ({
   purpose: scope.purpose,
-  organizationId: scope.organizationId,
+  workspaceId: scope.workspaceId,
   projectId: scope.projectId,
   channelId: null,
   userId: scope.userId,

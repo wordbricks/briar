@@ -61,7 +61,7 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
       if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : String(caught));
     }).finally(() => { if (generation.current === current) setBusy(false); });
     return () => { generation.current++; controller.abort(); };
-  }, [scope.token, scope.organizationId, scope.channelId, client, initialReference?.documentId, initialReference?.version]);
+  }, [scope.token, scope.workspaceId, scope.channelId, client, initialReference?.documentId, initialReference?.version]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -79,7 +79,7 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
       }).catch(() => { /* Explicit refresh retains actionable API errors. */ });
     }, 5000);
     return () => { clearInterval(timer); controller.abort(); };
-  }, [busy, editing, page, selectedSpace?.memoryRevision, scope.token, scope.organizationId, scope.channelId, client]);
+  }, [busy, editing, page, selectedSpace?.memoryRevision, scope.token, scope.workspaceId, scope.channelId, client]);
 
   async function perform(action: () => Promise<void>) {
     if (busy) return;

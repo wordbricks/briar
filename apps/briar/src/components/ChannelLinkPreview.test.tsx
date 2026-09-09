@@ -63,7 +63,7 @@ describe("channel link preview layout reservation", () => {
         <ChannelLinkPreview
           channelId="channel-1"
           message={message(url)}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>,
@@ -94,7 +94,7 @@ describe("channel link preview layout reservation", () => {
         <ChannelLinkPreview
           channelId="channel-1"
           message={message(url)}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>,
@@ -114,7 +114,7 @@ describe("channel link preview layout reservation", () => {
         <ChannelLinkPreview
           channelId="channel-1"
           message={message(url)}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>
@@ -145,7 +145,7 @@ describe("channel link preview layout reservation", () => {
         <ChannelLinkPreview
           channelId="channel-1"
           message={message(url)}
-          organizationId="org-1"
+          workspaceId="org-1"
           token="token"
         />
       </I18nProvider>,

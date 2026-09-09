@@ -25,7 +25,7 @@ export async function captureDmPublicMessageClaim(
   db: D1Database,
   input: {
     jobId: string;
-    organizationId: string;
+    workspaceId: string;
     workerId: string;
     deviceId: string;
     claimTokenHash: string;
@@ -91,7 +91,7 @@ export async function captureDmPublicMessageClaim(
   ).bind(
     input.observedAt,
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.workerId,
     input.deviceId,
     input.claimTokenHash,
@@ -104,7 +104,7 @@ export async function getDmPublicMessageClaim(
   db: D1Database,
   input: {
     jobId: string;
-    organizationId: string;
+    workspaceId: string;
     workerId: string;
     deviceId: string;
     claimTokenHash: string;
@@ -175,7 +175,7 @@ export async function getDmPublicMessageClaim(
             where channel_id = job.channel_id) = 1`,
   ).bind(
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.workerId,
     input.deviceId,
     input.claimTokenHash,
@@ -210,7 +210,7 @@ export async function findDmPublicMessageByClaimRequest(
   db: D1Database,
   input: {
     jobId: string;
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     workerId: string;
     deviceId: string;
@@ -229,7 +229,7 @@ export async function findDmPublicMessageByClaimRequest(
   ).bind(
     input.requestId,
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.workerId,
     input.deviceId,
@@ -253,13 +253,13 @@ export async function findDmPublicMessageByRequestId(
 
 export async function listDmPublicMessagesForReply(
   db: D1Database,
-  input: { jobId: string; organizationId: string },
+  input: { jobId: string; workspaceId: string },
 ) {
   const rows = await db.prepare(
     `select * from briar_dm_public_message_batches
      where origin_reply_job_id = ? and organization_id = ?
      order by first_sequence, id`,
-  ).bind(input.jobId, input.organizationId).all<DmPublicMessageBatchRow>();
+  ).bind(input.jobId, input.workspaceId).all<DmPublicMessageBatchRow>();
   const batches: DmPublishedMessageBatch[] = [];
   for (const row of rows.results) batches.push((await hydratedBatch(db, row))!);
   return batches;
@@ -270,7 +270,7 @@ export async function getDmFinalPublicMessageBatch(
   input: {
     batchId: string;
     jobId: string;
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     ownerUserId: string;
     agentId: string;
@@ -290,7 +290,7 @@ export async function getDmFinalPublicMessageBatch(
   ).bind(
     input.batchId,
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.ownerUserId,
     input.agentId,

@@ -59,7 +59,7 @@ export async function publishDmPublicMessageBatchApplication(input: {
   if (
     !worker.binding || request.workerId !== worker.binding.id ||
     request.projectId !== worker.binding.project_id ||
-    request.claim.organizationId !== worker.principal.organizationId
+    request.claim.workspaceId !== worker.principal.workspaceId
   ) {
     throw new DmPublicMessageError(
       "claim_stale",
@@ -70,7 +70,7 @@ export async function publishDmPublicMessageBatchApplication(input: {
   const payloadHash = await sha256(JSON.stringify(canonicalPayload(request)));
   const replay = await findDmPublicMessageByClaimRequest(input.db, {
     jobId: request.claim.workId,
-    organizationId: request.claim.organizationId,
+    workspaceId: request.claim.workspaceId,
     channelId: request.claim.runId,
     workerId: worker.binding.id,
     deviceId: worker.principal.deviceId,
@@ -88,7 +88,7 @@ export async function publishDmPublicMessageBatchApplication(input: {
   await requireDmMemoryReplyFence(input.db, request.claim.workId);
   const scope = await getDmPublicMessageClaim(input.db, {
     jobId: request.claim.workId,
-    organizationId: request.claim.organizationId,
+    workspaceId: request.claim.workspaceId,
     workerId: worker.binding.id,
     deviceId: worker.principal.deviceId,
     claimTokenHash,
@@ -131,7 +131,7 @@ export async function publishDmPublicMessageBatchApplication(input: {
   } catch (cause) {
     const racedReplay = await findDmPublicMessageByClaimRequest(input.db, {
       jobId: request.claim.workId,
-      organizationId: request.claim.organizationId,
+      workspaceId: request.claim.workspaceId,
       channelId: request.claim.runId,
       workerId: worker.binding.id,
       deviceId: worker.principal.deviceId,

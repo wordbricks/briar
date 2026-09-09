@@ -24,8 +24,8 @@ const planningProjectOf = (
   overrides: Partial<PlanningProject> = {},
 ): PlanningProject => ({
   id,
-  workspaceId: team.organizationId,
-  workspaceName: team.organizationName,
+  workspaceId: team.workspaceId,
+  workspaceName: team.workspaceName,
   teamId: team.id,
   teamName: team.name,
   name: id,

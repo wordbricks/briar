@@ -989,7 +989,7 @@ describe("RunPage", () => {
             }],
             dependents: [],
             relatedMessage: {
-              organizationId: "11111111-1111-4111-8111-111111111111",
+              workspaceId: "11111111-1111-4111-8111-111111111111",
               channelId: "22222222-2222-4222-8222-222222222222",
               messageId: "33333333-3333-4333-8333-333333333333",
               rootMessageId: "44444444-4444-4444-8444-444444444444",
@@ -1020,7 +1020,7 @@ describe("RunPage", () => {
     expect(relatedMessageButton?.textContent).toContain("관련 메시지로 돌아가기");
     await act(async () => relatedMessageButton?.click());
     expect(openRelatedMessage).toHaveBeenCalledWith({
-      organizationId: "11111111-1111-4111-8111-111111111111",
+      workspaceId: "11111111-1111-4111-8111-111111111111",
       channelId: "22222222-2222-4222-8222-222222222222",
       messageId: "33333333-3333-4333-8333-333333333333",
       rootMessageId: "44444444-4444-4444-8444-444444444444",

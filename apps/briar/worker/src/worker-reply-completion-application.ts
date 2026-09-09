@@ -19,7 +19,7 @@ import {
   failChannelReply,
   getChannelById,
   getClaimedChannelReply,
-  getOrganizationProject,
+  getWorkspaceProject,
   isAgentDirectMessage,
   listChannelAgents,
 } from "./channels";
@@ -30,7 +30,7 @@ import {
   getClaimedIssueAgentReply,
 } from "./issue-agent-reply-repository";
 import { issueAttachmentMarkdown } from "../../src/lib/issue-markdown";
-import { getOrganizationAgent } from "./organization-agents";
+import { getWorkspaceAgent } from "./workspace-agents";
 import {
   findReplyCompletionReceipt,
   prepareReplyAttachmentUploadRows,
@@ -67,7 +67,7 @@ import {
   executionWorkerRuntime,
 } from "./workers";
 import { scheduleWhatsAppOutboxFlush } from "./whatsapp-outbox";
-import { wakeOrganizationWorkers } from "./worker-wake-hub";
+import { wakeWorkspaceWorkers } from "./worker-wake-hub";
 import {
   findDmFinalPublicMessageForReply,
   getDmFinalPublicMessageBatch,
@@ -90,7 +90,7 @@ export class ReplyCompletionApplicationError extends Error {
 }
 
 export type ReplyCompletionWorker = {
-  principal: { organizationId: string; deviceId: string };
+  principal: { workspaceId: string; deviceId: string };
   binding: { id: string; project_id: string };
 };
 
@@ -110,10 +110,10 @@ export type ReplyCompletionApplicationServices = {
   readonly failChannelReply: typeof failChannelReply;
   readonly getChannelById: typeof getChannelById;
   readonly listAgentMessageTargetAgents: typeof listAgentMessageTargetAgents;
-  readonly getOrganizationAgent: typeof getOrganizationAgent;
+  readonly getWorkspaceAgent: typeof getWorkspaceAgent;
   readonly listChannelAgents: typeof listChannelAgents;
   readonly hydrateAgentSkills: typeof hydrateAgentSkills;
-  readonly getOrganizationProject: typeof getOrganizationProject;
+  readonly getWorkspaceProject: typeof getWorkspaceProject;
   readonly enqueueExpiredUploadCleanup: typeof enqueueExpiredUploadCleanup;
   readonly processUploadCleanupQueue: typeof processUploadCleanupQueue;
   readonly scheduleProjectRealtimePublish: typeof scheduleProjectRealtimePublish;
@@ -124,7 +124,7 @@ export type ReplyCompletionApplicationServices = {
   readonly requireDmMemoryReplyFence: typeof requireDmMemoryReplyFence;
   readonly channelReplyWorkerAvailability: typeof channelReplyWorkerAvailability;
   readonly scheduleWhatsAppOutboxFlush: typeof scheduleWhatsAppOutboxFlush;
-  readonly wakeOrganizationWorkers: typeof wakeOrganizationWorkers;
+  readonly wakeWorkspaceWorkers: typeof wakeWorkspaceWorkers;
   readonly findDmFinalPublicMessageForReply:
     typeof findDmFinalPublicMessageForReply;
   readonly getDmFinalPublicMessageBatch: typeof getDmFinalPublicMessageBatch;
@@ -145,10 +145,10 @@ const applicationServices: ReplyCompletionApplicationServices = {
   failChannelReply,
   getChannelById,
   listAgentMessageTargetAgents,
-  getOrganizationAgent,
+  getWorkspaceAgent,
   listChannelAgents,
   hydrateAgentSkills,
-  getOrganizationProject,
+  getWorkspaceProject,
   enqueueExpiredUploadCleanup,
   processUploadCleanupQueue,
   scheduleProjectRealtimePublish,
@@ -159,7 +159,7 @@ const applicationServices: ReplyCompletionApplicationServices = {
   requireDmMemoryReplyFence,
   channelReplyWorkerAvailability,
   scheduleWhatsAppOutboxFlush,
-  wakeOrganizationWorkers,
+  wakeWorkspaceWorkers,
   findDmFinalPublicMessageForReply,
   getDmFinalPublicMessageBatch,
   getDmPublicMessageClaim,
@@ -191,7 +191,7 @@ async function failureOutcome(
     providerBlockRecovery(input.block.reason) !== "request"
   ) {
     anotherWorkerAvailable = await services.channelReplyWorkerAvailability(db, {
-      organizationId: input.scope.organizationId,
+      workspaceId: input.scope.workspaceId,
       projectId: input.scope.replyKind === "issue" ? input.scope.projectId : null,
       excludeWorkerId: input.scope.workerId,
       provider: input.provider,
@@ -237,17 +237,17 @@ const scopeFor = async (
     );
   }
   if (
-    input.claim.organizationId !== null &&
-    input.claim.organizationId !== worker.principal.organizationId
+    input.claim.workspaceId !== null &&
+    input.claim.workspaceId !== worker.principal.workspaceId
   ) {
     throw new ReplyCompletionApplicationError(
       "claim_conflict",
-      "Reply claim belongs to another organization",
+      "Reply claim belongs to another workspace",
     );
   }
   return {
     replyKind: input.claim.replyKind,
-    organizationId: worker.principal.organizationId,
+    workspaceId: worker.principal.workspaceId,
     projectId: input.projectId,
     workId: input.claim.workId,
     runId: input.claim.runId,
@@ -283,7 +283,7 @@ const activeClaim = async (
     claimTokenHash: scope.claimTokenHash,
     observedAt,
   });
-  return job && job.organization_id === scope.organizationId &&
+  return job && job.organization_id === scope.workspaceId &&
       job.channel_id === scope.runId &&
       (job.project_id === null || job.project_id === scope.projectId)
     ? job
@@ -399,7 +399,7 @@ const receiptMatches = (
 ) =>
   receipt.request_id === input.requestId &&
   receipt.reply_kind === input.replyKind &&
-  receipt.organization_id === input.organizationId &&
+  receipt.organization_id === input.workspaceId &&
   receipt.project_id === input.projectId &&
   receipt.work_id === input.workId &&
   receipt.run_id === input.runId &&
@@ -544,7 +544,7 @@ const channelExecutionTargetInSnapshot = (
 const DEFAULT_AGENT_MESSAGE_HOURLY_LIMIT = 30;
 const AGENT_MESSAGE_WINDOW_MS = 60 * 60 * 1_000;
 
-/** Plan §3.6: one organization-wide ceiling on Agent-to-Agent turns per hour. */
+/** Plan §3.6: one workspace-wide ceiling on Agent-to-Agent turns per hour. */
 const agentMessageHourlyLimit = (env: Env) => {
   const configured = env.AGENT_MESSAGE_HOURLY_LIMIT;
   const parsed = configured === undefined || String(configured).trim() === ""
@@ -599,7 +599,7 @@ async function resolveAgentMessage(
   }
   const channel = await services.getChannelById(
     input.db,
-    scope.organizationId,
+    scope.workspaceId,
     claimed.channel_id,
   );
   if (
@@ -618,7 +618,7 @@ async function resolveAgentMessage(
   ).bind(claimed.trigger_message_id, claimed.channel_id)
     .first<{ author_user_id: string | null }>();
   const targets = await services.listAgentMessageTargetAgents(input.db, {
-    organizationId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     viewerUserId: trigger?.author_user_id ?? null,
     excludeAgentId: claimed.agent_id,
   });
@@ -634,7 +634,7 @@ async function resolveAgentMessage(
     `select count(*) as count from briar_channel_agent_reply_jobs
      where organization_id = ? and agent_message_hop > 0 and created_at > ?`,
   ).bind(
-    scope.organizationId,
+    scope.workspaceId,
     new Date(Date.parse(input.observedAt) - AGENT_MESSAGE_WINDOW_MS)
       .toISOString(),
   ).first<{ count: number }>();
@@ -657,7 +657,7 @@ async function resolveAgentMessage(
     throw new ReplyCompletionApplicationError("invalid_request", message);
   }
   const availability = await services.channelReplyWorkerAvailability(input.db, {
-    organizationId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     projectId: target.project_id,
     preferredWorkerId: target.designated_worker_id ?? null,
     provider: target.provider,
@@ -807,15 +807,15 @@ export async function completeIssueReplyApplication(
     );
     services.scheduleIssueActivityClear(
       input.env,
-      scope.organizationId,
+      scope.workspaceId,
       completed,
       input.context,
     );
     // A reply queued behind this one on the same issue only becomes claimable
     // now, so wake instead of leaving it to the next idle poll.
-    services.wakeOrganizationWorkers(
+    services.wakeWorkspaceWorkers(
       input.env,
-      scope.organizationId,
+      scope.workspaceId,
       "issue_reply_completed",
       input.context,
     );
@@ -855,7 +855,7 @@ export async function completeChannelReplyApplication(
     services.scheduleChannelRealtimePublish(
       input.env,
       input.db,
-      scope.organizationId,
+      scope.workspaceId,
       input.context,
     );
     services.scheduleWhatsAppOutboxFlush(input.env, input.db, input.context);
@@ -896,7 +896,7 @@ export async function completeChannelReplyApplication(
     await services.requireDmMemoryReplyFence(input.db, scope.workId);
     const publicationScope = await services.getDmPublicMessageClaim(input.db, {
       jobId: scope.workId,
-      organizationId: scope.organizationId,
+      workspaceId: scope.workspaceId,
       workerId: scope.workerId,
       deviceId: scope.deviceId,
       claimTokenHash: scope.claimTokenHash,
@@ -908,7 +908,7 @@ export async function completeChannelReplyApplication(
     publishedFinal = await services.getDmFinalPublicMessageBatch(input.db, {
       batchId: input.request.publishedFinalBatchId,
       jobId: publicationScope.job_id,
-      organizationId: publicationScope.organization_id,
+      workspaceId: publicationScope.organization_id,
       channelId: publicationScope.channel_id,
       ownerUserId: publicationScope.owner_user_id,
       agentId: publicationScope.agent_id,
@@ -979,9 +979,9 @@ export async function completeChannelReplyApplication(
           : {}),
       });
     } else {
-      const agent = await services.getOrganizationAgent(
+      const agent = await services.getWorkspaceAgent(
         input.db,
-        scope.organizationId,
+        scope.workspaceId,
         claimed.agent_id,
       );
       if (!agent) {
@@ -1046,7 +1046,7 @@ export async function completeChannelReplyApplication(
       ) {
         throw new ReplyCompletionApplicationError(
           "invalid_request",
-          "Only an Organization Agent can delegate",
+          "Only a Workspace Agent can delegate",
         );
       }
       const defaultProject = (value: string | null) => value ?? agent.project_id;
@@ -1073,7 +1073,7 @@ export async function completeChannelReplyApplication(
       ) {
         throw new ReplyCompletionApplicationError(
           "invalid_request",
-          "Organization Agents must delegate execution requests",
+          "Workspace Agents must delegate execution requests",
         );
       }
       if (
@@ -1109,7 +1109,7 @@ export async function completeChannelReplyApplication(
         );
         if (
           !target?.project_id ||
-          target.organization_id !== scope.organizationId ||
+          target.organization_id !== scope.workspaceId ||
           target.project_id !== result.delegation.projectId
         ) {
           throw new ReplyCompletionApplicationError(
@@ -1133,15 +1133,15 @@ export async function completeChannelReplyApplication(
       ]) {
         if (
           targetProjectId &&
-          !(await services.getOrganizationProject(
+          !(await services.getWorkspaceProject(
             input.db,
-            scope.organizationId,
+            scope.workspaceId,
             targetProjectId,
           ))
         ) {
           throw new ReplyCompletionApplicationError(
             "invalid_request",
-            "Reply target project is outside the organization",
+            "Reply target project is outside the workspace",
           );
         }
       }
@@ -1170,7 +1170,7 @@ export async function completeChannelReplyApplication(
           "https://briar.wordbricks.ai",
         attachments: attachments.map((attachment) => ({
           id: attachment.upload_id,
-          organization_id: scope.organizationId,
+          organization_id: scope.workspaceId,
           object_key: attachment.object_key,
           filename: attachment.filename,
           content_type: attachment.content_type,
@@ -1185,16 +1185,16 @@ export async function completeChannelReplyApplication(
     services.scheduleChannelRealtimePublish(
       input.env,
       input.db,
-      scope.organizationId,
+      scope.workspaceId,
       input.context,
     );
     services.scheduleChannelActivityClear(input.env, completed, input.context);
     services.scheduleWhatsAppOutboxFlush(input.env, input.db, input.context);
     // A reply queued behind this one in the same session only becomes
     // claimable now, so wake instead of leaving it to the next idle poll.
-    services.wakeOrganizationWorkers(
+    services.wakeWorkspaceWorkers(
       input.env,
-      scope.organizationId,
+      scope.workspaceId,
       "channel_reply_completed",
       input.context,
     );

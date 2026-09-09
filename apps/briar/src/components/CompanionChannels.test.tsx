@@ -7,14 +7,14 @@ import { I18nProvider } from "../i18n";
 import { RegistryContext } from "@effect/atom-react";
 import { createTestRegistry } from "../state/registry";
 import { channelCatalogCursorAtom } from "../state/channels/atoms";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import { applySyncEvent } from "../state/sync/apply";
 import type { ChannelSummary } from "../lib/channels-contract";
 import { CompanionChannels } from "./CompanionChannels";
 
 const selectedChannel: ChannelSummary = {
   id: "channel-1",
-  organizationId: "org-1",
+  workspaceId: "org-1",
   slug: "general",
   name: "General",
   topic: null,
@@ -40,7 +40,7 @@ const selectedChannel: ChannelSummary = {
 
 const channelSummaryWire = (channel: ChannelSummary) => ({
   id: channel.id,
-  workspaceId: channel.organizationId,
+  workspaceId: channel.workspaceId,
   slug: channel.slug,
   name: channel.name,
   visibility: 1,
@@ -105,7 +105,7 @@ describe("CompanionChannels", () => {
           activeProjectId={null}
           currentUserId="user-1"
           onLobbyOpen={onLobbyOpen}
-          organizationId="org-1"
+          workspaceId="org-1"
           projects={[]}
           token="token"
         />
@@ -127,12 +127,12 @@ describe("CompanionChannels", () => {
     // The list is the shared catalog's, not a fetch this screen makes, so the
     // case seeds the catalog the way `useChannelCatalogSync` would have.
     const registry = createTestRegistry([
-      [activeOrganizationIdAtom, "org-1"],
+      [activeWorkspaceIdAtom, "org-1"],
       [channelCatalogCursorAtom, 1],
     ]);
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-1",
+      workspaceId: "org-1",
       channels: [selectedChannel],
     });
     await renderReactTestRoot(
@@ -142,7 +142,7 @@ describe("CompanionChannels", () => {
         <CompanionChannels
           activeProjectId={null}
           currentUserId="user-1"
-          organizationId="org-1"
+          workspaceId="org-1"
           projects={[]}
           token="token"
         />
@@ -181,12 +181,12 @@ describe("CompanionChannels", () => {
   it("groups the shared catalog without asking for it again", async () => {
     const { cleanup, container, root } = createReactTestRoot();
     const registry = createTestRegistry([
-      [activeOrganizationIdAtom, "org-1"],
+      [activeWorkspaceIdAtom, "org-1"],
       [channelCatalogCursorAtom, 1],
     ]);
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-1",
+      workspaceId: "org-1",
       channels: [
         selectedChannel,
         { ...selectedChannel, id: "channel-2", name: "Web", defaultProjectId: "project-1" },
@@ -200,7 +200,7 @@ describe("CompanionChannels", () => {
           <CompanionChannels
             activeProjectId="project-1"
             currentUserId="user-1"
-            organizationId="org-1"
+            workspaceId="org-1"
             projects={[{ id: "project-1", name: "Briar web" }]}
             token="token"
           />

@@ -5,7 +5,7 @@ import { startDashboardPolling } from "../../lib/dashboard-polling";
 import { boardSourceAtom } from "../board/atoms";
 import { activePlanningProjectIdAtom } from "../dialogs/atoms";
 import { companionStatusAtom } from "../navigation/atoms";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { adoptsHydratedSession } from "../persistence/hydration";
 import { companionMode, demoMode } from "../platform";
 import { useRegistry } from "../registry";
@@ -16,7 +16,7 @@ import { useTeamSyncLoader } from "./loader";
 
 /**
  * Keeps the selected team's dashboard in sync, and keeps the store scoped to
- * the session and organization it belongs to.
+ * the session and workspace it belongs to.
  *
  * These were four `useEffect` blocks in `useBriar`: the poll / visibility /
  * online triggers, the request invalidation on a selection change, and the two
@@ -32,7 +32,7 @@ export function useTeamSync() {
   const activePlanningProjectId = useAtomValue(activePlanningProjectIdAtom);
   const boardSource = useAtomValue(boardSourceAtom);
   const companionStatus = useAtomValue(companionStatusAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const previousToken = useRef<string | null | undefined>(undefined);
   const previousMobileFilter = useRef<string | null>(null);
 
@@ -52,15 +52,15 @@ export function useTeamSync() {
     applySyncEvent(registry, { kind: "session-cleared" });
   }, [registry, token]);
 
-  // …and organization scoped: leaving an organization drops every team that
-  // belongs to it. Demo mode has no organization switch to follow.
+  // …and workspace scoped: leaving a workspace drops every team that
+  // belongs to it. Demo mode has no workspace switch to follow.
   useEffect(() => {
     if (demoMode) return;
     applySyncEvent(registry, {
-      kind: "organization-left",
-      retainedOrganizationId: activeOrganizationId,
+      kind: "workspace-left",
+      retainedWorkspaceId: activeWorkspaceId,
     });
-  }, [activeOrganizationId, registry]);
+  }, [activeWorkspaceId, registry]);
 
   // A selection or session change invalidates every request in flight, so a
   // response cannot land under the identity that replaced it.

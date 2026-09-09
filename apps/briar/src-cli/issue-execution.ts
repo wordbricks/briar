@@ -251,10 +251,10 @@ async function runClaimedIssueInRuntime(
     );
     return;
   }
-  const organizationId = activeProject.executionWorker?.organizationId;
-  if (!organizationId) {
+  const workspaceId = activeProject.executionWorker?.workspaceId;
+  if (!workspaceId) {
     await failInvalidExecutionProfile(
-      "The active Worker configuration does not bind the claimed project to an organization.",
+      "The active Worker configuration does not bind the claimed project to a workspace.",
     );
     return;
   }
@@ -266,7 +266,7 @@ async function runClaimedIssueInRuntime(
     detachedAgent = detachedIssueExecutionAgent({
       agent: logicalAgent,
       runId: issue.runId,
-      organizationId,
+      workspaceId,
       projectId: project.id,
       provider: execution.provider,
       model: execution.model,
