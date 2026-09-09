@@ -170,7 +170,7 @@ const requireOrganizationRead = async (db: D1Database, organizationId: string, u
   }
 };
 
-export async function listOrganizationUsageRunsApplication(
+export async function listWorkspaceUsageRunsApplication(
   input: {
     readonly db: D1Database;
     readonly organizationId: string;

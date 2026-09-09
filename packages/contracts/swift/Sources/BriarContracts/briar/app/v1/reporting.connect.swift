@@ -15,7 +15,7 @@ import SwiftProtobuf
 public protocol BriarAPI_ReportingServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
-    func `listOrganizationUsageRuns`(request: BriarAPI_ListOrganizationUsageRunsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListOrganizationUsageRunsResponse>
+    func `listWorkspaceUsageRuns`(request: BriarAPI_ListWorkspaceUsageRunsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListWorkspaceUsageRunsResponse>
 
     @available(iOS 13, *)
     func `getProjectUsageSummary`(request: BriarAPI_GetProjectUsageSummaryRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_GetProjectUsageSummaryResponse>
@@ -36,8 +36,8 @@ public final class BriarAPI_ReportingServiceClient: BriarAPI_ReportingServiceCli
     }
 
     @available(iOS 13, *)
-    public func `listOrganizationUsageRuns`(request: BriarAPI_ListOrganizationUsageRunsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListOrganizationUsageRunsResponse> {
-        return await self.client.unary(path: "/briar.app.v1.ReportingService/ListOrganizationUsageRuns", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `listWorkspaceUsageRuns`(request: BriarAPI_ListWorkspaceUsageRunsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListWorkspaceUsageRunsResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ReportingService/ListWorkspaceUsageRuns", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -57,7 +57,7 @@ public final class BriarAPI_ReportingServiceClient: BriarAPI_ReportingServiceCli
 
     public enum Metadata {
         public enum Methods {
-            public static let listOrganizationUsageRuns = Connect.MethodSpec(name: "ListOrganizationUsageRuns", service: "briar.app.v1.ReportingService", type: .unary)
+            public static let listWorkspaceUsageRuns = Connect.MethodSpec(name: "ListWorkspaceUsageRuns", service: "briar.app.v1.ReportingService", type: .unary)
             public static let getProjectUsageSummary = Connect.MethodSpec(name: "GetProjectUsageSummary", service: "briar.app.v1.ReportingService", type: .unary)
             public static let listStatusTrayRuns = Connect.MethodSpec(name: "ListStatusTrayRuns", service: "briar.app.v1.ReportingService", type: .unary)
             public static let getRunCostEstimate = Connect.MethodSpec(name: "GetRunCostEstimate", service: "briar.app.v1.ReportingService", type: .unary)

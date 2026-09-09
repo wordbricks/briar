@@ -1,5 +1,5 @@
 import {
-  OrganizationUsageRange,
+  WorkspaceUsageRange,
   ProjectUsagePeriod,
   ReportingService,
 } from "@briar/contracts/gen/briar/app/v1/reporting_pb";
@@ -16,7 +16,7 @@ import { HttpError } from "./http-response";
 import {
   getProjectUsageSummaryApplication,
   getRunCostEstimateApplication,
-  listOrganizationUsageRunsApplication,
+  listWorkspaceUsageRunsApplication,
   listStatusTrayRunsApplication,
   ReportingApplicationError,
   reportingApplicationServices,
@@ -39,15 +39,15 @@ export type AppConnectReportingInput = {
 
 const decodeUuid = decodeRequestSync(UuidString);
 
-const organizationUsageDays = (range: OrganizationUsageRange): 7 | 30 | 90 => {
+const organizationUsageDays = (range: WorkspaceUsageRange): 7 | 30 | 90 => {
   switch (range) {
-    case OrganizationUsageRange.ORGANIZATION_USAGE_RANGE_7_DAYS:
+    case WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_7_DAYS:
       return decodeUsageRangeDays(7);
-    case OrganizationUsageRange.ORGANIZATION_USAGE_RANGE_30_DAYS:
+    case WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_30_DAYS:
       return decodeUsageRangeDays(30);
-    case OrganizationUsageRange.ORGANIZATION_USAGE_RANGE_90_DAYS:
+    case WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_90_DAYS:
       return decodeUsageRangeDays(90);
-    case OrganizationUsageRange.ORGANIZATION_USAGE_RANGE_UNSPECIFIED:
+    case WorkspaceUsageRange.WORKSPACE_USAGE_RANGE_UNSPECIFIED:
       throw new ConnectError("Organization usage range is required", Code.InvalidArgument);
     default:
       throw new ConnectError(`Unknown organization usage range: ${range}`, Code.InvalidArgument);
@@ -93,13 +93,13 @@ export const createAppReportingService = (
   { request, auth, db }: AppConnectReportingInput,
   services: ReportingApplicationServices = reportingApplicationServices,
 ): ServiceImpl<typeof ReportingService> => ({
-  listOrganizationUsageRuns: async (input) => {
+  listWorkspaceUsageRuns: async (input) => {
     const session = await requireSession(auth, request);
     const result = await withApplicationErrors(
-      listOrganizationUsageRunsApplication(
+      listWorkspaceUsageRunsApplication(
         {
           db,
-          organizationId: decodeUuid(input.organizationId),
+          organizationId: decodeUuid(input.workspaceId),
           userId: session.user.id,
           days: organizationUsageDays(input.range),
         },
@@ -135,7 +135,7 @@ export const createAppReportingService = (
     const result = await withApplicationErrors(
       listStatusTrayRunsApplication({
         db,
-        organizationId: decodeUuid(input.organizationId),
+        organizationId: decodeUuid(input.workspaceId),
         userId: session.user.id,
       }),
     );

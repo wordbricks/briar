@@ -9,7 +9,7 @@ import type {
 } from "../team-usage-summary";
 import { appCallOptions, appTransport } from "./core";
 import {
-  organizationUsageRangeToProto,
+  workspaceUsageRangeToProto,
   organizationUsageReportFromProto,
   projectUsagePeriodToProto,
   projectUsageSummaryFromProto,
@@ -35,8 +35,8 @@ export async function loadAgentUsageReport(
   signal?: AbortSignal,
 ) {
   return organizationUsageReportFromProto(
-    await requireReportingClient().listOrganizationUsageRuns(
-      { organizationId, range: organizationUsageRangeToProto(days) },
+    await requireReportingClient().listWorkspaceUsageRuns(
+      { workspaceId: organizationId, range: workspaceUsageRangeToProto(days) },
       appCallOptions(token, signal),
     ),
   );
@@ -69,7 +69,7 @@ export async function loadStatusTrayRuns(
 ) {
   return statusTrayRunsFromProto(
     await requireReportingClient().listStatusTrayRuns(
-      { organizationId },
+      { workspaceId: organizationId },
       appCallOptions(token, signal),
     ),
   );

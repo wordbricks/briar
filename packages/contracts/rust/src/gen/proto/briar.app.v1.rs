@@ -143172,32 +143172,32 @@ pub const __CREATE_REALTIME_TICKET_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
 };
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
-pub enum OrganizationUsageRange {
-    ORGANIZATION_USAGE_RANGE_UNSPECIFIED = 0i32,
-    ORGANIZATION_USAGE_RANGE_7_DAYS = 1i32,
-    ORGANIZATION_USAGE_RANGE_30_DAYS = 2i32,
-    ORGANIZATION_USAGE_RANGE_90_DAYS = 3i32,
+pub enum WorkspaceUsageRange {
+    WORKSPACE_USAGE_RANGE_UNSPECIFIED = 0i32,
+    WORKSPACE_USAGE_RANGE_7_DAYS = 1i32,
+    WORKSPACE_USAGE_RANGE_30_DAYS = 2i32,
+    WORKSPACE_USAGE_RANGE_90_DAYS = 3i32,
 }
-impl OrganizationUsageRange {
-    ///Idiomatic alias for [`Self::ORGANIZATION_USAGE_RANGE_UNSPECIFIED`]; `Debug` prints the variant name.
+impl WorkspaceUsageRange {
+    ///Idiomatic alias for [`Self::WORKSPACE_USAGE_RANGE_UNSPECIFIED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const OrganizationUsageRangeUnspecified: Self = Self::ORGANIZATION_USAGE_RANGE_UNSPECIFIED;
-    ///Idiomatic alias for [`Self::ORGANIZATION_USAGE_RANGE_7_DAYS`]; `Debug` prints the variant name.
+    pub const WorkspaceUsageRangeUnspecified: Self = Self::WORKSPACE_USAGE_RANGE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::WORKSPACE_USAGE_RANGE_7_DAYS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const OrganizationUsageRange7Days: Self = Self::ORGANIZATION_USAGE_RANGE_7_DAYS;
-    ///Idiomatic alias for [`Self::ORGANIZATION_USAGE_RANGE_30_DAYS`]; `Debug` prints the variant name.
+    pub const WorkspaceUsageRange7Days: Self = Self::WORKSPACE_USAGE_RANGE_7_DAYS;
+    ///Idiomatic alias for [`Self::WORKSPACE_USAGE_RANGE_30_DAYS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const OrganizationUsageRange30Days: Self = Self::ORGANIZATION_USAGE_RANGE_30_DAYS;
-    ///Idiomatic alias for [`Self::ORGANIZATION_USAGE_RANGE_90_DAYS`]; `Debug` prints the variant name.
+    pub const WorkspaceUsageRange30Days: Self = Self::WORKSPACE_USAGE_RANGE_30_DAYS;
+    ///Idiomatic alias for [`Self::WORKSPACE_USAGE_RANGE_90_DAYS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const OrganizationUsageRange90Days: Self = Self::ORGANIZATION_USAGE_RANGE_90_DAYS;
+    pub const WorkspaceUsageRange90Days: Self = Self::WORKSPACE_USAGE_RANGE_90_DAYS;
 }
-impl ::core::default::Default for OrganizationUsageRange {
+impl ::core::default::Default for WorkspaceUsageRange {
     fn default() -> Self {
-        Self::ORGANIZATION_USAGE_RANGE_UNSPECIFIED
+        Self::WORKSPACE_USAGE_RANGE_UNSPECIFIED
     }
 }
-impl ::serde::Serialize for OrganizationUsageRange {
+impl ::serde::Serialize for WorkspaceUsageRange {
     fn serialize<S: ::serde::Serializer>(
         &self,
         s: S,
@@ -143205,13 +143205,13 @@ impl ::serde::Serialize for OrganizationUsageRange {
         s.serialize_str(::buffa::Enumeration::proto_name(self))
     }
 }
-impl<'de> ::serde::Deserialize<'de> for OrganizationUsageRange {
+impl<'de> ::serde::Deserialize<'de> for WorkspaceUsageRange {
     fn deserialize<D: ::serde::Deserializer<'de>>(
         d: D,
     ) -> ::core::result::Result<Self, D::Error> {
         struct _V;
         impl ::serde::de::Visitor<'_> for _V {
-            type Value = OrganizationUsageRange;
+            type Value = WorkspaceUsageRange;
             fn expecting(
                 &self,
                 f: &mut ::core::fmt::Formatter<'_>,
@@ -143219,28 +143219,28 @@ impl<'de> ::serde::Deserialize<'de> for OrganizationUsageRange {
                 f.write_str(
                     concat!(
                         "a string, integer, or null for ",
-                        stringify!(OrganizationUsageRange)
+                        stringify!(WorkspaceUsageRange)
                     ),
                 )
             }
             fn visit_str<E: ::serde::de::Error>(
                 self,
                 v: &str,
-            ) -> ::core::result::Result<OrganizationUsageRange, E> {
-                <OrganizationUsageRange as ::buffa::Enumeration>::from_proto_name(v)
+            ) -> ::core::result::Result<WorkspaceUsageRange, E> {
+                <WorkspaceUsageRange as ::buffa::Enumeration>::from_proto_name(v)
                     .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
             }
             fn visit_i64<E: ::serde::de::Error>(
                 self,
                 v: i64,
-            ) -> ::core::result::Result<OrganizationUsageRange, E> {
+            ) -> ::core::result::Result<WorkspaceUsageRange, E> {
                 let v32 = i32::try_from(v)
                     .map_err(|_| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("enum value {v} out of i32 range"),
                         )
                     })?;
-                <OrganizationUsageRange as ::buffa::Enumeration>::from_i32(v32)
+                <WorkspaceUsageRange as ::buffa::Enumeration>::from_i32(v32)
                     .ok_or_else(|| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("unknown enum value {v32}"),
@@ -143250,14 +143250,14 @@ impl<'de> ::serde::Deserialize<'de> for OrganizationUsageRange {
             fn visit_u64<E: ::serde::de::Error>(
                 self,
                 v: u64,
-            ) -> ::core::result::Result<OrganizationUsageRange, E> {
+            ) -> ::core::result::Result<WorkspaceUsageRange, E> {
                 let v32 = i32::try_from(v)
                     .map_err(|_| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("enum value {v} out of i32 range"),
                         )
                     })?;
-                <OrganizationUsageRange as ::buffa::Enumeration>::from_i32(v32)
+                <WorkspaceUsageRange as ::buffa::Enumeration>::from_i32(v32)
                     .ok_or_else(|| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("unknown enum value {v32}"),
@@ -143266,14 +143266,14 @@ impl<'de> ::serde::Deserialize<'de> for OrganizationUsageRange {
             }
             fn visit_unit<E: ::serde::de::Error>(
                 self,
-            ) -> ::core::result::Result<OrganizationUsageRange, E> {
+            ) -> ::core::result::Result<WorkspaceUsageRange, E> {
                 ::core::result::Result::Ok(::core::default::Default::default())
             }
         }
         d.deserialize_any(_V)
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for OrganizationUsageRange {
+impl ::buffa::json_helpers::ProtoElemJson for WorkspaceUsageRange {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -143286,15 +143286,13 @@ impl ::buffa::json_helpers::ProtoElemJson for OrganizationUsageRange {
         <Self as ::serde::Deserialize>::deserialize(d)
     }
 }
-impl ::buffa::Enumeration for OrganizationUsageRange {
+impl ::buffa::Enumeration for WorkspaceUsageRange {
     fn from_i32(value: i32) -> ::core::option::Option<Self> {
         match value {
-            0i32 => {
-                ::core::option::Option::Some(Self::ORGANIZATION_USAGE_RANGE_UNSPECIFIED)
-            }
-            1i32 => ::core::option::Option::Some(Self::ORGANIZATION_USAGE_RANGE_7_DAYS),
-            2i32 => ::core::option::Option::Some(Self::ORGANIZATION_USAGE_RANGE_30_DAYS),
-            3i32 => ::core::option::Option::Some(Self::ORGANIZATION_USAGE_RANGE_90_DAYS),
+            0i32 => ::core::option::Option::Some(Self::WORKSPACE_USAGE_RANGE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::WORKSPACE_USAGE_RANGE_7_DAYS),
+            2i32 => ::core::option::Option::Some(Self::WORKSPACE_USAGE_RANGE_30_DAYS),
+            3i32 => ::core::option::Option::Some(Self::WORKSPACE_USAGE_RANGE_90_DAYS),
             _ => ::core::option::Option::None,
         }
     }
@@ -143303,37 +143301,37 @@ impl ::buffa::Enumeration for OrganizationUsageRange {
     }
     fn proto_name(&self) -> &'static str {
         match self {
-            Self::ORGANIZATION_USAGE_RANGE_UNSPECIFIED => {
-                "ORGANIZATION_USAGE_RANGE_UNSPECIFIED"
+            Self::WORKSPACE_USAGE_RANGE_UNSPECIFIED => {
+                "WORKSPACE_USAGE_RANGE_UNSPECIFIED"
             }
-            Self::ORGANIZATION_USAGE_RANGE_7_DAYS => "ORGANIZATION_USAGE_RANGE_7_DAYS",
-            Self::ORGANIZATION_USAGE_RANGE_30_DAYS => "ORGANIZATION_USAGE_RANGE_30_DAYS",
-            Self::ORGANIZATION_USAGE_RANGE_90_DAYS => "ORGANIZATION_USAGE_RANGE_90_DAYS",
+            Self::WORKSPACE_USAGE_RANGE_7_DAYS => "WORKSPACE_USAGE_RANGE_7_DAYS",
+            Self::WORKSPACE_USAGE_RANGE_30_DAYS => "WORKSPACE_USAGE_RANGE_30_DAYS",
+            Self::WORKSPACE_USAGE_RANGE_90_DAYS => "WORKSPACE_USAGE_RANGE_90_DAYS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
         match name {
-            "ORGANIZATION_USAGE_RANGE_UNSPECIFIED" => {
-                ::core::option::Option::Some(Self::ORGANIZATION_USAGE_RANGE_UNSPECIFIED)
+            "WORKSPACE_USAGE_RANGE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::WORKSPACE_USAGE_RANGE_UNSPECIFIED)
             }
-            "ORGANIZATION_USAGE_RANGE_7_DAYS" => {
-                ::core::option::Option::Some(Self::ORGANIZATION_USAGE_RANGE_7_DAYS)
+            "WORKSPACE_USAGE_RANGE_7_DAYS" => {
+                ::core::option::Option::Some(Self::WORKSPACE_USAGE_RANGE_7_DAYS)
             }
-            "ORGANIZATION_USAGE_RANGE_30_DAYS" => {
-                ::core::option::Option::Some(Self::ORGANIZATION_USAGE_RANGE_30_DAYS)
+            "WORKSPACE_USAGE_RANGE_30_DAYS" => {
+                ::core::option::Option::Some(Self::WORKSPACE_USAGE_RANGE_30_DAYS)
             }
-            "ORGANIZATION_USAGE_RANGE_90_DAYS" => {
-                ::core::option::Option::Some(Self::ORGANIZATION_USAGE_RANGE_90_DAYS)
+            "WORKSPACE_USAGE_RANGE_90_DAYS" => {
+                ::core::option::Option::Some(Self::WORKSPACE_USAGE_RANGE_90_DAYS)
             }
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
         &[
-            Self::ORGANIZATION_USAGE_RANGE_UNSPECIFIED,
-            Self::ORGANIZATION_USAGE_RANGE_7_DAYS,
-            Self::ORGANIZATION_USAGE_RANGE_30_DAYS,
-            Self::ORGANIZATION_USAGE_RANGE_90_DAYS,
+            Self::WORKSPACE_USAGE_RANGE_UNSPECIFIED,
+            Self::WORKSPACE_USAGE_RANGE_7_DAYS,
+            Self::WORKSPACE_USAGE_RANGE_30_DAYS,
+            Self::WORKSPACE_USAGE_RANGE_90_DAYS,
         ]
     }
 }
@@ -147800,49 +147798,49 @@ pub const __AGENT_USAGE_RUN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ListOrganizationUsageRunsRequest {
-    /// Field 1: `organization_id`
+pub struct ListWorkspaceUsageRunsRequest {
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     /// Field 2: `range`
     #[serde(
         rename = "range",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub range: ::buffa::EnumValue<OrganizationUsageRange>,
+    pub range: ::buffa::EnumValue<WorkspaceUsageRange>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ListOrganizationUsageRunsRequest {
+impl ::core::fmt::Debug for ListWorkspaceUsageRunsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListOrganizationUsageRunsRequest")
-            .field("organization_id", &self.organization_id)
+        f.debug_struct("ListWorkspaceUsageRunsRequest")
+            .field("workspace_id", &self.workspace_id)
             .field("range", &self.range)
             .finish()
     }
 }
-impl ListOrganizationUsageRunsRequest {
+impl ListWorkspaceUsageRunsRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationUsageRunsRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceUsageRunsRequest";
 }
-::buffa::impl_default_instance!(ListOrganizationUsageRunsRequest);
-impl ::buffa::MessageName for ListOrganizationUsageRunsRequest {
+::buffa::impl_default_instance!(ListWorkspaceUsageRunsRequest);
+impl ::buffa::MessageName for ListWorkspaceUsageRunsRequest {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ListOrganizationUsageRunsRequest";
-    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationUsageRunsRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationUsageRunsRequest";
+    const NAME: &'static str = "ListWorkspaceUsageRunsRequest";
+    const FULL_NAME: &'static str = "briar.app.v1.ListWorkspaceUsageRunsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceUsageRunsRequest";
 }
-impl ::buffa::Message for ListOrganizationUsageRunsRequest {
+impl ::buffa::Message for ListWorkspaceUsageRunsRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -147855,10 +147853,8 @@ impl ::buffa::Message for ListOrganizationUsageRunsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         {
             let val = self.range.to_i32();
@@ -147876,8 +147872,8 @@ impl ::buffa::Message for ListOrganizationUsageRunsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         {
             let val = self.range.to_i32();
@@ -147903,7 +147899,7 @@ impl ::buffa::Message for ListOrganizationUsageRunsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -147922,13 +147918,13 @@ impl ::buffa::Message for ListOrganizationUsageRunsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.range = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ListOrganizationUsageRunsRequest {
-    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationUsageRunsRequest";
+impl ::buffa::ExtensionSet for ListWorkspaceUsageRunsRequest {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListWorkspaceUsageRunsRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -147936,7 +147932,7 @@ impl ::buffa::ExtensionSet for ListOrganizationUsageRunsRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationUsageRunsRequest {
+impl ::buffa::json_helpers::ProtoElemJson for ListWorkspaceUsageRunsRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -147950,16 +147946,16 @@ impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationUsageRunsRequest {
     }
 }
 #[doc(hidden)]
-pub const __LIST_ORGANIZATION_USAGE_RUNS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationUsageRunsRequest",
-    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationUsageRunsRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<ListOrganizationUsageRunsRequest>,
+pub const __LIST_WORKSPACE_USAGE_RUNS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListWorkspaceUsageRunsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListWorkspaceUsageRunsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListWorkspaceUsageRunsRequest>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct ListOrganizationUsageRunsResponse {
+pub struct ListWorkspaceUsageRunsResponse {
     /// Field 1: `runs`
     #[serde(
         rename = "runs",
@@ -147990,30 +147986,30 @@ pub struct ListOrganizationUsageRunsResponse {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for ListOrganizationUsageRunsResponse {
+impl ::core::fmt::Debug for ListWorkspaceUsageRunsResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListOrganizationUsageRunsResponse")
+        f.debug_struct("ListWorkspaceUsageRunsResponse")
             .field("runs", &self.runs)
             .field("generated_at", &self.generated_at)
             .field("pricing", &self.pricing)
             .finish()
     }
 }
-impl ListOrganizationUsageRunsResponse {
+impl ListWorkspaceUsageRunsResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationUsageRunsResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceUsageRunsResponse";
 }
-::buffa::impl_default_instance!(ListOrganizationUsageRunsResponse);
-impl ::buffa::MessageName for ListOrganizationUsageRunsResponse {
+::buffa::impl_default_instance!(ListWorkspaceUsageRunsResponse);
+impl ::buffa::MessageName for ListWorkspaceUsageRunsResponse {
     const PACKAGE: &'static str = "briar.app.v1";
-    const NAME: &'static str = "ListOrganizationUsageRunsResponse";
-    const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationUsageRunsResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationUsageRunsResponse";
+    const NAME: &'static str = "ListWorkspaceUsageRunsResponse";
+    const FULL_NAME: &'static str = "briar.app.v1.ListWorkspaceUsageRunsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceUsageRunsResponse";
 }
-impl ::buffa::Message for ListOrganizationUsageRunsResponse {
+impl ::buffa::Message for ListWorkspaceUsageRunsResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -148145,8 +148141,8 @@ impl ::buffa::Message for ListOrganizationUsageRunsResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for ListOrganizationUsageRunsResponse {
-    const PROTO_FQN: &'static str = "briar.app.v1.ListOrganizationUsageRunsResponse";
+impl ::buffa::ExtensionSet for ListWorkspaceUsageRunsResponse {
+    const PROTO_FQN: &'static str = "briar.app.v1.ListWorkspaceUsageRunsResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -148154,7 +148150,7 @@ impl ::buffa::ExtensionSet for ListOrganizationUsageRunsResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationUsageRunsResponse {
+impl ::buffa::json_helpers::ProtoElemJson for ListWorkspaceUsageRunsResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -148168,12 +148164,10 @@ impl ::buffa::json_helpers::ProtoElemJson for ListOrganizationUsageRunsResponse 
     }
 }
 #[doc(hidden)]
-pub const __LIST_ORGANIZATION_USAGE_RUNS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/briar.app.v1.ListOrganizationUsageRunsResponse",
-    to_json: ::buffa::type_registry::any_to_json::<ListOrganizationUsageRunsResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<
-        ListOrganizationUsageRunsResponse,
-    >,
+pub const __LIST_WORKSPACE_USAGE_RUNS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.ListWorkspaceUsageRunsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListWorkspaceUsageRunsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListWorkspaceUsageRunsResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -149692,14 +149686,14 @@ pub const __STATUS_TRAY_RUN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListStatusTrayRunsRequest {
-    /// Field 1: `organization_id`
+    /// Field 1: `workspace_id`
     #[serde(
-        rename = "organizationId",
-        alias = "organization_id",
+        rename = "workspaceId",
+        alias = "workspace_id",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub organization_id: ::buffa::alloc::string::String,
+    pub workspace_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -149707,7 +149701,7 @@ pub struct ListStatusTrayRunsRequest {
 impl ::core::fmt::Debug for ListStatusTrayRunsRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListStatusTrayRunsRequest")
-            .field("organization_id", &self.organization_id)
+            .field("workspace_id", &self.workspace_id)
             .finish()
     }
 }
@@ -149738,10 +149732,8 @@ impl ::buffa::Message for ListStatusTrayRunsRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.organization_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.organization_id) as u64;
+        if !self.workspace_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.workspace_id) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -149753,8 +149745,8 @@ impl ::buffa::Message for ListStatusTrayRunsRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.organization_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+        if !self.workspace_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -149774,7 +149766,7 @@ impl ::buffa::Message for ListStatusTrayRunsRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.organization_id, buf)?;
+                ::buffa::types::merge_string(&mut self.workspace_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -149784,7 +149776,7 @@ impl ::buffa::Message for ListStatusTrayRunsRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.organization_id.clear();
+        self.workspace_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -372130,15 +372122,15 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ListOrganizationUsageRunsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+        pub struct ListWorkspaceUsageRunsRequestView<'a> {
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             /// Field 2: `range`
-            pub range: ::buffa::EnumValue<super::super::OrganizationUsageRange>,
+            pub range: ::buffa::EnumValue<super::super::WorkspaceUsageRange>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ListOrganizationUsageRunsRequestView<'a> {
-            type Owned = super::super::ListOrganizationUsageRunsRequest;
+        impl<'a> ::buffa::MessageView<'a> for ListWorkspaceUsageRunsRequestView<'a> {
+            type Owned = super::super::ListWorkspaceUsageRunsRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -372174,7 +372166,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -372197,7 +372189,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ListOrganizationUsageRunsRequest,
+                super::super::ListWorkspaceUsageRunsRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -372207,14 +372199,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ListOrganizationUsageRunsRequest,
+                super::super::ListWorkspaceUsageRunsRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ListOrganizationUsageRunsRequest {
-                    organization_id: self.organization_id.to_string(),
+                ::core::result::Result::Ok(super::super::ListWorkspaceUsageRunsRequest {
+                    workspace_id: self.workspace_id.to_string(),
                     range: self.range,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -372224,16 +372216,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationUsageRunsRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for ListWorkspaceUsageRunsRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 {
@@ -372253,8 +372245,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 {
                     let val = self.range.to_i32();
@@ -372276,15 +372268,15 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ListOrganizationUsageRunsRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for ListWorkspaceUsageRunsRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.range) {
                     __map.serialize_entry("range", &self.range)?;
@@ -372292,24 +372284,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ListOrganizationUsageRunsRequestView<'a> {
+        impl<'a> ::buffa::MessageName for ListWorkspaceUsageRunsRequestView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ListOrganizationUsageRunsRequest";
-            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationUsageRunsRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationUsageRunsRequest";
+            const NAME: &'static str = "ListWorkspaceUsageRunsRequest";
+            const FULL_NAME: &'static str = "briar.app.v1.ListWorkspaceUsageRunsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceUsageRunsRequest";
         }
-        ::buffa::impl_default_view_instance!(ListOrganizationUsageRunsRequestView);
-        ::buffa::impl_view_reborrow!(ListOrganizationUsageRunsRequestView);
-        /** Self-contained, `'static` owned view of a `ListOrganizationUsageRunsRequest` message.
+        ::buffa::impl_default_view_instance!(ListWorkspaceUsageRunsRequestView);
+        ::buffa::impl_view_reborrow!(ListWorkspaceUsageRunsRequestView);
+        /** Self-contained, `'static` owned view of a `ListWorkspaceUsageRunsRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationUsageRunsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`ListWorkspaceUsageRunsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationUsageRunsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListWorkspaceUsageRunsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ListOrganizationUsageRunsRequestOwnedView(
-            ::buffa::OwnedView<ListOrganizationUsageRunsRequestView<'static>>,
+        pub struct ListWorkspaceUsageRunsRequestOwnedView(
+            ::buffa::OwnedView<ListWorkspaceUsageRunsRequestView<'static>>,
         );
-        impl ListOrganizationUsageRunsRequestOwnedView {
+        impl ListWorkspaceUsageRunsRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -372323,7 +372315,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationUsageRunsRequestOwnedView(
+                    ListWorkspaceUsageRunsRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -372340,7 +372332,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationUsageRunsRequestOwnedView(
+                    ListWorkspaceUsageRunsRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -372354,17 +372346,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ListOrganizationUsageRunsRequest,
+                msg: &super::super::ListWorkspaceUsageRunsRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationUsageRunsRequestOwnedView(
+                    ListWorkspaceUsageRunsRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`ListOrganizationUsageRunsRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`ListWorkspaceUsageRunsRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ListOrganizationUsageRunsRequestView<'_> {
+            pub fn view(&self) -> &ListWorkspaceUsageRunsRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -372377,7 +372369,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::ListOrganizationUsageRunsRequest {
+            ) -> super::super::ListWorkspaceUsageRunsRequest {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -372390,48 +372382,48 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
             /// Field 2: `range`
             #[must_use]
             pub fn range(
                 &self,
-            ) -> ::buffa::EnumValue<super::super::OrganizationUsageRange> {
+            ) -> ::buffa::EnumValue<super::super::WorkspaceUsageRange> {
                 self.0.reborrow().range
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<ListOrganizationUsageRunsRequestView<'static>>,
-        > for ListOrganizationUsageRunsRequestOwnedView {
+            ::buffa::OwnedView<ListWorkspaceUsageRunsRequestView<'static>>,
+        > for ListWorkspaceUsageRunsRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<ListOrganizationUsageRunsRequestView<'static>>,
+                inner: ::buffa::OwnedView<ListWorkspaceUsageRunsRequestView<'static>>,
             ) -> Self {
-                ListOrganizationUsageRunsRequestOwnedView(inner)
+                ListWorkspaceUsageRunsRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ListOrganizationUsageRunsRequestOwnedView>
-        for ::buffa::OwnedView<ListOrganizationUsageRunsRequestView<'static>> {
-            fn from(wrapper: ListOrganizationUsageRunsRequestOwnedView) -> Self {
+        impl ::core::convert::From<ListWorkspaceUsageRunsRequestOwnedView>
+        for ::buffa::OwnedView<ListWorkspaceUsageRunsRequestView<'static>> {
+            fn from(wrapper: ListWorkspaceUsageRunsRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ListOrganizationUsageRunsRequestView<'static>>,
-        > for ListOrganizationUsageRunsRequestOwnedView {
+            ::buffa::OwnedView<ListWorkspaceUsageRunsRequestView<'static>>,
+        > for ListWorkspaceUsageRunsRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<ListOrganizationUsageRunsRequestView<'static>> {
+            ) -> &::buffa::OwnedView<ListWorkspaceUsageRunsRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::ListOrganizationUsageRunsRequest {
-            type View<'a> = ListOrganizationUsageRunsRequestView<'a>;
-            type ViewHandle = ListOrganizationUsageRunsRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::ListWorkspaceUsageRunsRequest {
+            type View<'a> = ListWorkspaceUsageRunsRequestView<'a>;
+            type ViewHandle = ListWorkspaceUsageRunsRequestOwnedView;
         }
-        impl ::serde::Serialize for ListOrganizationUsageRunsRequestOwnedView {
+        impl ::serde::Serialize for ListWorkspaceUsageRunsRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -372440,7 +372432,7 @@ pub mod __buffa {
             }
         }
         #[derive(Clone, Debug, Default)]
-        pub struct ListOrganizationUsageRunsResponseView<'a> {
+        pub struct ListWorkspaceUsageRunsResponseView<'a> {
             /// Field 1: `runs`
             pub runs: ::buffa::RepeatedView<
                 'a,
@@ -372456,8 +372448,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for ListOrganizationUsageRunsResponseView<'a> {
-            type Owned = super::super::ListOrganizationUsageRunsResponse;
+        impl<'a> ::buffa::MessageView<'a> for ListWorkspaceUsageRunsResponseView<'a> {
+            type Owned = super::super::ListWorkspaceUsageRunsResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -372570,7 +372562,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::ListOrganizationUsageRunsResponse,
+                super::super::ListWorkspaceUsageRunsResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -372580,13 +372572,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::ListOrganizationUsageRunsResponse,
+                super::super::ListWorkspaceUsageRunsResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ListOrganizationUsageRunsResponse {
+                ::core::result::Result::Ok(super::super::ListWorkspaceUsageRunsResponse {
                     runs: self
                         .runs
                         .iter()
@@ -372618,7 +372610,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for ListOrganizationUsageRunsResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for ListWorkspaceUsageRunsResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -372697,7 +372689,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ListOrganizationUsageRunsResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for ListWorkspaceUsageRunsResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -372723,24 +372715,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for ListOrganizationUsageRunsResponseView<'a> {
+        impl<'a> ::buffa::MessageName for ListWorkspaceUsageRunsResponseView<'a> {
             const PACKAGE: &'static str = "briar.app.v1";
-            const NAME: &'static str = "ListOrganizationUsageRunsResponse";
-            const FULL_NAME: &'static str = "briar.app.v1.ListOrganizationUsageRunsResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListOrganizationUsageRunsResponse";
+            const NAME: &'static str = "ListWorkspaceUsageRunsResponse";
+            const FULL_NAME: &'static str = "briar.app.v1.ListWorkspaceUsageRunsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.ListWorkspaceUsageRunsResponse";
         }
-        ::buffa::impl_default_view_instance!(ListOrganizationUsageRunsResponseView);
-        ::buffa::impl_view_reborrow!(ListOrganizationUsageRunsResponseView);
-        /** Self-contained, `'static` owned view of a `ListOrganizationUsageRunsResponse` message.
+        ::buffa::impl_default_view_instance!(ListWorkspaceUsageRunsResponseView);
+        ::buffa::impl_view_reborrow!(ListWorkspaceUsageRunsResponseView);
+        /** Self-contained, `'static` owned view of a `ListWorkspaceUsageRunsResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`ListOrganizationUsageRunsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`ListWorkspaceUsageRunsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListOrganizationUsageRunsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListWorkspaceUsageRunsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct ListOrganizationUsageRunsResponseOwnedView(
-            ::buffa::OwnedView<ListOrganizationUsageRunsResponseView<'static>>,
+        pub struct ListWorkspaceUsageRunsResponseOwnedView(
+            ::buffa::OwnedView<ListWorkspaceUsageRunsResponseView<'static>>,
         );
-        impl ListOrganizationUsageRunsResponseOwnedView {
+        impl ListWorkspaceUsageRunsResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -372754,7 +372746,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationUsageRunsResponseOwnedView(
+                    ListWorkspaceUsageRunsResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -372771,7 +372763,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationUsageRunsResponseOwnedView(
+                    ListWorkspaceUsageRunsResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -372785,17 +372777,17 @@ pub mod __buffa {
             /// another [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::ListOrganizationUsageRunsResponse,
+                msg: &super::super::ListWorkspaceUsageRunsResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    ListOrganizationUsageRunsResponseOwnedView(
+                    ListWorkspaceUsageRunsResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`ListOrganizationUsageRunsResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`ListWorkspaceUsageRunsResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &ListOrganizationUsageRunsResponseView<'_> {
+            pub fn view(&self) -> &ListWorkspaceUsageRunsResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -372808,7 +372800,7 @@ pub mod __buffa {
             #[must_use]
             pub fn to_owned_message(
                 &self,
-            ) -> super::super::ListOrganizationUsageRunsResponse {
+            ) -> super::super::ListWorkspaceUsageRunsResponse {
                 self.0.to_owned_message()
             }
             /// The underlying bytes buffer.
@@ -372851,35 +372843,34 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<ListOrganizationUsageRunsResponseView<'static>>,
-        > for ListOrganizationUsageRunsResponseOwnedView {
+            ::buffa::OwnedView<ListWorkspaceUsageRunsResponseView<'static>>,
+        > for ListWorkspaceUsageRunsResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<ListOrganizationUsageRunsResponseView<'static>>,
+                inner: ::buffa::OwnedView<ListWorkspaceUsageRunsResponseView<'static>>,
             ) -> Self {
-                ListOrganizationUsageRunsResponseOwnedView(inner)
+                ListWorkspaceUsageRunsResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<ListOrganizationUsageRunsResponseOwnedView>
-        for ::buffa::OwnedView<ListOrganizationUsageRunsResponseView<'static>> {
-            fn from(wrapper: ListOrganizationUsageRunsResponseOwnedView) -> Self {
+        impl ::core::convert::From<ListWorkspaceUsageRunsResponseOwnedView>
+        for ::buffa::OwnedView<ListWorkspaceUsageRunsResponseView<'static>> {
+            fn from(wrapper: ListWorkspaceUsageRunsResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ListOrganizationUsageRunsResponseView<'static>>,
-        > for ListOrganizationUsageRunsResponseOwnedView {
+            ::buffa::OwnedView<ListWorkspaceUsageRunsResponseView<'static>>,
+        > for ListWorkspaceUsageRunsResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<ListOrganizationUsageRunsResponseView<'static>> {
+            ) -> &::buffa::OwnedView<ListWorkspaceUsageRunsResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView
-        for super::super::ListOrganizationUsageRunsResponse {
-            type View<'a> = ListOrganizationUsageRunsResponseView<'a>;
-            type ViewHandle = ListOrganizationUsageRunsResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::ListWorkspaceUsageRunsResponse {
+            type View<'a> = ListWorkspaceUsageRunsResponseView<'a>;
+            type ViewHandle = ListWorkspaceUsageRunsResponseOwnedView;
         }
-        impl ::serde::Serialize for ListOrganizationUsageRunsResponseOwnedView {
+        impl ::serde::Serialize for ListWorkspaceUsageRunsResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -375429,8 +375420,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListStatusTrayRunsRequestView<'a> {
-            /// Field 1: `organization_id`
-            pub organization_id: &'a str,
+            /// Field 1: `workspace_id`
+            pub workspace_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListStatusTrayRunsRequestView<'a> {
@@ -375470,7 +375461,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.organization_id = ::buffa::types::borrow_str(&mut cur)?;
+                        view.workspace_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -375501,7 +375492,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListStatusTrayRunsRequest {
-                    organization_id: self.organization_id.to_string(),
+                    workspace_id: self.workspace_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -375516,10 +375507,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u64;
-                if !self.organization_id.is_empty() {
+                if !self.workspace_id.is_empty() {
                     size
                         += 1u64
-                            + ::buffa::types::string_encoded_len(&self.organization_id)
+                            + ::buffa::types::string_encoded_len(&self.workspace_id)
                                 as u64;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -375533,8 +375524,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.organization_id.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.organization_id, buf);
+                if !self.workspace_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.workspace_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -375557,8 +375548,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.organization_id) {
-                    __map.serialize_entry("organizationId", self.organization_id)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.workspace_id) {
+                    __map.serialize_entry("workspaceId", self.workspace_id)?;
                 }
                 __map.end()
             }
@@ -375659,10 +375650,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Field 1: `organization_id`
+            /// Field 1: `workspace_id`
             #[must_use]
-            pub fn organization_id(&self) -> &'_ str {
-                self.0.reborrow().organization_id
+            pub fn workspace_id(&self) -> &'_ str {
+                self.0.reborrow().workspace_id
             }
         }
         impl ::core::convert::From<
@@ -380567,8 +380558,8 @@ pub mod __buffa {
         reg.register_json_any(super::__AGENT_USAGE_COST_RECORD_JSON_ANY);
         reg.register_json_any(super::__AGENT_USAGE_ESTIMATED_COST_RECORD_JSON_ANY);
         reg.register_json_any(super::__AGENT_USAGE_RUN_JSON_ANY);
-        reg.register_json_any(super::__LIST_ORGANIZATION_USAGE_RUNS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_ORGANIZATION_USAGE_RUNS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_WORKSPACE_USAGE_RUNS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_WORKSPACE_USAGE_RUNS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__PROJECT_USAGE_TIMELINE_POINT_JSON_ANY);
         reg.register_json_any(super::__PROJECT_USAGE_BREAKDOWN_ITEM_JSON_ANY);
         reg.register_json_any(super::__GET_PROJECT_USAGE_SUMMARY_REQUEST_JSON_ANY);
@@ -382642,13 +382633,13 @@ pub use self::__buffa::view::AgentUsageRunView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentUsageRunOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ListOrganizationUsageRunsRequestView;
+pub use self::__buffa::view::ListWorkspaceUsageRunsRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::ListOrganizationUsageRunsRequestOwnedView;
+pub use self::__buffa::view::ListWorkspaceUsageRunsRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ListOrganizationUsageRunsResponseView;
+pub use self::__buffa::view::ListWorkspaceUsageRunsResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::ListOrganizationUsageRunsResponseOwnedView;
+pub use self::__buffa::view::ListWorkspaceUsageRunsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ProjectUsageTimelinePointView;
 #[doc(inline)]

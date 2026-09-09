@@ -36938,15 +36938,15 @@ where
     }
 }
 
-///Shorthand for `OwnedView<ListOrganizationUsageRunsRequestView<'static>>`.
-pub type OwnedListOrganizationUsageRunsRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsRequestView<
+///Shorthand for `OwnedView<ListWorkspaceUsageRunsRequestView<'static>>`.
+pub type OwnedListWorkspaceUsageRunsRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListWorkspaceUsageRunsRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<ListOrganizationUsageRunsResponseView<'static>>`.
-pub type OwnedListOrganizationUsageRunsResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsResponseView<
+///Shorthand for `OwnedView<ListWorkspaceUsageRunsResponseView<'static>>`.
+pub type OwnedListWorkspaceUsageRunsResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::app::v1::__buffa::view::ListWorkspaceUsageRunsResponseView<
         'static,
     >,
 >;
@@ -36979,11 +36979,9 @@ pub type OwnedGetRunCostEstimateResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::app::v1::__buffa::view::GetRunCostEstimateResponseView<'static>,
 >;
 impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::ListOrganizationUsageRunsResponse,
+    crate::proto::briar::app::v1::ListWorkspaceUsageRunsResponse,
 >
-for crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsResponseView<
-    '_,
-> {
+for crate::proto::briar::app::v1::__buffa::view::ListWorkspaceUsageRunsResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -36992,10 +36990,10 @@ for crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsRespon
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::app::v1::ListOrganizationUsageRunsResponse,
+    crate::proto::briar::app::v1::ListWorkspaceUsageRunsResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsResponseView<
+    crate::proto::briar::app::v1::__buffa::view::ListWorkspaceUsageRunsResponseView<
         'static,
     >,
 > {
@@ -37130,9 +37128,9 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const REPORTING_SERVICE_SERVICE_NAME: &str = "briar.app.v1.ReportingService";
-/// Static [`Spec`](::connectrpc::Spec) for the `ListOrganizationUsageRuns` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const REPORTING_SERVICE_LIST_ORGANIZATION_USAGE_RUNS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.app.v1.ReportingService/ListOrganizationUsageRuns",
+/// Static [`Spec`](::connectrpc::Spec) for the `ListWorkspaceUsageRuns` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const REPORTING_SERVICE_LIST_WORKSPACE_USAGE_RUNS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.app.v1.ReportingService/ListWorkspaceUsageRuns",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -37207,7 +37205,7 @@ pub const REPORTING_SERVICE_GET_RUN_COST_ESTIMATE_SPEC: ::connectrpc::Spec = ::c
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait ReportingService: Send + Sync + 'static {
-    /// Handle the ListOrganizationUsageRuns RPC.
+    /// Handle the ListWorkspaceUsageRuns RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -37216,17 +37214,17 @@ pub trait ReportingService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn list_organization_usage_runs<'a>(
+    fn list_workspace_usage_runs<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::app::v1::ListOrganizationUsageRunsRequest,
+            crate::proto::briar::app::v1::ListWorkspaceUsageRunsRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::app::v1::ListOrganizationUsageRunsResponse,
+                crate::proto::briar::app::v1::ListWorkspaceUsageRunsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -37333,13 +37331,13 @@ impl<S: ReportingService> ReportingServiceExt for S {
         router
             .route_view(
                 REPORTING_SERVICE_SERVICE_NAME,
-                "ListOrganizationUsageRuns",
+                "ListWorkspaceUsageRuns",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsRequestView<
+                            crate::proto::briar::app::v1::__buffa::view::ListWorkspaceUsageRunsRequestView<
                                 'static,
                             >,
                         >,
@@ -37348,18 +37346,18 @@ impl<S: ReportingService> ReportingServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::app::v1::ListOrganizationUsageRunsRequest,
+                                crate::proto::briar::app::v1::ListWorkspaceUsageRunsRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.list_organization_usage_runs(ctx, sreq)
+                            svc.list_workspace_usage_runs(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::app::v1::ListOrganizationUsageRunsResponse,
+                                    crate::proto::briar::app::v1::ListWorkspaceUsageRunsResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(REPORTING_SERVICE_LIST_ORGANIZATION_USAGE_RUNS_SPEC)
+            .with_spec(REPORTING_SERVICE_LIST_WORKSPACE_USAGE_RUNS_SPEC)
             .route_view(
                 REPORTING_SERVICE_SERVICE_NAME,
                 "GetProjectUsageSummary",
@@ -37501,10 +37499,10 @@ impl<T: ReportingService> ::connectrpc::Dispatcher for ReportingServiceServer<T>
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("briar.app.v1.ReportingService/")?;
         match method {
-            "ListOrganizationUsageRuns" => {
+            "ListWorkspaceUsageRuns" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(REPORTING_SERVICE_LIST_ORGANIZATION_USAGE_RUNS_SPEC),
+                        .with_spec(REPORTING_SERVICE_LIST_WORKSPACE_USAGE_RUNS_SPEC),
                 )
             }
             "GetProjectUsageSummary" => {
@@ -37540,25 +37538,25 @@ impl<T: ReportingService> ::connectrpc::Dispatcher for ReportingServiceServer<T>
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "ListOrganizationUsageRuns" => {
+            "ListWorkspaceUsageRuns" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::app::v1::ListOrganizationUsageRunsRequest,
+                        crate::proto::briar::app::v1::ListWorkspaceUsageRunsRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsRequestView<
+                    let req: crate::proto::briar::app::v1::__buffa::view::ListWorkspaceUsageRunsRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::app::v1::ListOrganizationUsageRunsRequest,
+                        crate::proto::briar::app::v1::ListWorkspaceUsageRunsRequest,
                     >::from_parts(&req, &body);
-                    svc.list_organization_usage_runs(ctx, req)
+                    svc.list_workspace_usage_runs(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::app::v1::ListOrganizationUsageRunsResponse,
+                            crate::proto::briar::app::v1::ListWorkspaceUsageRunsResponse,
                         >(format)
                 })
             }
@@ -37695,7 +37693,7 @@ impl<T: ReportingService> ::connectrpc::Dispatcher for ReportingServiceServer<T>
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = ReportingServiceClient::new(conn, config);
-/// let response = client.list_organization_usage_runs(request).await?;
+/// let response = client.list_workspace_usage_runs(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -37707,7 +37705,7 @@ impl<T: ReportingService> ::connectrpc::Dispatcher for ReportingServiceServer<T>
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = ReportingServiceClient::new(http, config);
-/// let response = client.list_organization_usage_runs(request).await?;
+/// let response = client.list_workspace_usage_runs(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -37717,7 +37715,7 @@ impl<T: ReportingService> ::connectrpc::Dispatcher for ReportingServiceServer<T>
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.list_organization_usage_runs(request).await?;
+/// let resp = client.list_workspace_usage_runs(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -37725,7 +37723,7 @@ impl<T: ReportingService> ::connectrpc::Dispatcher for ReportingServiceServer<T>
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.list_organization_usage_runs(request).await?.into_owned();
+/// let owned = client.list_workspace_usage_runs(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -37758,35 +37756,35 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the ListOrganizationUsageRuns RPC. Sends a request to /briar.app.v1.ReportingService/ListOrganizationUsageRuns.
-    pub async fn list_organization_usage_runs(
+    /// Call the ListWorkspaceUsageRuns RPC. Sends a request to /briar.app.v1.ReportingService/ListWorkspaceUsageRuns.
+    pub async fn list_workspace_usage_runs(
         &self,
-        request: crate::proto::briar::app::v1::ListOrganizationUsageRunsRequest,
+        request: crate::proto::briar::app::v1::ListWorkspaceUsageRunsRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::ListWorkspaceUsageRunsResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.list_organization_usage_runs_with_options(
+        self.list_workspace_usage_runs_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the ListOrganizationUsageRuns RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn list_organization_usage_runs_with_options(
+    /// Call the ListWorkspaceUsageRuns RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_workspace_usage_runs_with_options(
         &self,
-        request: crate::proto::briar::app::v1::ListOrganizationUsageRunsRequest,
+        request: crate::proto::briar::app::v1::ListWorkspaceUsageRunsRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::app::v1::__buffa::view::ListOrganizationUsageRunsResponseView<
+                crate::proto::briar::app::v1::__buffa::view::ListWorkspaceUsageRunsResponseView<
                     'static,
                 >,
             >,
@@ -37796,7 +37794,7 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                REPORTING_SERVICE_LIST_ORGANIZATION_USAGE_RUNS_SPEC
+                REPORTING_SERVICE_LIST_WORKSPACE_USAGE_RUNS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
