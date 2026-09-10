@@ -46,7 +46,7 @@ agree with the line above.
 | field | meaning |
 | --- | --- |
 | `triggerToClaim` | the person's message → this Worker's claim |
-| `claimToAck` | claim → the placeholder reaction reached the server |
+| `claimToAck` | claim → the Worker's 👀 placeholder reached the server; absent whenever the server's own emoji was already on the message |
 | `setup`, `firstTurnBoot` | the setup line's `total` and `boot` |
 | `turns` | `{round, ms, result}` per provider round; `result` is `reply`, `memory`, `repository`, `context`, `repair` or `failed` |
 | `post` | last round → the completion RPC returned (settle, publish, complete) |
@@ -60,6 +60,27 @@ channel reply timeline: {"workId":"787f79e0-…","triggerToClaim":251,"claimToAc
 
 A reply that ends in `steered` is claimed again under the same work id; the next
 claim's `triggerToClaim` is the gap the person actually waited through.
+
+## Where the acknowledgement emoji comes from
+
+The acknowledgement exists to say "the Agent read this" *before* the reply
+arrives, so the server chooses it: when a direct message enqueues a reply job,
+the API asks Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) for one
+emoji, giving it the trigger and the two messages before it and nothing else —
+no memory, no attachments, no workspace metadata. The call rides `waitUntil`,
+so it delays neither the message's response nor the Worker wake, and it is
+bounded: about three seconds for the model and four for the whole task, one
+call per user message that enqueued a job. A message folded into a running
+reply as a steer is skipped, because the reply it joined already reacted.
+
+The Worker's 👀 is the fallback for everything that can go wrong above: it is
+published from the claim itself, before routing, the worktree or the memory
+brief. Whichever writes first owns the Agent's slot — a later 👀 never replaces
+a real emoji, while the server's emoji does replace a 👀. The Worker no longer
+runs a provider turn of its own to choose one, so `acknowledgement` in the
+timeline reads `existing` on a healthy DM (the server got there first) and
+`placeholder` when the Worker had to cover for it. Roll the server out before
+the Worker CLI release.
 
 ## One reply's numbers
 

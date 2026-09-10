@@ -56,6 +56,7 @@ import {
   decodeChannelMessageApplicationInput,
 } from "./app-mutation-request-mappers";
 import { sha256 } from "./crypto-digest";
+import { scheduleDmAcknowledgementReaction } from "./dm-acknowledgement-reaction";
 import { wakeWorkspaceWorkers } from "./worker-wake-hub";
 import {
   findChannelMessageMutationReceipt,
@@ -492,6 +493,27 @@ export async function createWorkspaceChannelMessage(
       stopReply ? "channel_reply_completed" : "channel_reply_enqueued",
       input.context,
     );
+  }
+  /*
+    Only after the wake, and never in front of this response: the person is
+    owed the reaction within a couple of seconds, not the wake within four. A
+    message folded into a running reply as a steer is skipped — the reply it
+    joined already reacted on its own trigger.
+  */
+  if (input.env && channel.kind === "dm") {
+    scheduleDmAcknowledgementReaction({
+      env: input.env,
+      db: input.db,
+      workspaceId: input.workspaceId,
+      channelId: channel.id,
+      triggerMessageId: message.id,
+      jobs: agentReplies.flatMap((reply) =>
+        reply.status === "queued" && reply.superseded_by_reply_job_id === null
+          ? [{ id: reply.id, agentId: reply.agent_id }]
+          : []
+      ),
+      context: input.context,
+    });
   }
   return {
     message,

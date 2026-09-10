@@ -2,7 +2,10 @@ import { dmScheduleReplyFenceCurrent } from "./dm-schedule-fence";
 import { dmReplyRoutingAvailable } from "./dm-reply-routing-admission";
 import { dmReplySteerStatements } from "./dm-reply-steer";
 import { workerAgentProviderFromProto } from "./worker-runtime-mappers";
-import { channelAcknowledgementFallbackStatement } from "./channel-acknowledgement-reaction";
+import {
+  CHANNEL_ACKNOWLEDGEMENT_PLACEHOLDER,
+  channelAcknowledgementFallbackStatement,
+} from "./channel-acknowledgement-reaction";
 
 import { dmReplyStopStatements, type DmReplyStop } from "./dm-reply-stop";
 import * as Schema from "effect/Schema";
@@ -4459,7 +4462,11 @@ export async function publishChannelAcknowledgementReaction(
   // One batch, so the INSERT reads the row the DELETE removed and both the
   // reaction triggers and the realtime publish see a single settled state.
   await db.batch([
-    db.prepare(`
+    // The placeholder only ever opens the slot. A Worker that claims a reply
+    // before the server's own emoji reached it publishes 👀 anyway, and that
+    // publication must not take the message back to "read" from whatever the
+    // server, or an earlier attempt, already said.
+    ...(input.emoji === CHANNEL_ACKNOWLEDGEMENT_PLACEHOLDER ? [] : [db.prepare(`
       delete from briar_channel_message_reactions
       where rowid in (
         select current.rowid
@@ -4478,7 +4485,7 @@ export async function publishChannelAcknowledgementReaction(
             where held.message_id = job.trigger_message_id
               and held.agent_id = job.agent_id) = 1
       )
-    `).bind(input.emoji, ...claim),
+    `).bind(input.emoji, ...claim)]),
     // Requesting the emoji the Agent already holds leaves the row untouched,
     // and so does a message this Agent has several reactions on.
     db.prepare(`
@@ -4495,6 +4502,73 @@ export async function publishChannelAcknowledgementReaction(
           where existing.message_id = job.trigger_message_id and existing.agent_id = job.agent_id)
       on conflict do nothing
     `).bind(input.emoji, input.observedAt, ...claim),
+  ]);
+}
+
+/*
+  The server's own act, so there is no claim to authorize it: the reply job has
+  only just been enqueued and no Worker holds it yet. What it still repeats is
+  everything about the target — the job belongs to this Agent, the trigger is a
+  live person's message, and the DM's roster still carries the Agent.
+*/
+const serverAcknowledgementTarget = `
+  job.id = ? and job.agent_id = ?
+    and channel.organization_id = job.organization_id and channel.kind = 'dm'
+    and message.author_user_id is not null and message.deleted_at is null
+    and exists (select 1 from briar_channel_agents roster
+      where roster.channel_id = job.channel_id and roster.agent_id = job.agent_id)`;
+
+/**
+ * Sets the Agent's acknowledgement slot from the server, at message receipt.
+ * It inserts when the Agent has no reaction on the trigger, and replaces the
+ * Worker's 👀 when the Worker got there first. Any other reaction the Agent
+ * holds is deliberate and is left alone, and a person's reaction is never
+ * touched.
+ */
+export async function setChannelAgentAcknowledgementReaction(
+  db: D1Database,
+  input: { jobId: string; agentId: string; emoji: string; observedAt: string },
+) {
+  if (input.emoji.length > 32 || input.emoji !== input.emoji.trim() ||
+      !isChannelReactionEmoji(input.emoji)) throw new Error("Invalid acknowledgement emoji");
+  const target = [input.jobId, input.agentId];
+  // One batch, so the INSERT reads the row the DELETE removed and both the
+  // reaction triggers and the realtime publish see a single settled state.
+  await db.batch([
+    db.prepare(`
+      delete from briar_channel_message_reactions
+      where rowid in (
+        select current.rowid
+        from briar_channel_message_reactions current
+        join briar_channel_agent_reply_jobs job
+          on job.trigger_message_id = current.message_id
+         and job.agent_id = current.agent_id
+        join briar_channels channel on channel.id = job.channel_id
+        join briar_project_agents agent
+          on agent.id = job.agent_id and agent.organization_id = job.organization_id
+        join briar_channel_messages message
+          on message.id = job.trigger_message_id and message.channel_id = channel.id
+        where current.user_id is null and current.emoji = ? and current.emoji <> ?
+          and ${serverAcknowledgementTarget}
+          and (select count(*) from briar_channel_message_reactions held
+            where held.message_id = job.trigger_message_id
+              and held.agent_id = job.agent_id) = 1
+      )
+    `).bind(CHANNEL_ACKNOWLEDGEMENT_PLACEHOLDER, input.emoji, ...target),
+    db.prepare(`
+      insert into briar_channel_message_reactions (message_id, user_id, agent_id, emoji, created_at)
+      select job.trigger_message_id, null, job.agent_id, ?, ?
+      from briar_channel_agent_reply_jobs job
+      join briar_channels channel on channel.id = job.channel_id
+      join briar_project_agents agent
+        on agent.id = job.agent_id and agent.organization_id = job.organization_id
+      join briar_channel_messages message
+        on message.id = job.trigger_message_id and message.channel_id = channel.id
+      where ${serverAcknowledgementTarget}
+        and not exists (select 1 from briar_channel_message_reactions existing
+          where existing.message_id = job.trigger_message_id and existing.agent_id = job.agent_id)
+      on conflict do nothing
+    `).bind(input.emoji, input.observedAt, ...target),
   ]);
 }
 

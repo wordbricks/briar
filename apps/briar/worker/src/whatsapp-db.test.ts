@@ -294,6 +294,9 @@ describe("WhatsApp DM bridge D1 integration", () => {
     const pending: Promise<unknown>[] = [];
     const wakeEnv = {
       ...env,
+      // The DM is owed an acknowledgement emoji too, and the real binding for
+      // it only answers remotely. Nothing here reads the model's answer.
+      DM_MEMORY_AI: { run: async () => ({ response: "" }) },
       WORKER_WAKE: {
         getByName: (name: string) => {
           wakes.push(name);
@@ -319,9 +322,9 @@ describe("WhatsApp DM bridge D1 integration", () => {
 
     await Promise.all(pending.splice(0));
     expect(wakes).toEqual([workspaceId]);
-    // The message path registers nothing else on the context, so this lone
-    // remaining task is the wake itself rather than a dangling promise.
-    expect(pending.length).toBe(1);
+    // The message path defers exactly two things and nothing dangling: the
+    // wake itself, and the acknowledgement emoji this DM is owed at receipt.
+    expect(pending.length).toBe(2);
     await Promise.all(pending.splice(0));
   });
 

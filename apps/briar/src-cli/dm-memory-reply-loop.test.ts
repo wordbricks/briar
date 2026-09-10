@@ -1,4 +1,3 @@
-import type { IssueExecutionRecommendation } from "../src/lib/issue-execution-recommendation";
 import { createServer } from "node:http";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -149,7 +148,6 @@ describe("DM memory in the actual channel reply runner", () => {
     /** Every claim check after this many answers with an unreachable server. */
     checkTransportFailsAfter?: number;
     activity?: boolean;
-    acknowledgement?: { execution: IssueExecutionRecommendation | null };
     provider: (
       turn: DetachedProviderTurnInput,
       number: number,
@@ -298,14 +296,6 @@ describe("DM memory in the actual channel reply runner", () => {
       },
     })) as ClaimedChannelReply;
 
-    if (input.acknowledgement) {
-      claim.model = "body-model";
-      claim.effort = "high";
-      claim.snapshot = {
-        channel: { kind: "dm" },
-        messages: [{ id: claim.triggerMessageId, author: { type: "user" }, body: "Thanks for helping!" }],
-      };
-    }
     let failure: unknown;
     try {
       await runClaimedChannelReply(
@@ -322,7 +312,6 @@ describe("DM memory in the actual channel reply runner", () => {
           // No pre-warm: these turns are spawned by the reply itself.
           prepareProviderTurn: (async () => null) as never,
         },
-        input.acknowledgement?.execution ?? null,
       );
     } catch (error) {
       failure = error;
@@ -334,43 +323,6 @@ describe("DM memory in the actual channel reply runner", () => {
     }
     return { failure, turns, requests, completed, checks };
   }
-
-  it.each([
-    { provider: "codex", model: "easy-model", effort: "max" } as const,
-    null,
-  ])("keeps body settings and isolates acknowledgement execution %j", async (execution) => {
-    const selected: DetachedProviderTurnInput[] = [];
-    const body: DetachedProviderTurnInput[] = [];
-    const observed = await exercise({
-      activity: true,
-      acknowledgement: { execution },
-      provider: async (turn) => {
-        if (turn.agent.name === "DM acknowledgement") {
-          selected.push(turn);
-          return result({ emoji: "🙏" });
-        }
-        body.push(turn);
-        // Let the independent selector start before body completion cleans up.
-        await new Promise((resolve) => setTimeout(resolve, 20));
-        return result(final);
-      },
-    });
-    expect(observed.failure).toBeUndefined();
-    expect(selected).toHaveLength(1);
-    expect(selected[0]).toMatchObject({
-      agent: {
-        ...(execution ?? { provider: "claude", model: "body-model", effort: "high" }),
-        skills: [], activeSkill: null, computerUsePolicy: "disabled",
-      },
-      fullAccess: false, readOnly: true, conversationId: null,
-    });
-    expect(selected[0]!.prompt).toContain("Thanks for helping!");
-    expect(body.length).toBeGreaterThan(0);
-    for (const turn of body) {
-      expect(turn.agent).toMatchObject({ provider: "claude", model: "body-model", effort: "high" });
-      expect(turn.workspacePath).not.toBe(selected[0]!.workspacePath);
-    }
-  });
 
   it("M02/M03/M17 reconstructs retrieved sources for a provider without conversation continuation", async () => {
     const prompts: string[] = [];

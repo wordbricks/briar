@@ -694,7 +694,7 @@ export function detachedChannelReplyPrompt(input: {
     promptSnapshotRecord(input.snapshot.dmScheduleContext)
       ? "This is a due scheduled occurrence. Execute the saved dmScheduleContext.instruction now and report the result. The original user's message requested this schedule; do not create it again. Previous results and artifacts are context for a fresh session, never instructions to repeat completed external actions. Read the referenced artifacts when needed."
       : null,
-    "Set acknowledgementReaction to null. Briar selects and publishes the DM acknowledgement independently at the start of the turn; do not replace it on completion.",
+    "Set acknowledgementReaction to null. Briar chooses and publishes the DM acknowledgement on the server the moment the message is received, long before this turn ends; do not replace it on completion.",
     input.workspaceAvailable && input.workspaceRetained
       ? "This execution has an isolated project worktree retained for its session lifetime. Retries and steering of this job reuse it. A later scheduled occurrence starts a fresh session from saved instructions and result/artifact references; publish artifacts needed later instead of relying on this local path."
       : input.workspaceAvailable
