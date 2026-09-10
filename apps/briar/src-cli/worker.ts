@@ -320,10 +320,10 @@ export function idleDelayWithBackoffMs(
  * How long to wait after an empty claim.
  *
  * A server delay shorter than the base idle delay is a deliberate "come back
- * soon" hint - a DM reply inside its settle window, say - and is honored
- * exactly: stretching it to the poll interval would strand work the server
- * knows is about to be claimable. Anything else keeps the historical
- * behaviour, where the server delay is only ever a floor under the backoff.
+ * soon" hint from the server and is honored exactly: stretching it to the poll
+ * interval would strand work the server knows is about to be claimable.
+ * Anything else keeps the historical behaviour, where the server delay is only
+ * ever a floor under the backoff.
  */
 export function emptyClaimDelayMs(input: {
   serverDelayMs: number | null;

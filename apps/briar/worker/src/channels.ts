@@ -3060,20 +3060,6 @@ export async function getClaimedChannelReplyAttachment(
     .first<ChannelMessageAttachmentRow>();
 }
 
-/**
- * An ordinary conversation turn: the Agent simply answers what the person
- * wrote. A Skill command, a delegated turn, an Agent-to-Agent hop and an
- * approved Skill execution each carry their own contract with the runner, so
- * none of them may be absorbed into a later message or held back by the DM
- * settle window.
- */
-const channelReplyPlainConversationTurn = (job: string) =>
-  `${job}.skill_id is null
-     and ${job}.delegated_by_reply_job_id is null
-     and ${job}.agent_message_hop = 0
-     and ${job}.approved_skill_execution_proposal_id is null`;
-
-
 
 /**
  * One job per mentioned agent, so a message that names two agents gets two
@@ -3572,99 +3558,6 @@ export async function cleanupExpiredChannelReplySessions(
 }
 
 /**
- * How long a queued direct-message conversation turn waits before a Worker may
- * claim it. Someone typing "hi", "quick question", "about the deploy" wants one
- * answer, and the supersede path can only fold those together while they are
- * all still queued — which means the first one must not be claimed the instant
- * it lands.
- */
-export const DM_REPLY_SETTLE_MS = 2_000;
-
-/** The largest and smallest wait a settle-blocked claim asks the Worker for. */
-export const DM_REPLY_SETTLE_MIN_RETRY_MS = 250;
-export const DM_REPLY_SETTLE_MAX_RETRY_MS = 2_000;
-
-/** The configured window, or the default whenever it is absent or nonsense. */
-export const dmReplySettleMs = (configured: unknown) => {
-  const raw = typeof configured === "string" ? configured.trim() : configured;
-  if (raw === "" || raw === null || raw === undefined) {
-    return DM_REPLY_SETTLE_MS;
-  }
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 60_000
-    ? parsed
-    : DM_REPLY_SETTLE_MS;
-};
-
-const dmReplySettleThreshold = (claimedAt: string, settleMs?: number) =>
-  new Date(Date.parse(claimedAt) - (settleMs ?? DM_REPLY_SETTLE_MS))
-    .toISOString();
-
-/**
- * A direct-message conversation turn is claimable only once the settle window
- * has passed. Everything else — Skill commands, delegated turns, Agent-to-Agent
- * hops, approved Skill executions and every channel thread — is claimable the
- * moment it is queued, exactly as before.
- */
-const channelReplySettled = (job: string) => `(
-       ${job}.created_at <= ?
-       or not exists (
-         select 1 from briar_channels settle_channel
-         where settle_channel.id = ${job}.channel_id
-           and settle_channel.kind = 'dm'
-           and ${channelReplyPlainConversationTurn(job)}
-       )
-     )`;
-
-/**
- * How long the caller should wait before asking again, when the only work it
- * could have taken is a direct-message turn still inside its settle window.
- * Null means nothing is waiting and the caller keeps its ordinary idle delay.
- */
-export async function nextChannelReplySettleWaitMs(
-  db: D1Database,
-  workspaceId: string,
-  input: { observedAt: string; settleMs?: number },
-) {
-  const settleMs = input.settleMs ?? DM_REPLY_SETTLE_MS;
-  if (settleMs <= 0) return null;
-  const settleThreshold = dmReplySettleThreshold(input.observedAt, settleMs);
-  const next = await db.prepare(
-    `select min(job.created_at) as earliest
-     from briar_channel_agent_reply_jobs job
-     join briar_channels channel on channel.id = job.channel_id
-     where job.organization_id = ? and job.status = 'queued'
-       and channel.kind = 'dm'
-       and ${channelReplyPlainConversationTurn("job")}
-       and job.created_at > ?
-       and (job.attempts < (? + job.memory_restart_count + job.steer_restart_count) or job.steer_revision > job.applied_steer_revision)
-       and exists (
-         select 1 from briar_channel_agents current_roster
-         where current_roster.channel_id = job.channel_id
-           and current_roster.agent_id = job.agent_id
-       )
-       and not exists (
-         select 1 from briar_channel_agent_reply_jobs active_job
-         where active_job.session_id = job.session_id
-           and active_job.id <> job.id and active_job.status = 'running'
-           and active_job.lease_expires_at > ?
-       )`,
-  ).bind(
-    workspaceId,
-    settleThreshold,
-    MAX_REPLY_ATTEMPTS,
-    input.observedAt,
-  ).first<{ earliest: string | null }>();
-  if (!next?.earliest) return null;
-  const remaining = Date.parse(next.earliest) + settleMs -
-    Date.parse(input.observedAt);
-  return Math.min(
-    DM_REPLY_SETTLE_MAX_RETRY_MS,
-    Math.max(DM_REPLY_SETTLE_MIN_RETRY_MS, Math.ceil(remaining)),
-  );
-}
-
-/**
  * Any enabled binding may host a workspace job. A Project Agent job may
  * only be claimed by the exact binding for that project; device identity alone
  * is insufficient because one device can run several project loops.
@@ -3679,13 +3572,8 @@ export async function claimNextChannelAgentReply(
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
-    settleMs?: number;
   },
 ) {
-  const settleThreshold = dmReplySettleThreshold(
-    input.claimedAt,
-    input.settleMs,
-  );
   // Migration 0092 is a deployment prerequisite, so every claim enforces the
   // saved-Skill snapshot without a runtime compatibility branch.
   const liveSkillSnapshot = (job: string) => `(
@@ -3916,7 +3804,6 @@ export async function claimNextChannelAgentReply(
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))
        and coalesce(job.error, '') <> 'dm_reply_stop_unconfirmed'
-       and ${channelReplySettled("job")}
        and not exists (
          select 1 from briar_channel_agent_reply_jobs active_job
          where active_job.session_id = job.session_id
@@ -3963,7 +3850,6 @@ export async function claimNextChannelAgentReply(
     workspaceId,
     MAX_REPLY_ATTEMPTS,
     input.claimedAt,
-    settleThreshold,
     input.claimedAt,
     input.workerId,
     input.workerId,
@@ -4063,7 +3949,6 @@ export async function claimNextChannelAgentReply(
          and (status = 'queued'
            or (status = 'running' and lease_expires_at <= ?))
          and coalesce(error, '') <> 'dm_reply_stop_unconfirmed'
-         and ${channelReplySettled("briar_channel_agent_reply_jobs")}
          and not exists (
            select 1 from briar_channel_agent_reply_jobs active_job
            where active_job.session_id = briar_channel_agent_reply_jobs.session_id
@@ -4124,7 +4009,6 @@ export async function claimNextChannelAgentReply(
         MAX_REPLY_ATTEMPTS,
         candidate.session_id,
         input.claimedAt,
-        settleThreshold,
         input.claimedAt,
         candidate.session_updated_at,
         candidate.session_owner_worker_id,

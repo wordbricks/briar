@@ -13,8 +13,6 @@ import {
   refreshChannelReplyClaim,
 } from "./channel-reply-claim-routes";
 import {
-  DM_REPLY_SETTLE_MAX_RETRY_MS,
-  DM_REPLY_SETTLE_MIN_RETRY_MS,
   checkpointChannelReplySession,
   completeChannelReply,
   publishChannelAcknowledgementReaction,
@@ -30,7 +28,6 @@ import {
   getClaimedChannelReply,
   getLiveDmChannelReplySession,
   listChannelThreadMessages,
-  nextChannelReplySettleWaitMs,
   renewChannelReplyLease,
 } from "./channels";
 import { createWorkspaceAgent } from "./workspace-agents";
@@ -226,11 +223,11 @@ describe("direct message reply bursts", () => {
   };
 
   /*
-    Messages arrive with the current time, which is exactly what the settle
-    window holds back. Ageing the job is how a test says "the person stopped
-    typing"; the trigger message itself keeps its real timestamp.
+    A job's `created_at` places it in the claim order and inside or outside the
+    30-second steer window, so ageing it is how a test pins the arrangement it
+    means to exercise; the trigger message keeps its real timestamp.
   */
-  const stopTyping = (jobId: string, secondsAgo = 30) =>
+  const ageJob = (jobId: string, secondsAgo = 30) =>
     db.prepare(
       `update briar_channel_agent_reply_jobs set created_at = ? where id = ?`,
     ).bind(
@@ -341,7 +338,7 @@ describe("direct message reply bursts", () => {
     });
     await db.prepare(`insert into briar_channel_message_reactions (message_id, agent_id, emoji, created_at)
       values (?, ?, '👀', ?)`).bind(sent.messageId, otherAgentId, new Date().toISOString()).run();
-    await stopTyping(sent.job.id);
+    await ageJob(sent.job.id);
     const claimed = (await claim())!;
     const cursor = await getChannelSyncCursor(db, workspaceId);
     // The claim publishes the placeholder; the selection replaces it later.
@@ -372,7 +369,7 @@ describe("direct message reply bursts", () => {
   it("leaves the row alone when the selection lands on the placeholder again", async () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "hello");
-    await stopTyping(sent.job.id);
+    await ageJob(sent.job.id);
     const claimed = (await claim())!;
     const rows = () => db.prepare(
       `select emoji, created_at from briar_channel_message_reactions
@@ -396,7 +393,7 @@ describe("direct message reply bursts", () => {
   it("rejects invalid emoji and stale claims without preventing body completion", async () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "thank you");
-    await stopTyping(sent.job.id);
+    await ageJob(sent.job.id);
     const claimed = (await claim())!;
     for (const emoji of ["", "not emoji", "🎉🙏", " 🎉 "]) {
       await expect(react(claimed, emoji)).rejects.toThrow();
@@ -419,7 +416,7 @@ describe("direct message reply bursts", () => {
   it("sets the slot only from the claim token the job currently holds", async () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "thanks");
-    await stopTyping(sent.job.id);
+    await ageJob(sent.job.id);
     const claimed = (await claim())!;
     await Promise.all([react(claimed, "🎉"), react(claimed, "🙏")]);
     const first = (await getChannelMessage(db, channelId, sent.messageId))?.reactions;
@@ -441,7 +438,7 @@ describe("direct message reply bursts", () => {
   it("tells a re-claim which acknowledgement the Agent already holds", async () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "hi");
-    await stopTyping(sent.job.id);
+    await ageJob(sent.job.id);
     const claimed = (await claim())!;
     // A first attempt has nothing on the message, so the runner publishes.
     expect(claimed.acknowledgementReaction).toBeNull();
@@ -458,7 +455,7 @@ describe("direct message reply bursts", () => {
   it.each(["deleted", "agent-authored"])("does not react to a %s trigger", async (kind) => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "thanks");
-    await stopTyping(sent.job.id);
+    await ageJob(sent.job.id);
     const claimed = (await claim())!;
     if (kind === "deleted") {
       await db.prepare("update briar_channel_messages set deleted_at = ? where id = ?")
@@ -476,7 +473,7 @@ describe("direct message reply bursts", () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "hello");
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
-    await stopTyping(sent.job.id);
+    await ageJob(sent.job.id);
     const claimed = (await claim())!;
     expect(await finish(claimed, { acknowledgementReaction: "🙏" })).not.toBeNull();
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions)
@@ -486,7 +483,7 @@ describe("direct message reply bursts", () => {
   it("does not publish after an Agent leaves the DM", async () => {
     const channelId = await freshConversation("dm");
     const sent = await send(channelId, "thanks");
-    await stopTyping(sent.job.id);
+    await ageJob(sent.job.id);
     const claimed = (await claim())!;
     await db.prepare("delete from briar_channel_agents where channel_id = ? and agent_id = ?")
       .bind(channelId, agentId).run();
@@ -598,7 +595,7 @@ describe("direct message reply bursts", () => {
     expect(sent.job).not.toBeNull();
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
     // The Worker's placeholder is the fallback, and it still lands at claim.
-    await stopTyping(sent.job!.id);
+    await ageJob(sent.job!.id);
     const claimed = (await claim())!;
     await react(claimed, "👀");
     expect(await agentReactions(channelId, sent.messageId)).toEqual(["👀"]);
@@ -620,7 +617,7 @@ describe("direct message reply bursts", () => {
     const sent = await sendWithModel(channelId, "thank you so much", chooses("🙏"));
     expect(await agentReactions(channelId, sent.messageId)).toEqual(["🙏"]);
 
-    await stopTyping(sent.job!.id);
+    await ageJob(sent.job!.id);
     const claimed = (await claim())!;
     // The usual case: the claim already carries it and the runner publishes
     // nothing. A Worker that raced the write publishes 👀 anyway, and that
@@ -634,7 +631,7 @@ describe("direct message reply bursts", () => {
   it("replaces the Worker's placeholder when the server's emoji lands second", async () => {
     const channelId = await freshConversation("dm");
     const sent = await sendWithModel(channelId, "hello", silent);
-    await stopTyping(sent.job!.id);
+    await ageJob(sent.job!.id);
     const claimed = (await claim())!;
     await react(claimed, "👀");
     await db.prepare(
@@ -673,7 +670,7 @@ describe("direct message reply bursts", () => {
   it("asks the model nothing for a message folded into a running reply", async () => {
     const channelId = await freshConversation("dm");
     const first = await sendWithModel(channelId, "first input", silent);
-    await stopTyping(first.job!.id, 3);
+    await ageJob(first.job!.id, 3);
     const running = (await claim())!;
     expect(running.workId).toBe(first.job!.id);
 
@@ -714,7 +711,7 @@ describe("direct message reply bursts", () => {
   it("keeps a second direct message in the first message's session", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "hi");
-    await stopTyping(first.job.id);
+    await ageJob(first.job.id);
     const firstClaim = await claim();
     expect(firstClaim?.workId).toBe(first.job.id);
 
@@ -739,7 +736,7 @@ describe("direct message reply bursts", () => {
       });
 
     // One reply at a time in a session: the second turn waits for the first.
-    await stopTyping(second.job.id);
+    await ageJob(second.job.id);
     expect(await claim()).toBeNull();
     await finish(firstClaim!);
     expect((await claim())?.workId).toBe(second.job.id);
@@ -748,7 +745,7 @@ describe("direct message reply bursts", () => {
   it("resumes the provider conversation only for an explicit reply", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "run the deploy check");
-    await stopTyping(first.job.id);
+    await ageJob(first.job.id);
     const firstClaim = await claim();
     expect(firstClaim?.session?.conversationId).toBeNull();
     await checkpointChannelReplySession(db, {
@@ -763,7 +760,7 @@ describe("direct message reply bursts", () => {
 
     // A message the person simply sent starts its own conversation.
     const plain = await send(channelId, "hi");
-    await stopTyping(plain.job.id);
+    await ageJob(plain.job.id);
     const plainClaim = await claim();
     expect(plainClaim?.workId).toBe(plain.job.id);
     expect(plainClaim?.session?.conversationId).toBeNull();
@@ -773,7 +770,7 @@ describe("direct message reply bursts", () => {
     const answer = await send(channelId, "keep going", {
       parentMessageId: first.messageId,
     });
-    await stopTyping(answer.job.id);
+    await ageJob(answer.job.id);
     const answerClaim = await claim();
     expect(answerClaim?.workId).toBe(answer.job.id);
     expect(answerClaim?.session?.conversationId)
@@ -798,7 +795,7 @@ describe("direct message reply bursts", () => {
   it.each([29_999, 30_000, 30_001])("uses the inclusive receive-time boundary at %i ms", async (gap) => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "first input");
-    await stopTyping(first.job.id, 31);
+    await ageJob(first.job.id, 31);
     const running = (await claim())!;
     const next = await send(channelId, "second input");
     const incoming = (await getChannelAgentReplyJob(db, workspaceId, next.job.id))!;
@@ -813,7 +810,7 @@ describe("direct message reply bursts", () => {
   it("slides the window across a burst longer than thirty seconds", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "first");
-    await stopTyping(first.job.id, 31);
+    await ageJob(first.job.id, 31);
     await claim();
     const base = Date.now();
     await db.prepare("update briar_channel_agent_reply_jobs set last_input_at = ? where id = ?")
@@ -837,7 +834,7 @@ describe("direct message reply bursts", () => {
   it("stops the response when a person replies stop to an absorbed input", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "task");
-    await stopTyping(first.job.id, 3);
+    await ageJob(first.job.id, 3);
     const running = (await claim())!;
     const detail = await send(channelId, "detail");
     await send(channelId, "stop", { parentMessageId: detail.messageId });
@@ -851,7 +848,7 @@ describe("direct message reply bursts", () => {
   it("fences the old result and resumes one response with every input and the saved conversation", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "inspect the deployment");
-    await stopTyping(first.job.id, 3);
+    await ageJob(first.job.id, 3);
     const running = (await claim())!;
     await checkpointChannelReplySession(db, {
       jobId: running.workId, deviceId, workerId,
@@ -919,7 +916,7 @@ describe("direct message reply bursts", () => {
   it("folds a steer into the running claim without restarting it", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "ㅎㅇㅎㅇ");
-    await stopTyping(first.job.id, 3);
+    await ageJob(first.job.id, 3);
     const running = (await claim())!;
     expect(running.pendingTriggerMessageIds).toEqual([first.messageId]);
     const second = await send(channelId, "안녕");
@@ -961,7 +958,7 @@ describe("direct message reply bursts", () => {
   it("reports nothing to fold when no input is pending", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "only message");
-    await stopTyping(first.job.id, 3);
+    await ageJob(first.job.id, 3);
     const running = (await claim())!;
     expect(await refresh(running)).toBeNull();
     expect(await getChannelAgentReplyJob(db, workspaceId, running.workId))
@@ -978,7 +975,7 @@ describe("direct message reply bursts", () => {
   it("refuses a fold outside the live claim it is scoped to", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "task");
-    await stopTyping(first.job.id, 3);
+    await ageJob(first.job.id, 3);
     const running = (await claim())!;
     await send(channelId, "detail");
     await expect(refresh(running, {
@@ -1009,7 +1006,7 @@ describe("direct message reply bursts", () => {
     try {
       const channelId = await freshConversation("dm");
       const first = await send(channelId, "publish as you go");
-      await stopTyping(first.job.id, 3);
+      await ageJob(first.job.id, 3);
       const running = (await claim())!;
       expect(running.dmPublicMessageProtocol).toBe(1);
       expect(running.inputRevision).toBe(0);
@@ -1040,7 +1037,7 @@ describe("direct message reply bursts", () => {
   it("keeps messages beyond a gap out of the running response and claims them afterwards", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "first task");
-    await stopTyping(first.job.id, 3);
+    await ageJob(first.job.id, 3);
     const running = (await claim())!;
     await send(channelId, "first task detail");
     expect(await acknowledgeSteer(running)).toBe(true);
@@ -1055,14 +1052,14 @@ describe("direct message reply bursts", () => {
     }
     expect(await acknowledgeSteer(resumed)).toBe(false);
     await finish(resumed);
-    await stopTyping(next.job.id);
+    await ageJob(next.job.id);
     expect((await claim())?.workId).toBe(next.job.id);
   });
 
   it("serializes input arrival against the final answer transaction", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "task");
-    await stopTyping(first.job.id, 3);
+    await ageJob(first.job.id, 3);
     const running = (await claim())!;
     const [next, completed] = await Promise.all([
       send(channelId, "racing detail"), finish(running),
@@ -1076,7 +1073,7 @@ describe("direct message reply bursts", () => {
       await finish(resumed);
     } else {
       expect(completed).not.toBeNull();
-      await stopTyping(next.job.id);
+      await ageJob(next.job.id);
       await finish((await claim())!);
     }
     expect(await claim()).toBeNull();
@@ -1088,7 +1085,7 @@ describe("direct message reply bursts", () => {
   it("recovers pending input after a Worker dies without acknowledging shutdown", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "task");
-    await stopTyping(first.job.id, 3);
+    await ageJob(first.job.id, 3);
     const running = (await claim())!;
     const next = await send(channelId, "detail");
     await db.prepare("update briar_channel_agent_reply_jobs set lease_expires_at = ?, attempts = 3 where id = ?")
@@ -1126,7 +1123,7 @@ describe("direct message reply bursts", () => {
   it("revokes a running claim and fences stale completion while its session peer stays queued", async () => {
     const channelId = await freshConversation("dm");
     const original = await send(channelId, "First task");
-    await stopTyping(original.job.id);
+    await ageJob(original.job.id);
     const claimed = (await claim())!;
     const claimTokenHash = sha256(claimed.claimToken);
     const oldJob = (await getClaimedChannelReply(db, {
@@ -1153,14 +1150,14 @@ describe("direct message reply bursts", () => {
   it("does not cancel on ambiguous prose and keeps explicit DM replies in the thread", async () => {
     const channelId = await freshConversation("dm");
     const original = await send(channelId, "First task");
-    await stopTyping(original.job.id);
+    await ageJob(original.job.id);
     const firstClaim = (await claim())!;
     const followup = await send(channelId, "중단이라는 단어를 설명해 줘", { parentMessageId: original.messageId });
     expect(followup.job).toBeDefined();
     expect(await getChannelAgentReplyJob(db, workspaceId, original.job.id))
       .toMatchObject({ status: "running" });
     await finish(firstClaim);
-    await stopTyping(followup.job.id);
+    await ageJob(followup.job.id);
     const next = (await claim())!;
     expect(next.workId).toBe(followup.job.id);
     expect(next.snapshot.messages.map((message) => message.id)).toEqual([
@@ -1233,14 +1230,14 @@ describe("direct message reply bursts", () => {
     await send(channelId, "stop", { parentMessageId: first.messageId });
     expect(await getChannelAgentReplyJob(db, workspaceId, second.job.id))
       .toMatchObject({ status: "queued" });
-    await stopTyping(second.job.id);
+    await ageJob(second.job.id);
     expect((await claim())?.workId).toBe(second.job.id);
   });
 
   it("never takes a turn away from a Worker that already started it", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "hi");
-    await stopTyping(first.job.id);
+    await ageJob(first.job.id);
     expect((await claim())?.workId).toBe(first.job.id);
 
     await send(channelId, "and one more thing");
@@ -1275,37 +1272,18 @@ describe("direct message reply bursts", () => {
       .toMatchObject({ status: "queued", superseded_by_reply_job_id: null });
   });
 
-  it("holds a fresh direct message back and asks the Worker to come straight back", async () => {
+  /*
+    A burst is folded into the running turn before the provider starts it, so
+    nothing is gained by making the person wait for their first message to be
+    picked up.
+  */
+  it("hands a just-queued direct message to the next claim", async () => {
     const channelId = await freshConversation("dm");
     const first = await send(channelId, "hi");
-    expect(await claim()).toBeNull();
 
-    const observedAt = new Date().toISOString();
-    const waitMs = await nextChannelReplySettleWaitMs(db, workspaceId, {
-      observedAt,
-    });
-    expect(waitMs).not.toBeNull();
-    expect(waitMs).toBeGreaterThanOrEqual(DM_REPLY_SETTLE_MIN_RETRY_MS);
-    expect(waitMs).toBeLessThanOrEqual(DM_REPLY_SETTLE_MAX_RETRY_MS);
-
-    // The ordinary idle answer is 15 seconds, which would leave the person
-    // waiting long after their own message settled.
     const queued = await claimThroughQueue();
-    expect(queued.work).toBeUndefined();
-    expect(queued.retryAfterMs).toBeGreaterThanOrEqual(
-      DM_REPLY_SETTLE_MIN_RETRY_MS,
-    );
-    expect(queued.retryAfterMs).toBeLessThanOrEqual(
-      DM_REPLY_SETTLE_MAX_RETRY_MS,
-    );
-
-    await stopTyping(first.job.id);
-    expect(await nextChannelReplySettleWaitMs(db, workspaceId, {
-      observedAt: new Date().toISOString(),
-    })).toBeNull();
-    expect((await claimThroughQueue()).work?.channelReply?.workId).toBe(
-      first.job.id,
-    );
+    expect(queued.work?.channelReply?.workId).toBe(first.job.id);
+    expect(queued.retryAfterMs).toBeUndefined();
   });
 
   it("includes the latest twenty DM messages in a new reply claim", async () => {
@@ -1327,7 +1305,7 @@ describe("direct message reply bursts", () => {
       });
     }
     const trigger = await send(channelId, "current request");
-    await stopTyping(trigger.job.id);
+    await ageJob(trigger.job.id);
 
     const claimed = (await claim())!;
     expect(claimed.snapshot.messages).toHaveLength(20);
@@ -1356,12 +1334,8 @@ describe("direct message reply bursts", () => {
           parent_message_id: root.messageId,
         });
     }
-    // No settle window outside a direct message: the root turn is claimable the
-    // moment it is queued.
+    // The root turn is claimable the moment it is queued.
     expect((await claim())?.workId).toBe(root.job.id);
-    expect(await nextChannelReplySettleWaitMs(db, workspaceId, {
-      observedAt: new Date().toISOString(),
-    })).toBeNull();
   });
 
   describe("classified DM input", () => {
@@ -1372,7 +1346,7 @@ describe("direct message reply bursts", () => {
         JSON.stringify({ protocol: 1, providers: ["AGENT_PROVIDER_CLAUDE"] }), workerId).run();
     const incoming = async (channelId: string, body: string) => {
       const sent = await send(channelId, body);
-      await stopTyping(sent.job.id);
+      await ageJob(sent.job.id);
       const work = (await claim())!;
       expect(work.workId).toBe(sent.job.id);
       expect(work.routing?.action).toBe("pending");
@@ -1400,7 +1374,7 @@ describe("direct message reply bursts", () => {
         .toMatchObject({ status: "queued", routing_action: "pending" });
       await db.prepare("update briar_execution_workers set last_heartbeat_at = ?, accepting_work = 1, readiness_state = 'busy' where id = ?")
         .bind(new Date().toISOString(), workerId).run();
-      await stopTyping(waiting.job.id);
+      await ageJob(waiting.job.id);
       const first = (await claim())!;
       expect(first.workId).toBe(waiting.job.id);
       expect(await getDmPublicMessageClaim(db, { jobId: first.workId, workspaceId,

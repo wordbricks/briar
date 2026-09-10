@@ -75,11 +75,9 @@ import {
 import { scheduleChannelRealtimePublish } from "./realtime-scheduling";
 import {
   checkpointChannelReplySession,
-  dmReplySettleMs,
   failChannelReply,
   getClaimedChannelReply,
   getChannelReplySession,
-  nextChannelReplySettleWaitMs,
   renewChannelReplyLease,
 } from "./channels";
 import { sha256 } from "./crypto-digest";
@@ -187,7 +185,6 @@ export type WorkerQueueServices = {
   readonly completeTeamAgentTaskWork: typeof completeTeamAgentTaskWork;
   readonly claimNextChannelReplyWork: typeof claimNextChannelReplyWork;
   readonly refreshChannelReplyClaim: typeof refreshChannelReplyClaim;
-  readonly nextChannelReplySettleWaitMs: typeof nextChannelReplySettleWaitMs;
   readonly claimNextQueueWork: typeof claimNextQueueWork;
   readonly claimDmLearningJob: typeof claimDmLearningJob;
   readonly sha256: typeof sha256;
@@ -239,7 +236,6 @@ const workerQueueServices: WorkerQueueServices = {
   completeTeamAgentTaskWork,
   claimNextChannelReplyWork,
   refreshChannelReplyClaim,
-  nextChannelReplySettleWaitMs,
   claimNextQueueWork,
   claimDmLearningJob,
   sha256,
@@ -493,21 +489,8 @@ async function claimWork(
     if (learning) return { work: workerClaimMessage(learning) };
   }
 
-  /*
-    Nothing was claimable, but a direct-message turn inside its settle window
-    becomes claimable in a moment. Asking the Worker back then, instead of after
-    the ordinary idle delay, is what keeps a burst of short messages feeling
-    immediate while still arriving as one reply.
-  */
-  const settleWaitMs = await services.nextChannelReplySettleWaitMs(
-    input.db,
-    worker.principal.workspaceId,
-    {
-      observedAt: new Date().toISOString(),
-      settleMs: dmReplySettleMs(input.env.DM_REPLY_SETTLE_MS),
-    },
-  );
-  return { retryAfterMs: settleWaitMs ?? 15_000 };
+  // Nothing was claimable, so the Worker keeps its ordinary idle cadence.
+  return { retryAfterMs: 15_000 };
 }
 
 async function renewIssueLease(

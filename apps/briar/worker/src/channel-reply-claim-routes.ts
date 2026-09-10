@@ -23,7 +23,6 @@ import {
 import {
   applyChannelReplySteerInPlace,
   claimNextChannelAgentReply,
-  dmReplySettleMs,
   failChannelReply,
   getChannelAgentReplyJob,
   getChannelById,
@@ -113,7 +112,6 @@ export async function claimNextChannelReplyWork(
     claimTokenHash,
     claimedAt: observedAt,
     leaseExpiresAt: leaseExpiryFrom(observedAt),
-    settleMs: dmReplySettleMs(env.DM_REPLY_SETTLE_MS),
   });
   if (!job) return null;
   scheduleChannelRealtimePublish(env, db, input.workspaceId, context);

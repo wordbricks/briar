@@ -41,9 +41,6 @@
     // Agent-to-Agent turns (the recipient's run plus the sender's relay run)
     // one organization may spend per hour.
     "AGENT_MESSAGE_HOURLY_LIMIT": "30",
-    // How long a queued direct-message conversation turn waits before a Worker
-    // may claim it, so several short messages sent in a row become one reply.
-    "DM_REPLY_SETTLE_MS": "2000",
     "WHATSAPP_GRAPH_API_VERSION": "v25.0",
     "WHATSAPP_APP_ORIGIN": "https://briar.wordbricks.ai",
     "APNS_TEAM_ID": "QFJZ2V3829",

@@ -5,8 +5,10 @@ received no more than 30 seconds after its last input. The boundary is inclusive
 each absorbed input advances the window. A queued independent turn forms a
 barrier, so messages after a gap cannot jump back into the earlier response.
 Skill commands, approved executions, delegated replies and Agent-to-Agent hops
-keep their separate execution contracts. The existing pre-claim settle delay and
-independent cancellation of messages that have not started are unchanged.
+keep their separate execution contracts. A DM turn is claimable the moment it is
+queued: folding a burst into one reply is entirely the steer path's job, both at
+enqueue and again just before the provider turn starts. Independent cancellation
+of messages that have not started is unchanged.
 
 The message transaction links each absorbed job to the original response and
 increments its input revision. Worker wake pushes interrupt lease renewal waits.
