@@ -823,6 +823,39 @@ describe("DM reply worktree allocation", () => {
     );
   });
 
+  it("answers after refusing a workspace context request on a project reply", async () => {
+    const conversationId = crypto.randomUUID();
+    const contextRequest = providerOutput({
+      contextRequests: [
+        { resource: "issues", projectId: "project-1", detail: "summary", limit: 25, cursor: null },
+      ],
+    });
+    const observed = await exercise({
+      provider: async (_turn, number) =>
+        number === 1 ? turnResult(contextRequest, conversationId) : turnResult(answer),
+    });
+    expect(observed.failure).toBeUndefined();
+    expect(observed.turns).toBe(2);
+    expect(observed.prompts[1]).toContain("contextRequests must be null");
+    expect(observed.prompts[1]).toContain("repositoryRequest");
+  });
+
+  it("fails a project reply that requests workspace context twice", async () => {
+    const conversationId = crypto.randomUUID();
+    const contextRequest = providerOutput({
+      contextRequests: [
+        { resource: "issues", projectId: "project-1", detail: "summary", limit: 25, cursor: null },
+      ],
+    });
+    const observed = await exercise({
+      provider: async () => turnResult(contextRequest, conversationId),
+    });
+    expect(observed.failure).toMatchObject({
+      message: expect.stringContaining("cannot request workspace context"),
+    });
+    expect(observed.turns).toBe(2);
+  });
+
   it("rejects a second repository request in the same reply", async () => {
     const conversationId = crypto.randomUUID();
     const observed = await exercise({

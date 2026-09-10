@@ -1600,6 +1600,8 @@ async function runClaimedChannelReplyTurn(
     let lookupRounds = 0;
     let repairRounds = 0;
     let repositoryRounds = 0;
+    /** One refusal per reply: a second context request is the model ignoring it. */
+    let contextRefused = false;
     /**
      * Checks the project out mid-reply, once. A session keeps the checkout in
      * its cached analysis worktree so a retry or a steer of the same
@@ -1851,9 +1853,33 @@ async function runClaimedChannelReplyTurn(
       }
       timeline.endTurn("context");
       if (!organizationContext) {
-        throw new Error(
-          "Project reply cannot request workspace context",
-        );
+        /*
+          A project Agent has no workspace context index, but the shared
+          response shape still names contextRequests, and a question like "how
+          many issues are open" tempts the model into asking for one. Failing
+          the reply here cost the person three attempts and a generic error;
+          say once what is and is not available and let the model answer.
+        */
+        if (contextRefused) {
+          throw new Error(
+            "Project reply cannot request workspace context",
+          );
+        }
+        contextRefused = true;
+        repairRounds += 1;
+        conversationId = reply.routing ? null : turn.conversationId;
+        const refusal = [
+          "Workspace context lookups are not available to this reply: contextRequests must be null.",
+          repositoryRequestAvailable && analysisWorktree === null
+            ? "If the answer needs the project repository, return the repositoryRequest object instead."
+            : null,
+          "Otherwise return the normal channel reply JSON now, answering from the conversation and saying plainly what cannot be established from it.",
+        ].filter(Boolean).join(" ");
+        turnPrompt = conversationId
+          ? refusal
+          : [prompt, refusal, memoryInvocation?.prompt(), messageInvocation?.prompt()]
+            .filter(Boolean).join("\n\n");
+        continue;
       }
       if (lookupRounds >= 3) {
         throw new Error("Workspace Agent context lookup limit exceeded");
