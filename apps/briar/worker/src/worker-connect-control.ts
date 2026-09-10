@@ -84,7 +84,7 @@ export const createWorkerControlService = (
   heartbeatWorker: async (input) => {
     const principal = await requireWorkerCredential(db, request);
     const observedAt = new Date().toISOString();
-    const result = await withWorkerControlErrors(heartbeatWorkerApplication({
+    const result = await withWorkerControlErrors((async () => heartbeatWorkerApplication({
       db,
       principal,
       workerId: workerId(input.workerId),
@@ -94,7 +94,7 @@ export const createWorkerControlService = (
       readinessState: readinessState(input.readinessState),
       readinessDetail: input.readinessDetail,
       observedAt,
-    }));
+    }))());
     return {
       worker: appDashboardWorker(workerJson(result.worker, observedAt)),
       workflowRequirements: result.workflowRequirements ?? [],
@@ -106,13 +106,13 @@ export const createWorkerControlService = (
 
   updateWorkerLabel: async (input) => {
     const principal = await requireWorkerCredential(db, request);
-    const device = await withWorkerControlErrors(updateWorkerLabelApplication({
+    const device = await withWorkerControlErrors((async () => updateWorkerLabelApplication({
       db,
       principal,
       workerId: workerId(input.workerId),
       label: input.label,
       observedAt: new Date().toISOString(),
-    }));
+    }))());
     return { deviceId: device.id, label: device.label };
   },
 
@@ -159,14 +159,14 @@ export const createWorkerControlService = (
 
   failWorkerUpdateHandoff: async (input) => {
     const principal = await requireWorkerCredential(db, request);
-    return await withWorkerControlErrors(failWorkerUpdateHandoffApplication({
+    return await withWorkerControlErrors((async () => failWorkerUpdateHandoffApplication({
       db,
       principal,
       workerId: workerId(input.workerId),
       requestId: input.requestId,
       error: input.error,
       observedAt: new Date().toISOString(),
-    }));
+    }))());
   },
   finishWorkerUpdate: async (input) => {
     const principal = await requireWorkerCredential(db, request);

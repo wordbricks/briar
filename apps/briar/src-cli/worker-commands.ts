@@ -167,10 +167,15 @@ const workerRuntime = async ({
       import.meta.dir,
       "dm-message-mcp-server.js",
     ).find((path) => Bun.file(path).size > 0);
+    // Only a healthy provider may be advertised: the server refuses the whole
+    // heartbeat when a listed provider is not (an installed but signed-out
+    // claude, say), and that refusal took every Worker on the machine offline.
     const providers = Object.entries(input.providerHealth).flatMap(
-      ([provider]) => supportsDmMessagePublicationProvider(provider as WorkerRuntimeInput["agentProvider"])
-        ? [provider as WorkerRuntimeInput["agentProvider"]]
-        : [],
+      ([provider, health]) =>
+        health.healthy &&
+          supportsDmMessagePublicationProvider(provider as WorkerRuntimeInput["agentProvider"])
+          ? [provider as WorkerRuntimeInput["agentProvider"]]
+          : [],
     );
     return bundle && providers.length > 0
       ? { protocol: 1 as const, providers }
