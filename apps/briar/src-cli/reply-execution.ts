@@ -1,8 +1,7 @@
 import { DmExecutionContext } from "./dm-execution-context";
 import { classifyDmReply } from "./dm-reply-routing";
 
-import type { IssueExecutionRecommendation } from "../src/lib/issue-execution-recommendation";
-import { dmAcknowledgementAgent, dmAcknowledgementPrompt, startDmAcknowledgement } from "./dm-acknowledgement";
+import { dmAcknowledgementOwed, startDmAcknowledgement } from "./dm-acknowledgement";
 import {
   ChannelReplyTimeline,
   channelReplyTriggerCreatedAt,
@@ -706,68 +705,37 @@ const defaultChannelReplyRuntime = (): ChannelReplyRuntime => ({
 });
 
 /*
-  The reaction is the person's first sign that Briar read the message, so it is
-  published from the claim itself rather than from anywhere downstream of
-  routing, the worktree or the memory brief. The emoji the model chooses lands
-  a few seconds later, on its own track, replacing the placeholder.
+  The server chooses this Agent's emoji from the message itself the moment it
+  arrives, so by the time a reply is claimed the reaction is usually already
+  there and this publishes nothing. What is left here is the fallback for a
+  server selection that failed: the placeholder, published from the claim
+  itself rather than from anywhere downstream of routing, the worktree or the
+  memory brief.
 */
 function startChannelReplyAcknowledgement(
   config: Config,
   reply: ClaimedChannelReply,
   signal: AbortSignal,
-  runtime: ChannelReplyRuntime,
-  acknowledgementExecution: IssueExecutionRecommendation | null,
   timeline: ChannelReplyTimeline,
 ): ChannelReplyAcknowledgementTask {
-  const prompt = dmAcknowledgementPrompt(reply.snapshot, reply.triggerMessageId);
   const capability = reply.activity?.token;
-  if (!prompt || !capability) return { acknowledgement: { mode: "none" }, stop: () => {} };
-  // A steer restart or a lease-expiry retry re-claims a message this Agent has
-  // already reacted to; repeating the selection turn would only pay for it.
+  if (!capability || !dmAcknowledgementOwed(reply.snapshot, reply.triggerMessageId)) {
+    return { acknowledgement: { mode: "none" }, stop: () => {} };
+  }
+  // The server's own emoji, a steer restart or a lease-expiry retry all reach
+  // this claim with a reaction already on the trigger; the placeholder would
+  // say nothing the message does not already show.
   if (reply.acknowledgementReaction !== null) {
     return { acknowledgement: { mode: "existing" }, stop: () => {} };
   }
   const replyActivity = createReplyActivityClient(config.apiUrl);
-  const publish = (emoji: string, publishSignal: AbortSignal) =>
-    replyActivity.publishAcknowledgementReaction({
-      replyJobId: reply.workId, capability, emoji, signal: publishSignal,
-    });
-  const selectionAgent = dmAcknowledgementAgent(detachedReplyAgent({
-    workId: reply.workId, provider: reply.provider, model: reply.model,
-    effort: reply.effort, agent: reply.agent, activeSkill: null,
-    fallbackName: "Briar Channel", scope: reply.scope,
-  }), acknowledgementExecution);
   const stop = startDmAcknowledgement({
     signal,
-    publish,
+    publish: (emoji, publishSignal) =>
+      replyActivity.publishAcknowledgementReaction({
+        replyJobId: reply.workId, capability, emoji, signal: publishSignal,
+      }),
     onPlaceholderPublished: () => timeline.recordAcknowledgementPublished(),
-    select: async (selectionSignal) => {
-      // The claim has no workspace yet, and this turn never needs one: it runs
-      // read-only in a private directory of its own that it then removes.
-      const selectionWorkspace = await mkdtemp(join(tmpdir(), "briar-dm-acknowledgement-"));
-      await chmod(selectionWorkspace, 0o700);
-      try {
-        const turn = await runtime.runProviderTurn({
-          agent: selectionAgent,
-          prompt,
-          workspacePath: selectionWorkspace,
-          fullAccess: false,
-          readOnly: true,
-          conversationId: null,
-          environment: providerExecutionEnvironment(
-            config, selectionAgent.provider, { ...process.env },
-          ),
-          signal: selectionSignal,
-        });
-        assertDetachedProviderTurnSucceeded(turn);
-        return turn.resultText;
-      } finally {
-        await rm(selectionWorkspace, { recursive: true, force: true });
-      }
-    },
-    onRefined: (emoji) => console.log(
-      `channel reply acknowledgement refined for ${reply.workId}: ${emoji}`,
-    ),
     onError: (error) => console.error(
       `channel reply acknowledgement publish failed for ${reply.workId}: ${
         error instanceof Error ? error.message : String(error)
@@ -785,7 +753,6 @@ async function runClaimedChannelReply(
   signal: AbortSignal,
   reportCheckpoint?: (value: WorkerExecutionCheckpoint) => void,
   runtime: ChannelReplyRuntime = defaultChannelReplyRuntime(),
-  acknowledgementExecution: IssueExecutionRecommendation | null = null,
 ) {
   /*
     Created before anything else this claim does, so every stretch below is
@@ -800,7 +767,7 @@ async function runClaimedChannelReply(
     ),
   });
   const { acknowledgement, stop } = startChannelReplyAcknowledgement(
-    config, reply, signal, runtime, acknowledgementExecution, timeline,
+    config, reply, signal, timeline,
   );
   timeline.recordAcknowledgementMode(acknowledgement.mode);
   /*
@@ -823,8 +790,7 @@ async function runClaimedChannelReply(
     }
     throw error;
   } finally {
-    // Cancels an in-flight selection and drops a result that arrives after the
-    // reply is already finished.
+    // Cancels a placeholder publication still in flight once the reply is over.
     stop();
     timeline.finish(outcome);
   }

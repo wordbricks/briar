@@ -155,7 +155,10 @@ type Exercise = {
   /** Claim the same retained session again, the way a follow-up message does. */
   sessionId?: string;
   agentMessageHop?: number;
-  /** The reaction the claim says this Agent already holds on the trigger. */
+  /**
+   * The reaction the claim says this Agent already holds on the trigger. The
+   * server picks its emoji at receipt, so a claim usually carries one.
+   */
   acknowledgementReaction?: string;
   /** Bind a private DM memory space, so the claim owes a memory brief RPC. */
   memory?: boolean;
@@ -178,8 +181,6 @@ type Exercise = {
    * the claim, which it is not.
    */
   memoryBriefFails?: "transport" | "revoked";
-  /** What the acknowledgement selection turn answers, and when. */
-  selectAcknowledgement?: () => Promise<DetachedProviderTurnResult>;
   /**
    * Reactions to wait for before the server closes: the acknowledgement is
    * deliberately off the reply's critical path, so nothing else waits for it.
@@ -496,10 +497,8 @@ describe("DM reply worktree allocation", () => {
       .mockImplementation((...args: unknown[]) => { logs.push(args.join(" ")); });
     if (input.steerVerdict) deferChannelReplyTimelineOutcome(workId);
     const workspacePaths: string[] = [];
-    const acknowledgementWorkspaces: string[] = [];
     const prompts: string[] = [];
     const toolInheritances: (string | undefined)[] = [];
-    const acknowledgementToolInheritances: (string | undefined)[] = [];
     // What the reply asked the pre-warm for, and what it did with the handle.
     const prewarmRequests: {
       workspacePath: string;
@@ -541,15 +540,6 @@ describe("DM reply worktree allocation", () => {
             turn: DetachedProviderTurnInput,
             prepared?: unknown,
           ) => {
-            // Briar picks the acknowledgement emoji on its own track; it is
-            // not one of this reply's rounds.
-            if (turn.agent.name === "DM acknowledgement") {
-              acknowledgementWorkspaces.push(turn.workspacePath);
-              acknowledgementToolInheritances.push(turn.toolInheritance);
-              return input.selectAcknowledgement
-                ? input.selectAcknowledgement()
-                : Promise.resolve(turnResult({ emoji: "👀" }));
-            }
             calls.push(`turn:${turns + 1}`);
             events.push(`turn:${turns + 1}`);
             workspacePaths.push(turn.workspacePath);
@@ -590,10 +580,8 @@ describe("DM reply worktree allocation", () => {
       events,
       reactions,
       workspacePaths,
-      acknowledgementWorkspaces,
       prompts,
       toolInheritances,
-      acknowledgementToolInheritances,
       prewarmRequests,
       prewarmDiscards,
       preparedRounds,
@@ -720,8 +708,7 @@ describe("DM reply worktree allocation", () => {
   /*
     The host user's `~/.codex/config.toml` MCP servers, apps and plugins were
     started before the prompt reached the model on every reply round — 4.5 s of
-    the measured boot — and a channel reply never uses them. The emoji
-    selection turn keeps its own lockdown and is not this axis.
+    the measured boot — and a channel reply never uses them.
   */
   it("asks for Briar-owned tools on every round of a channel reply", async () => {
     const conversationId = crypto.randomUUID();
@@ -735,7 +722,6 @@ describe("DM reply worktree allocation", () => {
     expect(observed.failure).toBeUndefined();
     expect(observed.turns).toBe(2);
     expect(observed.toolInheritances).toEqual(["briar", "briar"]);
-    expect(observed.acknowledgementToolInheritances).toEqual([undefined]);
   });
 
   /*
@@ -865,7 +851,9 @@ describe("DM reply worktree allocation", () => {
   /*
     The reaction used to wait for routing, the worktree, the memory brief and a
     whole provider turn of its own, so it reached the person about 48 seconds
-    after they sent the message. It is now published from the claim itself.
+    after they sent the message. The server now picks the emoji at receipt, and
+    this placeholder — the fallback for a selection that failed — is published
+    from the claim itself.
   */
   it("publishes the placeholder before the reply asks the server for anything else", async () => {
     const observed = await exercise({
@@ -879,51 +867,10 @@ describe("DM reply worktree allocation", () => {
     expect(observed.calls.indexOf("reaction:👀")).toBeLessThan(
       observed.calls.indexOf("memory-brief"),
     );
-    // The selection has no workspace of its own to run in yet, so it never
-    // borrows the reply's.
-    expect(observed.acknowledgementWorkspaces[0]).not.toContain("worker-sessions");
-    expect(observed.workspacePaths).not.toContain(observed.acknowledgementWorkspaces[0]);
-    await expect(stat(observed.acknowledgementWorkspaces[0]!)).rejects.toThrow();
-  });
-
-  it("replaces the placeholder with the emoji the model chose", async () => {
-    const observed = await exercise({
-      selectAcknowledgement: async () => turnResult({ emoji: "🎉" }),
-      expectReactions: 2,
-      provider: async () => turnResult(answer),
-    });
-
-    expect(observed.failure).toBeUndefined();
-    // Order, not just membership: the placeholder can never land on top.
-    expect(observed.reactions).toEqual(["👀", "🎉"]);
-    expect(observed.completed).toContain("A synthetic answer");
-  });
-
-  it("publishes nothing beyond the placeholder when selection fails", async () => {
-    const observed = await exercise({
-      selectAcknowledgement: () => Promise.reject(new Error("provider offline")),
-      expectReactions: 1,
-      provider: async () => turnResult(answer),
-    });
-
-    expect(observed.failure).toBeUndefined();
-    expect(observed.reactions).toEqual(["👀"]);
-  });
-
-  it("ignores a selection that only lands after the reply finished", async () => {
-    let selected!: (value: DetachedProviderTurnResult) => void;
-    const observed = await exercise({
-      selectAcknowledgement: () => new Promise((resolve) => { selected = resolve; }),
-      expectReactions: 1,
-      afterRun: async () => {
-        selected(turnResult({ emoji: "🎉" }));
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      },
-      provider: async () => turnResult(answer),
-    });
-
-    expect(observed.failure).toBeUndefined();
-    expect(observed.reactions).toEqual(["👀"]);
+    // Nothing else is published: the contextual emoji is the server's, and no
+    // round of this reply is spent choosing one.
+    expect(observed.reactions).toHaveLength(1);
+    expect(observed.turns).toBe(1);
   });
 
   /*
@@ -1183,7 +1130,7 @@ describe("DM reply worktree allocation", () => {
     });
   });
 
-  it("neither reacts nor runs a selection when the claim already carries one", async () => {
+  it("publishes nothing when the claim already carries the server's emoji", async () => {
     const observed = await exercise({
       acknowledgementReaction: "🎉",
       provider: async () => turnResult(answer),
@@ -1191,7 +1138,7 @@ describe("DM reply worktree allocation", () => {
 
     expect(observed.failure).toBeUndefined();
     expect(observed.reactions).toEqual([]);
-    expect(observed.acknowledgementWorkspaces).toEqual([]);
+    expect(observed.turns).toBe(1);
     expect(observed.completed).toContain("A synthetic answer");
   });
 

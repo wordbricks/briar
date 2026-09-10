@@ -1,5 +1,4 @@
 import { supportsOwnedProcessSupervisor } from "./owned-process-supervisor";
-import { recommendIssueExecution, type IssueExecutionRecommendation } from "../src/lib/issue-execution-recommendation";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
@@ -786,25 +785,12 @@ async function workerCommand() {
     (line) => console.log(line),
   );
   wakeClient.start();
-  let acknowledgementExecution: IssueExecutionRecommendation | null = null;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
   // Provider probes cost seconds; the heartbeat reports the last reading and
   // this scheduler refreshes it in the background for the next one.
   const runtimeProbes = createWorkerRuntimeProbes({
-    probe: async () => {
-      const probed = await probeWorkerRuntime(config);
-      // The DM acknowledgement emoji picks its model from this same reading,
-      // so recompute it whenever the capability snapshot changes; the reply
-      // path must never start a discovery of its own.
-      acknowledgementExecution = recommendIssueExecution(
-        "easy",
-        probed.providerCapabilities,
-        null,
-        (selection) => probed.providers.includes(selection.provider),
-      );
-      return probed;
-    },
+    probe: () => probeWorkerRuntime(config),
     log: (line) => console.log(line),
   });
   const analysisWorktreeSweep = createBackgroundSweep({
@@ -1181,8 +1167,6 @@ async function workerCommand() {
                 workerToken,
                 signal,
                 reportCheckpoint,
-                undefined,
-                acknowledgementExecution,
               );
             } catch (error) {
               if (error instanceof DetachedProviderStopUnconfirmedError) {

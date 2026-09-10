@@ -18,6 +18,7 @@ import {
   checkpointChannelReplySession,
   completeChannelReply,
   publishChannelAcknowledgementReaction,
+  setChannelAgentAcknowledgementReaction,
   enqueueChannelAgentReplies,
   getChannelSyncCursor,
   loadChannelDelta,
@@ -490,6 +491,214 @@ describe("direct message reply bursts", () => {
     await db.prepare("delete from briar_channel_agents where channel_id = ? and agent_id = ?")
       .bind(channelId, agentId).run();
     await expect(react(claimed, "🙏")).rejects.toThrow();
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
+  });
+
+  /*
+    The acknowledgement is chosen on the server, at receipt, from the trigger
+    and the two messages before it — the person is owed it within a couple of
+    seconds, which is far less than a Worker needs to claim the reply and run a
+    provider turn of its own. It rides `waitUntil`, so nothing here delays the
+    message's own response.
+  */
+  type AcknowledgementModelRun = (
+    model: string,
+    inputs: { messages: { role: string; content: string }[] },
+  ) => Promise<unknown>;
+
+  /** Drains what the route deferred, including work those tasks defer in turn. */
+  const drainingContext = () => {
+    const pending: Promise<unknown>[] = [];
+    return {
+      context: {
+        waitUntil: (promise: Promise<unknown>) => { pending.push(promise); },
+        passThroughOnException: () => {},
+      } as unknown as ExecutionContext,
+      settled: async () => {
+        for (let index = 0; index < pending.length; index += 1) {
+          await pending[index]!.catch(() => {});
+        }
+      },
+    };
+  };
+
+  const sendWithModel = async (
+    channelId: string,
+    body: string,
+    run: AcknowledgementModelRun,
+    overrides: { mentionedAgentIds?: string[] } = {},
+  ) => {
+    const drain = drainingContext();
+    const decoded = decodeChannelMessageApplicationInput({
+      body,
+      parentMessageId: null,
+      mentionedAgentIds: overrides.mentionedAgentIds ?? [],
+      skillId: null,
+    });
+    const result = await createWorkspaceChannelMessage({
+      db,
+      workspaceId,
+      channelId,
+      userId: ownerId,
+      request: { ...decoded, clientMessageId: crypto.randomUUID() },
+      attachmentIds: [],
+      env: { ...env(), DM_MEMORY_AI: { run } } as unknown as Env,
+      context: drain.context,
+    });
+    await drain.settled();
+    return { messageId: result.message.id, job: result.agentReplies[0] ?? null };
+  };
+
+  const chooses = (emoji: string): AcknowledgementModelRun =>
+    async () => ({ response: JSON.stringify({ emoji }) });
+  /** Answers nothing usable, so the message keeps whatever it already has. */
+  const silent: AcknowledgementModelRun = async () => ({ response: "no emoji here" });
+  const age = (messageId: string, secondsAgo: number) => db.prepare(
+    `update briar_channel_messages set created_at = ? where id = ?`,
+  ).bind(new Date(Date.now() - secondsAgo * 1_000).toISOString(), messageId).run();
+
+  it("reacts at receipt with the emoji the model read out of the last three messages", async () => {
+    const channelId = await freshConversation("dm");
+    const asked: { model: string; messages: { role: string; content: string }[] }[] = [];
+    const run: AcknowledgementModelRun = async (model, inputs) => {
+      asked.push({ model, messages: inputs.messages });
+      return { response: JSON.stringify({ emoji: "👋" }) };
+    };
+    for (const [index, body] of ["one", "two", "three"].entries()) {
+      const older = await sendWithModel(channelId, body, silent);
+      await age(older.messageId, 30 - index * 10);
+    }
+    const sent = await sendWithModel(channelId, "four", run);
+
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.model).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+    const instructions = asked[0]!.messages[0]!.content;
+    expect(instructions).toContain("never mock distress");
+    expect(instructions).toContain("untrusted data");
+    // The trigger and the two before it, newest last, and nothing else: no
+    // memory, no attachments, no workspace metadata.
+    expect(JSON.parse(asked[0]!.messages.at(-1)!.content)).toEqual([
+      { trigger: false, author: "user", body: "two" },
+      { trigger: false, author: "user", body: "three" },
+      { trigger: true, author: "user", body: "four" },
+    ]);
+    expect(await agentReactions(channelId, sent.messageId)).toEqual(["👋"]);
+  });
+
+  it.each([
+    ["fails", (async () => { throw new Error("model offline"); }) as AcknowledgementModelRun],
+    ["answers with prose", silent],
+    ["answers with something that is not an emoji", chooses("thanks")],
+    ["answers with two emoji", chooses("🎉🙏")],
+    ["answers with padding", chooses(" 🎮 ")],
+  ])("writes nothing when the model %s, and never fails the message", async (_case, run) => {
+    const channelId = await freshConversation("dm");
+    const sent = await sendWithModel(channelId, "hello", run);
+
+    expect(sent.job).not.toBeNull();
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
+    // The Worker's placeholder is the fallback, and it still lands at claim.
+    await stopTyping(sent.job!.id);
+    const claimed = (await claim())!;
+    await react(claimed, "👀");
+    expect(await agentReactions(channelId, sent.messageId)).toEqual(["👀"]);
+  });
+
+  it("gives the model a bounded budget and abandons a call that outlives it", async () => {
+    const channelId = await freshConversation("dm");
+    const started = Date.now();
+    const sent = await sendWithModel(
+      channelId, "hello", () => new Promise<never>(() => {}),
+    );
+
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
+  });
+
+  it("leaves the server's emoji alone when the Worker's placeholder lands after it", async () => {
+    const channelId = await freshConversation("dm");
+    const sent = await sendWithModel(channelId, "thank you so much", chooses("🙏"));
+    expect(await agentReactions(channelId, sent.messageId)).toEqual(["🙏"]);
+
+    await stopTyping(sent.job!.id);
+    const claimed = (await claim())!;
+    // The usual case: the claim already carries it and the runner publishes
+    // nothing. A Worker that raced the write publishes 👀 anyway, and that
+    // must not take the message back to "read".
+    expect(claimed.acknowledgementReaction).toBe("🙏");
+    await react(claimed, "👀");
+    expect(await agentReactions(channelId, sent.messageId)).toEqual(["🙏"]);
+    expect(await finish(claimed)).not.toBeNull();
+  });
+
+  it("replaces the Worker's placeholder when the server's emoji lands second", async () => {
+    const channelId = await freshConversation("dm");
+    const sent = await sendWithModel(channelId, "hello", silent);
+    await stopTyping(sent.job!.id);
+    const claimed = (await claim())!;
+    await react(claimed, "👀");
+    await db.prepare(
+      `insert into briar_channel_message_reactions (message_id, user_id, emoji, created_at)
+       values (?, ?, '👀', ?)`,
+    ).bind(sent.messageId, ownerId, new Date().toISOString()).run();
+
+    await setChannelAgentAcknowledgementReaction(db, {
+      jobId: sent.job!.id, agentId, emoji: "🎉",
+      observedAt: new Date().toISOString(),
+    });
+
+    expect(await agentReactions(channelId, sent.messageId)).toEqual(["🎉"]);
+    // A person's own reaction is never this slot's to move.
+    expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions
+      .find((reaction) => reaction.emoji === "👀")).toMatchObject({ userIds: [ownerId] });
+    expect(await finish(claimed)).not.toBeNull();
+  });
+
+  it("leaves any other reaction the Agent chose exactly where it is", async () => {
+    const channelId = await freshConversation("dm");
+    const sent = await sendWithModel(channelId, "hello", chooses("🎮"));
+
+    await setChannelAgentAcknowledgementReaction(db, {
+      jobId: sent.job!.id, agentId, emoji: "🔥",
+      observedAt: new Date().toISOString(),
+    });
+
+    expect(await agentReactions(channelId, sent.messageId)).toEqual(["🎮"]);
+    await expect(setChannelAgentAcknowledgementReaction(db, {
+      jobId: sent.job!.id, agentId, emoji: "not emoji",
+      observedAt: new Date().toISOString(),
+    })).rejects.toThrow();
+  });
+
+  it("asks the model nothing for a message folded into a running reply", async () => {
+    const channelId = await freshConversation("dm");
+    const first = await sendWithModel(channelId, "first input", silent);
+    await stopTyping(first.job!.id, 3);
+    const running = (await claim())!;
+    expect(running.workId).toBe(first.job!.id);
+
+    const asked: string[] = [];
+    const folded = await sendWithModel(channelId, "and one more thing", async (model) => {
+      asked.push(model);
+      return { response: JSON.stringify({ emoji: "🎉" }) };
+    });
+
+    // The reply it joined already reacted on its own trigger.
+    expect(await getChannelAgentReplyJob(db, workspaceId, folded.job!.id))
+      .toMatchObject({ superseded_by_reply_job_id: first.job!.id });
+    expect(asked).toEqual([]);
+    expect((await getChannelMessage(db, channelId, folded.messageId))?.reactions).toEqual([]);
+  });
+
+  it("asks the model nothing outside a direct message", async () => {
+    const channelId = await freshConversation("channel");
+    const asked: string[] = [];
+    const sent = await sendWithModel(channelId, "thanks", async (model) => {
+      asked.push(model);
+      return { response: JSON.stringify({ emoji: "🎉" }) };
+    }, { mentionedAgentIds: [agentId] });
+
+    expect(asked).toEqual([]);
     expect((await getChannelMessage(db, channelId, sent.messageId))?.reactions).toEqual([]);
   });
 
