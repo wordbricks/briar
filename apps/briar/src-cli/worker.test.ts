@@ -190,9 +190,8 @@ describe("briar worker loop", () => {
   });
 
   /*
-    The server shortens `retryAfterMs` while a DM reply is inside its settle
-    window. Stretching that hint up to the poll interval would strand work the
-    server already knows is about to be claimable.
+    A server delay shorter than the poll interval says work is about to become
+    claimable. Stretching that hint up to the poll interval would strand it.
   */
   it("re-claims on a short server retry hint instead of the idle interval", async () => {
     let polls = 0;
@@ -200,7 +199,7 @@ describe("briar worker loop", () => {
       claim: async () => {
         polls += 1;
         return polls > 2
-          ? { work: issue("issue-settled") }
+          ? { work: issue("issue-soon") }
           : { work: null, retryAfterMs: 2_000 };
       },
     });

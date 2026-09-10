@@ -328,9 +328,8 @@ HTTP routes.
 
 - The Worker suite drives `claimNextChannelReplyWork` with a real authenticated
   Worker binding and calls `getDmMemoryClaimBrief` and `lookupDmMemoryClaim`
-  directly, matching how the original called its route handler. Its fixtures now
-  age the reply job, because DM replies are held by the settle window that keeps
-  a burst of messages on one job.
+  directly, matching how the original called its route handler. Its fixtures age
+  the reply job so the claim order under test is pinned.
 - The runner suite serves a synthetic `WorkerQueueService` and
   `OrganizationAgentContextService` through `connectNodeAdapter`, so the real
   generated Worker Queue client is exercised end to end. Its claim is built as a
