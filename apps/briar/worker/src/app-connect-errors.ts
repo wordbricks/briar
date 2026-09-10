@@ -152,6 +152,19 @@ export const connectErrorInterceptor: Interceptor =
     try {
       return await next(request);
     } catch (error) {
-      throw toConnectError(error);
+      const connectError = toConnectError(error);
+      // An unmapped exception reaches the client as a bare "Internal server
+      // error"; without this line the server keeps no record of what it was,
+      // and a failing Worker heartbeat can only be diagnosed by guesswork.
+      if (connectError.code === Code.Internal) {
+        console.error(JSON.stringify({
+          message: "connect request failed",
+          service: request.service.typeName,
+          method: request.method.name,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+          stack: error instanceof Error ? (error.stack ?? "").slice(0, 1_500) : undefined,
+        }));
+      }
+      throw connectError;
     }
   };
