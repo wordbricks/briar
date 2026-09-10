@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.231",
+        date: "2026년 9월 10일",
+        title: "DM 답장 실패와 확인 이모지를 고쳤습니다",
+        summary:
+          "이슈 개수처럼 프로젝트 정보를 묻는 DM에 Agent가 답하지 못하고 실패하던 문제를 고쳤고, 메시지에 붙는 확인 이모지가 대부분 👀로만 나오던 것을 인사·질문·요청에 맞는 이모지로 바꿨습니다.",
+        items: [
+          "프로젝트 정보를 묻는 DM이 실패하지 않고 답장합니다.",
+          "확인 이모지가 인사(👋), 감사(🙏), 질문(🔍) 등 메시지 의도에 맞게 붙습니다.",
+          "워커가 DM 게시 프로바이더를 건강한 것만 광고해, 로그아웃된 CLI가 있어도 워커가 멈추지 않습니다.",
+        ],
+      },
+      {
         version: "1.2.230",
         date: "2026년 9월 10일",
         title: "DM 답장이 훨씬 빨라졌습니다",
@@ -2058,6 +2070,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.231",
+        date: "September 10, 2026",
+        title: "Fixed failing DM replies and the acknowledgement emoji",
+        summary:
+          "A DM asking for project information, such as how many issues are open, could fail instead of being answered, and the acknowledgement emoji on your messages was almost always 👀. Both are fixed.",
+        items: [
+          "DMs that ask for project information are answered instead of failing.",
+          "The acknowledgement emoji now matches the message: a greeting gets 👋, thanks get 🙏, a question gets 🔍.",
+          "A worker only advertises healthy providers for DM publishing, so a signed-out CLI no longer takes the worker offline.",
+        ],
+      },
       {
         version: "1.2.230",
         date: "September 10, 2026",
