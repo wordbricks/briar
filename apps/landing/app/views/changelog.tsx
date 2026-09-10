@@ -30,6 +30,20 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.230",
+        date: "2026년 9월 10일",
+        title: "DM 답장이 훨씬 빨라졌습니다",
+        summary:
+          "메시지를 보내면 Agent가 읽었다는 이모지가 1~2초 안에 붙고, 답장도 이전보다 몇 배 빨리 도착합니다. 답장을 준비하는 과정에서 기다릴 필요가 없던 단계들을 걷어내고, 연속으로 보낸 메시지는 한 번의 답장으로 묶습니다.",
+        items: [
+          "메시지에 맞는 확인 이모지를 서버가 수신 즉시 골라 붙입니다. 답장이 늦어도 읽었다는 표시는 바로 보입니다.",
+          "인사나 질문 같은 일반 대화는 저장소를 준비하지 않고 바로 답합니다. 코드를 봐야 할 때만 Agent가 저장소를 요청합니다.",
+          "답장을 준비하는 단계들을 동시에 진행하고, Codex는 미리 띄워 둡니다.",
+          "답장을 만드는 도중 새 메시지가 오면 처음부터 다시 하지 않고 같은 답장에 합칩니다.",
+          "메시지를 보낸 뒤 워커가 받기까지 기다리던 2초 대기를 없앴습니다.",
+        ],
+      },
+      {
         version: "1.2.229",
         date: "2026년 9월 10일",
         title: "사이드바 왼쪽 위가 깨지던 문제를 고쳤습니다",
@@ -2044,6 +2058,20 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.230",
+        date: "September 10, 2026",
+        title: "DM replies are much faster",
+        summary:
+          "After you send a message, the Agent's acknowledgement emoji appears within a second or two, and the reply itself arrives several times faster than before. Steps that never needed to be waited on were taken off the path, and messages sent in a burst are answered together.",
+        items: [
+          "The server picks a fitting acknowledgement emoji the moment your message arrives, so you see it was read even when the reply takes longer.",
+          "Plain conversation such as a greeting or a question is answered without preparing the repository; the Agent asks for the repository only when it needs to read code.",
+          "Reply preparation steps now run at the same time, and Codex is started ahead of time.",
+          "A message that arrives while a reply is being written is folded into that reply instead of restarting it.",
+          "The two-second wait between your message and a worker picking it up is gone.",
+        ],
+      },
       {
         version: "1.2.229",
         date: "September 10, 2026",
