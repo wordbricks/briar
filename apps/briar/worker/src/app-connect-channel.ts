@@ -786,6 +786,7 @@ const createAppChannelService = (
       userId: session.user.id,
       channelId: request.channelId ? canonicalUuid(request.channelId) : null,
       query: request.query,
+      kind: request.kind === "dm" || request.kind === "channel" ? request.kind : null,
       cursor: request.cursor,
       limit: request.limit,
     });
@@ -796,6 +797,8 @@ const createAppChannelService = (
         rootMessageId: hit.rootMessageId,
         channelName: hit.channelName,
         isDirectMessage: hit.isDirectMessage,
+        isThreadReply: hit.isThreadReply,
+        authorName: hit.authorName,
         body: hit.body,
         createdAt: timestampFromDate(new Date(hit.createdAt)),
       })),

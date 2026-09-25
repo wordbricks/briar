@@ -1399,6 +1399,16 @@ public nonisolated struct BriarAPI_SearchChannelMessagesRequest: Sendable {
   /// Clears the value of `limit`. Subsequent reads from it will return its default value.
   public mutating func clearLimit() {self._limit = nil}
 
+  /// channel or dm
+  public var kind: String {
+    get {_kind ?? String()}
+    set {_kind = newValue}
+  }
+  /// Returns true if `kind` has been explicitly set.
+  public var hasKind: Bool {self._kind != nil}
+  /// Clears the value of `kind`. Subsequent reads from it will return its default value.
+  public mutating func clearKind() {self._kind = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1406,6 +1416,7 @@ public nonisolated struct BriarAPI_SearchChannelMessagesRequest: Sendable {
   fileprivate var _channelID: String? = nil
   fileprivate var _cursor: String? = nil
   fileprivate var _limit: UInt32? = nil
+  fileprivate var _kind: String? = nil
 }
 
 public nonisolated struct BriarAPI_SearchChannelMessageHit: Sendable {
@@ -1433,6 +1444,10 @@ public nonisolated struct BriarAPI_SearchChannelMessageHit: Sendable {
   public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var authorName: String = String()
+
+  public var isThreadReply: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -5492,7 +5507,7 @@ nonisolated extension BriarAPI_ListChannelMessagesResponse: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_SearchChannelMessagesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SearchChannelMessagesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}query\0\u{3}channel_id\0\u{1}cursor\0\u{1}limit\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}query\0\u{3}channel_id\0\u{1}cursor\0\u{1}limit\0\u{1}kind\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5505,6 +5520,7 @@ nonisolated extension BriarAPI_SearchChannelMessagesRequest: SwiftProtobuf.Messa
       case 3: try { try decoder.decodeSingularStringField(value: &self._channelID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._cursor) }()
       case 5: try { try decoder.decodeSingularUInt32Field(value: &self._limit) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._kind) }()
       default: break
       }
     }
@@ -5530,6 +5546,9 @@ nonisolated extension BriarAPI_SearchChannelMessagesRequest: SwiftProtobuf.Messa
     try { if let v = self._limit {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 5)
     } }()
+    try { if let v = self._kind {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5539,6 +5558,7 @@ nonisolated extension BriarAPI_SearchChannelMessagesRequest: SwiftProtobuf.Messa
     if lhs._channelID != rhs._channelID {return false}
     if lhs._cursor != rhs._cursor {return false}
     if lhs._limit != rhs._limit {return false}
+    if lhs._kind != rhs._kind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5546,7 +5566,7 @@ nonisolated extension BriarAPI_SearchChannelMessagesRequest: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_SearchChannelMessageHit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SearchChannelMessageHit"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}message_id\0\u{3}channel_id\0\u{3}root_message_id\0\u{3}channel_name\0\u{3}is_direct_message\0\u{1}body\0\u{3}created_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}message_id\0\u{3}channel_id\0\u{3}root_message_id\0\u{3}channel_name\0\u{3}is_direct_message\0\u{1}body\0\u{3}created_at\0\u{3}author_name\0\u{3}is_thread_reply\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5561,6 +5581,8 @@ nonisolated extension BriarAPI_SearchChannelMessageHit: SwiftProtobuf.Message, S
       case 5: try { try decoder.decodeSingularBoolField(value: &self.isDirectMessage) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self.body) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.authorName) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.isThreadReply) }()
       default: break
       }
     }
@@ -5592,6 +5614,12 @@ nonisolated extension BriarAPI_SearchChannelMessageHit: SwiftProtobuf.Message, S
     try { if let v = self._createdAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
     } }()
+    if !self.authorName.isEmpty {
+      try visitor.visitSingularStringField(value: self.authorName, fieldNumber: 8)
+    }
+    if self.isThreadReply != false {
+      try visitor.visitSingularBoolField(value: self.isThreadReply, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5603,6 +5631,8 @@ nonisolated extension BriarAPI_SearchChannelMessageHit: SwiftProtobuf.Message, S
     if lhs.isDirectMessage != rhs.isDirectMessage {return false}
     if lhs.body != rhs.body {return false}
     if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.authorName != rhs.authorName {return false}
+    if lhs.isThreadReply != rhs.isThreadReply {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
