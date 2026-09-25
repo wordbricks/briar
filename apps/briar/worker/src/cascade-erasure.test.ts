@@ -22,8 +22,9 @@ describe("cascade erasure", () => {
 
   it("prepares a delete against every table", async () => {
     const tables = (await db.prepare(
-      `select name from sqlite_schema
-       where type = 'table' and name not like 'sqlite_%' and name not like 'd1_%'
+      `select name from pragma_table_list
+       where schema = 'main' and type in ('table', 'virtual')
+         and name not like 'sqlite_%' and name not like 'd1_%'
          and name not like '\\_cf\\_%' escape '\\'
        order by name`,
     ).all<{ name: string }>()).results;
