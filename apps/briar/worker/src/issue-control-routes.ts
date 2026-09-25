@@ -1,4 +1,5 @@
 import {
+  getHuntRunForProject,
   getTeam,
   HuntTransitionError,
   moveHuntRun,
@@ -181,10 +182,25 @@ export async function moveProjectIssueRun(
 ) {
   const project = await requireIssueExecutionProject(
     input,
-    "issues:execute",
-    "Issue execution permission required",
+    "issues:write",
+    "Issue editing permission required",
   );
   const request = decodeMoveRunInput(input.request);
+  if (!hasWorkspaceCapability(project.member_role, "issues:execute")) {
+    // Editors can correct an unclaimed queue entry, but cannot start, redirect,
+    // or override execution (including a queued run already dispatched).
+    const run = await getHuntRunForProject(input.db, project.id, input.runId);
+    if (!run) throw new HttpError(404, "Run not found");
+    if (
+      request.status !== "backlog" ||
+      !["backlog", "queued"].includes(run.status) ||
+      run.dispatch_request_id !== null ||
+      run.claimed_by !== null ||
+      run.lease_expires_at !== null
+    ) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
+  }
   try {
     const result = await moveHuntRun(input.db, project.id, {
       runId: input.runId,
