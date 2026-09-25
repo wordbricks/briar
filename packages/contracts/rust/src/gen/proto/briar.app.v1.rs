@@ -72693,6 +72693,11 @@ pub struct SearchChannelMessagesRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub limit: ::core::option::Option<u32>,
+    /// channel or dm
+    ///
+    /// Field 6: `kind`
+    #[serde(rename = "kind", skip_serializing_if = "::core::option::Option::is_none")]
+    pub kind: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -72705,6 +72710,7 @@ impl ::core::fmt::Debug for SearchChannelMessagesRequest {
             .field("channel_id", &self.channel_id)
             .field("cursor", &self.cursor)
             .field("limit", &self.limit)
+            .field("kind", &self.kind)
             .finish()
     }
 }
@@ -72743,6 +72749,16 @@ impl SearchChannelMessagesRequest {
         self.limit = Some(value);
         self
     }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::kind`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_kind(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.kind = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(SearchChannelMessagesRequest);
 impl ::buffa::MessageName for SearchChannelMessagesRequest {
@@ -72779,6 +72795,9 @@ impl ::buffa::Message for SearchChannelMessagesRequest {
         if let Some(v) = self.limit {
             size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.kind {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -72803,6 +72822,9 @@ impl ::buffa::Message for SearchChannelMessagesRequest {
         }
         if let Some(v) = self.limit {
             ::buffa::types::put_uint32_field(5u32, v, buf);
+        }
+        if let Some(ref v) = self.kind {
+            ::buffa::types::put_string_field(6u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -72862,6 +72884,16 @@ impl ::buffa::Message for SearchChannelMessagesRequest {
                     ::buffa::types::decode_uint32(buf)?,
                 );
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.kind.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -72875,6 +72907,7 @@ impl ::buffa::Message for SearchChannelMessagesRequest {
         self.channel_id = ::core::option::Option::None;
         self.cursor = ::core::option::Option::None;
         self.limit = ::core::option::Option::None;
+        self.kind = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -72968,6 +73001,22 @@ pub struct SearchChannelMessageHit {
         ::buffa_types::google::protobuf::Timestamp,
         ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
     >,
+    /// Field 8: `author_name`
+    #[serde(
+        rename = "authorName",
+        alias = "author_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub author_name: ::buffa::alloc::string::String,
+    /// Field 9: `is_thread_reply`
+    #[serde(
+        rename = "isThreadReply",
+        alias = "is_thread_reply",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub is_thread_reply: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -72982,6 +73031,8 @@ impl ::core::fmt::Debug for SearchChannelMessageHit {
             .field("is_direct_message", &self.is_direct_message)
             .field("body", &self.body)
             .field("created_at", &self.created_at)
+            .field("author_name", &self.author_name)
+            .field("is_thread_reply", &self.is_thread_reply)
             .finish()
     }
 }
@@ -73040,6 +73091,12 @@ impl ::buffa::Message for SearchChannelMessageHit {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if !self.author_name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.author_name) as u64;
+        }
+        if self.is_thread_reply {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -73075,6 +73132,12 @@ impl ::buffa::Message for SearchChannelMessageHit {
                 buf,
             );
             self.created_at.write_to(__cache, buf);
+        }
+        if !self.author_name.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.author_name, buf);
+        }
+        if self.is_thread_reply {
+            ::buffa::types::put_bool_field(9u32, self.is_thread_reply, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -73142,6 +73205,20 @@ impl ::buffa::Message for SearchChannelMessageHit {
                     ctx,
                 )?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.author_name, buf)?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.is_thread_reply = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -73157,6 +73234,8 @@ impl ::buffa::Message for SearchChannelMessageHit {
         self.is_direct_message = false;
         self.body.clear();
         self.created_at = ::buffa::MessageField::none();
+        self.author_name.clear();
+        self.is_thread_reply = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -254445,6 +254524,10 @@ pub mod __buffa {
             pub cursor: ::core::option::Option<&'a str>,
             /// Field 5: `limit`
             pub limit: ::core::option::Option<u32>,
+            /// channel or dm
+            ///
+            /// Field 6: `kind`
+            pub kind: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SearchChannelMessagesRequestView<'a> {
@@ -254514,6 +254597,13 @@ pub mod __buffa {
                         )?;
                         view.limit = Some(::buffa::types::decode_uint32(&mut cur)?);
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.kind = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -254548,6 +254638,7 @@ pub mod __buffa {
                     channel_id: self.channel_id.map(|s| s.to_string()),
                     cursor: self.cursor.map(|s| s.to_string()),
                     limit: self.limit,
+                    kind: self.kind.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -254581,6 +254672,9 @@ pub mod __buffa {
                 if let Some(v) = self.limit {
                     size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
                 }
+                if let Some(ref v) = self.kind {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -254606,6 +254700,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.limit {
                     ::buffa::types::put_uint32_field(5u32, v, buf);
+                }
+                if let Some(ref v) = self.kind {
+                    ::buffa::types::put_string_field(6u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -254646,6 +254743,9 @@ pub mod __buffa {
                             "limit",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.kind {
+                    __map.serialize_entry("kind", __v)?;
                 }
                 __map.end()
             }
@@ -254773,6 +254873,13 @@ pub mod __buffa {
             pub fn limit(&self) -> ::core::option::Option<u32> {
                 self.0.reborrow().limit
             }
+            /// channel or dm
+            ///
+            /// Field 6: `kind`
+            #[must_use]
+            pub fn kind(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().kind
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<SearchChannelMessagesRequestView<'static>>,
@@ -254828,6 +254935,10 @@ pub mod __buffa {
             pub created_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Field 8: `author_name`
+            pub author_name: &'a str,
+            /// Field 9: `is_thread_reply`
+            pub is_thread_reply: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SearchChannelMessageHitView<'a> {
@@ -254929,6 +255040,20 @@ pub mod __buffa {
                             }
                         }
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.author_name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.is_thread_reply = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -254973,6 +255098,8 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    author_name: self.author_name.to_string(),
+                    is_thread_reply: self.is_thread_reply,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -255025,6 +255152,15 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if !self.author_name.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.author_name)
+                                as u64;
+                }
+                if self.is_thread_reply {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -255061,6 +255197,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.created_at.write_to(__cache, buf);
+                }
+                if !self.author_name.is_empty() {
+                    ::buffa::types::put_string_field(8u32, &self.author_name, buf);
+                }
+                if self.is_thread_reply {
+                    ::buffa::types::put_bool_field(9u32, self.is_thread_reply, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -255108,6 +255250,12 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("createdAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.author_name) {
+                    __map.serialize_entry("authorName", self.author_name)?;
+                }
+                if self.is_thread_reply {
+                    __map.serialize_entry("isThreadReply", &self.is_thread_reply)?;
                 }
                 __map.end()
             }
@@ -255244,6 +255392,16 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().created_at
+            }
+            /// Field 8: `author_name`
+            #[must_use]
+            pub fn author_name(&self) -> &'_ str {
+                self.0.reborrow().author_name
+            }
+            /// Field 9: `is_thread_reply`
+            #[must_use]
+            pub fn is_thread_reply(&self) -> bool {
+                self.0.reborrow().is_thread_reply
             }
         }
         impl ::core::convert::From<
