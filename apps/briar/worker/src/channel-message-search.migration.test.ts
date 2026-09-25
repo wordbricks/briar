@@ -7,7 +7,7 @@ const beforeSearch = "0218_issue_attachment_sources.sql";
 const searchMigration = "0219_channel_message_search.sql";
 
 describe("channel message search migration", () => {
-  it("creates an empty index and leaves historical messages for approved backfill", async () => {
+  it("creates an empty index and leaves historical messages out by owner choice", async () => {
     const db = env.DB;
     await applyD1Migrations(db, { through: beforeSearch });
     await executeD1Sql(db, `
@@ -27,6 +27,12 @@ describe("channel message search migration", () => {
     // insert an FTS delete tombstone for a row that does not exist yet.
     await db.prepare(`update briar_channel_messages set body = 'edited banana'
       where id = 'search-migration-old'`).run();
+    const oldBigram = await db.prepare(`select * from briar_channel_message_bigrams
+      where gram = 'ap'`).all();
+    expect(oldBigram.results).toHaveLength(0);
+    const editedBigram = await db.prepare(`select * from briar_channel_message_bigrams
+      where gram = 'ba'`).all();
+    expect(editedBigram.results).toHaveLength(1);
     const editedMatch = await db.prepare(`select rowid from briar_channel_message_search
       where briar_channel_message_search match '"banana"'`).all();
     expect(editedMatch.results).toHaveLength(1);

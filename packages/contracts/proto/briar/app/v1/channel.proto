@@ -364,6 +364,7 @@ message SearchChannelMessagesRequest {
   optional string channel_id = 3;
   optional string cursor = 4;
   optional uint32 limit = 5;
+  optional string kind = 6; // channel or dm
 }
 
 message SearchChannelMessageHit {
@@ -374,6 +375,8 @@ message SearchChannelMessageHit {
   bool is_direct_message = 5;
   string body = 6;
   google.protobuf.Timestamp created_at = 7;
+  string author_name = 8;
+  bool is_thread_reply = 9;
 }
 
 message SearchChannelMessagesResponse {
