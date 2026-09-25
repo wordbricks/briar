@@ -993,11 +993,11 @@ function formatRelativeDate(value: string, localeTag: string) {
   }).format(new Date(value));
 }
 
-const originBadgeTone: Record<InboxOrigin, string> = {
+const originBadgeTone = {
   issue: "bg-primary/10 text-primary",
   channel: "bg-[#3aa8a3]/12 text-[#2b8a86]",
   agent: "bg-muted text-muted-foreground",
-};
+} satisfies Record<InboxOrigin, string>;
 
 /** Says at a glance whether a row came from an issue, a channel, or an agent. */
 function InboxOriginBadge({ origin }: { origin: InboxOrigin }) {
