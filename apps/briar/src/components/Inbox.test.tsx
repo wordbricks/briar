@@ -11,6 +11,7 @@ import {
 } from "../state/inbox/atoms";
 import {
   classifyInboxMessage,
+  inboxMessageOrigin,
   type InboxMessage,
   type InboxMessageWithReadState,
 } from "../state/inbox/model";
@@ -95,6 +96,7 @@ const summaryOf = (
   id: message.id,
   projectId: message.projectId,
   category: classifyInboxMessage(message),
+  origin: inboxMessageOrigin(message),
   isUnread: message.isUnread,
 });
 
