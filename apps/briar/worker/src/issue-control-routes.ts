@@ -186,7 +186,10 @@ export async function moveProjectIssueRun(
     "Issue editing permission required",
   );
   const request = decodeMoveRunInput(input.request);
-  if (!hasWorkspaceCapability(project.member_role, "issues:execute")) {
+  const editorCorrection = !hasWorkspaceCapability(
+    project.member_role, "issues:execute",
+  );
+  if (editorCorrection) {
     // Editors can correct an unclaimed queue entry, but cannot start, redirect,
     // or override execution (including a queued run already dispatched).
     const run = await getHuntRunForProject(input.db, project.id, input.runId);
@@ -209,6 +212,7 @@ export async function moveProjectIssueRun(
       requestId: request.requestId,
       actor: `briar-app:${input.userId}`,
       occurredAt: new Date().toISOString(),
+      requireUnclaimedQueueCorrection: editorCorrection,
     });
     if (result.outcome === "not_found") {
       throw new HttpError(404, "Run not found");
