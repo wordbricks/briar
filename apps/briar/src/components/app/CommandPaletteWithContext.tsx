@@ -94,7 +94,7 @@ export function CommandPaletteWithContext(props: CommandPaletteShellProps) {
         } : undefined;
         const when = new Intl.DateTimeFormat(undefined, {
           dateStyle: "medium", timeStyle: "short",
-        }).format(hit.createdAt);
+        }).format(new Date(hit.createdAt));
         return {
           id: `message:${hit.messageId}`,
           label: `${start > 0 ? "…" : ""}${snippet}${hit.body.length > start + 110 ? "…" : ""}`,
