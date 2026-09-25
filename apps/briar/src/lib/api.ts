@@ -118,6 +118,7 @@ export {
   deleteChannelSidebarSection,
   listAgentDirectMessages,
   listChannelMessages,
+  searchChannelMessages,
   listChannels,
   listChannelSidebarSections,
   listChannelWebhooks,

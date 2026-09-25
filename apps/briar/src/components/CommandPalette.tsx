@@ -46,6 +46,7 @@ const emptySectionOrder = new Map([
   ["issues", 6],
   ["channels", 7],
   ["direct-messages", 8],
+  ["messages", 9],
 ]);
 
 function keyboardEventIsComposing(
@@ -83,6 +84,7 @@ export function CommandPalette({
   contextLabel,
   initialQuery = "",
   items,
+  messageSearch,
   loading = false,
   onOpenChange,
   open,
@@ -91,6 +93,7 @@ export function CommandPalette({
   contextLabel?: string | null;
   initialQuery?: string;
   items: readonly CommandPaletteItem[];
+  messageSearch?: (query: string) => Promise<CommandPaletteItem[]>;
   loading?: boolean;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -107,6 +110,8 @@ export function CommandPalette({
       : null,
   );
   const [query, setQuery] = useState("");
+  const [messageItems, setMessageItems] = useState<CommandPaletteItem[]>([]);
+  const [searchPending, setSearchPending] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [recentIds, setRecentIds] = useState<string[]>(() =>
     open ? loadCommandPaletteRecents() : []
@@ -116,20 +121,43 @@ export function CommandPalette({
     if (!open) return;
     restoreFocusOnCloseRef.current = true;
     setQuery(initialQuery);
+    setMessageItems([]);
     setActiveId(null);
     setRecentIds(loadCommandPaletteRecents());
   }, [initialQuery, open]);
 
+  useEffect(() => {
+    const scoped = query.trim().match(/^m:\s*(.*)$/isu);
+    const term = scoped?.[1]?.trim() ?? "";
+    if (!open || !messageSearch || term.length < 3) {
+      setMessageItems([]);
+      setSearchPending(false);
+      return;
+    }
+    setSearchPending(true);
+    setMessageItems([]);
+    let current = true;
+    const timer = setTimeout(() => {
+      void messageSearch(term).then(
+        (results) => { if (current) setMessageItems(results); },
+        () => { if (current) setMessageItems([]); },
+      ).finally(() => { if (current) setSearchPending(false); });
+    }, 220);
+    return () => { current = false; clearTimeout(timer); };
+  }, [open, query, messageSearch]);
+
   const hasQuery = query.trim().length > 0;
   const matchedGroups = useMemo(() => {
-    const matched = groupCommandPaletteItems(items, query);
+    const matched = groupCommandPaletteItems(
+      /^m:/iu.test(query.trim()) ? messageItems : items, query,
+    );
     if (hasQuery) return matched;
     return matched.sort(
       (left, right) =>
         (emptySectionOrder.get(left.section) ?? Number.MAX_SAFE_INTEGER) -
         (emptySectionOrder.get(right.section) ?? Number.MAX_SAFE_INTEGER),
     );
-  }, [hasQuery, items, query]);
+  }, [hasQuery, items, messageItems, query]);
   const totalResultCount = useMemo(
     () =>
       matchedGroups.reduce(
@@ -410,7 +438,7 @@ export function CommandPalette({
               className="grid min-h-40 place-items-center px-6 py-8 text-center"
               role="status"
             >
-              {loading ? (
+              {loading || searchPending ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Spinner aria-hidden="true" className="size-[17px]" />
                   {t("commandPalette.loading")}

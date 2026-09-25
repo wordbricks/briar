@@ -118,6 +118,7 @@ import {
   appCreateChannelMessageResponse,
 } from "./app-connect-channel-response-mappers";
 import { schedulePostCommitCleanup } from "./post-commit-cleanup";
+import { searchWorkspaceChannelMessages } from "./channel-message-search";
 import {
   prepareChannelMessageAttachmentsApplication,
 } from "./channel-message-upload-application";
@@ -159,6 +160,7 @@ export type AppConnectChannelServices = {
   readonly getMessageDocument: typeof getChannelMessageDocumentApplication;
   readonly listChannels: typeof listWorkspaceChannels;
   readonly listMessages: typeof listWorkspaceChannelMessages;
+  readonly searchMessages: typeof searchWorkspaceChannelMessages;
   readonly markRead: typeof markWorkspaceChannelRead;
   readonly markUnread: typeof markChannelUnreadApplication;
   readonly updateSidebarPreference:
@@ -199,6 +201,7 @@ export const appConnectChannelServices: AppConnectChannelServices = {
   getMessageDocument: getChannelMessageDocumentApplication,
   listChannels: listWorkspaceChannels,
   listMessages: listWorkspaceChannelMessages,
+  searchMessages: searchWorkspaceChannelMessages,
   markRead: markWorkspaceChannelRead,
   markUnread: markChannelUnreadApplication,
   updateSidebarPreference: updateChannelSidebarPreferenceApplication,
@@ -770,6 +773,32 @@ const createAppChannelService = (
     });
     return create(ChannelService.method.listChannelMessages.output, {
       messages: result.messages.map(appChannelMessage),
+      nextCursor: result.nextCursor ?? undefined,
+    });
+  },
+
+  searchChannelMessages: async (request, context) => {
+    context.responseHeader.set("Cache-Control", "private, no-store");
+    const session = await services.requireSession(input.auth, input.request);
+    const result = await services.searchMessages({
+      db: input.db,
+      workspaceId: canonicalUuid(request.workspaceId),
+      userId: session.user.id,
+      channelId: request.channelId ? canonicalUuid(request.channelId) : null,
+      query: request.query,
+      cursor: request.cursor,
+      limit: request.limit,
+    });
+    return create(ChannelService.method.searchChannelMessages.output, {
+      hits: result.hits.map((hit) => ({
+        messageId: hit.messageId,
+        channelId: hit.channelId,
+        rootMessageId: hit.rootMessageId,
+        channelName: hit.channelName,
+        isDirectMessage: hit.isDirectMessage,
+        body: hit.body,
+        createdAt: timestampFromDate(new Date(hit.createdAt)),
+      })),
       nextCursor: result.nextCursor ?? undefined,
     });
   },

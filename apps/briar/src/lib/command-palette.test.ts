@@ -83,6 +83,10 @@ describe("command palette search", () => {
       query: "bri",
       scope: "issues",
     });
+    expect(parseCommandPaletteQuery("m: 고양이")).toEqual({
+      query: "고양이".normalize("NFKD"),
+      scope: "messages",
+    });
     expect(parseCommandPaletteQuery("p:")).toEqual({
       query: "",
       scope: "projects",

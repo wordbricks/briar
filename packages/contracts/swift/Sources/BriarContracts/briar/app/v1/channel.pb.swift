@@ -1363,6 +1363,107 @@ public nonisolated struct BriarAPI_ListChannelMessagesResponse: Sendable {
   fileprivate var _nextCursor: String? = nil
 }
 
+public nonisolated struct BriarAPI_SearchChannelMessagesRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var workspaceID: String = String()
+
+  public var query: String = String()
+
+  public var channelID: String {
+    get {_channelID ?? String()}
+    set {_channelID = newValue}
+  }
+  /// Returns true if `channelID` has been explicitly set.
+  public var hasChannelID: Bool {self._channelID != nil}
+  /// Clears the value of `channelID`. Subsequent reads from it will return its default value.
+  public mutating func clearChannelID() {self._channelID = nil}
+
+  public var cursor: String {
+    get {_cursor ?? String()}
+    set {_cursor = newValue}
+  }
+  /// Returns true if `cursor` has been explicitly set.
+  public var hasCursor: Bool {self._cursor != nil}
+  /// Clears the value of `cursor`. Subsequent reads from it will return its default value.
+  public mutating func clearCursor() {self._cursor = nil}
+
+  public var limit: UInt32 {
+    get {_limit ?? 0}
+    set {_limit = newValue}
+  }
+  /// Returns true if `limit` has been explicitly set.
+  public var hasLimit: Bool {self._limit != nil}
+  /// Clears the value of `limit`. Subsequent reads from it will return its default value.
+  public mutating func clearLimit() {self._limit = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _channelID: String? = nil
+  fileprivate var _cursor: String? = nil
+  fileprivate var _limit: UInt32? = nil
+}
+
+public nonisolated struct BriarAPI_SearchChannelMessageHit: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var messageID: String = String()
+
+  public var channelID: String = String()
+
+  public var rootMessageID: String = String()
+
+  public var channelName: String = String()
+
+  public var isDirectMessage: Bool = false
+
+  public var body: String = String()
+
+  public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {self._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
+public nonisolated struct BriarAPI_SearchChannelMessagesResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var hits: [BriarAPI_SearchChannelMessageHit] = []
+
+  public var nextCursor: String {
+    get {_nextCursor ?? String()}
+    set {_nextCursor = newValue}
+  }
+  /// Returns true if `nextCursor` has been explicitly set.
+  public var hasNextCursor: Bool {self._nextCursor != nil}
+  /// Clears the value of `nextCursor`. Subsequent reads from it will return its default value.
+  public mutating func clearNextCursor() {self._nextCursor = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _nextCursor: String? = nil
+}
+
 public nonisolated struct BriarAPI_PrepareChannelMessageAttachmentsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -5383,6 +5484,163 @@ nonisolated extension BriarAPI_ListChannelMessagesResponse: SwiftProtobuf.Messag
 
   public static func ==(lhs: BriarAPI_ListChannelMessagesResponse, rhs: BriarAPI_ListChannelMessagesResponse) -> Bool {
     if lhs.messages != rhs.messages {return false}
+    if lhs._nextCursor != rhs._nextCursor {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_SearchChannelMessagesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchChannelMessagesRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}query\0\u{3}channel_id\0\u{1}cursor\0\u{1}limit\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.query) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._channelID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._cursor) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self._limit) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
+    }
+    if !self.query.isEmpty {
+      try visitor.visitSingularStringField(value: self.query, fieldNumber: 2)
+    }
+    try { if let v = self._channelID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._cursor {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._limit {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_SearchChannelMessagesRequest, rhs: BriarAPI_SearchChannelMessagesRequest) -> Bool {
+    if lhs.workspaceID != rhs.workspaceID {return false}
+    if lhs.query != rhs.query {return false}
+    if lhs._channelID != rhs._channelID {return false}
+    if lhs._cursor != rhs._cursor {return false}
+    if lhs._limit != rhs._limit {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_SearchChannelMessageHit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchChannelMessageHit"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}message_id\0\u{3}channel_id\0\u{3}root_message_id\0\u{3}channel_name\0\u{3}is_direct_message\0\u{1}body\0\u{3}created_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.messageID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.rootMessageID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.channelName) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.isDirectMessage) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.body) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.messageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.messageID, fieldNumber: 1)
+    }
+    if !self.channelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
+    }
+    if !self.rootMessageID.isEmpty {
+      try visitor.visitSingularStringField(value: self.rootMessageID, fieldNumber: 3)
+    }
+    if !self.channelName.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelName, fieldNumber: 4)
+    }
+    if self.isDirectMessage != false {
+      try visitor.visitSingularBoolField(value: self.isDirectMessage, fieldNumber: 5)
+    }
+    if !self.body.isEmpty {
+      try visitor.visitSingularStringField(value: self.body, fieldNumber: 6)
+    }
+    try { if let v = self._createdAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_SearchChannelMessageHit, rhs: BriarAPI_SearchChannelMessageHit) -> Bool {
+    if lhs.messageID != rhs.messageID {return false}
+    if lhs.channelID != rhs.channelID {return false}
+    if lhs.rootMessageID != rhs.rootMessageID {return false}
+    if lhs.channelName != rhs.channelName {return false}
+    if lhs.isDirectMessage != rhs.isDirectMessage {return false}
+    if lhs.body != rhs.body {return false}
+    if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension BriarAPI_SearchChannelMessagesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SearchChannelMessagesResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}hits\0\u{3}next_cursor\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.hits) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._nextCursor) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.hits.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.hits, fieldNumber: 1)
+    }
+    try { if let v = self._nextCursor {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_SearchChannelMessagesResponse, rhs: BriarAPI_SearchChannelMessagesResponse) -> Bool {
+    if lhs.hits != rhs.hits {return false}
     if lhs._nextCursor != rhs._nextCursor {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

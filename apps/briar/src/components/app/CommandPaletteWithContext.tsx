@@ -1,6 +1,11 @@
-import { useAtomValue } from "@effect/atom-react";
-import { lazy, Suspense, type ComponentProps } from "react";
-
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { lazy, Suspense, useCallback, type ComponentProps } from "react";
+import { MessageSquare } from "lucide-react";
+import { searchChannelMessages } from "../../lib/api";
+import { useI18n } from "../../i18n";
+import { useChannelActions } from "../../state/channels/actions";
+import { messageSearchChannelIdAtom, organizationDirectMessagesAtom, requestedChannelMessageAtom, visibleWorkspaceChannelsAtom } from "../../state/channels/atoms";
+import { tokenAtom } from "../../state/session/atoms";
 import { directMessageDisplayName } from "../../lib/direct-messages";
 import { formatIssueKey } from "../../lib/issue-key";
 import { channelAtom } from "../../state/entities/channels";
@@ -36,10 +41,11 @@ const CommandPalette = lazy(() =>
 
 type CommandPaletteShellProps = Omit<
   ComponentProps<typeof CommandPalette>,
-  "contextLabel" | "loading"
+  "contextLabel" | "loading" | "messageSearch"
 >;
 
 export function CommandPaletteWithContext(props: CommandPaletteShellProps) {
+  const { t } = useI18n();
   const activePage = useAtomValue(activePageAtom);
   const selectedRunId = useAtomValue(activeRunIdAtom);
   const sessionLoading = useAtomValue(loadingAtom);
@@ -56,6 +62,44 @@ export function CommandPaletteWithContext(props: CommandPaletteShellProps) {
   const currentRun =
     selectedRunId && activeTeamRunIds?.includes(selectedRunId) ? storedRun : null;
 
+  const token = useAtomValue(tokenAtom);
+  const messageSearchChannelId = useAtomValue(messageSearchChannelIdAtom);
+  const setMessageSearchChannelId = useAtomSet(messageSearchChannelIdAtom);
+  const setRequestedMessage = useAtomSet(requestedChannelMessageAtom);
+  const { openWorkspaceChannel } = useChannelActions();
+  const visibleChannels = useAtomValue(visibleWorkspaceChannelsAtom);
+  const visibleDms = useAtomValue(organizationDirectMessagesAtom);
+  const messageSearch = useCallback(async (query: string) => {
+    if (!token || !activeWorkspace) return [];
+    const { hits } = await searchChannelMessages(token, activeWorkspace.id, query, {
+      channelId: messageSearchChannelId ?? undefined,
+      limit: 20,
+    });
+    const allowedIds = new Set([...visibleChannels, ...visibleDms].map((channel) => channel.id));
+    return hits.filter((hit) => allowedIds.has(hit.channelId)).map((hit) => ({
+      id: `message:${hit.messageId}`,
+      label: hit.body.slice(0, 100),
+      description: hit.channelName,
+      icon: <MessageSquare />,
+      scope: "messages" as const,
+      section: "messages",
+      sectionLabel: t("commandPalette.groupMessages"),
+      remember: false,
+      onSelect: () => {
+        setRequestedMessage({
+          channelId: hit.channelId,
+          messageId: hit.messageId,
+          rootMessageId: hit.rootMessageId,
+        });
+        openWorkspaceChannel(hit.channelId);
+      },
+    }));
+  }, [token, activeWorkspace, messageSearchChannelId, visibleChannels, visibleDms, setRequestedMessage, openWorkspaceChannel, t]);
+  const onPaletteOpenChange = useCallback((open: boolean) => {
+    if (!open) setMessageSearchChannelId(null);
+    props.onOpenChange(open);
+  }, [props.onOpenChange, setMessageSearchChannelId]);
+
   const contextLabel =
     currentRun && activeTeam
       ? `${formatIssueKey(activeTeam.issueKeyPrefix, currentRun.runNumber)} · ${currentRun.title}`
@@ -69,6 +113,8 @@ export function CommandPaletteWithContext(props: CommandPaletteShellProps) {
     <Suspense fallback={null}>
       <CommandPalette
         {...props}
+        onOpenChange={onPaletteOpenChange}
+        messageSearch={messageSearch}
         contextLabel={contextLabel}
         loading={sessionLoading || channelsLoading}
       />

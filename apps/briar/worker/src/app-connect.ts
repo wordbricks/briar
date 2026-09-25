@@ -169,7 +169,7 @@ export async function handleAppConnectRequest(
     !/\/(?:ListDmMemories|GetDmMemoryDocument|ListDmMemoryRevisions)$/u.test(pathname)
   ) || (
     pathname.startsWith("/briar.app.v1.ChannelService/") &&
-    !/\/(?:ListChannels|SyncChannels|ListDirectMessageRecipients|ListChannelWebhooks|GetChannel|ListChannelMessages|GetChannelMessageDocument|GetChannelLinkPreview)$/u.test(pathname)
+    !/\/(?:ListChannels|SyncChannels|ListDirectMessageRecipients|ListChannelWebhooks|GetChannel|ListChannelMessages|SearchChannelMessages|GetChannelMessageDocument|GetChannelLinkPreview)$/u.test(pathname)
   );
   if (mutationMayRevokeMemory) {
     scheduleDmMemoryActivityRevocations(input.env.DB, input.env, input.context);
