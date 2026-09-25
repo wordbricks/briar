@@ -5,6 +5,7 @@ import type { HuntRun } from "../../types";
 import {
   emptyIssuePropertyFilters,
   filterRunIds,
+  issueUpdatedBucketOf,
   runMatchesBoardFilters,
   runMatchesIssuePropertyFilters,
   runSearchText,
@@ -81,6 +82,7 @@ describe("board filters", () => {
       assignee: ["member-1"],
       agent: ["agent-1"],
       creator: ["creator-1"],
+      updated: [],
     };
 
     expect(runMatchesIssuePropertyFilters(runningIssue, filters)).toBe(true);
@@ -95,6 +97,7 @@ describe("board filters", () => {
         assignee: ["__unset__"],
         agent: ["__unset__"],
         creator: [],
+        updated: [],
       }),
     ).toBe(true);
   });
@@ -160,5 +163,61 @@ describe("board filters", () => {
       "b",
       "a",
     ]);
+  });
+
+  it("buckets the last-updated time by whole elapsed days without overlap", () => {
+    const now = Date.parse("2026-09-25T12:00:00.000Z");
+    const hoursAgo = (hours: number) =>
+      new Date(now - hours * 60 * 60 * 1000).toISOString();
+
+    expect(issueUpdatedBucketOf(hoursAgo(0), now)).toBe("last24h");
+    expect(issueUpdatedBucketOf(hoursAgo(23.99), now)).toBe("last24h");
+    expect(issueUpdatedBucketOf(hoursAgo(24), now)).toBe("days1to7");
+    expect(issueUpdatedBucketOf(hoursAgo(7 * 24 + 23), now)).toBe("days1to7");
+    expect(issueUpdatedBucketOf(hoursAgo(8 * 24), now)).toBe("days8to30");
+    expect(issueUpdatedBucketOf(hoursAgo(30 * 24 + 23), now)).toBe("days8to30");
+    expect(issueUpdatedBucketOf(hoursAgo(31 * 24), now)).toBe("over30d");
+    expect(issueUpdatedBucketOf(hoursAgo(-1), now)).toBe("last24h");
+    expect(issueUpdatedBucketOf("not a date", now)).toBeNull();
+    expect(issueUpdatedBucketOf(null, now)).toBeNull();
+  });
+
+  it("ORs selected update buckets and ANDs them with other properties", () => {
+    const now = Date.parse("2026-09-25T12:00:00.000Z");
+    const fresh = runOf({
+      id: "fresh",
+      status: "running",
+      updatedAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+    });
+    const stale = runOf({
+      id: "stale",
+      status: "paused",
+      updatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const weekOld = runOf({
+      id: "week",
+      status: "running",
+      updatedAt: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const filters = (overrides: Partial<IssuePropertyFilters>) => ({
+      ...emptyIssuePropertyFilters(),
+      ...overrides,
+    });
+
+    const recent = filters({ updated: ["last24h", "days1to7"] });
+    expect(runMatchesIssuePropertyFilters(fresh, recent, now)).toBe(true);
+    expect(runMatchesIssuePropertyFilters(weekOld, recent, now)).toBe(true);
+    expect(runMatchesIssuePropertyFilters(stale, recent, now)).toBe(false);
+
+    const runningAndOld = filters({ updated: ["over30d"], status: ["running"] });
+    expect(runMatchesIssuePropertyFilters(stale, runningAndOld, now)).toBe(false);
+    expect(
+      runMatchesIssuePropertyFilters(
+        stale,
+        filters({ updated: ["over30d"], status: ["paused"] }),
+        now,
+      ),
+    ).toBe(true);
+    expect(runMatchesIssuePropertyFilters(stale, emptyIssuePropertyFilters(), now)).toBe(true);
   });
 });
