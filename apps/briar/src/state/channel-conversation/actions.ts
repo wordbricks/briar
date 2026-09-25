@@ -54,6 +54,7 @@ import {
   channelThreadSubscriptionAction,
   channelThreadSubscriptionPendingAtom,
 } from "./atoms";
+import { confirmChannelMessageDeletion } from "./delete-confirmation";
 import {
   channelConversationFailureAtom,
   reportChannelConversationError,
@@ -643,7 +644,11 @@ export function createChannelConversationActions(
     const session = credentials();
     const context = options.context();
     if (!session || !channelId || item.deletedAt) return;
-    if (!window.confirm(context.text.deleteMessageConfirm)) return;
+    const confirmed = await confirmChannelMessageDeletion(
+      registry,
+      context.text.deleteMessageConfirm,
+    );
+    if (!confirmed) return;
     const { token, workspaceId } = session;
     const api = resolveApi();
     const deletionContext = loader.captureSurface();
