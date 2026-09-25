@@ -30,6 +30,21 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.232",
+        date: "2026년 9월 26일",
+        title: "이슈 관리와 알림이 더 선명해졌습니다",
+        summary:
+          "업데이트 시점으로 이슈를 찾고 알림 출처를 바로 구분할 수 있습니다. 대기열과 삭제 확인 동작을 다듬었고, transcript 저장 비용도 줄였습니다.",
+        items: [
+          "이슈 목록을 업데이트 시점으로 필터링할 수 있습니다.",
+          "알림에 이슈 대화와 채널 메시지를 구분하는 출처 배지가 표시되고, 출처별로 필터링할 수 있습니다.",
+          "담당자가 없는 queued 이슈를 Kanban 보드에서 backlog로 되돌릴 수 있습니다.",
+          "채널 삭제 확인이 시스템 팝업 대신 앱 안의 일관된 확인 화면으로 표시됩니다.",
+          "DM 확인 이모지가 메시지의 의도에 더 정확히 맞도록 판단 기준을 개선했습니다.",
+          "중복 transcript segment 인덱스를 제거해 데이터 변경 없이 D1 쓰기 및 저장 공간 부담을 줄였습니다.",
+        ],
+      },
+      {
         version: "1.2.231",
         date: "2026년 9월 10일",
         title: "DM 답장 실패와 확인 이모지를 고쳤습니다",
@@ -2070,6 +2085,21 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.232",
+        date: "September 26, 2026",
+        title: "Clearer issue management and notification context",
+        summary:
+          "Issues can now be filtered by update time, and notification sources are visible at a glance. Queue and delete-confirmation behavior is more predictable, while transcript storage writes less redundant index data.",
+        items: [
+          "Filter the issue list by when issues were last updated.",
+          "Notification badges and filters distinguish issue conversations from channel messages.",
+          "Return unassigned queued issues to the backlog from the Kanban board.",
+          "Channel deletion uses a consistent in-app confirmation dialog instead of a system prompt.",
+          "DM acknowledgement emoji guidance better matches the intent of each message.",
+          "A redundant transcript segment index was removed, reducing D1 write and storage overhead without changing transcript data.",
+        ],
+      },
       {
         version: "1.2.231",
         date: "September 10, 2026",
