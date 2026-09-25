@@ -254,7 +254,8 @@ describe("HuntBoard", () => {
       priority: ["1"],
       assignee: ["member-1"],
       agent: ["agent-1"],
-      creator: ["creator-1"]
+      creator: ["creator-1"],
+      updated: []
     };
     expect(runMatchesIssuePropertyFilters(runningIssue, filters)).toBe(true);
     expect(runMatchesIssuePropertyFilters(unassignedFeedback, filters)).toBe(false);
@@ -264,7 +265,8 @@ describe("HuntBoard", () => {
       priority: ["__unset__"],
       assignee: ["__unset__"],
       agent: ["__unset__"],
-      creator: []
+      creator: [],
+      updated: []
     })).toBe(true);
   });
   it("opens issue creation with Command-N", async () => {
