@@ -156,6 +156,32 @@ export type InboxCategory =
   | "important"
   | "activity";
 
+/**
+ * Where an inbox message came from, as the list shows and filters it: issue
+ * run updates and issue conversations are both "issue", a channel thread reply
+ * is "channel", and an agent session notice is "agent".
+ */
+export type InboxOrigin = "issue" | "channel" | "agent";
+
+/** The origin filter choices; "all" keeps every origin, including agent. */
+export const inboxOriginFilters = ["all", "issue", "channel"] as const;
+export type InboxOriginFilter = (typeof inboxOriginFilters)[number];
+
+export function inboxMessageOrigin(
+  message: Pick<InboxMessage, "kind">,
+): InboxOrigin {
+  if (message.kind === "channel") return "channel";
+  if (message.kind === "session") return "agent";
+  return "issue";
+}
+
+export function inboxOriginFilterMatches(
+  origin: InboxOrigin,
+  filter: InboxOriginFilter,
+) {
+  return filter === "all" || origin === filter;
+}
+
 export function inboxIssueMessageVersion(
   run: Pick<
     HuntRun,
