@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { moveProjectIssueRun } from "./issue-control-routes";
+import { moveHuntRun } from "./hunt-run-move-repository";
 import { getHuntRunForProject } from "./db";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 
@@ -51,6 +52,21 @@ describe("queued issue editor corrections", () => {
     await expect(move(queuedId, "queued")).rejects.toMatchObject({ status: 403 });
     await expect(move(queuedId, "backlog")).resolves.toMatchObject({ outcome: "moved", status: "backlog" });
     expect(await getHuntRunForProject(env.DB, teamId, queuedId)).toMatchObject({ status: "backlog" });
+  });
+
+  it("does not create a move event when dispatch wins after permission check", async () => {
+    const requestId = crypto.randomUUID();
+    await expect(moveHuntRun(env.DB, teamId, {
+      runId: dispatchedId, status: "backlog", workflowStage: null,
+      requestId, actor: `briar-app:${editorId}`, occurredAt: new Date().toISOString(),
+      requireUnclaimedQueueCorrection: true,
+    })).rejects.toThrow("Issue processing run changed");
+    expect(await getHuntRunForProject(env.DB, teamId, dispatchedId))
+      .toMatchObject({ status: "queued", dispatch_request_id: queuedId });
+    const event = await env.DB.prepare(
+      "select id from briar_hunt_events where run_id = ? and event_key = ?",
+    ).bind(dispatchedId, `admin:move:${requestId}`).first();
+    expect(event).toBeNull();
   });
 
   it("keeps execution changes restricted and reports missing runs", async () => {
