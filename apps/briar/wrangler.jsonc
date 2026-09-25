@@ -17,6 +17,14 @@
     {
       "pattern": "briar.wordbricks.ai/device*",
       "zone_name": "wordbricks.ai"
+    },
+    {
+      "pattern": "briar.wordbricks.ai/hooks/*",
+      "zone_name": "wordbricks.ai"
+    },
+    {
+      "pattern": "briar.wordbricks.ai/open/*",
+      "zone_name": "wordbricks.ai"
     }
   ],
   "rules": [
