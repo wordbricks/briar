@@ -1600,6 +1600,11 @@ export const ko = {
   "dashboard.filter": "필터",
   "dashboard.propertyFilters": "프로퍼티 필터",
   "dashboard.clearFilters": "필터 모두 지우기",
+  "dashboard.updatedFilter": "업데이트 시점",
+  "dashboard.updatedFilter.last24h": "최근 24시간",
+  "dashboard.updatedFilter.days1to7": "1~7일 전",
+  "dashboard.updatedFilter.days8to30": "8~30일 전",
+  "dashboard.updatedFilter.over30d": "30일 초과",
   "dashboard.connectRepositoryTitle": "이 컴퓨터에 저장소가 연결되지 않았습니다.",
   "dashboard.connectRepositoryDescription":
     "이슈와 설정은 계정에 저장되어 있습니다. 대기 이슈를 처리하려면 이 컴퓨터의 Git 저장소만 연결하세요.",
