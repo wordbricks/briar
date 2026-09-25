@@ -15,7 +15,7 @@ const root = "c9999999-9999-4999-8999-999999999999";
 const reply = "caaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const timestamp = "2026-09-25T00:00:00.000Z";
 const search = (userId: string, query: string, extra: {
-  channelId?: string; cursor?: string; limit?: number;
+  channelId?: string; cursor?: string; limit?: number; kind?: "channel" | "dm";
 } = {}) => searchWorkspaceChannelMessages({
   db: env.DB, workspaceId: workspace, userId, query, ...extra,
 });
@@ -67,6 +67,8 @@ describe("workspace message body search", () => {
       "cb222222-2222-4222-8222-222222222222", reply, root,
     ]);
     expect(found.hits.find((hit) => hit.messageId === reply)?.rootMessageId).toBe(root);
+    expect((await search(reader, "고양")).hits.map((hit) => hit.messageId))
+      .toEqual(["cb222222-2222-4222-8222-222222222222", reply, root]);
     expect((await search(reader, "meeting")).hits.map((hit) => hit.messageId))
       .toEqual([reply, root]);
   });
@@ -86,6 +88,33 @@ describe("workspace message body search", () => {
     expect(second.hits.map((hit) => hit.messageId)).toEqual([reply, root]);
     await expect(search(owner, "고양이", {cursor: alien})).rejects.toMatchObject({status: 400});
     await expect(search(owner, "고")).rejects.toMatchObject({status: 400});
+  });
+  it("ranks a prefix match above a newer substring and paginates across ranks", async () => {
+    const prefixId = "cb555555-5555-4555-8555-555555555555";
+    const innerId = "cb666666-6666-4666-8666-666666666666";
+    for (const [id, body, minute] of [
+      [prefixId, "ranking first", "06"],
+      [innerId, "later ranking", "07"],
+    ]) {
+      await env.DB.prepare(`insert into briar_channel_messages
+        (id,channel_id,author_user_id,body,created_at,updated_at)
+        values (?,?,?,?,?,?)`).bind(id, publicChannel, owner, body,
+        `2026-09-25T00:${minute}:00.000Z`, timestamp).run();
+    }
+    const page = await search(owner, "ranking", { limit: 1 });
+    expect(page.hits[0]?.messageId).toBe(prefixId);
+    const second = await search(owner, "ranking", { limit: 1, cursor: page.nextCursor! });
+    expect(second.hits[0]?.messageId).toBe(innerId);
+  });
+  it("filters by channel/DM kind and identifies authors and replies", async () => {
+    const channel = await search(owner, "고양", { kind: "channel" });
+    expect(channel.hits.every((hit) => !hit.isDirectMessage)).toBe(true);
+    expect(channel.hits.find((hit) => hit.messageId === reply)).toMatchObject({
+      authorName: "Owner", isThreadReply: true,
+    });
+    const direct = await search(owner, "고양", { kind: "dm" });
+    expect(direct.hits).toHaveLength(1);
+    expect(direct.hits[0]?.isDirectMessage).toBe(true);
   });
   it("updates the index when a body changes and removes it on deletion", async () => {
     await env.DB.prepare("update briar_channel_messages set body = ? where id = ?")
