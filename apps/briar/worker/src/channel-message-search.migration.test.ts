@@ -38,6 +38,14 @@ describe("channel message search migration", () => {
     expect(editedMatch.results).toHaveLength(1);
     await db.prepare(`insert into briar_channel_messages (id,channel_id,author_user_id,body,created_at,updated_at)
       values ('search-migration-new','search-migration-channel','search-migration-user','new apple','2026-09-25','2026-09-25')`).run();
+    // The body limit is 50k; a two-character hit near the end must be indexed.
+    await db.prepare(`insert into briar_channel_messages
+      (id,channel_id,author_user_id,body,created_at,updated_at)
+      values ('search-migration-long','search-migration-channel','search-migration-user',?,'2026-09-25','2026-09-25')`)
+      .bind(`${"a".repeat(10_100)}한글`).run();
+    const tailHit = await db.prepare(`select count(*) as count from briar_channel_message_bigrams
+      where gram = '한글'`).first<number>('count');
+    expect(tailHit).toBe(1);
     const newMatch = await db.prepare(`select message.id from briar_channel_message_search idx
       join briar_channel_messages message on message.rowid=idx.rowid
       where briar_channel_message_search match '"apple"'`).all<{id:string}>();

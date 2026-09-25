@@ -47,7 +47,7 @@ begin
   from json_each('[' || (select group_concat(value) from (
     with recursive positions(value) as (
       select 1 union all select value + 1 from positions
-      where value < length(new.body) - 1 and value < 10000
+      where value < length(new.body) - 1 and value < 50000
     ) select value from positions
   )) || ']') positions
   where length(lower(substr(new.body, positions.value, 2))) = 2;
@@ -70,7 +70,7 @@ begin
   from json_each('[' || (select group_concat(value) from (
     with recursive positions(value) as (
       select 1 union all select value + 1 from positions
-      where value < length(new.body) - 1 and value < 10000
+      where value < length(new.body) - 1 and value < 50000
     ) select value from positions
   )) || ']') positions
   where new.deleted_at is null and length(lower(substr(new.body, positions.value, 2))) = 2;
