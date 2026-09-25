@@ -84,6 +84,12 @@ export const activeChannelIdAtom = organizationScopedAtom<string | null>(
   "channels/activeId",
 );
 
+/** Limit a header-initiated message search to its conversation until the palette closes. */
+export const messageSearchChannelIdAtom = organizationScopedAtom<string | null>(
+  null,
+  "channels/messageSearchChannelId",
+);
+
 /** A channel whose settings dialog should open once the view mounts. */
 export const requestedChannelSettingsIdAtom = organizationScopedAtom<
   string | null

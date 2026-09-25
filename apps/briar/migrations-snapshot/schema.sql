@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 964cfeed82e94581f715728a2802322160d78d9510ee339dafbe082839d295c8
--- snapshot-digest: 9d434b74db51bd4b0e0f36a9134bd3676ef45575f053b6d0399f883d070858f8
+-- migrations-digest: f2790f8bfac527636f5b5273370b1ff780151901bae54c6918187cd83c74f92b
+-- snapshot-digest: 82459833ce9324d597a675ce57f0e49f6e33b7e3cfdf6f49a873b9e415471d66
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14010,3 +14010,29 @@ BEGIN
     and project_id = new.project_id and issue_source_key = new.source_key
     and accepted_by_user_id is not null and accepted_at is not null;
 END;
+-- @statement
+create virtual table briar_channel_message_search using fts5(
+  body,
+  tokenize='trigram'
+);
+-- @statement
+create trigger briar_channel_message_search_insert
+  after insert on briar_channel_messages when new.deleted_at is null
+begin
+  insert into briar_channel_message_search(rowid, body)
+  values (new.rowid, new.body);
+end;
+-- @statement
+create trigger briar_channel_message_search_delete
+  after delete on briar_channel_messages when old.deleted_at is null
+begin
+  delete from briar_channel_message_search where rowid = old.rowid;
+end;
+-- @statement
+create trigger briar_channel_message_search_update
+  after update of body, deleted_at on briar_channel_messages
+begin
+  delete from briar_channel_message_search where rowid = old.rowid;
+  insert into briar_channel_message_search(rowid, body)
+  select new.rowid, new.body where new.deleted_at is null;
+end;

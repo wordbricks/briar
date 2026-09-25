@@ -24,6 +24,9 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "./ui/spinner";
+import { useAtomSet } from "@effect/atom-react";
+import { commandPaletteInitialQueryAtom, isCommandPaletteOpenAtom } from "../state/dialogs/atoms";
+import { messageSearchChannelIdAtom } from "../state/channels/atoms";
 import { DmMemoryCitations } from "./DmMemoryCitations";
 import { DmComputerPanel, type DmComputerPanelServices } from "./DmComputerPanel";
 import {
@@ -379,6 +382,15 @@ export function Channels({
   );
   const [computerPanelAvailable, setComputerPanelAvailable] = useState(false);
   const computerPanelId = useId();
+  const setMessageSearchChannelId = useAtomSet(messageSearchChannelIdAtom);
+  const setPaletteQuery = useAtomSet(commandPaletteInitialQueryAtom);
+  const setPaletteOpen = useAtomSet(isCommandPaletteOpenAtom);
+  const openMessageSearch = () => {
+    if (!activeChannelId) return;
+    setMessageSearchChannelId(activeChannelId);
+    setPaletteQuery("m:");
+    setPaletteOpen(true);
+  };
   const { t, localeTag } = useI18n();
   const imageCache = useChannelMessageImageCache(`${workspaceId}\0${token}`);
   useEffect(() => {
@@ -1367,6 +1379,12 @@ export function Channels({
                 </div>
               )}
               <div className="channel-header-actions">
+                <button type="button" className="channel-header-icon"
+                  aria-label={t("channel.searchMessages")}
+                  title={t("channel.searchMessages")}
+                  onClick={openMessageSearch}>
+                  <Search size={16} aria-hidden="true" />
+                </button>
                 {readOnly ? (
                   <Badge
                     className="channel-readonly-badge shrink-0 gap-1"

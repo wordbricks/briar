@@ -38,6 +38,7 @@ service ChannelService {
   rpc RenameChannelSidebarSection(RenameChannelSidebarSectionRequest) returns (RenameChannelSidebarSectionResponse);
   rpc DeleteChannelSidebarSection(DeleteChannelSidebarSectionRequest) returns (DeleteChannelSidebarSectionResponse);
   rpc ListChannelMessages(ListChannelMessagesRequest) returns (ListChannelMessagesResponse);
+  rpc SearchChannelMessages(SearchChannelMessagesRequest) returns (SearchChannelMessagesResponse);
   rpc PrepareChannelMessageAttachments(PrepareChannelMessageAttachmentsRequest) returns (PrepareChannelMessageAttachmentsResponse);
   rpc CreateChannelMessage(CreateChannelMessageRequest) returns (CreateChannelMessageResponse);
   rpc DeleteChannelMessage(DeleteChannelMessageRequest) returns (DeleteChannelMessageResponse);
@@ -354,6 +355,29 @@ message ListChannelMessagesRequest {
 
 message ListChannelMessagesResponse {
   repeated ChannelMessage messages = 1;
+  optional string next_cursor = 2;
+}
+
+message SearchChannelMessagesRequest {
+  string workspace_id = 1;
+  string query = 2;
+  optional string channel_id = 3;
+  optional string cursor = 4;
+  optional uint32 limit = 5;
+}
+
+message SearchChannelMessageHit {
+  string message_id = 1;
+  string channel_id = 2;
+  string root_message_id = 3;
+  string channel_name = 4;
+  bool is_direct_message = 5;
+  string body = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message SearchChannelMessagesResponse {
+  repeated SearchChannelMessageHit hits = 1;
   optional string next_cursor = 2;
 }
 

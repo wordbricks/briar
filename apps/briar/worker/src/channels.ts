@@ -627,7 +627,7 @@ const agentDirectMessageVisibleToUser = `(
   Agent-to-Agent DM open keeps receiving it. Binds the user ID twice, the
   membership check first.
 */
-const readableByUser = `(
+export const readableByUser = `(
   ${visibleToUser}
   or ${agentDirectMessageVisibleToUser}
 )`;
