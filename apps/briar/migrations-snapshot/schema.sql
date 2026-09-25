@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 4e038eadbcdca3fc3c7bc707ec7ddd51357fc8078d3e42acfeb8e7bbb49eba9f
--- snapshot-digest: c4b818079fbab7d682de4933f53c093ea2ef451d384f9e147091e2678c088cce
+-- migrations-digest: 935743267936e68610db650b3d730eeba04904d42541b9f58ba05564d8e90589
+-- snapshot-digest: d8829a95f0301ca784fb4f37ccf6ea6eb6ddee69fa6e0a38375872574f809f73
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14051,7 +14051,7 @@ begin
   from json_each('[' || (select group_concat(value) from (
     with recursive positions(value) as (
       select 1 union all select value + 1 from positions
-      where value < length(new.body) - 1 and value < 10000
+      where value < length(new.body) - 1 and value < 50000
     ) select value from positions
   )) || ']') positions
   where length(lower(substr(new.body, positions.value, 2))) = 2;
@@ -14072,7 +14072,7 @@ begin
   from json_each('[' || (select group_concat(value) from (
     with recursive positions(value) as (
       select 1 union all select value + 1 from positions
-      where value < length(new.body) - 1 and value < 10000
+      where value < length(new.body) - 1 and value < 50000
     ) select value from positions
   )) || ']') positions
   where new.deleted_at is null and length(lower(substr(new.body, positions.value, 2))) = 2;
