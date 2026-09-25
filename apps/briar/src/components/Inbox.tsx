@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleAlert,
+  CircleDot,
   Clock3,
+  Hash,
   Inbox as InboxIcon,
   Mail,
   Siren,
@@ -39,7 +41,12 @@ import {
 } from "../state/inbox/atoms";
 import {
   classifyInboxMessage,
+  inboxMessageOrigin,
+  inboxOriginFilterMatches,
+  inboxOriginFilters,
   type InboxCategory,
+  type InboxOrigin,
+  type InboxOriginFilter,
   type InboxIssueMessage,
   type InboxMessageWithReadState,
 } from "../state/inbox/model";
@@ -131,6 +138,15 @@ export function Inbox({
   );
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState("all");
+  const [originFilter, setOriginFilter] = useState<InboxOriginFilter>("all");
+  const originOptions = useMemo(
+    () =>
+      inboxOriginFilters.map((value) => ({
+        label: t(`inbox.origin.${value}` as MessageKey),
+        value,
+      })),
+    [t],
+  );
   const [visibleCount, setVisibleCount] = useState(INBOX_PAGE_SIZE);
   const [cursorMessageId, setCursorMessageId] = useState<string | null>(
     selectedMessageId,
@@ -157,12 +173,13 @@ export function Inbox({
     : "all";
   const projectMessages = useMemo(
     () =>
-      effectiveProjectId === "all"
-        ? messages
-        : messages.filter(
-            (message) => message.projectId === effectiveProjectId,
-          ),
-    [effectiveProjectId, messages],
+      messages.filter(
+        (message) =>
+          (effectiveProjectId === "all" ||
+            message.projectId === effectiveProjectId) &&
+          inboxOriginFilterMatches(message.origin, originFilter),
+      ),
+    [effectiveProjectId, messages, originFilter],
   );
   const unreadCategoryCounts = useMemo(
     () =>
@@ -186,12 +203,12 @@ export function Inbox({
   );
   const filterKey = useMemo(
     () =>
-      `${effectiveProjectId}:${showUnreadOnly ? "unread" : "all"}:${[
+      `${effectiveProjectId}:${originFilter}:${showUnreadOnly ? "unread" : "all"}:${[
         ...activeFilters,
       ]
         .sort()
         .join(",")}`,
-    [activeFilters, effectiveProjectId, showUnreadOnly],
+    [activeFilters, effectiveProjectId, originFilter, showUnreadOnly],
   );
   const visibleMessages = useMemo(
     () => pageInboxMessages(filteredMessages, visibleCount),
@@ -347,6 +364,16 @@ export function Inbox({
                   options={projectOptions}
                   size="small"
                   value={effectiveProjectId}
+                />
+                <SelectMenu
+                  className="inbox-origin-filter !w-[128px] !shrink-0 max-[760px]:!w-full max-[760px]:!flex-auto"
+                  label={t("inbox.originFilter")}
+                  onValueChange={(value) =>
+                    setOriginFilter(value as InboxOriginFilter)
+                  }
+                  options={originOptions}
+                  size="small"
+                  value={originFilter}
                 />
                 <div
                   aria-label={t("inbox.filters")}
@@ -719,6 +746,7 @@ function InboxMessageRowContent({
             "inbox-message-detail flex min-w-0 items-center gap-[5px] overflow-hidden text-2xs leading-[1.3] whitespace-nowrap text-muted-foreground",
             compact && "gap-[3px] text-xs",
           )}>
+            <InboxOriginBadge origin={inboxMessageOrigin(message)} />
             <span className="inbox-message-project shrink-0 font-medium text-muted-foreground">
               {message.kind === "channel" ? `#${message.channelName}` : message.projectName}
             </span>
@@ -963,4 +991,36 @@ function formatRelativeDate(value: string, localeTag: string) {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
+}
+
+const originBadgeTone: Record<InboxOrigin, string> = {
+  issue: "bg-primary/10 text-primary",
+  channel: "bg-[#3aa8a3]/12 text-[#2b8a86]",
+  agent: "bg-muted text-muted-foreground",
+};
+
+/** Says at a glance whether a row came from an issue, a channel, or an agent. */
+function InboxOriginBadge({ origin }: { origin: InboxOrigin }) {
+  const { t } = useI18n();
+  const label = t(`inbox.origin.${origin}` as MessageKey);
+  return (
+    <span
+      aria-label={t("inbox.originLabel", { origin: label })}
+      className={cn(
+        "inbox-message-origin inline-flex h-4 shrink-0 items-center gap-0.5 rounded-[5px] px-1 text-[10px] font-semibold leading-none",
+        origin,
+        originBadgeTone[origin],
+      )}
+      data-origin={origin}
+    >
+      {origin === "channel" ? (
+        <Hash aria-hidden="true" size={10} />
+      ) : origin === "agent" ? (
+        <Bot aria-hidden="true" size={10} />
+      ) : (
+        <CircleDot aria-hidden="true" size={10} />
+      )}
+      {label}
+    </span>
+  );
 }
