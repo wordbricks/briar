@@ -6,6 +6,7 @@ import { appKeyboardShortcutSpecs } from "../../lib/app-keyboard-shortcuts";
 import { formatShortcut, loadKeybindings } from "../../lib/keybindings";
 import { useAppKeyboardCommandState } from "../../hooks/appKeyboardCommands";
 import { useWorkerDispatch } from "../../hooks/useWorkerDispatch";
+import { ChannelMessageDeleteConfirmDialog } from "../ChannelMessageDeleteConfirmDialog";
 import { KeyboardShortcutModeHint } from "../KeyboardShortcutModeHint";
 import {
   commandPaletteInitialQueryAtom,
@@ -102,8 +103,15 @@ export function AppDialogs({
     </Suspense>
   );
 
-  // The companion shell showed only this one, and it is the same mount now.
-  if (companionMode) return dispatchDialog;
+  // The companion shell showed only the dispatch dialog, and it is the same
+  // mount now; the delete confirmation floats above either shell.
+  if (companionMode)
+    return (
+      <>
+        {dispatchDialog}
+        <ChannelMessageDeleteConfirmDialog />
+      </>
+    );
 
   const configuredKeybindings = loadKeybindings();
   const pendingShortcutSpec = pendingShortcut
@@ -129,6 +137,7 @@ export function AppDialogs({
 
   return (
     <Suspense fallback={null}>
+      <ChannelMessageDeleteConfirmDialog />
       <PlanningProjectDialogWithPlanning />
       {commandPaletteAvailable && isCommandPaletteOpen ? (
         <CommandPaletteWithContext
