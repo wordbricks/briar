@@ -1812,3 +1812,26 @@ export const channelDeltaFromMessage = (
   removedMessageIds: [...response.removedMessageIds],
   agentReplies: response.agentReplies.map(channelAgentReplyFromMessage),
 });
+
+/** Body search results intentionally include no attachments or private metadata. */
+export async function searchChannelMessages(
+  token: string,
+  workspaceId: string,
+  query: string,
+  options: { channelId?: string; cursor?: string; limit?: number; signal?: AbortSignal } = {},
+) {
+  const response = await requireChannelClient().searchChannelMessages(
+    { workspaceId, query, channelId: options.channelId, cursor: options.cursor,
+      limit: options.limit },
+    appCallOptions(token, options.signal),
+  );
+  return {
+    hits: response.hits.map((hit) => ({
+      messageId: hit.messageId, channelId: hit.channelId,
+      rootMessageId: hit.rootMessageId, channelName: hit.channelName,
+      isDirectMessage: hit.isDirectMessage, body: hit.body,
+      createdAt: requiredTimestamp(hit.createdAt, "searchHit.createdAt"),
+    })),
+    nextCursor: response.nextCursor ?? null,
+  };
+}

@@ -139,6 +139,28 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     );
   });
 
+  it("searches message bodies only in m: scope", async () => {
+    const resolveSearch = vi.fn(async (query: string) => [{
+      id: `message:${query}`,
+      label: `${query} in thread`,
+      onSelect: vi.fn(),
+      scope: "messages" as const,
+      section: "messages",
+      sectionLabel: "Messages",
+    }]);
+    await act(async () => {
+      root.render(<I18nProvider><CommandPalette
+        items={makeItems()} messageSearch={resolveSearch}
+        open initialQuery="m:고양이" onOpenChange={vi.fn()} shortcutLabel="⌘K"
+      /></I18nProvider>);
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 270)); });
+    expect(resolveSearch).toHaveBeenCalledWith("고양이");
+    expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+    expect(document.querySelector('[role="option"]')?.textContent).toContain("고양이 in thread");
+  });
+
   it("opens with a scoped initial query", async () => {
     await renderPalette({ initialQuery: "i:" });
 

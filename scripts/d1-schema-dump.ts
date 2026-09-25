@@ -204,7 +204,19 @@ export async function dumpMigratedSchema(
 ) {
   const stateDir = await mkdtemp(join(tmpdir(), "briar-d1-dump-"));
   try {
-    await stageMigrations(stateDir, names);
+    // Miniflare's D1 exporter cannot export databases containing FTS5 virtual
+    // tables. Apply ordinary migrations, export them, then append the FTS
+    // migration verbatim to the snapshot in dependency order. Its statements
+    // create an empty index and triggers, never rewrite historical messages.
+    const virtualTableMigration = "0219_channel_message_search.sql";
+    const virtualTableIncluded = names.includes(virtualTableMigration);
+    if (virtualTableIncluded && names.at(-1) !== virtualTableMigration) {
+      throw new Error("FTS migration must be last for snapshot export");
+    }
+    await stageMigrations(
+      stateDir,
+      names.filter((name) => name !== virtualTableMigration),
+    );
     const config = join(stateDir, "wrangler.jsonc");
     await run([
       "bunx",
@@ -231,7 +243,14 @@ export async function dumpMigratedSchema(
       output,
     ], stateDir);
     console.log(`[${label}] applied ${names.length} migrations`);
-    return dumpStatements(await Bun.file(output).text());
+    const statements = dumpStatements(await Bun.file(output).text());
+    if (virtualTableIncluded) {
+      const sql = await readFile(join(migrationsDir, virtualTableMigration), "utf8");
+      statements.push(...sql.split(`${STATEMENT_SENTINEL}\n`).slice(1).map((part) =>
+        part.trim()
+      ).filter(Boolean));
+    }
+    return statements;
   } finally {
     await rm(stateDir, { recursive: true, force: true });
   }
