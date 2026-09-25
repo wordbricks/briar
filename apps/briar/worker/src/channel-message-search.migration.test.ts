@@ -1,0 +1,54 @@
+import { env } from "cloudflare:workers";
+import { describe, expect, it } from "vitest";
+import { applyD1Migrations } from "./test-helpers/d1";
+import { executeD1Sql } from "./test-helpers/d1-sql";
+
+const beforeSearch = "0218_issue_attachment_sources.sql";
+const searchMigration = "0219_channel_message_search.sql";
+
+describe("channel message search migration", () => {
+  it("creates an empty index and leaves historical messages out by owner choice", async () => {
+    const db = env.DB;
+    await applyD1Migrations(db, { through: beforeSearch });
+    await executeD1Sql(db, `
+      insert into "user" (id,name,email,emailVerified,createdAt,updatedAt)
+      values ('search-migration-user','Owner','migration-search@example.com',1,'2026-09-25','2026-09-25');
+      insert into briar_organizations (id,name,handle,created_at,updated_at)
+      values ('search-migration-org','Search','search-migration','2026-09-25','2026-09-25');
+      insert into briar_channels (id,organization_id,slug,name,visibility,created_at,updated_at)
+      values ('search-migration-channel','search-migration-org','search','Search','public','2026-09-25','2026-09-25');
+      insert into briar_channel_messages (id,channel_id,author_user_id,body,created_at,updated_at)
+      values ('search-migration-old','search-migration-channel','search-migration-user','old apple','2026-09-25','2026-09-25');
+    `);
+    await applyD1Migrations(db, { files: [searchMigration] });
+    const oldMatch = await db.prepare(`select rowid from briar_channel_message_search where briar_channel_message_search match '"apple"'`).all();
+    expect(oldMatch.results).toHaveLength(0);
+    // A historical row was never indexed. Editing or deleting it must not
+    // insert an FTS delete tombstone for a row that does not exist yet.
+    await db.prepare(`update briar_channel_messages set body = 'edited banana'
+      where id = 'search-migration-old'`).run();
+    const oldBigram = await db.prepare(`select * from briar_channel_message_bigrams
+      where gram = 'ap'`).all();
+    expect(oldBigram.results).toHaveLength(0);
+    const editedBigram = await db.prepare(`select * from briar_channel_message_bigrams
+      where gram = 'ba'`).all();
+    expect(editedBigram.results).toHaveLength(1);
+    const editedMatch = await db.prepare(`select rowid from briar_channel_message_search
+      where briar_channel_message_search match '"banana"'`).all();
+    expect(editedMatch.results).toHaveLength(1);
+    await db.prepare(`insert into briar_channel_messages (id,channel_id,author_user_id,body,created_at,updated_at)
+      values ('search-migration-new','search-migration-channel','search-migration-user','new apple','2026-09-25','2026-09-25')`).run();
+    // The body limit is 50k; a two-character hit near the end must be indexed.
+    await db.prepare(`insert into briar_channel_messages
+      (id,channel_id,author_user_id,body,created_at,updated_at)
+      values ('search-migration-long','search-migration-channel','search-migration-user',?,'2026-09-25','2026-09-25')`)
+      .bind(`${"a".repeat(10_100)}한글`).run();
+    const tailHit = await db.prepare(`select count(*) as count from briar_channel_message_bigrams
+      where gram = '한글'`).first<number>('count');
+    expect(tailHit).toBe(1);
+    const newMatch = await db.prepare(`select message.id from briar_channel_message_search idx
+      join briar_channel_messages message on message.rowid=idx.rowid
+      where briar_channel_message_search match '"apple"'`).all<{id:string}>();
+    expect(newMatch.results.map(({id})=>id)).toEqual(['search-migration-new']);
+  });
+});

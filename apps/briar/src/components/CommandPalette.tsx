@@ -28,6 +28,7 @@ import {
 export type CommandPaletteItem = CommandPaletteSearchItem & {
   active?: boolean;
   icon?: ReactNode;
+  highlight?: { before: string; match: string; after: string };
   onSelect: () => void;
   remember?: boolean;
   restoreFocusOnSelect?: boolean;
@@ -46,6 +47,7 @@ const emptySectionOrder = new Map([
   ["issues", 6],
   ["channels", 7],
   ["direct-messages", 8],
+  ["messages", 9],
 ]);
 
 function keyboardEventIsComposing(
@@ -83,6 +85,7 @@ export function CommandPalette({
   contextLabel,
   initialQuery = "",
   items,
+  messageSearch,
   loading = false,
   onOpenChange,
   open,
@@ -91,6 +94,10 @@ export function CommandPalette({
   contextLabel?: string | null;
   initialQuery?: string;
   items: readonly CommandPaletteItem[];
+  messageSearch?: (query: string, cursor?: string | null, kind?: "channel" | "dm") => Promise<{
+    items: CommandPaletteItem[];
+    nextCursor: string | null;
+  }>;
   loading?: boolean;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -107,6 +114,13 @@ export function CommandPalette({
       : null,
   );
   const [query, setQuery] = useState("");
+  const [messageItems, setMessageItems] = useState<CommandPaletteItem[]>([]);
+  const [searchPending, setSearchPending] = useState(false);
+  const [searchError, setSearchError] = useState(false);
+  const [nextMessageCursor, setNextMessageCursor] = useState<string | null>(null);
+  const searchVersionRef = useRef(0);
+  const lastSearchRef = useRef("");
+  const [messageKind, setMessageKind] = useState<"all" | "channel" | "dm">("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [recentIds, setRecentIds] = useState<string[]>(() =>
     open ? loadCommandPaletteRecents() : []
@@ -116,20 +130,81 @@ export function CommandPalette({
     if (!open) return;
     restoreFocusOnCloseRef.current = true;
     setQuery(initialQuery);
+    setMessageKind("all");
+    setMessageItems([]);
+    setSearchError(false);
+    setNextMessageCursor(null);
     setActiveId(null);
     setRecentIds(loadCommandPaletteRecents());
   }, [initialQuery, open]);
 
+  useEffect(() => {
+    const scoped = query.trim().match(/^m:(?:\s*(dm|channel):)?\s*(.*)$/isu);
+    const term = scoped?.[2]?.trim() ?? "";
+    const kind = (scoped?.[1]?.toLowerCase() as "channel" | "dm" | undefined)
+      ?? (messageKind === "all" ? undefined : messageKind);
+    if (!open || !messageSearch || [...term].length < 2) {
+      ++searchVersionRef.current;
+      setMessageItems([]);
+      setSearchPending(false);
+      setNextMessageCursor(null);
+      setSearchError(false);
+      return;
+    }
+    setSearchPending(true);
+    setSearchError(false);
+    setNextMessageCursor(null);
+    setMessageItems([]);
+    const version = ++searchVersionRef.current;
+    lastSearchRef.current = `${term}\0${kind ?? ""}`;
+    let current = true;
+    const timer = setTimeout(() => {
+      void messageSearch(term, null, kind).then(
+        (result) => {
+          if (current && version === searchVersionRef.current) {
+            setMessageItems(result.items);
+            setNextMessageCursor(result.nextCursor);
+          }
+        },
+        () => { if (current && version === searchVersionRef.current) { setMessageItems([]); setSearchError(true); } },
+      ).finally(() => { if (current && version === searchVersionRef.current) setSearchPending(false); });
+    }, 220);
+    return () => { current = false; clearTimeout(timer); };
+  }, [open, query, messageSearch, messageKind]);
+
+  const loadMoreMessages = () => {
+    const parsed = query.trim().match(/^m:(?:\s*(dm|channel):)?\s*(.*)$/isu);
+    if (!nextMessageCursor || !messageSearch || !parsed || searchPending) return;
+    const term = parsed[2]?.trim() ?? "";
+    const kind = (parsed[1]?.toLowerCase() as "channel" | "dm" | undefined)
+      ?? (messageKind === "all" ? undefined : messageKind);
+    const version = searchVersionRef.current;
+    if (lastSearchRef.current !== `${term}\0${kind ?? ""}`) return;
+    setSearchPending(true);
+    setSearchError(false);
+    void messageSearch(term, nextMessageCursor, kind).then(
+      (result) => {
+        if (version !== searchVersionRef.current) return;
+        setMessageItems((current) => [...current, ...result.items]);
+        setNextMessageCursor(result.nextCursor);
+      },
+      () => { if (version === searchVersionRef.current) setSearchError(true); },
+    ).finally(() => { if (version === searchVersionRef.current) setSearchPending(false); });
+  };
+
   const hasQuery = query.trim().length > 0;
   const matchedGroups = useMemo(() => {
-    const matched = groupCommandPaletteItems(items, query);
+    const matched = groupCommandPaletteItems(
+      /^m:/iu.test(query.trim()) ? messageItems : items,
+      query.trim().replace(/^m:(?:\s*(?:dm|channel):)/iu, "m:"),
+    );
     if (hasQuery) return matched;
     return matched.sort(
       (left, right) =>
         (emptySectionOrder.get(left.section) ?? Number.MAX_SAFE_INTEGER) -
         (emptySectionOrder.get(right.section) ?? Number.MAX_SAFE_INTEGER),
     );
-  }, [hasQuery, items, query]);
+  }, [hasQuery, items, messageItems, query]);
   const totalResultCount = useMemo(
     () =>
       matchedGroups.reduce(
@@ -139,7 +214,9 @@ export function CommandPalette({
     [matchedGroups],
   );
   const groups = useMemo(() => {
-    const limit = hasQuery ? searchGroupLimit : emptyGroupLimit;
+    const limit = hasQuery && /^m:/iu.test(query.trim())
+      ? Number.POSITIVE_INFINITY
+      : hasQuery ? searchGroupLimit : emptyGroupLimit;
     if (hasQuery || recentIds.length === 0) {
       return matchedGroups.map((group) => ({
         ...group,
@@ -324,6 +401,18 @@ export function CommandPalette({
           </div>
         </div>
 
+        {/^m:/iu.test(query.trim()) ? (
+          <div className="flex gap-1 px-3 pb-2" role="group" aria-label={t("commandPalette.filterKind")}>
+            {(["all", "channel", "dm"] as const).map((kind) => (
+              <button key={kind} type="button" aria-pressed={messageKind === kind}
+                className={`rounded-lg px-2 py-1 text-xs ${messageKind === kind ? "bg-primary/15 text-primary" : "text-muted-foreground"}`}
+                onClick={() => setMessageKind(kind)}>
+                {t(kind === "all" ? "commandPalette.filterAll" : kind === "channel"
+                  ? "commandPalette.filterChannels" : "commandPalette.filterDms")}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="max-h-[min(58vh,520px)] overflow-y-auto overscroll-contain p-2">
           <div
             aria-label={t("commandPalette.results")}
@@ -372,7 +461,9 @@ export function CommandPalette({
                       </span>
                       <span className="min-w-0 flex-1">
                         <strong className="block truncate text-[13px] font-medium">
-                          {item.label}
+                          {item.highlight ? <>
+                            {item.highlight.before}<mark className="rounded bg-primary/20 text-inherit">{item.highlight.match}</mark>{item.highlight.after}
+                          </> : item.label}
                         </strong>
                         {item.description ? (
                           <small className="mt-0.5 block truncate text-[11px] text-muted-foreground">
@@ -405,12 +496,23 @@ export function CommandPalette({
               </section>
             ))}
           </div>
-          {groups.length === 0 ? (
+          {searchError ? (
+            <p role="alert" className="px-3 py-2 text-sm text-destructive">
+              {t("commandPalette.searchError")}
+            </p>
+          ) : null}
+          {nextMessageCursor ? (
+            <button className="w-full rounded-lg px-3 py-2 text-sm text-primary hover:bg-muted"
+              disabled={searchPending} onClick={loadMoreMessages} type="button">
+              {searchPending ? t("commandPalette.loading") : t("commandPalette.loadMore")}
+            </button>
+          ) : null}
+          {groups.length === 0 && !searchError ? (
             <div
               className="grid min-h-40 place-items-center px-6 py-8 text-center"
               role="status"
             >
-              {loading ? (
+              {loading || searchPending ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Spinner aria-hidden="true" className="size-[17px]" />
                   {t("commandPalette.loading")}

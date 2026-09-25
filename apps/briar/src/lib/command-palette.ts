@@ -3,6 +3,7 @@ export type CommandPaletteScope =
   | "channels"
   | "direct-messages"
   | "issues"
+  | "messages"
   | "navigation"
   | "projects"
   | "sessions";
@@ -42,6 +43,7 @@ const scopePrefixes = new Map<string, CommandPaletteScope>([
   ["c", "channels"],
   ["d", "direct-messages"],
   ["i", "issues"],
+  ["m", "messages"],
   ["n", "navigation"],
   ["p", "projects"],
   ["s", "sessions"],
@@ -68,7 +70,7 @@ export function parseCommandPaletteQuery(
     .toLocaleLowerCase()
     .trimStart();
   const match = normalizedWithSeparator.match(
-    /^([acdinps]):(.*)$/u,
+    /^([acdimnps]):(.*)$/u,
   );
   if (!match) {
     return { query: normalizeCommandPaletteText(query), scope: null };

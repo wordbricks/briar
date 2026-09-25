@@ -139,6 +139,89 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     );
   });
 
+  it("searches message bodies only in m: scope", async () => {
+    const resolveSearch = vi.fn(async (query: string) => ({ items: [{
+      id: `message:${query}`,
+      label: `${query} in thread`,
+      onSelect: vi.fn(),
+      scope: "messages" as const,
+      section: "messages",
+      sectionLabel: "Messages",
+    }], nextCursor: null }));
+    await act(async () => {
+      root.render(<I18nProvider><CommandPalette
+        items={makeItems()} messageSearch={resolveSearch}
+        open initialQuery="m:고양이" onOpenChange={vi.fn()} shortcutLabel="⌘K"
+      /></I18nProvider>);
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 270)); });
+    expect(resolveSearch).toHaveBeenCalledWith("고양이", null, undefined);
+    expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+    expect(document.querySelector('[role="option"]')?.textContent).toContain("고양이 in thread");
+  });
+
+  it("loads another message page without hiding a matching first result", async () => {
+    const resolveSearch = vi.fn(async (_query: string, cursor?: string | null) => ({
+      items: [{
+        id: `message:${cursor ? "second" : "first"}`,
+        label: cursor ? "Another cat" : "First cat",
+        onSelect: vi.fn(), scope: "messages" as const,
+        section: "messages", sectionLabel: "Messages",
+      }],
+      nextCursor: cursor ? null : "first",
+    }));
+    await act(async () => {
+      root.render(<I18nProvider><CommandPalette items={makeItems()}
+        messageSearch={resolveSearch} open initialQuery="m:cat"
+        onOpenChange={vi.fn()} shortcutLabel="⌘K" /></I18nProvider>);
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 270)); });
+    expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+    const more = [...document.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent?.includes("Load more messages"));
+    expect(more).toBeDefined();
+    await act(async () => { more?.click(); await Promise.resolve(); });
+    expect(resolveSearch).toHaveBeenLastCalledWith("cat", "first", undefined);
+    expect(document.querySelectorAll('[role="option"]')).toHaveLength(2);
+  });
+
+  it("filters message search to DMs and keeps the selected filter pressed", async () => {
+    const resolveSearch = vi.fn(async () => ({ items: [], nextCursor: null }));
+    await act(async () => {
+      root.render(<I18nProvider><CommandPalette items={makeItems()}
+        messageSearch={resolveSearch} open initialQuery="m:cat"
+        onOpenChange={vi.fn()} shortcutLabel="⌘K" /></I18nProvider>);
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
+    const dmFilter = [...document.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "DMs");
+    expect(dmFilter).toBeDefined();
+    await act(async () => { dmFilter?.click(); await new Promise((resolve) => setTimeout(resolve, 270)); });
+    expect(dmFilter?.getAttribute("aria-pressed")).toBe("true");
+    expect(resolveSearch).toHaveBeenLastCalledWith("cat", null, "dm");
+  });
+
+  it("highlights the matched substring without changing its accessible label", async () => {
+    const resolveSearch = vi.fn(async () => ({
+      items: [{ id: "message:highlight", label: "before cat after",
+        highlight: { before: "before ", match: "cat", after: " after" },
+        onSelect: vi.fn(), scope: "messages" as const,
+        section: "messages", sectionLabel: "Messages" }],
+      nextCursor: null,
+    }));
+    await act(async () => {
+      root.render(<I18nProvider><CommandPalette items={makeItems()}
+        messageSearch={resolveSearch} open initialQuery="m:cat"
+        onOpenChange={vi.fn()} shortcutLabel="⌘K" /></I18nProvider>);
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 270)); });
+    expect(document.querySelector('[role="option"] mark')?.textContent).toBe("cat");
+    expect(document.querySelector('[role="option"] strong')?.textContent).toBe("before cat after");
+  });
+
   it("opens with a scoped initial query", async () => {
     await renderPalette({ initialQuery: "i:" });
 

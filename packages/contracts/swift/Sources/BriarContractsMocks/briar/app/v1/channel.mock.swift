@@ -69,6 +69,8 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
     public var mockAsyncDeleteChannelSidebarSection = { (_: BriarAPI_DeleteChannelSidebarSectionRequest) -> ResponseMessage<BriarAPI_DeleteChannelSidebarSectionResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `listChannelMessages()`.
     public var mockAsyncListChannelMessages = { (_: BriarAPI_ListChannelMessagesRequest) -> ResponseMessage<BriarAPI_ListChannelMessagesResponse> in .init(result: .success(.init())) }
+    /// Mocked for async calls to `searchChannelMessages()`.
+    public var mockAsyncSearchChannelMessages = { (_: BriarAPI_SearchChannelMessagesRequest) -> ResponseMessage<BriarAPI_SearchChannelMessagesResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `prepareChannelMessageAttachments()`.
     public var mockAsyncPrepareChannelMessageAttachments = { (_: BriarAPI_PrepareChannelMessageAttachmentsRequest) -> ResponseMessage<BriarAPI_PrepareChannelMessageAttachmentsResponse> in .init(result: .success(.init())) }
     /// Mocked for async calls to `createChannelMessage()`.
@@ -188,6 +190,10 @@ open class BriarAPI_ChannelServiceClientMock: BriarAPI_ChannelServiceClientInter
 
     open func `listChannelMessages`(request: BriarAPI_ListChannelMessagesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_ListChannelMessagesResponse> {
         return self.mockAsyncListChannelMessages(request)
+    }
+
+    open func `searchChannelMessages`(request: BriarAPI_SearchChannelMessagesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SearchChannelMessagesResponse> {
+        return self.mockAsyncSearchChannelMessages(request)
     }
 
     open func `prepareChannelMessageAttachments`(request: BriarAPI_PrepareChannelMessageAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareChannelMessageAttachmentsResponse> {

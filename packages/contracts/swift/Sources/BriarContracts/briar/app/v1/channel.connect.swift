@@ -84,6 +84,9 @@ public protocol BriarAPI_ChannelServiceClientInterface: Sendable {
     func `listChannelMessages`(request: BriarAPI_ListChannelMessagesRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_ListChannelMessagesResponse>
 
     @available(iOS 13, *)
+    func `searchChannelMessages`(request: BriarAPI_SearchChannelMessagesRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_SearchChannelMessagesResponse>
+
+    @available(iOS 13, *)
     func `prepareChannelMessageAttachments`(request: BriarAPI_PrepareChannelMessageAttachmentsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_PrepareChannelMessageAttachmentsResponse>
 
     @available(iOS 13, *)
@@ -246,6 +249,11 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
     }
 
     @available(iOS 13, *)
+    public func `searchChannelMessages`(request: BriarAPI_SearchChannelMessagesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_SearchChannelMessagesResponse> {
+        return await self.client.unary(path: "/briar.app.v1.ChannelService/SearchChannelMessages", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
     public func `prepareChannelMessageAttachments`(request: BriarAPI_PrepareChannelMessageAttachmentsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_PrepareChannelMessageAttachmentsResponse> {
         return await self.client.unary(path: "/briar.app.v1.ChannelService/PrepareChannelMessageAttachments", idempotencyLevel: .unknown, request: request, headers: headers)
     }
@@ -326,6 +334,7 @@ public final class BriarAPI_ChannelServiceClient: BriarAPI_ChannelServiceClientI
             public static let renameChannelSidebarSection = Connect.MethodSpec(name: "RenameChannelSidebarSection", service: "briar.app.v1.ChannelService", type: .unary)
             public static let deleteChannelSidebarSection = Connect.MethodSpec(name: "DeleteChannelSidebarSection", service: "briar.app.v1.ChannelService", type: .unary)
             public static let listChannelMessages = Connect.MethodSpec(name: "ListChannelMessages", service: "briar.app.v1.ChannelService", type: .unary)
+            public static let searchChannelMessages = Connect.MethodSpec(name: "SearchChannelMessages", service: "briar.app.v1.ChannelService", type: .unary)
             public static let prepareChannelMessageAttachments = Connect.MethodSpec(name: "PrepareChannelMessageAttachments", service: "briar.app.v1.ChannelService", type: .unary)
             public static let createChannelMessage = Connect.MethodSpec(name: "CreateChannelMessage", service: "briar.app.v1.ChannelService", type: .unary)
             public static let deleteChannelMessage = Connect.MethodSpec(name: "DeleteChannelMessage", service: "briar.app.v1.ChannelService", type: .unary)
