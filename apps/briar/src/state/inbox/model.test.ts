@@ -9,6 +9,8 @@ import {
   isInboxMessageUnread,
   mergeInboxMessages,
   mergeInboxReadVersions,
+  inboxMessageOrigin,
+  inboxOriginFilterMatches,
 } from "./model";
 
 const project = demoDashboard.team;
@@ -602,5 +604,25 @@ describe("Inbox messages", () => {
       "important",
       "activity",
     ]);
+  });
+});
+
+describe("inbox message origin", () => {
+  it("labels issue runs and issue conversations as issue, channel replies as channel", () => {
+    expect(inboxMessageOrigin({ kind: "issue" })).toBe("issue");
+    expect(inboxMessageOrigin({ kind: "conversation" })).toBe("issue");
+    expect(inboxMessageOrigin({ kind: "channel" })).toBe("channel");
+    expect(inboxMessageOrigin({ kind: "session" })).toBe("agent");
+  });
+
+  it("keeps every origin for all and only the matching one otherwise", () => {
+    expect(inboxOriginFilterMatches("issue", "all")).toBe(true);
+    expect(inboxOriginFilterMatches("channel", "all")).toBe(true);
+    expect(inboxOriginFilterMatches("agent", "all")).toBe(true);
+    expect(inboxOriginFilterMatches("issue", "issue")).toBe(true);
+    expect(inboxOriginFilterMatches("channel", "issue")).toBe(false);
+    expect(inboxOriginFilterMatches("agent", "issue")).toBe(false);
+    expect(inboxOriginFilterMatches("channel", "channel")).toBe(true);
+    expect(inboxOriginFilterMatches("issue", "channel")).toBe(false);
   });
 });
