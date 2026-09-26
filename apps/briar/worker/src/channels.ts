@@ -6323,7 +6323,7 @@ export async function completeChannelReply(
     channelMessageId: job.reply_message_id,
     body: input.body,
     approvalSummary: whatsappApprovalSummary,
-    appOrigin: input.whatsappAppOrigin ?? "https://briar.wordbricks.ai",
+    appOrigin: input.whatsappAppOrigin ?? "https://briar.onequery.dev",
   }));
   statements.push(
     db.prepare(

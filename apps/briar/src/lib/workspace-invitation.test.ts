@@ -24,7 +24,7 @@ describe("workspace invitation state", () => {
     expect(parseWorkspaceInvitationToken(token)).toBe(token);
     expect(
       parseWorkspaceInvitationToken(
-        `https://briar.wordbricks.ai/app/invitations/${token}`,
+        `https://briar.onequery.dev/app/invitations/${token}`,
       ),
     ).toBe(token);
     expect(parseWorkspaceInvitationToken("https://example.com/orgs/1")).toBeNull();
