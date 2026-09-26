@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -208,6 +209,11 @@ for (const required of [
 }
 if (!browserHelper.includes('case "$url" in') || browserHelper.includes("eval ")) {
   fail("browser helper must validate and quote the URL without eval");
+}
+
+const browserTests = spawnSync("python3", [join(image, "briar-open-browser.test.py")], { encoding: "utf8" });
+if (browserTests.status !== 0) {
+  fail(`browser recovery tests failed: ${browserTests.error?.message ?? browserTests.stderr}`);
 }
 
 const installer = await text(join(image, "install-image-runtime"));
