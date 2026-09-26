@@ -65,9 +65,9 @@ https://github.com/wordbricks/briar
 
 ## Links
 
-- Website: https://briar.wordbricks.ai
-- Web App: https://briar.wordbricks.ai/app/
-- Download: https://briar.wordbricks.ai/download
-- Tutorial: https://briar.wordbricks.ai/tutorial
+- Website: https://briar.onequery.dev
+- Web App: https://briar.onequery.dev/app/
+- Download: https://briar.onequery.dev/download
+- Tutorial: https://briar.onequery.dev/tutorial
 - GitHub: https://github.com/wordbricks/briar
 - Releases: https://github.com/wordbricks/briar/releases/latest
