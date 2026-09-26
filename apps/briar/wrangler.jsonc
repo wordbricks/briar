@@ -19,32 +19,6 @@
       "zone_name": "wordbricks.ai"
     },
     {
-      "pattern": "briar.wordbricks.ai/hooks/*",
-      "zone_name": "wordbricks.ai"
-    },
-    {
-      "pattern": "briar.wordbricks.ai/open/*",
-      "zone_name": "wordbricks.ai"
-      
-    },
-    
-    {
-      
-      "pattern": "briar.onequery.dev/hooks/*",
-      
-      "zone_name": "onequery.dev"
-      
-    },
-    
-    {
-      
-      "pattern": "briar.onequery.dev/open/*",
-      
-      "zone_name": "onequery.dev"
-      
-    },
-    
-    {
       "pattern": "briar.onequery.dev/app*",
       "zone_name": "onequery.dev"
     },
@@ -54,6 +28,22 @@
     },
     {
       "pattern": "briar.onequery.dev/device*",
+      "zone_name": "onequery.dev"
+    },
+    {
+      "pattern": "briar.wordbricks.ai/hooks/*",
+      "zone_name": "wordbricks.ai"
+    },
+    {
+      "pattern": "briar.wordbricks.ai/open/*",
+      "zone_name": "wordbricks.ai"
+    },
+    {
+      "pattern": "briar.onequery.dev/hooks/*",
+      "zone_name": "onequery.dev"
+    },
+    {
+      "pattern": "briar.onequery.dev/open/*",
       "zone_name": "onequery.dev"
     }
   ],
