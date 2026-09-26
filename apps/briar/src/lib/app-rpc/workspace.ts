@@ -242,7 +242,7 @@ export async function createWorkspaceInvitation(
       },
       appCallOptions(token),
     );
-  const appOrigin = briarWebAppOrigin || "https://briar.wordbricks.ai";
+  const appOrigin = briarWebAppOrigin || "https://briar.onequery.dev";
   return {
     invitation: invitationFromMessage(
       requiredMessage(

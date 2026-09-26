@@ -1167,7 +1167,7 @@ export async function completeChannelReplyApplication(
         conversationId: input.request.conversationId,
         publishedFinalBatchId: publishedFinal?.batchId,
         whatsappAppOrigin: input.env.WHATSAPP_APP_ORIGIN?.trim() ||
-          "https://briar.wordbricks.ai",
+          "https://briar.onequery.dev",
         attachments: attachments.map((attachment) => ({
           id: attachment.upload_id,
           organization_id: scope.workspaceId,

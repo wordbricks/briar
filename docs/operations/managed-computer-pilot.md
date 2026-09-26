@@ -280,7 +280,7 @@ aws iam attach-user-policy \
    - `MANAGED_COMPUTER_API_ORIGIN=https://briar-api.wbai.workers.dev`
    - `MANAGED_COMPUTER_AWS_IDENTITY_PUBLIC_KEY=<스택 리전의 AWS RSA 인증서에서 추출한 PUBLIC KEY PEM>`
    - `MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED=false` (스테이징 검증 완료 전 필수)
-   - `MANAGED_COMPUTER_REMOTE_DESKTOP_ALLOWED_ORIGINS=https://briar.wordbricks.ai,tauri://localhost,http://tauri.localhost`
+   - `MANAGED_COMPUTER_REMOTE_DESKTOP_ALLOWED_ORIGINS=https://briar.onequery.dev,tauri://localhost,http://tauri.localhost`
    - `MANAGED_COMPUTER_REMOTE_DESKTOP_TOKEN_TTL_SECONDS=60`
    - `MANAGED_COMPUTER_REMOTE_DESKTOP_MAX_SESSION_MINUTES=60`
    - `MANAGED_COMPUTER_REMOTE_DESKTOP_ORGANIZATION_SESSION_LIMIT=<승인된 조직 동시 세션 수>`
