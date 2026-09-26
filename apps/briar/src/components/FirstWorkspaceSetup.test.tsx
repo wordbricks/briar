@@ -79,7 +79,7 @@ describe("FirstWorkspaceSetup", () => {
     await act(async () =>
       setInputValue(
         input!,
-        `https://briar.wordbricks.ai/app/invitations/${token}`,
+        `https://briar.onequery.dev/app/invitations/${token}`,
       ),
     );
     await act(async () => container.querySelector("form")?.requestSubmit());

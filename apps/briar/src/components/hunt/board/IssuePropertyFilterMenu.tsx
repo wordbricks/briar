@@ -1,11 +1,11 @@
-import { Activity, Bot, Check, ChevronDown, ChevronRight, ListFilter, Pencil, Signal, UserRound, Waypoints, X } from "lucide-react";
+import { Activity, Bot, Check, ChevronDown, ChevronRight, Clock, ListFilter, Pencil, Signal, UserRound, Waypoints, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { type ReactElement } from "react";
 import { autoHuntRunStatuses, autoHuntSources } from "@/lib/auto-hunt-contract";
 import type { WorkspaceMember, ProjectAgent } from "@/types";
 import { useI18n } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
-import { IssuePropertyFilterKey, IssuePropertyFilters, emptyIssuePropertyFilters, selectedIssuePropertyFilterCount, toggleIssuePropertyFilterValue, unsetIssuePropertyFilterValue } from "@/state/board/filters";
+import { IssuePropertyFilterKey, IssuePropertyFilters, emptyIssuePropertyFilters, issueUpdatedBuckets, selectedIssuePropertyFilterCount, toggleIssuePropertyFilterValue, unsetIssuePropertyFilterValue } from "@/state/board/filters";
 export function IssuePropertyFilterMenu({
   agents,
   filters,
@@ -89,6 +89,14 @@ export function IssuePropertyFilterMenu({
       label: t("run.notSet"),
       value: unsetIssuePropertyFilterValue
     }]
+  }, {
+    icon: <Clock aria-hidden="true" size={16} />,
+    key: "updated",
+    label: t("dashboard.updatedFilter"),
+    options: issueUpdatedBuckets.map(value => ({
+      label: t(`dashboard.updatedFilter.${value}` as MessageKey),
+      value
+    }))
   }];
   return <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>

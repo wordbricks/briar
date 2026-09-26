@@ -13,6 +13,7 @@ import { activeTeamIdAtom, teamNotificationsAtom, teamsAtom } from "../team/atom
 import {
   buildCurrentInboxMessages,
   classifyInboxMessage,
+  inboxMessageOrigin,
   collapseInboxThreadMessages,
   filterInboxMessagesByWorkspace,
   inboxConversationSyncSignal,
@@ -24,6 +25,7 @@ import {
   type InboxMessage,
   type InboxMessageWithReadState,
   type InboxSource,
+  type InboxOrigin,
 } from "./model";
 import { inboxStorageKey, readInboxState, type InboxState } from "./persistence";
 
@@ -330,6 +332,7 @@ export interface InboxMessageSummary {
   readonly id: string;
   readonly projectId: string;
   readonly category: InboxCategory;
+  readonly origin: InboxOrigin;
   readonly isUnread: boolean;
 }
 
@@ -340,6 +343,7 @@ const sameInboxMessageSummary = (
   left.id === right.id &&
   left.projectId === right.projectId &&
   left.category === right.category &&
+  left.origin === right.origin &&
   left.isUnread === right.isUnread;
 
 const summarizeInboxMessages = (
@@ -354,6 +358,7 @@ const summarizeInboxMessages = (
       id: message.id,
       projectId: message.projectId,
       category: classifyInboxMessage(message),
+      origin: inboxMessageOrigin(message),
       isUnread: message.isUnread,
     };
     const stored = previousById.get(next.id);

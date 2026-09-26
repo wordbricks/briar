@@ -44,6 +44,7 @@ export const workerD1TestFiles = [
   "worker/src/issue-attachments.test.ts",
   "worker/src/issue-execution-approval.test.ts",
   "worker/src/issue-message-mutation.test.ts",
+  "worker/src/issue-queued-editor-move.test.ts",
   "worker/src/issue-relation-repository.test.ts",
   "worker/src/legacy-update-bootstrap.test.ts",
   "worker/src/linear-import-repository.test.ts",

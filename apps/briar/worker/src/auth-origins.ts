@@ -1,4 +1,5 @@
 const authClientOrigins = [
+  "https://briar.onequery.dev",
   "https://briar.wordbricks.ai",
   "http://localhost:1420",
   "tauri://localhost",

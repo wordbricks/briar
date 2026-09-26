@@ -2,7 +2,7 @@
 
 import { act } from "react";
 import { BoardHarness } from "../../../test/board-harness";
-import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
+import { createReactTestRoot, renderReactTestRoot, settle } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/types";
@@ -534,6 +534,9 @@ describe("RunPage", () => {
     expect(container.querySelector(".run-page-composer-dock")).toBeNull();
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".run-page-titlebar-back")?.click();
+    });
+    await settle(() => container.querySelector(".kanban-board") !== null, {
+      description: "the kanban board to return after closing issue details",
     });
     expect(container.querySelector(".run-page")).toBeNull();
     expect(container.querySelector(".kanban-board")).not.toBeNull();

@@ -223,6 +223,7 @@ export function managedComputerConfig(env: Env): ManagedComputerConfig {
     remoteDesktopAllowedOrigins: [
       ...configuredRemoteOrigins,
       ...(apiOriginValue ? [apiOriginValue] : []),
+      "https://briar.onequery.dev",
       "https://briar.wordbricks.ai",
       "tauri://localhost",
       "http://tauri.localhost",
