@@ -35,7 +35,7 @@ export function parseWorkspaceInvitationToken(value: string) {
   try {
     const base =
       typeof window === "undefined"
-        ? "https://briar.wordbricks.ai"
+        ? "https://briar.onequery.dev"
         : window.location.origin;
     const token = invitationTokenFromPath(new URL(candidate, base).pathname);
     return token && invitationTokenPattern.test(token) ? token : null;

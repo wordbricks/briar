@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 964cfeed82e94581f715728a2802322160d78d9510ee339dafbe082839d295c8
--- snapshot-digest: 9d434b74db51bd4b0e0f36a9134bd3676ef45575f053b6d0399f883d070858f8
+-- migrations-digest: 39d7e9efe812138876763096aea5c60b527c8a0e54d44f2e93f45303ecec761f
+-- snapshot-digest: 6bfc108718dd5436ee939d53766a5433989b7ddef8b7fca32bf42f672690cc77
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4858,11 +4858,6 @@ CREATE INDEX briar_agent_worklog_entries_session_sequence_idx
 -- @statement
 CREATE INDEX briar_agent_worklog_entries_session_updated_idx
   on briar_agent_worklog_entries (session_id, updated_sequence, entry_id);
--- @statement
-CREATE INDEX briar_agent_transcript_segments_session_sequence_idx
-  on briar_agent_transcript_segments (
-    session_id, first_sequence, last_sequence
-  );
 -- @statement
 CREATE INDEX briar_hunt_runs_github_reconcile_idx
   on briar_hunt_runs (paused_at, id)

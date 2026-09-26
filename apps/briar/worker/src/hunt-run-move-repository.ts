@@ -25,6 +25,8 @@ export async function moveHuntRun(
     requestId: string;
     actor: string;
     occurredAt: string;
+    /** Keep an editor correction from racing a dispatch or claim. */
+    requireUnclaimedQueueCorrection?: boolean;
   },
 ): Promise<{
   outcome: HuntMoveOutcome;
@@ -167,6 +169,11 @@ export async function moveHuntRun(
          from briar_hunt_runs
          where id = ? and project_id = ? and current_attempt = ?
            and last_event_at = ?
+           and (? = 0 or (
+             status in ('backlog', 'queued')
+             and dispatch_request_id is null
+             and claimed_by is null and lease_expires_at is null
+           ))
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
@@ -185,6 +192,7 @@ export async function moveHuntRun(
         projectId,
         run.current_attempt,
         run.last_event_at,
+        input.requireUnclaimedQueueCorrection ? 1 : 0,
       ),
     db
       .prepare(
@@ -205,6 +213,11 @@ export async function moveHuntRun(
              updated_at = ?
          where id = ? and project_id = ? and current_attempt = ?
            and last_event_at = ?
+           and (? = 0 or (
+             status in ('backlog', 'queued')
+             and dispatch_request_id is null
+             and claimed_by is null and lease_expires_at is null
+           ))
            and exists (
              select 1 from briar_hunt_events
              where id = ? and run_id = briar_hunt_runs.id
@@ -232,6 +245,7 @@ export async function moveHuntRun(
         projectId,
         run.current_attempt,
         run.last_event_at,
+        input.requireUnclaimedQueueCorrection ? 1 : 0,
         eventId,
       ),
     ...invalidatedStages.map((stage) =>
