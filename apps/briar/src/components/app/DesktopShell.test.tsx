@@ -224,6 +224,15 @@ describe("DesktopShell", () => {
       const { view } = await mount(registry);
       await act(async () => registry.set(isSidebarOpenAtom, true));
       expect(view.container.querySelector(".mobile-sidebar-backdrop")).not.toBeNull();
+      await act(async () => {
+        view.container.querySelector<HTMLElement>("#app-sidebar")?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+      });
+      await flush();
+      expect(registry.get(isSidebarOpenAtom)).toBe(false);
+      await act(async () => registry.set(isSidebarOpenAtom, true));
+      expect(view.container.querySelector(".mobile-sidebar-backdrop")).not.toBeNull();
       await act(async () => createNavigationActions(registry).navigateToPage("inbox"));
       await flush();
       expect(registry.get(isSidebarOpenAtom)).toBe(false);

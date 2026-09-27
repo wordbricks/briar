@@ -6472,5 +6472,8 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .run-page-titlebar-actions { gap:3px; }
   .dm-conversation-pane.sidebar-closed .channel-header,
   .page-header.app-page-header.sidebar-closed { padding-left:18px; }
+  .my-issues-reference-list,.my-issues-reference-row { min-width:0; }
+  .my-issues-reference-row { grid-template-columns:26px 85px minmax(0,1fr); }
+  .my-issues-reference-arrow { display:none; }
   .app-status-bar { max-width:100vw; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
 }
