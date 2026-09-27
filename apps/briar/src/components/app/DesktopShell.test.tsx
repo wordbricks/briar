@@ -12,7 +12,7 @@ import { demoDashboard } from "../../lib/demo-data";
 import { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
 import { settingsNavigationLocation } from "../../lib/app-navigation";
 import { demoWorkspace, demoUser } from "../../state/demo-fixtures";
-import { requestedTeamAgentSettingsIdAtom } from "../../state/dialogs/atoms";
+import { isSidebarOpenAtom, requestedTeamAgentSettingsIdAtom } from "../../state/dialogs/atoms";
 import { createNavigationActions } from "../../state/navigation/actions";
 import { activePageAtom } from "../../state/navigation/atoms";
 import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
@@ -211,6 +211,31 @@ describe("DesktopShell", () => {
     await settle(() => view.container.textContent?.includes(run.title) === true);
     expect(view.container.textContent).toContain(run.title);
     await view.cleanup();
+  });
+
+  it("closes the mobile drawer after navigation and keeps the page in place", async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: (query: string) => ({ matches: query === "(max-width: 760px)" }),
+    });
+    const registry = harness();
+    try {
+      const { view } = await mount(registry);
+      await act(async () => registry.set(isSidebarOpenAtom, true));
+      expect(view.container.querySelector(".mobile-sidebar-backdrop")).not.toBeNull();
+      await act(async () => createNavigationActions(registry).navigateToPage("inbox"));
+      await flush();
+      expect(registry.get(isSidebarOpenAtom)).toBe(false);
+      expect(registry.get(activePageAtom)).toBe("inbox");
+      expect(view.container.querySelector(".mobile-sidebar-backdrop")).toBeNull();
+      await view.cleanup();
+    } finally {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
   });
 
   it("hides the sidebar on the settings page", async () => {

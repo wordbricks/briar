@@ -1,5 +1,5 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { AgentUsageStatusBar } from "../AgentUsageStatusBar";
 import { AppVersionStatus } from "../AppVersionStatus";
@@ -38,6 +38,7 @@ import {
   issueListRequestKeyAtom,
   lastDirectMessageChannelIdAtom,
   lastWorkLocationAtom,
+  navigationLocationAtom,
   requestedRunIdAtom,
   requestedSessionIdAtom,
   settingsTargetAtom,
@@ -88,6 +89,7 @@ export function DesktopShell({
   const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const setIsSidebarOpen = useAtomSet(isSidebarOpenAtom);
+  const isSidebarOpen = useAtomValue(isSidebarOpenAtom);
   const setSettingsTarget = useAtomSet(settingsTargetAtom);
   const setRequestedRunId = useAtomSet(requestedRunIdAtom);
   const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
@@ -217,6 +219,16 @@ export function DesktopShell({
         ref={appShellRef}
       >
         <WindowNavigationControlsWithHistory />
+        {isSidebarOpen && (
+          <button
+            aria-label="Close sidebar"
+            className="mobile-sidebar-backdrop"
+            onClick={() => setIsSidebarOpen(false)}
+            type="button"
+          />
+        )}
+        <div className="mobile-sidebar-layer">
+          <CloseMobileSidebarOnNavigation />
         <SidebarWithSession
           agents={agents.all}
           sidebarResizeProps={sidebarResizeProps}
@@ -336,6 +348,7 @@ export function DesktopShell({
           onLogout={() => void logout()}
           unreadInboxCount={unreadInboxCount}
         />
+        </div>
         <DesktopPages {...pages} />
       </div>
       <div className="app-status-bar">
@@ -379,4 +392,19 @@ export function DesktopShell({
       </div>
     </div>
   );
+}
+
+/** A narrow drawer closes after a destination changes, including channel and DM selections. */
+function CloseMobileSidebarOnNavigation() {
+  const location = useAtomValue(navigationLocationAtom);
+  const setIsSidebarOpen = useAtomSet(isSidebarOpenAtom);
+  useEffect(() => {
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 760px)").matches
+    ) {
+      setIsSidebarOpen(false);
+    }
+  }, [location, setIsSidebarOpen]);
+  return null;
 }
