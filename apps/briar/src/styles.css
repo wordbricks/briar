@@ -6469,9 +6469,37 @@ button.issue-message-state { width:100%; cursor:pointer; }
   .run-page-shell > .topbar,
   .run-page-shell > .topbar.sidebar-closed { min-width:0; gap:4px; padding-right:8px; padding-left:10px; overflow:hidden; }
   .run-page-shell .run-page-window-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .run-page-titlebar-actions { gap:3px; }
+  /* Keep issue title readable; compact actions live above, properties below. */
+  .run-page-shell > .topbar,
+  .run-page-shell > .topbar.sidebar-closed {
+    height:112px; min-height:112px; flex-basis:112px; display:grid;
+    grid-template-columns:28px auto minmax(0,1fr) auto;
+    grid-template-rows:28px 28px 28px; column-gap:8px; row-gap:4px;
+    padding:8px 12px; overflow:visible;
+  }
+  .run-page-titlebar-back { grid-column:1; grid-row:1; }
+  .run-page-window-number { grid-column:2; grid-row:1; }
+  .run-page-shell .run-page-window-title { grid-column:1 / -1; grid-row:2; width:100%; }
+  .run-page-save-status { grid-column:3; grid-row:1; justify-self:end; }
+  .run-page-titlebar-actions { display:contents; }
+  .run-page-titlebar-tools { grid-column:4; grid-row:1; gap:3px; }
+  .run-page-titlebar-divider { display:none; }
+  .run-page-property-badges { grid-column:1 / -1; grid-row:3; overflow-x:auto; scrollbar-width:none; }
+  .run-page-property-badges::-webkit-scrollbar { display:none; }
   .dm-conversation-pane.sidebar-closed .channel-header,
   .page-header.app-page-header.sidebar-closed { padding-left:18px; }
+  /* Keep issue scope and filters on one compact, scrollable row, as on mobile Linear. */
+  .my-issues-reference-toolbar { flex-direction:row; align-items:center; gap:6px; padding:6px 8px; min-height:48px; }
+  .my-issues-scope-tabs { width:auto; flex:1 1 auto; gap:4px; }
+  .my-issues-scope-tabs button { height:32px; padding:0 10px; font-size:var(--text-xs); }
+  .my-issues-reference-tools { width:auto; flex:0 0 auto; gap:4px; }
+  .my-issues-reference-tools .issue-property-filter-trigger,
+  .my-issues-reference-tools .my-issues-project-filter-trigger,
+  .my-issues-reference-tool-button { width:32px; height:32px; }
+  .my-issues-reference-view-switch { width:64px; height:32px; flex-basis:64px; padding:2px; }
+  .my-issues-reference-view-switch button { width:29px; height:26px; }
+  .my-issues-reference-search { right:8px; top:40px; }
+  .my-issues-reference-search.is-open { max-width:calc(100vw - 16px); }
   .my-issues-reference-list,.my-issues-reference-row { min-width:0; }
   .my-issues-reference-row { grid-template-columns:26px 85px minmax(0,1fr); }
   .my-issues-reference-arrow { display:none; }
