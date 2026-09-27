@@ -201,6 +201,7 @@ function InboxDetailPane({
   );
   return (
     <InboxDetailPanel
+      hasTarget={Boolean(target)}
       label={
         target
           ? inboxDetailLabel({
