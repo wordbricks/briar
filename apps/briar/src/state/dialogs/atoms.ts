@@ -99,8 +99,12 @@ export const repositorySetupTeamIdAtom = Atom.make<string | null>(null).pipe(
   Atom.withLabel("dialogs/repositorySetupTeamId"),
 );
 
-/** The sidebar, which starts open and is toggled by a shortcut or the palette. */
-export const isSidebarOpenAtom = Atom.make(true).pipe(
+/** The sidebar starts closed on narrow app viewports so the page remains usable. */
+export const isSidebarOpenAtom = Atom.make(
+  typeof window === "undefined" ||
+    typeof window.matchMedia !== "function" ||
+    !window.matchMedia("(max-width: 760px)").matches,
+).pipe(
   Atom.keepAlive,
   Atom.withLabel("dialogs/sidebarOpen"),
 );
