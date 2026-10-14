@@ -4,9 +4,8 @@
  *
  * * `MEMORY_ARTIFACTS` → namespace `briar-memory-e2e` (remote: real Artifacts),
  *   never the production `briar-memory`.
- * * `MEMORY_VAULT_ENABLED = "true"`, migration switch off.
  * * Everything else that could reach a production resource is removed or
- *   local: routes, Workers AI and Vectorize (`remote: true` in production) are
+ *   local: routes and Workers AI (`remote: true` in production) are
  *   dropped, R2 / D1 / Durable Objects / Workflows / email run in Miniflare.
  * * Static assets are dropped (the check only speaks Connect RPC).
  * * Dummy secrets as vars; nothing real is needed or read.
@@ -55,10 +54,6 @@ export async function writeDevConfig(input: { repoRoot: string; workDirectory: s
     artifacts: [{ binding: "MEMORY_ARTIFACTS", namespace: e2eNamespace, remote: true }],
     vars: {
       ...source.vars,
-      DM_MEMORY_INDEX_ENABLED: "false",
-      DM_MEMORY_RETRIEVAL_ENABLED: "false",
-      MEMORY_VAULT_ENABLED: "true",
-      MEMORY_VAULT_MIGRATION_ENABLED: "false",
       MANAGED_COMPUTER_REMOTE_DESKTOP_ENABLED: "false",
       WHATSAPP_APP_ORIGIN: "http://127.0.0.1",
       // Dummy secrets: the e2e never signs in with Google/Slack/AWS.

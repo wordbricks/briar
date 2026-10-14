@@ -62,7 +62,7 @@ export function memoryVaultCitationStatement(db: D1Database, input: {
 /**
  * Vault citations the app may show, keyed by message. Only DM vaults: their
  * owner can open the record from the DM memory dialog, and the same live
- * roster rule as legacy citations hides them once the DM changes hands. A
+ * roster rule as the DM memory dialog hides them once the DM changes hands. A
  * forgotten record's citations are deleted with it; the `deleted_at` check
  * covers the moment in between.
  */

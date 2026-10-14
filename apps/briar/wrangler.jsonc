@@ -53,15 +53,6 @@
     "mode": "smart"
   },
   "vars": {
-    "DM_MEMORY_INDEX_ENABLED": "true",
-    "DM_MEMORY_RETRIEVAL_ENABLED": "true",
-    "DM_MEMORY_MINIMUM_SCORE": "0.5",
-    // Memory vault on Cloudflare Artifacts (docs/plans/memory-vault-spec.md).
-    // Off until the live check and the D1 → vault migration have run.
-    "MEMORY_VAULT_ENABLED": "true",
-    // Runs the D1 → vault migration (one DM space per minute) before the
-    // vault is switched on; docs/operations/memory-vault.md, rollout.
-    "MEMORY_VAULT_MIGRATION_ENABLED": "true",
     // Agent-to-Agent turns (the recipient's run plus the sender's relay run)
     // one organization may spend per hour.
     "AGENT_MESSAGE_HOURLY_LIMIT": "30",
@@ -119,15 +110,10 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Workers AI picks the DM acknowledgement emoji (dm-acknowledgement-reaction.ts).
   "ai": { "binding": "DM_MEMORY_AI", "remote": true },
-  "vectorize": [
-    {
-      "binding": "DM_MEMORY_INDEX",
-      "index_name": "briar-dm-memory-prod-m3-v1",
-      "remote": true
-    }
-  ],
-  // One Git repo per memory vault; writes are pushes from an in-memory clone.
+  // One Git repo per memory vault (docs/plans/memory-vault-spec.md); writes are
+  // pushes from an in-memory clone. Without it memory reports memory_unavailable.
   "artifacts": [{ "binding": "MEMORY_ARTIFACTS", "namespace": "briar-memory", "remote": true }],
   "durable_objects": {
     "bindings": [

@@ -37,23 +37,24 @@ describe("cascade trigger depth", () => {
     worst.sort((left, right) => right.depth - left.depth);
     // D1 refuses to prepare a statement whose chain of trigger programs is
     // deeper than this, so the budget is the limit itself rather than a
-    // comfortable margin: `delete from briar_projects` and `delete from "user"`
-    // already sit on it. A new trigger layer on an erasure path has to be
+    // comfortable margin: `delete from briar_projects` already sits on it
+    // (`delete from "user"` did too until 0222 removed the legacy DM memory
+    // triggers on channel messages). A new trigger layer on an erasure path has to be
     // folded into an existing one instead of stacked on top of it, and a
     // migration that rebuilds tables has to be re-measured, because reordering
     // `sqlite_schema` alone can move these numbers by two.
     expect(
       worst.filter((entry) => entry.depth > D1_TRIGGER_DEPTH_LIMIT),
     ).toEqual([]);
-    // These two sit exactly on the limit today, so this list is the early
-    // warning the number itself cannot give: a third entry means some erasure
+    // This one sits exactly on the limit today, so this list is the early
+    // warning the number itself cannot give: a new entry means some erasure
     // path grew a level and is one migration away from failing in production.
     expect(
       worst
         .filter((entry) => entry.depth === D1_TRIGGER_DEPTH_LIMIT)
         .map((entry) => entry.statement)
         .sort(),
-    ).toEqual(["delete briar_projects", "delete user"]);
+    ).toEqual(["delete briar_projects"]);
   });
 
   it("still reads the schema it is guarding", () => {

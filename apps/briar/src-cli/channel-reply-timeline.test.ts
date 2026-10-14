@@ -57,7 +57,6 @@ describe("channel reply timeline", () => {
       totalMs: 3_000,
       bootMs: 1_200,
       steerFolded: true,
-      memoryBrief: "loaded",
       prewarm: "used",
     });
     test.record.startTurn();
@@ -82,7 +81,6 @@ describe("channel reply timeline", () => {
       outcome: "completed",
       steerFolded: true,
       prewarm: "used",
-      memoryBrief: "loaded",
       workspace: "none",
       acknowledgement: "placeholder",
     }]);

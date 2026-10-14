@@ -13,7 +13,6 @@ import {
   type CompleteIssueReplyRequest,
   CompleteChannelReplyRequestSchema,
   CompleteIssueReplyRequestSchema,
-  DmMemorySaveRequestSchema,
   IssueReplyClaimIdentitySchema,
   IssueReplySuccessSchema,
   ReplyIssueDraftSchema,
@@ -133,9 +132,6 @@ describe("reply completion protobuf mapping", () => {
             body: "기억하고 있는 내용을 정리했습니다.",
             acknowledgementReaction: "🙏",
             memoryCitations: [reference()],
-            memorySaveRequest: create(DmMemorySaveRequestSchema, {
-              documents: [reference()],
-            }),
           }),
         },
       },
@@ -146,13 +142,34 @@ describe("reply completion protobuf mapping", () => {
     const completion = mapped.outcome.completion;
     expect(completion.acknowledgementReaction).toBe("🙏");
     expect(completion.memoryCitations).toEqual([{ documentId, version: 2 }]);
-    expect(completion.memorySaveRequest).toEqual({
-      documents: [{ documentId, version: 2 }],
-    });
+    expect(completion).not.toHaveProperty("memorySaveRequest");
     expect(Object.keys(completion.memoryCitations![0]!)).toEqual([
       "documentId",
       "version",
     ]);
+  });
+
+  /*
+    `memory_save_request` (field 5) is retired and reserved. Workers 1.2.231 to
+    1.2.233 refuse to send it unless the claim enabled learning, which no
+    server has done since the vault cutover, so it never arrives. If it did,
+    the fail-closed guard treats it as any other unknown field.
+  */
+  it("treats the retired memory save request as an unknown field", () => {
+    const reference = toBinary(DmMemoryReferenceSchema, create(DmMemoryReferenceSchema, {
+      documentId: "70000000-0000-4000-8000-000000000002", version: 1,
+    }));
+    const saveRequest = new Uint8Array([0x0a, reference.length, ...reference]);
+    const success = toBinary(ChannelReplySuccessSchema, create(ChannelReplySuccessSchema, { body: "Saved." }));
+    const legacy = fromBinary(ChannelReplySuccessSchema,
+      new Uint8Array([...success, 0x2a, saveRequest.length, ...saveRequest]));
+    expect(() => completeChannelReplyInputFromProto(create(CompleteChannelReplyRequestSchema, {
+      requestId,
+      projectId,
+      workerId: "worker-1",
+      work: channelWork(),
+      outcome: { case: "success", value: legacy },
+    }))).toThrow("unknown protobuf fields");
   });
 
   it("retains semantic validation for generated success payloads", () => {

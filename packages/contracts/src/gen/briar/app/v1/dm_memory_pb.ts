@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/dm_memory.proto.
  */
 export const file_briar_app_v1_dm_memory: GenFile = /*@__PURE__*/
-  fileDesc("Chxicmlhci9hcHAvdjEvZG1fbWVtb3J5LnByb3RvEgxicmlhci5hcHAudjEikwEKFUxpc3REbU1lbW9yaWVzUmVxdWVzdBIUCgx3b3Jrc3BhY2VfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIcCg9tZW1vcnlfc3BhY2VfaWQYAyABKAlIAIgBARITCgZjdXJzb3IYBCABKAlIAYgBAUISChBfbWVtb3J5X3NwYWNlX2lkQgkKB19jdXJzb3Ii7gIKFkxpc3REbU1lbW9yaWVzUmVzcG9uc2USEAoIZWxpZ2libGUYASABKAgSOAoMY2FwYWJpbGl0aWVzGAIgASgLMiIuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2FwYWJpbGl0aWVzEisKBnNwYWNlcxgDIAMoCzIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNwYWNlEh4KEXNlbGVjdGVkX3NwYWNlX2lkGAQgASgJSACIAQESMQoJZG9jdW1lbnRzGAUgAygLMh4uYnJpYXIuYXBwLnYxLkRtTWVtb3J5RG9jdW1lbnQSGAoLbmV4dF9jdXJzb3IYBiABKAlIAYgBARI7CghsZWFybmluZxgHIAEoCzIkLmJyaWFyLmFwcC52MS5EbU1lbW9yeUxlYXJuaW5nU3RhdHVzSAKIAQFCFAoSX3NlbGVjdGVkX3NwYWNlX2lkQg4KDF9uZXh0X2N1cnNvckILCglfbGVhcm5pbmci9gIKFkRtTWVtb3J5TGVhcm5pbmdTdGF0dXMSRwoNY29uZmlndXJhdGlvbhgBIAEoCzIrLmJyaWFyLmFwcC52MS5EbU1lbW9yeUxlYXJuaW5nQ29uZmlndXJhdGlvbkgAiAEBEhMKC2NhbGxzX3RvZGF5GAIgASgNEiAKGHJlc2VydmVkX21pY3JvX3VzZF90b2RheRgDIAEoBBIUCgxwZW5kaW5nX2pvYnMYBCABKA0SEwoLZmFpbGVkX2pvYnMYBSABKA0SOAoIbGFzdF9qb2IYBiABKAsyIS5icmlhci5hcHAudjEuRG1NZW1vcnlMZWFybmluZ0pvYkgBiAEBEkYKDXJldHJ5YWJsZV9qb2IYByABKAsyKi5icmlhci5hcHAudjEuRG1NZW1vcnlMZWFybmluZ1JldHJ5YWJsZUpvYkgCiAEBQhAKDl9jb25maWd1cmF0aW9uQgsKCV9sYXN0X2pvYkIQCg5fcmV0cnlhYmxlX2pvYiKwAgodRG1NZW1vcnlMZWFybmluZ0NvbmZpZ3VyYXRpb24SNQoIcHJvcG9zZXIYASABKAsyIy5icmlhci5hcHAudjEuRG1NZW1vcnlMZWFybmluZ01vZGVsEjUKCHZlcmlmaWVyGAIgASgLMiMuYnJpYXIuYXBwLnYxLkRtTWVtb3J5TGVhcm5pbmdNb2RlbBIZChFzcGFjZV9kYWlseV9jYWxscxgDIAEoDRIdChVzcGFjZV9kYWlseV9taWNyb191c2QYBCABKAQSFAoMY29zdF90cmFja2VkGAUgASgIEhYKDmFnZW50X3Byb3ZpZGVyGAYgASgJEh8KF2FnZW50X3Byb3ZpZGVyX3ZlcmlmaWVkGAcgASgIEhgKEHdvcmtlcl9hdmFpbGFibGUYCCABKAgiSwoVRG1NZW1vcnlMZWFybmluZ01vZGVsEg0KBW1vZGVsGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhEKCXRyYW5zcG9ydBgDIAEoCSLYAgoTRG1NZW1vcnlMZWFybmluZ0pvYhIKCgJpZBgBIAEoCRIzCgRraW5kGAIgASgOMiUuYnJpYXIuYXBwLnYxLkRtTWVtb3J5TGVhcm5pbmdKb2JLaW5kEjcKBnN0YXR1cxgDIAEoDjInLmJyaWFyLmFwcC52MS5EbU1lbW9yeUxlYXJuaW5nSm9iU3RhdHVzEjoKBXN0YWdlGAQgASgOMiYuYnJpYXIuYXBwLnYxLkRtTWVtb3J5TGVhcm5pbmdKb2JTdGFnZUgAiAEBEkIKCmVycm9yX2NvZGUYBSABKA4yKS5icmlhci5hcHAudjEuRG1NZW1vcnlMZWFybmluZ0ZhaWx1cmVDb2RlSAGIAQESLgoKdXBkYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCCAoGX3N0YWdlQg0KC19lcnJvcl9jb2RlIj4KHERtTWVtb3J5TGVhcm5pbmdSZXRyeWFibGVKb2ISCgoCaWQYASABKAkSEgoKY2FsbHNfdXNlZBgCIAEoDSKGAQocUmV0cnlEbU1lbW9yeUxlYXJuaW5nUmVxdWVzdBIUCgx3b3Jrc3BhY2VfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIOCgZqb2JfaWQYAyABKAkSEgoKcmVxdWVzdF9pZBgEIAEoCRIYChByZXZvY2F0aW9uX2Vwb2NoGAUgASgEIkMKHVJldHJ5RG1NZW1vcnlMZWFybmluZ1Jlc3BvbnNlEhAKCGFjY2VwdGVkGAEgASgIEhAKCHJlcGxheWVkGAIgASgIIn0KGkdldERtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0EhQKDHdvcmtzcGFjZV9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhMKC2RvY3VtZW50X2lkGAMgASgJEhQKB3ZlcnNpb24YBCABKA1IAIgBAUIKCghfdmVyc2lvbiJPChtHZXREbU1lbW9yeURvY3VtZW50UmVzcG9uc2USMAoIZG9jdW1lbnQYASABKAsyHi5icmlhci5hcHAudjEuRG1NZW1vcnlEb2N1bWVudCJ9ChxMaXN0RG1NZW1vcnlSZXZpc2lvbnNSZXF1ZXN0EhQKDHdvcmtzcGFjZV9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhMKC2RvY3VtZW50X2lkGAMgASgJEhMKBmN1cnNvchgEIAEoDUgAiAEBQgkKB19jdXJzb3IiqgEKHUxpc3REbU1lbW9yeVJldmlzaW9uc1Jlc3BvbnNlEhMKC2RvY3VtZW50X2lkGAEgASgJEhcKD2N1cnJlbnRfdmVyc2lvbhgCIAEoDRIxCglyZXZpc2lvbnMYAyADKAsyHi5icmlhci5hcHAudjEuRG1NZW1vcnlSZXZpc2lvbhIYCgtuZXh0X2N1cnNvchgEIAEoDUgAiAEBQg4KDF9uZXh0X2N1cnNvciKdAgoQRG1NZW1vcnlSZXZpc2lvbhIPCgd2ZXJzaW9uGAEgASgNEi4KCmNyZWF0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjEKDG1lbW9yeV9jbGFzcxgDIAEoDjIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeUNsYXNzEhkKEXByb3RlY3RlZF9ieV91c2VyGAQgASgIEjQKC3ZhbGlkX3VudGlsGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgAiAEBEjQKBm9yaWdpbhgGIAEoDjIkLmJyaWFyLmFwcC52MS5EbU1lbW9yeVJldmlzaW9uT3JpZ2luQg4KDF92YWxpZF91bnRpbCLZAwodQ3JlYXRlRG1NZW1vcnlEb2N1bWVudFJlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEhIKCmNoYW5uZWxfaWQYAiABKAkSEgoKcmVxdWVzdF9pZBgDIAEoCRIcCg9tZW1vcnlfc3BhY2VfaWQYBCABKAlIAIgBARINCgV0aXRsZRgFIAEoCRIMCgRib2R5GAYgASgJEjEKDG1lbW9yeV9jbGFzcxgHIAEoDjIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeUNsYXNzEhcKD3NvdXJjZV9sYW5ndWFnZRgIIAEoCRI0CgtvYnNlcnZlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAYgBARI0Cgt2YWxpZF91bnRpbBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAogBARJACg5zb3VyY2VfbWVzc2FnZRgLIAEoCzIjLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNvdXJjZU1lc3NhZ2VIA4gBAUISChBfbWVtb3J5X3NwYWNlX2lkQg4KDF9vYnNlcnZlZF9hdEIOCgxfdmFsaWRfdW50aWxCEQoPX3NvdXJjZV9tZXNzYWdlIogECh1VcGRhdGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBIUCgx3b3Jrc3BhY2VfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRITCgtkb2N1bWVudF9pZBgDIAEoCRISCgpyZXF1ZXN0X2lkGAQgASgJEhwKD21lbW9yeV9zcGFjZV9pZBgFIAEoCUgAiAEBEhgKEGV4cGVjdGVkX3ZlcnNpb24YBiABKA0SDQoFdGl0bGUYByABKAkSDAoEYm9keRgIIAEoCRIxCgxtZW1vcnlfY2xhc3MYCSABKA4yGy5icmlhci5hcHAudjEuRG1NZW1vcnlDbGFzcxIXCg9zb3VyY2VfbGFuZ3VhZ2UYCiABKAkSNAoLb2JzZXJ2ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAGIAQESNAoLdmFsaWRfdW50aWwYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAKIAQESQAoOc291cmNlX21lc3NhZ2UYDSABKAsyIy5icmlhci5hcHAudjEuRG1NZW1vcnlTb3VyY2VNZXNzYWdlSAOIAQFCEgoQX21lbW9yeV9zcGFjZV9pZEIOCgxfb2JzZXJ2ZWRfYXRCDgoMX3ZhbGlkX3VudGlsQhEKD19zb3VyY2VfbWVzc2FnZSJYCh5DcmVhdGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2USEwoLZG9jdW1lbnRfaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoDRIQCghyZXBsYXllZBgDIAEoCCJYCh5VcGRhdGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2USEwoLZG9jdW1lbnRfaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoDRIQCghyZXBsYXllZBgDIAEoCCJeCh1EZWxldGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBIUCgx3b3Jrc3BhY2VfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRITCgtkb2N1bWVudF9pZBgDIAEoCSJGCh5EZWxldGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2USDwoHZGVsZXRlZBgBIAEoCBITCgtwdXJnZV9zdGF0ZRgCIAEoCSLcAQodVXBkYXRlRG1NZW1vcnlTZXR0aW5nc1JlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEhIKCmNoYW5uZWxfaWQYAiABKAkSEgoKcmVxdWVzdF9pZBgDIAEoCRIcCg9tZW1vcnlfc3BhY2VfaWQYBCABKAlIAIgBARIgChhleHBlY3RlZF9tZW1vcnlfcmV2aXNpb24YBSABKAQSEwoLdXNlX2VuYWJsZWQYBiABKAgSFAoMYXV0b19lbmFibGVkGAcgASgIQhIKEF9tZW1vcnlfc3BhY2VfaWQiTAoeVXBkYXRlRG1NZW1vcnlTZXR0aW5nc1Jlc3BvbnNlEioKBXNwYWNlGAEgASgLMhsuYnJpYXIuYXBwLnYxLkRtTWVtb3J5U3BhY2UiQgoURG1NZW1vcnlDYXBhYmlsaXRpZXMSDgoGcmVjYWxsGAEgASgIEhoKEmF1dG9tYXRpY19sZWFybmluZxgCIAEoCCLIAgoNRG1NZW1vcnlTcGFjZRIKCgJpZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhAKCGFnZW50X2lkGAMgASgJEhQKDHJvc3Rlcl9lcG9jaBgEIAEoBBIxCgZzdGF0dXMYBSABKA4yIS5icmlhci5hcHAudjEuRG1NZW1vcnlTcGFjZVN0YXR1cxITCgt1c2VfZW5hYmxlZBgGIAEoCBIUCgxhdXRvX2VuYWJsZWQYByABKAgSFwoPbWVtb3J5X3JldmlzaW9uGAggASgEEhgKEHJldm9jYXRpb25fZXBvY2gYCSABKAQSLgoKY3JlYXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAi4wUKEERtTWVtb3J5RG9jdW1lbnQSCgoCaWQYASABKAkSFwoPbWVtb3J5X3NwYWNlX2lkGAIgASgJEjAKBGtpbmQYAyABKA4yIi5icmlhci5hcHAudjEuRG1NZW1vcnlEb2N1bWVudEtpbmQSDQoFdGl0bGUYBCABKAkSDwoHdmVyc2lvbhgFIAEoDRI0CgZzdGF0dXMYBiABKA4yJC5icmlhci5hcHAudjEuRG1NZW1vcnlEb2N1bWVudFN0YXR1cxISCgpjb25mbGljdGVkGAcgASgIEjEKDG1lbW9yeV9jbGFzcxgIIAEoDjIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeUNsYXNzEjkKDWV2aWRlbmNlX3R5cGUYCSABKA4yIi5icmlhci5hcHAudjEuRG1NZW1vcnlFdmlkZW5jZVR5cGUSGQoRcHJvdGVjdGVkX2J5X3VzZXIYCiABKAgSFwoPc291cmNlX2xhbmd1YWdlGAsgASgJEjQKC29ic2VydmVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgAiAEBEjQKC3ZhbGlkX3VudGlsGA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBEi4KCmNyZWF0ZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjUKC2luZGV4X3N0YXRlGBAgASgOMiAuYnJpYXIuYXBwLnYxLkRtTWVtb3J5SW5kZXhTdGF0ZRIRCgRib2R5GBEgASgJSAKIAQESLQoHc291cmNlcxgSIAMoCzIcLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNvdXJjZUIOCgxfb2JzZXJ2ZWRfYXRCDgoMX3ZhbGlkX3VudGlsQgcKBV9ib2R5IjQKFURtTWVtb3J5U291cmNlTWVzc2FnZRIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgNIl0KDkRtTWVtb3J5U291cmNlEi4KBHR5cGUYASABKA4yIC5icmlhci5hcHAudjEuRG1NZW1vcnlTb3VyY2VUeXBlEgoKAmlkGAIgASgJEg8KB3ZlcnNpb24YAyABKA0iOQoRRG1NZW1vcnlSZWZlcmVuY2USEwoLZG9jdW1lbnRfaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoDSLBAQoSRG1NZW1vcnlEZXNjcmlwdG9yEhAKCHByb3RvY29sGAEgASgNEhcKD21lbW9yeV9zcGFjZV9pZBgCIAEoCRIXCg9tZW1vcnlfcmV2aXNpb24YAyABKAQSGAoQcmV2b2NhdGlvbl9lcG9jaBgEIAEoBBIWCg5zZWFyY2hfZW5hYmxlZBgFIAEoCBI1CgticmllZl9zdGF0ZRgGIAEoDjIgLmJyaWFyLmFwcC52MS5EbU1lbW9yeUJyaWVmU3RhdGUqzgEKF0RtTWVtb3J5TGVhcm5pbmdKb2JLaW5kEisKJ0RNX01FTU9SWV9MRUFSTklOR19KT0JfS0lORF9VTlNQRUNJRklFRBAAEicKI0RNX01FTU9SWV9MRUFSTklOR19KT0JfS0lORF9FWFRSQUNUEAESMAosRE1fTUVNT1JZX0xFQVJOSU5HX0pPQl9LSU5EX0VYUExJQ0lUX1JFUVVFU1QQAhIrCidETV9NRU1PUllfTEVBUk5JTkdfSk9CX0tJTkRfQ09OU09MSURBVEUQAyr/AgoZRG1NZW1vcnlMZWFybmluZ0pvYlN0YXR1cxItCilETV9NRU1PUllfTEVBUk5JTkdfSk9CX1NUQVRVU19VTlNQRUNJRklFRBAAEikKJURNX01FTU9SWV9MRUFSTklOR19KT0JfU1RBVFVTX1BFTkRJTkcQARIpCiVETV9NRU1PUllfTEVBUk5JTkdfSk9CX1NUQVRVU19SVU5OSU5HEAISLAooRE1fTUVNT1JZX0xFQVJOSU5HX0pPQl9TVEFUVVNfUkVUUllfV0FJVBADEigKJERNX01FTU9SWV9MRUFSTklOR19KT0JfU1RBVFVTX0ZBSUxFRBAEEisKJ0RNX01FTU9SWV9MRUFSTklOR19KT0JfU1RBVFVTX0NBTkNFTExFRBAFEisKJ0RNX01FTU9SWV9MRUFSTklOR19KT0JfU1RBVFVTX1NVQ0NFRURFRBAGEisKJ0RNX01FTU9SWV9MRUFSTklOR19KT0JfU1RBVFVTX05PX0NIQU5HRRAHKs0BChhEbU1lbW9yeUxlYXJuaW5nSm9iU3RhZ2USLAooRE1fTUVNT1JZX0xFQVJOSU5HX0pPQl9TVEFHRV9VTlNQRUNJRklFRBAAEioKJkRNX01FTU9SWV9MRUFSTklOR19KT0JfU1RBR0VfUFJPUE9TSU5HEAESKgomRE1fTUVNT1JZX0xFQVJOSU5HX0pPQl9TVEFHRV9WRVJJRllJTkcQAhIrCidETV9NRU1PUllfTEVBUk5JTkdfSk9CX1NUQUdFX0NPTU1JVFRJTkcQAyrhBAobRG1NZW1vcnlMZWFybmluZ0ZhaWx1cmVDb2RlEi8KK0RNX01FTU9SWV9MRUFSTklOR19GQUlMVVJFX0NPREVfVU5TUEVDSUZJRUQQABI0CjBETV9NRU1PUllfTEVBUk5JTkdfRkFJTFVSRV9DT0RFX0lOVkFMSURfUFJPUE9TQUwQARI5CjVETV9NRU1PUllfTEVBUk5JTkdfRkFJTFVSRV9DT0RFX1ZFUklGSUNBVElPTl9SRUpFQ1RFRBACEikKJURNX01FTU9SWV9MRUFSTklOR19GQUlMVVJFX0NPREVfU1RBTEUQAxIxCi1ETV9NRU1PUllfTEVBUk5JTkdfRkFJTFVSRV9DT0RFX1NDT1BFX1JFVk9LRUQQBBI0CjBETV9NRU1PUllfTEVBUk5JTkdfRkFJTFVSRV9DT0RFX0JVREdFVF9FWEhBVVNURUQQBRI1CjFETV9NRU1PUllfTEVBUk5JTkdfRkFJTFVSRV9DT0RFX01PREVMX1VOQVZBSUxBQkxFEAYSMQotRE1fTUVNT1JZX0xFQVJOSU5HX0ZBSUxVUkVfQ09ERV9NT0RFTF9USU1FT1VUEAcSNQoxRE1fTUVNT1JZX0xFQVJOSU5HX0ZBSUxVUkVfQ09ERV9NT0RFTF9DUkVERU5USUFMUxAIEjcKM0RNX01FTU9SWV9MRUFSTklOR19GQUlMVVJFX0NPREVfTU9ERUxfQ09ORklHVVJBVElPThAJEjIKLkRNX01FTU9SWV9MRUFSTklOR19GQUlMVVJFX0NPREVfSU5QVVRfQ0FQQUNJVFkQCiqAAQoNRG1NZW1vcnlDbGFzcxIfChtETV9NRU1PUllfQ0xBU1NfVU5TUEVDSUZJRUQQABIbChdETV9NRU1PUllfQ0xBU1NfUFJPRklMRRABEhcKE0RNX01FTU9SWV9DTEFTU19MT0cQAhIYChRETV9NRU1PUllfQ0xBU1NfTk9URRADKoMBChNEbU1lbW9yeVNwYWNlU3RhdHVzEiYKIkRNX01FTU9SWV9TUEFDRV9TVEFUVVNfVU5TUEVDSUZJRUQQABIhCh1ETV9NRU1PUllfU1BBQ0VfU1RBVFVTX0FDVElWRRABEiEKHURNX01FTU9SWV9TUEFDRV9TVEFUVVNfQ0xPU0VEEAIqiwEKFERtTWVtb3J5RG9jdW1lbnRLaW5kEicKI0RNX01FTU9SWV9ET0NVTUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASJwojRE1fTUVNT1JZX0RPQ1VNRU5UX0tJTkRfT0JTRVJWQVRJT04QARIhCh1ETV9NRU1PUllfRE9DVU1FTlRfS0lORF9UT1BJQxACKr4BChZEbU1lbW9yeURvY3VtZW50U3RhdHVzEikKJURNX01FTU9SWV9ET0NVTUVOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIkCiBETV9NRU1PUllfRE9DVU1FTlRfU1RBVFVTX0FDVElWRRABEikKJURNX01FTU9SWV9ET0NVTUVOVF9TVEFUVVNfSU5WQUxJREFURUQQAhIoCiRETV9NRU1PUllfRE9DVU1FTlRfU1RBVFVTX1NVUEVSU0VERUQQAyqQAQoURG1NZW1vcnlFdmlkZW5jZVR5cGUSJwojRE1fTUVNT1JZX0VWSURFTkNFX1RZUEVfVU5TUEVDSUZJRUQQABIpCiVETV9NRU1PUllfRVZJREVOQ0VfVFlQRV9FWFBMSUNJVF9VU0VSEAESJAogRE1fTUVNT1JZX0VWSURFTkNFX1RZUEVfT0JTRVJWRUQQAiqhAQoSRG1NZW1vcnlJbmRleFN0YXRlEiUKIURNX01FTU9SWV9JTkRFWF9TVEFURV9VTlNQRUNJRklFRBAAEiEKHURNX01FTU9SWV9JTkRFWF9TVEFURV9QRU5ESU5HEAESHwobRE1fTUVNT1JZX0lOREVYX1NUQVRFX1JFQURZEAISIAocRE1fTUVNT1JZX0lOREVYX1NUQVRFX0ZBSUxFRBADKokBChJEbU1lbW9yeVNvdXJjZVR5cGUSJQohRE1fTUVNT1JZX1NPVVJDRV9UWVBFX1VOU1BFQ0lGSUVEEAASIQodRE1fTUVNT1JZX1NPVVJDRV9UWVBFX01FU1NBR0UQARIpCiVETV9NRU1PUllfU09VUkNFX1RZUEVfVVNFUl9FRElUX0VWRU5UEAIq7gEKFkRtTWVtb3J5UmV2aXNpb25PcmlnaW4SKQolRE1fTUVNT1JZX1JFVklTSU9OX09SSUdJTl9VTlNQRUNJRklFRBAAEicKI0RNX01FTU9SWV9SRVZJU0lPTl9PUklHSU5fVVNFUl9FRElUEAESLgoqRE1fTUVNT1JZX1JFVklTSU9OX09SSUdJTl9FWFBMSUNJVF9SRVFVRVNUEAISJQohRE1fTUVNT1JZX1JFVklTSU9OX09SSUdJTl9FWFRSQUNUEAMSKQolRE1fTUVNT1JZX1JFVklTSU9OX09SSUdJTl9DT05TT0xJREFURRAEKoQBChJEbU1lbW9yeUJyaWVmU3RhdGUSJQohRE1fTUVNT1JZX0JSSUVGX1NUQVRFX1VOU1BFQ0lGSUVEEAASIwofRE1fTUVNT1JZX0JSSUVGX1NUQVRFX0FWQUlMQUJMRRABEiIKHkRNX01FTU9SWV9CUklFRl9TVEFURV9ESVNBQkxFRBACMpIHCg9EbU1lbW9yeVNlcnZpY2USWwoOTGlzdERtTWVtb3JpZXMSIy5icmlhci5hcHAudjEuTGlzdERtTWVtb3JpZXNSZXF1ZXN0GiQuYnJpYXIuYXBwLnYxLkxpc3REbU1lbW9yaWVzUmVzcG9uc2USagoTR2V0RG1NZW1vcnlEb2N1bWVudBIoLmJyaWFyLmFwcC52MS5HZXREbU1lbW9yeURvY3VtZW50UmVxdWVzdBopLmJyaWFyLmFwcC52MS5HZXREbU1lbW9yeURvY3VtZW50UmVzcG9uc2UScAoVTGlzdERtTWVtb3J5UmV2aXNpb25zEiouYnJpYXIuYXBwLnYxLkxpc3REbU1lbW9yeVJldmlzaW9uc1JlcXVlc3QaKy5icmlhci5hcHAudjEuTGlzdERtTWVtb3J5UmV2aXNpb25zUmVzcG9uc2UScwoWQ3JlYXRlRG1NZW1vcnlEb2N1bWVudBIrLmJyaWFyLmFwcC52MS5DcmVhdGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBosLmJyaWFyLmFwcC52MS5DcmVhdGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2UScwoWVXBkYXRlRG1NZW1vcnlEb2N1bWVudBIrLmJyaWFyLmFwcC52MS5VcGRhdGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBosLmJyaWFyLmFwcC52MS5VcGRhdGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2UScwoWRGVsZXRlRG1NZW1vcnlEb2N1bWVudBIrLmJyaWFyLmFwcC52MS5EZWxldGVEbU1lbW9yeURvY3VtZW50UmVxdWVzdBosLmJyaWFyLmFwcC52MS5EZWxldGVEbU1lbW9yeURvY3VtZW50UmVzcG9uc2UScwoWVXBkYXRlRG1NZW1vcnlTZXR0aW5ncxIrLmJyaWFyLmFwcC52MS5VcGRhdGVEbU1lbW9yeVNldHRpbmdzUmVxdWVzdBosLmJyaWFyLmFwcC52MS5VcGRhdGVEbU1lbW9yeVNldHRpbmdzUmVzcG9uc2UScAoVUmV0cnlEbU1lbW9yeUxlYXJuaW5nEiouYnJpYXIuYXBwLnYxLlJldHJ5RG1NZW1vcnlMZWFybmluZ1JlcXVlc3QaKy5icmlhci5hcHAudjEuUmV0cnlEbU1lbW9yeUxlYXJuaW5nUmVzcG9uc2VCDLoCCUJyaWFyQVBJX2IGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("Chxicmlhci9hcHAvdjEvZG1fbWVtb3J5LnByb3RvEgxicmlhci5hcHAudjEikwEKFUxpc3REbU1lbW9yaWVzUmVxdWVzdBIUCgx3b3Jrc3BhY2VfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIcCg9tZW1vcnlfc3BhY2VfaWQYAyABKAlIAIgBARITCgZjdXJzb3IYBCABKAlIAYgBAUISChBfbWVtb3J5X3NwYWNlX2lkQgkKB19jdXJzb3IitAIKFkxpc3REbU1lbW9yaWVzUmVzcG9uc2USEAoIZWxpZ2libGUYASABKAgSOAoMY2FwYWJpbGl0aWVzGAIgASgLMiIuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2FwYWJpbGl0aWVzEisKBnNwYWNlcxgDIAMoCzIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNwYWNlEh4KEXNlbGVjdGVkX3NwYWNlX2lkGAQgASgJSACIAQESMQoJZG9jdW1lbnRzGAUgAygLMh4uYnJpYXIuYXBwLnYxLkRtTWVtb3J5RG9jdW1lbnQSGAoLbmV4dF9jdXJzb3IYBiABKAlIAYgBAUIUChJfc2VsZWN0ZWRfc3BhY2VfaWRCDgoMX25leHRfY3Vyc29ySgQIBxAIUghsZWFybmluZyJ9ChpHZXREbU1lbW9yeURvY3VtZW50UmVxdWVzdBIUCgx3b3Jrc3BhY2VfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRITCgtkb2N1bWVudF9pZBgDIAEoCRIUCgd2ZXJzaW9uGAQgASgNSACIAQFCCgoIX3ZlcnNpb24iTwobR2V0RG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEjAKCGRvY3VtZW50GAEgASgLMh4uYnJpYXIuYXBwLnYxLkRtTWVtb3J5RG9jdW1lbnQifQocTGlzdERtTWVtb3J5UmV2aXNpb25zUmVxdWVzdBIUCgx3b3Jrc3BhY2VfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRITCgtkb2N1bWVudF9pZBgDIAEoCRITCgZjdXJzb3IYBCABKA1IAIgBAUIJCgdfY3Vyc29yIqoBCh1MaXN0RG1NZW1vcnlSZXZpc2lvbnNSZXNwb25zZRITCgtkb2N1bWVudF9pZBgBIAEoCRIXCg9jdXJyZW50X3ZlcnNpb24YAiABKA0SMQoJcmV2aXNpb25zGAMgAygLMh4uYnJpYXIuYXBwLnYxLkRtTWVtb3J5UmV2aXNpb24SGAoLbmV4dF9jdXJzb3IYBCABKA1IAIgBAUIOCgxfbmV4dF9jdXJzb3IinQIKEERtTWVtb3J5UmV2aXNpb24SDwoHdmVyc2lvbhgBIAEoDRIuCgpjcmVhdGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIxCgxtZW1vcnlfY2xhc3MYAyABKA4yGy5icmlhci5hcHAudjEuRG1NZW1vcnlDbGFzcxIZChFwcm90ZWN0ZWRfYnlfdXNlchgEIAEoCBI0Cgt2YWxpZF91bnRpbBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAIgBARI0CgZvcmlnaW4YBiABKA4yJC5icmlhci5hcHAudjEuRG1NZW1vcnlSZXZpc2lvbk9yaWdpbkIOCgxfdmFsaWRfdW50aWwi2QMKHUNyZWF0ZURtTWVtb3J5RG9jdW1lbnRSZXF1ZXN0EhQKDHdvcmtzcGFjZV9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhIKCnJlcXVlc3RfaWQYAyABKAkSHAoPbWVtb3J5X3NwYWNlX2lkGAQgASgJSACIAQESDQoFdGl0bGUYBSABKAkSDAoEYm9keRgGIAEoCRIxCgxtZW1vcnlfY2xhc3MYByABKA4yGy5icmlhci5hcHAudjEuRG1NZW1vcnlDbGFzcxIXCg9zb3VyY2VfbGFuZ3VhZ2UYCCABKAkSNAoLb2JzZXJ2ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAGIAQESNAoLdmFsaWRfdW50aWwYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wSAKIAQESQAoOc291cmNlX21lc3NhZ2UYCyABKAsyIy5icmlhci5hcHAudjEuRG1NZW1vcnlTb3VyY2VNZXNzYWdlSAOIAQFCEgoQX21lbW9yeV9zcGFjZV9pZEIOCgxfb2JzZXJ2ZWRfYXRCDgoMX3ZhbGlkX3VudGlsQhEKD19zb3VyY2VfbWVzc2FnZSKIBAodVXBkYXRlRG1NZW1vcnlEb2N1bWVudFJlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEhIKCmNoYW5uZWxfaWQYAiABKAkSEwoLZG9jdW1lbnRfaWQYAyABKAkSEgoKcmVxdWVzdF9pZBgEIAEoCRIcCg9tZW1vcnlfc3BhY2VfaWQYBSABKAlIAIgBARIYChBleHBlY3RlZF92ZXJzaW9uGAYgASgNEg0KBXRpdGxlGAcgASgJEgwKBGJvZHkYCCABKAkSMQoMbWVtb3J5X2NsYXNzGAkgASgOMhsuYnJpYXIuYXBwLnYxLkRtTWVtb3J5Q2xhc3MSFwoPc291cmNlX2xhbmd1YWdlGAogASgJEjQKC29ic2VydmVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgBiAEBEjQKC3ZhbGlkX3VudGlsGAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgCiAEBEkAKDnNvdXJjZV9tZXNzYWdlGA0gASgLMiMuYnJpYXIuYXBwLnYxLkRtTWVtb3J5U291cmNlTWVzc2FnZUgDiAEBQhIKEF9tZW1vcnlfc3BhY2VfaWRCDgoMX29ic2VydmVkX2F0Qg4KDF92YWxpZF91bnRpbEIRCg9fc291cmNlX21lc3NhZ2UiWAoeQ3JlYXRlRG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEhMKC2RvY3VtZW50X2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKA0SEAoIcmVwbGF5ZWQYAyABKAgiWAoeVXBkYXRlRG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEhMKC2RvY3VtZW50X2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKA0SEAoIcmVwbGF5ZWQYAyABKAgiXgodRGVsZXRlRG1NZW1vcnlEb2N1bWVudFJlcXVlc3QSFAoMd29ya3NwYWNlX2lkGAEgASgJEhIKCmNoYW5uZWxfaWQYAiABKAkSEwoLZG9jdW1lbnRfaWQYAyABKAkiRgoeRGVsZXRlRG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEg8KB2RlbGV0ZWQYASABKAgSEwoLcHVyZ2Vfc3RhdGUYAiABKAki3AEKHVVwZGF0ZURtTWVtb3J5U2V0dGluZ3NSZXF1ZXN0EhQKDHdvcmtzcGFjZV9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJEhIKCnJlcXVlc3RfaWQYAyABKAkSHAoPbWVtb3J5X3NwYWNlX2lkGAQgASgJSACIAQESIAoYZXhwZWN0ZWRfbWVtb3J5X3JldmlzaW9uGAUgASgEEhMKC3VzZV9lbmFibGVkGAYgASgIEhQKDGF1dG9fZW5hYmxlZBgHIAEoCEISChBfbWVtb3J5X3NwYWNlX2lkIkwKHlVwZGF0ZURtTWVtb3J5U2V0dGluZ3NSZXNwb25zZRIqCgVzcGFjZRgBIAEoCzIbLmJyaWFyLmFwcC52MS5EbU1lbW9yeVNwYWNlIkIKFERtTWVtb3J5Q2FwYWJpbGl0aWVzEg4KBnJlY2FsbBgBIAEoCBIaChJhdXRvbWF0aWNfbGVhcm5pbmcYAiABKAgiyAIKDURtTWVtb3J5U3BhY2USCgoCaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIQCghhZ2VudF9pZBgDIAEoCRIUCgxyb3N0ZXJfZXBvY2gYBCABKAQSMQoGc3RhdHVzGAUgASgOMiEuYnJpYXIuYXBwLnYxLkRtTWVtb3J5U3BhY2VTdGF0dXMSEwoLdXNlX2VuYWJsZWQYBiABKAgSFAoMYXV0b19lbmFibGVkGAcgASgIEhcKD21lbW9yeV9yZXZpc2lvbhgIIAEoBBIYChByZXZvY2F0aW9uX2Vwb2NoGAkgASgEEi4KCmNyZWF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIuMFChBEbU1lbW9yeURvY3VtZW50EgoKAmlkGAEgASgJEhcKD21lbW9yeV9zcGFjZV9pZBgCIAEoCRIwCgRraW5kGAMgASgOMiIuYnJpYXIuYXBwLnYxLkRtTWVtb3J5RG9jdW1lbnRLaW5kEg0KBXRpdGxlGAQgASgJEg8KB3ZlcnNpb24YBSABKA0SNAoGc3RhdHVzGAYgASgOMiQuYnJpYXIuYXBwLnYxLkRtTWVtb3J5RG9jdW1lbnRTdGF0dXMSEgoKY29uZmxpY3RlZBgHIAEoCBIxCgxtZW1vcnlfY2xhc3MYCCABKA4yGy5icmlhci5hcHAudjEuRG1NZW1vcnlDbGFzcxI5Cg1ldmlkZW5jZV90eXBlGAkgASgOMiIuYnJpYXIuYXBwLnYxLkRtTWVtb3J5RXZpZGVuY2VUeXBlEhkKEXByb3RlY3RlZF9ieV91c2VyGAogASgIEhcKD3NvdXJjZV9sYW5ndWFnZRgLIAEoCRI0CgtvYnNlcnZlZF9hdBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAIgBARI0Cgt2YWxpZF91bnRpbBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAYgBARIuCgpjcmVhdGVkX2F0GA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GA8gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1CgtpbmRleF9zdGF0ZRgQIAEoDjIgLmJyaWFyLmFwcC52MS5EbU1lbW9yeUluZGV4U3RhdGUSEQoEYm9keRgRIAEoCUgCiAEBEi0KB3NvdXJjZXMYEiADKAsyHC5icmlhci5hcHAudjEuRG1NZW1vcnlTb3VyY2VCDgoMX29ic2VydmVkX2F0Qg4KDF92YWxpZF91bnRpbEIHCgVfYm9keSI0ChVEbU1lbW9yeVNvdXJjZU1lc3NhZ2USCgoCaWQYASABKAkSDwoHdmVyc2lvbhgCIAEoDSJdCg5EbU1lbW9yeVNvdXJjZRIuCgR0eXBlGAEgASgOMiAuYnJpYXIuYXBwLnYxLkRtTWVtb3J5U291cmNlVHlwZRIKCgJpZBgCIAEoCRIPCgd2ZXJzaW9uGAMgASgNIjkKEURtTWVtb3J5UmVmZXJlbmNlEhMKC2RvY3VtZW50X2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKA0qgAEKDURtTWVtb3J5Q2xhc3MSHwobRE1fTUVNT1JZX0NMQVNTX1VOU1BFQ0lGSUVEEAASGwoXRE1fTUVNT1JZX0NMQVNTX1BST0ZJTEUQARIXChNETV9NRU1PUllfQ0xBU1NfTE9HEAISGAoURE1fTUVNT1JZX0NMQVNTX05PVEUQAyqDAQoTRG1NZW1vcnlTcGFjZVN0YXR1cxImCiJETV9NRU1PUllfU1BBQ0VfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIQodRE1fTUVNT1JZX1NQQUNFX1NUQVRVU19BQ1RJVkUQARIhCh1ETV9NRU1PUllfU1BBQ0VfU1RBVFVTX0NMT1NFRBACKosBChREbU1lbW9yeURvY3VtZW50S2luZBInCiNETV9NRU1PUllfRE9DVU1FTlRfS0lORF9VTlNQRUNJRklFRBAAEicKI0RNX01FTU9SWV9ET0NVTUVOVF9LSU5EX09CU0VSVkFUSU9OEAESIQodRE1fTUVNT1JZX0RPQ1VNRU5UX0tJTkRfVE9QSUMQAiq+AQoWRG1NZW1vcnlEb2N1bWVudFN0YXR1cxIpCiVETV9NRU1PUllfRE9DVU1FTlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASJAogRE1fTUVNT1JZX0RPQ1VNRU5UX1NUQVRVU19BQ1RJVkUQARIpCiVETV9NRU1PUllfRE9DVU1FTlRfU1RBVFVTX0lOVkFMSURBVEVEEAISKAokRE1fTUVNT1JZX0RPQ1VNRU5UX1NUQVRVU19TVVBFUlNFREVEEAMqkAEKFERtTWVtb3J5RXZpZGVuY2VUeXBlEicKI0RNX01FTU9SWV9FVklERU5DRV9UWVBFX1VOU1BFQ0lGSUVEEAASKQolRE1fTUVNT1JZX0VWSURFTkNFX1RZUEVfRVhQTElDSVRfVVNFUhABEiQKIERNX01FTU9SWV9FVklERU5DRV9UWVBFX09CU0VSVkVEEAIqoQEKEkRtTWVtb3J5SW5kZXhTdGF0ZRIlCiFETV9NRU1PUllfSU5ERVhfU1RBVEVfVU5TUEVDSUZJRUQQABIhCh1ETV9NRU1PUllfSU5ERVhfU1RBVEVfUEVORElORxABEh8KG0RNX01FTU9SWV9JTkRFWF9TVEFURV9SRUFEWRACEiAKHERNX01FTU9SWV9JTkRFWF9TVEFURV9GQUlMRUQQAyqJAQoSRG1NZW1vcnlTb3VyY2VUeXBlEiUKIURNX01FTU9SWV9TT1VSQ0VfVFlQRV9VTlNQRUNJRklFRBAAEiEKHURNX01FTU9SWV9TT1VSQ0VfVFlQRV9NRVNTQUdFEAESKQolRE1fTUVNT1JZX1NPVVJDRV9UWVBFX1VTRVJfRURJVF9FVkVOVBACKu4BChZEbU1lbW9yeVJldmlzaW9uT3JpZ2luEikKJURNX01FTU9SWV9SRVZJU0lPTl9PUklHSU5fVU5TUEVDSUZJRUQQABInCiNETV9NRU1PUllfUkVWSVNJT05fT1JJR0lOX1VTRVJfRURJVBABEi4KKkRNX01FTU9SWV9SRVZJU0lPTl9PUklHSU5fRVhQTElDSVRfUkVRVUVTVBACEiUKIURNX01FTU9SWV9SRVZJU0lPTl9PUklHSU5fRVhUUkFDVBADEikKJURNX01FTU9SWV9SRVZJU0lPTl9PUklHSU5fQ09OU09MSURBVEUQBDKgBgoPRG1NZW1vcnlTZXJ2aWNlElsKDkxpc3REbU1lbW9yaWVzEiMuYnJpYXIuYXBwLnYxLkxpc3REbU1lbW9yaWVzUmVxdWVzdBokLmJyaWFyLmFwcC52MS5MaXN0RG1NZW1vcmllc1Jlc3BvbnNlEmoKE0dldERtTWVtb3J5RG9jdW1lbnQSKC5icmlhci5hcHAudjEuR2V0RG1NZW1vcnlEb2N1bWVudFJlcXVlc3QaKS5icmlhci5hcHAudjEuR2V0RG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEnAKFUxpc3REbU1lbW9yeVJldmlzaW9ucxIqLmJyaWFyLmFwcC52MS5MaXN0RG1NZW1vcnlSZXZpc2lvbnNSZXF1ZXN0GisuYnJpYXIuYXBwLnYxLkxpc3REbU1lbW9yeVJldmlzaW9uc1Jlc3BvbnNlEnMKFkNyZWF0ZURtTWVtb3J5RG9jdW1lbnQSKy5icmlhci5hcHAudjEuQ3JlYXRlRG1NZW1vcnlEb2N1bWVudFJlcXVlc3QaLC5icmlhci5hcHAudjEuQ3JlYXRlRG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEnMKFlVwZGF0ZURtTWVtb3J5RG9jdW1lbnQSKy5icmlhci5hcHAudjEuVXBkYXRlRG1NZW1vcnlEb2N1bWVudFJlcXVlc3QaLC5icmlhci5hcHAudjEuVXBkYXRlRG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEnMKFkRlbGV0ZURtTWVtb3J5RG9jdW1lbnQSKy5icmlhci5hcHAudjEuRGVsZXRlRG1NZW1vcnlEb2N1bWVudFJlcXVlc3QaLC5icmlhci5hcHAudjEuRGVsZXRlRG1NZW1vcnlEb2N1bWVudFJlc3BvbnNlEnMKFlVwZGF0ZURtTWVtb3J5U2V0dGluZ3MSKy5icmlhci5hcHAudjEuVXBkYXRlRG1NZW1vcnlTZXR0aW5nc1JlcXVlc3QaLC5icmlhci5hcHAudjEuVXBkYXRlRG1NZW1vcnlTZXR0aW5nc1Jlc3BvbnNlQgy6AglCcmlhckFQSV9iBnByb3RvMw", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message briar.app.v1.ListDmMemoriesRequest
@@ -79,11 +79,6 @@ export type ListDmMemoriesResponse = Message<"briar.app.v1.ListDmMemoriesRespons
    * @generated from field: optional string next_cursor = 6;
    */
   nextCursor?: string | undefined;
-
-  /**
-   * @generated from field: optional briar.app.v1.DmMemoryLearningStatus learning = 7;
-   */
-  learning?: DmMemoryLearningStatus | undefined;
 };
 
 /**
@@ -92,255 +87,6 @@ export type ListDmMemoriesResponse = Message<"briar.app.v1.ListDmMemoriesRespons
  */
 export const ListDmMemoriesResponseSchema: GenMessage<ListDmMemoriesResponse> = /*@__PURE__*/
   messageDesc(file_briar_app_v1_dm_memory, 1);
-
-/**
- * @generated from message briar.app.v1.DmMemoryLearningStatus
- */
-export type DmMemoryLearningStatus = Message<"briar.app.v1.DmMemoryLearningStatus"> & {
-  /**
-   * @generated from field: optional briar.app.v1.DmMemoryLearningConfiguration configuration = 1;
-   */
-  configuration?: DmMemoryLearningConfiguration | undefined;
-
-  /**
-   * @generated from field: uint32 calls_today = 2;
-   */
-  callsToday: number;
-
-  /**
-   * @generated from field: uint64 reserved_micro_usd_today = 3;
-   */
-  reservedMicroUsdToday: bigint;
-
-  /**
-   * @generated from field: uint32 pending_jobs = 4;
-   */
-  pendingJobs: number;
-
-  /**
-   * @generated from field: uint32 failed_jobs = 5;
-   */
-  failedJobs: number;
-
-  /**
-   * @generated from field: optional briar.app.v1.DmMemoryLearningJob last_job = 6;
-   */
-  lastJob?: DmMemoryLearningJob | undefined;
-
-  /**
-   * @generated from field: optional briar.app.v1.DmMemoryLearningRetryableJob retryable_job = 7;
-   */
-  retryableJob?: DmMemoryLearningRetryableJob | undefined;
-};
-
-/**
- * Describes the message briar.app.v1.DmMemoryLearningStatus.
- * Use `create(DmMemoryLearningStatusSchema)` to create a new message.
- */
-export const DmMemoryLearningStatusSchema: GenMessage<DmMemoryLearningStatus> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 2);
-
-/**
- * @generated from message briar.app.v1.DmMemoryLearningConfiguration
- */
-export type DmMemoryLearningConfiguration = Message<"briar.app.v1.DmMemoryLearningConfiguration"> & {
-  /**
-   * @generated from field: briar.app.v1.DmMemoryLearningModel proposer = 1;
-   */
-  proposer?: DmMemoryLearningModel | undefined;
-
-  /**
-   * @generated from field: briar.app.v1.DmMemoryLearningModel verifier = 2;
-   */
-  verifier?: DmMemoryLearningModel | undefined;
-
-  /**
-   * @generated from field: uint32 space_daily_calls = 3;
-   */
-  spaceDailyCalls: number;
-
-  /**
-   * @generated from field: uint64 space_daily_micro_usd = 4;
-   */
-  spaceDailyMicroUsd: bigint;
-
-  /**
-   * @generated from field: bool cost_tracked = 5;
-   */
-  costTracked: boolean;
-
-  /**
-   * @generated from field: string agent_provider = 6;
-   */
-  agentProvider: string;
-
-  /**
-   * @generated from field: bool agent_provider_verified = 7;
-   */
-  agentProviderVerified: boolean;
-
-  /**
-   * @generated from field: bool worker_available = 8;
-   */
-  workerAvailable: boolean;
-};
-
-/**
- * Describes the message briar.app.v1.DmMemoryLearningConfiguration.
- * Use `create(DmMemoryLearningConfigurationSchema)` to create a new message.
- */
-export const DmMemoryLearningConfigurationSchema: GenMessage<DmMemoryLearningConfiguration> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 3);
-
-/**
- * @generated from message briar.app.v1.DmMemoryLearningModel
- */
-export type DmMemoryLearningModel = Message<"briar.app.v1.DmMemoryLearningModel"> & {
-  /**
-   * @generated from field: string model = 1;
-   */
-  model: string;
-
-  /**
-   * @generated from field: string provider = 2;
-   */
-  provider: string;
-
-  /**
-   * @generated from field: string transport = 3;
-   */
-  transport: string;
-};
-
-/**
- * Describes the message briar.app.v1.DmMemoryLearningModel.
- * Use `create(DmMemoryLearningModelSchema)` to create a new message.
- */
-export const DmMemoryLearningModelSchema: GenMessage<DmMemoryLearningModel> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 4);
-
-/**
- * @generated from message briar.app.v1.DmMemoryLearningJob
- */
-export type DmMemoryLearningJob = Message<"briar.app.v1.DmMemoryLearningJob"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
-
-  /**
-   * @generated from field: briar.app.v1.DmMemoryLearningJobKind kind = 2;
-   */
-  kind: DmMemoryLearningJobKind;
-
-  /**
-   * @generated from field: briar.app.v1.DmMemoryLearningJobStatus status = 3;
-   */
-  status: DmMemoryLearningJobStatus;
-
-  /**
-   * @generated from field: optional briar.app.v1.DmMemoryLearningJobStage stage = 4;
-   */
-  stage?: DmMemoryLearningJobStage | undefined;
-
-  /**
-   * @generated from field: optional briar.app.v1.DmMemoryLearningFailureCode error_code = 5;
-   */
-  errorCode?: DmMemoryLearningFailureCode | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 6;
-   */
-  updatedAt?: Timestamp | undefined;
-};
-
-/**
- * Describes the message briar.app.v1.DmMemoryLearningJob.
- * Use `create(DmMemoryLearningJobSchema)` to create a new message.
- */
-export const DmMemoryLearningJobSchema: GenMessage<DmMemoryLearningJob> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 5);
-
-/**
- * @generated from message briar.app.v1.DmMemoryLearningRetryableJob
- */
-export type DmMemoryLearningRetryableJob = Message<"briar.app.v1.DmMemoryLearningRetryableJob"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
-
-  /**
-   * @generated from field: uint32 calls_used = 2;
-   */
-  callsUsed: number;
-};
-
-/**
- * Describes the message briar.app.v1.DmMemoryLearningRetryableJob.
- * Use `create(DmMemoryLearningRetryableJobSchema)` to create a new message.
- */
-export const DmMemoryLearningRetryableJobSchema: GenMessage<DmMemoryLearningRetryableJob> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 6);
-
-/**
- * @generated from message briar.app.v1.RetryDmMemoryLearningRequest
- */
-export type RetryDmMemoryLearningRequest = Message<"briar.app.v1.RetryDmMemoryLearningRequest"> & {
-  /**
-   * @generated from field: string workspace_id = 1;
-   */
-  workspaceId: string;
-
-  /**
-   * @generated from field: string channel_id = 2;
-   */
-  channelId: string;
-
-  /**
-   * @generated from field: string job_id = 3;
-   */
-  jobId: string;
-
-  /**
-   * @generated from field: string request_id = 4;
-   */
-  requestId: string;
-
-  /**
-   * @generated from field: uint64 revocation_epoch = 5;
-   */
-  revocationEpoch: bigint;
-};
-
-/**
- * Describes the message briar.app.v1.RetryDmMemoryLearningRequest.
- * Use `create(RetryDmMemoryLearningRequestSchema)` to create a new message.
- */
-export const RetryDmMemoryLearningRequestSchema: GenMessage<RetryDmMemoryLearningRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 7);
-
-/**
- * @generated from message briar.app.v1.RetryDmMemoryLearningResponse
- */
-export type RetryDmMemoryLearningResponse = Message<"briar.app.v1.RetryDmMemoryLearningResponse"> & {
-  /**
-   * @generated from field: bool accepted = 1;
-   */
-  accepted: boolean;
-
-  /**
-   * @generated from field: bool replayed = 2;
-   */
-  replayed: boolean;
-};
-
-/**
- * Describes the message briar.app.v1.RetryDmMemoryLearningResponse.
- * Use `create(RetryDmMemoryLearningResponseSchema)` to create a new message.
- */
-export const RetryDmMemoryLearningResponseSchema: GenMessage<RetryDmMemoryLearningResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 8);
 
 /**
  * @generated from message briar.app.v1.GetDmMemoryDocumentRequest
@@ -372,7 +118,7 @@ export type GetDmMemoryDocumentRequest = Message<"briar.app.v1.GetDmMemoryDocume
  * Use `create(GetDmMemoryDocumentRequestSchema)` to create a new message.
  */
 export const GetDmMemoryDocumentRequestSchema: GenMessage<GetDmMemoryDocumentRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 9);
+  messageDesc(file_briar_app_v1_dm_memory, 2);
 
 /**
  * @generated from message briar.app.v1.GetDmMemoryDocumentResponse
@@ -389,7 +135,7 @@ export type GetDmMemoryDocumentResponse = Message<"briar.app.v1.GetDmMemoryDocum
  * Use `create(GetDmMemoryDocumentResponseSchema)` to create a new message.
  */
 export const GetDmMemoryDocumentResponseSchema: GenMessage<GetDmMemoryDocumentResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 10);
+  messageDesc(file_briar_app_v1_dm_memory, 3);
 
 /**
  * @generated from message briar.app.v1.ListDmMemoryRevisionsRequest
@@ -421,7 +167,7 @@ export type ListDmMemoryRevisionsRequest = Message<"briar.app.v1.ListDmMemoryRev
  * Use `create(ListDmMemoryRevisionsRequestSchema)` to create a new message.
  */
 export const ListDmMemoryRevisionsRequestSchema: GenMessage<ListDmMemoryRevisionsRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 11);
+  messageDesc(file_briar_app_v1_dm_memory, 4);
 
 /**
  * @generated from message briar.app.v1.ListDmMemoryRevisionsResponse
@@ -453,7 +199,7 @@ export type ListDmMemoryRevisionsResponse = Message<"briar.app.v1.ListDmMemoryRe
  * Use `create(ListDmMemoryRevisionsResponseSchema)` to create a new message.
  */
 export const ListDmMemoryRevisionsResponseSchema: GenMessage<ListDmMemoryRevisionsResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 12);
+  messageDesc(file_briar_app_v1_dm_memory, 5);
 
 /**
  * @generated from message briar.app.v1.DmMemoryRevision
@@ -495,7 +241,7 @@ export type DmMemoryRevision = Message<"briar.app.v1.DmMemoryRevision"> & {
  * Use `create(DmMemoryRevisionSchema)` to create a new message.
  */
 export const DmMemoryRevisionSchema: GenMessage<DmMemoryRevision> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 13);
+  messageDesc(file_briar_app_v1_dm_memory, 6);
 
 /**
  * @generated from message briar.app.v1.CreateDmMemoryDocumentRequest
@@ -537,6 +283,8 @@ export type CreateDmMemoryDocumentRequest = Message<"briar.app.v1.CreateDmMemory
   memoryClass: DmMemoryClass;
 
   /**
+   * Legacy, accepted and ignored: the vault does not store them.
+   *
    * @generated from field: string source_language = 8;
    */
   sourceLanguage: string;
@@ -562,7 +310,7 @@ export type CreateDmMemoryDocumentRequest = Message<"briar.app.v1.CreateDmMemory
  * Use `create(CreateDmMemoryDocumentRequestSchema)` to create a new message.
  */
 export const CreateDmMemoryDocumentRequestSchema: GenMessage<CreateDmMemoryDocumentRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 14);
+  messageDesc(file_briar_app_v1_dm_memory, 7);
 
 /**
  * @generated from message briar.app.v1.UpdateDmMemoryDocumentRequest
@@ -614,6 +362,8 @@ export type UpdateDmMemoryDocumentRequest = Message<"briar.app.v1.UpdateDmMemory
   memoryClass: DmMemoryClass;
 
   /**
+   * Legacy, accepted and ignored: the vault does not store them.
+   *
    * @generated from field: string source_language = 10;
    */
   sourceLanguage: string;
@@ -639,7 +389,7 @@ export type UpdateDmMemoryDocumentRequest = Message<"briar.app.v1.UpdateDmMemory
  * Use `create(UpdateDmMemoryDocumentRequestSchema)` to create a new message.
  */
 export const UpdateDmMemoryDocumentRequestSchema: GenMessage<UpdateDmMemoryDocumentRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 15);
+  messageDesc(file_briar_app_v1_dm_memory, 8);
 
 /**
  * @generated from message briar.app.v1.CreateDmMemoryDocumentResponse
@@ -666,7 +416,7 @@ export type CreateDmMemoryDocumentResponse = Message<"briar.app.v1.CreateDmMemor
  * Use `create(CreateDmMemoryDocumentResponseSchema)` to create a new message.
  */
 export const CreateDmMemoryDocumentResponseSchema: GenMessage<CreateDmMemoryDocumentResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 16);
+  messageDesc(file_briar_app_v1_dm_memory, 9);
 
 /**
  * @generated from message briar.app.v1.UpdateDmMemoryDocumentResponse
@@ -693,7 +443,7 @@ export type UpdateDmMemoryDocumentResponse = Message<"briar.app.v1.UpdateDmMemor
  * Use `create(UpdateDmMemoryDocumentResponseSchema)` to create a new message.
  */
 export const UpdateDmMemoryDocumentResponseSchema: GenMessage<UpdateDmMemoryDocumentResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 17);
+  messageDesc(file_briar_app_v1_dm_memory, 10);
 
 /**
  * @generated from message briar.app.v1.DeleteDmMemoryDocumentRequest
@@ -720,7 +470,7 @@ export type DeleteDmMemoryDocumentRequest = Message<"briar.app.v1.DeleteDmMemory
  * Use `create(DeleteDmMemoryDocumentRequestSchema)` to create a new message.
  */
 export const DeleteDmMemoryDocumentRequestSchema: GenMessage<DeleteDmMemoryDocumentRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 18);
+  messageDesc(file_briar_app_v1_dm_memory, 11);
 
 /**
  * @generated from message briar.app.v1.DeleteDmMemoryDocumentResponse
@@ -742,7 +492,7 @@ export type DeleteDmMemoryDocumentResponse = Message<"briar.app.v1.DeleteDmMemor
  * Use `create(DeleteDmMemoryDocumentResponseSchema)` to create a new message.
  */
 export const DeleteDmMemoryDocumentResponseSchema: GenMessage<DeleteDmMemoryDocumentResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 19);
+  messageDesc(file_briar_app_v1_dm_memory, 12);
 
 /**
  * @generated from message briar.app.v1.UpdateDmMemorySettingsRequest
@@ -789,7 +539,7 @@ export type UpdateDmMemorySettingsRequest = Message<"briar.app.v1.UpdateDmMemory
  * Use `create(UpdateDmMemorySettingsRequestSchema)` to create a new message.
  */
 export const UpdateDmMemorySettingsRequestSchema: GenMessage<UpdateDmMemorySettingsRequest> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 20);
+  messageDesc(file_briar_app_v1_dm_memory, 13);
 
 /**
  * @generated from message briar.app.v1.UpdateDmMemorySettingsResponse
@@ -806,7 +556,7 @@ export type UpdateDmMemorySettingsResponse = Message<"briar.app.v1.UpdateDmMemor
  * Use `create(UpdateDmMemorySettingsResponseSchema)` to create a new message.
  */
 export const UpdateDmMemorySettingsResponseSchema: GenMessage<UpdateDmMemorySettingsResponse> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 21);
+  messageDesc(file_briar_app_v1_dm_memory, 14);
 
 /**
  * @generated from message briar.app.v1.DmMemoryCapabilities
@@ -828,7 +578,7 @@ export type DmMemoryCapabilities = Message<"briar.app.v1.DmMemoryCapabilities"> 
  * Use `create(DmMemoryCapabilitiesSchema)` to create a new message.
  */
 export const DmMemoryCapabilitiesSchema: GenMessage<DmMemoryCapabilities> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 22);
+  messageDesc(file_briar_app_v1_dm_memory, 15);
 
 /**
  * @generated from message briar.app.v1.DmMemorySpace
@@ -895,9 +645,15 @@ export type DmMemorySpace = Message<"briar.app.v1.DmMemorySpace"> & {
  * Use `create(DmMemorySpaceSchema)` to create a new message.
  */
 export const DmMemorySpaceSchema: GenMessage<DmMemorySpace> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 23);
+  messageDesc(file_briar_app_v1_dm_memory, 16);
 
 /**
+ * Fields marked legacy are not stored by the vault. Servers send kind
+ * OBSERVATION, status ACTIVE, conflicted false, evidence EXPLICIT_USER for
+ * owner-protected records and OBSERVED otherwise, source_language "und", no
+ * observed_at/valid_until and index_state READY, because shipped clients
+ * reject the UNSPECIFIED values. New clients ignore them.
+ *
  * @generated from message briar.app.v1.DmMemoryDocument
  */
 export type DmMemoryDocument = Message<"briar.app.v1.DmMemoryDocument"> & {
@@ -997,7 +753,7 @@ export type DmMemoryDocument = Message<"briar.app.v1.DmMemoryDocument"> & {
  * Use `create(DmMemoryDocumentSchema)` to create a new message.
  */
 export const DmMemoryDocumentSchema: GenMessage<DmMemoryDocument> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 24);
+  messageDesc(file_briar_app_v1_dm_memory, 17);
 
 /**
  * @generated from message briar.app.v1.DmMemorySourceMessage
@@ -1019,7 +775,7 @@ export type DmMemorySourceMessage = Message<"briar.app.v1.DmMemorySourceMessage"
  * Use `create(DmMemorySourceMessageSchema)` to create a new message.
  */
 export const DmMemorySourceMessageSchema: GenMessage<DmMemorySourceMessage> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 25);
+  messageDesc(file_briar_app_v1_dm_memory, 18);
 
 /**
  * @generated from message briar.app.v1.DmMemorySource
@@ -1046,7 +802,7 @@ export type DmMemorySource = Message<"briar.app.v1.DmMemorySource"> & {
  * Use `create(DmMemorySourceSchema)` to create a new message.
  */
 export const DmMemorySourceSchema: GenMessage<DmMemorySource> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 26);
+  messageDesc(file_briar_app_v1_dm_memory, 19);
 
 /**
  * @generated from message briar.app.v1.DmMemoryReference
@@ -1068,228 +824,7 @@ export type DmMemoryReference = Message<"briar.app.v1.DmMemoryReference"> & {
  * Use `create(DmMemoryReferenceSchema)` to create a new message.
  */
 export const DmMemoryReferenceSchema: GenMessage<DmMemoryReference> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 27);
-
-/**
- * @generated from message briar.app.v1.DmMemoryDescriptor
- */
-export type DmMemoryDescriptor = Message<"briar.app.v1.DmMemoryDescriptor"> & {
-  /**
-   * @generated from field: uint32 protocol = 1;
-   */
-  protocol: number;
-
-  /**
-   * @generated from field: string memory_space_id = 2;
-   */
-  memorySpaceId: string;
-
-  /**
-   * @generated from field: uint64 memory_revision = 3;
-   */
-  memoryRevision: bigint;
-
-  /**
-   * @generated from field: uint64 revocation_epoch = 4;
-   */
-  revocationEpoch: bigint;
-
-  /**
-   * @generated from field: bool search_enabled = 5;
-   */
-  searchEnabled: boolean;
-
-  /**
-   * @generated from field: briar.app.v1.DmMemoryBriefState brief_state = 6;
-   */
-  briefState: DmMemoryBriefState;
-};
-
-/**
- * Describes the message briar.app.v1.DmMemoryDescriptor.
- * Use `create(DmMemoryDescriptorSchema)` to create a new message.
- */
-export const DmMemoryDescriptorSchema: GenMessage<DmMemoryDescriptor> = /*@__PURE__*/
-  messageDesc(file_briar_app_v1_dm_memory, 28);
-
-/**
- * @generated from enum briar.app.v1.DmMemoryLearningJobKind
- */
-export enum DmMemoryLearningJobKind {
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_KIND_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_KIND_EXTRACT = 1;
-   */
-  EXTRACT = 1,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_KIND_EXPLICIT_REQUEST = 2;
-   */
-  EXPLICIT_REQUEST = 2,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_KIND_CONSOLIDATE = 3;
-   */
-  CONSOLIDATE = 3,
-}
-
-/**
- * Describes the enum briar.app.v1.DmMemoryLearningJobKind.
- */
-export const DmMemoryLearningJobKindSchema: GenEnum<DmMemoryLearningJobKind> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 0);
-
-/**
- * @generated from enum briar.app.v1.DmMemoryLearningJobStatus
- */
-export enum DmMemoryLearningJobStatus {
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STATUS_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STATUS_PENDING = 1;
-   */
-  PENDING = 1,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STATUS_RUNNING = 2;
-   */
-  RUNNING = 2,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STATUS_RETRY_WAIT = 3;
-   */
-  RETRY_WAIT = 3,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STATUS_FAILED = 4;
-   */
-  FAILED = 4,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STATUS_CANCELLED = 5;
-   */
-  CANCELLED = 5,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STATUS_SUCCEEDED = 6;
-   */
-  SUCCEEDED = 6,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STATUS_NO_CHANGE = 7;
-   */
-  NO_CHANGE = 7,
-}
-
-/**
- * Describes the enum briar.app.v1.DmMemoryLearningJobStatus.
- */
-export const DmMemoryLearningJobStatusSchema: GenEnum<DmMemoryLearningJobStatus> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 1);
-
-/**
- * @generated from enum briar.app.v1.DmMemoryLearningJobStage
- */
-export enum DmMemoryLearningJobStage {
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STAGE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STAGE_PROPOSING = 1;
-   */
-  PROPOSING = 1,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STAGE_VERIFYING = 2;
-   */
-  VERIFYING = 2,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_JOB_STAGE_COMMITTING = 3;
-   */
-  COMMITTING = 3,
-}
-
-/**
- * Describes the enum briar.app.v1.DmMemoryLearningJobStage.
- */
-export const DmMemoryLearningJobStageSchema: GenEnum<DmMemoryLearningJobStage> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 2);
-
-/**
- * @generated from enum briar.app.v1.DmMemoryLearningFailureCode
- */
-export enum DmMemoryLearningFailureCode {
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_INVALID_PROPOSAL = 1;
-   */
-  INVALID_PROPOSAL = 1,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_VERIFICATION_REJECTED = 2;
-   */
-  VERIFICATION_REJECTED = 2,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_STALE = 3;
-   */
-  STALE = 3,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_SCOPE_REVOKED = 4;
-   */
-  SCOPE_REVOKED = 4,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_BUDGET_EXHAUSTED = 5;
-   */
-  BUDGET_EXHAUSTED = 5,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_UNAVAILABLE = 6;
-   */
-  MODEL_UNAVAILABLE = 6,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_TIMEOUT = 7;
-   */
-  MODEL_TIMEOUT = 7,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CREDENTIALS = 8;
-   */
-  MODEL_CREDENTIALS = 8,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_MODEL_CONFIGURATION = 9;
-   */
-  MODEL_CONFIGURATION = 9,
-
-  /**
-   * @generated from enum value: DM_MEMORY_LEARNING_FAILURE_CODE_INPUT_CAPACITY = 10;
-   */
-  INPUT_CAPACITY = 10,
-}
-
-/**
- * Describes the enum briar.app.v1.DmMemoryLearningFailureCode.
- */
-export const DmMemoryLearningFailureCodeSchema: GenEnum<DmMemoryLearningFailureCode> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 3);
+  messageDesc(file_briar_app_v1_dm_memory, 20);
 
 /**
  * @generated from enum briar.app.v1.DmMemoryClass
@@ -1320,7 +855,7 @@ export enum DmMemoryClass {
  * Describes the enum briar.app.v1.DmMemoryClass.
  */
 export const DmMemoryClassSchema: GenEnum<DmMemoryClass> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 4);
+  enumDesc(file_briar_app_v1_dm_memory, 0);
 
 /**
  * @generated from enum briar.app.v1.DmMemorySpaceStatus
@@ -1346,7 +881,7 @@ export enum DmMemorySpaceStatus {
  * Describes the enum briar.app.v1.DmMemorySpaceStatus.
  */
 export const DmMemorySpaceStatusSchema: GenEnum<DmMemorySpaceStatus> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 5);
+  enumDesc(file_briar_app_v1_dm_memory, 1);
 
 /**
  * @generated from enum briar.app.v1.DmMemoryDocumentKind
@@ -1372,7 +907,7 @@ export enum DmMemoryDocumentKind {
  * Describes the enum briar.app.v1.DmMemoryDocumentKind.
  */
 export const DmMemoryDocumentKindSchema: GenEnum<DmMemoryDocumentKind> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 6);
+  enumDesc(file_briar_app_v1_dm_memory, 2);
 
 /**
  * @generated from enum briar.app.v1.DmMemoryDocumentStatus
@@ -1403,7 +938,7 @@ export enum DmMemoryDocumentStatus {
  * Describes the enum briar.app.v1.DmMemoryDocumentStatus.
  */
 export const DmMemoryDocumentStatusSchema: GenEnum<DmMemoryDocumentStatus> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 7);
+  enumDesc(file_briar_app_v1_dm_memory, 3);
 
 /**
  * @generated from enum briar.app.v1.DmMemoryEvidenceType
@@ -1429,7 +964,7 @@ export enum DmMemoryEvidenceType {
  * Describes the enum briar.app.v1.DmMemoryEvidenceType.
  */
 export const DmMemoryEvidenceTypeSchema: GenEnum<DmMemoryEvidenceType> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 8);
+  enumDesc(file_briar_app_v1_dm_memory, 4);
 
 /**
  * @generated from enum briar.app.v1.DmMemoryIndexState
@@ -1460,7 +995,7 @@ export enum DmMemoryIndexState {
  * Describes the enum briar.app.v1.DmMemoryIndexState.
  */
 export const DmMemoryIndexStateSchema: GenEnum<DmMemoryIndexState> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 9);
+  enumDesc(file_briar_app_v1_dm_memory, 5);
 
 /**
  * @generated from enum briar.app.v1.DmMemorySourceType
@@ -1486,7 +1021,7 @@ export enum DmMemorySourceType {
  * Describes the enum briar.app.v1.DmMemorySourceType.
  */
 export const DmMemorySourceTypeSchema: GenEnum<DmMemorySourceType> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 10);
+  enumDesc(file_briar_app_v1_dm_memory, 6);
 
 /**
  * @generated from enum briar.app.v1.DmMemoryRevisionOrigin
@@ -1522,35 +1057,14 @@ export enum DmMemoryRevisionOrigin {
  * Describes the enum briar.app.v1.DmMemoryRevisionOrigin.
  */
 export const DmMemoryRevisionOriginSchema: GenEnum<DmMemoryRevisionOrigin> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 11);
+  enumDesc(file_briar_app_v1_dm_memory, 7);
 
 /**
- * @generated from enum briar.app.v1.DmMemoryBriefState
- */
-export enum DmMemoryBriefState {
-  /**
-   * @generated from enum value: DM_MEMORY_BRIEF_STATE_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * @generated from enum value: DM_MEMORY_BRIEF_STATE_AVAILABLE = 1;
-   */
-  AVAILABLE = 1,
-
-  /**
-   * @generated from enum value: DM_MEMORY_BRIEF_STATE_DISABLED = 2;
-   */
-  DISABLED = 2,
-}
-
-/**
- * Describes the enum briar.app.v1.DmMemoryBriefState.
- */
-export const DmMemoryBriefStateSchema: GenEnum<DmMemoryBriefState> = /*@__PURE__*/
-  enumDesc(file_briar_app_v1_dm_memory, 12);
-
-/**
+ * The owner's view of one DM's memory vault (docs/plans/memory-vault-spec.md §9).
+ * The message shapes predate the vault: a document is a vault record, its id
+ * the record's handle (a UUID). Fields the vault does not store are kept so
+ * shipped clients still decode them; servers fill the defaults noted below.
+ *
  * @generated from service briar.app.v1.DmMemoryService
  */
 export const DmMemoryService: GenService<{
@@ -1609,14 +1123,6 @@ export const DmMemoryService: GenService<{
     methodKind: "unary";
     input: typeof UpdateDmMemorySettingsRequestSchema;
     output: typeof UpdateDmMemorySettingsResponseSchema;
-  },
-  /**
-   * @generated from rpc briar.app.v1.DmMemoryService.RetryDmMemoryLearning
-   */
-  retryDmMemoryLearning: {
-    methodKind: "unary";
-    input: typeof RetryDmMemoryLearningRequestSchema;
-    output: typeof RetryDmMemoryLearningResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_briar_app_v1_dm_memory, 0);

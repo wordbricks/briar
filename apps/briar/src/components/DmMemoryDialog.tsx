@@ -1,7 +1,6 @@
 import { Brain, Download, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
-import { agentProviderLabels, agentProviders } from "../lib/agent-provider";
 import {
   dmMemoryApi, type DmMemoryClient, type DmMemoryApiScope,
 } from "../lib/api/dm-memory";
@@ -13,12 +12,6 @@ import type { DmMemoryReference } from "../lib/dm-memory-query-contract";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 
-/** Learning provider identity is information, not a setting the owner can change. */
-const providerLabel = (provider: string) => {
-  const known = agentProviders.find((candidate) => candidate === provider);
-  return known === undefined ? provider : agentProviderLabels[known];
-};
-
 export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialReference }: {
   scope: DmMemoryApiScope; onClose: () => void; client?: DmMemoryClient; initialReference?: DmMemoryReference;
 }) {
@@ -28,13 +21,9 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
   const [editing, setEditing] = useState(false);
   const [history, setHistory] = useState<DmMemoryRevisionPage | null>(null);
   const [historyPreview, setHistoryPreview] = useState<DmMemoryDocumentDetail | null>(null);
-  const [observedNow, setObservedNow] = useState(Date.now());
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [memoryClass, setMemoryClass] = useState<DmMemoryClass>("profile");
-  const [sourceLanguage, setSourceLanguage] = useState("und");
-  const [observedAt, setObservedAt] = useState("");
-  const [validUntil, setValidUntil] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -67,7 +56,6 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
     const controller = new AbortController();
     const current = generation.current;
     const timer = setInterval(() => {
-      setObservedNow(Date.now());
       if (busy || editing || !page) return;
       void client.load(scope, page.selectedSpaceId ?? undefined, undefined, controller.signal).then(async (first) => {
         let fresh = first;
@@ -98,8 +86,7 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
   function beginEdit(document: DmMemoryDocumentDetail | null) {
     setHistory(null); setHistoryPreview(null);
     setSelected(document); setTitle(document?.title ?? ""); setBody(document?.body ?? "");
-    setMemoryClass(document?.memoryClass ?? "profile"); setSourceLanguage(document?.sourceLanguage ?? "und");
-    setObservedAt(document?.observedAt ?? ""); setValidUntil(document?.validUntil ?? "");
+    setMemoryClass(document?.memoryClass ?? "profile");
     requestId.current = crypto.randomUUID(); setEditing(true); setNotice(null);
   }
   const changeDraft = () => { requestId.current = crypto.randomUUID(); };
@@ -113,7 +100,6 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
       {notice && <p role="status" className="text-sm">{notice}</p>}
       {!page && busy && <p role="status">{t("memory.loading")}</p>}
       {page && <>
-        {!page.capabilities.recall && <p className="text-sm text-muted-foreground">{t("memory.recallPending")}</p>}
         {page.spaces.length > 1 && <label className="grid gap-1 text-sm">{t("memory.space")}
           <select className={inputClass} disabled={busy} value={page.selectedSpaceId ?? ""}
             onChange={(event) => { setEditing(false); void perform(() => refresh(event.target.value)); }}>
@@ -137,42 +123,14 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
             }); }} />{t("memory.use")}
         </label>}
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input type="checkbox" disabled={busy || !writable || !selectedSpace?.useEnabled ||
-            (!page.capabilities.automaticLearning && !selectedSpace?.autoEnabled)} checked={selectedSpace?.autoEnabled ?? false}
+          <input type="checkbox" disabled={busy || !writable || !selectedSpace?.useEnabled} checked={selectedSpace?.autoEnabled ?? false}
             onChange={(event) => { const enabled = event.target.checked; void perform(async () => {
               const space = await client.settings(scope, { requestId: crypto.randomUUID(), memorySpaceId: selectedSpace?.id,
                 expectedMemoryRevision: selectedSpace?.memoryRevision ?? 0, useEnabled: true, autoEnabled: enabled });
               await refresh(space.id);
-            }); }} />{t(page.capabilities.automaticLearning ? "memory.automatic" : "memory.automaticPending")}
+            }); }} />{t("memory.automatic")}
         </label>
         <p className="text-xs text-muted-foreground">{t("memory.automaticHelp")}</p>
-        {page.learning && <div className="grid gap-2 rounded-md border border-border p-3 text-xs" aria-label={t("memory.learningStatus")}>
-          {page.learning.configuration && <>
-            {page.learning.configuration.agentProviderVerified
-              ? <p className="break-words">{t("memory.learningModel")} · {t("memory.learningModelSame",
-                { provider: providerLabel(page.learning.configuration.proposer.provider) })}</p>
-              : <p className="break-words">{t("memory.learningProviderUnverified", {
-                agent: providerLabel(page.learning.configuration.agentProvider),
-                preferred: providerLabel(page.learning.configuration.proposer.provider) })}</p>}
-            {!page.learning.configuration.workerAvailable && <p className="text-destructive">
-              {t("memory.learningWorkerMissing", {
-                preferred: providerLabel(page.learning.configuration.proposer.provider) })}</p>}
-            <p>{t("memory.learningCalls")} · {page.learning.callsToday} / {page.learning.configuration.spaceDailyCalls}</p>
-            {page.learning.configuration.costTracked && <p>{t("memory.learningCost")} · ${(page.learning.reservedMicroUsdToday / 1_000_000).toFixed(4)}
-              {" / $"}{(page.learning.configuration.spaceDailyMicroUsd / 1_000_000).toFixed(2)} USD</p>
-            }
-          </>}
-          <p>{t("memory.learningPending")} · {page.learning.pendingJobs} / {t("memory.learningFailures")} · {page.learning.failedJobs}</p>
-          <p role="status">{t("memory.learningStatus")} · {page.learning.lastJob
-            ? t(`memory.learningState.${page.learning.lastJob.status === "running" && page.learning.lastJob.stage
-              ? page.learning.lastJob.stage : page.learning.lastJob.status}`)
-            : t("memory.learningNone")}</p>
-          {page.learning.lastJob?.errorCode && <p className="text-destructive">{t(`memory.learningError.${page.learning.lastJob.errorCode}`)}</p>}
-          {page.learning.retryableJob && selectedSpace && <Button size="sm" disabled={busy} onClick={() => void perform(async () => {
-            await client.retryLearning(scope, page.learning!.retryableJob!.id, selectedSpace.revocationEpoch);
-            await refresh(selectedSpace.id);
-          })}>{t("memory.learningRetry")}</Button>}
-        </div>}
         <div className="flex flex-wrap gap-2">
           {writable && <Button disabled={busy} onClick={() => beginEdit(null)}><Plus size={15} />{t("memory.add")}</Button>}
           <Button variant="outline" disabled={busy} onClick={() => void perform(() => refresh())}><RefreshCw size={15} />{t("memory.refresh")}</Button>
@@ -197,10 +155,8 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
                 const detail = await client.get(scope, item.id); beginEdit(detail);
               })}>
                 <span className="block break-words font-medium">{item.title}</span>
-                <span className="text-xs text-muted-foreground">{item.memoryClass} · v{item.version} · {item.indexState === "ready" ? t("memory.indexReady") : item.indexState === "failed" ? t("memory.indexFailed") : t("memory.indexPending")}</span>
-                {item.validUntil && <span className="block text-xs text-muted-foreground">{Date.parse(item.validUntil) <= observedNow ? t("memory.expired") : t("memory.expiry")} · {item.validUntil}</span>}
+                <span className="text-xs text-muted-foreground">{item.memoryClass} · v{item.version}</span>
                 {item.protectedByUser && <span className="ml-2 text-xs">{t("memory.protected")}</span>}
-                {(item.conflicted || item.status !== "active") && <span className="block text-xs">{t("memory.needsReview")}</span>}
               </button>
               <Button size="icon" variant="ghost" disabled={busy} aria-label={t("memory.delete")} onClick={() => void perform(async () => {
                 await client.remove(scope, item.id); if (selected?.id === item.id) setEditing(false);
@@ -216,7 +172,7 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
         {editing && <form className="grid gap-3 border-t border-border pt-4" onSubmit={(event) => {
           event.preventDefault(); void perform(async () => {
             const input = { requestId: requestId.current, memorySpaceId: selectedSpace?.id,
-              title, body, memoryClass, sourceLanguage, observedAt: observedAt || null, validUntil: validUntil || null };
+              title, body, memoryClass };
             await client.save(scope, selected ? { ...input, expectedVersion: selected.version } : input, selected?.id);
             setEditing(false); await refresh(); setNotice(t("common.saved"));
           });
@@ -225,14 +181,9 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
           <label className="grid gap-1 text-sm">{t("memory.documentTitle")}<input required maxLength={200} disabled={!canEdit || busy} className={inputClass} value={title} onChange={(event) => { changeDraft(); setTitle(event.target.value); }} /></label>
           <label className="grid gap-1 text-sm">{t("memory.body")}<textarea required rows={6} disabled={!canEdit || busy} className={inputClass} value={body} onChange={(event) => { changeDraft(); setBody(event.target.value); }} /></label>
           <span className="text-xs text-muted-foreground">{new TextEncoder().encode(body).length} / {dmMemoryDocumentMaxBytes} bytes</span>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm">{t("memory.class")}<select disabled={!canEdit || busy} className={inputClass} value={memoryClass} onChange={(event) => { changeDraft(); setMemoryClass(event.target.value as DmMemoryClass); }}>
-              {dmMemoryClasses.map((value) => <option key={value}>{value}</option>)}
-            </select></label>
-            <label className="grid gap-1 text-sm">{t("memory.language")}<input disabled={!canEdit || busy} className={inputClass} value={sourceLanguage} onChange={(event) => { changeDraft(); setSourceLanguage(event.target.value); }} /></label>
-            <label className="grid gap-1 text-sm">{t("memory.observed")}<input disabled={!canEdit || busy} className={inputClass} placeholder="2026-09-01T09:00:00+09:00" value={observedAt} onChange={(event) => { changeDraft(); setObservedAt(event.target.value); }} /></label>
-            <label className="grid gap-1 text-sm">{t("memory.expiry")}<input disabled={!canEdit || busy} className={inputClass} placeholder={t("memory.optionalDate")} value={validUntil} onChange={(event) => { changeDraft(); setValidUntil(event.target.value); }} /></label>
-          </div>
+          <label className="grid gap-1 text-sm">{t("memory.class")}<select disabled={!canEdit || busy} className={inputClass} value={memoryClass} onChange={(event) => { changeDraft(); setMemoryClass(event.target.value as DmMemoryClass); }}>
+            {dmMemoryClasses.map((value) => <option key={value}>{value}</option>)}
+          </select></label>
           {selected && <div className="break-all text-xs text-muted-foreground">
             <p>{t("memory.updated")} {selected.updatedAt}</p>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void perform(async () => {
@@ -255,7 +206,7 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
                 <pre className="whitespace-pre-wrap break-words">{historyPreview.body}</pre>
               </section>}
             </div>}
-            <p>{t("memory.sources")}: {selected.sources.map((source) => `${source.type}:${source.id}@${source.version}`).join(", ")}</p>
+            {selected.sources.length > 0 && <p>{t("memory.sources")}: {selected.sources.map((source) => `${source.type}:${source.id}@${source.version}`).join(", ")}</p>}
           </div>}
           <div className="flex gap-2">
             {canEdit && <Button type="submit" disabled={busy || new TextEncoder().encode(body).length > dmMemoryDocumentMaxBytes}>{busy ? t("common.saving") : t("common.save")}</Button>}

@@ -107,9 +107,12 @@ describe("direct message reply bursts", () => {
       workerId,
       projectId,
       "d".repeat(64),
+      // A current Worker CLI: only a vault-capable Worker resumes a DM
+      // conversation (dm-memory-claim.ts), so the resume cases need one.
       workerRuntimeProtoJsonFixture({
         agentProvider: "claude",
         providers: ["claude"],
+        memoryVault: { protocol: 1 },
       }),
       now,
       now,
@@ -992,6 +995,7 @@ describe("direct message reply bursts", () => {
     const base = workerRuntimeProtoJsonFixture({
       agentProvider: "claude",
       providers: ["claude"],
+      memoryVault: { protocol: 1 },
     });
     const runtime = JSON.parse(base) as {
       capabilities: Record<string, unknown>;

@@ -1,4 +1,3 @@
-import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { createClient } from "@connectrpc/connect";
 import {
   DmMemoryClass as ProtoDmMemoryClass,
@@ -7,11 +6,6 @@ import {
   DmMemoryDocumentStatus as ProtoDmMemoryDocumentStatus,
   DmMemoryEvidenceType as ProtoDmMemoryEvidenceType,
   DmMemoryIndexState as ProtoDmMemoryIndexState,
-  DmMemoryLearningFailureCode as ProtoDmMemoryLearningFailureCode,
-  DmMemoryLearningJobKind as ProtoDmMemoryLearningJobKind,
-  DmMemoryLearningJobStage as ProtoDmMemoryLearningJobStage,
-  DmMemoryLearningJobStatus as ProtoDmMemoryLearningJobStatus,
-  type DmMemoryLearningStatus as DmMemoryLearningStatusMessage,
   DmMemoryService,
   DmMemoryRevisionOrigin as ProtoDmMemoryRevisionOrigin,
   DmMemorySourceType as ProtoDmMemorySourceType,
@@ -25,7 +19,6 @@ import type {
   DmMemoryDocument,
   DmMemoryDocumentDetail,
   DmMemoryEditInput,
-  DmMemoryLearningStatus,
   DmMemoryPage,
   DmMemoryRevisionPage,
   DmMemorySettingsInput,
@@ -103,47 +96,41 @@ const spaceFromProto = (space: DmMemorySpaceMessage): DmMemorySpace => ({
   updatedAt: requiredTimestamp(space.updatedAt, "dmMemorySpace.updatedAt"),
 });
 
+/**
+ * The vault does not store a document's kind, status, conflict flag, evidence,
+ * language, validity or index state; the server fills fixed values for shipped
+ * clients (`dm_memory.proto`). The dialog no longer shows them, so they are
+ * decoded leniently and never fail a page.
+ */
 const documentBaseFromProto = (
   document: DmMemoryDocumentMessage,
 ): DmMemoryDocument => ({
   id: document.id,
   memorySpaceId: document.memorySpaceId,
-  kind: document.kind === ProtoDmMemoryDocumentKind.OBSERVATION
-    ? "observation"
-    : document.kind === ProtoDmMemoryDocumentKind.TOPIC
-    ? "topic"
-    : (() => { throw new Error(`Unknown memory document kind: ${document.kind}`); })(),
+  kind: document.kind === ProtoDmMemoryDocumentKind.TOPIC ? "topic" : "observation",
   title: document.title,
   version: document.version,
-  status: (() => {
-    switch (document.status) {
-      case ProtoDmMemoryDocumentStatus.ACTIVE: return "active" as const;
-      case ProtoDmMemoryDocumentStatus.INVALIDATED: return "invalidated" as const;
-      case ProtoDmMemoryDocumentStatus.SUPERSEDED: return "superseded" as const;
-      default: throw new Error(`Unknown memory document status: ${document.status}`);
-    }
-  })(),
+  status: document.status === ProtoDmMemoryDocumentStatus.INVALIDATED
+    ? "invalidated"
+    : document.status === ProtoDmMemoryDocumentStatus.SUPERSEDED
+    ? "superseded"
+    : "active",
   conflicted: document.conflicted,
   memoryClass: memoryClassFromProto(document.memoryClass),
   evidenceType: document.evidenceType === ProtoDmMemoryEvidenceType.EXPLICIT_USER
     ? "explicit_user"
-    : document.evidenceType === ProtoDmMemoryEvidenceType.OBSERVED
-    ? "observed"
-    : (() => { throw new Error(`Unknown memory evidence type: ${document.evidenceType}`); })(),
+    : "observed",
   protectedByUser: document.protectedByUser,
   sourceLanguage: document.sourceLanguage,
   observedAt: optionalTimestamp(document.observedAt),
   validUntil: optionalTimestamp(document.validUntil),
   createdAt: requiredTimestamp(document.createdAt, "dmMemoryDocument.createdAt"),
   updatedAt: requiredTimestamp(document.updatedAt, "dmMemoryDocument.updatedAt"),
-  indexState: (() => {
-    switch (document.indexState) {
-      case ProtoDmMemoryIndexState.PENDING: return "pending" as const;
-      case ProtoDmMemoryIndexState.READY: return "ready" as const;
-      case ProtoDmMemoryIndexState.FAILED: return "failed" as const;
-      default: throw new Error(`Unknown memory index state: ${document.indexState}`);
-    }
-  })(),
+  indexState: document.indexState === ProtoDmMemoryIndexState.PENDING
+    ? "pending"
+    : document.indexState === ProtoDmMemoryIndexState.FAILED
+    ? "failed"
+    : "ready",
 });
 
 const documentDetailFromProto = (
@@ -162,122 +149,14 @@ const documentDetailFromProto = (
   })),
 });
 
-const optionalInputTimestamp = (value: string | null) => value === null
-  ? undefined
-  : timestampFromDate(new Date(value));
-
+/** Legacy request fields (language, validity, source message) stay at their proto defaults. */
 const writeInput = (input: DmMemoryCreateInput | DmMemoryEditInput) => ({
   requestId: input.requestId,
   memorySpaceId: input.memorySpaceId,
   title: input.title,
   body: input.body,
   memoryClass: memoryClassToProto(input.memoryClass),
-  sourceLanguage: input.sourceLanguage,
-  observedAt: optionalInputTimestamp(input.observedAt),
-  validUntil: optionalInputTimestamp(input.validUntil),
-  sourceMessage: input.sourceMessage,
 });
-
-const learningModelFromProto = (
-  value: { readonly transport: string; readonly model: string; readonly provider: string },
-) => ({
-  transport: value.transport === "agent"
-    ? "agent" as const
-    : value.transport === "openrouter" || value.transport === ""
-    ? "openrouter" as const
-    : (() => { throw new Error(`Unknown DM memory learning transport: ${value.transport}`); })(),
-  model: value.model,
-  provider: value.provider,
-});
-
-const learningStatusFromProto = (
-  value: DmMemoryLearningStatusMessage,
-): DmMemoryLearningStatus => {
-  const configuration = value.configuration;
-  const last = value.lastJob;
-  return {
-    configuration: configuration === undefined
-      ? null
-      : {
-          proposer: learningModelFromProto(requiredMessage(
-            configuration.proposer,
-            "dmMemoryLearning.configuration.proposer",
-          )),
-          verifier: learningModelFromProto(requiredMessage(
-            configuration.verifier,
-            "dmMemoryLearning.configuration.verifier",
-          )),
-          costTracked: configuration.costTracked,
-          spaceDailyCalls: configuration.spaceDailyCalls,
-          spaceDailyMicroUsd: safeNumber(
-            configuration.spaceDailyMicroUsd,
-            "dmMemoryLearning.configuration.spaceDailyMicroUsd",
-          ),
-          agentProvider: configuration.agentProvider,
-          agentProviderVerified: configuration.agentProviderVerified,
-          workerAvailable: configuration.workerAvailable,
-        },
-    callsToday: value.callsToday,
-    reservedMicroUsdToday: safeNumber(
-      value.reservedMicroUsdToday,
-      "dmMemoryLearning.reservedMicroUsdToday",
-    ),
-    pendingJobs: value.pendingJobs,
-    failedJobs: value.failedJobs,
-    retryableJob: value.retryableJob ?? null,
-    lastJob: last === undefined
-      ? null
-      : {
-          id: last.id,
-          kind: (() => {
-            switch (last.kind) {
-              case ProtoDmMemoryLearningJobKind.EXTRACT: return "extract" as const;
-              case ProtoDmMemoryLearningJobKind.EXPLICIT_REQUEST: return "explicit_request" as const;
-              case ProtoDmMemoryLearningJobKind.CONSOLIDATE: return "consolidate" as const;
-              default: throw new Error(`Unknown memory learning job kind: ${last.kind}`);
-            }
-          })(),
-          status: (() => {
-            switch (last.status) {
-              case ProtoDmMemoryLearningJobStatus.PENDING: return "pending" as const;
-              case ProtoDmMemoryLearningJobStatus.RUNNING: return "running" as const;
-              case ProtoDmMemoryLearningJobStatus.RETRY_WAIT: return "retry_wait" as const;
-              case ProtoDmMemoryLearningJobStatus.FAILED: return "failed" as const;
-              case ProtoDmMemoryLearningJobStatus.CANCELLED: return "cancelled" as const;
-              case ProtoDmMemoryLearningJobStatus.SUCCEEDED: return "succeeded" as const;
-              case ProtoDmMemoryLearningJobStatus.NO_CHANGE: return "no_change" as const;
-              default: throw new Error(`Unknown memory learning job status: ${last.status}`);
-            }
-          })(),
-          stage: (() => {
-            switch (last.stage) {
-              case undefined: return null;
-              case ProtoDmMemoryLearningJobStage.PROPOSING: return "proposing" as const;
-              case ProtoDmMemoryLearningJobStage.VERIFYING: return "verifying" as const;
-              case ProtoDmMemoryLearningJobStage.COMMITTING: return "committing" as const;
-              default: throw new Error(`Unknown memory learning job stage: ${last.stage}`);
-            }
-          })(),
-          errorCode: (() => {
-            switch (last.errorCode) {
-              case undefined: return null;
-              case ProtoDmMemoryLearningFailureCode.INVALID_PROPOSAL: return "invalid_proposal" as const;
-              case ProtoDmMemoryLearningFailureCode.VERIFICATION_REJECTED: return "verification_rejected" as const;
-              case ProtoDmMemoryLearningFailureCode.STALE: return "stale" as const;
-              case ProtoDmMemoryLearningFailureCode.SCOPE_REVOKED: return "scope_revoked" as const;
-              case ProtoDmMemoryLearningFailureCode.BUDGET_EXHAUSTED: return "budget_exhausted" as const;
-              case ProtoDmMemoryLearningFailureCode.MODEL_UNAVAILABLE: return "model_unavailable" as const;
-              case ProtoDmMemoryLearningFailureCode.MODEL_TIMEOUT: return "model_timeout" as const;
-              case ProtoDmMemoryLearningFailureCode.MODEL_CREDENTIALS: return "model_credentials" as const;
-              case ProtoDmMemoryLearningFailureCode.MODEL_CONFIGURATION: return "model_configuration" as const;
-              case ProtoDmMemoryLearningFailureCode.INPUT_CAPACITY: return "input_capacity" as const;
-              default: throw new Error(`Unknown memory learning failure: ${last.errorCode}`);
-            }
-          })(),
-          updatedAt: requiredTimestamp(last.updatedAt, "dmMemoryLearning.lastJob.updatedAt"),
-        },
-  };
-};
 
 export async function loadDmMemory(
   scope: DmMemoryApiScope,
@@ -301,9 +180,6 @@ export async function loadDmMemory(
     selectedSpaceId: response.selectedSpaceId ?? null,
     documents: response.documents.map(documentBaseFromProto),
     nextCursor: response.nextCursor ?? null,
-    learning: response.learning
-      ? learningStatusFromProto(response.learning)
-      : null,
   };
 }
 
@@ -417,21 +293,6 @@ export async function removeDmMemoryDocument(
   }, appCallOptions(scope.token));
 }
 
-export async function retryDmMemoryLearning(
-  scope: DmMemoryApiScope,
-  jobId: string,
-  revocationEpoch: number,
-) {
-  const response = await requireClient().retryDmMemoryLearning({
-    workspaceId: scope.workspaceId,
-    channelId: scope.channelId,
-    jobId,
-    requestId: crypto.randomUUID(),
-    revocationEpoch: BigInt(revocationEpoch),
-  }, appCallOptions(scope.token));
-  return { accepted: response.accepted, replayed: response.replayed };
-}
-
 export async function exportDmMemory(scope: DmMemoryApiScope, spaceId: string) {
   const response = await fetch(
     `${briarApiUrl}${base(scope.workspaceId, scope.channelId)}/export?memorySpaceId=${encodeURIComponent(spaceId)}`,
@@ -448,7 +309,6 @@ export const dmMemoryApi = {
   save: saveDmMemoryDocument,
   settings: setDmMemorySettings,
   remove: removeDmMemoryDocument,
-  retryLearning: retryDmMemoryLearning,
   export: exportDmMemory,
 };
 export type DmMemoryClient = typeof dmMemoryApi;

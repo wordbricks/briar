@@ -1,12 +1,8 @@
 import type { BriarAuth } from "./auth";
 import { requireChannelAccess } from "./channel-route-access";
 import { dmMemoryZipResponse } from "./dm-memory-export";
-import {
-  exportDmMemoryEntries,
-  listDmMemorySpaces,
-} from "./dm-memory-repository";
+import { listDmMemorySpaces } from "./dm-memory-spaces";
 import { HttpError } from "./http-response";
-import { memoryVaultEnabled } from "./memory-vault/flag";
 import type { VaultGitStore } from "./memory-vault/git-store";
 import { exportOwnerVaultEntries } from "./memory-vault/owner";
 import { getWorkspaceRole } from "./workspace-repository";
@@ -16,15 +12,18 @@ import { requireSession } from "./session-auth";
 
 const decodeId = decodeRequestSync(UuidString);
 
-/** Binary export remains ordinary HTTP; typed memory reads and writes use Connect. */
+/**
+ * The owner's export of one DM memory space: the vault's head tree as a zip
+ * (memory-vault spec §9). Binary export remains ordinary HTTP; typed memory
+ * reads and writes use Connect.
+ */
 export async function handleDmMemoryRoute(input: {
   request: Request;
   url: URL;
   auth: BriarAuth;
   db: D1Database;
-  /** `MEMORY_VAULT_ENABLED` decides whether the export is the vault's head tree. */
-  env?: Pick<Env, "MEMORY_VAULT_ENABLED">;
-  memoryVaultStore?: VaultGitStore | null;
+  /** Null without the `MEMORY_ARTIFACTS` binding: a non-empty vault then reports `memory_unavailable`. */
+  memoryVaultStore: VaultGitStore | null;
 }): Promise<Response | undefined> {
   const { request, url, auth, db } = input;
   const match = url.pathname.match(
@@ -61,15 +60,8 @@ export async function handleDmMemoryRoute(input: {
   if (!selected) {
     throw new HttpError(404, "Memory space not found", "memory_not_found");
   }
-  // After the vault cutover the export is the vault's head tree (memory-vault spec §9).
-  if (input.env && memoryVaultEnabled(input.env)) {
-    return dmMemoryZipResponse(
-      exportOwnerVaultEntries({ db, store: input.memoryVaultStore ?? null }, selected),
-      selected.id,
-    );
-  }
   return dmMemoryZipResponse(
-    exportDmMemoryEntries(db, owner, selected.id),
+    exportOwnerVaultEntries({ db, store: input.memoryVaultStore }, selected),
     selected.id,
   );
 }

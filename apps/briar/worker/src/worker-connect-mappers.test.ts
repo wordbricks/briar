@@ -55,6 +55,7 @@ const channelReply = {
   skillExecutionTarget: null,
   activity: { token: "activity", expiresAt: leaseExpiresAt },
   acknowledgementReaction: null,
+  directMessage: true,
   organizationContext: null,
   delegation: null,
   delegationTargets: [],
@@ -73,8 +74,6 @@ const channelReply = {
     url:
       "/workspaces/77777777-7777-4777-8777-777777777777/channel-reply-claims/11111111-1111-4111-8111-111111111111/attachments/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
   }],
-      memory: null,
-      memoryLearningEnabled: false,
   agentMessageTargets: [],
   inboundAgentMessage: null,
   agentMessageHop: 0,
@@ -126,6 +125,7 @@ describe("Worker claim protobuf mapper", () => {
     expect(timestampDate(message.work.value.claimedAt!).toISOString()).toBe(
       claimedAt,
     );
+    expect(message.work.value.directMessage).toBe(true);
 
     const executionClaim = claimedWorkFromProto(message);
     expect(executionClaim).toMatchObject({
@@ -137,6 +137,7 @@ describe("Worker claim protobuf mapper", () => {
         retainedUntil: channelReply.session.retainedUntil,
       },
       triggerAttachments: channelReply.triggerAttachments,
+      directMessage: true,
     });
   });
 

@@ -1,10 +1,12 @@
 # Memory vault on Cloudflare Artifacts
 
-Status: implementation spec, 2026-10-13. Supersedes the storage half of
-[dm-memory-spec.md](dm-memory-spec.md): D1 stops being the source of memory
-Markdown. The opt-in, explicit save/correct/delete, protected-record and
-citation contracts of that spec stay in force and are restated here where the
-mechanism changes.
+Status: implementation spec, 2026-10-13; the only memory system since
+2026-10-14. It replaced the D1 DM memory of
+[dm-memory-spec.md](dm-memory-spec.md) (D1 documents, Vectorize, briefs,
+learning pipeline), which was removed with `0222_remove_legacy_dm_memory.sql`
+(§11). The opt-in, explicit save/correct/delete, protected-record and citation
+contracts of that spec stay in force and are restated here; its DM memory
+spaces and reply fences are still the D1 identity of a DM vault.
 
 The user-facing contract is the application-owned README in
 `apps/briar/worker/src/memory-vault/memory-vault-readme.md`, copied verbatim
@@ -80,7 +82,7 @@ Isolation rules enforced by the server on every call, not by the prompt:
 | Vault | Read (`list`/`read`/`search`, context injection) | Write (`journal`/`save`) |
 | --- | --- | --- |
 | `dm` | space `use_enabled = 1` | space `auto_enabled = 1`, **or** `--user-requested` on a turn whose trigger message was written by the owner. A user-requested write turns `use_enabled` on (as the first explicit save did before). |
-| `group`, `project` | `MEMORY_VAULT_ENABLED` | `MEMORY_VAULT_ENABLED` |
+| `group`, `project` | always (every run with an Agent) | always |
 
 * Records the owner created or edited in the app are `protected_by_user`.
   An agent save to a protected record needs `--user-requested`; otherwise
@@ -260,16 +262,16 @@ For a DM space whose vault is active, `DmMemoryService` keeps its RPC shapes and
 is served from the vault: list = records, get = read, revisions = the D1
 revision map, create/update = `save` as `user:<id>` with
 `protected_by_user = 1`, delete = forget (§10), export = the head tree. Clients
-(web, iOS, Android web view) treat `documentId` as an opaque string, so no
-client change is needed unless a test shows otherwise.
+(web, iOS, Android web view) treat `documentId` as an opaque string. Fields
+of the old document shape the vault does not store (validity, language, index
+state, learning status) are filled with fixed values for shipped clients and no
+longer shown by current ones (`dm_memory.proto`).
 
 ## 10. Forget
 
 1. Immediately: a commit removing the file; the record row → `deleted`; its
    revision rows and claim reads deleted; the space's `revocation_epoch` bumped
-   (existing fences stop resumed conversations that saw it); legacy D1
-   documents mapped to it go through the existing `deleteDmMemory` purge
-   (revisions, chunks, vectors, briefs).
+   (existing fences stop resumed conversations that saw it).
 2. Purge job (leased, resumable, idempotent): full clone of generation g,
    rewrite every commit without the forgotten paths, push to a new repo
    `…-g<g+1>`, verify its head tree equals g's head tree, switch the vault row
@@ -283,36 +285,23 @@ client change is needed unless a test shows otherwise.
 Deleting a whole vault (space closed, agent deleted, owner opts out and asks to
 erase) deletes the repo and all D1 rows.
 
-## 11. Migration from D1 memory
+## 11. Migration from D1 memory (done, removed)
 
-Rerunnable, per DM space, gated by `MEMORY_VAULT_MIGRATION_ENABLED` (or
-`MEMORY_VAULT_ENABLED`) and run by the minute cron, one space per run, so it
-can finish before the cutover:
+The D1 → vault migration ran per DM space from the minute cron between
+2026-10-13 and 2026-10-14: every revision of every active legacy document became
+one commit (`Briar-Operation: migrate`, `Briar-Legacy: <document id>@<version>`
+trailers), `profile` → `person` and `note`/`log` → `fact` records, verified by
+reading each revision back. Production: 11 documents in the two DM spaces that
+had active documents, both verified.
 
-* Each active document becomes one record; each of its revisions one commit, in
-  version order, with the original timestamps and a `Briar-Legacy` trailer
-  (`<document id>@<version>`). `memory_class` maps `profile` → `person`
-  (owner profile `entities/people/owner`… id from the title slug), `note` →
-  `fact`, `log` → `fact` as well (as built: a legacy log document is versioned
-  and may be multi-line, which an immutable single journal line cannot hold,
-  and read-back verification needs one record per document). Source message ids
-  and `protected_by_user` carry over (sources as a `## Sources` footer, protection
-  in D1).
-* `briar_memory_vault_legacy_map` records document/version → record/revision/
-  commit and the body hash; a rerun skips mapped versions and fails loudly if a
-  mapped body hash differs. Verification reads every migrated revision back
-  from Artifacts and compares hashes.
-* The legacy rows are left untouched, so setting `MEMORY_VAULT_ENABLED=false`
-  rolls back to the D1 path (vault writes made after cutover are then not
-  visible until re-enabled).
-* After cutover the legacy learning pipeline (`extract`/`consolidate`/
-  `explicit_request`) no longer enqueues for vault spaces; the agent maintains
-  memory with the tools. Legacy brief/lookup RPCs return no memory for vault
-  spaces, so an old Worker CLI degrades to "no memory" rather than writing
-  somewhere the vault does not see.
-
-Production size on 2026-10-13: 12 spaces, 14 documents, 13 revisions — the
-migration writes well under 1,000 D1 rows.
+`0222_remove_legacy_dm_memory.sql` then removed the legacy system: it rewrote
+each legacy reply citation of a migrated document version into a citation of
+the vault record revision it became (so old messages keep their citations, now
+by record handle), and dropped the legacy tables, the migration ledger
+(`briar_memory_vault_legacy_map`, `briar_memory_vault_legacy_migrations`) and
+the triggers that only served them. The migration code and both switches
+(`MEMORY_VAULT_ENABLED`, `MEMORY_VAULT_MIGRATION_ENABLED`) are gone; the
+`Briar-Legacy` trailer stays readable in history.
 
 ## 12. D1
 
@@ -334,7 +323,11 @@ schema migration: the lookup rows (≈ 20). See §11 for the data migration.
 * `briar_memory_vault_requests` — idempotency.
 * `briar_memory_vault_claim_reads` — citation validation.
 * `briar_memory_vault_purges` — forget jobs.
-* `briar_memory_vault_legacy_map` — migration.
+* `briar_memory_vault_reply_citations` — accepted citations (0221).
+* Kept from the D1 DM memory: `briar_dm_memory_spaces` (+ the live roster view
+  and the triggers that close or revoke spaces), `briar_dm_memory_reply_fences`,
+  `briar_dm_memory_activity_revocations`, `briar_dm_memory_exclusions`, and
+  `briar_dm_memory_setting_requests` (settings idempotency, 0222).
 
 ## 13. Failure and recovery
 
@@ -345,18 +338,18 @@ schema migration: the lookup rows (≈ 20). See §11 for the data migration.
 | Agent/CLI killed mid-call | The retry reuses the request id; the server dedupes. A journal retried by the model with a new request id is deduped by line identity. |
 | Artifacts unavailable | `memory_unavailable` (retryable). The turn continues without memory; nothing is cached locally as a substitute. |
 | Purge interrupted | Leased job resumes; target generation name is deterministic, an existing half-built target is deleted and rebuilt. |
-| Old Worker CLI | Gets no vault and no legacy memory for migrated spaces (§11). |
+| Old Worker CLI (no `memoryVaultProtocol`) | No memory: no tools, no context, no resumed DM transcript. Its legacy citations are dropped at completion; the reply still completes. |
 
 ## 14. Rollout
 
-1. Merge; `bun run d1:migrate:remote`; `worker:deploy` with the
-   `MEMORY_ARTIFACTS` binding (namespace `briar-memory`) and
-   `MEMORY_VAULT_ENABLED=false`.
-2. Release the Worker CLI; update Workers.
-3. Run the live check (`docs/operations/memory-vault.md`), then the migration,
-   then set `MEMORY_VAULT_ENABLED=true` and deploy.
-4. Watch: Artifacts ops in the dashboard (billing from 2026-10-14), `busy` and
-   `memory_unavailable` rates in Worker logs, purge job state.
+Done (2026-10-13 → 2026-10-14): tables and binding, Worker CLI release, live
+check, D1 → vault migration, switch on, then `0222` removed the legacy system and
+the switches. The vault now runs for every run with an Agent; without the
+`MEMORY_ARTIFACTS` binding it reports `memory_unavailable` and the turn runs
+without memory. Rollback is reverting the deploy (`0222` dropped the legacy
+tables; restoring them needs D1 time travel to a bookmark taken before it).
+Watch: Artifacts ops in the dashboard, `busy` and `memory_unavailable` rates in
+Worker logs, purge job state.
 
 ## 15. Phase A implementation notes (2026-10-13)
 
@@ -414,6 +407,5 @@ migration `0220_memory_vault.sql`.
   which `delete "user"` cannot afford (it already sits on D1's trigger-depth
   limit, see `cascade-trigger-depth.test.ts`).
 * **Owner operations** (§9, Phase C) call `forgetMemoryVaultRecord` with
-  `actor = user:<id>`; it also runs `deleteDmMemory` for legacy documents in
-  `briar_memory_vault_legacy_map`.
+  `actor = user:<id>`.
 

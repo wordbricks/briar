@@ -5,7 +5,6 @@ import { agentReplyAttachmentPathsProviderSchema } from "./agent-reply-contract"
 import {
   channelMessageBodySchema,
   channelReplyMemoryCitationSchema,
-  channelMemorySaveRequestSchema,
   channelReplyCompletionFields,
   channelReplyCompletionSchema,
 } from "./channels-contract";
@@ -13,7 +12,6 @@ import {
   WorkspaceAgentContextRequests,
   WorkspaceAgentContextRequestTurn,
 } from "./workspace-agent-context-contract";
-import { dmMemoryRequestSchema } from "./dm-memory-query-contract";
 
 const strictSchemaOptions = {
   errors: "all",
@@ -29,7 +27,7 @@ const mutableArray = <S extends Schema.Top>(item: S) =>
  * A DM conversation turn starts without a repository checkout: a channel reply
  * never changes code, so the checkout is only worth its fetch when the Agent
  * says it actually has to read the project. This is that request, consumed on
- * the CLI exactly like a memory lookup and never sent to the server.
+ * the CLI exactly like a context lookup and never sent to the server.
  */
 export const channelRepositoryRequestSchema = strict(Schema.Struct({
   reason: Schema.String.check(Schema.isLengthBetween(1, 2_000)),
@@ -44,10 +42,6 @@ const ChannelAgentReplyTurnSchema = Schema.Union([
   strict(Schema.Struct({
     case: Schema.Literal("context"),
     requests: WorkspaceAgentContextRequestTurn,
-  })),
-  strict(Schema.Struct({
-    case: Schema.Literal("memory"),
-    request: dmMemoryRequestSchema,
   })),
   strict(Schema.Struct({
     case: Schema.Literal("repository"),
@@ -66,13 +60,9 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
   attachments: agentReplyAttachmentPathsProviderSchema,
   ...channelReplyCompletionFields,
   contextRequests: Schema.NullOr(WorkspaceAgentContextRequests),
-  memoryRequests: Schema.NullOr(
-    mutableArray(dmMemoryRequestSchema).check(Schema.isLengthBetween(1, 1)),
-  ),
   memoryCitations: Schema.NullOr(
     mutableArray(channelReplyMemoryCitationSchema).check(Schema.isMaxLength(10)),
   ),
-  memorySaveRequest: Schema.NullOr(channelMemorySaveRequestSchema),
   // Optional, not required: only a turn that may check the repository out is
   // told this member exists, and every other reply keeps its current shape.
   repositoryRequest: Schema.optional(
@@ -108,49 +98,16 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
           });
         }
       }
-      if (
-        output.memoryRequests !== null || output.memoryCitations !== null ||
-        output.memorySaveRequest !== null
-      ) {
+      if (output.memoryCitations !== null) {
         issues.push({
-          path: ["memoryRequests"],
-          issue: "A context lookup cannot include memory data",
+          path: ["memoryCitations"],
+          issue: "A context lookup cannot include memory citations",
         });
       }
       if (repositoryRequest !== null) {
         issues.push({
           path: ["repositoryRequest"],
           issue: "A context lookup cannot also request the repository",
-        });
-      }
-    } else if (output.memoryRequests !== null) {
-      if (output.body !== null || output.attachments.length > 0) {
-        issues.push({
-          path: ["memoryRequests"],
-          issue: "A memory lookup cannot include a channel reply",
-        });
-      }
-      for (const field of Object.keys(channelReplyCompletionFields) as Array<
-        keyof typeof channelReplyCompletionFields
-      >) {
-        if (output[field] !== null) {
-          issues.push({
-            path: [field],
-            issue:
-              "A memory lookup cannot include a proposal, delegation or Agent message",
-          });
-        }
-      }
-      if (output.memoryCitations !== null || output.memorySaveRequest !== null) {
-        issues.push({
-          path: ["memoryCitations"],
-          issue: "A memory lookup cannot cite a result before it is returned",
-        });
-      }
-      if (repositoryRequest !== null) {
-        issues.push({
-          path: ["repositoryRequest"],
-          issue: "A memory lookup cannot also request the repository",
         });
       }
     } else if (repositoryRequest !== null) {
@@ -171,10 +128,10 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
           });
         }
       }
-      if (output.memoryCitations !== null || output.memorySaveRequest !== null) {
+      if (output.memoryCitations !== null) {
         issues.push({
           path: ["memoryCitations"],
-          issue: "A repository request cannot carry memory data",
+          issue: "A repository request cannot carry memory citations",
         });
       }
     } else if (output.body === null) {
@@ -208,12 +165,6 @@ export const ChannelAgentReplyProviderOutputSchema =
               requests: { contextRequests: output.contextRequests },
             };
           }
-          if (output.memoryRequests !== null) {
-            return {
-              case: "memory",
-              request: output.memoryRequests[0]!,
-            };
-          }
           if (output.repositoryRequest) {
             return {
               case: "repository",
@@ -224,7 +175,6 @@ export const ChannelAgentReplyProviderOutputSchema =
             attachments,
             body,
             contextRequests: _contextRequests,
-            memoryRequests: _memoryRequests,
             repositoryRequest: _repositoryRequest,
             ...completion
           } = output;
@@ -248,26 +198,7 @@ export const ChannelAgentReplyProviderOutputSchema =
                 delegation: null,
                 agentMessage: null,
                 contextRequests: turn.requests.contextRequests,
-                memoryRequests: null,
                 memoryCitations: null,
-                memorySaveRequest: null,
-                repositoryRequest: null,
-              };
-            case "memory":
-              return {
-                body: null,
-                attachments: [],
-                document: null,
-                issueProposal: null,
-                issueBatchProposal: null,
-                executionProposal: null,
-                skillExecutionProposal: null,
-                delegation: null,
-                agentMessage: null,
-                contextRequests: null,
-                memoryRequests: [turn.request],
-                memoryCitations: null,
-                memorySaveRequest: null,
                 repositoryRequest: null,
               };
             case "repository":
@@ -282,9 +213,7 @@ export const ChannelAgentReplyProviderOutputSchema =
                 delegation: null,
                 agentMessage: null,
                 contextRequests: null,
-                memoryRequests: null,
                 memoryCitations: null,
-                memorySaveRequest: null,
                 repositoryRequest: turn.request,
               };
             case "reply":
@@ -302,11 +231,9 @@ export const ChannelAgentReplyProviderOutputSchema =
                 delegation: turn.result.delegation,
                 agentMessage: turn.result.agentMessage,
                 contextRequests: null,
-                memoryRequests: null,
                 memoryCitations: turn.result.memoryCitations
                   ? [...turn.result.memoryCitations]
                   : null,
-                memorySaveRequest: turn.result.memorySaveRequest ?? null,
                 repositoryRequest: null,
               };
           }

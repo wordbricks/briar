@@ -66,12 +66,8 @@ export async function memoryVaultFixture(db: D1Database) {
       .bind(workerId).run();
   }
 
-  /**
-   * Posts a message from `author` in a fresh channel and claims the Agent's
-   * reply on this Worker. `vaultEnabled` claims with `MEMORY_VAULT_ENABLED`.
-   */
-  async function claimChannel(kind: "dm" | "channel", author: string, body = "Please remember this.",
-    options: { vaultEnabled?: boolean } = {}) {
+  /** Posts a message from `author` in a fresh channel and claims the Agent's reply on this Worker. */
+  async function claimChannel(kind: "dm" | "channel", author: string, body = "Please remember this.") {
     const channelId = crypto.randomUUID();
     const messageId = crypto.randomUUID();
     const at = new Date().toISOString();
@@ -101,10 +97,7 @@ export async function memoryVaultFixture(db: D1Database) {
     const claimed = await claimNextChannelReplyWork({
       input: { workspaceId, workerId },
       db,
-      env: {
-        DB: db, DM_MEMORY_RETRIEVAL_ENABLED: "true", DM_MEMORY_MINIMUM_SCORE: "",
-        MEMORY_VAULT_ENABLED: options.vaultEnabled ? "true" : "false",
-      } as unknown as Env,
+      env: { DB: db } as unknown as Env,
       authenticatedWorker: await requireWorkerProjectBinding(db, request(), projectId, workerId),
     });
     if (!claimed || claimed.workId !== jobs[0]!.id) throw new Error("The fixture reply was not claimed");
@@ -180,7 +173,6 @@ export function memoryVaultDeps(db: D1Database, overrides: Partial<MemoryVaultDe
   const store = new InMemoryVaultGitStore();
   const deps: MemoryVaultDeps & { store: InMemoryVaultGitStore } = {
     db,
-    env: { MEMORY_VAULT_ENABLED: "true" },
     store,
     sleep: async () => {},
     ...overrides,

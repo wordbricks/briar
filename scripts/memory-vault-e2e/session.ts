@@ -76,7 +76,7 @@ const reply = await time("claim", async () => {
   }
   throw new Error("no reply job was claimable");
 });
-note(`claimed ${reply.workId} (channel ${reply.channelId}), legacy memory descriptor: ${reply.memory ? "present" : "none"}`);
+note(`claimed ${reply.workId} (channel ${reply.channelId})`);
 
 // 2. The run's vault invocation, exactly as reply-execution.ts opens it.
 const vault = await openMemoryVaultInvocation({
@@ -117,7 +117,6 @@ const basePrompt = detachedChannelReplyPrompt({
   workspaceAvailable: false,
   repositoryRequestAvailable: false,
   organizationContextAvailable: false,
-  memoryLearningAvailable: false,
   memoryVaultAvailable: Boolean(turn),
   delegationTargets: reply.delegationTargets,
   delegation: reply.delegation,
@@ -187,7 +186,6 @@ const result = {
   scenario,
   workId: reply.workId,
   channelId: reply.channelId,
-  legacyMemoryDescriptor: reply.memory ? "present" : "none",
   hasVault: Boolean(turn),
   context: turn ? {
     scopeKind: turn.context.scopeKind,

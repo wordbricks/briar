@@ -92,7 +92,6 @@ async function caller(
 
 const deps = (input: MemoryVaultConnectInput, services: MemoryVaultConnectServices): MemoryVaultDeps => ({
   db: input.db,
-  env: input.env,
   store: services.memoryVaultStore(input.env),
 });
 

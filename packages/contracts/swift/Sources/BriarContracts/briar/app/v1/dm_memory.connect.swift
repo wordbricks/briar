@@ -9,6 +9,10 @@ import Connect
 import Foundation
 import SwiftProtobuf
 
+/// The owner's view of one DM's memory vault (docs/plans/memory-vault-spec.md §9).
+/// The message shapes predate the vault: a document is a vault record, its id
+/// the record's handle (a UUID). Fields the vault does not store are kept so
+/// shipped clients still decode them; servers fill the defaults noted below.
 public protocol BriarAPI_DmMemoryServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
@@ -31,9 +35,6 @@ public protocol BriarAPI_DmMemoryServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `updateDmMemorySettings`(request: BriarAPI_UpdateDmMemorySettingsRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_UpdateDmMemorySettingsResponse>
-
-    @available(iOS 13, *)
-    func `retryDmMemoryLearning`(request: BriarAPI_RetryDmMemoryLearningRequest, headers: Connect.Headers) async -> ResponseMessage<BriarAPI_RetryDmMemoryLearningResponse>
 }
 
 /// Concrete implementation of `BriarAPI_DmMemoryServiceClientInterface`.
@@ -79,11 +80,6 @@ public final class BriarAPI_DmMemoryServiceClient: BriarAPI_DmMemoryServiceClien
         return await self.client.unary(path: "/briar.app.v1.DmMemoryService/UpdateDmMemorySettings", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
-    @available(iOS 13, *)
-    public func `retryDmMemoryLearning`(request: BriarAPI_RetryDmMemoryLearningRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<BriarAPI_RetryDmMemoryLearningResponse> {
-        return await self.client.unary(path: "/briar.app.v1.DmMemoryService/RetryDmMemoryLearning", idempotencyLevel: .unknown, request: request, headers: headers)
-    }
-
     public enum Metadata {
         public enum Methods {
             public static let listDmMemories = Connect.MethodSpec(name: "ListDmMemories", service: "briar.app.v1.DmMemoryService", type: .unary)
@@ -93,7 +89,6 @@ public final class BriarAPI_DmMemoryServiceClient: BriarAPI_DmMemoryServiceClien
             public static let updateDmMemoryDocument = Connect.MethodSpec(name: "UpdateDmMemoryDocument", service: "briar.app.v1.DmMemoryService", type: .unary)
             public static let deleteDmMemoryDocument = Connect.MethodSpec(name: "DeleteDmMemoryDocument", service: "briar.app.v1.DmMemoryService", type: .unary)
             public static let updateDmMemorySettings = Connect.MethodSpec(name: "UpdateDmMemorySettings", service: "briar.app.v1.DmMemoryService", type: .unary)
-            public static let retryDmMemoryLearning = Connect.MethodSpec(name: "RetryDmMemoryLearning", service: "briar.app.v1.DmMemoryService", type: .unary)
         }
     }
 }

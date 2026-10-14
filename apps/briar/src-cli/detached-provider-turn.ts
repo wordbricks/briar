@@ -773,8 +773,8 @@ export async function executeDetachedProviderTurn(
   Pre-warming. A Codex turn spends its first seconds on work that is decided
   the moment the workspace is: starting `codex app-server`, the initialize
   handshake, reading the config, listing models and installed apps. None of it
-  needs the prompt, so it can run beside the memory brief, the attachment
-  downloads and the Skill catalog instead of after them.
+  needs the prompt, so it can run beside the memory vault context, the
+  attachment downloads and the Skill catalog instead of after them.
 
   The prompt's developer instructions are what the thread request needs, so the
   prepared process stops exactly before `thread/start` and waits. Everything

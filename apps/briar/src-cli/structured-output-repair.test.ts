@@ -33,9 +33,7 @@ const proposalWithStatus = JSON.stringify({
   delegation: null,
   agentMessage: null,
   contextRequests: null,
-  memoryRequests: null,
   memoryCitations: null,
-  memorySaveRequest: null,
 });
 
 describe("structured output repair", () => {

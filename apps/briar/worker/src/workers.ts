@@ -1,4 +1,3 @@
-import { dmLearningCapacityTable } from "./dm-memory-capacity";
 /**
  * Detached execution workers and their agent transcripts.
  *
@@ -1784,7 +1783,7 @@ export async function deleteExecutionWorker(
       .prepare(
         `delete from briar_execution_worker_devices
          where id = ?
-           and not exists (${executionWorkerDeviceSessionsQuery(await dmLearningCapacityTable(db))})`,
+           and not exists (${executionWorkerDeviceSessionsQuery()})`,
       )
       .bind(
         deviceId,
@@ -2006,11 +2005,6 @@ export async function listExecutionWorkers(
                       'enqueueing', 'waiting_tail', 'validating',
                       'publishing', 'draining'
                     )
-                  union all
-                  select learning.id from ${await dmLearningCapacityTable(db)} learning
-                  where learning.claimed_device_id = device.id and learning.status = 'running'
-                    and learning.kind in ('extract', 'explicit_request', 'consolidate')
-                    and learning.lease_expires_at > ?
                 ) active_work
               ) as active_sessions
        from briar_execution_workers worker
@@ -2018,7 +2012,7 @@ export async function listExecutionWorkers(
        where worker.project_id = ?
        order by worker.last_heartbeat_at desc, worker.id asc`,
     )
-    .bind(observedAt, observedAt, observedAt, observedAt, projectId)
+    .bind(observedAt, observedAt, observedAt, projectId)
     .all<
       ExecutionWorkerRow & {
         owner_user_id: string;
@@ -2166,11 +2160,6 @@ export async function listWorkspaceExecutionWorkers(
                       'enqueueing', 'waiting_tail', 'validating',
                       'publishing', 'draining'
                     )
-                  union all
-                  select learning.id from ${await dmLearningCapacityTable(db)} learning
-                  where learning.claimed_device_id = device.id and learning.status = 'running'
-                    and learning.kind in ('extract', 'explicit_request', 'consolidate')
-                    and learning.lease_expires_at > ?
                 ) active_work
               ) as active_sessions
        from briar_execution_worker_devices device
@@ -2181,7 +2170,7 @@ export async function listWorkspaceExecutionWorkers(
        where device.organization_id = ?
        order by device.last_heartbeat_at desc, device.id, team.created_at`,
     )
-    .bind(observedAt, observedAt, observedAt, observedAt, workspaceId)
+    .bind(observedAt, observedAt, observedAt, workspaceId)
     .all<{
       device_id: string;
       owner_user_id: string;
@@ -3229,8 +3218,7 @@ export async function listExecutionAuditEvents(
   return result.results ?? [];
 }
 
-export function executionWorkerDeviceSessionsQuery(memoryTable = "briar_dm_memory_jobs") { return `
-         select legacy.id from (
+export function executionWorkerDeviceSessionsQuery() { return `
          select run.id
          from briar_hunt_runs run
          join briar_execution_workers worker on worker.id = run.worker_id
@@ -3273,12 +3261,6 @@ export function executionWorkerDeviceSessionsQuery(memoryTable = "briar_dm_memor
            on worker.id = reply.claimed_worker_id
          where worker.device_id = ? and reply.status = 'running'
            and reply.lease_expires_at > ?
-         ) legacy
-         union all
-         select learning.id from ${memoryTable} learning
-         where learning.claimed_device_id = ? and learning.status = 'running'
-           and learning.kind in ('extract', 'explicit_request', 'consolidate')
-           and learning.lease_expires_at > ?
 `;
 }
 
@@ -3286,8 +3268,6 @@ export const executionWorkerDeviceSessionBindings = (
   deviceId: string,
   observedAt: string,
 ) => [
-  deviceId,
-  observedAt,
   deviceId,
   observedAt,
   deviceId,
@@ -3309,7 +3289,7 @@ export async function countExecutionWorkerDeviceSessions(
   const row = await db
     .prepare(
       `select count(*) as active_sessions
-       from (${executionWorkerDeviceSessionsQuery(await dmLearningCapacityTable(db))}) active_work`,
+       from (${executionWorkerDeviceSessionsQuery()}) active_work`,
     )
     .bind(...executionWorkerDeviceSessionBindings(deviceId, observedAt))
     .first<{ active_sessions: number }>();

@@ -20,12 +20,11 @@ import {
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
 import { maintainUploadCleanup } from "./upload-repository";
-import { runDmMemoryMaintenance } from "./dm-memory-indexing";
+import { cleanupAbandonedReplyLookups } from "./channel-reply-lookup-budget";
+import { flushDmMemoryActivityRevocations } from "./dm-memory-activity-revocations";
 import { flushWhatsAppOutbox } from "./whatsapp-outbox";
 import { memoryVaultStoreFromEnv } from "./memory-vault/artifacts-git-store";
 import { runMemoryVaultMaintenance as runMemoryVaultMaintenanceWithStore } from "./memory-vault/forget";
-import { memoryVaultEnabled } from "./memory-vault/flag";
-import { runLegacyMemoryMigration } from "./memory-vault/legacy-migration";
 
 /**
  * Memory vault purges (every minute) and the orphan repository sweep (every six
@@ -42,24 +41,18 @@ async function runMemoryVaultMaintenance(env: Env, cadence: "minute" | "six_hour
     console.error(JSON.stringify({ message: "Memory vault maintenance failed", cadence, error: message }));
     maintenance = { error: message };
   }
-  if (cadence !== "minute" || !store || !legacyMemoryMigrationEnabled(env)) return maintenance;
-  // One DM space per minute moves from D1 memory into its vault (docs/operations/memory-vault.md).
-  try {
-    return { ...maintenance, legacyMigration: await runLegacyMemoryMigration({ db: env.DB, store }) };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(JSON.stringify({ message: "Legacy memory migration failed", error: message }));
-    return { ...maintenance, legacyMigration: { error: message } };
-  }
+  return maintenance;
 }
 
 /**
- * The legacy D1 → vault migration runs while the vault serves memory, and
- * before that when `MEMORY_VAULT_MIGRATION_ENABLED` is on (rollout step 3:
- * migrate first, then switch the vault on).
+ * Reply-claim housekeeping that used to ride on DM memory maintenance: drop
+ * lookup caches of reply claims that ended, and clear the activity of replies
+ * a DM memory revocation sent back to the queue.
  */
-const legacyMemoryMigrationEnabled = (env: Env) =>
-  memoryVaultEnabled(env) || String(env.MEMORY_VAULT_MIGRATION_ENABLED) === "true";
+async function runDmReplyCleanup(env: Env, observedAt: string) {
+  await cleanupAbandonedReplyLookups(env.DB, observedAt);
+  return env.CHANNEL_ACTIVITY_REALTIME ? await flushDmMemoryActivityRevocations(env.DB, env) : null;
+}
 
 export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
@@ -73,7 +66,7 @@ export type ScheduledTaskDependencies = {
   reconcileManagedComputers: typeof reconcileManagedComputers;
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
   maintainUploadCleanup: typeof maintainUploadCleanup;
-  runDmMemoryMaintenance: typeof runDmMemoryMaintenance;
+  runDmReplyCleanup: typeof runDmReplyCleanup;
   runDueDmSchedules: typeof runDueDmSchedules;
   flushWhatsAppOutbox: typeof flushWhatsAppOutbox;
   runMemoryVaultMaintenance: typeof runMemoryVaultMaintenance;
@@ -95,7 +88,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   reconcileManagedComputers,
   cleanupExpiredChannelReplySessions,
   maintainUploadCleanup,
-  runDmMemoryMaintenance,
+  runDmReplyCleanup,
   runDueDmSchedules,
   flushWhatsAppOutbox,
   runMemoryVaultMaintenance,
@@ -113,7 +106,7 @@ export async function handleScheduledTask(
   if (controller.cron === GITHUB_RECONCILIATION_CRON) {
     ctx.waitUntil((async () => {
       try {
-        const [github, mergeQueue, managedComputerRetirements, dmMemory, whatsapp, dmSchedules, memoryVault] =
+        const [github, mergeQueue, managedComputerRetirements, dmReplyCleanup, whatsapp, dmSchedules, memoryVault] =
           await Promise.all([
           dependencies.reconcileGithubMergedRuns(env.DB),
           dependencies.reconcileEnabledMergeQueueRuns(env.DB, observedAt),
@@ -122,7 +115,7 @@ export async function handleScheduledTask(
             env,
             observedAt,
           ),
-          dependencies.runDmMemoryMaintenance(env, observedAt),
+          dependencies.runDmReplyCleanup(env, observedAt),
           dependencies.flushWhatsAppOutbox(env, env.DB, observedAt),
           dependencies.runDueDmSchedules(env.DB, new Date().toISOString()),
           dependencies.runMemoryVaultMaintenance(env, "minute"),
@@ -137,7 +130,7 @@ export async function handleScheduledTask(
           github,
           mergeQueue,
           managedComputerRetirements,
-          dmMemory,
+          dmReplyCleanup,
           whatsapp,
           dmSchedules,
           memoryVault,
