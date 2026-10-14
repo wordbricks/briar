@@ -10,17 +10,12 @@ import {
 import { dmReplyStopStatements, type DmReplyStop } from "./dm-reply-stop";
 import * as Schema from "effect/Schema";
 import {
-  dmMemoryCitationsCurrent,
-  dmMemoryCitationStatement,
-  readDmMemoryCitations,
-} from "./dm-memory-citations";
-import {
   dmMemoryReplyFenceCurrent,
   requireDmMemoryReplyFence,
 } from "./dm-memory-reply-fence";
-import { dmLearningReplyOutboxStatements } from "./dm-memory-learning-queue";
 import {
   memoryVaultCitationStatement,
+  readMemoryVaultCitations,
   type AcceptedMemoryVaultCitation,
 } from "./memory-vault/citations";
 import {
@@ -1864,7 +1859,7 @@ async function attachMessageRelations(
     subscribers,
     relays,
   ] = await Promise.all([
-    readDmMemoryCitations(db, ids),
+    readMemoryVaultCitations(db, ids),
     db
       .prepare(
         `select message_id, user_id from briar_channel_message_mentions
@@ -4816,17 +4811,8 @@ export async function failChannelReply(
 
 export type ChannelReplyCompletionInput = {
   acknowledgementReaction?: string | null;
-  memoryCitations?: readonly { documentId: string; version: number }[] | null;
   /** Vault citations completion already accepted (memory-vault spec §8). */
   memoryVaultCitations?: readonly AcceptedMemoryVaultCitation[];
-  /**
-   * `MEMORY_VAULT_ENABLED`: the legacy learning outbox (extract,
-   * explicit_request) is not written; the agent keeps memory with its tools.
-   */
-  memoryVaultCutover?: boolean;
-  memorySaveRequest?: {
-    readonly documents: readonly { documentId: string; version: number }[];
-  } | null;
   jobId: string;
   deviceId: string;
   workerId: string;
@@ -4907,14 +4893,13 @@ export async function completeChannelReply(
       input.executionProposal || input.skillExecutionProposal,
   );
   if ((job.routing_action === "answer" || job.routing_action === "clarify") &&
-    (artifactRequested || delegation || agentMessage || input.attachments?.length || input.memorySaveRequest)) {
+    (artifactRequested || delegation || agentMessage || input.attachments?.length)) {
     throw new Error("A conversational DM routing decision cannot perform work");
   }
   if (
     input.publishedFinalBatchId &&
     (artifactRequested || delegation || agentMessage ||
-      input.memoryCitations?.length || input.memoryVaultCitations?.length ||
-      input.memorySaveRequest ||
+      input.memoryVaultCitations?.length ||
       input.attachments?.length)
   ) {
     throw new Error(
@@ -4944,7 +4929,7 @@ export async function completeChannelReply(
   */
   if (
     job.agent_message_hop === 1 &&
-    (delegation || artifactRequested || input.memorySaveRequest)
+    (delegation || artifactRequested)
   ) {
     throw new Error(
       "An Agent-to-Agent answer can only carry a body and attachments",
@@ -5240,7 +5225,6 @@ export async function completeChannelReply(
            )
            and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
            and ${dmMemoryReplyFenceCurrent("briar_channel_agent_reply_jobs")}
-           and ${dmMemoryCitationsCurrent("briar_channel_agent_reply_jobs")}
            and exists (
              select 1 from briar_execution_workers binding
              where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
@@ -5352,10 +5336,6 @@ export async function completeChannelReply(
         input.workerId,
         input.claimTokenHash,
         input.completedAt,
-        JSON.stringify([
-          ...(input.memoryCitations ?? []),
-          ...(input.memorySaveRequest?.documents ?? []),
-        ]),
         input.publishedFinalBatchId ?? null,
         input.body,
         input.publishedFinalBatchId ?? null,
@@ -5411,15 +5391,6 @@ export async function completeChannelReply(
         input.publishedFinalBatchId ?? null,
       ),
   );
-  if (input.memoryCitations?.length) {
-    statements.push(dmMemoryCitationStatement(db, {
-      jobId: input.jobId,
-      claimTokenHash: input.claimTokenHash,
-      messageId: job.reply_message_id,
-      completedAt: input.completedAt,
-      references: input.memoryCitations,
-    }));
-  }
   if (input.memoryVaultCitations?.length) {
     statements.push(memoryVaultCitationStatement(db, {
       jobId: input.jobId,
@@ -5427,15 +5398,6 @@ export async function completeChannelReply(
       messageId: job.reply_message_id,
       completedAt: input.completedAt,
       citations: input.memoryVaultCitations,
-    }));
-  }
-  if (!input.memoryVaultCutover) {
-    statements.push(...dmLearningReplyOutboxStatements(db, {
-      jobId: input.jobId,
-      claimTokenHash: input.claimTokenHash,
-      completedAt: input.completedAt,
-      explicitRequested: input.memorySaveRequest != null,
-      requestTargets: input.memorySaveRequest?.documents,
     }));
   }
   for (const attachment of input.attachments ?? []) {

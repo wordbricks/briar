@@ -310,7 +310,6 @@ describe("durable DM public messages", () => {
         completion: {
           body: "The investigation is complete.",
           memoryCitations: null,
-          memorySaveRequest: null,
           document: null,
           issueProposal: null,
           issueBatchProposal: null,

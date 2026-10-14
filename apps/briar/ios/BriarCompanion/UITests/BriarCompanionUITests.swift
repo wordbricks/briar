@@ -230,8 +230,9 @@ final class BriarCompanionUITests: XCTestCase {
         open.tap()
         let document = app.buttons["dm-memory-document-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]
         XCTAssertTrue(document.waitForExistence(timeout: 5))
-        XCTAssertTrue(document.label.contains("색인 대기"))
+        XCTAssertTrue(document.label.contains("profile · v1"))
         XCTAssertTrue(document.label.contains("사용자 보호"))
+        XCTAssertFalse(document.label.contains("색인"))
         captureScreenshot(named: "companion-dm-memory-list")
         document.tap()
         let save = app.buttons["dm-memory-save"]
@@ -239,7 +240,6 @@ final class BriarCompanionUITests: XCTestCase {
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
         XCTAssertTrue(document.label.contains("v2"))
-        XCTAssertTrue(document.label.contains("색인 대기"))
         document.tap()
         let history = app.buttons["dm-memory-history"]
         if !history.isHittable { app.swipeUp() }

@@ -1,5 +1,3 @@
-import { deleteDmMemory } from "../dm-memory-repository";
-import { HttpError } from "../http-response";
 import { MemoryVaultError } from "./errors";
 import type { VaultGitStore } from "./git-store";
 import { commitWithRetry, type MemoryVaultDeps } from "./operations";
@@ -102,32 +100,7 @@ export async function forgetMemoryVaultRecord(deps: MemoryVaultMaintenanceDeps, 
   if (current && outcome.kind === "committed" && current.head_commit !== outcome.commit) {
     await reconcileVault(deps.db, deps.store, current, now);
   }
-  await forgetLegacyDocuments(deps.db, vault, input.recordId);
   return { commit: forgetCommit, purgeGeneration: vault.generation };
-}
-
-/** Legacy D1 documents migrated into the record go through the existing D1 purge. */
-async function forgetLegacyDocuments(db: D1Database, vault: VaultRow, recordId: string) {
-  const documents = (await db.prepare(`select distinct document_id from briar_memory_vault_legacy_map
-    where vault_id = ? and record_id = ?`).bind(vault.id, recordId).all<{ document_id: string }>()).results;
-  if (documents.length === 0) return;
-  const space = vault.dm_space_id
-    ? await db.prepare(`select organization_id, channel_id, owner_user_id from briar_dm_memory_spaces where id = ?`)
-      .bind(vault.dm_space_id).first<{ organization_id: string; channel_id: string; owner_user_id: string }>()
-    : null;
-  if (space) {
-    for (const document of documents) {
-      try {
-        await deleteDmMemory(db, { workspaceId: space.organization_id, channelId: space.channel_id, userId: space.owner_user_id },
-          document.document_id);
-      } catch (error) {
-        // Already gone from the owner's view (or the owner left the workspace): nothing left to purge here.
-        if (!(error instanceof HttpError && error.status === 404)) throw error;
-      }
-    }
-  }
-  await db.prepare(`delete from briar_memory_vault_legacy_map where vault_id = ? and record_id = ?`)
-    .bind(vault.id, recordId).run();
 }
 
 type PurgeRow = {
@@ -239,7 +212,6 @@ async function runPurge(deps: MemoryVaultMaintenanceDeps, job: { vault_id: strin
         remap("briar_memory_vault_records"),
         remap("briar_memory_vault_revisions"),
         remap("briar_memory_vault_requests"),
-        remap("briar_memory_vault_legacy_map"),
         db.prepare(`update briar_memory_vault_purges set switched_at = ?, updated_at = ?
           where vault_id = ? and source_generation = ? and lease_token = ? and ${switched}`)
           .bind(timestamp, timestamp, vault.id, generation, token, vault.id, generation + 1),

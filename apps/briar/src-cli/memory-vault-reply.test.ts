@@ -3,14 +3,10 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { create, fromJson, type JsonValue } from "@bufbuild/protobuf";
-import { ValueSchema, timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import {
-  DmMemoryBriefState,
-  DmMemoryDescriptorSchema,
-} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
   WorkspaceAgentContextService,
   WorkspaceAgentContextServiceGetManifestResponseSchema,
@@ -18,11 +14,9 @@ import {
 import {
   ChannelReplyScopeSchema,
   ChannelReplyScope_WorkspaceSchema,
-  CheckDmMemoryClaimResponseSchema,
   ClaimedWorkSchema,
   CompleteChannelReplyResponseSchema,
   DetachedAgentClaimSchema,
-  GetDmMemoryBriefResponseSchema,
   GetMemoryVaultContextResponseSchema,
   MemoryVaultReadResponseSchema,
   ReplyCompletionDisposition,
@@ -44,8 +38,8 @@ import {
 
 /*
   The memory vault in the actual reply and Agent-task runners: what a provider
-  turn receives with a vault, that the legacy DM memory brief stays closed
-  beside it, and that a `none` answer leaves the legacy path exactly as it was.
+  turn receives with a vault, and that a `none` answer runs the reply without
+  memory.
 */
 const readmePath = fileURLToPath(new URL("../worker/src/memory-vault/memory-vault-readme.md", import.meta.url));
 const workspaceId = crypto.randomUUID();
@@ -63,9 +57,7 @@ const reply = (overrides: Record<string, unknown>) => ({
   skillExecutionProposal: null,
   delegation: null,
   agentMessage: null,
-  memoryRequests: null,
   memoryCitations: null,
-  memorySaveRequest: null,
   contextRequests: null,
   ...overrides,
 });
@@ -79,21 +71,8 @@ const result = (value: unknown): DetachedProviderTurnResult => ({
   runnerError: null,
 });
 
-const jsonValue = (value: unknown) =>
-  fromJson(ValueSchema, JSON.parse(JSON.stringify(value)) as JsonValue);
-
-const memorySpaceId = crypto.randomUUID();
 /** The claim the synthetic server is answering for; the manifest echoes it. */
 let currentWorkId = crypto.randomUUID();
-
-const descriptor = () => create(DmMemoryDescriptorSchema, {
-  protocol: 1,
-  memorySpaceId,
-  memoryRevision: 1n,
-  revocationEpoch: 0n,
-  searchEnabled: true,
-  briefState: DmMemoryBriefState.AVAILABLE,
-});
 
 const config = (port: number): Config => ({
   apiUrl: `http://127.0.0.1:${port}`,
@@ -156,20 +135,6 @@ async function withServer<T>(
             record: { id: "bay-area", type: "workstream", path: "workstreams/bay-area.md", aliases: [], revision: 4, protectedByUser: false },
             body: "Moving in March.",
             latest: true,
-          });
-        },
-        checkDmMemoryClaim: () => {
-          calls.push("memory-check");
-          return create(CheckDmMemoryClaimResponseSchema, { memory: descriptor() });
-        },
-        getDmMemoryBrief: () => {
-          calls.push("memory-brief");
-          return create(GetDmMemoryBriefResponseSchema, {
-            memory: descriptor(),
-            brief: jsonValue({
-              memorySpaceId, memoryRevision: 1, revocationEpoch: 0, policyVersion: "test",
-              validThrough: null, profile: [], progress: [], omitted: true, notice: "",
-            }),
           });
         },
         completeChannelReply: (request) => {
@@ -235,8 +200,6 @@ const channelClaim = () => claimedWorkFromProto(create(ClaimedWorkSchema, {
       leaseExpiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
       snapshot: {},
       workspaceContextSnapshotAt: timestampFromDate(new Date(snapshotAt)),
-      memory: descriptor(),
-      memoryLearningEnabled: true,
     },
   },
 })) as ClaimedChannelReply;
@@ -282,7 +245,7 @@ async function toolsFromTurn(turn: DetachedProviderTurnInput, argv: string[]) {
 }
 
 describe("memory vault in the channel reply runner", () => {
-  it("gives a vault reply the README, the tags and working tools, and keeps the legacy brief closed", async () => {
+  it("gives a vault reply the README, the tags and working tools", async () => {
     const seen: DetachedProviderTurnInput[] = [];
     let toolResult: Awaited<ReturnType<typeof toolsFromTurn>> | null = null;
     const observed = await exerciseChannelReply("context", async (turn) => {
@@ -299,19 +262,21 @@ describe("memory vault in the channel reply runner", () => {
     expect(turn!.prompt).toContain("<voice-guide>\n- Answer in Korean (user, 2026-10-10)\n</voice-guide>");
     expect(turn!.prompt).toContain("<playbook-memory></playbook-memory>");
     expect(turn!.prompt).toContain("Memory is kept with the `tools memory` command");
-    expect(turn!.prompt).not.toContain("Private profile file");
-    expect(turn!.prompt).not.toContain("set memorySaveRequest to");
+    expect(turn!.prompt).not.toContain("memorySaveRequest");
+    expect(turn!.prompt).not.toContain("memoryRequests");
+    // The reply job id lets `briar channel messages` read this channel under
+    // the claim; the claim token itself also authorizes submitting the reply.
+    expect(turn!.environment.BRIAR_CHANNEL_REPLY_WORK_ID).toBe(currentWorkId);
     expect(JSON.stringify(turn!.environment)).not.toContain(claimToken);
     expect(toolResult).toMatchObject({ exitCode: 0, json: { id: "bay-area", revision: 4, body: "Moving in March." } });
     // The claim reached the server from the Worker side only.
     expect(observed.calls).toContain("vault-read:bay-area:true");
-    expect(observed.calls).not.toContain("memory-brief");
     expect(observed.completed).toContain("\"documentId\":\"bay-area\"");
     // The run's private directory is gone with the reply.
     await expect(readdir(toolResult!.bin)).rejects.toThrow();
   });
 
-  it("refuses a legacy memory lookup beside a vault once, then completes", async () => {
+  it("repairs a reply that still carries the removed memoryRequests field", async () => {
     const prompts: string[] = [];
     const observed = await exerciseChannelReply("context", async (turn, number) => {
       prompts.push(turn.prompt);
@@ -321,12 +286,12 @@ describe("memory vault in the channel reply runner", () => {
     });
     expect(observed.failure).toBeUndefined();
     expect(observed.turns).toBe(2);
-    expect(prompts[1]).toContain("memoryRequests are not available to this reply");
+    expect(observed.completed).toContain("Done.");
     // Every provider turn gets the tags again.
     expect(prompts[1]!.startsWith("<voice-memory>")).toBe(true);
   });
 
-  it("leaves the legacy DM memory path untouched when the server says none", async () => {
+  it("runs the reply without memory when the server says none", async () => {
     const seen: DetachedProviderTurnInput[] = [];
     let bin = "";
     const observed = await exerciseChannelReply("none", async (turn) => {
@@ -338,9 +303,7 @@ describe("memory vault in the channel reply runner", () => {
     const [turn] = seen;
     expect(turn!.memoryVaultInstructions).toBeUndefined();
     expect(turn!.prompt).not.toContain("<voice-memory>");
-    expect(turn!.prompt).toContain("Private profile file");
-    expect(turn!.prompt).toContain("set memorySaveRequest to");
-    expect(observed.calls).toContain("memory-brief");
+    expect(turn!.prompt).toContain("Memory is unavailable for this reply.");
     expect(observed.calls.filter((call) => call === "vault-context")).toHaveLength(1);
     // The pre-warm PATH entry is an empty private directory: no `tools` is offered.
     expect(bin).toMatch(/briar-memory-tools-/u);

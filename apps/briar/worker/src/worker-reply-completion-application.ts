@@ -25,7 +25,6 @@ import {
 } from "./channels";
 import { sha256 } from "./crypto-digest";
 import { acceptMemoryVaultCitations } from "./memory-vault/citations";
-import { memoryVaultEnabled } from "./memory-vault/flag";
 import { completeIssueAgentReplyOutput } from "./issue-agent-reply-completion-repository";
 import {
   failIssueAgentReply,
@@ -63,11 +62,7 @@ import type {
   PreparedReplyAttachmentUploadsInput,
 } from "./worker-reply-completion-mappers";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
-import {
-  channelReplyWorkerAvailability,
-  executionWorkerBindingById,
-  executionWorkerRuntime,
-} from "./workers";
+import { channelReplyWorkerAvailability } from "./workers";
 import { scheduleWhatsAppOutboxFlush } from "./whatsapp-outbox";
 import { wakeWorkspaceWorkers } from "./worker-wake-hub";
 import {
@@ -122,7 +117,6 @@ export type ReplyCompletionApplicationServices = {
   readonly scheduleIssueActivityClear: typeof scheduleIssueActivityClear;
   readonly scheduleChannelRealtimePublish: typeof scheduleChannelRealtimePublish;
   readonly scheduleChannelActivityClear: typeof scheduleChannelActivityClear;
-  readonly executionWorkerBindingById: typeof executionWorkerBindingById;
   readonly requireDmMemoryReplyFence: typeof requireDmMemoryReplyFence;
   readonly channelReplyWorkerAvailability: typeof channelReplyWorkerAvailability;
   readonly scheduleWhatsAppOutboxFlush: typeof scheduleWhatsAppOutboxFlush;
@@ -134,7 +128,6 @@ export type ReplyCompletionApplicationServices = {
   readonly acceptMemoryVaultCitations: typeof acceptMemoryVaultCitations;
 };
 
-const LEGACY_DOCUMENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 const applicationServices: ReplyCompletionApplicationServices = {
   sha256,
@@ -160,7 +153,6 @@ const applicationServices: ReplyCompletionApplicationServices = {
   scheduleIssueActivityClear,
   scheduleChannelRealtimePublish,
   scheduleChannelActivityClear,
-  executionWorkerBindingById,
   requireDmMemoryReplyFence,
   channelReplyWorkerAvailability,
   scheduleWhatsAppOutboxFlush,
@@ -889,7 +881,7 @@ export async function completeChannelReplyApplication(
     const result = input.request.outcome.completion;
     if (
       input.request.attachmentIds.length > 0 ||
-      result.memoryCitations?.length || result.memorySaveRequest ||
+      result.memoryCitations?.length ||
       result.document || result.issueProposal || result.issueBatchProposal ||
       result.executionProposal || result.skillExecutionProposal ||
       result.delegation || result.agentMessage
@@ -997,40 +989,6 @@ export async function completeChannelReplyApplication(
         );
       }
       const result = resolved.outcome.completion;
-      /*
-        After the vault cutover the agent cites vault records and keeps memory
-        with its tools; a legacy save request (an old Worker CLI) has no
-        learning pipeline left to run it, so it is dropped rather than failing
-        the reply (memory-vault spec §8, §11).
-      */
-      const vaultCutover = memoryVaultEnabled(input.env);
-      const memorySaveRequest = vaultCutover ? null : result.memorySaveRequest;
-      if (vaultCutover && result.memorySaveRequest) {
-        console.warn(JSON.stringify({
-          message: "legacy memory save request dropped after the memory vault cutover",
-          jobId: scope.workId,
-        }));
-      }
-      if (memorySaveRequest) {
-        const binding = await services.executionWorkerBindingById(
-          input.db,
-          scope.deviceId,
-          scope.workerId,
-        );
-        const capabilities = binding
-          ? executionWorkerRuntime(binding).proto.capabilities
-          : undefined;
-        if (capabilities?.dmMemoryLearningRequests !== 1) {
-          throw new ReplyCompletionApplicationError(
-            "claim_conflict",
-            "Memory learning is unavailable",
-          );
-        }
-        await services.requireDmMemoryReplyFence(
-          input.db,
-          scope.workId,
-        );
-      }
       const artifactRequested = Boolean(
         result.document || result.issueProposal || result.issueBatchProposal ||
           result.executionProposal || result.skillExecutionProposal,
@@ -1042,8 +1000,7 @@ export async function completeChannelReplyApplication(
       */
       if (
         claimed.agent_message_hop === 1 &&
-        (result.delegation || result.agentMessage || artifactRequested ||
-          memorySaveRequest)
+        (result.delegation || result.agentMessage || artifactRequested)
       ) {
         throw new ReplyCompletionApplicationError(
           "invalid_request",
@@ -1166,14 +1123,12 @@ export async function completeChannelReplyApplication(
         }
       }
       /*
-        A UUID names a legacy DM memory document and keeps the legacy check
-        inside the completion transaction; anything else is a vault record id
-        (memory-vault spec §8), kept only if this claim read that revision and
-        it is still current. Unaccepted vault citations are dropped, not fatal.
+        A citation names a vault record id (memory-vault spec §8) and is kept
+        only if this claim read that revision and it is still current.
+        Anything else — including a legacy D1 document UUID from an older
+        Worker CLI — is dropped, not fatal.
       */
-      const citations = result.memoryCitations ?? [];
-      const legacyCitations = citations.filter((citation) => LEGACY_DOCUMENT_ID.test(citation.documentId));
-      const vaultCandidates = citations.filter((citation) => !LEGACY_DOCUMENT_ID.test(citation.documentId));
+      const vaultCandidates = result.memoryCitations ?? [];
       const vaultCitations = vaultCandidates.length > 0
         ? await services.acceptMemoryVaultCitations(input.db, {
             claimTokenHash: scope.claimTokenHash,
@@ -1198,10 +1153,7 @@ export async function completeChannelReplyApplication(
         claimTokenHash: scope.claimTokenHash,
         body: publishedFinal?.finalBody ?? result.body,
         acknowledgementReaction: result.acknowledgementReaction,
-        memoryCitations: legacyCitations,
-        memorySaveRequest,
         memoryVaultCitations: vaultCitations?.accepted ?? [],
-        memoryVaultCutover: vaultCutover,
         document,
         issueProposal,
         issueBatchProposal,

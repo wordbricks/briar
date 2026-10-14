@@ -8,7 +8,6 @@ import {
   excludeForgottenDmSources,
 } from "./dm-memory-claim";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
-import { memoryVaultEnabled } from "./memory-vault/flag";
 import {
   captureDmPublicMessageClaim,
   listDmPublicMessagesForReply,
@@ -518,9 +517,6 @@ async function claimedChannelReplyPayload(
     ? await bindDmMemoryReplyClaim(db, {
         jobId: job.id,
         claimTokenHash,
-        supportsMemory: runtime.proto.capabilities?.dmMemoryProtocol === 1,
-        enabled: String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
-        vaultCutover: memoryVaultEnabled(env),
         vaultCapable: runtime.proto.capabilities?.memoryVaultProtocol === 1,
       })
     : null;
@@ -643,12 +639,6 @@ async function claimedChannelReplyPayload(
     activity,
     acknowledgementReaction: heldAcknowledgement ? heldAcknowledgement.emoji : null,
     handoffContext: memoryBinding ? null : handoffContext,
-    memory: memoryBinding?.memory ?? null,
-    // After the vault cutover the agent keeps memory with `tools memory`;
-    // the legacy learning requests have nowhere to go (spec §11).
-    memoryLearningEnabled:
-      runtime.proto.capabilities?.dmMemoryLearningRequests === 1 &&
-      memoryBinding !== null && !memoryVaultEnabled(env),
     session: {
       id: job.channel_reply_session.id,
       threadId: job.channel_reply_session.thread_root_message_id,

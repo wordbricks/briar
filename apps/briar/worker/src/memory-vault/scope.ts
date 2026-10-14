@@ -3,7 +3,6 @@ import { sha256 } from "../crypto-digest";
 import { HttpError } from "../http-response";
 import { getClaimedIssueAgentReply } from "../issue-agent-reply-repository";
 import { MemoryVaultError } from "./errors";
-import { memoryVaultEnabled, type MemoryVaultEnv } from "./flag";
 import type { VaultKey, VaultScopeKind } from "./vault-repository";
 
 /**
@@ -195,33 +194,25 @@ export async function resolveMemoryVaultScope(db: D1Database, input: {
 }
 
 export type VaultAccess = {
-  readonly enabled: boolean;
   readonly readable: boolean;
   readonly writable: boolean;
   /** `--user-requested` is honoured on this turn. */
   readonly userRequestedWritable: boolean;
 };
 
-export { memoryVaultEnabled, type MemoryVaultEnv } from "./flag";
-
 /** Opt-in and authority (spec §4). */
-export function vaultAccess(env: MemoryVaultEnv, scope: ResolvedVaultScope): VaultAccess {
-  if (!memoryVaultEnabled(env)) {
-    return { enabled: false, readable: false, writable: false, userRequestedWritable: false };
-  }
+export function vaultAccess(scope: ResolvedVaultScope): VaultAccess {
   if (scope.dmSpace) {
     return {
-      enabled: true,
       readable: scope.dmSpace.useEnabled,
       writable: scope.dmSpace.autoEnabled,
       userRequestedWritable: scope.triggeredByPerson,
     };
   }
-  return { enabled: true, readable: true, writable: true, userRequestedWritable: scope.triggeredByPerson };
+  return { readable: true, writable: true, userRequestedWritable: scope.triggeredByPerson };
 }
 
 export function assertWritable(access: VaultAccess, userRequested: boolean) {
-  if (!access.enabled) throw new MemoryVaultError("memory_disabled", "Memory is not available for this run");
   if (userRequested) {
     if (!access.userRequestedWritable) {
       throw new MemoryVaultError(

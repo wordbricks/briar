@@ -5,17 +5,13 @@ import {
 } from "./agent-runner";
 import type { Config, TeamConfig } from "./config-contract";
 import type { DetachedProviderTurnResult } from "./detached-provider-turn";
-import { dmMemoryExecutionError } from "./dm-memory-invocation";
 import {
   channelReplyFailureReport,
   publishPlainDmFinal,
   runClaimedProjectAgentTask,
 } from "./reply-execution";
 import type { ParsedChannelReplyAgentResult } from "../src/lib/channel-agent-reply-contract";
-import type {
-  ClaimedChannelReply,
-  ClaimedProjectAgentTask,
-} from "./worker-queue-contract";
+import type { ClaimedProjectAgentTask } from "./worker-queue-contract";
 import type { GitRunner } from "./worktree";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -120,7 +116,6 @@ const plainChannelResult = (): ParsedChannelReplyAgentResult["result"] => ({
   delegation: null,
   agentMessage: null,
   memoryCitations: null,
-  memorySaveRequest: null,
 });
 
 describe("DM final publication", () => {
@@ -146,17 +141,6 @@ describe("DM final publication", () => {
       {
         ...plainChannelResult(),
         memoryCitations: [{ documentId: "memory-1", version: 1 }],
-      },
-      [],
-      signal,
-    )).resolves.toBeNull();
-    await expect(publishPlainDmFinal(
-      invocation,
-      {
-        ...plainChannelResult(),
-        memorySaveRequest: {
-          documents: [{ documentId: "memory-1", version: 1 }],
-        },
       },
       [],
       signal,
@@ -471,43 +455,12 @@ describe("Project Agent task worktrees", () => {
 });
 
 describe("reporting a failed channel reply", () => {
-  const reply = (memory: boolean) =>
-    ({ ...(memory ? { memory: { protocol: 1 } } : {}) }) as
-      Pick<ClaimedChannelReply, "memory">;
-
-  it("logs what failed beside the code a DM is allowed to report", () => {
+  it("reports the message and logs what failed beside it", () => {
     const report = channelReplyFailureReport(
-      new TypeError("private recalled text"),
-      reply(true),
-    );
-    expect(report.reported).toBe("memory_reply_failed");
-    expect(report.diagnostic).toContain("TypeError");
-    expect(report.diagnostic).not.toContain("private recalled text");
-  });
-
-  it("keeps the message of a reply that carries no DM memory", () => {
-    const report = channelReplyFailureReport(
-      new Error("workspace allocation failed"),
-      reply(false),
+      new TypeError("workspace allocation failed"),
     );
     expect(report.reported).toBe("workspace allocation failed");
-  });
-
-  it("keeps a code the redaction already recognizes", () => {
-    expect(channelReplyFailureReport(
-      new Error("memory_scope_revoked"),
-      reply(true),
-    ).reported).toBe("memory_scope_revoked");
-  });
-
-  // The reply already throws the redaction, so the report only ever sees the wrapper.
-  it("describes the failure the reply redacted before throwing it", () => {
-    const report = channelReplyFailureReport(
-      dmMemoryExecutionError(new TypeError("private recalled text")),
-      reply(true),
-    );
-    expect(report.reported).toBe("memory_reply_failed");
     expect(report.diagnostic).toContain("TypeError");
-    expect(report.diagnostic).not.toContain("private recalled text");
+    expect(report.diagnostic).not.toContain("workspace allocation failed");
   });
 });

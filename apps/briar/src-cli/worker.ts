@@ -24,7 +24,6 @@ export type ClaimedIssue = {
     | "issueReply"
     | "channelReply"
     | "projectAgentTask"
-    | "dmMemory"
     | "mergeBatch";
   workId?: string;
   session?: { id: string } | null;
@@ -394,7 +393,6 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     Promise<{ issue: Issue; error: unknown | null; handedOff: boolean; steered?: boolean }>
   >();
   const activeControllers = new Map<string, AbortController>();
-  const atomicLearningControllers = new Set<AbortController>();
   let activeSlotCount = 0;
   let updateDirective: WorkerLoopUpdateDirective | null = null;
   const serialTails = new Map<string, Promise<void>>();
@@ -433,10 +431,6 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     if (updateDirective) {
       acceptingWork = false;
       for (const controller of activeControllers.values()) {
-        // Memory learning commits a budgeted proposer/verifier transaction. It has
-        // no resumable provider conversation; finish this bounded system job instead
-        // of replaying a charged call. The updater cancels if draining exceeds 120s.
-        if (atomicLearningControllers.has(controller)) continue;
         if (!controller.signal.aborted) {
           controller.abort(new WorkerUpdateDrainError());
         }
@@ -566,7 +560,6 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     const execution = new AbortController();
     const key = executionKey(issue);
     activeControllers.set(key, execution);
-    if (issue.workType === "dmMemory") atomicLearningControllers.add(execution);
     let checkpoint: WorkerExecutionCheckpoint = {};
     const leaseRenewal: LeaseRenewalState = { failure: null };
     const renewalLoop = (async () => {
@@ -707,7 +700,6 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       execution.abort();
       await renewalLoop;
       activeControllers.delete(key);
-      atomicLearningControllers.delete(execution);
     }
   };
 

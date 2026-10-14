@@ -9,7 +9,6 @@ import {
   CompleteChannelReplyRequestSchema,
   CompleteMergeBatchPublicationRequestSchema,
   CompleteProjectAgentTaskRequestSchema,
-  DmMemorySaveRequestSchema,
   HandoffWorkRequestSchema,
   HandoffWorkResponse_Outcome,
   IssueClaimIdentitySchema,
@@ -165,8 +164,6 @@ const unserializableChannelReplyClaim = {
     claimReason: "reason_the_enum_does_not_carry",
   },
   triggerAttachments: [],
-  memory: null,
-  memoryLearningEnabled: false,
   snapshot: { channel: { id: channelId } },
 };
 
@@ -447,9 +444,6 @@ describe("WorkerQueueService lifecycle semantics", () => {
         value: create(ChannelReplySuccessSchema, {
           body: "기억한 내용을 인용해 답했습니다.",
           memoryCitations: [reference()],
-          memorySaveRequest: create(DmMemorySaveRequestSchema, {
-            documents: [reference()],
-          }),
         }),
       },
     });
@@ -462,7 +456,6 @@ describe("WorkerQueueService lifecycle semantics", () => {
           case: "success",
           completion: expect.objectContaining({
             memoryCitations: [{ documentId, version: 3 }],
-            memorySaveRequest: { documents: [{ documentId, version: 3 }] },
           }),
         },
       }),

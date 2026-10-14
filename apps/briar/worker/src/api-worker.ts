@@ -180,7 +180,7 @@ async function route(
   }
 
   const memoryResponse = await handleDmMemoryRoute({
-    request, url, auth, db, env, memoryVaultStore: memoryVaultStoreFromEnv(env),
+    request, url, auth, db, memoryVaultStore: memoryVaultStoreFromEnv(env),
   });
   if (memoryResponse !== undefined) return memoryResponse;
 

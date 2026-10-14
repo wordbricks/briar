@@ -8,9 +8,7 @@ import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import { Code, ConnectError } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
-import { DmMemoryBriefState, DmMemoryDescriptorSchema } from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
 import {
   ChannelReplyScopeSchema,
   ChannelReplyScope_ProjectSchema,
@@ -19,10 +17,8 @@ import {
   ChannelReplySessionSchema,
   ChannelReplySessionClaimReason,
   ClaimedWorkSchema,
-  CheckDmMemoryClaimResponseSchema,
   CheckpointChannelReplySessionResponseSchema,
   CompleteChannelReplyResponseSchema,
-  GetDmMemoryBriefResponseSchema,
   DetachedAgentClaimSchema,
   PublishReplyActivityResponseSchema,
   ReplyActivityService,
@@ -77,9 +73,7 @@ const providerOutput = (overrides: Record<string, unknown>) => ({
   delegation: null,
   agentMessage: null,
   contextRequests: null,
-  memoryRequests: null,
   memoryCitations: null,
-  memorySaveRequest: null,
   repositoryRequest: null,
   ...overrides,
 });
@@ -140,7 +134,7 @@ const git: GitRunner = (args, options = {}) => {
 };
 
 /** The setup steps this harness can observe from the server side. */
-type HeldSetupStep = "memory-brief" | "memory-check" | "attachment" | "prewarm";
+type HeldSetupStep = "attachment" | "prewarm";
 
 /** Where `DmMessageInvocation` keeps the journal it owns for a work item. */
 const publicationJournalDirectory = (workId: string) => join(
@@ -160,8 +154,6 @@ type Exercise = {
    * server picks its emoji at receipt, so a claim usually carries one.
    */
   acknowledgementReaction?: string;
-  /** Bind a private DM memory space, so the claim owes a memory brief RPC. */
-  memory?: boolean;
   /** Attach one text file to the trigger, so the claim owes a download. */
   attachment?: boolean;
   /**
@@ -175,12 +167,8 @@ type Exercise = {
    * can never open that barrier, so it fails on the order it produced instead.
    */
   hold?: readonly HeldSetupStep[];
-  /**
-   * How the memory brief refuses: `transport` is an unreachable server, which
-   * the reply is expected to survive, and `revoked` is the server's verdict on
-   * the claim, which it is not.
-   */
-  memoryBriefFails?: "transport" | "revoked";
+  /** The attachment download answers 500, so the setup fails before any turn. */
+  attachmentFails?: boolean;
   /**
    * Reactions to wait for before the server closes: the acknowledgement is
    * deliberately off the reply's critical path, so nothing else waits for it.
@@ -280,14 +268,6 @@ describe("DM reply worktree allocation", () => {
     };
     let completed = "";
     let turns = 0;
-    const memory = {
-      protocol: 1,
-      memorySpaceId: crypto.randomUUID(),
-      memoryRevision: 1n,
-      revocationEpoch: 1n,
-      searchEnabled: false,
-      briefState: DmMemoryBriefState.DISABLED,
-    };
 
     const adapter = connectNodeAdapter({
       routes: (router) => {
@@ -298,29 +278,6 @@ describe("DM reply worktree allocation", () => {
                 new Date("2099-01-01T00:00:00Z"),
               ),
             }),
-          getDmMemoryBrief: async () => {
-            calls.push("memory-brief");
-            await holdStep("memory-brief");
-            events.push("memory-brief:end");
-            if (input.memoryBriefFails === "transport") {
-              throw new ConnectError(
-                "synthetic memory brief outage",
-                Code.Unavailable,
-              );
-            }
-            return create(GetDmMemoryBriefResponseSchema, {
-              // A revoked scope answers with an epoch the claim cannot accept.
-              memory: input.memoryBriefFails === "revoked"
-                ? { ...memory, revocationEpoch: memory.revocationEpoch + 1n }
-                : memory,
-            });
-          },
-          checkDmMemoryClaim: async () => {
-            calls.push("memory-check");
-            await holdStep("memory-check");
-            events.push("memory-check:end");
-            return create(CheckDmMemoryClaimResponseSchema, { memory });
-          },
           ...(input.steerFold === undefined ? {} : {
             /*
               The reply asks once, right before its first provider turn. An
@@ -379,6 +336,11 @@ describe("DM reply worktree allocation", () => {
           calls.push("attachment");
           await holdStep("attachment");
           events.push("attachment:end");
+          if (input.attachmentFails) {
+            reply.writeHead(500);
+            reply.end();
+            return;
+          }
           const body = Buffer.from(attachmentBody, "utf8");
           reply.writeHead(200, {
             "Content-Type": "text/plain",
@@ -470,7 +432,6 @@ describe("DM reply worktree allocation", () => {
       claimedAt: timestampFromDate(new Date("2026-09-09T00:00:00Z")),
       leaseExpiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
       acknowledgementReaction: input.acknowledgementReaction,
-      memory: input.memory ? create(DmMemoryDescriptorSchema, memory) : undefined,
       dmPublicMessageProtocol: input.publicMessages ? 1 : 0,
       triggerAttachments: input.attachment
         ? [{
@@ -727,22 +688,35 @@ describe("DM reply worktree allocation", () => {
   /*
     The provider process is what a "hi" waits on after the setup, and starting
     it needs nothing the setup produces. These hold the shape of that: it runs
-    beside the memory brief, only the first round may use it, and it never
-    outlives the reply.
+    beside the attachment download, only the first round may use it, and it
+    never outlives the reply.
   */
   it("pre-warms the provider process against the rest of the setup", async () => {
     const observed = await exercise({
       prewarm: true,
-      memory: true,
-      hold: ["memory-brief", "prewarm"],
+      attachment: true,
+      hold: ["attachment", "prewarm"],
       provider: async () => turnResult(answer),
     });
 
     expect(observed.failure).toBeUndefined();
-    // The barrier only opens when both have started, so a setup that waited
-    // for the brief before pre-warming could not have got here.
-    expect(observed.events).toContain("prewarm:end");
-    expect(observed.events).toContain("memory-brief:end");
+    // Each one started before the other could finish: serialized, the second
+    // start could only follow the first end.
+    expect(observed.events.indexOf("prewarm:start")).toBeLessThan(
+      observed.events.indexOf("attachment:end"),
+    );
+    expect(observed.events.indexOf("attachment:start")).toBeLessThan(
+      observed.events.indexOf("prewarm:end"),
+    );
+    // Both results are still owed before the model runs.
+    expect(observed.events.indexOf("attachment:end")).toBeLessThan(
+      observed.events.indexOf("turn:1"),
+    );
+    expect(observed.events.indexOf("prewarm:end")).toBeLessThan(
+      observed.events.indexOf("turn:1"),
+    );
+    // The downloaded file reached the prompt, so the parallel step really ran.
+    expect(observed.prompts[0]).toContain(".briar-channel-attachments");
     expect(observed.prewarmRequests).toEqual([
       {
         workspacePath: join(root, "worker-sessions", `channel-${observed.sessionId}`),
@@ -774,8 +748,8 @@ describe("DM reply worktree allocation", () => {
   it("kills the pre-warmed process when the reply fails before its turn", async () => {
     const observed = await exercise({
       prewarm: true,
-      memory: true,
-      memoryBriefFails: "revoked",
+      attachment: true,
+      attachmentFails: true,
       provider: async () => turnResult(answer),
     });
 
@@ -882,7 +856,7 @@ describe("DM reply worktree allocation", () => {
   });
 
   /*
-    The reaction used to wait for routing, the worktree, the memory brief and a
+    The reaction used to wait for routing, the worktree, the setup and a
     whole provider turn of its own, so it reached the person about 48 seconds
     after they sent the message. The server now picks the emoji at receipt, and
     this placeholder — the fallback for a selection that failed — is published
@@ -890,7 +864,7 @@ describe("DM reply worktree allocation", () => {
   */
   it("publishes the placeholder before the reply asks the server for anything else", async () => {
     const observed = await exercise({
-      memory: true,
+      attachment: true,
       expectReactions: 1,
       provider: async () => turnResult(answer),
     });
@@ -898,7 +872,7 @@ describe("DM reply worktree allocation", () => {
     expect(observed.failure).toBeUndefined();
     expect(observed.reactions).toEqual(["👀"]);
     expect(observed.calls.indexOf("reaction:👀")).toBeLessThan(
-      observed.calls.indexOf("memory-brief"),
+      observed.calls.indexOf("attachment"),
     );
     // Nothing else is published: the contextual emoji is the server's, and no
     // round of this reply is spent choosing one.
@@ -906,140 +880,29 @@ describe("DM reply worktree allocation", () => {
     expect(observed.turns).toBe(1);
   });
 
-  /*
-    Even with no checkout to make, a DM used to spend 15–30 seconds between its
-    claim and `turn.started` because every setup step waited for the one before
-    it. These tests hold the shape that fixed it: the steps that do not depend
-    on each other are in flight together, and the turn still waits for all of
-    them.
-  */
-  it("runs the memory brief and the attachment download against each other", async () => {
+  it("cleans a created message invocation up when the setup fails", async () => {
     const observed = await exercise({
-      memory: true,
       attachment: true,
-      hold: ["memory-brief", "attachment"],
-      provider: async () => turnResult(answer),
-    });
-
-    expect(observed.failure).toBeUndefined();
-    // Each one started before the other could finish: serialized, the second
-    // start could only follow the first end.
-    expect(observed.events.indexOf("memory-brief:start")).toBeLessThan(
-      observed.events.indexOf("attachment:end"),
-    );
-    expect(observed.events.indexOf("attachment:start")).toBeLessThan(
-      observed.events.indexOf("memory-brief:end"),
-    );
-    // Both results are still owed before the model runs.
-    expect(observed.events.indexOf("memory-brief:end")).toBeLessThan(
-      observed.events.indexOf("turn:1"),
-    );
-    expect(observed.events.indexOf("attachment:end")).toBeLessThan(
-      observed.events.indexOf("turn:1"),
-    );
-    // The downloaded file reached the prompt, so the parallel step really ran.
-    expect(observed.prompts[0]).toContain(".briar-channel-attachments");
-  });
-
-  /*
-    The memory claim check that used to open round one is the same fence, moved:
-    it now runs inside the setup, beside the steps that do not need it, instead
-    of costing a serial round trip once they are all finished. M07 needs it
-    before the first provider turn either way.
-  */
-  it("checks the memory claim before the first turn, beside the other setup", async () => {
-    const observed = await exercise({
-      memory: true,
-      attachment: true,
-      hold: ["memory-check", "attachment"],
-      provider: async () => turnResult(answer),
-    });
-
-    expect(observed.failure).toBeUndefined();
-    // The attachment download was already in flight when the check ran, which
-    // it could not be if the check waited for the whole setup to finish.
-    expect(observed.events.indexOf("attachment:start")).toBeLessThan(
-      observed.events.indexOf("memory-check:end"),
-    );
-    expect(observed.calls.indexOf("memory-check")).toBeLessThan(
-      observed.calls.indexOf("turn:1"),
-    );
-    // Round one asks nothing further; a later round still checks in the loop.
-    const beforeFirstTurn = observed.calls.slice(
-      0,
-      observed.calls.indexOf("turn:1"),
-    );
-    expect(beforeFirstTurn.filter((call) => call === "memory-check")).toHaveLength(1);
-  });
-
-  it("checks the memory claim again on a continuation round", async () => {
-    const observed = await exercise({
-      memory: true,
-      // Unparseable output, so round two is a repair continuation rather than
-      // anything that would publish activity of its own.
-      provider: async (_turn, number) =>
-        number === 1 ? turnResult("not a channel reply") : turnResult(answer),
-    });
-
-    expect(observed.failure).toBeUndefined();
-    expect(observed.turns).toBe(2);
-    const between = observed.calls.slice(
-      observed.calls.indexOf("turn:1") + 1,
-      observed.calls.indexOf("turn:2"),
-    );
-    expect(between).toEqual(["memory-check"]);
-  });
-
-  it("cleans a created message invocation up when the memory brief is revoked", async () => {
-    const observed = await exercise({
-      memory: true,
+      attachmentFails: true,
       publicMessages: true,
-      memoryBriefFails: "revoked",
       provider: async () => turnResult(answer),
     });
 
-    // A revocation is the server's answer, not a stall: the reply still stops
-    // before the model is asked anything.
+    // The reply stops before the model is asked anything.
     expect(observed.failure).toMatchObject({
-      message: "memory_scope_revoked",
+      message: "Channel reply attachment download failed (500)",
     });
     expect(observed.turns).toBe(0);
-    // The message invocation was created beside the failing brief. Its journal
-    // owner is released only by `cleanup()`, so its absence is the proof that
-    // the relay socket and its private directory went with it.
-    expect(observed.calls).toContain("memory-brief");
+    // The message invocation was created beside the failing download. Its
+    // journal owner is released only by `cleanup()`, so its absence is the
+    // proof that the relay socket and its private directory went with it.
+    expect(observed.calls).toContain("attachment");
     await expect(
       stat(join(publicationJournalDirectory(observed.workId), "owner.json")),
     ).rejects.toThrow();
     await expect(
       stat(publicationJournalDirectory(observed.workId)),
     ).resolves.toBeDefined();
-  });
-
-  /*
-    The other half of the same claim: a brief the server cannot answer at all
-    used to fail the whole reply, so a DM whose memory space held nothing lost
-    its answer to a 7 s stall (2026-09-09).
-  */
-  it("answers without the brief when it keeps failing at the transport", async () => {
-    const observed = await exercise({
-      memory: true,
-      memoryBriefFails: "transport",
-      provider: async () => turnResult(answer),
-    });
-
-    expect(observed.failure).toBeUndefined();
-    expect(observed.turns).toBe(1);
-    // Three attempts inside the one setup step, not three claims.
-    expect(observed.calls.filter((call) => call === "memory-brief")).toHaveLength(3);
-    expect(observed.prompts[0]).toContain(
-      "The memory brief could not be loaded for this reply.",
-    );
-    expect(observed.completed).toContain("A synthetic answer");
-    expect(observed.logs.some((line) =>
-      line.startsWith("channel reply setup:") &&
-      line.includes(`"memoryBrief":"unavailable"`)
-    )).toBe(true);
   });
 
   /*
@@ -1060,7 +923,6 @@ describe("DM reply worktree allocation", () => {
 
     it("accounts for a completed reply from the person's message to the completion", async () => {
       const observed = await exercise({
-        memory: true,
         attachment: true,
         provider: async () => turnResult(answer),
       });
@@ -1092,7 +954,6 @@ describe("DM reply worktree allocation", () => {
       expect(timeline.setup).toBe(setup.total);
       expect(timeline.steerFolded).toBe(setup.steerFolded);
       expect(timeline.prewarm).toBe(setup.prewarm);
-      expect(timeline.memoryBrief).toBe(setup.memoryBrief);
       // A stretch this reply never had is absent rather than zero: nothing
       // reported a provider boot, so neither line claims one.
       expect(setup).not.toHaveProperty("boot");
@@ -1101,12 +962,14 @@ describe("DM reply worktree allocation", () => {
 
     it("still accounts for a reply that failed before its first turn", async () => {
       const observed = await exercise({
-        memory: true,
-        memoryBriefFails: "revoked",
+        attachment: true,
+        attachmentFails: true,
         provider: async () => turnResult(answer),
       });
 
-      expect(observed.failure).toMatchObject({ message: "memory_scope_revoked" });
+      expect(observed.failure).toMatchObject({
+        message: "Channel reply attachment download failed (500)",
+      });
       const [timeline, ...extra] = timelines(observed.logs);
       expect(extra).toEqual([]);
       expect(timeline).toMatchObject({
@@ -1127,8 +990,8 @@ describe("DM reply worktree allocation", () => {
     */
     it("names a steered reply once the Worker command has the verdict", async () => {
       const observed = await exercise({
-        memory: true,
-        memoryBriefFails: "revoked",
+        attachment: true,
+        attachmentFails: true,
         steerVerdict: "steered",
         provider: async () => turnResult(answer),
       });

@@ -512,7 +512,7 @@ describe("detached Agent runner", () => {
         agent: projectAgent,
         snapshot: { messages: [] },
         workspaceAvailable: true,
-        memoryLearningAvailable: true,
+        memoryVaultAvailable: true,
       }),
       detachedChannelReplyPrompt({
         agent: organizationAgent,

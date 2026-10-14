@@ -63,6 +63,21 @@ describe("Worker runtime protobuf mapping", () => {
     ).toEqual(["codex"]);
   });
 
+  it("reads a stored advertisement carrying the retired D1 memory capabilities", () => {
+    // Workers up to 1.2.232 advertised these; their stored row keeps them
+    // until the next heartbeat rewrites it, and an offline Worker never does.
+    const stored = JSON.parse(workerRuntimeMetadataFromProto(workerRuntimeFixture({ providers: ["codex"] }))
+      .runtimeProtoJson) as { capabilities: Record<string, unknown> };
+    stored.capabilities.dmMemoryProtocol = 1;
+    stored.capabilities.dmMemoryLearningRequests = 1;
+    stored.capabilities.dmMemoryLearning = { protocol: 1, transports: ["agent"], providers: ["AGENT_PROVIDER_CODEX"] };
+
+    const metadata = workerRuntimeMetadataFromStoredProtoJson(JSON.stringify(stored));
+
+    expect(metadata.providers).toEqual(["codex"]);
+    expect(metadata.runtimeProtoJson).not.toContain("dmMemory");
+  });
+
   it("rejects duplicate runtime catalog entries", () => {
     const duplicateCapabilities = workerRuntimeFixture();
     if (!duplicateCapabilities.capabilities) {
