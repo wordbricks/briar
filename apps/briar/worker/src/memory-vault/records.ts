@@ -32,6 +32,14 @@ export type WorkstreamStatus = (typeof WORKSTREAM_STATUSES)[number];
 /** Legacy layout: listed, read and searched; saving moves the record to `workstreams/<id>.md`. */
 export const LEGACY_WORKSTREAM_DIRECTORIES = ["active", "completed"] as const;
 
+/**
+ * Every folder of the layout (`entities/people`, `comms`, …), sorted: the
+ * skeleton the owner's folder tree shows even before a folder holds a record.
+ */
+export const VAULT_FOLDERS: readonly string[] = [...new Set(Object.values(RECORD_TYPES)
+  .filter((template) => template.includes("/"))
+  .map((template) => template.slice(0, template.lastIndexOf("/"))))].sort();
+
 export const README_PATH = "README.md";
 export const PLAYBOOK_ID = "playbook";
 export const VOICE_ID = "voice";

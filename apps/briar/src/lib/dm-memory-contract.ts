@@ -2,6 +2,8 @@ import * as Schema from "effect/Schema";
 
 export const dmMemoryDocumentMaxBytes = 65_536;
 export const dmMemoryPageSize = 50;
+/** Records in one whole-vault (folder tree) list response; `nextCursor` continues past it. */
+export const dmMemoryTreeMaxDocuments = 1000;
 export const dmMemoryClasses = ["profile", "log", "note"] as const;
 export type DmMemoryClass = (typeof dmMemoryClasses)[number];
 
@@ -57,6 +59,15 @@ const documentFields = {
   sourceLanguage: Schema.String, observedAt: Schema.NullOr(Schema.String),
   validUntil: Schema.NullOr(Schema.String), createdAt: Schema.String, updatedAt: Schema.String,
   indexState: Schema.Literals(["pending", "ready", "failed"]),
+  /**
+   * Where the record lives in the vault, its real type and a workstream's
+   * status. Null from servers before the folder tree (the dialog then lists
+   * the record at the root).
+   */
+  path: Schema.NullOr(Schema.String), recordType: Schema.NullOr(Schema.String),
+  recordStatus: Schema.NullOr(Schema.String),
+  /** The app-owned README.md: readable, never edited or deleted. */
+  readOnly: Schema.Boolean,
 };
 export const DmMemoryDocument = Schema.Struct(documentFields);
 export type DmMemoryDocument = typeof DmMemoryDocument.Type;
@@ -82,7 +93,9 @@ export const DmMemoryPage = Schema.Struct({
   eligible: Schema.Boolean,
   capabilities: Schema.Struct({ recall: Schema.Boolean, automaticLearning: Schema.Boolean }),
   spaces: Schema.Array(DmMemorySpace), selectedSpaceId: Schema.NullOr(id),
-  documents: Schema.Array(DmMemoryDocument), nextCursor: Schema.NullOr(id),
+  documents: Schema.Array(DmMemoryDocument), nextCursor: Schema.NullOr(Schema.String),
+  /** The vault's canonical folders for the tree; empty from servers before it. */
+  folders: Schema.Array(Schema.String),
 });
 export type DmMemoryPage = typeof DmMemoryPage.Type;
 

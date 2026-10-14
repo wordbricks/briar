@@ -25,6 +25,11 @@ message ListDmMemoriesRequest {
   string channel_id = 2;
   optional string memory_space_id = 3;
   optional string cursor = 4;
+  // Ask for the whole vault for the folder tree: up to the server's maximum
+  // (dmMemoryTreeMaxDocuments) records in one response, next_cursor past it,
+  // the app-owned README.md first and `folders` filled. Servers before this
+  // field ignore it and page by 50; clients detect that by empty `folders`.
+  bool whole_vault = 5;
 }
 
 message ListDmMemoriesResponse {
@@ -37,6 +42,9 @@ message ListDmMemoriesResponse {
   // Legacy learning status; the vault has no learning jobs.
   reserved 7;
   reserved "learning";
+  // With whole_vault: every canonical folder of the vault layout (spec §5.1),
+  // such as `entities/people`, sorted, whether or not it holds a record.
+  repeated string folders = 8;
 }
 
 message GetDmMemoryDocumentRequest {
@@ -185,6 +193,17 @@ message DmMemoryDocument {
   DmMemoryIndexState index_state = 16;
   optional string body = 17;
   repeated DmMemorySource sources = 18;
+  // The record's file in the vault, such as `knowledge/facts/coffee.md`;
+  // legacy `workstreams/active|completed/` files keep their own path.
+  // Unset from servers before the folder tree.
+  optional string path = 19;
+  // The vault record type (`fact`, `person`, `timeline-daily`, …, or
+  // `readme`). A string because the type set grows with the lookup table.
+  optional string record_type = 20;
+  // A workstream's status: `active`, `completed` or `someday`.
+  optional string record_status = 21;
+  // An application-owned file (README.md): readable, never edited or deleted.
+  bool read_only = 22;
 }
 
 message DmMemorySourceMessage {

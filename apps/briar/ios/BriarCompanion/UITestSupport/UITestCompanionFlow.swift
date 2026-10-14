@@ -455,9 +455,28 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             )
             document.updatedAt = document.createdAt
             document.indexState = .ready
+            document.path = "entities/people/synthetic-memory.md"
+            document.recordType = "person"
             if detail {
                 document.body = "합성 데이터: 설명은 결론부터 제시한다."
             }
+            return document
+        }
+
+        static let readmeDocumentID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+
+        /// The app-owned README.md the folder tree lists first, read only.
+        private func readmeDocument(detail: Bool) -> BriarAPI_DmMemoryDocument {
+            var document = memoryDocument(detail: false, version: 1)
+            document.id = Self.readmeDocumentID
+            document.title = "README.md"
+            document.memoryClass = .note
+            document.evidenceType = .observed
+            document.protectedByUser = false
+            document.path = "README.md"
+            document.recordType = "readme"
+            document.readOnly = true
+            if detail { document.body = "# Memory vault\n\n합성 안내 파일." }
             return document
         }
 
@@ -482,13 +501,22 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             space.updatedAt = space.createdAt
             response.spaces = [space]
             response.selectedSpaceID = space.id
-            response.documents = memoryDeleted ? [] : [memoryDocument(detail: false)]
+            response.documents = [readmeDocument(detail: false)]
+                + (memoryDeleted ? [] : [memoryDocument(detail: false)])
+            response.folders = [
+                "browser-guidance/attempts", "comms", "entities/infrastructure", "entities/orgs",
+                "entities/people", "entities/projects", "entities/tools", "knowledge/decisions",
+                "knowledge/facts", "knowledge/lessons", "knowledge/preferences", "knowledge/procedures",
+                "timeline/daily", "timeline/monthly", "timeline/weekly", "workstreams",
+            ]
             return response
         }
 
-        func getDmMemoryDocument() -> BriarAPI_GetDmMemoryDocumentResponse {
+        func getDmMemoryDocument(id: String) -> BriarAPI_GetDmMemoryDocumentResponse {
             var response = BriarAPI_GetDmMemoryDocumentResponse()
-            response.document = memoryDocument(detail: true)
+            response.document = id == Self.readmeDocumentID
+                ? readmeDocument(detail: true)
+                : memoryDocument(detail: true)
             return response
         }
 
@@ -549,7 +577,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             request: BriarAPI_GetDmMemoryDocumentRequest,
             headers _: Connect.Headers = [:]
         ) async -> ResponseMessage<BriarAPI_GetDmMemoryDocumentResponse> {
-            var response = await scenario.getDmMemoryDocument()
+            var response = await scenario.getDmMemoryDocument(id: request.documentID)
             if request.hasVersion {
                 response.document.version = request.version
             }

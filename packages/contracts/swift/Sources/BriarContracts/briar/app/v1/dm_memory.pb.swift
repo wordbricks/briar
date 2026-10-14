@@ -371,6 +371,12 @@ public nonisolated struct BriarAPI_ListDmMemoriesRequest: Sendable {
   /// Clears the value of `cursor`. Subsequent reads from it will return its default value.
   public mutating func clearCursor() {self._cursor = nil}
 
+  /// Ask for the whole vault for the folder tree: up to the server's maximum
+  /// (dmMemoryTreeMaxDocuments) records in one response, next_cursor past it,
+  /// the app-owned README.md first and `folders` filled. Servers before this
+  /// field ignore it and page by 50; clients detect that by empty `folders`.
+  public var wholeVault: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -416,6 +422,10 @@ public nonisolated struct BriarAPI_ListDmMemoriesResponse: Sendable {
   public var hasNextCursor: Bool {self._nextCursor != nil}
   /// Clears the value of `nextCursor`. Subsequent reads from it will return its default value.
   public mutating func clearNextCursor() {self._nextCursor = nil}
+
+  /// With whole_vault: every canonical folder of the vault layout (spec §5.1),
+  /// such as `entities/people`, sorted, whether or not it holds a record.
+  public var folders: [String] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1002,6 +1012,45 @@ public nonisolated struct BriarAPI_DmMemoryDocument: @unchecked Sendable {
     set {_uniqueStorage()._sources = newValue}
   }
 
+  /// The record's file in the vault, such as `knowledge/facts/coffee.md`;
+  /// legacy `workstreams/active|completed/` files keep their own path.
+  /// Unset from servers before the folder tree.
+  public var path: String {
+    get {_storage._path ?? String()}
+    set {_uniqueStorage()._path = newValue}
+  }
+  /// Returns true if `path` has been explicitly set.
+  public var hasPath: Bool {_storage._path != nil}
+  /// Clears the value of `path`. Subsequent reads from it will return its default value.
+  public mutating func clearPath() {_uniqueStorage()._path = nil}
+
+  /// The vault record type (`fact`, `person`, `timeline-daily`, …, or
+  /// `readme`). A string because the type set grows with the lookup table.
+  public var recordType: String {
+    get {_storage._recordType ?? String()}
+    set {_uniqueStorage()._recordType = newValue}
+  }
+  /// Returns true if `recordType` has been explicitly set.
+  public var hasRecordType: Bool {_storage._recordType != nil}
+  /// Clears the value of `recordType`. Subsequent reads from it will return its default value.
+  public mutating func clearRecordType() {_uniqueStorage()._recordType = nil}
+
+  /// A workstream's status: `active`, `completed` or `someday`.
+  public var recordStatus: String {
+    get {_storage._recordStatus ?? String()}
+    set {_uniqueStorage()._recordStatus = newValue}
+  }
+  /// Returns true if `recordStatus` has been explicitly set.
+  public var hasRecordStatus: Bool {_storage._recordStatus != nil}
+  /// Clears the value of `recordStatus`. Subsequent reads from it will return its default value.
+  public mutating func clearRecordStatus() {_uniqueStorage()._recordStatus = nil}
+
+  /// An application-owned file (README.md): readable, never edited or deleted.
+  public var readOnly: Bool {
+    get {_storage._readOnly}
+    set {_uniqueStorage()._readOnly = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1091,7 +1140,7 @@ nonisolated extension BriarAPI_DmMemoryRevisionOrigin: SwiftProtobuf._ProtoNameP
 
 nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListDmMemoriesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}memory_space_id\0\u{1}cursor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}memory_space_id\0\u{1}cursor\0\u{3}whole_vault\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1103,6 +1152,7 @@ nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, Swi
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._memorySpaceID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._cursor) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.wholeVault) }()
       default: break
       }
     }
@@ -1125,6 +1175,9 @@ nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, Swi
     try { if let v = self._cursor {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
+    if self.wholeVault != false {
+      try visitor.visitSingularBoolField(value: self.wholeVault, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1133,6 +1186,7 @@ nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, Swi
     if lhs.channelID != rhs.channelID {return false}
     if lhs._memorySpaceID != rhs._memorySpaceID {return false}
     if lhs._cursor != rhs._cursor {return false}
+    if lhs.wholeVault != rhs.wholeVault {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1140,7 +1194,7 @@ nonisolated extension BriarAPI_ListDmMemoriesRequest: SwiftProtobuf.Message, Swi
 
 nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListDmMemoriesResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}eligible\0\u{1}capabilities\0\u{1}spaces\0\u{3}selected_space_id\0\u{1}documents\0\u{3}next_cursor\0\u{b}learning\0\u{c}\u{7}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}eligible\0\u{1}capabilities\0\u{1}spaces\0\u{3}selected_space_id\0\u{1}documents\0\u{3}next_cursor\0\u{2}\u{2}folders\0\u{b}learning\0\u{c}\u{7}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1154,6 +1208,7 @@ nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, Sw
       case 4: try { try decoder.decodeSingularStringField(value: &self._selectedSpaceID) }()
       case 5: try { try decoder.decodeRepeatedMessageField(value: &self.documents) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._nextCursor) }()
+      case 8: try { try decoder.decodeRepeatedStringField(value: &self.folders) }()
       default: break
       }
     }
@@ -1182,6 +1237,9 @@ nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, Sw
     try { if let v = self._nextCursor {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
     } }()
+    if !self.folders.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.folders, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1192,6 +1250,7 @@ nonisolated extension BriarAPI_ListDmMemoriesResponse: SwiftProtobuf.Message, Sw
     if lhs._selectedSpaceID != rhs._selectedSpaceID {return false}
     if lhs.documents != rhs.documents {return false}
     if lhs._nextCursor != rhs._nextCursor {return false}
+    if lhs.folders != rhs.folders {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1989,7 +2048,7 @@ nonisolated extension BriarAPI_DmMemorySpace: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension BriarAPI_DmMemoryDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DmMemoryDocument"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}memory_space_id\0\u{1}kind\0\u{1}title\0\u{1}version\0\u{1}status\0\u{1}conflicted\0\u{3}memory_class\0\u{3}evidence_type\0\u{3}protected_by_user\0\u{3}source_language\0\u{3}observed_at\0\u{3}valid_until\0\u{3}created_at\0\u{3}updated_at\0\u{3}index_state\0\u{1}body\0\u{1}sources\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}memory_space_id\0\u{1}kind\0\u{1}title\0\u{1}version\0\u{1}status\0\u{1}conflicted\0\u{3}memory_class\0\u{3}evidence_type\0\u{3}protected_by_user\0\u{3}source_language\0\u{3}observed_at\0\u{3}valid_until\0\u{3}created_at\0\u{3}updated_at\0\u{3}index_state\0\u{1}body\0\u{1}sources\0\u{1}path\0\u{3}record_type\0\u{3}record_status\0\u{3}read_only\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -2010,6 +2069,10 @@ nonisolated extension BriarAPI_DmMemoryDocument: SwiftProtobuf.Message, SwiftPro
     var _indexState: BriarAPI_DmMemoryIndexState = .unspecified
     var _body: String? = nil
     var _sources: [BriarAPI_DmMemorySource] = []
+    var _path: String? = nil
+    var _recordType: String? = nil
+    var _recordStatus: String? = nil
+    var _readOnly: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -2038,6 +2101,10 @@ nonisolated extension BriarAPI_DmMemoryDocument: SwiftProtobuf.Message, SwiftPro
       _indexState = source._indexState
       _body = source._body
       _sources = source._sources
+      _path = source._path
+      _recordType = source._recordType
+      _recordStatus = source._recordStatus
+      _readOnly = source._readOnly
     }
   }
 
@@ -2074,6 +2141,10 @@ nonisolated extension BriarAPI_DmMemoryDocument: SwiftProtobuf.Message, SwiftPro
         case 16: try { try decoder.decodeSingularEnumField(value: &_storage._indexState) }()
         case 17: try { try decoder.decodeSingularStringField(value: &_storage._body) }()
         case 18: try { try decoder.decodeRepeatedMessageField(value: &_storage._sources) }()
+        case 19: try { try decoder.decodeSingularStringField(value: &_storage._path) }()
+        case 20: try { try decoder.decodeSingularStringField(value: &_storage._recordType) }()
+        case 21: try { try decoder.decodeSingularStringField(value: &_storage._recordStatus) }()
+        case 22: try { try decoder.decodeSingularBoolField(value: &_storage._readOnly) }()
         default: break
         }
       }
@@ -2140,6 +2211,18 @@ nonisolated extension BriarAPI_DmMemoryDocument: SwiftProtobuf.Message, SwiftPro
       if !_storage._sources.isEmpty {
         try visitor.visitRepeatedMessageField(value: _storage._sources, fieldNumber: 18)
       }
+      try { if let v = _storage._path {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 19)
+      } }()
+      try { if let v = _storage._recordType {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 20)
+      } }()
+      try { if let v = _storage._recordStatus {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 21)
+      } }()
+      if _storage._readOnly != false {
+        try visitor.visitSingularBoolField(value: _storage._readOnly, fieldNumber: 22)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -2167,6 +2250,10 @@ nonisolated extension BriarAPI_DmMemoryDocument: SwiftProtobuf.Message, SwiftPro
         if _storage._indexState != rhs_storage._indexState {return false}
         if _storage._body != rhs_storage._body {return false}
         if _storage._sources != rhs_storage._sources {return false}
+        if _storage._path != rhs_storage._path {return false}
+        if _storage._recordType != rhs_storage._recordType {return false}
+        if _storage._recordStatus != rhs_storage._recordStatus {return false}
+        if _storage._readOnly != rhs_storage._readOnly {return false}
         return true
       }
       if !storagesAreEqual {return false}

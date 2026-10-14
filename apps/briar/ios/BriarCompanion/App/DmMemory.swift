@@ -45,6 +45,94 @@ private extension BriarAPI_DmMemoryRevisionOrigin {
     }
 }
 
+/// The owner's memory vault as a folder tree: the layout's folders (sent by
+/// the server, so empty ones show too), legacy folders that exist only because
+/// a file lives there, and every record file at its vault path. A server before
+/// the folder tree sends no folders or paths; its records then sit at the root
+/// under their titles, which is the flat list the tree replaces.
+indirect enum DmMemoryTreeNode: Identifiable, Equatable {
+    case folder(key: String, name: String, children: [DmMemoryTreeNode], fileCount: Int)
+    case file(key: String, name: String, document: DmMemoryDocument)
+
+    var id: String {
+        switch self {
+        case let .folder(key, _, _, _): "folder:" + key
+        case let .file(key, _, _): "file:" + key
+        }
+    }
+
+    var name: String {
+        switch self {
+        case let .folder(_, name, _, _), let .file(_, name, _): name
+        }
+    }
+
+    var fileCount: Int {
+        switch self {
+        case let .folder(_, _, _, count): count
+        case .file: 1
+        }
+    }
+
+    static let rootName = "memory"
+
+    static func tree(folders: [String], documents: [DmMemoryDocument]) -> DmMemoryTreeNode {
+        final class Folder {
+            let key: String
+            let name: String
+            var folders: [String: Folder] = [:]
+            var files: [DmMemoryTreeNode] = []
+            init(key: String, name: String) { self.key = key; self.name = name }
+        }
+        let root = Folder(key: "", name: rootName)
+        func folder(at path: Substring) -> Folder {
+            var current = root
+            for segment in path.split(separator: "/") {
+                let name = String(segment)
+                if let next = current.folders[name] { current = next; continue }
+                let next = Folder(key: current.key.isEmpty ? name : current.key + "/" + name, name: name)
+                current.folders[name] = next
+                current = next
+            }
+            return current
+        }
+        for path in folders { _ = folder(at: Substring(path)) }
+        for document in documents {
+            guard document.hasPath else {
+                root.files.append(.file(key: "#" + document.id, name: document.title, document: document))
+                continue
+            }
+            let path = document.path
+            if let slash = path.lastIndex(of: "/") {
+                folder(at: path[..<slash]).files.append(
+                    .file(key: path, name: String(path[path.index(after: slash)...]), document: document)
+                )
+            } else {
+                root.files.append(.file(key: path, name: path, document: document))
+            }
+        }
+        func freeze(_ folder: Folder) -> DmMemoryTreeNode {
+            let subfolders = folder.folders.values.sorted { $0.name < $1.name }.map(freeze)
+            let files = folder.files.sorted { $0.name < $1.name }
+            return .folder(
+                key: folder.key, name: folder.name, children: subfolders + files,
+                fileCount: files.count + subfolders.reduce(0) { $0 + $1.fileCount }
+            )
+        }
+        return freeze(root)
+    }
+}
+
+extension DmMemoryDocument {
+    /// The quiet label beside a file: its real type, a workstream's status and the revision.
+    var treeDetails: [String] {
+        // A server before the folder tree sends no record type, only the legacy class.
+        let type = hasRecordType ? recordType : memoryClass.label
+        if readOnly { return [type] }
+        return [type] + (hasRecordStatus ? [recordStatus] : []) + ["r\(version)"]
+    }
+}
+
 struct DmMemoryWrite: Sendable, Equatable {
     var requestId = UUID().uuidString.lowercased()
     var memorySpaceId: String?
@@ -95,6 +183,7 @@ final class DmMemoryStore: ObservableObject, Identifiable {
         request.channelID = channelID
         if let spaceID { request.memorySpaceID = spaceID }
         if let cursor { request.cursor = cursor }
+        request.wholeVault = true
         let result = try await service.listDmMemories(request: request, headers: [:]).briarValue()
         try requireScope()
         return result
@@ -265,6 +354,8 @@ struct DmMemoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: Draft?
     @State private var error: String?
+    /// Folders the user opened or closed; the rest follow whether they hold files.
+    @State private var expansion: [String: Bool] = [:]
     private struct Draft: Identifiable { let id = UUID(); let document: DmMemoryDocument? }
     private func text(_ ko: String, _ en: String) -> String { locale == .ko ? ko : en }
 
@@ -318,28 +409,23 @@ struct DmMemoryView: View {
                                   "Enable memory use first. When on, the Agent saves what is worth keeping from this conversation on its own. When off, it saves only when you ask. It does not change memories you edited unless you ask."))
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    Section(text("저장된 기억", "Saved memories")) {
-                        if page.documents.isEmpty { Text(text("저장된 기억이 없습니다.", "No saved memories.")) }
-                        ForEach(page.documents, id: \.id) { document in
-                            Button {
-                                Task {
-                                    do { draft = Draft(document: try await store.document(document.id)) }
-                                    catch { self.error = error.localizedDescription }
-                                }
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(document.title).foregroundStyle(.primary)
-                                    Text("\(document.memoryClass.label) · v\(document.version)")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                    if document.protectedByUser { Text(text("사용자 보호", "User protected")).font(.caption) }
-                                }
-                            }
-                            .accessibilityIdentifier("dm-memory-document-" + document.id)
-                            .swipeActions {
-                                Button(text("기억에서 삭제", "Forget"), role: .destructive) {
-                                    Task { await store.forget(document.id) }
-                                }
-                            }
+                    Section(text("기억 폴더", "Memory folders")) {
+                        if !page.documents.contains(where: { !$0.readOnly }) {
+                            Text(text("저장된 기억이 없습니다.", "No saved memories."))
+                        }
+                        if page.eligible || store.space != nil {
+                            DmMemoryTreeRow(
+                                node: DmMemoryTreeNode.tree(folders: page.folders, documents: page.documents),
+                                expansion: $expansion,
+                                locale: locale,
+                                open: { document in
+                                    Task {
+                                        do { draft = Draft(document: try await store.document(document.id)) }
+                                        catch { self.error = error.localizedDescription }
+                                    }
+                                },
+                                forget: { document in Task { await store.forget(document.id) } }
+                            )
                         }
                         if page.hasNextCursor {
                             Button(text("더 보기", "Load more")) { Task { await store.load(more: true) } }
@@ -387,6 +473,72 @@ struct DmMemoryView: View {
     }
 }
 
+/// One node of the folder tree: a folder as a `DisclosureGroup` (open while it
+/// holds files unless the user closed it, dimmed when empty), a file as a row
+/// that opens the detail screen.
+private struct DmMemoryTreeRow: View {
+    let node: DmMemoryTreeNode
+    @Binding var expansion: [String: Bool]
+    let locale: CompanionLocale
+    let open: (DmMemoryDocument) -> Void
+    let forget: (DmMemoryDocument) -> Void
+    private func text(_ ko: String, _ en: String) -> String { locale == .ko ? ko : en }
+
+    var body: some View {
+        switch node {
+        case let .folder(key, name, children, fileCount):
+            let identifier = "dm-memory-folder-" + (key.isEmpty ? DmMemoryTreeNode.rootName : key)
+            // The identifier goes on the label: on the DisclosureGroup it would replace every descendant's.
+            if children.isEmpty {
+                folderLabel(name: name, fileCount: fileCount, expanded: false)
+                    .accessibilityIdentifier(identifier)
+            } else {
+                DisclosureGroup(isExpanded: Binding(
+                    get: { expansion[key] ?? (key.isEmpty || fileCount > 0) },
+                    set: { expansion[key] = $0 }
+                )) {
+                    ForEach(children) { child in
+                        DmMemoryTreeRow(node: child, expansion: $expansion, locale: locale, open: open, forget: forget)
+                    }
+                } label: {
+                    folderLabel(name: name, fileCount: fileCount, expanded: expansion[key] ?? (key.isEmpty || fileCount > 0))
+                        .accessibilityIdentifier(identifier)
+                }
+            }
+        case let .file(_, name, document):
+            let details = document.treeDetails
+                + (document.readOnly ? [text("읽기 전용", "Read only")] : [])
+                + (document.protectedByUser ? [text("사용자 보호", "User protected")] : [])
+            Button { open(document) } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(name, systemImage: "doc.text")
+                        .font(.body.monospaced())
+                        .foregroundStyle(.primary)
+                    Text(details.joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .padding(.leading, 28)
+                }
+            }
+            .accessibilityIdentifier("dm-memory-document-" + document.id)
+            .swipeActions {
+                if !document.readOnly {
+                    Button(text("기억에서 삭제", "Forget"), role: .destructive) { forget(document) }
+                }
+            }
+        }
+    }
+
+    private func folderLabel(name: String, fileCount: Int, expanded: Bool) -> some View {
+        HStack(spacing: 6) {
+            Label(name, systemImage: expanded ? "folder.fill" : "folder")
+                .font(.body.monospaced().weight(fileCount > 0 ? .semibold : .regular))
+            if fileCount > 0 { Text("\(fileCount)").font(.caption).foregroundStyle(.secondary) }
+        }
+        .foregroundStyle(fileCount > 0 ? .primary : .secondary)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct DmMemoryEditor: View {
     @ObservedObject var store: DmMemoryStore
     let document: DmMemoryDocument?
@@ -402,33 +554,51 @@ private struct DmMemoryEditor: View {
             memoryClass: document?.memoryClass ?? .profile
         ))
     }
+    /// README.md belongs to the app: shown, never edited, versioned or forgotten.
+    private var readOnly: Bool { document?.readOnly == true }
+
     var body: some View {
         NavigationStack {
             Form {
                 if let error = store.errorMessage { Text(error).foregroundStyle(.red) }
-                Section {
-                    TextField(text("제목", "Title"), text: $draft.title)
-                    TextEditor(text: $draft.body).frame(minHeight: 160).accessibilityLabel(text("기억 본문", "Memory text"))
-                    Text("\(draft.body.utf8.count) / 65536 bytes").font(.caption)
-                    Picker(text("분류", "Category"), selection: $draft.memoryClass) {
-                        ForEach([BriarAPI_DmMemoryClass.profile, .log, .note], id: \.rawValue) {
-                            Text($0.label)
-                        }
+                if let document, document.hasPath {
+                    Text(document.path).font(.caption.monospaced()).foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("dm-memory-path")
+                }
+                if readOnly, let document {
+                    Section {
+                        Text(text("앱이 관리하는 안내 파일입니다. 읽을 수만 있고 편집하거나 삭제할 수 없습니다.",
+                                  "The app maintains this guide. You can read it but not edit or delete it."))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(document.body).font(.callout.monospaced()).textSelection(.enabled)
+                            .accessibilityIdentifier("dm-memory-readonly-body")
                     }
-                }.disabled(!store.writable || store.busy)
-                if let document {
-                    Section(text("근거", "Sources")) {
-                        NavigationLink(text("변경 이력", "Revision history")) {
-                            DmMemoryHistoryView(store: store, documentID: document.id, locale: locale)
+                } else {
+                    Section {
+                        TextField(text("제목", "Title"), text: $draft.title)
+                        TextEditor(text: $draft.body).frame(minHeight: 160).accessibilityLabel(text("기억 본문", "Memory text"))
+                        Text("\(draft.body.utf8.count) / 65536 bytes").font(.caption)
+                        Picker(text("분류", "Category"), selection: $draft.memoryClass) {
+                            ForEach([BriarAPI_DmMemoryClass.profile, .log, .note], id: \.rawValue) {
+                                Text($0.label)
+                            }
                         }
-                        .accessibilityIdentifier("dm-memory-history")
-                        Text(dmMemoryTimestamp(document.updatedAt)).font(.caption)
-                        ForEach(Array(document.sources.enumerated()), id: \.offset) { _, source in
-                            Text("\(source.type.label):\(source.id)@\(source.version)").font(.caption).textSelection(.enabled)
+                    }.disabled(!store.writable || store.busy)
+                    if let document {
+                        Section(text("근거", "Sources")) {
+                            NavigationLink(text("변경 이력", "Revision history")) {
+                                DmMemoryHistoryView(store: store, documentID: document.id, locale: locale)
+                            }
+                            .accessibilityIdentifier("dm-memory-history")
+                            Text(dmMemoryTimestamp(document.updatedAt)).font(.caption)
+                            ForEach(Array(document.sources.enumerated()), id: \.offset) { _, source in
+                                Text("\(source.type.label):\(source.id)@\(source.version)").font(.caption).textSelection(.enabled)
+                            }
+                            Button(text("기억에서 삭제", "Forget memory"), role: .destructive) {
+                                Task { await store.forget(document.id); if store.errorMessage == nil { dismiss() } }
+                            }.disabled(store.busy).accessibilityIdentifier("dm-memory-forget")
                         }
-                        Button(text("기억에서 삭제", "Forget memory"), role: .destructive) {
-                            Task { await store.forget(document.id); if store.errorMessage == nil { dismiss() } }
-                        }.disabled(store.busy).accessibilityIdentifier("dm-memory-forget")
                     }
                 }
             }
@@ -439,8 +609,10 @@ private struct DmMemoryEditor: View {
             }
             .navigationTitle(text("기억", "Memory"))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button(text("닫기", "Close")) { dismiss() } }
-                if store.writable {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(text("닫기", "Close")) { dismiss() }.accessibilityIdentifier("dm-memory-editor-close")
+                }
+                if store.writable && !readOnly {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(store.busy ? text("저장 중", "Saving") : text("저장", "Save")) {
                             Task { if await store.save(draft, documentID: document?.id) { dismiss() } }

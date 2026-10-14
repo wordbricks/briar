@@ -44,6 +44,7 @@ import {
 import { HttpError } from "./http-response";
 import { memoryVaultStoreFromEnv } from "./memory-vault/artifacts-git-store";
 import type { VaultGitStore } from "./memory-vault/git-store";
+import { VAULT_FOLDERS } from "./memory-vault/records";
 import {
   forgetOwnerVaultRecord,
   getOwnerVaultDocument,
@@ -205,6 +206,10 @@ const protoDocument = (
       version: source.version,
     }))
     : [],
+  path: document.path ?? undefined,
+  recordType: document.recordType ?? undefined,
+  recordStatus: document.recordStatus ?? undefined,
+  readOnly: document.readOnly,
 });
 
 const checkedNumber = (value: bigint, field: string) => {
@@ -256,8 +261,9 @@ const createAppDmMemoryService = (
           input.db,
           page.selected,
           request.cursor === undefined ? undefined : opaqueDocumentId(request.cursor),
+          { wholeVault: request.wholeVault },
         )
-      : { documents: [], nextCursor: null };
+      : { documents: [], nextCursor: null, folders: request.wholeVault ? VAULT_FOLDERS : [] };
     return create(DmMemoryService.method.listDmMemories.output, {
       eligible: page.eligible,
       capabilities: { recall: true, automaticLearning: true },
@@ -265,6 +271,7 @@ const createAppDmMemoryService = (
       selectedSpaceId: page.selected?.id,
       documents: vaultPage.documents.map(protoDocument),
       nextCursor: vaultPage.nextCursor ?? undefined,
+      folders: [...vaultPage.folders],
     });
   },
 

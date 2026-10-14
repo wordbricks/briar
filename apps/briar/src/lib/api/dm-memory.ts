@@ -131,6 +131,11 @@ const documentBaseFromProto = (
     : document.indexState === ProtoDmMemoryIndexState.FAILED
     ? "failed"
     : "ready",
+  // Unset from servers before the folder tree; the dialog lists those records at the root.
+  path: document.path ?? null,
+  recordType: document.recordType ?? null,
+  recordStatus: document.recordStatus ?? null,
+  readOnly: document.readOnly,
 });
 
 const documentDetailFromProto = (
@@ -169,6 +174,7 @@ export async function loadDmMemory(
     channelId: scope.channelId,
     memorySpaceId: spaceId,
     cursor,
+    wholeVault: true,
   }, appCallOptions(scope.token, signal));
   return {
     eligible: response.eligible,
@@ -180,6 +186,7 @@ export async function loadDmMemory(
     selectedSpaceId: response.selectedSpaceId ?? null,
     documents: response.documents.map(documentBaseFromProto),
     nextCursor: response.nextCursor ?? null,
+    folders: response.folders,
   };
 }
 
