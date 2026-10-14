@@ -334,6 +334,11 @@ export class MemoryVaultInvocation {
   /** Whether the last answered context gave this run a vault. */
   hasVault() { return this.cached !== null; }
 
+  /** The scope of the last context the server returned (`dm`, `group`, `project`), or null before one / for `none`. */
+  get scopeKind(): string | null {
+    return this.cached?.scopeKind ?? null;
+  }
+
   /**
    * Starts the next turn's context request early, so the first turn of a reply
    * does not wait for it serially. The next `prepareTurn` consumes it.

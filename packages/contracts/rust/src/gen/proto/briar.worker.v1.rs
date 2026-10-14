@@ -34404,6 +34404,18 @@ pub struct ClaimedChannelReply {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub acknowledgement_reaction: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The reply answers a person in a 1:1 DM with this Agent. Its failure text
+    /// and provider block messages can echo the DM, recalled memory or the prompt,
+    /// so the Worker reports only a fixed failure code and the block headline.
+    /// Absent means an older server: the Worker redacts as if true.
+    ///
+    /// Field 37: `direct_message`
+    #[serde(
+        rename = "directMessage",
+        alias = "direct_message",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub direct_message: ::core::option::Option<bool>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -34445,6 +34457,7 @@ impl ::core::fmt::Debug for ClaimedChannelReply {
             .field("dm_public_message_protocol", &self.dm_public_message_protocol)
             .field("routing", &self.routing)
             .field("acknowledgement_reaction", &self.acknowledgement_reaction)
+            .field("direct_message", &self.direct_message)
             .finish()
     }
 }
@@ -34484,6 +34497,13 @@ impl ClaimedChannelReply {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.acknowledgement_reaction = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::direct_message`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_direct_message(mut self, value: bool) -> Self {
+        self.direct_message = Some(value);
         self
     }
 }
@@ -34713,6 +34733,9 @@ impl ::buffa::Message for ClaimedChannelReply {
         if let Some(ref v) = self.acknowledgement_reaction {
             size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if self.direct_message.is_some() {
+            size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -34921,6 +34944,9 @@ impl ::buffa::Message for ClaimedChannelReply {
         }
         if let Some(ref v) = self.acknowledgement_reaction {
             ::buffa::types::put_string_field(36u32, v, buf);
+        }
+        if let Some(v) = self.direct_message {
+            ::buffa::types::put_bool_field(37u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -35266,6 +35292,15 @@ impl ::buffa::Message for ClaimedChannelReply {
                     buf,
                 )?;
             }
+            37u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.direct_message = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -35308,6 +35343,7 @@ impl ::buffa::Message for ClaimedChannelReply {
         self.dm_public_message_protocol = 0u32;
         self.routing = ::buffa::MessageField::none();
         self.acknowledgement_reaction = ::core::option::Option::None;
+        self.direct_message = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -105413,6 +105449,13 @@ pub mod __buffa {
             ///
             /// Field 36: `acknowledgement_reaction`
             pub acknowledgement_reaction: ::core::option::Option<&'a str>,
+            /// The reply answers a person in a 1:1 DM with this Agent. Its failure text
+            /// and provider block messages can echo the DM, recalled memory or the prompt,
+            /// so the Worker reports only a fixed failure code and the block headline.
+            /// Absent means an older server: the Worker redacts as if true.
+            ///
+            /// Field 37: `direct_message`
+            pub direct_message: ::core::option::Option<bool>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ClaimedChannelReplyView<'a> {
@@ -105910,6 +105953,15 @@ pub mod __buffa {
                             ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
+                    37u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.direct_message = Some(
+                            ::buffa::types::decode_bool(&mut cur)?,
+                        );
+                    }
                     21u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -106204,6 +106256,7 @@ pub mod __buffa {
                     acknowledgement_reaction: self
                         .acknowledgement_reaction
                         .map(|s| s.to_string()),
+                    direct_message: self.direct_message,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -106446,6 +106499,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.acknowledgement_reaction {
                     size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if self.direct_message.is_some() {
+                    size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -106659,6 +106715,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.acknowledgement_reaction {
                     ::buffa::types::put_string_field(36u32, v, buf);
+                }
+                if let Some(v) = self.direct_message {
+                    ::buffa::types::put_bool_field(37u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -106881,6 +106940,9 @@ pub mod __buffa {
                 if let ::core::option::Option::Some(__v) = self.acknowledgement_reaction
                 {
                     __map.serialize_entry("acknowledgementReaction", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.direct_message {
+                    __map.serialize_entry("directMessage", &__v)?;
                 }
                 __map.end()
             }
@@ -107255,6 +107317,16 @@ pub mod __buffa {
             #[must_use]
             pub fn acknowledgement_reaction(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().acknowledgement_reaction
+            }
+            /// The reply answers a person in a 1:1 DM with this Agent. Its failure text
+            /// and provider block messages can echo the DM, recalled memory or the prompt,
+            /// so the Worker reports only a fixed failure code and the block headline.
+            /// Absent means an older server: the Worker redacts as if true.
+            ///
+            /// Field 37: `direct_message`
+            #[must_use]
+            pub fn direct_message(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().direct_message
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ClaimedChannelReplyView<'static>>>

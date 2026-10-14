@@ -122,6 +122,7 @@ downloaded. Those are separate records the owner can delete.
 | Purge `last_error` | Artifacts failed mid-rewrite, vault moved | Retried with backoff from the then-current head; vault returns to `active` between attempts. |
 | Reply citations missing | Agent cited a record it did not read on this claim, or an old revision | Dropped by design (logged `memory vault citations rejected`). |
 | Old CLI says nothing about memory | Expected: it has no vault tools | Update the Worker. |
+| A DM reply failed with `memory_reply_failed` | DM failure text is redacted (`ClaimedChannelReply.direct_message`, `src-cli/dm-reply-redaction.ts`): it can echo the DM or memory | The real failure is the Worker's stderr line `channel reply … failed: memory_reply_failed \| <class, codes, stack frames>`. Provider blocks keep reason and provider, with the headline only. |
 
 ## Diagnostics
 

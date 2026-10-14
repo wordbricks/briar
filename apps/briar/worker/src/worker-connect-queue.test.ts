@@ -164,6 +164,7 @@ const unserializableChannelReplyClaim = {
     claimReason: "reason_the_enum_does_not_carry",
   },
   triggerAttachments: [],
+  directMessage: false,
   snapshot: { channel: { id: channelId } },
 };
 

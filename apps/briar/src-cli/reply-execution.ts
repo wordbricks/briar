@@ -21,6 +21,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { replyErrorDiagnostic } from "./reply-error-diagnostic";
+import { dmReplyRedacted, dmReplyRedactedError, dmSafeProviderBlock } from "./dm-reply-redaction";
 import {
   DmMessageInvocation,
   supportsDmMessagePublicationProvider,
@@ -52,6 +53,7 @@ import {
 } from "./agent-runner";
 import { agentImageAttachments } from "../src-agent/runner-attachments";
 import {
+  DetachedProviderBlockedError,
   DetachedProviderStopUnconfirmedError,
   assertDetachedProviderTurnSucceeded,
   detachedProviderBlockOf,
@@ -1233,7 +1235,9 @@ async function runClaimedChannelReplyTurn(
       lastActivityErrorAt = now;
       console.error(
         `channel activity publish failed for ${reply.workId}: ${
-          error instanceof Error ? error.message : String(error)
+          dmReplyRedacted(reply, memoryVault?.scopeKind)
+            ? dmReplyRedactedError(error).message
+            : error instanceof Error ? error.message : String(error)
         } | ${replyErrorDiagnostic(error)}`,
       );
     },
@@ -1912,7 +1916,11 @@ async function runClaimedChannelReplyTurn(
       await writeFile(join(workspacePath, ".briar-stop-unconfirmed"), "provider_stop_unconfirmed\n", { flag: "wx" })
         .catch(() => undefined);
     }
-    throw error;
+    if (
+      !dmReplyRedacted(reply, memoryVault?.scopeKind) ||
+      error instanceof DetachedProviderBlockedError || error instanceof DetachedProviderStopUnconfirmedError
+    ) throw error;
+    throw dmReplyRedactedError(error);
   } finally {
     startedChannelReplyTurns.delete(reply.workId);
     // A pre-warmed process must never outlive the reply that started it, on
@@ -1939,7 +1947,9 @@ async function runClaimedChannelReplyTurn(
         } catch (error) {
           console.error(
             `channel session worktree retention update failed for ${reply.session.id}: ${
-              error instanceof Error ? error.message : String(error)
+              dmReplyRedacted(reply, memoryVault?.scopeKind)
+                ? dmReplyRedactedError(error).message
+                : error instanceof Error ? error.message : String(error)
             } | ${replyErrorDiagnostic(error)}`,
           );
         } finally {
@@ -1956,13 +1966,25 @@ async function runClaimedChannelReplyTurn(
 }
 
 /**
- * What a failed reply tells Briar, and what this Worker logs beside it: the
- * message, and the failure's shape (class, machine codes, stack frames) for
- * the operator.
+ * What a failed reply tells Briar, and what this Worker logs beside it. A
+ * person's DM reports only a fixed code — the message can echo the
+ * conversation, recalled memory or the prompt (`dm-reply-redaction.ts`) — so
+ * the diagnostic is the operator's only account of what actually broke; it
+ * carries the failure's shape and never its text. A provider block reports its
+ * own (headline-only in a DM) block instead of a message.
  */
-export function channelReplyFailureReport(error: unknown) {
+export function channelReplyFailureReport(
+  error: unknown,
+  reply: Pick<ClaimedChannelReply, "directMessage">,
+) {
+  const message = error instanceof Error ? error.message : String(error);
+  const redacted = dmReplyRedacted(reply);
+  const block = detachedProviderBlockOf(error);
   return {
-    reported: error instanceof Error ? error.message : String(error),
+    reported: redacted && !block ? dmReplyRedactedError(error).message : message,
+    // A block names the provider and its reason; in a DM its message is
+    // reduced to the headline, which cannot echo the conversation.
+    block: block && redacted ? dmSafeProviderBlock(block) : block,
     diagnostic: replyErrorDiagnostic(error),
   };
 }
@@ -1976,8 +1998,7 @@ async function failClaimedChannelReply(
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
-  const block = detachedProviderBlockOf(error);
-  const { reported, diagnostic } = channelReplyFailureReport(error);
+  const { reported, block, diagnostic } = channelReplyFailureReport(error, reply);
   console.error(
     `channel reply ${reply.workId} failed: ${reported} | ${diagnostic}`,
   );

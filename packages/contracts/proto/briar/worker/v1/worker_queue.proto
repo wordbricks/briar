@@ -1228,6 +1228,11 @@ message ClaimedChannelReply {
   // one, so a steer restart or a lease-expiry retry neither re-publishes the
   // placeholder nor spends a provider turn choosing the emoji again.
   optional string acknowledgement_reaction = 36;
+  // The reply answers a person in a 1:1 DM with this Agent. Its failure text
+  // and provider block messages can echo the DM, recalled memory or the prompt,
+  // so the Worker reports only a fixed failure code and the block headline.
+  // Absent means an older server: the Worker redacts as if true.
+  optional bool direct_message = 37;
 }
 
 message PublishedDmMessageBatch {

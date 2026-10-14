@@ -154,6 +154,11 @@ type Exercise = {
    * server picks its emoji at receipt, so a claim usually carries one.
    */
   acknowledgementReaction?: string;
+  /**
+   * The claim's `direct_message`. Off by default so these tests can read the
+   * failure itself; a DM reply's failure text is redacted (dm-reply-redaction.ts).
+   */
+  directMessage?: boolean;
   /** Attach one text file to the trigger, so the claim owes a download. */
   attachment?: boolean;
   /**
@@ -432,6 +437,7 @@ describe("DM reply worktree allocation", () => {
       claimedAt: timestampFromDate(new Date("2026-09-09T00:00:00Z")),
       leaseExpiresAt: timestampFromDate(new Date("2099-01-01T00:00:00Z")),
       acknowledgementReaction: input.acknowledgementReaction,
+      directMessage: input.directMessage ?? false,
       dmPublicMessageProtocol: input.publicMessages ? 1 : 0,
       triggerAttachments: input.attachment
         ? [{
@@ -853,6 +859,18 @@ describe("DM reply worktree allocation", () => {
       "A disposable project worktree is available",
     );
     expect(observed.failure).toMatchObject({ message: "repository_unavailable" });
+  });
+
+  it("throws only the redacted code when the same failure happens in a DM", async () => {
+    const observed = await exercise({
+      agentMessageHop: 1,
+      directMessage: true,
+      provider: async () => turnResult(repositoryRequest),
+    });
+    expect(observed.failure).toMatchObject({
+      message: "memory_reply_failed",
+      cause: { message: "repository_unavailable" },
+    });
   });
 
   /*

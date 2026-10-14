@@ -513,7 +513,8 @@ async function claimedChannelReplyPayload(
     })).map(agentMessageTargetJson)
     : [];
   // An Agent-to-Agent DM has no owner, so it can never carry DM memory.
-  const memoryBinding = channel.kind === "dm" && !agentDirectMessage
+  const personDirectMessage = channel.kind === "dm" && !agentDirectMessage;
+  const memoryBinding = personDirectMessage
     ? await bindDmMemoryReplyClaim(db, {
         jobId: job.id,
         claimTokenHash,
@@ -638,6 +639,12 @@ async function claimedChannelReplyPayload(
     leaseExpiresAt: job.lease_expires_at,
     activity,
     acknowledgementReaction: heldAcknowledgement ? heldAcknowledgement.emoji : null,
+    /*
+      Every person's DM, not only one whose live roster bound a memory space:
+      a superset of the vault's eligibility, so the Worker redacts this reply's
+      failure text whenever it could echo a private conversation.
+    */
+    directMessage: personDirectMessage,
     handoffContext: memoryBinding ? null : handoffContext,
     session: {
       id: job.channel_reply_session.id,

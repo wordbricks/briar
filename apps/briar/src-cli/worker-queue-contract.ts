@@ -542,6 +542,9 @@ export const channelReplyFromProto = (
     // Absent on an older server and on a first attempt alike: either way this
     // claim has no reaction of its own on the trigger message yet.
     acknowledgementReaction: value.acknowledgementReaction ?? null,
+    // A 1:1 DM reply reports only redacted failure text. An older server does
+    // not send the field; `null` is redacted as well (fail closed).
+    directMessage: value.directMessage ?? null,
     organizationContext: value.workspaceContextSnapshotAt
       ? {
           snapshotAt: isoTimestamp(

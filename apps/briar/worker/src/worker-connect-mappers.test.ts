@@ -55,6 +55,7 @@ const channelReply = {
   skillExecutionTarget: null,
   activity: { token: "activity", expiresAt: leaseExpiresAt },
   acknowledgementReaction: null,
+  directMessage: true,
   organizationContext: null,
   delegation: null,
   delegationTargets: [],
@@ -124,6 +125,7 @@ describe("Worker claim protobuf mapper", () => {
     expect(timestampDate(message.work.value.claimedAt!).toISOString()).toBe(
       claimedAt,
     );
+    expect(message.work.value.directMessage).toBe(true);
 
     const executionClaim = claimedWorkFromProto(message);
     expect(executionClaim).toMatchObject({
@@ -135,6 +137,7 @@ describe("Worker claim protobuf mapper", () => {
         retainedUntil: channelReply.session.retainedUntil,
       },
       triggerAttachments: channelReply.triggerAttachments,
+      directMessage: true,
     });
   });
 

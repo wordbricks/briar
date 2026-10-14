@@ -162,6 +162,8 @@ describe("DM memory on the vault", () => {
     const mine = await fixture.claimChannel("dm", fixture.ownerId, "remember");
     expect(mine.claimed).not.toHaveProperty("memory");
     expect(mine.claimed).not.toHaveProperty("memoryLearningEnabled");
+    // Its failure text is redacted by the Worker (dm-reply-redaction.ts).
+    expect(mine.claimed.directMessage).toBe(true);
     expect(await fenceOf(mine.jobId)).toMatchObject({ protocol: 0, space_id: await fixture.spaceOf(mine.channelId) });
     await fixture.setDmMemory(mine.channelId, { use: true, auto: true });
     await save(deps, mine.caller, "secret-plan", "Owner A private plan");
@@ -176,6 +178,7 @@ describe("DM memory on the vault", () => {
     expect(await vaultCode(read(deps, theirs.caller, "secret-plan"))).toBe("not_found");
     const group = await fixture.claimChannel("channel", fixture.ownerId, "hello");
     expect(await fenceOf(group.jobId)).toBeNull();
+    expect(group.claimed.directMessage).toBe(false);
     expect(await listIds(deps, group.caller)).toEqual(["readme"]);
     expect(await vaultCode(read(deps, group.caller, "secret-plan"))).toBe("not_found");
     const run = await fixture.claimIssueRun();
