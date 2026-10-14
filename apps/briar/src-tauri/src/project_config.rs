@@ -1298,6 +1298,11 @@ pub(super) fn install_auto_hunt_assets(
         "agent/computer-use-mcp-server.js",
         "dist-agent/computer-use-mcp-server.js",
     );
+    let memory_tools_source = bundled_path(
+        resource_directory,
+        "agent/memory-tools.js",
+        "dist-agent/memory-tools.js",
+    );
     if !cli_source.is_file() || !launcher_source.is_file() {
         return Err("Briar CLI 번들을 찾지 못했습니다.".to_string());
     }
@@ -1309,6 +1314,7 @@ pub(super) fn install_auto_hunt_assets(
         || !opencode_runner_source.is_file()
         || !pi_runner_source.is_file()
         || !computer_use_mcp_source.is_file()
+        || !memory_tools_source.is_file()
     {
         return Err("Briar Agent runner 번들을 찾지 못했습니다.".to_string());
     }
@@ -1350,6 +1356,10 @@ pub(super) fn install_auto_hunt_assets(
         agent_directory.join("computer-use-mcp-server.js"),
     )
     .map_err(|error| format!("Computer Use MCP 서버를 설치하지 못했습니다: {error}"))?;
+    // Workers look for `tools memory` next to their runners and advertise the
+    // memory vault only when it is there (docs/plans/memory-vault-spec.md §6.1).
+    fs::copy(memory_tools_source, agent_directory.join("memory-tools.js"))
+        .map_err(|error| format!("Memory tools를 설치하지 못했습니다: {error}"))?;
     fs::write(
         library_directory.join("VERSION"),
         format!("{}\n", env!("CARGO_PKG_VERSION")),
@@ -1392,6 +1402,7 @@ pub(super) fn auto_hunt_assets_are_current(resource_directory: &Path, home: &Pat
         && cli_directory.join("agent/agy-runner.js").is_file()
         && cli_directory.join("agent/opencode-runner.js").is_file()
         && cli_directory.join("agent/pi-runner.js").is_file()
+        && cli_directory.join("agent/memory-tools.js").is_file()
         && read_trimmed_file(&cli_directory.join("VERSION")).as_deref()
             == Some(env!("CARGO_PKG_VERSION"));
     if !cli_current {
