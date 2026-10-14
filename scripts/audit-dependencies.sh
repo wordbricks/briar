@@ -5,4 +5,5 @@ set -euo pipefail
 # Keep each GHSA visible here so dependency updates can remove it deliberately.
 bun audit --audit-level high \
   --ignore GHSA-w3rx-r6r6-pgpr \
-  --ignore GHSA-5p2g-fcmc-qvqq
+  --ignore GHSA-5p2g-fcmc-qvqq \
+  --ignore GHSA-vfj7-8cjw-p6xm

@@ -90,3 +90,21 @@ This exception does not lower the gate for any other high or critical advisory.
 The audit runs once without warning denial to keep accepted debt visible, then
 again with `--deny warnings` and this exact allowlist. Vulnerabilities and any
 new unmaintained, unsound, or yanked advisory therefore fail the gate.
+
+## GHSA-vfj7-8cjw-p6xm — temporary landing build exception
+
+- Recorded: 2026-10-14
+- Review by: 2026-10-28
+- Dependency path: `vinext -> vite-plugin-commonjs -> vite-plugin-dynamic-import
+  -> fast-glob -> micromatch -> braces@3.0.3`
+- Finding: stack exhaustion (denial of service) when `braces` expands deeply
+  nested brace patterns.
+- Scope: landing build tooling only. The plugin expands glob patterns written in
+  the landing source while Vite builds; the build never expands patterns from
+  users, requests or other untrusted input.
+- Production exposure: none. Neither the generated landing Worker nor the
+  `briar-api` Worker bundle contains `braces`.
+- Upstream status: the advisory lists no patched version (every release through
+  3.0.3 is affected), so there is nothing to override to.
+- Removal condition: remove the ignore when a patched `braces` is published or
+  the landing build stops depending on it.
