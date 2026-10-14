@@ -228,18 +228,59 @@ final class BriarCompanionUITests: XCTestCase {
         let open = app.buttons["dm-memory-open"]
         XCTAssertTrue(open.waitForExistence(timeout: channelTransitionTimeout))
         open.tap()
+        // The vault as a folder tree: empty layout folders are listed, folders holding files are open.
+        // A folder that opens carries its identifier on the disclosure button and on its label; take the first.
+        let folder = { (key: String) in
+            app.descendants(matching: .any).matching(identifier: "dm-memory-folder-" + key).firstMatch
+        }
+        XCTAssertTrue(folder("memory").waitForExistence(timeout: 5))
+        XCTAssertTrue(folder("comms").exists)
+        XCTAssertFalse(folder("knowledge/facts").exists)
+        captureScreenshot(named: "companion-dm-memory-tree")
+        let knowledge = folder("knowledge")
+        reveal(knowledge, in: app)
+        knowledge.tap()
+        XCTAssertTrue(folder("knowledge/facts").waitForExistence(timeout: 5))
+        knowledge.tap()
+        XCTAssertTrue(folder("knowledge/facts").waitForNonExistence(timeout: 5))
+        // The record sits under entities/people with its real type and revision.
         let document = app.buttons["dm-memory-document-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]
-        XCTAssertTrue(document.waitForExistence(timeout: 5))
-        XCTAssertTrue(document.label.contains("profile · v1"))
+        reveal(document, in: app)
+        XCTAssertTrue(document.label.contains("synthetic-memory.md"))
+        XCTAssertTrue(document.label.contains("person · r1"))
         XCTAssertTrue(document.label.contains("사용자 보호"))
         XCTAssertFalse(document.label.contains("색인"))
-        captureScreenshot(named: "companion-dm-memory-list")
+        // Closing a folder hides its files; opening it shows them again.
+        let people = folder("entities/people")
+        reveal(people, in: app)
+        people.tap()
+        XCTAssertTrue(document.waitForNonExistence(timeout: 5))
+        people.tap()
+        XCTAssertTrue(document.waitForExistence(timeout: 5))
+
+        // README.md opens read only: no save, history or forget.
+        let readme = app.buttons["dm-memory-document-cccccccc-cccc-4ccc-8ccc-cccccccccccc"]
+        reveal(readme, in: app)
+        XCTAssertTrue(readme.label.contains("README.md"))
+        XCTAssertTrue(readme.label.contains("읽기 전용"))
+        captureScreenshot(named: "companion-dm-memory-tree-files")
+        readme.tap()
+        XCTAssertTrue(app.staticTexts["dm-memory-readonly-body"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["dm-memory-save"].exists)
+        XCTAssertFalse(app.buttons["dm-memory-forget"].exists)
+        XCTAssertFalse(app.buttons["dm-memory-history"].exists)
+        captureScreenshot(named: "companion-dm-memory-readme")
+        app.buttons["dm-memory-editor-close"].tap()
+        XCTAssertTrue(app.staticTexts["dm-memory-readonly-body"].waitForNonExistence(timeout: 5))
+        reveal(document, in: app)
+
         document.tap()
+        XCTAssertTrue(app.staticTexts["dm-memory-path"].waitForExistence(timeout: 5))
         let save = app.buttons["dm-memory-save"]
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(document.label.contains("v2"))
+        XCTAssertTrue(document.label.contains("r2"))
         document.tap()
         let history = app.buttons["dm-memory-history"]
         if !history.isHittable { app.swipeUp() }
@@ -256,8 +297,15 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(forget.waitForExistence(timeout: 5))
         forget.tap()
         XCTAssertTrue(document.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["저장된 기억이 없습니다."].waitForExistence(timeout: 5))
+        reveal(app.staticTexts["저장된 기억이 없습니다."], in: app)
         captureScreenshot(named: "companion-dm-memory-forgotten")
+    }
+
+    /// Scrolls the DM memory form until a lazily rendered row is on screen.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<6 where !(element.exists && element.isHittable) { app.swipeUp() }
+        for _ in 0..<6 where !(element.exists && element.isHittable) { app.swipeDown() }
+        XCTAssertTrue(element.waitForExistence(timeout: 5))
     }
 
     func testChannelShowsLoadingSpinnerWhileMessagesLoad() {

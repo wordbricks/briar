@@ -9,6 +9,7 @@ import {
   type DmMemoryDocumentDetail, type DmMemoryPage, type DmMemoryRevisionPage,
 } from "../lib/dm-memory-contract";
 import type { DmMemoryReference } from "../lib/dm-memory-query-contract";
+import { DmMemoryTree } from "./DmMemoryTree";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 
@@ -33,7 +34,14 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
   const writable = page?.eligible && (!selectedSpace || selectedSpace.status === "active");
 
   const historicalSelected = selected && page?.documents.find((item) => item.id === selected.id)?.version !== selected.version;
-  const canEdit = writable && !historicalSelected;
+  // README.md belongs to the app: it is shown, never edited or forgotten.
+  const canEdit = writable && !historicalSelected && !selected?.readOnly;
+  const records = page?.documents.filter((item) => !item.readOnly) ?? [];
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    // jsdom has no scrollIntoView.
+    if (editing) form.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [editing, selected?.id]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -147,29 +155,15 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
           })}><Download size={15} />{t("memory.export")}</Button>}
         </div>
         {!page.eligible && !selectedSpace && <p>{t("memory.ineligible")}</p>}
-        {page.documents.length === 0 && <p className="text-sm text-muted-foreground">{t("memory.empty")}</p>}
-        <ul className="grid gap-2" aria-label={t("memory.list")}>
-          {page.documents.map((item) => <li key={item.id} className="rounded-lg border border-border p-3">
-            <div className="flex items-start justify-between gap-2">
-              <button type="button" className="min-w-0 text-left" disabled={busy} onClick={() => void perform(async () => {
-                const detail = await client.get(scope, item.id); beginEdit(detail);
-              })}>
-                <span className="block break-words font-medium">{item.title}</span>
-                <span className="text-xs text-muted-foreground">{item.memoryClass} · v{item.version}</span>
-                {item.protectedByUser && <span className="ml-2 text-xs">{t("memory.protected")}</span>}
-              </button>
-              <Button size="icon" variant="ghost" disabled={busy} aria-label={t("memory.delete")} onClick={() => void perform(async () => {
-                await client.remove(scope, item.id); if (selected?.id === item.id) setEditing(false);
-                await refresh(); setNotice(t("memory.deleted"));
-              })}><Trash2 size={16} /></Button>
-            </div>
-          </li>)}
-        </ul>
+        {records.length === 0 && <p className="text-sm text-muted-foreground">{t("memory.empty")}</p>}
+        {(page.eligible || selectedSpace) && <DmMemoryTree folders={page.folders} documents={page.documents}
+          selectedId={editing ? selected?.id ?? null : null} disabled={busy}
+          onOpen={(item) => void perform(async () => { beginEdit(await client.get(scope, item.id)); })} />}
         {page.nextCursor && <Button variant="outline" disabled={busy} onClick={() => void perform(async () => {
           const next = await client.load(scope, page.selectedSpaceId ?? undefined, page.nextCursor ?? undefined);
           setPage({ ...next, documents: [...page.documents, ...next.documents] });
         })}>{t("memory.more")}</Button>}
-        {editing && <form className="grid gap-3 border-t border-border pt-4" onSubmit={(event) => {
+        {editing && <form ref={form} className="grid gap-3 border-t border-border pt-4" onSubmit={(event) => {
           event.preventDefault(); void perform(async () => {
             const input = { requestId: requestId.current, memorySpaceId: selectedSpace?.id,
               title, body, memoryClass };
@@ -177,14 +171,20 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
             setEditing(false); await refresh(); setNotice(t("common.saved"));
           });
         }}>
+          {selected?.path && <p className="break-all font-mono text-xs text-muted-foreground">{selected.path}</p>}
+          {selected?.readOnly && <p className="text-sm text-muted-foreground">{t("memory.readmeHelp")}</p>}
           {historicalSelected && <p role="status">{t("memory.historical")}</p>}
-          <label className="grid gap-1 text-sm">{t("memory.documentTitle")}<input required maxLength={200} disabled={!canEdit || busy} className={inputClass} value={title} onChange={(event) => { changeDraft(); setTitle(event.target.value); }} /></label>
-          <label className="grid gap-1 text-sm">{t("memory.body")}<textarea required rows={6} disabled={!canEdit || busy} className={inputClass} value={body} onChange={(event) => { changeDraft(); setBody(event.target.value); }} /></label>
-          <span className="text-xs text-muted-foreground">{new TextEncoder().encode(body).length} / {dmMemoryDocumentMaxBytes} bytes</span>
-          <label className="grid gap-1 text-sm">{t("memory.class")}<select disabled={!canEdit || busy} className={inputClass} value={memoryClass} onChange={(event) => { changeDraft(); setMemoryClass(event.target.value as DmMemoryClass); }}>
-            {dmMemoryClasses.map((value) => <option key={value}>{value}</option>)}
-          </select></label>
-          {selected && <div className="break-all text-xs text-muted-foreground">
+          {selected?.readOnly
+            ? <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/40 p-3 text-xs">{selected.body}</pre>
+            : <>
+              <label className="grid gap-1 text-sm">{t("memory.documentTitle")}<input required maxLength={200} disabled={!canEdit || busy} className={inputClass} value={title} onChange={(event) => { changeDraft(); setTitle(event.target.value); }} /></label>
+              <label className="grid gap-1 text-sm">{t("memory.body")}<textarea required rows={6} disabled={!canEdit || busy} className={inputClass} value={body} onChange={(event) => { changeDraft(); setBody(event.target.value); }} /></label>
+              <span className="text-xs text-muted-foreground">{new TextEncoder().encode(body).length} / {dmMemoryDocumentMaxBytes} bytes</span>
+              <label className="grid gap-1 text-sm">{t("memory.class")}<select disabled={!canEdit || busy} className={inputClass} value={memoryClass} onChange={(event) => { changeDraft(); setMemoryClass(event.target.value as DmMemoryClass); }}>
+                {dmMemoryClasses.map((value) => <option key={value}>{value}</option>)}
+              </select></label>
+            </>}
+          {selected && !selected.readOnly && <div className="break-all text-xs text-muted-foreground">
             <p>{t("memory.updated")} {selected.updatedAt}</p>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void perform(async () => {
               setHistory(await client.history(scope, selected.id));
@@ -211,6 +211,11 @@ export function DmMemoryDialog({ scope, onClose, client = dmMemoryApi, initialRe
           <div className="flex gap-2">
             {canEdit && <Button type="submit" disabled={busy || new TextEncoder().encode(body).length > dmMemoryDocumentMaxBytes}>{busy ? t("common.saving") : t("common.save")}</Button>}
             <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(false)}>{t("common.close")}</Button>
+            {selected && !selected.readOnly && <Button type="button" variant="ghost" className="ml-auto text-destructive"
+              disabled={busy} aria-label={t("memory.delete")} onClick={() => void perform(async () => {
+                await client.remove(scope, selected.id); setEditing(false);
+                await refresh(); setNotice(t("memory.deleted"));
+              })}><Trash2 size={15} />{t("memory.delete")}</Button>}
           </div>
         </form>}
       </>}

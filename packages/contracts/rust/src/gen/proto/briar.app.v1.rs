@@ -56295,6 +56295,19 @@ pub struct ListDmMemoriesRequest {
     /// Field 4: `cursor`
     #[serde(rename = "cursor", skip_serializing_if = "::core::option::Option::is_none")]
     pub cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Ask for the whole vault for the folder tree: up to the server's maximum
+    /// (dmMemoryTreeMaxDocuments) records in one response, next_cursor past it,
+    /// the app-owned README.md first and `folders` filled. Servers before this
+    /// field ignore it and page by 50; clients detect that by empty `folders`.
+    ///
+    /// Field 5: `whole_vault`
+    #[serde(
+        rename = "wholeVault",
+        alias = "whole_vault",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub whole_vault: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -56306,6 +56319,7 @@ impl ::core::fmt::Debug for ListDmMemoriesRequest {
             .field("channel_id", &self.channel_id)
             .field("memory_space_id", &self.memory_space_id)
             .field("cursor", &self.cursor)
+            .field("whole_vault", &self.whole_vault)
             .finish()
     }
 }
@@ -56370,6 +56384,9 @@ impl ::buffa::Message for ListDmMemoriesRequest {
         if let Some(ref v) = self.cursor {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if self.whole_vault {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -56391,6 +56408,9 @@ impl ::buffa::Message for ListDmMemoriesRequest {
         }
         if let Some(ref v) = self.cursor {
             ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if self.whole_vault {
+            ::buffa::types::put_bool_field(5u32, self.whole_vault, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -56441,6 +56461,13 @@ impl ::buffa::Message for ListDmMemoriesRequest {
                     buf,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.whole_vault = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -56453,6 +56480,7 @@ impl ::buffa::Message for ListDmMemoriesRequest {
         self.channel_id.clear();
         self.memory_space_id = ::core::option::Option::None;
         self.cursor = ::core::option::Option::None;
+        self.whole_vault = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -56533,6 +56561,16 @@ pub struct ListDmMemoriesResponse {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub next_cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    /// With whole_vault: every canonical folder of the vault layout (spec §5.1),
+    /// such as `entities/people`, sorted, whether or not it holds a record.
+    ///
+    /// Field 8: `folders`
+    #[serde(
+        rename = "folders",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub folders: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -56546,6 +56584,7 @@ impl ::core::fmt::Debug for ListDmMemoriesResponse {
             .field("selected_space_id", &self.selected_space_id)
             .field("documents", &self.documents)
             .field("next_cursor", &self.next_cursor)
+            .field("folders", &self.folders)
             .finish()
     }
 }
@@ -56631,6 +56670,9 @@ impl ::buffa::Message for ListDmMemoriesResponse {
         if let Some(ref v) = self.next_cursor {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        for v in &self.folders {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -56673,6 +56715,9 @@ impl ::buffa::Message for ListDmMemoriesResponse {
         }
         if let Some(ref v) = self.next_cursor {
             ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        for v in &self.folders {
+            ::buffa::types::put_string_field(8u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -56753,6 +56798,17 @@ impl ::buffa::Message for ListDmMemoriesResponse {
                     buf,
                 )?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.folders.push(__elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -56767,6 +56823,7 @@ impl ::buffa::Message for ListDmMemoriesResponse {
         self.selected_space_id = ::core::option::Option::None;
         self.documents.clear();
         self.next_cursor = ::core::option::Option::None;
+        self.folders.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -60558,6 +60615,42 @@ pub struct DmMemoryDocument {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub sources: ::buffa::alloc::vec::Vec<DmMemorySource>,
+    /// The record's file in the vault, such as `knowledge/facts/coffee.md`;
+    /// legacy `workstreams/active|completed/` files keep their own path.
+    /// Unset from servers before the folder tree.
+    ///
+    /// Field 19: `path`
+    #[serde(rename = "path", skip_serializing_if = "::core::option::Option::is_none")]
+    pub path: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The vault record type (`fact`, `person`, `timeline-daily`, …, or
+    /// `readme`). A string because the type set grows with the lookup table.
+    ///
+    /// Field 20: `record_type`
+    #[serde(
+        rename = "recordType",
+        alias = "record_type",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub record_type: ::core::option::Option<::buffa::alloc::string::String>,
+    /// A workstream's status: `active`, `completed` or `someday`.
+    ///
+    /// Field 21: `record_status`
+    #[serde(
+        rename = "recordStatus",
+        alias = "record_status",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub record_status: ::core::option::Option<::buffa::alloc::string::String>,
+    /// An application-owned file (README.md): readable, never edited or deleted.
+    ///
+    /// Field 22: `read_only`
+    #[serde(
+        rename = "readOnly",
+        alias = "read_only",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub read_only: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -60583,6 +60676,10 @@ impl ::core::fmt::Debug for DmMemoryDocument {
             .field("index_state", &self.index_state)
             .field("body", &self.body)
             .field("sources", &self.sources)
+            .field("path", &self.path)
+            .field("record_type", &self.record_type)
+            .field("record_status", &self.record_status)
+            .field("read_only", &self.read_only)
             .finish()
     }
 }
@@ -60602,6 +60699,36 @@ impl DmMemoryDocument {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.body = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::path`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_path(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.path = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::record_type`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_record_type(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.record_type = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::record_status`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_record_status(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.record_status = Some(value.into());
         self
     }
 }
@@ -60723,6 +60850,18 @@ impl ::buffa::Message for DmMemoryDocument {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.path {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.record_type {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.record_status {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.read_only {
+            size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -60826,6 +60965,18 @@ impl ::buffa::Message for DmMemoryDocument {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.path {
+            ::buffa::types::put_string_field(19u32, v, buf);
+        }
+        if let Some(ref v) = self.record_type {
+            ::buffa::types::put_string_field(20u32, v, buf);
+        }
+        if let Some(ref v) = self.record_status {
+            ::buffa::types::put_string_field(21u32, v, buf);
+        }
+        if self.read_only {
+            ::buffa::types::put_bool_field(22u32, self.read_only, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -60998,6 +61149,47 @@ impl ::buffa::Message for DmMemoryDocument {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.sources.push(elem);
             }
+            19u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.path.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            20u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .record_type
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .record_status
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            22u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.read_only = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -61024,6 +61216,10 @@ impl ::buffa::Message for DmMemoryDocument {
         self.index_state = ::buffa::EnumValue::from(0);
         self.body = ::core::option::Option::None;
         self.sources.clear();
+        self.path = ::core::option::Option::None;
+        self.record_type = ::core::option::Option::None;
+        self.record_status = ::core::option::Option::None;
+        self.read_only = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -225292,6 +225488,13 @@ pub mod __buffa {
             pub memory_space_id: ::core::option::Option<&'a str>,
             /// Field 4: `cursor`
             pub cursor: ::core::option::Option<&'a str>,
+            /// Ask for the whole vault for the folder tree: up to the server's maximum
+            /// (dmMemoryTreeMaxDocuments) records in one response, next_cursor past it,
+            /// the app-owned README.md first and `folders` filled. Servers before this
+            /// field ignore it and page by 50; clients detect that by empty `folders`.
+            ///
+            /// Field 5: `whole_vault`
+            pub whole_vault: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListDmMemoriesRequestView<'a> {
@@ -225356,6 +225559,13 @@ pub mod __buffa {
                         )?;
                         view.cursor = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.whole_vault = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -225389,6 +225599,7 @@ pub mod __buffa {
                     channel_id: self.channel_id.to_string(),
                     memory_space_id: self.memory_space_id.map(|s| s.to_string()),
                     cursor: self.cursor.map(|s| s.to_string()),
+                    whole_vault: self.whole_vault,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -225421,6 +225632,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.cursor {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                if self.whole_vault {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -225443,6 +225657,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.cursor {
                     ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                if self.whole_vault {
+                    ::buffa::types::put_bool_field(5u32, self.whole_vault, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -225476,6 +225693,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.cursor {
                     __map.serialize_entry("cursor", __v)?;
+                }
+                if self.whole_vault {
+                    __map.serialize_entry("wholeVault", &self.whole_vault)?;
                 }
                 __map.end()
             }
@@ -225592,6 +225812,16 @@ pub mod __buffa {
             pub fn cursor(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().cursor
             }
+            /// Ask for the whole vault for the folder tree: up to the server's maximum
+            /// (dmMemoryTreeMaxDocuments) records in one response, next_cursor past it,
+            /// the app-owned README.md first and `folders` filled. Servers before this
+            /// field ignore it and page by 50; clients detect that by empty `folders`.
+            ///
+            /// Field 5: `whole_vault`
+            #[must_use]
+            pub fn whole_vault(&self) -> bool {
+                self.0.reborrow().whole_vault
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<ListDmMemoriesRequestView<'static>>,
@@ -225649,6 +225879,11 @@ pub mod __buffa {
             >,
             /// Field 6: `next_cursor`
             pub next_cursor: ::core::option::Option<&'a str>,
+            /// With whole_vault: every canonical folder of the vault layout (spec §5.1),
+            /// such as `entities/people`, sorted, whether or not it holds a record.
+            ///
+            /// Field 8: `folders`
+            pub folders: ::buffa::RepeatedView<'a, &'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListDmMemoriesResponseView<'a> {
@@ -225771,6 +226006,17 @@ pub mod __buffa {
                                 )?,
                             );
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.folders.push(__elem);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -225822,6 +226068,7 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     next_cursor: self.next_cursor.map(|s| s.to_string()),
+                    folders: self.folders.iter().map(|s| s.to_string()).collect(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -225869,6 +226116,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.next_cursor {
                     size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
                 }
+                for v in &self.folders {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -225913,6 +226163,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.next_cursor {
                     ::buffa::types::put_string_field(6u32, v, buf);
                 }
+                for v in &self.folders {
+                    ::buffa::types::put_string_field(8u32, v, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -225956,6 +226209,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.next_cursor {
                     __map.serialize_entry("nextCursor", __v)?;
+                }
+                if !self.folders.is_empty() {
+                    __map.serialize_entry("folders", &*self.folders)?;
                 }
                 __map.end()
             }
@@ -226095,6 +226351,14 @@ pub mod __buffa {
             #[must_use]
             pub fn next_cursor(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().next_cursor
+            }
+            /// With whole_vault: every canonical folder of the vault layout (spec §5.1),
+            /// such as `entities/people`, sorted, whether or not it holds a record.
+            ///
+            /// Field 8: `folders`
+            #[must_use]
+            pub fn folders(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().folders
             }
         }
         impl ::core::convert::From<
@@ -232517,6 +232781,25 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::DmMemorySourceView<'a>,
             >,
+            /// The record's file in the vault, such as `knowledge/facts/coffee.md`;
+            /// legacy `workstreams/active|completed/` files keep their own path.
+            /// Unset from servers before the folder tree.
+            ///
+            /// Field 19: `path`
+            pub path: ::core::option::Option<&'a str>,
+            /// The vault record type (`fact`, `person`, `timeline-daily`, …, or
+            /// `readme`). A string because the type set grows with the lookup table.
+            ///
+            /// Field 20: `record_type`
+            pub record_type: ::core::option::Option<&'a str>,
+            /// A workstream's status: `active`, `completed` or `someday`.
+            ///
+            /// Field 21: `record_status`
+            pub record_status: ::core::option::Option<&'a str>,
+            /// An application-owned file (README.md): readable, never edited or deleted.
+            ///
+            /// Field 22: `read_only`
+            pub read_only: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DmMemoryDocumentView<'a> {
@@ -232752,6 +233035,34 @@ pub mod __buffa {
                         )?;
                         view.body = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    19u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.path = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    20u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.record_type = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    21u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.record_status = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    22u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.read_only = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     18u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -232855,6 +233166,10 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    path: self.path.map(|s| s.to_string()),
+                    record_type: self.record_type.map(|s| s.to_string()),
+                    record_status: self.record_status.map(|s| s.to_string()),
+                    read_only: self.read_only,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -232972,6 +233287,18 @@ pub mod __buffa {
                         += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(ref v) = self.path {
+                    size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.record_type {
+                    size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.record_status {
+                    size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.read_only {
+                    size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -233077,6 +233404,18 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
+                if let Some(ref v) = self.path {
+                    ::buffa::types::put_string_field(19u32, v, buf);
+                }
+                if let Some(ref v) = self.record_type {
+                    ::buffa::types::put_string_field(20u32, v, buf);
+                }
+                if let Some(ref v) = self.record_status {
+                    ::buffa::types::put_string_field(21u32, v, buf);
+                }
+                if self.read_only {
+                    ::buffa::types::put_bool_field(22u32, self.read_only, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -233181,6 +233520,18 @@ pub mod __buffa {
                 }
                 if !self.sources.is_empty() {
                     __map.serialize_entry("sources", &*self.sources)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.path {
+                    __map.serialize_entry("path", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.record_type {
+                    __map.serialize_entry("recordType", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.record_status {
+                    __map.serialize_entry("recordStatus", __v)?;
+                }
+                if self.read_only {
+                    __map.serialize_entry("readOnly", &self.read_only)?;
                 }
                 __map.end()
             }
@@ -233397,6 +233748,37 @@ pub mod __buffa {
                 super::super::__buffa::view::DmMemorySourceView<'_>,
             > {
                 &self.0.reborrow().sources
+            }
+            /// The record's file in the vault, such as `knowledge/facts/coffee.md`;
+            /// legacy `workstreams/active|completed/` files keep their own path.
+            /// Unset from servers before the folder tree.
+            ///
+            /// Field 19: `path`
+            #[must_use]
+            pub fn path(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().path
+            }
+            /// The vault record type (`fact`, `person`, `timeline-daily`, …, or
+            /// `readme`). A string because the type set grows with the lookup table.
+            ///
+            /// Field 20: `record_type`
+            #[must_use]
+            pub fn record_type(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().record_type
+            }
+            /// A workstream's status: `active`, `completed` or `someday`.
+            ///
+            /// Field 21: `record_status`
+            #[must_use]
+            pub fn record_status(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().record_status
+            }
+            /// An application-owned file (README.md): readable, never edited or deleted.
+            ///
+            /// Field 22: `read_only`
+            #[must_use]
+            pub fn read_only(&self) -> bool {
+                self.0.reborrow().read_only
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<DmMemoryDocumentView<'static>>>

@@ -51,6 +51,7 @@ import {
   type MemoryVaultCaller,
   type MemoryVaultDeps,
 } from "./operations";
+import { MEMORY_VAULT_README } from "./readme";
 import { parseVaultCommitMessage } from "./trailers";
 
 /*
@@ -117,6 +118,8 @@ describe("DM memory on the vault", () => {
     return {
       list: (channelId: string) => service.listDmMemories(
         create(ListDmMemoriesRequestSchema, scope(channelId)), context) as Promise<ListDmMemoriesResponse>,
+      tree: (channelId: string) => service.listDmMemories(
+        create(ListDmMemoriesRequestSchema, { ...scope(channelId), wholeVault: true }), context) as Promise<ListDmMemoriesResponse>,
       get: (channelId: string, documentId: string, version?: number) => service.getDmMemoryDocument(
         create(GetDmMemoryDocumentRequestSchema, { ...scope(channelId), documentId, version }),
         context) as Promise<GetDmMemoryDocumentResponse>,
@@ -454,6 +457,82 @@ describe("DM memory on the vault", () => {
       for (const content of snapshot.files.values()) expect(content).not.toContain("private-detail-5521");
     }
     expect(await service.delete(dm.channelId, handle)).toMatchObject({ deleted: true, purgeState: "complete" });
+  });
+
+  it("lists the whole vault for the owner's folder tree: paths, real types, README and legacy workstreams", async () => {
+    await fixture.setVaultCapable(true);
+    const deps = memoryVaultDeps(db) as Deps;
+    const dm = await fixture.claimChannel("dm", fixture.ownerId, "folder tree");
+    await fixture.setDmMemory(dm.channelId, { use: true, auto: true });
+    const saveAs = (id: string, type: string, status: string | null = null, content = `${id} body`) =>
+      memoryVaultSave(deps, dm.caller, {
+        requestId: crypto.randomUUID(), id, type, status, aliases: [], expectedRevision: null, userRequested: false,
+        content,
+      });
+    await saveAs("coffee", "preference");
+    await saveAs("jane", "person");
+    await saveAs("2026-w42", "timeline-weekly");
+    await saveAs("launch", "workstream", "someday");
+    await saveAs("playbook", "playbook", null, "- tea asked → serve it unsweetened (1회, 2026-10-01) [[coffee]]");
+    await saveAs("gone", "fact");
+    const spaceId = await fixture.spaceOf(dm.channelId);
+    const vault = (await vaultOfSpace(spaceId))!;
+    // A file from the legacy workstream layout, indexed by the next tool call's reconcile.
+    await deps.store.write(vault.repo_name, async (head) => ({
+      kind: "commit",
+      files: new Map([...head.files, ["workstreams/completed/old-move.md", "# Old move\nDone.\n"]]),
+      message: "imported legacy layout",
+      timestamp: 1_760_000_000,
+      value: null,
+    }));
+    expect(await listIds(deps, dm.caller)).toContain("old-move");
+    const service = dmMemoryService(deps.store);
+    await service.delete(dm.channelId, await vaultRecordHandle(vault.id, "gone"));
+
+    const tree = await service.tree(dm.channelId);
+    expect(tree.folders).toEqual([
+      "browser-guidance/attempts", "comms", "entities/infrastructure", "entities/orgs", "entities/people",
+      "entities/projects", "entities/tools", "knowledge/decisions", "knowledge/facts", "knowledge/lessons",
+      "knowledge/preferences", "knowledge/procedures", "timeline/daily", "timeline/monthly", "timeline/weekly",
+      "workstreams",
+    ]);
+    expect(tree.nextCursor).toBeUndefined();
+    const readmeId = await vaultRecordHandle(vault.id, "readme");
+    expect(tree.documents.map((document) => [document.path, document.recordType, document.recordStatus ?? null,
+      document.readOnly])).toEqual([
+      ["README.md", "readme", null, true],
+      ["timeline/weekly/2026-w42.md", "timeline-weekly", null, false],
+      ["knowledge/preferences/coffee.md", "preference", null, false],
+      ["entities/people/jane.md", "person", null, false],
+      ["workstreams/launch.md", "workstream", "someday", false],
+      ["workstreams/completed/old-move.md", "workstream", "completed", false],
+      ["playbook.md", "playbook", null, false],
+    ]);
+    expect(tree.documents[0]).toMatchObject({ id: readmeId, title: "README.md", version: 1 });
+    // Handles stay the UUIDs shipped clients parse.
+    for (const document of tree.documents) {
+      expect(document.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+    }
+
+    // The paged list older clients call is unchanged: no README, no folders.
+    const legacy = await service.list(dm.channelId);
+    expect(legacy.folders).toEqual([]);
+    expect(legacy.documents.map((document) => document.title))
+      .toEqual(["2026-w42", "coffee", "jane", "launch", "old-move", "playbook"]);
+
+    // README.md opens from the server copy and is never written or forgotten.
+    const readme = (await service.get(dm.channelId, readmeId)).document!;
+    expect(readme).toMatchObject({ path: "README.md", recordType: "readme", readOnly: true });
+    expect(readme.body).toBe(MEMORY_VAULT_README);
+    await expect(service.delete(dm.channelId, readmeId)).rejects.toMatchObject({ status: 409, code: "readme_read_only" });
+    await expect(service.update(dm.channelId, readmeId, 1, { title: "README", body: "mine" }))
+      .rejects.toMatchObject({ status: 409, code: "readme_read_only" });
+    expect((await deps.store.snapshot(vault.repo_name)).files.get("README.md")).toBe(MEMORY_VAULT_README);
+
+    // A record's detail carries its path; a legacy workstream reads at its own path.
+    const oldMove = (await service.get(dm.channelId, await vaultRecordHandle(vault.id, "old-move"))).document!;
+    expect(oldMove).toMatchObject({ path: "workstreams/completed/old-move.md", recordType: "workstream",
+      recordStatus: "completed", readOnly: false, title: "Old move" });
   });
 
   it("answers a memory tool call without a usable claim with claim_inactive", async () => {
