@@ -61,7 +61,7 @@
     "MEMORY_VAULT_ENABLED": "false",
     // Runs the D1 → vault migration (one DM space per minute) before the
     // vault is switched on; docs/operations/memory-vault.md, rollout.
-    "MEMORY_VAULT_MIGRATION_ENABLED": "false",
+    "MEMORY_VAULT_MIGRATION_ENABLED": "true",
     // Agent-to-Agent turns (the recipient's run plus the sender's relay run)
     // one organization may spend per hour.
     "AGENT_MESSAGE_HOURLY_LIMIT": "30",
