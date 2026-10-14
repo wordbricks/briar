@@ -58,7 +58,7 @@
     "DM_MEMORY_MINIMUM_SCORE": "0.5",
     // Memory vault on Cloudflare Artifacts (docs/plans/memory-vault-spec.md).
     // Off until the live check and the D1 → vault migration have run.
-    "MEMORY_VAULT_ENABLED": "false",
+    "MEMORY_VAULT_ENABLED": "true",
     // Runs the D1 → vault migration (one DM space per minute) before the
     // vault is switched on; docs/operations/memory-vault.md, rollout.
     "MEMORY_VAULT_MIGRATION_ENABLED": "true",
