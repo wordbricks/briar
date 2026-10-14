@@ -131,6 +131,21 @@ extension DmMemoryDocument {
         if readOnly { return [type] }
         return [type] + (hasRecordStatus ? [recordStatus] : []) + ["r\(version)"]
     }
+
+    /// The file's name in the tree and the preview: the last path segment, or
+    /// the title when a server before the folder tree sent no path.
+    var fileName: String {
+        guard hasPath, let name = path.split(separator: "/").last else { return title }
+        return String(name)
+    }
+
+    /// The meta line under a file in the tree and the preview.
+    func detailLabels(locale: CompanionLocale) -> [String] {
+        let ko = locale == .ko
+        return treeDetails
+            + (readOnly ? [ko ? "읽기 전용" : "Read only"] : [])
+            + (protectedByUser ? [ko ? "사용자 보호" : "User protected"] : [])
+    }
 }
 
 struct DmMemoryWrite: Sendable, Equatable {
@@ -352,120 +367,176 @@ struct DmMemoryView: View {
     @ObservedObject var store: DmMemoryStore
     let locale: CompanionLocale
     @Environment(\.dismiss) private var dismiss
-    @State private var draft: Draft?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var creating = false
     @State private var error: String?
     /// Folders the user opened or closed; the rest follow whether they hold files.
     @State private var expansion: [String: Bool] = [:]
-    private struct Draft: Identifiable { let id = UUID(); let document: DmMemoryDocument? }
+    /// The file the preview shows. Nil leaves the detail column empty on iPad and pops the preview on iPhone.
+    @State private var selection: String?
+    /// A file swiped to forget, awaiting the same confirmation as the preview's Forget.
+    @State private var pendingForget: DmMemoryDocument?
     private func text(_ ko: String, _ en: String) -> String { locale == .ko ? ko : en }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text(text("이 DM의 사용자와 Agent만 사용하는 기억입니다. 다른 DM과 자동 공유하지 않습니다.",
-                              "Memory belongs to this DM's user and Agent and is not shared with other DMs."))
-                    Text(text("기억에서 삭제해도 원래 대화 메시지는 남습니다. 대화 삭제는 메시지 메뉴에서 별도로 할 수 있습니다.",
-                              "Forgetting leaves the original chat message. Delete it separately from its message menu."))
-                        .font(.caption)
-                    if let message = store.errorMessage ?? error { Text(message).foregroundStyle(.red) }
-                    if store.busy { ProgressView() }
+        Group {
+            if horizontalSizeClass == .regular {
+                // Two columns: the tree on the left, the selected file's preview on the right.
+                HStack(spacing: 0) {
+                    NavigationStack { tree }
+                        .frame(width: 320)
+                    Divider().ignoresSafeArea()
+                    NavigationStack { detail }
+                        .frame(maxWidth: .infinity)
                 }
-                if let page = store.page {
-                    Section(text("설정", "Settings")) {
-                        if page.spaces.count > 1, page.hasSelectedSpaceID {
-                            Picker(text("기억 공간", "Memory space"), selection: Binding(
-                                get: { page.selectedSpaceID },
-                                set: { value in Task { await store.load(spaceID: value) } }
-                            )) {
-                                ForEach(page.spaces, id: \.id) { space in
-                                    Text(spaceLabel(space)).tag(space.id)
-                                }
-                            }
-                        }
-                        if store.space?.status == .closed {
-                            Text(text("참여자가 바뀌어 닫힌 공간입니다. 읽기·삭제·내보내기만 가능합니다.",
-                                      "This space was closed after a participant change. Read, delete or export only."))
-                            if page.eligible {
-                                Button(text("현재 참여자로 새 공간 만들기", "Create a space for current participants")) {
-                                    Task { await store.setUse(false, newSpace: true) }
-                                }
-                            }
-                        }
-                        if store.writable {
-                            Toggle(text("이 DM에서 기억 사용", "Use memory in this DM"), isOn: Binding(
-                                get: { store.space?.useEnabled ?? false },
-                                set: { enabled in Task { await store.setUse(enabled) } }
-                            ))
-                        }
-                        Toggle(text("Agent가 스스로 기억 저장", "Let the Agent save memories on its own"),
-                               isOn: Binding(
-                                get: { store.space?.autoEnabled ?? false },
-                                set: { enabled in Task { await store.setUse(true, automatic: enabled) } }
-                               ))
-                            .disabled(!store.writable || store.space?.useEnabled != true)
-                            .accessibilityIdentifier("dm-memory-automatic")
-                        Text(text("기억 사용을 먼저 켜세요. 켜면 Agent가 대화에서 남길 만한 내용을 스스로 기억에 저장합니다. 끄면 요청할 때만 저장합니다. 직접 편집한 기억은 요청 없이 바꾸지 않습니다.",
-                                  "Enable memory use first. When on, the Agent saves what is worth keeping from this conversation on its own. When off, it saves only when you ask. It does not change memories you edited unless you ask."))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Section(text("기억 폴더", "Memory folders")) {
-                        if !page.documents.contains(where: { !$0.readOnly }) {
-                            Text(text("저장된 기억이 없습니다.", "No saved memories."))
-                        }
-                        if page.eligible || store.space != nil {
-                            DmMemoryTreeRow(
-                                node: DmMemoryTreeNode.tree(folders: page.folders, documents: page.documents),
-                                expansion: $expansion,
-                                locale: locale,
-                                open: { document in
-                                    Task {
-                                        do { draft = Draft(document: try await store.document(document.id)) }
-                                        catch { self.error = error.localizedDescription }
-                                    }
-                                },
-                                forget: { document in Task { await store.forget(document.id) } }
-                            )
-                        }
-                        if page.hasNextCursor {
-                            Button(text("더 보기", "Load more")) { Task { await store.load(more: true) } }
-                        }
-                        if store.writable {
-                            Button(text("기억 추가", "Add memory"), systemImage: "plus") { draft = Draft(document: nil) }
-                        } else if store.space == nil {
-                            Text(text("사용자 1명과 Agent 1명이 참여하는 DM에서만 저장할 수 있습니다.",
-                                      "Storage requires a DM with one user and one Agent."))
-                        }
-                    }
-                    if store.space != nil {
-                        Section {
-                            Button(text("Markdown 내보내기", "Export Markdown"), systemImage: "square.and.arrow.up") {
-                                Task { await store.export() }
-                            }
-                            if let file = store.exportedFile { ShareLink(item: file) }
-                            Text(text("내보낸 사본은 서버에서 기억을 삭제해도 남습니다. 기억 삭제는 대화 원문을 삭제하지 않습니다.",
-                                      "Exported copies remain after server deletion. Forgetting a memory does not delete chat history."))
-                                .font(.caption)
-                        }
-                    }
+            } else {
+                NavigationStack {
+                    tree.navigationDestination(item: $selection) { id in preview(id) }
                 }
             }
-            .disabled(store.busy)
-            .navigationTitle(text("기억", "Memory"))
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button(text("닫기", "Close")) { dismiss() } }
-            }
-            .refreshable { await store.load() }
-            .task {
-                await store.load()
-                while !Task.isCancelled {
-                    do { try await Task.sleep(for: .seconds(5)) } catch { return }
-                    if draft == nil { await store.refreshStatus() }
-                }
-            }
-            .sheet(item: $draft) { value in DmMemoryEditor(store: store, document: value.document, locale: locale) }
-            .onDisappear { store.clearExport() }
         }
+        .dmMemoryPageSizing()
+        .task {
+            await store.load()
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                if !creating { await store.refreshStatus() }
+            }
+        }
+        .onChange(of: store.page) { _, page in
+            // A file deleted here, by the Agent or with a space switch leaves nothing to preview.
+            guard let selection, page?.documents.contains(where: { $0.id == selection }) != true else { return }
+            self.selection = nil
+        }
+        .sheet(isPresented: $creating) { DmMemoryEditor(store: store, document: nil, locale: locale) }
+        .onDisappear { store.clearExport() }
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        if let selection {
+            preview(selection)
+        } else {
+            Color(.systemBackground)
+                .ignoresSafeArea()
+                .accessibilityElement()
+                .accessibilityLabel(text("선택한 파일 없음", "No file selected"))
+                .accessibilityIdentifier("dm-memory-empty-detail")
+        }
+    }
+
+    private func preview(_ id: String) -> some View {
+        DmMemoryPreview(store: store, documentID: id, locale: locale, close: { selection = nil })
+            .id(id)
+    }
+
+    private var tree: some View {
+        Form {
+            Section {
+                Text(text("이 DM의 사용자와 Agent만 사용하는 기억입니다. 다른 DM과 자동 공유하지 않습니다.",
+                          "Memory belongs to this DM's user and Agent and is not shared with other DMs."))
+                Text(text("기억에서 삭제해도 원래 대화 메시지는 남습니다. 대화 삭제는 메시지 메뉴에서 별도로 할 수 있습니다.",
+                          "Forgetting leaves the original chat message. Delete it separately from its message menu."))
+                    .font(.caption)
+                if let message = store.errorMessage ?? error { Text(message).foregroundStyle(.red) }
+                if store.busy { ProgressView() }
+            }
+            if let page = store.page {
+                Section(text("설정", "Settings")) {
+                    if page.spaces.count > 1, page.hasSelectedSpaceID {
+                        Picker(text("기억 공간", "Memory space"), selection: Binding(
+                            get: { page.selectedSpaceID },
+                            set: { value in Task { await store.load(spaceID: value) } }
+                        )) {
+                            ForEach(page.spaces, id: \.id) { space in
+                                Text(spaceLabel(space)).tag(space.id)
+                            }
+                        }
+                    }
+                    if store.space?.status == .closed {
+                        Text(text("참여자가 바뀌어 닫힌 공간입니다. 읽기·삭제·내보내기만 가능합니다.",
+                                  "This space was closed after a participant change. Read, delete or export only."))
+                        if page.eligible {
+                            Button(text("현재 참여자로 새 공간 만들기", "Create a space for current participants")) {
+                                Task { await store.setUse(false, newSpace: true) }
+                            }
+                        }
+                    }
+                    if store.writable {
+                        Toggle(text("이 DM에서 기억 사용", "Use memory in this DM"), isOn: Binding(
+                            get: { store.space?.useEnabled ?? false },
+                            set: { enabled in Task { await store.setUse(enabled) } }
+                        ))
+                    }
+                    Toggle(text("Agent가 스스로 기억 저장", "Let the Agent save memories on its own"),
+                           isOn: Binding(
+                            get: { store.space?.autoEnabled ?? false },
+                            set: { enabled in Task { await store.setUse(true, automatic: enabled) } }
+                           ))
+                        .disabled(!store.writable || store.space?.useEnabled != true)
+                        .accessibilityIdentifier("dm-memory-automatic")
+                    Text(text("기억 사용을 먼저 켜세요. 켜면 Agent가 대화에서 남길 만한 내용을 스스로 기억에 저장합니다. 끄면 요청할 때만 저장합니다. 직접 편집한 기억은 요청 없이 바꾸지 않습니다.",
+                              "Enable memory use first. When on, the Agent saves what is worth keeping from this conversation on its own. When off, it saves only when you ask. It does not change memories you edited unless you ask."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section(text("기억 폴더", "Memory folders")) {
+                    if !page.documents.contains(where: { !$0.readOnly }) {
+                        Text(text("저장된 기억이 없습니다.", "No saved memories."))
+                    }
+                    if page.eligible || store.space != nil {
+                        DmMemoryTreeRow(
+                            node: DmMemoryTreeNode.tree(folders: page.folders, documents: page.documents),
+                            expansion: $expansion,
+                            locale: locale,
+                            selection: selection,
+                            open: { document in selection = document.id },
+                            forget: { document in pendingForget = document }
+                        )
+                    }
+                    if page.hasNextCursor {
+                        Button(text("더 보기", "Load more")) { Task { await store.load(more: true) } }
+                    }
+                    if store.writable {
+                        Button(text("기억 추가", "Add memory"), systemImage: "plus") { creating = true }
+                            .accessibilityIdentifier("dm-memory-add")
+                    } else if store.space == nil {
+                        Text(text("사용자 1명과 Agent 1명이 참여하는 DM에서만 저장할 수 있습니다.",
+                                  "Storage requires a DM with one user and one Agent."))
+                    }
+                }
+                if store.space != nil {
+                    Section {
+                        Button(text("Markdown 내보내기", "Export Markdown"), systemImage: "square.and.arrow.up") {
+                            Task { await store.export() }
+                        }
+                        if let file = store.exportedFile { ShareLink(item: file) }
+                        Text(text("내보낸 사본은 서버에서 기억을 삭제해도 남습니다. 기억 삭제는 대화 원문을 삭제하지 않습니다.",
+                                  "Exported copies remain after server deletion. Forgetting a memory does not delete chat history."))
+                            .font(.caption)
+                    }
+                }
+            }
+        }
+        .disabled(store.busy)
+        .confirmationDialog(
+            text("이 기억을 삭제할까요?", "Forget this memory?"),
+            isPresented: Binding(get: { pendingForget != nil }, set: { if !$0 { pendingForget = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingForget
+        ) { document in
+            // Clearing the selection when the file disappears happens in onChange(of: store.page).
+            Button(text("기억에서 삭제", "Forget"), role: .destructive) { Task { await store.forget(document.id) } }
+                .accessibilityIdentifier("dm-memory-forget-confirm")
+            Button(text("취소", "Cancel"), role: .cancel) {}
+                .accessibilityIdentifier("dm-memory-forget-cancel")
+        } message: { _ in
+            Text(text("원래 대화 메시지는 남습니다.", "The original chat message stays."))
+        }
+        .navigationTitle(text("기억", "Memory"))
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) { Button(text("닫기", "Close")) { dismiss() } }
+        }
+        .refreshable { await store.load() }
     }
 
     private func spaceLabel(_ space: DmMemorySpace) -> String {
@@ -473,13 +544,22 @@ struct DmMemoryView: View {
     }
 }
 
+private extension View {
+    /// The memory window is a page-sized sheet on iPad so the tree and the preview fit side by side.
+    @ViewBuilder
+    func dmMemoryPageSizing() -> some View {
+        if #available(iOS 18.0, *) { presentationSizing(.page) } else { self }
+    }
+}
+
 /// One node of the folder tree: a folder as a `DisclosureGroup` (open while it
 /// holds files unless the user closed it, dimmed when empty), a file as a row
-/// that opens the detail screen.
+/// that selects it for the preview.
 private struct DmMemoryTreeRow: View {
     let node: DmMemoryTreeNode
     @Binding var expansion: [String: Bool]
     let locale: CompanionLocale
+    let selection: String?
     let open: (DmMemoryDocument) -> Void
     let forget: (DmMemoryDocument) -> Void
     private func text(_ ko: String, _ en: String) -> String { locale == .ko ? ko : en }
@@ -498,7 +578,10 @@ private struct DmMemoryTreeRow: View {
                     set: { expansion[key] = $0 }
                 )) {
                     ForEach(children) { child in
-                        DmMemoryTreeRow(node: child, expansion: $expansion, locale: locale, open: open, forget: forget)
+                        DmMemoryTreeRow(
+                            node: child, expansion: $expansion, locale: locale,
+                            selection: selection, open: open, forget: forget
+                        )
                     }
                 } label: {
                     folderLabel(name: name, fileCount: fileCount, expanded: expansion[key] ?? (key.isEmpty || fileCount > 0))
@@ -506,23 +589,24 @@ private struct DmMemoryTreeRow: View {
                 }
             }
         case let .file(_, name, document):
-            let details = document.treeDetails
-                + (document.readOnly ? [text("읽기 전용", "Read only")] : [])
-                + (document.protectedByUser ? [text("사용자 보호", "User protected")] : [])
+            let selected = selection == document.id
             Button { open(document) } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     Label(name, systemImage: "doc.text")
                         .font(.body.monospaced())
                         .foregroundStyle(.primary)
-                    Text(details.joined(separator: " · "))
+                    Text(document.detailLabels(locale: locale).joined(separator: " · "))
                         .font(.caption).foregroundStyle(.secondary)
                         .padding(.leading, 28)
                 }
             }
+            .listRowBackground(selected ? Color.accentColor.opacity(0.15) : Color(.secondarySystemGroupedBackground))
+            .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityIdentifier("dm-memory-document-" + document.id)
             .swipeActions {
                 if !document.readOnly {
                     Button(text("기억에서 삭제", "Forget"), role: .destructive) { forget(document) }
+                        .accessibilityIdentifier("dm-memory-swipe-forget")
                 }
             }
         }
@@ -539,6 +623,133 @@ private struct DmMemoryTreeRow: View {
     }
 }
 
+/// The selected file read in place: name, path, a quiet meta line, the body as
+/// Markdown, and its actions. README.md belongs to the app and has none.
+private struct DmMemoryPreview: View {
+    @ObservedObject var store: DmMemoryStore
+    let documentID: String
+    let locale: CompanionLocale
+    /// Clears the selection once the file is gone.
+    let close: () -> Void
+    @State private var document: DmMemoryDocument?
+    @State private var error: String?
+    @State private var editing = false
+    @State private var showingHistory = false
+    @State private var confirmingForget = false
+    private func text(_ ko: String, _ en: String) -> String { locale == .ko ? ko : en }
+
+    /// The file as the folder list has it; a save or an Agent edit bumps its version and reloads the preview.
+    private var listed: DmMemoryDocument? { store.page?.documents.first { $0.id == documentID } }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if let message = store.errorMessage ?? error { Text(message).foregroundStyle(.red) }
+                if let document {
+                    header(document)
+                    Divider()
+                    if document.readOnly {
+                        Text(text("앱이 관리하는 안내 파일입니다. 읽을 수만 있고 편집하거나 삭제할 수 없습니다.",
+                                  "The app maintains this guide. You can read it but not edit or delete it."))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    MarkdownText(markdown: document.body)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("dm-memory-preview-body")
+                } else if error == nil {
+                    ProgressView().frame(maxWidth: .infinity)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("dm-memory-preview")
+        }
+        .navigationTitle(document?.fileName ?? listed?.fileName ?? "")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: listed?.version) {
+            guard listed != nil else { return }
+            do {
+                let loaded = try await store.document(documentID)
+                if !Task.isCancelled { document = loaded; error = nil }
+            } catch {
+                if !Task.isCancelled { self.error = error.localizedDescription }
+            }
+        }
+        .navigationDestination(isPresented: $showingHistory) {
+            DmMemoryHistoryView(store: store, documentID: documentID, locale: locale)
+        }
+        .sheet(isPresented: $editing) {
+            if let document { DmMemoryEditor(store: store, document: document, locale: locale) }
+        }
+    }
+
+    private func previewMeta(_ document: DmMemoryDocument) -> String {
+        let updated = document.readOnly || !document.hasUpdatedAt ? [] : [
+            text("갱신 시각", "Updated at") + " "
+                + document.updatedAt.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened)
+                    .locale(Locale(identifier: locale == .ko ? "ko_KR" : "en_US"))),
+        ]
+        return (document.detailLabels(locale: locale) + updated).joined(separator: " · ")
+    }
+
+    private func header(_ document: DmMemoryDocument) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                // The title, as on the web: a record's file name is its id slug.
+                Text(document.title)
+                    .font(.title3.weight(.semibold))
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("dm-memory-preview-name")
+                if document.hasPath, document.path != document.title {
+                    Text(document.path)
+                        .font(.caption.monospaced()).foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("dm-memory-path")
+                }
+                Text(previewMeta(document))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("dm-memory-preview-meta")
+            }
+            if !document.readOnly {
+                HStack(spacing: 8) {
+                    if store.writable {
+                        Button(text("편집", "Edit"), systemImage: "pencil") { editing = true }
+                            .accessibilityIdentifier("dm-memory-edit")
+                    }
+                    Button(text("변경 이력", "History"), systemImage: "clock.arrow.circlepath") { showingHistory = true }
+                        .accessibilityIdentifier("dm-memory-history")
+                    Button(text("기억에서 삭제", "Forget"), systemImage: "trash", role: .destructive) {
+                        confirmingForget = true
+                    }
+                    .accessibilityIdentifier("dm-memory-forget")
+                    .confirmationDialog(
+                        text("이 기억을 삭제할까요?", "Forget this memory?"),
+                        isPresented: $confirmingForget,
+                        titleVisibility: .visible
+                    ) {
+                        Button(text("기억에서 삭제", "Forget"), role: .destructive) {
+                            Task {
+                                await store.forget(documentID)
+                                if store.errorMessage == nil { close() }
+                            }
+                        }
+                        .accessibilityIdentifier("dm-memory-forget-confirm")
+                        Button(text("취소", "Cancel"), role: .cancel) {}
+                            .accessibilityIdentifier("dm-memory-forget-cancel")
+                    } message: {
+                        Text(text("원래 대화 메시지는 남습니다.", "The original chat message stays."))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(store.busy)
+            }
+        }
+    }
+}
+
+/// Creates a memory, or edits the previewed one.
 private struct DmMemoryEditor: View {
     @ObservedObject var store: DmMemoryStore
     let document: DmMemoryDocument?
@@ -554,8 +765,6 @@ private struct DmMemoryEditor: View {
             memoryClass: document?.memoryClass ?? .profile
         ))
     }
-    /// README.md belongs to the app: shown, never edited, versioned or forgotten.
-    private var readOnly: Bool { document?.readOnly == true }
 
     var body: some View {
         NavigationStack {
@@ -564,55 +773,31 @@ private struct DmMemoryEditor: View {
                 if let document, document.hasPath {
                     Text(document.path).font(.caption.monospaced()).foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                        .accessibilityIdentifier("dm-memory-path")
+                        .accessibilityIdentifier("dm-memory-editor-path")
                 }
-                if readOnly, let document {
-                    Section {
-                        Text(text("앱이 관리하는 안내 파일입니다. 읽을 수만 있고 편집하거나 삭제할 수 없습니다.",
-                                  "The app maintains this guide. You can read it but not edit or delete it."))
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text(document.body).font(.callout.monospaced()).textSelection(.enabled)
-                            .accessibilityIdentifier("dm-memory-readonly-body")
-                    }
-                } else {
-                    Section {
-                        TextField(text("제목", "Title"), text: $draft.title)
-                        TextEditor(text: $draft.body).frame(minHeight: 160).accessibilityLabel(text("기억 본문", "Memory text"))
-                        Text("\(draft.body.utf8.count) / 65536 bytes").font(.caption)
-                        Picker(text("분류", "Category"), selection: $draft.memoryClass) {
-                            ForEach([BriarAPI_DmMemoryClass.profile, .log, .note], id: \.rawValue) {
-                                Text($0.label)
-                            }
-                        }
-                    }.disabled(!store.writable || store.busy)
-                    if let document {
-                        Section(text("근거", "Sources")) {
-                            NavigationLink(text("변경 이력", "Revision history")) {
-                                DmMemoryHistoryView(store: store, documentID: document.id, locale: locale)
-                            }
-                            .accessibilityIdentifier("dm-memory-history")
-                            Text(dmMemoryTimestamp(document.updatedAt)).font(.caption)
-                            ForEach(Array(document.sources.enumerated()), id: \.offset) { _, source in
-                                Text("\(source.type.label):\(source.id)@\(source.version)").font(.caption).textSelection(.enabled)
-                            }
-                            Button(text("기억에서 삭제", "Forget memory"), role: .destructive) {
-                                Task { await store.forget(document.id); if store.errorMessage == nil { dismiss() } }
-                            }.disabled(store.busy).accessibilityIdentifier("dm-memory-forget")
+                Section {
+                    TextField(text("제목", "Title"), text: $draft.title)
+                    TextEditor(text: $draft.body).frame(minHeight: 160).accessibilityLabel(text("기억 본문", "Memory text"))
+                    Text("\(draft.body.utf8.count) / 65536 bytes").font(.caption)
+                    Picker(text("분류", "Category"), selection: $draft.memoryClass) {
+                        ForEach([BriarAPI_DmMemoryClass.profile, .log, .note], id: \.rawValue) {
+                            Text($0.label)
                         }
                     }
-                }
+                }.disabled(!store.writable || store.busy)
             }
             .onChange(of: draft) { old, new in
                 if old.title != new.title || old.body != new.body || old.memoryClass != new.memoryClass {
                     draft.requestId = UUID().uuidString.lowercased()
                 }
             }
-            .navigationTitle(text("기억", "Memory"))
+            .navigationTitle(document == nil ? text("기억 추가", "Add memory") : text("기억 편집", "Edit memory"))
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(text("닫기", "Close")) { dismiss() }.accessibilityIdentifier("dm-memory-editor-close")
                 }
-                if store.writable && !readOnly {
+                if store.writable {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(store.busy ? text("저장 중", "Saving") : text("저장", "Save")) {
                             Task { if await store.save(draft, documentID: document?.id) { dismiss() } }
