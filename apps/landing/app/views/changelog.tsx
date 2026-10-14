@@ -30,6 +30,19 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.234",
+        date: "2026년 10월 14일",
+        title: "에이전트 기억이 새 저장소 하나로 정리되었습니다",
+        summary:
+          "이전 기억 시스템을 걷어내고, 에이전트가 새 기억 저장소만 쓰도록 정리했습니다. 데스크톱 앱에서도 에이전트가 기억 도구를 쓸 수 있습니다.",
+        items: [
+          "데스크톱 앱이 에이전트 기억 도구를 함께 설치해, 이 컴퓨터의 에이전트도 작업 중 기억을 조회하고 기록합니다.",
+          "이전 기억 시스템(자동 학습, 검색 인덱스)을 제거했습니다. 기존 기억은 새 저장소로 옮겨 그대로 유지됩니다.",
+          "기억 설정 화면에서 이전 시스템 전용 항목을 정리했습니다.",
+          "DM 답변이 실패하면 대화 내용이 담길 수 있는 오류 문구 대신 고정된 안내만 표시합니다.",
+        ],
+      },
+      {
         version: "1.2.233",
         date: "2026년 10월 14일",
         title: "에이전트가 일하면서 스스로 기억을 관리합니다",
@@ -2101,6 +2114,19 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.234",
+        date: "October 14, 2026",
+        title: "Agent memory now lives in one store",
+        summary:
+          "The previous memory system is gone and agents use only the new memory store. Agents on the desktop app can now use their memory tools too.",
+        items: [
+          "The desktop app installs the agent memory tools, so agents on this computer can look up and record memory while they work.",
+          "The previous memory system (automatic learning and its search index) was removed. Existing memories were moved to the new store and are kept.",
+          "Memory settings no longer show options that only the previous system used.",
+          "When a DM reply fails, Briar shows a fixed notice instead of error text that could repeat the conversation.",
+        ],
+      },
       {
         version: "1.2.233",
         date: "October 14, 2026",
