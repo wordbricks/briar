@@ -4,7 +4,8 @@ import XCTest
 
 final class DmMemoryTreeTests: XCTestCase {
     private func document(
-        _ id: String, path: String?, type: String? = nil, status: String? = nil, readOnly: Bool = false
+        _ id: String, path: String?, type: String? = nil, status: String? = nil, readOnly: Bool = false,
+        protected: Bool = false
     ) -> DmMemoryDocument {
         var document = DmMemoryDocument()
         document.id = id
@@ -15,6 +16,7 @@ final class DmMemoryTreeTests: XCTestCase {
         if let type { document.recordType = type }
         if let status { document.recordStatus = status }
         document.readOnly = readOnly
+        document.protectedByUser = protected
         return document
     }
 
@@ -64,5 +66,24 @@ final class DmMemoryTreeTests: XCTestCase {
         XCTAssertEqual(children(root).map(\.name), ["synthetic"])
         guard case let .file(_, _, synthetic) = children(root)[0] else { return XCTFail("expected a file") }
         XCTAssertEqual(synthetic.treeDetails, ["note", "r2"])
+    }
+
+    func testPreviewNamesAFileByItsLastPathSegmentOrItsTitle() {
+        XCTAssertEqual(document("jane", path: "entities/people/jane.md").fileName, "jane.md")
+        XCTAssertEqual(document("readme", path: "README.md").fileName, "README.md")
+        // A server before the folder tree sends no path.
+        XCTAssertEqual(document("synthetic", path: nil).fileName, "synthetic")
+    }
+
+    func testMetaLineAddsReadOnlyAndProtectionInTheUsersLanguage() {
+        let jane = document("jane", path: "entities/people/jane.md", type: "person", protected: true)
+        XCTAssertEqual(jane.detailLabels(locale: .ko), ["person", "r2", "사용자 보호"])
+        XCTAssertEqual(jane.detailLabels(locale: .en), ["person", "r2", "User protected"])
+        let readme = document("readme", path: "README.md", type: "readme", readOnly: true)
+        XCTAssertEqual(readme.detailLabels(locale: .ko), ["readme", "읽기 전용"])
+        let launch = document("launch", path: "workstreams/launch.md", type: "workstream", status: "active")
+        XCTAssertEqual(launch.detailLabels(locale: .en), ["workstream", "active", "r2"])
+        // An empty record type falls back to the legacy memory class.
+        XCTAssertEqual(document("synthetic", path: nil).detailLabels(locale: .en), ["note", "r2"])
     }
 }

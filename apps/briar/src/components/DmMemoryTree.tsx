@@ -72,7 +72,7 @@ export function DmMemoryTree({ folders, documents, selectedId, disabled, onOpen 
   }
 
   return <ul role="tree" aria-label={t("memory.tree")}
-    className="grid gap-px rounded-lg border border-border p-1 font-mono text-sm">
+    className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-px font-mono text-sm">
     {rows.map((row, index) => {
       const { node } = row;
       const folder = node.kind === "folder" ? node : null;
@@ -92,7 +92,7 @@ export function DmMemoryTree({ folders, documents, selectedId, disabled, onOpen 
         onClick={() => { setFocusKey(node.key); activate(row); }}
         style={{ paddingLeft: `${(row.level - 1) * 1.125 + 0.25}rem` }}
         className={cn(
-          "flex min-h-7 cursor-pointer select-none items-center gap-1.5 rounded-md pr-2 outline-none",
+          "flex min-h-7 min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-md pr-2 outline-none",
           "hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring",
           selected && "bg-accent text-accent-foreground",
           empty && "text-muted-foreground/70",
@@ -103,9 +103,9 @@ export function DmMemoryTree({ folders, documents, selectedId, disabled, onOpen 
         {folder
           ? (expanded ? <FolderOpen aria-hidden size={15} className="shrink-0" /> : <Folder aria-hidden size={15} className="shrink-0" />)
           : <FileText aria-hidden size={15} className="shrink-0 text-muted-foreground" />}
-        <span className={cn("min-w-0 truncate", folder && !empty && "font-medium")}>{node.name}</span>
+        <span className={cn("min-w-0 truncate", node.kind === "file" && "shrink-0 max-w-[75%]", folder && !empty && "font-medium")}>{node.name}</span>
         {folder && folder.fileCount > 0 && <span className="text-xs text-muted-foreground">{folder.fileCount}</span>}
-        {node.kind === "file" && <span className="ml-auto shrink-0 pl-3 font-sans text-xs text-muted-foreground">
+        {node.kind === "file" && <span className="ml-auto min-w-0 truncate pl-3 font-sans text-xs text-muted-foreground">
           {[
             ...dmMemoryFileDetails(node.document),
             ...(node.document.readOnly ? [t("memory.readOnly")] : []),
