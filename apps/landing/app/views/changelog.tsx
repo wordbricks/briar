@@ -30,6 +30,22 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.233",
+        date: "2026년 10월 14일",
+        title: "에이전트가 일하면서 스스로 기억을 관리합니다",
+        summary:
+          "에이전트가 대화와 작업 중에 기억을 직접 조회하고 기록하며, 새 실행에서도 이어서 씁니다. 새 도메인 briar.onequery.dev, 모바일 화면 개선과 의존성 보안 업데이트도 포함됩니다.",
+        items: [
+          "에이전트 기억이 Cloudflare Artifacts에 버전 이력과 함께 저장되고, 에이전트가 작업 중 기억을 조회·검색·기록합니다.",
+          "DM 기억은 사용자별로, 그룹 채널과 프로젝트 기억은 각각 분리되어 서로 섞이지 않습니다.",
+          "답변 문체와 지속 규칙, 실수에서 배운 교훈을 기억해 다음 답변과 작업에 반영합니다.",
+          "기억을 삭제하면 과거 이력까지 지워집니다.",
+          "Briar의 기본 주소가 briar.onequery.dev로 바뀌었습니다. 기존 주소도 계속 동작합니다.",
+          "휴대폰 화면에서 내비게이션이 닫을 수 있는 서랍으로 바뀌고, 받은함·이슈 화면이 좁은 폭에 맞게 정리되었습니다.",
+          "보안 경고가 있던 의존성을 업데이트했습니다.",
+        ],
+      },
+      {
         version: "1.2.232",
         date: "2026년 9월 26일",
         title: "이슈 관리와 알림이 더 선명해졌습니다",
@@ -2085,6 +2101,22 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.233",
+        date: "October 14, 2026",
+        title: "Agents keep their own memory while they work",
+        summary:
+          "Agents now look up and record memory during conversations and tasks, and pick it up again in later runs. This release also moves Briar to briar.onequery.dev, improves phone layouts and updates dependencies with security advisories.",
+        items: [
+          "Agent memory is stored in Cloudflare Artifacts with full version history, and agents read, search and record it while they work.",
+          "DM memory is kept per person, and group channel and project memory are kept separately, so they never mix.",
+          "Agents remember reply style, standing reply rules and lessons from their own mistakes, and apply them to later replies and tasks.",
+          "Deleting a memory also removes it from the stored history.",
+          "Briar's primary address is now briar.onequery.dev; the previous address keeps working.",
+          "On phones, navigation moves into a dismissible drawer, and the inbox and issue views fit narrow screens.",
+          "Dependencies with security advisories were updated.",
+        ],
+      },
       {
         version: "1.2.232",
         date: "September 26, 2026",
