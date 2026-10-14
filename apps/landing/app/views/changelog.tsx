@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.236",
+        date: "2026년 10월 14일",
+        title: "기억 창에서 폴더와 내용을 나란히 봅니다",
+        summary:
+          "DM 기억 창이 넓어지고, 왼쪽 폴더 트리에서 고른 기억을 오른쪽에서 바로 미리 봅니다.",
+        items: [
+          "기억 창이 커지고 왼쪽에 폴더 트리, 오른쪽에 선택한 기억의 미리보기가 표시됩니다.",
+          "미리보기에서 바로 편집하고 변경 이력을 보거나 삭제할 수 있습니다.",
+          "좁은 화면에서는 폴더와 미리보기를 한 화면씩 오갑니다.",
+        ],
+      },
+      {
         version: "1.2.235",
         date: "2026년 10월 14일",
         title: "기억을 폴더 구조로 봅니다",
@@ -2126,6 +2138,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.236",
+        date: "October 14, 2026",
+        title: "Folders and memory side by side",
+        summary:
+          "The DM memory window is larger, with the folder tree on the left and a preview of the selected memory on the right.",
+        items: [
+          "A larger memory window shows the folder tree on the left and the selected memory's preview on the right.",
+          "Edit, review history or delete straight from the preview.",
+          "On narrow screens, move between the folders and the preview one screen at a time.",
+        ],
+      },
       {
         version: "1.2.235",
         date: "October 14, 2026",
