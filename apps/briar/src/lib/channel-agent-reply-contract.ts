@@ -4,7 +4,7 @@ import * as SchemaTransformation from "effect/SchemaTransformation";
 import { agentReplyAttachmentPathsProviderSchema } from "./agent-reply-contract";
 import {
   channelMessageBodySchema,
-  channelMemoryCitationSchema,
+  channelReplyMemoryCitationSchema,
   channelMemorySaveRequestSchema,
   channelReplyCompletionFields,
   channelReplyCompletionSchema,
@@ -70,7 +70,7 @@ const ChannelAgentReplyProviderSourceSchema = strict(Schema.Struct({
     mutableArray(dmMemoryRequestSchema).check(Schema.isLengthBetween(1, 1)),
   ),
   memoryCitations: Schema.NullOr(
-    mutableArray(channelMemoryCitationSchema).check(Schema.isMaxLength(10)),
+    mutableArray(channelReplyMemoryCitationSchema).check(Schema.isMaxLength(10)),
   ),
   memorySaveRequest: Schema.NullOr(channelMemorySaveRequestSchema),
   // Optional, not required: only a turn that may check the repository out is

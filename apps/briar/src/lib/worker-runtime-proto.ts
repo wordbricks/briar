@@ -40,6 +40,10 @@ export type WorkerRuntimeInput = {
     readonly protocol: 1;
     readonly providers: ReadonlyArray<AgentProvider>;
   };
+  /** `tools memory …` and per-turn vault context (docs/plans/memory-vault-spec.md). */
+  readonly memoryVault?: {
+    readonly protocol: 1;
+  };
   readonly computerUse?: {
     readonly protocol: 1;
     readonly transport: "connectrpc-resource-exec";
@@ -135,6 +139,7 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
             ),
           }
         : undefined,
+      memoryVaultProtocol: input.memoryVault?.protocol,
     },
     versions: { ...input.versions },
   });

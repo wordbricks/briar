@@ -77,9 +77,16 @@ import {
 } from "./worktree-commands";
 import {
   createAuthenticatedWorkerExecutionClient,
+  createWorkerQueueClient,
   workClaimIdentityToProto,
 } from "./worker-queue-client";
 import { workerRunEventRequest } from "./run-event-proto";
+import {
+  closeMemoryVault,
+  openMemoryVaultInvocation,
+  runWithMemoryVault,
+  type MemoryVaultInvocation,
+} from "./memory-vault-invocation";
 
 const activeReplyActivityPublishers = new Map<
   string,
@@ -390,11 +397,22 @@ async function runClaimedIssueInRuntime(
   let nextPrompt = prompt;
   let turnNumber = 0;
   let consecutiveProviderTurnFailures = 0;
+  const workerId = activeProject.executionWorker?.workerId;
+  const memoryVault: MemoryVaultInvocation | null = workerId
+    ? await openMemoryVaultInvocation({
+        queue: createWorkerQueueClient(config.apiUrl, workerToken),
+        projectId: project.id,
+        workerId,
+        work: issue,
+        personFacing: false,
+        signal,
+      })
+    : null;
   try {
     for (;;) {
       turnNumber += 1;
       let runnerBlock: ReturnType<typeof detachedProviderBlockFromPayload> = null;
-      const turn = await runDetachedProviderTurn({
+      const turn = await runWithMemoryVault(memoryVault, {
         agent: detachedAgent,
         prompt: nextPrompt,
         workspacePath: workspace.path,
@@ -432,7 +450,7 @@ async function runClaimedIssueInRuntime(
             );
           }
         },
-      });
+      }, (turnInput) => runDetachedProviderTurn(turnInput));
       await transcriptBatcher.flush();
       conversationId = turn.conversationId;
       if (runnerBlock) {
@@ -524,6 +542,7 @@ async function runClaimedIssueInRuntime(
     }
     throw error;
   } finally {
+    await closeMemoryVault(memoryVault);
     await transcriptBatcher.flush();
     const usageObservations = usageCollector.finish();
     const usageRecords = agentExecutionUsageRecordsFromObservations(

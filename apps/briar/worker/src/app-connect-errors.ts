@@ -5,10 +5,13 @@ import {
 } from "@connectrpc/connect";
 import {
   ApplicationErrorDetailSchema,
+  RevisionConflictDetailSchema,
+  RevisionConflictReason,
   ValidationErrorDetailSchema} from "@briar/contracts/gen/briar/types/v1/error_pb";
 import * as SchemaIssue from "effect/SchemaIssue";
 import { agentSkillConflictMessage } from "./agent-skills";
 import { HttpError } from "./http-response";
+import { MemoryVaultError } from "./memory-vault/errors";
 import {
   WorkspaceAgentContextCursorError,
   WorkspaceAgentContextPageTooLargeError,
@@ -121,6 +124,30 @@ export const toConnectError = (error: unknown): ConnectError => {
       Code.FailedPrecondition,
       undefined,
       undefined,
+      error,
+    );
+  }
+  if (error instanceof MemoryVaultError && error.details.currentRevision !== undefined) {
+    // The memory tools read the current revision from here to tell the agent
+    // what to re-read and merge.
+    return new ConnectError(
+      error.message,
+      connectCodeFromHttpStatus(error.status),
+      undefined,
+      [
+        { desc: ApplicationErrorDetailSchema, value: { code: error.vaultCode } },
+        {
+          desc: RevisionConflictDetailSchema,
+          value: {
+            resourceId: error.details.recordId ?? "",
+            expectedRevision: error.details.expectedRevision === undefined
+              ? undefined
+              : BigInt(error.details.expectedRevision),
+            actualRevision: BigInt(error.details.currentRevision),
+            reason: RevisionConflictReason.STALE_WRITE,
+          },
+        },
+      ],
       error,
     );
   }

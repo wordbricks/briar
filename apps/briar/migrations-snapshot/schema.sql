@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 39d7e9efe812138876763096aea5c60b527c8a0e54d44f2e93f45303ecec761f
--- snapshot-digest: 6bfc108718dd5436ee939d53766a5433989b7ddef8b7fca32bf42f672690cc77
+-- migrations-digest: 9fbc6c310f3fa0460d432cd45819bbf403684311ee2d74dde07788220e965553
+-- snapshot-digest: ec97def6aaa8a2192515ff0e5e05ef2b00b44b8b13b03bb9455d53648f1356a4
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3868,6 +3868,152 @@ CREATE TABLE briar_issue_attachments (
   created_at text not null
 );
 -- @statement
+CREATE TABLE briar_memory_vault_scope_kinds (
+  scope_kind text primary key not null
+    check (scope_kind = lower(trim(scope_kind)) and length(scope_kind) between 1 and 32)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_states (
+  state text primary key not null
+    check (state = lower(trim(state)) and length(state) between 1 and 32)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_record_types (
+  record_type text primary key not null
+    check (record_type = lower(trim(record_type)) and length(record_type) between 1 and 32),
+  path_template text not null unique
+    check (length(path_template) between 4 and 100 and path_template glob '*.md')
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vaults (
+  id text primary key not null check (length(id) = 36),
+  organization_id text not null references briar_organizations (id) on delete cascade,
+  agent_id text not null references briar_project_agents (id) on delete cascade,
+  scope_kind text not null references briar_memory_vault_scope_kinds (scope_kind),
+  scope_key text not null check (length(scope_key) between 1 and 200),
+  owner_user_id text check (owner_user_id is null or length(owner_user_id) between 1 and 200),
+  dm_space_id text references briar_dm_memory_spaces (id) on delete cascade,
+  repo_name text not null unique check (length(repo_name) between 1 and 100),
+  generation integer not null default 1 check (generation >= 1),
+  head_commit text check (
+    head_commit is null
+    or (length(head_commit) = 40 and head_commit not glob '*[^0-9a-f]*')
+  ),
+  synced_at text,
+  state text not null default 'active' references briar_memory_vault_states (state),
+  created_at text not null,
+  updated_at text not null,
+  unique (organization_id, agent_id, scope_kind, scope_key),
+  check ((dm_space_id is null) = (owner_user_id is null)),
+  check (dm_space_id is null or scope_key = dm_space_id)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_records (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  record_id text not null check (length(record_id) between 1 and 63),
+  record_type text not null references briar_memory_record_types (record_type),
+  path text not null check (length(path) between 4 and 200 and path glob '*.md'),
+  status text check (status is null or length(status) between 1 and 32),
+  aliases_json text not null default '[]'
+    check (json_valid(aliases_json) and json_type(aliases_json) = 'array'),
+  revision integer not null check (revision >= 1),
+  commit_sha text not null check (length(commit_sha) = 40),
+  protected_by_user integer not null default 0 check (protected_by_user in (0, 1)),
+  created_at text not null,
+  updated_at text not null,
+  deleted_at text,
+  primary key (vault_id, record_id)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_revisions (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  record_id text not null check (length(record_id) between 1 and 63),
+  revision integer not null check (revision >= 1),
+  commit_sha text not null check (length(commit_sha) = 40),
+  path text not null check (length(path) between 4 and 200),
+  actor text not null check (length(actor) between 1 and 200),
+  created_at text not null,
+  primary key (vault_id, record_id, revision)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_requests (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  request_id text not null check (length(request_id) between 1 and 200),
+  payload_hash text not null
+    check (length(payload_hash) = 64 and payload_hash not glob '*[^0-9a-f]*'),
+  commit_sha text check (commit_sha is null or length(commit_sha) = 40),
+  result_json text not null check (json_valid(result_json)),
+  created_at text not null,
+  primary key (vault_id, request_id)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_claim_reads (
+  claim_token_hash text not null
+    check (length(claim_token_hash) = 64 and claim_token_hash not glob '*[^0-9a-f]*'),
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  record_id text not null check (length(record_id) between 1 and 63),
+  revision integer not null check (revision >= 1),
+  work_id text not null check (length(work_id) between 1 and 200),
+  read_at text not null,
+  primary key (claim_token_hash, vault_id, record_id, revision)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_purges (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  source_generation integer not null check (source_generation >= 1),
+  paths_json text not null
+    check (json_valid(paths_json) and json_type(paths_json) = 'array'),
+  requested_at text not null,
+  started_at text,
+  lease_token text check (lease_token is null or length(lease_token) = 36),
+  lease_expires_at text,
+  attempts integer not null default 0 check (attempts >= 0),
+  last_error text check (last_error is null or length(last_error) <= 2000),
+  switched_at text,
+  completed_at text,
+  updated_at text not null,
+  primary key (vault_id, source_generation)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_legacy_map (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  document_id text not null check (length(document_id) between 1 and 200),
+  document_version integer not null check (document_version >= 1),
+  record_id text not null check (length(record_id) between 1 and 63),
+  revision integer not null check (revision >= 1),
+  commit_sha text not null check (length(commit_sha) = 40),
+  body_hash text not null
+    check (length(body_hash) = 64 and body_hash not glob '*[^0-9a-f]*'),
+  created_at text not null,
+  primary key (vault_id, document_id, document_version)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_reply_citations (
+  message_id text not null references briar_channel_messages (id) on delete cascade,
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  record_id text not null check (length(record_id) between 1 and 63),
+  revision integer not null check (revision >= 1),
+  created_at text not null,
+  primary key (message_id, vault_id, record_id, revision)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_legacy_migrations (
+  space_id text primary key not null references briar_dm_memory_spaces (id) on delete cascade,
+  attempts integer not null default 0 check (attempts >= 0),
+  versions_migrated integer not null default 0 check (versions_migrated >= 0),
+  
+  
+  skipped_json text not null default '[]'
+    check (json_valid(skipped_json) and json_type(skipped_json) = 'array'),
+  last_error text check (last_error is null or length(last_error) <= 2000),
+  next_attempt_at text,
+  lease_token text check (lease_token is null or length(lease_token) = 36),
+  lease_expires_at text,
+  
+  verified_at text,
+  updated_at text not null
+) strict;
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -3931,6 +4077,50 @@ INSERT INTO "briar_dm_message_purposes" ("purpose","proto_name") VALUES('convers
 INSERT INTO "briar_dm_message_publication_kinds" ("publication_kind","proto_name") VALUES('intermediate','DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE');
 -- @statement
 INSERT INTO "briar_dm_message_publication_kinds" ("publication_kind","proto_name") VALUES('final','DM_MESSAGE_PUBLICATION_KIND_FINAL');
+-- @statement
+INSERT INTO "briar_memory_vault_scope_kinds" ("scope_kind") VALUES('dm');
+-- @statement
+INSERT INTO "briar_memory_vault_scope_kinds" ("scope_kind") VALUES('group');
+-- @statement
+INSERT INTO "briar_memory_vault_scope_kinds" ("scope_kind") VALUES('project');
+-- @statement
+INSERT INTO "briar_memory_vault_states" ("state") VALUES('active');
+-- @statement
+INSERT INTO "briar_memory_vault_states" ("state") VALUES('purging');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('person','entities/people/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('org','entities/orgs/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('tool','entities/tools/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('project','entities/projects/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('infrastructure','entities/infrastructure/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('comms','comms/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('workstream','workstreams/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('fact','knowledge/facts/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('procedure','knowledge/procedures/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('preference','knowledge/preferences/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('decision','knowledge/decisions/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('lesson','knowledge/lessons/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('playbook','playbook.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('timeline-weekly','timeline/weekly/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('timeline-monthly','timeline/monthly/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('browser-guidance','browser-guidance/attempts/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('timeline-daily','timeline/daily/{id}.md');
 -- @statement
 CREATE VIEW briar_run_child_storage_a_project_mismatches as
 select child.project_id as stale_project_id,
@@ -5214,6 +5404,36 @@ CREATE INDEX briar_issue_attachments_run_idx
 -- @statement
 CREATE INDEX briar_issue_attachments_project_idx
   on briar_issue_attachments (project_id, run_id);
+-- @statement
+CREATE INDEX briar_memory_vaults_dm_space on briar_memory_vaults (dm_space_id)
+where dm_space_id is not null;
+-- @statement
+CREATE UNIQUE INDEX briar_memory_vault_records_live_path
+on briar_memory_vault_records (vault_id, path)
+where deleted_at is null;
+-- @statement
+CREATE INDEX briar_memory_vault_records_recent
+on briar_memory_vault_records (vault_id, updated_at desc, record_id)
+where deleted_at is null;
+-- @statement
+CREATE INDEX briar_memory_vault_revisions_commit
+on briar_memory_vault_revisions (vault_id, commit_sha);
+-- @statement
+CREATE INDEX briar_memory_vault_claim_reads_age
+on briar_memory_vault_claim_reads (read_at);
+-- @statement
+CREATE INDEX briar_memory_vault_purges_open
+on briar_memory_vault_purges (lease_expires_at)
+where completed_at is null;
+-- @statement
+CREATE INDEX briar_memory_vault_legacy_map_record
+on briar_memory_vault_legacy_map (vault_id, record_id);
+-- @statement
+CREATE INDEX briar_memory_vault_reply_citations_record
+on briar_memory_vault_reply_citations (vault_id, record_id);
+-- @statement
+CREATE INDEX briar_memory_vault_legacy_migrations_due
+on briar_memory_vault_legacy_migrations (next_attempt_at);
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN

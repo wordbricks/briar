@@ -65,6 +65,10 @@ message WorkerCapabilities {
   optional ComputerUseCapability computer_use = 9;
   optional DmPublicMessageCapability dm_public_messages = 10;
   optional DmPublicMessageCapability dm_reply_routing = 11;
+  // Memory vault tools (`tools memory …`) and per-turn vault context
+  // (docs/plans/memory-vault-spec.md). Absence and zero mean the Worker CLI
+  // predates the vault and gets no memory in a vault-backed scope.
+  optional uint32 memory_vault_protocol = 12;
 }
 
 // Public DM output is negotiated independently from memory and computer use.

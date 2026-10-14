@@ -28,6 +28,16 @@ import {
   type DmMemoryVectorStore,
 } from "./dm-memory-vector-store";
 import { HttpError } from "./http-response";
+import { memoryVaultEnabled } from "./memory-vault/flag";
+
+/**
+ * Legacy recall is off after the vault cutover: a claim bound before the
+ * switch (or an old Worker CLI) gets a disabled descriptor, no brief and an
+ * unavailable lookup, so it degrades to "no memory" instead of reading D1
+ * memory the vault no longer mirrors (memory-vault spec §11).
+ */
+const legacyRecallEnabled = (env: Env) =>
+  String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true" && !memoryVaultEnabled(env);
 
 export type DmMemoryClaimScope = {
   readonly jobId: string;
@@ -118,7 +128,7 @@ export async function checkDmMemoryClaim(
   scope: DmMemoryClaimScope,
 ) {
   const claim = await activeClaim(db, scope);
-  return dmMemoryDescriptor(claim.space, String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true");
+  return dmMemoryDescriptor(claim.space, legacyRecallEnabled(env));
 }
 
 export async function getDmMemoryClaimBrief(
@@ -129,7 +139,7 @@ export async function getDmMemoryClaimBrief(
   const claim = await activeClaim(db, scope);
   const memory = dmMemoryDescriptor(
     claim.space,
-    String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
+    legacyRecallEnabled(env),
   );
   const brief = memory.searchEnabled
     ? await getDmMemoryBrief(db, dmMemoryClaimAccess(claim.space))
@@ -165,7 +175,7 @@ export async function lookupDmMemoryClaim(
   const claim = await activeClaim(db, scope);
   const descriptor = dmMemoryDescriptor(
     claim.space,
-    String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
+    legacyRecallEnabled(env),
   );
   if (!descriptor.searchEnabled) {
     throw new HttpError(503, "Memory retrieval is disabled", "memory_unavailable");

@@ -1,5 +1,11 @@
 # DM memory operations
 
+> **Storage moved (2026-10).** With `MEMORY_VAULT_ENABLED=true` DM memory is
+> stored in the memory vault on Cloudflare Artifacts, and the D1 path below
+> (brief, lookup, learning, owner dialog) is off. The D1 rows stay as the
+> rollback copy. See [memory-vault.md](memory-vault.md) for rollout, the
+> D1 → vault migration and rollback.
+
 The [SPEC](../plans/dm-memory-spec.md) defines ownership and behavior. The
 [delivery log](../plans/dm-memory-delivery.md) distinguishes merged foundations
 from enabled recall and learning. Recall is an owner opt-in even when its Worker

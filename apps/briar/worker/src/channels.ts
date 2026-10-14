@@ -20,6 +20,10 @@ import {
 } from "./dm-memory-reply-fence";
 import { dmLearningReplyOutboxStatements } from "./dm-memory-learning-queue";
 import {
+  memoryVaultCitationStatement,
+  type AcceptedMemoryVaultCitation,
+} from "./memory-vault/citations";
+import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
   type ChannelReplyUnavailableReason,
@@ -4813,6 +4817,13 @@ export async function failChannelReply(
 export type ChannelReplyCompletionInput = {
   acknowledgementReaction?: string | null;
   memoryCitations?: readonly { documentId: string; version: number }[] | null;
+  /** Vault citations completion already accepted (memory-vault spec §8). */
+  memoryVaultCitations?: readonly AcceptedMemoryVaultCitation[];
+  /**
+   * `MEMORY_VAULT_ENABLED`: the legacy learning outbox (extract,
+   * explicit_request) is not written; the agent keeps memory with its tools.
+   */
+  memoryVaultCutover?: boolean;
   memorySaveRequest?: {
     readonly documents: readonly { documentId: string; version: number }[];
   } | null;
@@ -4902,7 +4913,8 @@ export async function completeChannelReply(
   if (
     input.publishedFinalBatchId &&
     (artifactRequested || delegation || agentMessage ||
-      input.memoryCitations?.length || input.memorySaveRequest ||
+      input.memoryCitations?.length || input.memoryVaultCitations?.length ||
+      input.memorySaveRequest ||
       input.attachments?.length)
   ) {
     throw new Error(
@@ -5408,13 +5420,24 @@ export async function completeChannelReply(
       references: input.memoryCitations,
     }));
   }
-  statements.push(...dmLearningReplyOutboxStatements(db, {
-    jobId: input.jobId,
-    claimTokenHash: input.claimTokenHash,
-    completedAt: input.completedAt,
-    explicitRequested: input.memorySaveRequest != null,
-    requestTargets: input.memorySaveRequest?.documents,
-  }));
+  if (input.memoryVaultCitations?.length) {
+    statements.push(memoryVaultCitationStatement(db, {
+      jobId: input.jobId,
+      claimTokenHash: input.claimTokenHash,
+      messageId: job.reply_message_id,
+      completedAt: input.completedAt,
+      citations: input.memoryVaultCitations,
+    }));
+  }
+  if (!input.memoryVaultCutover) {
+    statements.push(...dmLearningReplyOutboxStatements(db, {
+      jobId: input.jobId,
+      claimTokenHash: input.claimTokenHash,
+      completedAt: input.completedAt,
+      explicitRequested: input.memorySaveRequest != null,
+      requestTargets: input.memorySaveRequest?.documents,
+    }));
+  }
   for (const attachment of input.attachments ?? []) {
     statements.push(
       db

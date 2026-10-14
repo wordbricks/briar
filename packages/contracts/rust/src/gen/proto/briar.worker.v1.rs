@@ -44855,6 +44855,4485 @@ pub const __EXECUTE_DM_SCHEDULE_TOOL_RESPONSE_JSON_ANY: ::buffa::type_registry::
     from_json: ::buffa::type_registry::any_from_json::<ExecuteDmScheduleToolResponse>,
     is_wkt: false,
 };
+/// Memory vault (docs/plans/memory-vault-spec.md). The server derives the one
+/// vault a run may touch from the claim alone: no request names an
+/// organization, owner, Agent, channel, project or vault. Tool failures are
+/// Connect errors carrying briar.types.v1.ApplicationErrorDetail with the stable
+/// code (revision_conflict, expected_revision_required, protected_record,
+/// type_mismatch, memory_disabled, write_not_allowed, secret_detected,
+/// invalid_record, frontmatter_not_allowed, readme_read_only, not_found, busy,
+/// memory_unavailable, idempotency_conflict, claim_inactive, invalid_request).
+/// revision_conflict and expected_revision_required also carry
+/// briar.types.v1.RevisionConflictDetail with the record's current revision.
+/// busy and memory_unavailable are retryable.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultClaim {
+    /// Field 1: `project_id`
+    #[serde(
+        rename = "projectId",
+        alias = "project_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub project_id: ::buffa::alloc::string::String,
+    /// Field 2: `worker_id`
+    #[serde(
+        rename = "workerId",
+        alias = "worker_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub worker_id: ::buffa::alloc::string::String,
+    /// An active issue, issue_reply, channel_reply or project_agent_task claim.
+    /// Other or unknown variants fail closed.
+    ///
+    /// Field 3: `work`
+    #[serde(
+        rename = "work",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub work: ::buffa::MessageField<
+        WorkClaimIdentity,
+        ::buffa::Inline<WorkClaimIdentity>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultClaim {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultClaim")
+            .field("project_id", &self.project_id)
+            .field("worker_id", &self.worker_id)
+            .field("work", &self.work)
+            .finish()
+    }
+}
+impl MemoryVaultClaim {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultClaim";
+}
+::buffa::impl_default_instance!(MemoryVaultClaim);
+impl ::buffa::MessageName for MemoryVaultClaim {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultClaim";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultClaim";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultClaim";
+}
+impl ::buffa::Message for MemoryVaultClaim {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.project_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.project_id) as u64;
+        }
+        if !self.worker_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+        }
+        if self.work.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.work.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.project_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+        }
+        if !self.worker_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.worker_id, buf);
+        }
+        if self.work.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.work.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.project_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.worker_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.work.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.project_id.clear();
+        self.worker_id.clear();
+        self.work = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultClaim {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultClaim";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultClaim {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_CLAIM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultClaim",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultClaim>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultClaim>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultRecordSummary {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// A record type from the vault layout, or "readme" for the README.
+    ///
+    /// Field 2: `type`
+    #[serde(
+        rename = "type",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub r#type: ::buffa::alloc::string::String,
+    /// Field 3: `path`
+    #[serde(
+        rename = "path",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub path: ::buffa::alloc::string::String,
+    /// Field 4: `status`
+    #[serde(rename = "status", skip_serializing_if = "::core::option::Option::is_none")]
+    pub status: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `aliases`
+    #[serde(
+        rename = "aliases",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub aliases: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 6: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub revision: u32,
+    /// Field 7: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub updated_at: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 8: `protected_by_user`
+    #[serde(
+        rename = "protectedByUser",
+        alias = "protected_by_user",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub protected_by_user: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultRecordSummary {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultRecordSummary")
+            .field("id", &self.id)
+            .field("type", &self.r#type)
+            .field("path", &self.path)
+            .field("status", &self.status)
+            .field("aliases", &self.aliases)
+            .field("revision", &self.revision)
+            .field("updated_at", &self.updated_at)
+            .field("protected_by_user", &self.protected_by_user)
+            .finish()
+    }
+}
+impl MemoryVaultRecordSummary {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultRecordSummary";
+}
+impl MemoryVaultRecordSummary {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::status`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_status(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.status = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::updated_at`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_updated_at(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.updated_at = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultRecordSummary);
+impl ::buffa::MessageName for MemoryVaultRecordSummary {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultRecordSummary";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultRecordSummary";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultRecordSummary";
+}
+impl ::buffa::Message for MemoryVaultRecordSummary {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.r#type.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.r#type) as u64;
+        }
+        if !self.path.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.path) as u64;
+        }
+        if let Some(ref v) = self.status {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.aliases {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.revision != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.revision) as u64;
+        }
+        if let Some(ref v) = self.updated_at {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.protected_by_user {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.r#type.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.r#type, buf);
+        }
+        if !self.path.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.path, buf);
+        }
+        if let Some(ref v) = self.status {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        for v in &self.aliases {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if self.revision != 0u32 {
+            ::buffa::types::put_uint32_field(6u32, self.revision, buf);
+        }
+        if let Some(ref v) = self.updated_at {
+            ::buffa::types::put_string_field(7u32, v, buf);
+        }
+        if self.protected_by_user {
+            ::buffa::types::put_bool_field(8u32, self.protected_by_user, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.r#type, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.path, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.status.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.aliases.push(__elem);
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint32(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .updated_at
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.protected_by_user = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.r#type.clear();
+        self.path.clear();
+        self.status = ::core::option::Option::None;
+        self.aliases.clear();
+        self.revision = 0u32;
+        self.updated_at = ::core::option::Option::None;
+        self.protected_by_user = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultRecordSummary {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultRecordSummary";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultRecordSummary {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_RECORD_SUMMARY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultRecordSummary",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultRecordSummary>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultRecordSummary>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultListRequest {
+    /// Field 1: `claim`
+    #[serde(
+        rename = "claim",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub claim: ::buffa::MessageField<
+        MemoryVaultClaim,
+        ::buffa::Inline<MemoryVaultClaim>,
+    >,
+    /// Field 2: `type`
+    #[serde(rename = "type", skip_serializing_if = "::core::option::Option::is_none")]
+    pub r#type: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 3: `prefix`
+    #[serde(rename = "prefix", skip_serializing_if = "::core::option::Option::is_none")]
+    pub prefix: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `status`
+    #[serde(rename = "status", skip_serializing_if = "::core::option::Option::is_none")]
+    pub status: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `cursor`
+    #[serde(rename = "cursor", skip_serializing_if = "::core::option::Option::is_none")]
+    pub cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 6: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub limit: ::core::option::Option<u32>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultListRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultListRequest")
+            .field("claim", &self.claim)
+            .field("type", &self.r#type)
+            .field("prefix", &self.prefix)
+            .field("status", &self.status)
+            .field("cursor", &self.cursor)
+            .field("limit", &self.limit)
+            .finish()
+    }
+}
+impl MemoryVaultListRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultListRequest";
+}
+impl MemoryVaultListRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets `type` to `Some(value)`, consuming and returning `self`.
+    pub fn with_type(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.r#type = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::prefix`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_prefix(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.prefix = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::status`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_status(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.status = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::cursor`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_cursor(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::limit`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_limit(mut self, value: u32) -> Self {
+        self.limit = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultListRequest);
+impl ::buffa::MessageName for MemoryVaultListRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultListRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultListRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultListRequest";
+}
+impl ::buffa::Message for MemoryVaultListRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.claim.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.claim.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.r#type {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.prefix {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.status {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.cursor {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.limit {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.claim.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.claim.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.r#type {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if let Some(ref v) = self.prefix {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.status {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.cursor {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if let Some(v) = self.limit {
+            ::buffa::types::put_uint32_field(6u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.claim.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.r#type.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.prefix.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.status.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.cursor.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.claim = ::buffa::MessageField::none();
+        self.r#type = ::core::option::Option::None;
+        self.prefix = ::core::option::Option::None;
+        self.status = ::core::option::Option::None;
+        self.cursor = ::core::option::Option::None;
+        self.limit = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultListRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultListRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultListRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_LIST_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultListRequest",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultListRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultListRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultListResponse {
+    /// Newest update first; the README leads the first page.
+    ///
+    /// Field 1: `records`
+    #[serde(
+        rename = "records",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub records: ::buffa::alloc::vec::Vec<MemoryVaultRecordSummary>,
+    /// Field 2: `next_cursor`
+    #[serde(
+        rename = "nextCursor",
+        alias = "next_cursor",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub next_cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultListResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultListResponse")
+            .field("records", &self.records)
+            .field("next_cursor", &self.next_cursor)
+            .finish()
+    }
+}
+impl MemoryVaultListResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultListResponse";
+}
+impl MemoryVaultListResponse {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::next_cursor`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_next_cursor(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.next_cursor = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultListResponse);
+impl ::buffa::MessageName for MemoryVaultListResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultListResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultListResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultListResponse";
+}
+impl ::buffa::Message for MemoryVaultListResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.records {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.next_cursor {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.records {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.next_cursor {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.records.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .next_cursor
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.records.clear();
+        self.next_cursor = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultListResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultListResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultListResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_LIST_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultListResponse",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultListResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultListResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultReadRequest {
+    /// Field 1: `claim`
+    #[serde(
+        rename = "claim",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub claim: ::buffa::MessageField<
+        MemoryVaultClaim,
+        ::buffa::Inline<MemoryVaultClaim>,
+    >,
+    /// A record id, a repository path, a daily date id, or README.md.
+    ///
+    /// Field 2: `target`
+    #[serde(
+        rename = "target",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub target: ::buffa::alloc::string::String,
+    /// Field 3: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub revision: ::core::option::Option<u32>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultReadRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultReadRequest")
+            .field("claim", &self.claim)
+            .field("target", &self.target)
+            .field("revision", &self.revision)
+            .finish()
+    }
+}
+impl MemoryVaultReadRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultReadRequest";
+}
+impl MemoryVaultReadRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::revision`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_revision(mut self, value: u32) -> Self {
+        self.revision = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultReadRequest);
+impl ::buffa::MessageName for MemoryVaultReadRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultReadRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultReadRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultReadRequest";
+}
+impl ::buffa::Message for MemoryVaultReadRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.claim.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.claim.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.target.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.target) as u64;
+        }
+        if let Some(v) = self.revision {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.claim.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.claim.write_to(__cache, buf);
+        }
+        if !self.target.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.target, buf);
+        }
+        if let Some(v) = self.revision {
+            ::buffa::types::put_uint32_field(3u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.claim.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.target, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.claim = ::buffa::MessageField::none();
+        self.target.clear();
+        self.revision = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultReadRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultReadRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultReadRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_READ_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultReadRequest",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultReadRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultReadRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultReadResponse {
+    /// Field 1: `record`
+    #[serde(
+        rename = "record",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub record: ::buffa::MessageField<
+        MemoryVaultRecordSummary,
+        ::buffa::Inline<MemoryVaultRecordSummary>,
+    >,
+    /// Field 2: `created_at`
+    #[serde(
+        rename = "createdAt",
+        alias = "created_at",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub created_at: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The body without frontmatter; for README.md the application template.
+    ///
+    /// Field 3: `body`
+    #[serde(
+        rename = "body",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub body: ::buffa::alloc::string::String,
+    /// Field 4: `latest`
+    #[serde(
+        rename = "latest",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub latest: bool,
+    /// Field 5: `commit`
+    #[serde(rename = "commit", skip_serializing_if = "::core::option::Option::is_none")]
+    pub commit: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultReadResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultReadResponse")
+            .field("record", &self.record)
+            .field("created_at", &self.created_at)
+            .field("body", &self.body)
+            .field("latest", &self.latest)
+            .field("commit", &self.commit)
+            .finish()
+    }
+}
+impl MemoryVaultReadResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultReadResponse";
+}
+impl MemoryVaultReadResponse {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::created_at`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_created_at(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.created_at = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::commit`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_commit(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.commit = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultReadResponse);
+impl ::buffa::MessageName for MemoryVaultReadResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultReadResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultReadResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultReadResponse";
+}
+impl ::buffa::Message for MemoryVaultReadResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.record.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.record.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.created_at {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if !self.body.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.body) as u64;
+        }
+        if self.latest {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if let Some(ref v) = self.commit {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.record.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.record.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.created_at {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if !self.body.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.body, buf);
+        }
+        if self.latest {
+            ::buffa::types::put_bool_field(4u32, self.latest, buf);
+        }
+        if let Some(ref v) = self.commit {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.record.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .created_at
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.body, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.latest = ::buffa::types::decode_bool(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.commit.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.record = ::buffa::MessageField::none();
+        self.created_at = ::core::option::Option::None;
+        self.body.clear();
+        self.latest = false;
+        self.commit = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultReadResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultReadResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultReadResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_READ_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultReadResponse",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultReadResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultReadResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultSearchRequest {
+    /// Field 1: `claim`
+    #[serde(
+        rename = "claim",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub claim: ::buffa::MessageField<
+        MemoryVaultClaim,
+        ::buffa::Inline<MemoryVaultClaim>,
+    >,
+    /// Field 2: `text`
+    #[serde(
+        rename = "text",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub text: ::buffa::alloc::string::String,
+    /// Field 3: `type`
+    #[serde(rename = "type", skip_serializing_if = "::core::option::Option::is_none")]
+    pub r#type: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `prefix`
+    #[serde(rename = "prefix", skip_serializing_if = "::core::option::Option::is_none")]
+    pub prefix: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Opaque; pins the commit the search started from.
+    ///
+    /// Field 5: `cursor`
+    #[serde(rename = "cursor", skip_serializing_if = "::core::option::Option::is_none")]
+    pub cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 6: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub limit: ::core::option::Option<u32>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultSearchRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultSearchRequest")
+            .field("claim", &self.claim)
+            .field("text", &self.text)
+            .field("type", &self.r#type)
+            .field("prefix", &self.prefix)
+            .field("cursor", &self.cursor)
+            .field("limit", &self.limit)
+            .finish()
+    }
+}
+impl MemoryVaultSearchRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchRequest";
+}
+impl MemoryVaultSearchRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets `type` to `Some(value)`, consuming and returning `self`.
+    pub fn with_type(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.r#type = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::prefix`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_prefix(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.prefix = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::cursor`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_cursor(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::limit`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_limit(mut self, value: u32) -> Self {
+        self.limit = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultSearchRequest);
+impl ::buffa::MessageName for MemoryVaultSearchRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultSearchRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSearchRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchRequest";
+}
+impl ::buffa::Message for MemoryVaultSearchRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.claim.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.claim.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.text.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
+        }
+        if let Some(ref v) = self.r#type {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.prefix {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.cursor {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.limit {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.claim.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.claim.write_to(__cache, buf);
+        }
+        if !self.text.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.text, buf);
+        }
+        if let Some(ref v) = self.r#type {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.prefix {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.cursor {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if let Some(v) = self.limit {
+            ::buffa::types::put_uint32_field(6u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.claim.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.text, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.r#type.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.prefix.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.cursor.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.claim = ::buffa::MessageField::none();
+        self.text.clear();
+        self.r#type = ::core::option::Option::None;
+        self.prefix = ::core::option::Option::None;
+        self.cursor = ::core::option::Option::None;
+        self.limit = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultSearchRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultSearchRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultSearchRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_SEARCH_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultSearchRequest",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultSearchRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultSearchRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultSearchHit {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `type`
+    #[serde(
+        rename = "type",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub r#type: ::buffa::alloc::string::String,
+    /// Field 3: `path`
+    #[serde(
+        rename = "path",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub path: ::buffa::alloc::string::String,
+    /// Field 4: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub revision: u32,
+    /// Field 5: `line`
+    #[serde(
+        rename = "line",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub line: u32,
+    /// Field 6: `snippet`
+    #[serde(
+        rename = "snippet",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub snippet: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultSearchHit {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultSearchHit")
+            .field("id", &self.id)
+            .field("type", &self.r#type)
+            .field("path", &self.path)
+            .field("revision", &self.revision)
+            .field("line", &self.line)
+            .field("snippet", &self.snippet)
+            .finish()
+    }
+}
+impl MemoryVaultSearchHit {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchHit";
+}
+::buffa::impl_default_instance!(MemoryVaultSearchHit);
+impl ::buffa::MessageName for MemoryVaultSearchHit {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultSearchHit";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSearchHit";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchHit";
+}
+impl ::buffa::Message for MemoryVaultSearchHit {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.r#type.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.r#type) as u64;
+        }
+        if !self.path.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.path) as u64;
+        }
+        if self.revision != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.revision) as u64;
+        }
+        if self.line != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.line) as u64;
+        }
+        if !self.snippet.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.snippet) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.r#type.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.r#type, buf);
+        }
+        if !self.path.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.path, buf);
+        }
+        if self.revision != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.revision, buf);
+        }
+        if self.line != 0u32 {
+            ::buffa::types::put_uint32_field(5u32, self.line, buf);
+        }
+        if !self.snippet.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.snippet, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.r#type, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.path, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.line = ::buffa::types::decode_uint32(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.snippet, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.r#type.clear();
+        self.path.clear();
+        self.revision = 0u32;
+        self.line = 0u32;
+        self.snippet.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultSearchHit {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultSearchHit";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultSearchHit {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_SEARCH_HIT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultSearchHit",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultSearchHit>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultSearchHit>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultSearchResponse {
+    /// Field 1: `hits`
+    #[serde(
+        rename = "hits",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub hits: ::buffa::alloc::vec::Vec<MemoryVaultSearchHit>,
+    /// Absent on the last page.
+    ///
+    /// Field 2: `next_cursor`
+    #[serde(
+        rename = "nextCursor",
+        alias = "next_cursor",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub next_cursor: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 3: `commit`
+    #[serde(rename = "commit", skip_serializing_if = "::core::option::Option::is_none")]
+    pub commit: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultSearchResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultSearchResponse")
+            .field("hits", &self.hits)
+            .field("next_cursor", &self.next_cursor)
+            .field("commit", &self.commit)
+            .finish()
+    }
+}
+impl MemoryVaultSearchResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchResponse";
+}
+impl MemoryVaultSearchResponse {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::next_cursor`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_next_cursor(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.next_cursor = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::commit`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_commit(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.commit = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultSearchResponse);
+impl ::buffa::MessageName for MemoryVaultSearchResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultSearchResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSearchResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchResponse";
+}
+impl ::buffa::Message for MemoryVaultSearchResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.hits {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.next_cursor {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.commit {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.hits {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.next_cursor {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if let Some(ref v) = self.commit {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.hits.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .next_cursor
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.commit.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.hits.clear();
+        self.next_cursor = ::core::option::Option::None;
+        self.commit = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultSearchResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultSearchResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultSearchResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_SEARCH_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultSearchResponse",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultSearchResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultSearchResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultJournalRequest {
+    /// Field 1: `claim`
+    #[serde(
+        rename = "claim",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub claim: ::buffa::MessageField<
+        MemoryVaultClaim,
+        ::buffa::Inline<MemoryVaultClaim>,
+    >,
+    /// Generated by the CLI per invocation and reused on its transport retries.
+    ///
+    /// Field 2: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Field 3: `text`
+    #[serde(
+        rename = "text",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub text: ::buffa::alloc::string::String,
+    /// ISO 8601 with offset; absent means server now.
+    ///
+    /// Field 4: `occurred_at`
+    #[serde(
+        rename = "occurredAt",
+        alias = "occurred_at",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub occurred_at: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `references`
+    #[serde(
+        rename = "references",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub references: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 6: `user_requested`
+    #[serde(
+        rename = "userRequested",
+        alias = "user_requested",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub user_requested: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultJournalRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultJournalRequest")
+            .field("claim", &self.claim)
+            .field("request_id", &self.request_id)
+            .field("text", &self.text)
+            .field("occurred_at", &self.occurred_at)
+            .field("references", &self.references)
+            .field("user_requested", &self.user_requested)
+            .finish()
+    }
+}
+impl MemoryVaultJournalRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultJournalRequest";
+}
+impl MemoryVaultJournalRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::occurred_at`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_occurred_at(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.occurred_at = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultJournalRequest);
+impl ::buffa::MessageName for MemoryVaultJournalRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultJournalRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultJournalRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultJournalRequest";
+}
+impl ::buffa::Message for MemoryVaultJournalRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.claim.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.claim.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.request_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.request_id) as u64;
+        }
+        if !self.text.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
+        }
+        if let Some(ref v) = self.occurred_at {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.references {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.user_requested {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.claim.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.claim.write_to(__cache, buf);
+        }
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+        }
+        if !self.text.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.text, buf);
+        }
+        if let Some(ref v) = self.occurred_at {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        for v in &self.references {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if self.user_requested {
+            ::buffa::types::put_bool_field(6u32, self.user_requested, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.claim.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.text, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .occurred_at
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.references.push(__elem);
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.user_requested = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.claim = ::buffa::MessageField::none();
+        self.request_id.clear();
+        self.text.clear();
+        self.occurred_at = ::core::option::Option::None;
+        self.references.clear();
+        self.user_requested = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultJournalRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultJournalRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultJournalRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_JOURNAL_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultJournalRequest",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultJournalRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultJournalRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultJournalResponse {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `path`
+    #[serde(
+        rename = "path",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub path: ::buffa::alloc::string::String,
+    /// Field 3: `line`
+    #[serde(
+        rename = "line",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub line: ::buffa::alloc::string::String,
+    /// Field 4: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub revision: u32,
+    /// Field 5: `commit`
+    #[serde(
+        rename = "commit",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub commit: ::buffa::alloc::string::String,
+    /// Field 6: `deduplicated`
+    #[serde(
+        rename = "deduplicated",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub deduplicated: bool,
+    /// Field 7: `replayed`
+    #[serde(
+        rename = "replayed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub replayed: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultJournalResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultJournalResponse")
+            .field("id", &self.id)
+            .field("path", &self.path)
+            .field("line", &self.line)
+            .field("revision", &self.revision)
+            .field("commit", &self.commit)
+            .field("deduplicated", &self.deduplicated)
+            .field("replayed", &self.replayed)
+            .finish()
+    }
+}
+impl MemoryVaultJournalResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultJournalResponse";
+}
+::buffa::impl_default_instance!(MemoryVaultJournalResponse);
+impl ::buffa::MessageName for MemoryVaultJournalResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultJournalResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultJournalResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultJournalResponse";
+}
+impl ::buffa::Message for MemoryVaultJournalResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.path.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.path) as u64;
+        }
+        if !self.line.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.line) as u64;
+        }
+        if self.revision != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.revision) as u64;
+        }
+        if !self.commit.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.commit) as u64;
+        }
+        if self.deduplicated {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.replayed {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.path.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.path, buf);
+        }
+        if !self.line.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.line, buf);
+        }
+        if self.revision != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.revision, buf);
+        }
+        if !self.commit.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.commit, buf);
+        }
+        if self.deduplicated {
+            ::buffa::types::put_bool_field(6u32, self.deduplicated, buf);
+        }
+        if self.replayed {
+            ::buffa::types::put_bool_field(7u32, self.replayed, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.path, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.line, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.commit, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.deduplicated = ::buffa::types::decode_bool(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.replayed = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.path.clear();
+        self.line.clear();
+        self.revision = 0u32;
+        self.commit.clear();
+        self.deduplicated = false;
+        self.replayed = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultJournalResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultJournalResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultJournalResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_JOURNAL_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultJournalResponse",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultJournalResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultJournalResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultSaveRequest {
+    /// Field 1: `claim`
+    #[serde(
+        rename = "claim",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub claim: ::buffa::MessageField<
+        MemoryVaultClaim,
+        ::buffa::Inline<MemoryVaultClaim>,
+    >,
+    /// Field 2: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Field 3: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 4: `type`
+    #[serde(
+        rename = "type",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub r#type: ::buffa::alloc::string::String,
+    /// Field 5: `status`
+    #[serde(rename = "status", skip_serializing_if = "::core::option::Option::is_none")]
+    pub status: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 6: `aliases`
+    #[serde(
+        rename = "aliases",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub aliases: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Required when the record exists; omitted only to create it.
+    ///
+    /// Field 7: `expected_revision`
+    #[serde(
+        rename = "expectedRevision",
+        alias = "expected_revision",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub expected_revision: ::core::option::Option<u32>,
+    /// Field 8: `user_requested`
+    #[serde(
+        rename = "userRequested",
+        alias = "user_requested",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub user_requested: bool,
+    /// Markdown body only; the server generates the frontmatter.
+    ///
+    /// Field 9: `content`
+    #[serde(
+        rename = "content",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub content: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultSaveRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultSaveRequest")
+            .field("claim", &self.claim)
+            .field("request_id", &self.request_id)
+            .field("id", &self.id)
+            .field("type", &self.r#type)
+            .field("status", &self.status)
+            .field("aliases", &self.aliases)
+            .field("expected_revision", &self.expected_revision)
+            .field("user_requested", &self.user_requested)
+            .field("content", &self.content)
+            .finish()
+    }
+}
+impl MemoryVaultSaveRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSaveRequest";
+}
+impl MemoryVaultSaveRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::status`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_status(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.status = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::expected_revision`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_expected_revision(mut self, value: u32) -> Self {
+        self.expected_revision = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultSaveRequest);
+impl ::buffa::MessageName for MemoryVaultSaveRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultSaveRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSaveRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSaveRequest";
+}
+impl ::buffa::Message for MemoryVaultSaveRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.claim.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.claim.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.request_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.request_id) as u64;
+        }
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.r#type.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.r#type) as u64;
+        }
+        if let Some(ref v) = self.status {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.aliases {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.expected_revision {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        if self.user_requested {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if !self.content.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.content) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.claim.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.claim.write_to(__cache, buf);
+        }
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+        }
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.id, buf);
+        }
+        if !self.r#type.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.r#type, buf);
+        }
+        if let Some(ref v) = self.status {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        for v in &self.aliases {
+            ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        if let Some(v) = self.expected_revision {
+            ::buffa::types::put_uint32_field(7u32, v, buf);
+        }
+        if self.user_requested {
+            ::buffa::types::put_bool_field(8u32, self.user_requested, buf);
+        }
+        if !self.content.is_empty() {
+            ::buffa::types::put_string_field(9u32, &self.content, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.claim.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.r#type, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.status.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.aliases.push(__elem);
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.expected_revision = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.user_requested = ::buffa::types::decode_bool(buf)?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.content, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.claim = ::buffa::MessageField::none();
+        self.request_id.clear();
+        self.id.clear();
+        self.r#type.clear();
+        self.status = ::core::option::Option::None;
+        self.aliases.clear();
+        self.expected_revision = ::core::option::Option::None;
+        self.user_requested = false;
+        self.content.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultSaveRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultSaveRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultSaveRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_SAVE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultSaveRequest",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultSaveRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultSaveRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultSaveResponse {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `type`
+    #[serde(
+        rename = "type",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub r#type: ::buffa::alloc::string::String,
+    /// Field 3: `path`
+    #[serde(
+        rename = "path",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub path: ::buffa::alloc::string::String,
+    /// Field 4: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub revision: u32,
+    /// Field 5: `commit`
+    #[serde(
+        rename = "commit",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub commit: ::buffa::alloc::string::String,
+    /// Playbook and voice lines dropped to stay within their size limit.
+    ///
+    /// Field 6: `dropped_lines`
+    #[serde(
+        rename = "droppedLines",
+        alias = "dropped_lines",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub dropped_lines: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 7: `replayed`
+    #[serde(
+        rename = "replayed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub replayed: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultSaveResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultSaveResponse")
+            .field("id", &self.id)
+            .field("type", &self.r#type)
+            .field("path", &self.path)
+            .field("revision", &self.revision)
+            .field("commit", &self.commit)
+            .field("dropped_lines", &self.dropped_lines)
+            .field("replayed", &self.replayed)
+            .finish()
+    }
+}
+impl MemoryVaultSaveResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSaveResponse";
+}
+::buffa::impl_default_instance!(MemoryVaultSaveResponse);
+impl ::buffa::MessageName for MemoryVaultSaveResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultSaveResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSaveResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSaveResponse";
+}
+impl ::buffa::Message for MemoryVaultSaveResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.r#type.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.r#type) as u64;
+        }
+        if !self.path.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.path) as u64;
+        }
+        if self.revision != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.revision) as u64;
+        }
+        if !self.commit.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.commit) as u64;
+        }
+        for v in &self.dropped_lines {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.replayed {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.r#type.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.r#type, buf);
+        }
+        if !self.path.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.path, buf);
+        }
+        if self.revision != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.revision, buf);
+        }
+        if !self.commit.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.commit, buf);
+        }
+        for v in &self.dropped_lines {
+            ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        if self.replayed {
+            ::buffa::types::put_bool_field(7u32, self.replayed, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.r#type, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.path, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.commit, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.dropped_lines.push(__elem);
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.replayed = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.r#type.clear();
+        self.path.clear();
+        self.revision = 0u32;
+        self.commit.clear();
+        self.dropped_lines.clear();
+        self.replayed = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultSaveResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultSaveResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultSaveResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_SAVE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultSaveResponse",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultSaveResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultSaveResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetMemoryVaultContextRequest {
+    /// Field 1: `claim`
+    #[serde(
+        rename = "claim",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub claim: ::buffa::MessageField<
+        MemoryVaultClaim,
+        ::buffa::Inline<MemoryVaultClaim>,
+    >,
+    /// The context_key of the last context this CLI injected.
+    ///
+    /// Field 2: `known_context_key`
+    #[serde(
+        rename = "knownContextKey",
+        alias = "known_context_key",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub known_context_key: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetMemoryVaultContextRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetMemoryVaultContextRequest")
+            .field("claim", &self.claim)
+            .field("known_context_key", &self.known_context_key)
+            .finish()
+    }
+}
+impl GetMemoryVaultContextRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.GetMemoryVaultContextRequest";
+}
+impl GetMemoryVaultContextRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::known_context_key`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_known_context_key(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.known_context_key = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(GetMemoryVaultContextRequest);
+impl ::buffa::MessageName for GetMemoryVaultContextRequest {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "GetMemoryVaultContextRequest";
+    const FULL_NAME: &'static str = "briar.worker.v1.GetMemoryVaultContextRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.GetMemoryVaultContextRequest";
+}
+impl ::buffa::Message for GetMemoryVaultContextRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.claim.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.claim.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.known_context_key {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.claim.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.claim.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.known_context_key {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.claim.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .known_context_key
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.claim = ::buffa::MessageField::none();
+        self.known_context_key = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetMemoryVaultContextRequest {
+    const PROTO_FQN: &'static str = "briar.worker.v1.GetMemoryVaultContextRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetMemoryVaultContextRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_MEMORY_VAULT_CONTEXT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.GetMemoryVaultContextRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetMemoryVaultContextRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetMemoryVaultContextRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct GetMemoryVaultContextResponse {
+    #[serde(flatten)]
+    pub state: ::core::option::Option<
+        __buffa::oneof::get_memory_vault_context_response::State,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetMemoryVaultContextResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetMemoryVaultContextResponse")
+            .field("state", &self.state)
+            .finish()
+    }
+}
+impl GetMemoryVaultContextResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.GetMemoryVaultContextResponse";
+}
+::buffa::impl_default_instance!(GetMemoryVaultContextResponse);
+impl ::buffa::MessageName for GetMemoryVaultContextResponse {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "GetMemoryVaultContextResponse";
+    const FULL_NAME: &'static str = "briar.worker.v1.GetMemoryVaultContextResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.GetMemoryVaultContextResponse";
+}
+impl ::buffa::Message for GetMemoryVaultContextResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let ::core::option::Option::Some(ref v) = self.state {
+            match v {
+                __buffa::oneof::get_memory_vault_context_response::State::None(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::get_memory_vault_context_response::State::Unchanged(
+                    x,
+                ) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::get_memory_vault_context_response::State::Context(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.state {
+            match v {
+                __buffa::oneof::get_memory_vault_context_response::State::None(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::get_memory_vault_context_response::State::Unchanged(
+                    x,
+                ) => {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::get_memory_vault_context_response::State::Context(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::get_memory_vault_context_response::State::None(
+                        ref mut existing,
+                    ),
+                ) = self.state
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.state = ::core::option::Option::Some(
+                        __buffa::oneof::get_memory_vault_context_response::State::None(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::get_memory_vault_context_response::State::Unchanged(
+                        ref mut existing,
+                    ),
+                ) = self.state
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.state = ::core::option::Option::Some(
+                        __buffa::oneof::get_memory_vault_context_response::State::Unchanged(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::get_memory_vault_context_response::State::Context(
+                        ref mut existing,
+                    ),
+                ) = self.state
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.state = ::core::option::Option::Some(
+                        __buffa::oneof::get_memory_vault_context_response::State::Context(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.state = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetMemoryVaultContextResponse {
+    const PROTO_FQN: &'static str = "briar.worker.v1.GetMemoryVaultContextResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for GetMemoryVaultContextResponse {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = GetMemoryVaultContextResponse;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct GetMemoryVaultContextResponse")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<GetMemoryVaultContextResponse, A::Error> {
+                let mut __oneof_state: ::core::option::Option<
+                    __buffa::oneof::get_memory_vault_context_response::State,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "none" => {
+                            let v: ::core::option::Option<MemoryVaultContextNone> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            MemoryVaultContextNone,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_state.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'state'",
+                                        ),
+                                    );
+                                }
+                                __oneof_state = Some(
+                                    __buffa::oneof::get_memory_vault_context_response::State::None(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "unchanged" => {
+                            let v: ::core::option::Option<MemoryVaultContextUnchanged> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            MemoryVaultContextUnchanged,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_state.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'state'",
+                                        ),
+                                    );
+                                }
+                                __oneof_state = Some(
+                                    __buffa::oneof::get_memory_vault_context_response::State::Unchanged(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "context" => {
+                            let v: ::core::option::Option<MemoryVaultContext> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            MemoryVaultContext,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_state.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'state'",
+                                        ),
+                                    );
+                                }
+                                __oneof_state = Some(
+                                    __buffa::oneof::get_memory_vault_context_response::State::Context(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <GetMemoryVaultContextResponse as ::core::default::Default>::default();
+                __r.state = __oneof_state;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetMemoryVaultContextResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_MEMORY_VAULT_CONTEXT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.GetMemoryVaultContextResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetMemoryVaultContextResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetMemoryVaultContextResponse>,
+    is_wkt: false,
+};
+pub mod get_memory_vault_context_response {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::get_memory_vault_context_response::State;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::get_memory_vault_context_response::State as StateView;
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultContextNone {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultContextNone {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultContextNone").finish()
+    }
+}
+impl MemoryVaultContextNone {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContextNone";
+}
+::buffa::impl_default_instance!(MemoryVaultContextNone);
+impl ::buffa::MessageName for MemoryVaultContextNone {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultContextNone";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultContextNone";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContextNone";
+}
+impl ::buffa::Message for MemoryVaultContextNone {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultContextNone {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultContextNone";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultContextNone {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_CONTEXT_NONE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultContextNone",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultContextNone>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultContextNone>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultContextUnchanged {
+    /// Field 1: `context_key`
+    #[serde(
+        rename = "contextKey",
+        alias = "context_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub context_key: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultContextUnchanged {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultContextUnchanged")
+            .field("context_key", &self.context_key)
+            .finish()
+    }
+}
+impl MemoryVaultContextUnchanged {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContextUnchanged";
+}
+::buffa::impl_default_instance!(MemoryVaultContextUnchanged);
+impl ::buffa::MessageName for MemoryVaultContextUnchanged {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultContextUnchanged";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultContextUnchanged";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContextUnchanged";
+}
+impl ::buffa::Message for MemoryVaultContextUnchanged {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.context_key.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.context_key) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.context_key.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.context_key, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.context_key, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.context_key.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultContextUnchanged {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultContextUnchanged";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultContextUnchanged {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_CONTEXT_UNCHANGED_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultContextUnchanged",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultContextUnchanged>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultContextUnchanged>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryVaultContext {
+    /// Covers the vault head and the current permissions.
+    ///
+    /// Field 1: `context_key`
+    #[serde(
+        rename = "contextKey",
+        alias = "context_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub context_key: ::buffa::alloc::string::String,
+    /// Field 2: `head`
+    #[serde(rename = "head", skip_serializing_if = "::core::option::Option::is_none")]
+    pub head: ::core::option::Option<::buffa::alloc::string::String>,
+    /// "dm", "group" or "project".
+    ///
+    /// Field 3: `scope_kind`
+    #[serde(
+        rename = "scopeKind",
+        alias = "scope_kind",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub scope_kind: ::buffa::alloc::string::String,
+    /// The application-owned README, for the trusted run instructions.
+    ///
+    /// Field 4: `readme`
+    #[serde(
+        rename = "readme",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub readme: ::buffa::alloc::string::String,
+    /// One line saying what is allowed now; follows the README.
+    ///
+    /// Field 5: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub status: ::buffa::alloc::string::String,
+    /// Record bodies for \<voice-memory\>, \<voice-guide\> and \<playbook-memory\>.
+    /// Empty when the record is missing or recall is off.
+    ///
+    /// Field 6: `voice`
+    #[serde(
+        rename = "voice",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub voice: ::buffa::alloc::string::String,
+    /// Field 7: `voice_guide`
+    #[serde(
+        rename = "voiceGuide",
+        alias = "voice_guide",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub voice_guide: ::buffa::alloc::string::String,
+    /// Field 8: `playbook`
+    #[serde(
+        rename = "playbook",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub playbook: ::buffa::alloc::string::String,
+    /// Field 9: `readable`
+    #[serde(
+        rename = "readable",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub readable: bool,
+    /// Field 10: `writable`
+    #[serde(
+        rename = "writable",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub writable: bool,
+    /// Field 11: `user_requested_writable`
+    #[serde(
+        rename = "userRequestedWritable",
+        alias = "user_requested_writable",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub user_requested_writable: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryVaultContext {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryVaultContext")
+            .field("context_key", &self.context_key)
+            .field("head", &self.head)
+            .field("scope_kind", &self.scope_kind)
+            .field("readme", &self.readme)
+            .field("status", &self.status)
+            .field("voice", &self.voice)
+            .field("voice_guide", &self.voice_guide)
+            .field("playbook", &self.playbook)
+            .field("readable", &self.readable)
+            .field("writable", &self.writable)
+            .field("user_requested_writable", &self.user_requested_writable)
+            .finish()
+    }
+}
+impl MemoryVaultContext {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContext";
+}
+impl MemoryVaultContext {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::head`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_head(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.head = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryVaultContext);
+impl ::buffa::MessageName for MemoryVaultContext {
+    const PACKAGE: &'static str = "briar.worker.v1";
+    const NAME: &'static str = "MemoryVaultContext";
+    const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultContext";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContext";
+}
+impl ::buffa::Message for MemoryVaultContext {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.context_key.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.context_key) as u64;
+        }
+        if let Some(ref v) = self.head {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if !self.scope_kind.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.scope_kind) as u64;
+        }
+        if !self.readme.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.readme) as u64;
+        }
+        if !self.status.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.status) as u64;
+        }
+        if !self.voice.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.voice) as u64;
+        }
+        if !self.voice_guide.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.voice_guide) as u64;
+        }
+        if !self.playbook.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.playbook) as u64;
+        }
+        if self.readable {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.writable {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.user_requested_writable {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.context_key.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.context_key, buf);
+        }
+        if let Some(ref v) = self.head {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if !self.scope_kind.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.scope_kind, buf);
+        }
+        if !self.readme.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.readme, buf);
+        }
+        if !self.status.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.status, buf);
+        }
+        if !self.voice.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.voice, buf);
+        }
+        if !self.voice_guide.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.voice_guide, buf);
+        }
+        if !self.playbook.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.playbook, buf);
+        }
+        if self.readable {
+            ::buffa::types::put_bool_field(9u32, self.readable, buf);
+        }
+        if self.writable {
+            ::buffa::types::put_bool_field(10u32, self.writable, buf);
+        }
+        if self.user_requested_writable {
+            ::buffa::types::put_bool_field(11u32, self.user_requested_writable, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.context_key, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.head.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.scope_kind, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.readme, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.status, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.voice, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.voice_guide, buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.playbook, buf)?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.readable = ::buffa::types::decode_bool(buf)?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.writable = ::buffa::types::decode_bool(buf)?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.user_requested_writable = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.context_key.clear();
+        self.head = ::core::option::Option::None;
+        self.scope_kind.clear();
+        self.readme.clear();
+        self.status.clear();
+        self.voice.clear();
+        self.voice_guide.clear();
+        self.playbook.clear();
+        self.readable = false;
+        self.writable = false;
+        self.user_requested_writable = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryVaultContext {
+    const PROTO_FQN: &'static str = "briar.worker.v1.MemoryVaultContext";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryVaultContext {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_VAULT_CONTEXT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.worker.v1.MemoryVaultContext",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryVaultContext>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryVaultContext>,
+    is_wkt: false,
+};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum ManagedComputerSetupPhase {
@@ -123525,6 +128004,7310 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// Memory vault (docs/plans/memory-vault-spec.md). The server derives the one
+        /// vault a run may touch from the claim alone: no request names an
+        /// organization, owner, Agent, channel, project or vault. Tool failures are
+        /// Connect errors carrying briar.types.v1.ApplicationErrorDetail with the stable
+        /// code (revision_conflict, expected_revision_required, protected_record,
+        /// type_mismatch, memory_disabled, write_not_allowed, secret_detected,
+        /// invalid_record, frontmatter_not_allowed, readme_read_only, not_found, busy,
+        /// memory_unavailable, idempotency_conflict, claim_inactive, invalid_request).
+        /// revision_conflict and expected_revision_required also carry
+        /// briar.types.v1.RevisionConflictDetail with the record's current revision.
+        /// busy and memory_unavailable are retryable.
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultClaimView<'a> {
+            /// Field 1: `project_id`
+            pub project_id: &'a str,
+            /// Field 2: `worker_id`
+            pub worker_id: &'a str,
+            /// An active issue, issue_reply, channel_reply or project_agent_task claim.
+            /// Other or unknown variants fail closed.
+            ///
+            /// Field 3: `work`
+            pub work: ::buffa::MessageFieldView<
+                super::super::__buffa::view::WorkClaimIdentityView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultClaimView<'a> {
+            type Owned = super::super::MemoryVaultClaim;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.project_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.worker_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.work.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.work = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::WorkClaimIdentityView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultClaim,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultClaim,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultClaim {
+                    project_id: self.project_id.to_string(),
+                    worker_id: self.worker_id.to_string(),
+                    work: match self.work.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::WorkClaimIdentity,
+                                ::buffa::Inline<super::super::WorkClaimIdentity>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultClaimView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.project_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.project_id)
+                                as u64;
+                }
+                if !self.worker_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.worker_id) as u64;
+                }
+                if self.work.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.work.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.project_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.project_id, buf);
+                }
+                if !self.worker_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.worker_id, buf);
+                }
+                if self.work.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.work.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultClaimView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.project_id) {
+                    __map.serialize_entry("projectId", self.project_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.worker_id) {
+                    __map.serialize_entry("workerId", self.worker_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.work.as_option() {
+                        __map.serialize_entry("work", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultClaimView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultClaim";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultClaim";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultClaim";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultClaimView);
+        ::buffa::impl_view_reborrow!(MemoryVaultClaimView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultClaim` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultClaimView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultClaimView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultClaimOwnedView(
+            ::buffa::OwnedView<MemoryVaultClaimView<'static>>,
+        );
+        impl MemoryVaultClaimOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultClaimOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultClaimOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultClaim,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultClaimOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MemoryVaultClaimView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultClaimView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultClaim {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `project_id`
+            #[must_use]
+            pub fn project_id(&self) -> &'_ str {
+                self.0.reborrow().project_id
+            }
+            /// Field 2: `worker_id`
+            #[must_use]
+            pub fn worker_id(&self) -> &'_ str {
+                self.0.reborrow().worker_id
+            }
+            /// An active issue, issue_reply, channel_reply or project_agent_task claim.
+            /// Other or unknown variants fail closed.
+            ///
+            /// Field 3: `work`
+            #[must_use]
+            pub fn work(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::WorkClaimIdentityView<'_>,
+            > {
+                &self.0.reborrow().work
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<MemoryVaultClaimView<'static>>>
+        for MemoryVaultClaimOwnedView {
+            fn from(inner: ::buffa::OwnedView<MemoryVaultClaimView<'static>>) -> Self {
+                MemoryVaultClaimOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultClaimOwnedView>
+        for ::buffa::OwnedView<MemoryVaultClaimView<'static>> {
+            fn from(wrapper: MemoryVaultClaimOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<MemoryVaultClaimView<'static>>>
+        for MemoryVaultClaimOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<MemoryVaultClaimView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultClaim {
+            type View<'a> = MemoryVaultClaimView<'a>;
+            type ViewHandle = MemoryVaultClaimOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultClaimOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultRecordSummaryView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// A record type from the vault layout, or "readme" for the README.
+            ///
+            /// Field 2: `type`
+            pub r#type: &'a str,
+            /// Field 3: `path`
+            pub path: &'a str,
+            /// Field 4: `status`
+            pub status: ::core::option::Option<&'a str>,
+            /// Field 5: `aliases`
+            pub aliases: ::buffa::RepeatedView<'a, &'a str>,
+            /// Field 6: `revision`
+            pub revision: u32,
+            /// Field 7: `updated_at`
+            pub updated_at: ::core::option::Option<&'a str>,
+            /// Field 8: `protected_by_user`
+            pub protected_by_user: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultRecordSummaryView<'a> {
+            type Owned = super::super::MemoryVaultRecordSummary;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.r#type = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.path = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.status = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.updated_at = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.protected_by_user = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.aliases.push(__elem);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultRecordSummary,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultRecordSummary,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultRecordSummary {
+                    id: self.id.to_string(),
+                    r#type: self.r#type.to_string(),
+                    path: self.path.to_string(),
+                    status: self.status.map(|s| s.to_string()),
+                    aliases: self.aliases.iter().map(|s| s.to_string()).collect(),
+                    revision: self.revision,
+                    updated_at: self.updated_at.map(|s| s.to_string()),
+                    protected_by_user: self.protected_by_user,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultRecordSummaryView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.r#type.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.r#type) as u64;
+                }
+                if !self.path.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.path) as u64;
+                }
+                if let Some(ref v) = self.status {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                for v in &self.aliases {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.revision != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.revision) as u64;
+                }
+                if let Some(ref v) = self.updated_at {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.protected_by_user {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.r#type.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.r#type, buf);
+                }
+                if !self.path.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.path, buf);
+                }
+                if let Some(ref v) = self.status {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                for v in &self.aliases {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                if self.revision != 0u32 {
+                    ::buffa::types::put_uint32_field(6u32, self.revision, buf);
+                }
+                if let Some(ref v) = self.updated_at {
+                    ::buffa::types::put_string_field(7u32, v, buf);
+                }
+                if self.protected_by_user {
+                    ::buffa::types::put_bool_field(8u32, self.protected_by_user, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultRecordSummaryView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.r#type) {
+                    __map.serialize_entry("type", self.r#type)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.path) {
+                    __map.serialize_entry("path", self.path)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.status {
+                    __map.serialize_entry("status", __v)?;
+                }
+                if !self.aliases.is_empty() {
+                    __map.serialize_entry("aliases", &*self.aliases)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.updated_at {
+                    __map.serialize_entry("updatedAt", __v)?;
+                }
+                if self.protected_by_user {
+                    __map.serialize_entry("protectedByUser", &self.protected_by_user)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultRecordSummaryView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultRecordSummary";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultRecordSummary";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultRecordSummary";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultRecordSummaryView);
+        ::buffa::impl_view_reborrow!(MemoryVaultRecordSummaryView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultRecordSummary` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultRecordSummaryView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultRecordSummaryView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultRecordSummaryOwnedView(
+            ::buffa::OwnedView<MemoryVaultRecordSummaryView<'static>>,
+        );
+        impl MemoryVaultRecordSummaryOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultRecordSummaryOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultRecordSummaryOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultRecordSummary,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultRecordSummaryOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultRecordSummaryView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultRecordSummaryView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultRecordSummary {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// A record type from the vault layout, or "readme" for the README.
+            ///
+            /// Field 2: `type`
+            #[must_use]
+            pub fn r#type(&self) -> &'_ str {
+                self.0.reborrow().r#type
+            }
+            /// Field 3: `path`
+            #[must_use]
+            pub fn path(&self) -> &'_ str {
+                self.0.reborrow().path
+            }
+            /// Field 4: `status`
+            #[must_use]
+            pub fn status(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().status
+            }
+            /// Field 5: `aliases`
+            #[must_use]
+            pub fn aliases(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().aliases
+            }
+            /// Field 6: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u32 {
+                self.0.reborrow().revision
+            }
+            /// Field 7: `updated_at`
+            #[must_use]
+            pub fn updated_at(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().updated_at
+            }
+            /// Field 8: `protected_by_user`
+            #[must_use]
+            pub fn protected_by_user(&self) -> bool {
+                self.0.reborrow().protected_by_user
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultRecordSummaryView<'static>>,
+        > for MemoryVaultRecordSummaryOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultRecordSummaryView<'static>>,
+            ) -> Self {
+                MemoryVaultRecordSummaryOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultRecordSummaryOwnedView>
+        for ::buffa::OwnedView<MemoryVaultRecordSummaryView<'static>> {
+            fn from(wrapper: MemoryVaultRecordSummaryOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultRecordSummaryView<'static>>,
+        > for MemoryVaultRecordSummaryOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultRecordSummaryView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultRecordSummary {
+            type View<'a> = MemoryVaultRecordSummaryView<'a>;
+            type ViewHandle = MemoryVaultRecordSummaryOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultRecordSummaryOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultListRequestView<'a> {
+            /// Field 1: `claim`
+            pub claim: ::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'a>,
+            >,
+            /// Field 2: `type`
+            pub r#type: ::core::option::Option<&'a str>,
+            /// Field 3: `prefix`
+            pub prefix: ::core::option::Option<&'a str>,
+            /// Field 4: `status`
+            pub status: ::core::option::Option<&'a str>,
+            /// Field 5: `cursor`
+            pub cursor: ::core::option::Option<&'a str>,
+            /// Field 6: `limit`
+            pub limit: ::core::option::Option<u32>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultListRequestView<'a> {
+            type Owned = super::super::MemoryVaultListRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.claim.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.claim = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::MemoryVaultClaimView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.r#type = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.prefix = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.status = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.cursor = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = Some(::buffa::types::decode_uint32(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultListRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultListRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultListRequest {
+                    claim: match self.claim.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::MemoryVaultClaim,
+                                ::buffa::Inline<super::super::MemoryVaultClaim>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    r#type: self.r#type.map(|s| s.to_string()),
+                    prefix: self.prefix.map(|s| s.to_string()),
+                    status: self.status.map(|s| s.to_string()),
+                    cursor: self.cursor.map(|s| s.to_string()),
+                    limit: self.limit,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultListRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.claim.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.claim.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.r#type {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.prefix {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.status {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.cursor {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(v) = self.limit {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.claim.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.claim.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.r#type {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if let Some(ref v) = self.prefix {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if let Some(ref v) = self.status {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                if let Some(ref v) = self.cursor {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                if let Some(v) = self.limit {
+                    ::buffa::types::put_uint32_field(6u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultListRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.claim.as_option() {
+                        __map.serialize_entry("claim", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self.r#type {
+                    __map.serialize_entry("type", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.prefix {
+                    __map.serialize_entry("prefix", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.status {
+                    __map.serialize_entry("status", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.cursor {
+                    __map.serialize_entry("cursor", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.limit {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultListRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultListRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultListRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultListRequest";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultListRequestView);
+        ::buffa::impl_view_reborrow!(MemoryVaultListRequestView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultListRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultListRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultListRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultListRequestOwnedView(
+            ::buffa::OwnedView<MemoryVaultListRequestView<'static>>,
+        );
+        impl MemoryVaultListRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultListRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultListRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultListRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultListRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MemoryVaultListRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultListRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultListRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `claim`
+            #[must_use]
+            pub fn claim(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'_>,
+            > {
+                &self.0.reborrow().claim
+            }
+            /// Field 2: `type`
+            #[must_use]
+            pub fn r#type(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().r#type
+            }
+            /// Field 3: `prefix`
+            #[must_use]
+            pub fn prefix(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().prefix
+            }
+            /// Field 4: `status`
+            #[must_use]
+            pub fn status(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().status
+            }
+            /// Field 5: `cursor`
+            #[must_use]
+            pub fn cursor(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().cursor
+            }
+            /// Field 6: `limit`
+            #[must_use]
+            pub fn limit(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().limit
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultListRequestView<'static>>,
+        > for MemoryVaultListRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultListRequestView<'static>>,
+            ) -> Self {
+                MemoryVaultListRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultListRequestOwnedView>
+        for ::buffa::OwnedView<MemoryVaultListRequestView<'static>> {
+            fn from(wrapper: MemoryVaultListRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultListRequestView<'static>>,
+        > for MemoryVaultListRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultListRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultListRequest {
+            type View<'a> = MemoryVaultListRequestView<'a>;
+            type ViewHandle = MemoryVaultListRequestOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultListRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultListResponseView<'a> {
+            /// Newest update first; the README leads the first page.
+            ///
+            /// Field 1: `records`
+            pub records: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::MemoryVaultRecordSummaryView<'a>,
+            >,
+            /// Field 2: `next_cursor`
+            pub next_cursor: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultListResponseView<'a> {
+            type Owned = super::super::MemoryVaultListResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_cursor = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::MemoryVaultRecordSummaryView,
+                            >(),
+                        )?;
+                        view.records
+                            .push(
+                                <super::super::__buffa::view::MemoryVaultRecordSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultListResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultListResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultListResponse {
+                    records: self
+                        .records
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    next_cursor: self.next_cursor.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultListResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.records {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.next_cursor {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.records {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.next_cursor {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultListResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.records.is_empty() {
+                    __map.serialize_entry("records", &*self.records)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.next_cursor {
+                    __map.serialize_entry("nextCursor", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultListResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultListResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultListResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultListResponse";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultListResponseView);
+        ::buffa::impl_view_reborrow!(MemoryVaultListResponseView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultListResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultListResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultListResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultListResponseOwnedView(
+            ::buffa::OwnedView<MemoryVaultListResponseView<'static>>,
+        );
+        impl MemoryVaultListResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultListResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultListResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultListResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultListResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultListResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultListResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultListResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Newest update first; the README leads the first page.
+            ///
+            /// Field 1: `records`
+            #[must_use]
+            pub fn records(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::MemoryVaultRecordSummaryView<'_>,
+            > {
+                &self.0.reborrow().records
+            }
+            /// Field 2: `next_cursor`
+            #[must_use]
+            pub fn next_cursor(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().next_cursor
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultListResponseView<'static>>,
+        > for MemoryVaultListResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultListResponseView<'static>>,
+            ) -> Self {
+                MemoryVaultListResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultListResponseOwnedView>
+        for ::buffa::OwnedView<MemoryVaultListResponseView<'static>> {
+            fn from(wrapper: MemoryVaultListResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultListResponseView<'static>>,
+        > for MemoryVaultListResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultListResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultListResponse {
+            type View<'a> = MemoryVaultListResponseView<'a>;
+            type ViewHandle = MemoryVaultListResponseOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultListResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultReadRequestView<'a> {
+            /// Field 1: `claim`
+            pub claim: ::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'a>,
+            >,
+            /// A record id, a repository path, a daily date id, or README.md.
+            ///
+            /// Field 2: `target`
+            pub target: &'a str,
+            /// Field 3: `revision`
+            pub revision: ::core::option::Option<u32>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultReadRequestView<'a> {
+            type Owned = super::super::MemoryVaultReadRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.claim.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.claim = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::MemoryVaultClaimView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.target = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = Some(::buffa::types::decode_uint32(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultReadRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultReadRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultReadRequest {
+                    claim: match self.claim.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::MemoryVaultClaim,
+                                ::buffa::Inline<super::super::MemoryVaultClaim>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    target: self.target.to_string(),
+                    revision: self.revision,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultReadRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.claim.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.claim.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if !self.target.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.target) as u64;
+                }
+                if let Some(v) = self.revision {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.claim.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.claim.write_to(__cache, buf);
+                }
+                if !self.target.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.target, buf);
+                }
+                if let Some(v) = self.revision {
+                    ::buffa::types::put_uint32_field(3u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultReadRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.claim.as_option() {
+                        __map.serialize_entry("claim", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.target) {
+                    __map.serialize_entry("target", self.target)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.revision {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultReadRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultReadRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultReadRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultReadRequest";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultReadRequestView);
+        ::buffa::impl_view_reborrow!(MemoryVaultReadRequestView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultReadRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultReadRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultReadRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultReadRequestOwnedView(
+            ::buffa::OwnedView<MemoryVaultReadRequestView<'static>>,
+        );
+        impl MemoryVaultReadRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultReadRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultReadRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultReadRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultReadRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MemoryVaultReadRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultReadRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultReadRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `claim`
+            #[must_use]
+            pub fn claim(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'_>,
+            > {
+                &self.0.reborrow().claim
+            }
+            /// A record id, a repository path, a daily date id, or README.md.
+            ///
+            /// Field 2: `target`
+            #[must_use]
+            pub fn target(&self) -> &'_ str {
+                self.0.reborrow().target
+            }
+            /// Field 3: `revision`
+            #[must_use]
+            pub fn revision(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().revision
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultReadRequestView<'static>>,
+        > for MemoryVaultReadRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultReadRequestView<'static>>,
+            ) -> Self {
+                MemoryVaultReadRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultReadRequestOwnedView>
+        for ::buffa::OwnedView<MemoryVaultReadRequestView<'static>> {
+            fn from(wrapper: MemoryVaultReadRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultReadRequestView<'static>>,
+        > for MemoryVaultReadRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultReadRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultReadRequest {
+            type View<'a> = MemoryVaultReadRequestView<'a>;
+            type ViewHandle = MemoryVaultReadRequestOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultReadRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultReadResponseView<'a> {
+            /// Field 1: `record`
+            pub record: ::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultRecordSummaryView<'a>,
+            >,
+            /// Field 2: `created_at`
+            pub created_at: ::core::option::Option<&'a str>,
+            /// The body without frontmatter; for README.md the application template.
+            ///
+            /// Field 3: `body`
+            pub body: &'a str,
+            /// Field 4: `latest`
+            pub latest: bool,
+            /// Field 5: `commit`
+            pub commit: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultReadResponseView<'a> {
+            type Owned = super::super::MemoryVaultReadResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.record.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.record = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::MemoryVaultRecordSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.created_at = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.body = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.latest = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.commit = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultReadResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultReadResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultReadResponse {
+                    record: match self.record.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::MemoryVaultRecordSummary,
+                                ::buffa::Inline<super::super::MemoryVaultRecordSummary>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    created_at: self.created_at.map(|s| s.to_string()),
+                    body: self.body.to_string(),
+                    latest: self.latest,
+                    commit: self.commit.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultReadResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.record.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.record.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.created_at {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if !self.body.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.body) as u64;
+                }
+                if self.latest {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if let Some(ref v) = self.commit {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.record.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.record.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.created_at {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if !self.body.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.body, buf);
+                }
+                if self.latest {
+                    ::buffa::types::put_bool_field(4u32, self.latest, buf);
+                }
+                if let Some(ref v) = self.commit {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultReadResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.record.as_option() {
+                        __map.serialize_entry("record", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self.created_at {
+                    __map.serialize_entry("createdAt", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.body) {
+                    __map.serialize_entry("body", self.body)?;
+                }
+                if self.latest {
+                    __map.serialize_entry("latest", &self.latest)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.commit {
+                    __map.serialize_entry("commit", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultReadResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultReadResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultReadResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultReadResponse";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultReadResponseView);
+        ::buffa::impl_view_reborrow!(MemoryVaultReadResponseView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultReadResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultReadResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultReadResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultReadResponseOwnedView(
+            ::buffa::OwnedView<MemoryVaultReadResponseView<'static>>,
+        );
+        impl MemoryVaultReadResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultReadResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultReadResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultReadResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultReadResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultReadResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultReadResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultReadResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `record`
+            #[must_use]
+            pub fn record(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultRecordSummaryView<'_>,
+            > {
+                &self.0.reborrow().record
+            }
+            /// Field 2: `created_at`
+            #[must_use]
+            pub fn created_at(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().created_at
+            }
+            /// The body without frontmatter; for README.md the application template.
+            ///
+            /// Field 3: `body`
+            #[must_use]
+            pub fn body(&self) -> &'_ str {
+                self.0.reborrow().body
+            }
+            /// Field 4: `latest`
+            #[must_use]
+            pub fn latest(&self) -> bool {
+                self.0.reborrow().latest
+            }
+            /// Field 5: `commit`
+            #[must_use]
+            pub fn commit(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().commit
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultReadResponseView<'static>>,
+        > for MemoryVaultReadResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultReadResponseView<'static>>,
+            ) -> Self {
+                MemoryVaultReadResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultReadResponseOwnedView>
+        for ::buffa::OwnedView<MemoryVaultReadResponseView<'static>> {
+            fn from(wrapper: MemoryVaultReadResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultReadResponseView<'static>>,
+        > for MemoryVaultReadResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultReadResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultReadResponse {
+            type View<'a> = MemoryVaultReadResponseView<'a>;
+            type ViewHandle = MemoryVaultReadResponseOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultReadResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultSearchRequestView<'a> {
+            /// Field 1: `claim`
+            pub claim: ::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'a>,
+            >,
+            /// Field 2: `text`
+            pub text: &'a str,
+            /// Field 3: `type`
+            pub r#type: ::core::option::Option<&'a str>,
+            /// Field 4: `prefix`
+            pub prefix: ::core::option::Option<&'a str>,
+            /// Opaque; pins the commit the search started from.
+            ///
+            /// Field 5: `cursor`
+            pub cursor: ::core::option::Option<&'a str>,
+            /// Field 6: `limit`
+            pub limit: ::core::option::Option<u32>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultSearchRequestView<'a> {
+            type Owned = super::super::MemoryVaultSearchRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.claim.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.claim = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::MemoryVaultClaimView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.text = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.r#type = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.prefix = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.cursor = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = Some(::buffa::types::decode_uint32(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSearchRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSearchRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultSearchRequest {
+                    claim: match self.claim.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::MemoryVaultClaim,
+                                ::buffa::Inline<super::super::MemoryVaultClaim>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    text: self.text.to_string(),
+                    r#type: self.r#type.map(|s| s.to_string()),
+                    prefix: self.prefix.map(|s| s.to_string()),
+                    cursor: self.cursor.map(|s| s.to_string()),
+                    limit: self.limit,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultSearchRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.claim.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.claim.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if !self.text.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
+                }
+                if let Some(ref v) = self.r#type {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.prefix {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.cursor {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(v) = self.limit {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.claim.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.claim.write_to(__cache, buf);
+                }
+                if !self.text.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.text, buf);
+                }
+                if let Some(ref v) = self.r#type {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if let Some(ref v) = self.prefix {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                if let Some(ref v) = self.cursor {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                if let Some(v) = self.limit {
+                    ::buffa::types::put_uint32_field(6u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultSearchRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.claim.as_option() {
+                        __map.serialize_entry("claim", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.text) {
+                    __map.serialize_entry("text", self.text)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.r#type {
+                    __map.serialize_entry("type", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.prefix {
+                    __map.serialize_entry("prefix", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.cursor {
+                    __map.serialize_entry("cursor", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.limit {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultSearchRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultSearchRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSearchRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchRequest";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultSearchRequestView);
+        ::buffa::impl_view_reborrow!(MemoryVaultSearchRequestView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultSearchRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultSearchRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultSearchRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultSearchRequestOwnedView(
+            ::buffa::OwnedView<MemoryVaultSearchRequestView<'static>>,
+        );
+        impl MemoryVaultSearchRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultSearchRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultSearchRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultSearchRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultSearchRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `claim`
+            #[must_use]
+            pub fn claim(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'_>,
+            > {
+                &self.0.reborrow().claim
+            }
+            /// Field 2: `text`
+            #[must_use]
+            pub fn text(&self) -> &'_ str {
+                self.0.reborrow().text
+            }
+            /// Field 3: `type`
+            #[must_use]
+            pub fn r#type(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().r#type
+            }
+            /// Field 4: `prefix`
+            #[must_use]
+            pub fn prefix(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().prefix
+            }
+            /// Opaque; pins the commit the search started from.
+            ///
+            /// Field 5: `cursor`
+            #[must_use]
+            pub fn cursor(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().cursor
+            }
+            /// Field 6: `limit`
+            #[must_use]
+            pub fn limit(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().limit
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultSearchRequestView<'static>>,
+        > for MemoryVaultSearchRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultSearchRequestView<'static>>,
+            ) -> Self {
+                MemoryVaultSearchRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultSearchRequestOwnedView>
+        for ::buffa::OwnedView<MemoryVaultSearchRequestView<'static>> {
+            fn from(wrapper: MemoryVaultSearchRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultSearchRequestView<'static>>,
+        > for MemoryVaultSearchRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultSearchRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultSearchRequest {
+            type View<'a> = MemoryVaultSearchRequestView<'a>;
+            type ViewHandle = MemoryVaultSearchRequestOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultSearchRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultSearchHitView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `type`
+            pub r#type: &'a str,
+            /// Field 3: `path`
+            pub path: &'a str,
+            /// Field 4: `revision`
+            pub revision: u32,
+            /// Field 5: `line`
+            pub line: u32,
+            /// Field 6: `snippet`
+            pub snippet: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultSearchHitView<'a> {
+            type Owned = super::super::MemoryVaultSearchHit;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.r#type = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.path = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.line = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.snippet = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSearchHit,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSearchHit,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultSearchHit {
+                    id: self.id.to_string(),
+                    r#type: self.r#type.to_string(),
+                    path: self.path.to_string(),
+                    revision: self.revision,
+                    line: self.line,
+                    snippet: self.snippet.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultSearchHitView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.r#type.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.r#type) as u64;
+                }
+                if !self.path.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.path) as u64;
+                }
+                if self.revision != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.revision) as u64;
+                }
+                if self.line != 0u32 {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(self.line) as u64;
+                }
+                if !self.snippet.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.snippet) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.r#type.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.r#type, buf);
+                }
+                if !self.path.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.path, buf);
+                }
+                if self.revision != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.revision, buf);
+                }
+                if self.line != 0u32 {
+                    ::buffa::types::put_uint32_field(5u32, self.line, buf);
+                }
+                if !self.snippet.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.snippet, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultSearchHitView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.r#type) {
+                    __map.serialize_entry("type", self.r#type)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.path) {
+                    __map.serialize_entry("path", self.path)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.line) {
+                    __map
+                        .serialize_entry(
+                            "line",
+                            &::buffa::json_helpers::ProtoJson(&self.line),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.snippet) {
+                    __map.serialize_entry("snippet", self.snippet)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultSearchHitView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultSearchHit";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSearchHit";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchHit";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultSearchHitView);
+        ::buffa::impl_view_reborrow!(MemoryVaultSearchHitView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultSearchHit` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultSearchHitView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultSearchHitView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultSearchHitOwnedView(
+            ::buffa::OwnedView<MemoryVaultSearchHitView<'static>>,
+        );
+        impl MemoryVaultSearchHitOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchHitOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchHitOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultSearchHit,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchHitOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MemoryVaultSearchHitView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultSearchHitView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultSearchHit {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `type`
+            #[must_use]
+            pub fn r#type(&self) -> &'_ str {
+                self.0.reborrow().r#type
+            }
+            /// Field 3: `path`
+            #[must_use]
+            pub fn path(&self) -> &'_ str {
+                self.0.reborrow().path
+            }
+            /// Field 4: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u32 {
+                self.0.reborrow().revision
+            }
+            /// Field 5: `line`
+            #[must_use]
+            pub fn line(&self) -> u32 {
+                self.0.reborrow().line
+            }
+            /// Field 6: `snippet`
+            #[must_use]
+            pub fn snippet(&self) -> &'_ str {
+                self.0.reborrow().snippet
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<MemoryVaultSearchHitView<'static>>>
+        for MemoryVaultSearchHitOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultSearchHitView<'static>>,
+            ) -> Self {
+                MemoryVaultSearchHitOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultSearchHitOwnedView>
+        for ::buffa::OwnedView<MemoryVaultSearchHitView<'static>> {
+            fn from(wrapper: MemoryVaultSearchHitOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultSearchHitView<'static>>,
+        > for MemoryVaultSearchHitOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<MemoryVaultSearchHitView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultSearchHit {
+            type View<'a> = MemoryVaultSearchHitView<'a>;
+            type ViewHandle = MemoryVaultSearchHitOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultSearchHitOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultSearchResponseView<'a> {
+            /// Field 1: `hits`
+            pub hits: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::MemoryVaultSearchHitView<'a>,
+            >,
+            /// Absent on the last page.
+            ///
+            /// Field 2: `next_cursor`
+            pub next_cursor: ::core::option::Option<&'a str>,
+            /// Field 3: `commit`
+            pub commit: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultSearchResponseView<'a> {
+            type Owned = super::super::MemoryVaultSearchResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_cursor = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.commit = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::core::mem::size_of::<
+                                super::super::__buffa::view::MemoryVaultSearchHitView,
+                            >(),
+                        )?;
+                        view.hits
+                            .push(
+                                <super::super::__buffa::view::MemoryVaultSearchHitView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSearchResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSearchResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultSearchResponse {
+                    hits: self
+                        .hits
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    next_cursor: self.next_cursor.map(|s| s.to_string()),
+                    commit: self.commit.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultSearchResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                for v in &self.hits {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.next_cursor {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(ref v) = self.commit {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.hits {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.next_cursor {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if let Some(ref v) = self.commit {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultSearchResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.hits.is_empty() {
+                    __map.serialize_entry("hits", &*self.hits)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.next_cursor {
+                    __map.serialize_entry("nextCursor", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.commit {
+                    __map.serialize_entry("commit", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultSearchResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultSearchResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSearchResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSearchResponse";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultSearchResponseView);
+        ::buffa::impl_view_reborrow!(MemoryVaultSearchResponseView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultSearchResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultSearchResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultSearchResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultSearchResponseOwnedView(
+            ::buffa::OwnedView<MemoryVaultSearchResponseView<'static>>,
+        );
+        impl MemoryVaultSearchResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultSearchResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSearchResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultSearchResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultSearchResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultSearchResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `hits`
+            #[must_use]
+            pub fn hits(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::MemoryVaultSearchHitView<'_>,
+            > {
+                &self.0.reborrow().hits
+            }
+            /// Absent on the last page.
+            ///
+            /// Field 2: `next_cursor`
+            #[must_use]
+            pub fn next_cursor(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().next_cursor
+            }
+            /// Field 3: `commit`
+            #[must_use]
+            pub fn commit(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().commit
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultSearchResponseView<'static>>,
+        > for MemoryVaultSearchResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultSearchResponseView<'static>>,
+            ) -> Self {
+                MemoryVaultSearchResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultSearchResponseOwnedView>
+        for ::buffa::OwnedView<MemoryVaultSearchResponseView<'static>> {
+            fn from(wrapper: MemoryVaultSearchResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultSearchResponseView<'static>>,
+        > for MemoryVaultSearchResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultSearchResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultSearchResponse {
+            type View<'a> = MemoryVaultSearchResponseView<'a>;
+            type ViewHandle = MemoryVaultSearchResponseOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultSearchResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultJournalRequestView<'a> {
+            /// Field 1: `claim`
+            pub claim: ::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'a>,
+            >,
+            /// Generated by the CLI per invocation and reused on its transport retries.
+            ///
+            /// Field 2: `request_id`
+            pub request_id: &'a str,
+            /// Field 3: `text`
+            pub text: &'a str,
+            /// ISO 8601 with offset; absent means server now.
+            ///
+            /// Field 4: `occurred_at`
+            pub occurred_at: ::core::option::Option<&'a str>,
+            /// Field 5: `references`
+            pub references: ::buffa::RepeatedView<'a, &'a str>,
+            /// Field 6: `user_requested`
+            pub user_requested: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultJournalRequestView<'a> {
+            type Owned = super::super::MemoryVaultJournalRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.claim.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.claim = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::MemoryVaultClaimView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.text = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.occurred_at = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.user_requested = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.references.push(__elem);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultJournalRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultJournalRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultJournalRequest {
+                    claim: match self.claim.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::MemoryVaultClaim,
+                                ::buffa::Inline<super::super::MemoryVaultClaim>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    request_id: self.request_id.to_string(),
+                    text: self.text.to_string(),
+                    occurred_at: self.occurred_at.map(|s| s.to_string()),
+                    references: self.references.iter().map(|s| s.to_string()).collect(),
+                    user_requested: self.user_requested,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultJournalRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.claim.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.claim.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u64;
+                }
+                if !self.text.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
+                }
+                if let Some(ref v) = self.occurred_at {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                for v in &self.references {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.user_requested {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.claim.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.claim.write_to(__cache, buf);
+                }
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+                }
+                if !self.text.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.text, buf);
+                }
+                if let Some(ref v) = self.occurred_at {
+                    ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                for v in &self.references {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                if self.user_requested {
+                    ::buffa::types::put_bool_field(6u32, self.user_requested, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultJournalRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.claim.as_option() {
+                        __map.serialize_entry("claim", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.text) {
+                    __map.serialize_entry("text", self.text)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.occurred_at {
+                    __map.serialize_entry("occurredAt", __v)?;
+                }
+                if !self.references.is_empty() {
+                    __map.serialize_entry("references", &*self.references)?;
+                }
+                if self.user_requested {
+                    __map.serialize_entry("userRequested", &self.user_requested)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultJournalRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultJournalRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultJournalRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultJournalRequest";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultJournalRequestView);
+        ::buffa::impl_view_reborrow!(MemoryVaultJournalRequestView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultJournalRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultJournalRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultJournalRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultJournalRequestOwnedView(
+            ::buffa::OwnedView<MemoryVaultJournalRequestView<'static>>,
+        );
+        impl MemoryVaultJournalRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultJournalRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultJournalRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultJournalRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultJournalRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultJournalRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultJournalRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultJournalRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `claim`
+            #[must_use]
+            pub fn claim(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'_>,
+            > {
+                &self.0.reborrow().claim
+            }
+            /// Generated by the CLI per invocation and reused on its transport retries.
+            ///
+            /// Field 2: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Field 3: `text`
+            #[must_use]
+            pub fn text(&self) -> &'_ str {
+                self.0.reborrow().text
+            }
+            /// ISO 8601 with offset; absent means server now.
+            ///
+            /// Field 4: `occurred_at`
+            #[must_use]
+            pub fn occurred_at(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().occurred_at
+            }
+            /// Field 5: `references`
+            #[must_use]
+            pub fn references(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().references
+            }
+            /// Field 6: `user_requested`
+            #[must_use]
+            pub fn user_requested(&self) -> bool {
+                self.0.reborrow().user_requested
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultJournalRequestView<'static>>,
+        > for MemoryVaultJournalRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultJournalRequestView<'static>>,
+            ) -> Self {
+                MemoryVaultJournalRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultJournalRequestOwnedView>
+        for ::buffa::OwnedView<MemoryVaultJournalRequestView<'static>> {
+            fn from(wrapper: MemoryVaultJournalRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultJournalRequestView<'static>>,
+        > for MemoryVaultJournalRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultJournalRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultJournalRequest {
+            type View<'a> = MemoryVaultJournalRequestView<'a>;
+            type ViewHandle = MemoryVaultJournalRequestOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultJournalRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultJournalResponseView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `path`
+            pub path: &'a str,
+            /// Field 3: `line`
+            pub line: &'a str,
+            /// Field 4: `revision`
+            pub revision: u32,
+            /// Field 5: `commit`
+            pub commit: &'a str,
+            /// Field 6: `deduplicated`
+            pub deduplicated: bool,
+            /// Field 7: `replayed`
+            pub replayed: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultJournalResponseView<'a> {
+            type Owned = super::super::MemoryVaultJournalResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.path = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.line = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.commit = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.deduplicated = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.replayed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultJournalResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultJournalResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultJournalResponse {
+                    id: self.id.to_string(),
+                    path: self.path.to_string(),
+                    line: self.line.to_string(),
+                    revision: self.revision,
+                    commit: self.commit.to_string(),
+                    deduplicated: self.deduplicated,
+                    replayed: self.replayed,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultJournalResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.path.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.path) as u64;
+                }
+                if !self.line.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.line) as u64;
+                }
+                if self.revision != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.revision) as u64;
+                }
+                if !self.commit.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.commit) as u64;
+                }
+                if self.deduplicated {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.replayed {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.path.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.path, buf);
+                }
+                if !self.line.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.line, buf);
+                }
+                if self.revision != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.revision, buf);
+                }
+                if !self.commit.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.commit, buf);
+                }
+                if self.deduplicated {
+                    ::buffa::types::put_bool_field(6u32, self.deduplicated, buf);
+                }
+                if self.replayed {
+                    ::buffa::types::put_bool_field(7u32, self.replayed, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultJournalResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.path) {
+                    __map.serialize_entry("path", self.path)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.line) {
+                    __map.serialize_entry("line", self.line)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.commit) {
+                    __map.serialize_entry("commit", self.commit)?;
+                }
+                if self.deduplicated {
+                    __map.serialize_entry("deduplicated", &self.deduplicated)?;
+                }
+                if self.replayed {
+                    __map.serialize_entry("replayed", &self.replayed)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultJournalResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultJournalResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultJournalResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultJournalResponse";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultJournalResponseView);
+        ::buffa::impl_view_reborrow!(MemoryVaultJournalResponseView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultJournalResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultJournalResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultJournalResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultJournalResponseOwnedView(
+            ::buffa::OwnedView<MemoryVaultJournalResponseView<'static>>,
+        );
+        impl MemoryVaultJournalResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultJournalResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultJournalResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultJournalResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultJournalResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultJournalResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultJournalResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultJournalResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `path`
+            #[must_use]
+            pub fn path(&self) -> &'_ str {
+                self.0.reborrow().path
+            }
+            /// Field 3: `line`
+            #[must_use]
+            pub fn line(&self) -> &'_ str {
+                self.0.reborrow().line
+            }
+            /// Field 4: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u32 {
+                self.0.reborrow().revision
+            }
+            /// Field 5: `commit`
+            #[must_use]
+            pub fn commit(&self) -> &'_ str {
+                self.0.reborrow().commit
+            }
+            /// Field 6: `deduplicated`
+            #[must_use]
+            pub fn deduplicated(&self) -> bool {
+                self.0.reborrow().deduplicated
+            }
+            /// Field 7: `replayed`
+            #[must_use]
+            pub fn replayed(&self) -> bool {
+                self.0.reborrow().replayed
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultJournalResponseView<'static>>,
+        > for MemoryVaultJournalResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultJournalResponseView<'static>>,
+            ) -> Self {
+                MemoryVaultJournalResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultJournalResponseOwnedView>
+        for ::buffa::OwnedView<MemoryVaultJournalResponseView<'static>> {
+            fn from(wrapper: MemoryVaultJournalResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultJournalResponseView<'static>>,
+        > for MemoryVaultJournalResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultJournalResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultJournalResponse {
+            type View<'a> = MemoryVaultJournalResponseView<'a>;
+            type ViewHandle = MemoryVaultJournalResponseOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultJournalResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultSaveRequestView<'a> {
+            /// Field 1: `claim`
+            pub claim: ::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'a>,
+            >,
+            /// Field 2: `request_id`
+            pub request_id: &'a str,
+            /// Field 3: `id`
+            pub id: &'a str,
+            /// Field 4: `type`
+            pub r#type: &'a str,
+            /// Field 5: `status`
+            pub status: ::core::option::Option<&'a str>,
+            /// Field 6: `aliases`
+            pub aliases: ::buffa::RepeatedView<'a, &'a str>,
+            /// Required when the record exists; omitted only to create it.
+            ///
+            /// Field 7: `expected_revision`
+            pub expected_revision: ::core::option::Option<u32>,
+            /// Field 8: `user_requested`
+            pub user_requested: bool,
+            /// Markdown body only; the server generates the frontmatter.
+            ///
+            /// Field 9: `content`
+            pub content: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultSaveRequestView<'a> {
+            type Owned = super::super::MemoryVaultSaveRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.claim.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.claim = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::MemoryVaultClaimView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.r#type = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.status = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.expected_revision = Some(
+                            ::buffa::types::decode_uint32(&mut cur)?,
+                        );
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.user_requested = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.content = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.aliases.push(__elem);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSaveRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSaveRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultSaveRequest {
+                    claim: match self.claim.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::MemoryVaultClaim,
+                                ::buffa::Inline<super::super::MemoryVaultClaim>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    request_id: self.request_id.to_string(),
+                    id: self.id.to_string(),
+                    r#type: self.r#type.to_string(),
+                    status: self.status.map(|s| s.to_string()),
+                    aliases: self.aliases.iter().map(|s| s.to_string()).collect(),
+                    expected_revision: self.expected_revision,
+                    user_requested: self.user_requested,
+                    content: self.content.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultSaveRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.claim.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.claim.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u64;
+                }
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.r#type.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.r#type) as u64;
+                }
+                if let Some(ref v) = self.status {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                for v in &self.aliases {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if let Some(v) = self.expected_revision {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
+                if self.user_requested {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if !self.content.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.content) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.claim.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.claim.write_to(__cache, buf);
+                }
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+                }
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.id, buf);
+                }
+                if !self.r#type.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.r#type, buf);
+                }
+                if let Some(ref v) = self.status {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                for v in &self.aliases {
+                    ::buffa::types::put_string_field(6u32, v, buf);
+                }
+                if let Some(v) = self.expected_revision {
+                    ::buffa::types::put_uint32_field(7u32, v, buf);
+                }
+                if self.user_requested {
+                    ::buffa::types::put_bool_field(8u32, self.user_requested, buf);
+                }
+                if !self.content.is_empty() {
+                    ::buffa::types::put_string_field(9u32, &self.content, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultSaveRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.claim.as_option() {
+                        __map.serialize_entry("claim", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.r#type) {
+                    __map.serialize_entry("type", self.r#type)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.status {
+                    __map.serialize_entry("status", __v)?;
+                }
+                if !self.aliases.is_empty() {
+                    __map.serialize_entry("aliases", &*self.aliases)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.expected_revision {
+                    __map
+                        .serialize_entry(
+                            "expectedRevision",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if self.user_requested {
+                    __map.serialize_entry("userRequested", &self.user_requested)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.content) {
+                    __map.serialize_entry("content", self.content)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultSaveRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultSaveRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSaveRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSaveRequest";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultSaveRequestView);
+        ::buffa::impl_view_reborrow!(MemoryVaultSaveRequestView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultSaveRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultSaveRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultSaveRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultSaveRequestOwnedView(
+            ::buffa::OwnedView<MemoryVaultSaveRequestView<'static>>,
+        );
+        impl MemoryVaultSaveRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSaveRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSaveRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultSaveRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSaveRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MemoryVaultSaveRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultSaveRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultSaveRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `claim`
+            #[must_use]
+            pub fn claim(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'_>,
+            > {
+                &self.0.reborrow().claim
+            }
+            /// Field 2: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Field 3: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 4: `type`
+            #[must_use]
+            pub fn r#type(&self) -> &'_ str {
+                self.0.reborrow().r#type
+            }
+            /// Field 5: `status`
+            #[must_use]
+            pub fn status(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().status
+            }
+            /// Field 6: `aliases`
+            #[must_use]
+            pub fn aliases(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().aliases
+            }
+            /// Required when the record exists; omitted only to create it.
+            ///
+            /// Field 7: `expected_revision`
+            #[must_use]
+            pub fn expected_revision(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().expected_revision
+            }
+            /// Field 8: `user_requested`
+            #[must_use]
+            pub fn user_requested(&self) -> bool {
+                self.0.reborrow().user_requested
+            }
+            /// Markdown body only; the server generates the frontmatter.
+            ///
+            /// Field 9: `content`
+            #[must_use]
+            pub fn content(&self) -> &'_ str {
+                self.0.reborrow().content
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultSaveRequestView<'static>>,
+        > for MemoryVaultSaveRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultSaveRequestView<'static>>,
+            ) -> Self {
+                MemoryVaultSaveRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultSaveRequestOwnedView>
+        for ::buffa::OwnedView<MemoryVaultSaveRequestView<'static>> {
+            fn from(wrapper: MemoryVaultSaveRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultSaveRequestView<'static>>,
+        > for MemoryVaultSaveRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultSaveRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultSaveRequest {
+            type View<'a> = MemoryVaultSaveRequestView<'a>;
+            type ViewHandle = MemoryVaultSaveRequestOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultSaveRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultSaveResponseView<'a> {
+            /// Field 1: `id`
+            pub id: &'a str,
+            /// Field 2: `type`
+            pub r#type: &'a str,
+            /// Field 3: `path`
+            pub path: &'a str,
+            /// Field 4: `revision`
+            pub revision: u32,
+            /// Field 5: `commit`
+            pub commit: &'a str,
+            /// Playbook and voice lines dropped to stay within their size limit.
+            ///
+            /// Field 6: `dropped_lines`
+            pub dropped_lines: ::buffa::RepeatedView<'a, &'a str>,
+            /// Field 7: `replayed`
+            pub replayed: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultSaveResponseView<'a> {
+            type Owned = super::super::MemoryVaultSaveResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.r#type = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.path = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.commit = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.replayed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                        ctx.register_element_memory(
+                            ::buffa::__private::element_footprint(&__elem),
+                        )?;
+                        view.dropped_lines.push(__elem);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSaveResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultSaveResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultSaveResponse {
+                    id: self.id.to_string(),
+                    r#type: self.r#type.to_string(),
+                    path: self.path.to_string(),
+                    revision: self.revision,
+                    commit: self.commit.to_string(),
+                    dropped_lines: self
+                        .dropped_lines
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    replayed: self.replayed,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultSaveResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.id.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+                }
+                if !self.r#type.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.r#type) as u64;
+                }
+                if !self.path.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.path) as u64;
+                }
+                if self.revision != 0u32 {
+                    size
+                        += 1u64
+                            + ::buffa::types::uint32_encoded_len(self.revision) as u64;
+                }
+                if !self.commit.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.commit) as u64;
+                }
+                for v in &self.dropped_lines {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if self.replayed {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.id, buf);
+                }
+                if !self.r#type.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.r#type, buf);
+                }
+                if !self.path.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.path, buf);
+                }
+                if self.revision != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.revision, buf);
+                }
+                if !self.commit.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.commit, buf);
+                }
+                for v in &self.dropped_lines {
+                    ::buffa::types::put_string_field(6u32, v, buf);
+                }
+                if self.replayed {
+                    ::buffa::types::put_bool_field(7u32, self.replayed, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultSaveResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+                    __map.serialize_entry("id", self.id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.r#type) {
+                    __map.serialize_entry("type", self.r#type)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.path) {
+                    __map.serialize_entry("path", self.path)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.commit) {
+                    __map.serialize_entry("commit", self.commit)?;
+                }
+                if !self.dropped_lines.is_empty() {
+                    __map.serialize_entry("droppedLines", &*self.dropped_lines)?;
+                }
+                if self.replayed {
+                    __map.serialize_entry("replayed", &self.replayed)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultSaveResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultSaveResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultSaveResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultSaveResponse";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultSaveResponseView);
+        ::buffa::impl_view_reborrow!(MemoryVaultSaveResponseView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultSaveResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultSaveResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultSaveResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultSaveResponseOwnedView(
+            ::buffa::OwnedView<MemoryVaultSaveResponseView<'static>>,
+        );
+        impl MemoryVaultSaveResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSaveResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSaveResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultSaveResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultSaveResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultSaveResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultSaveResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultSaveResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> &'_ str {
+                self.0.reborrow().id
+            }
+            /// Field 2: `type`
+            #[must_use]
+            pub fn r#type(&self) -> &'_ str {
+                self.0.reborrow().r#type
+            }
+            /// Field 3: `path`
+            #[must_use]
+            pub fn path(&self) -> &'_ str {
+                self.0.reborrow().path
+            }
+            /// Field 4: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u32 {
+                self.0.reborrow().revision
+            }
+            /// Field 5: `commit`
+            #[must_use]
+            pub fn commit(&self) -> &'_ str {
+                self.0.reborrow().commit
+            }
+            /// Playbook and voice lines dropped to stay within their size limit.
+            ///
+            /// Field 6: `dropped_lines`
+            #[must_use]
+            pub fn dropped_lines(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().dropped_lines
+            }
+            /// Field 7: `replayed`
+            #[must_use]
+            pub fn replayed(&self) -> bool {
+                self.0.reborrow().replayed
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultSaveResponseView<'static>>,
+        > for MemoryVaultSaveResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultSaveResponseView<'static>>,
+            ) -> Self {
+                MemoryVaultSaveResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultSaveResponseOwnedView>
+        for ::buffa::OwnedView<MemoryVaultSaveResponseView<'static>> {
+            fn from(wrapper: MemoryVaultSaveResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultSaveResponseView<'static>>,
+        > for MemoryVaultSaveResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultSaveResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultSaveResponse {
+            type View<'a> = MemoryVaultSaveResponseView<'a>;
+            type ViewHandle = MemoryVaultSaveResponseOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultSaveResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct GetMemoryVaultContextRequestView<'a> {
+            /// Field 1: `claim`
+            pub claim: ::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'a>,
+            >,
+            /// The context_key of the last context this CLI injected.
+            ///
+            /// Field 2: `known_context_key`
+            pub known_context_key: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetMemoryVaultContextRequestView<'a> {
+            type Owned = super::super::GetMemoryVaultContextRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.claim.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.claim = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::MemoryVaultClaimView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.known_context_key = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetMemoryVaultContextRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetMemoryVaultContextRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetMemoryVaultContextRequest {
+                    claim: match self.claim.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::MemoryVaultClaim,
+                                ::buffa::Inline<super::super::MemoryVaultClaim>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    known_context_key: self.known_context_key.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetMemoryVaultContextRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if self.claim.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.claim.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
+                if let Some(ref v) = self.known_context_key {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.claim.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.claim.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.known_context_key {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetMemoryVaultContextRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.claim.as_option() {
+                        __map.serialize_entry("claim", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self.known_context_key {
+                    __map.serialize_entry("knownContextKey", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetMemoryVaultContextRequestView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "GetMemoryVaultContextRequest";
+            const FULL_NAME: &'static str = "briar.worker.v1.GetMemoryVaultContextRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.GetMemoryVaultContextRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetMemoryVaultContextRequestView);
+        ::buffa::impl_view_reborrow!(GetMemoryVaultContextRequestView);
+        /** Self-contained, `'static` owned view of a `GetMemoryVaultContextRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetMemoryVaultContextRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetMemoryVaultContextRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetMemoryVaultContextRequestOwnedView(
+            ::buffa::OwnedView<GetMemoryVaultContextRequestView<'static>>,
+        );
+        impl GetMemoryVaultContextRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMemoryVaultContextRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMemoryVaultContextRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetMemoryVaultContextRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMemoryVaultContextRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetMemoryVaultContextRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetMemoryVaultContextRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::GetMemoryVaultContextRequest {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `claim`
+            #[must_use]
+            pub fn claim(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::MemoryVaultClaimView<'_>,
+            > {
+                &self.0.reborrow().claim
+            }
+            /// The context_key of the last context this CLI injected.
+            ///
+            /// Field 2: `known_context_key`
+            #[must_use]
+            pub fn known_context_key(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().known_context_key
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetMemoryVaultContextRequestView<'static>>,
+        > for GetMemoryVaultContextRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetMemoryVaultContextRequestView<'static>>,
+            ) -> Self {
+                GetMemoryVaultContextRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetMemoryVaultContextRequestOwnedView>
+        for ::buffa::OwnedView<GetMemoryVaultContextRequestView<'static>> {
+            fn from(wrapper: GetMemoryVaultContextRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetMemoryVaultContextRequestView<'static>>,
+        > for GetMemoryVaultContextRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetMemoryVaultContextRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetMemoryVaultContextRequest {
+            type View<'a> = GetMemoryVaultContextRequestView<'a>;
+            type ViewHandle = GetMemoryVaultContextRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetMemoryVaultContextRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct GetMemoryVaultContextResponseView<'a> {
+            pub state: ::core::option::Option<
+                super::super::__buffa::view::oneof::get_memory_vault_context_response::State<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetMemoryVaultContextResponseView<'a> {
+            type Owned = super::super::GetMemoryVaultContextResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::get_memory_vault_context_response::State::None(
+                                ref mut existing,
+                            ),
+                        ) = view.state
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.state = Some(
+                                super::super::__buffa::view::oneof::get_memory_vault_context_response::State::None(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::MemoryVaultContextNoneView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Unchanged(
+                                ref mut existing,
+                            ),
+                        ) = view.state
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.state = Some(
+                                super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Unchanged(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::MemoryVaultContextUnchangedView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Context(
+                                ref mut existing,
+                            ),
+                        ) = view.state
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.state = Some(
+                                super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Context(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::MemoryVaultContextView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetMemoryVaultContextResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetMemoryVaultContextResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetMemoryVaultContextResponse {
+                    state: match self.state.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::get_memory_vault_context_response::State::None(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::get_memory_vault_context_response::State::None(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Unchanged(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::get_memory_vault_context_response::State::Unchanged(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Context(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::get_memory_vault_context_response::State::Context(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetMemoryVaultContextResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if let ::core::option::Option::Some(ref v) = self.state {
+                    match v {
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::None(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Unchanged(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Context(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                                    + inner as u64;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let ::core::option::Option::Some(ref v) = self.state {
+                    match v {
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::None(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                1u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Unchanged(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                2u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Context(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                3u32,
+                                u64::from(__cache.consume_next()),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetMemoryVaultContextResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(ref __ov) = self.state {
+                    match __ov {
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::None(
+                            v,
+                        ) => {
+                            __map.serialize_entry("none", v)?;
+                        }
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Unchanged(
+                            v,
+                        ) => {
+                            __map.serialize_entry("unchanged", v)?;
+                        }
+                        super::super::__buffa::view::oneof::get_memory_vault_context_response::State::Context(
+                            v,
+                        ) => {
+                            __map.serialize_entry("context", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetMemoryVaultContextResponseView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "GetMemoryVaultContextResponse";
+            const FULL_NAME: &'static str = "briar.worker.v1.GetMemoryVaultContextResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.GetMemoryVaultContextResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetMemoryVaultContextResponseView);
+        ::buffa::impl_view_reborrow!(GetMemoryVaultContextResponseView);
+        /** Self-contained, `'static` owned view of a `GetMemoryVaultContextResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetMemoryVaultContextResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetMemoryVaultContextResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetMemoryVaultContextResponseOwnedView(
+            ::buffa::OwnedView<GetMemoryVaultContextResponseView<'static>>,
+        );
+        impl GetMemoryVaultContextResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMemoryVaultContextResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMemoryVaultContextResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetMemoryVaultContextResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMemoryVaultContextResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetMemoryVaultContextResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetMemoryVaultContextResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(
+                &self,
+            ) -> super::super::GetMemoryVaultContextResponse {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Oneof `state`.
+            #[must_use]
+            pub fn state(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::get_memory_vault_context_response::State<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().state.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetMemoryVaultContextResponseView<'static>>,
+        > for GetMemoryVaultContextResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetMemoryVaultContextResponseView<'static>>,
+            ) -> Self {
+                GetMemoryVaultContextResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetMemoryVaultContextResponseOwnedView>
+        for ::buffa::OwnedView<GetMemoryVaultContextResponseView<'static>> {
+            fn from(wrapper: GetMemoryVaultContextResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetMemoryVaultContextResponseView<'static>>,
+        > for GetMemoryVaultContextResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetMemoryVaultContextResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetMemoryVaultContextResponse {
+            type View<'a> = GetMemoryVaultContextResponseView<'a>;
+            type ViewHandle = GetMemoryVaultContextResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetMemoryVaultContextResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultContextNoneView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultContextNoneView<'a> {
+            type Owned = super::super::MemoryVaultContextNone;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultContextNone,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultContextNone,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultContextNone {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultContextNoneView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultContextNoneView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultContextNoneView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultContextNone";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultContextNone";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContextNone";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultContextNoneView);
+        ::buffa::impl_view_reborrow!(MemoryVaultContextNoneView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultContextNone` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultContextNoneView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultContextNoneView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultContextNoneOwnedView(
+            ::buffa::OwnedView<MemoryVaultContextNoneView<'static>>,
+        );
+        impl MemoryVaultContextNoneOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextNoneOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextNoneOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultContextNone,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextNoneOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MemoryVaultContextNoneView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultContextNoneView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultContextNone {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultContextNoneView<'static>>,
+        > for MemoryVaultContextNoneOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultContextNoneView<'static>>,
+            ) -> Self {
+                MemoryVaultContextNoneOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultContextNoneOwnedView>
+        for ::buffa::OwnedView<MemoryVaultContextNoneView<'static>> {
+            fn from(wrapper: MemoryVaultContextNoneOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultContextNoneView<'static>>,
+        > for MemoryVaultContextNoneOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultContextNoneView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultContextNone {
+            type View<'a> = MemoryVaultContextNoneView<'a>;
+            type ViewHandle = MemoryVaultContextNoneOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultContextNoneOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultContextUnchangedView<'a> {
+            /// Field 1: `context_key`
+            pub context_key: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultContextUnchangedView<'a> {
+            type Owned = super::super::MemoryVaultContextUnchanged;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.context_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultContextUnchanged,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultContextUnchanged,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultContextUnchanged {
+                    context_key: self.context_key.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultContextUnchangedView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.context_key.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.context_key)
+                                as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.context_key.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.context_key, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultContextUnchangedView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.context_key) {
+                    __map.serialize_entry("contextKey", self.context_key)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultContextUnchangedView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultContextUnchanged";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultContextUnchanged";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContextUnchanged";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultContextUnchangedView);
+        ::buffa::impl_view_reborrow!(MemoryVaultContextUnchangedView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultContextUnchanged` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultContextUnchangedView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultContextUnchangedView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultContextUnchangedOwnedView(
+            ::buffa::OwnedView<MemoryVaultContextUnchangedView<'static>>,
+        );
+        impl MemoryVaultContextUnchangedOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextUnchangedOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextUnchangedOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultContextUnchanged,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextUnchangedOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`MemoryVaultContextUnchangedView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultContextUnchangedView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultContextUnchanged {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Field 1: `context_key`
+            #[must_use]
+            pub fn context_key(&self) -> &'_ str {
+                self.0.reborrow().context_key
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<MemoryVaultContextUnchangedView<'static>>,
+        > for MemoryVaultContextUnchangedOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<MemoryVaultContextUnchangedView<'static>>,
+            ) -> Self {
+                MemoryVaultContextUnchangedOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultContextUnchangedOwnedView>
+        for ::buffa::OwnedView<MemoryVaultContextUnchangedView<'static>> {
+            fn from(wrapper: MemoryVaultContextUnchangedOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<MemoryVaultContextUnchangedView<'static>>,
+        > for MemoryVaultContextUnchangedOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<MemoryVaultContextUnchangedView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultContextUnchanged {
+            type View<'a> = MemoryVaultContextUnchangedView<'a>;
+            type ViewHandle = MemoryVaultContextUnchangedOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultContextUnchangedOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct MemoryVaultContextView<'a> {
+            /// Covers the vault head and the current permissions.
+            ///
+            /// Field 1: `context_key`
+            pub context_key: &'a str,
+            /// Field 2: `head`
+            pub head: ::core::option::Option<&'a str>,
+            /// "dm", "group" or "project".
+            ///
+            /// Field 3: `scope_kind`
+            pub scope_kind: &'a str,
+            /// The application-owned README, for the trusted run instructions.
+            ///
+            /// Field 4: `readme`
+            pub readme: &'a str,
+            /// One line saying what is allowed now; follows the README.
+            ///
+            /// Field 5: `status`
+            pub status: &'a str,
+            /// Record bodies for \<voice-memory\>, \<voice-guide\> and \<playbook-memory\>.
+            /// Empty when the record is missing or recall is off.
+            ///
+            /// Field 6: `voice`
+            pub voice: &'a str,
+            /// Field 7: `voice_guide`
+            pub voice_guide: &'a str,
+            /// Field 8: `playbook`
+            pub playbook: &'a str,
+            /// Field 9: `readable`
+            pub readable: bool,
+            /// Field 10: `writable`
+            pub writable: bool,
+            /// Field 11: `user_requested_writable`
+            pub user_requested_writable: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MemoryVaultContextView<'a> {
+            type Owned = super::super::MemoryVaultContext;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.context_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.head = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.scope_kind = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.readme = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.voice = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.voice_guide = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.playbook = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.readable = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.writable = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.user_requested_writable = ::buffa::types::decode_bool(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultContext,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MemoryVaultContext,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MemoryVaultContext {
+                    context_key: self.context_key.to_string(),
+                    head: self.head.map(|s| s.to_string()),
+                    scope_kind: self.scope_kind.to_string(),
+                    readme: self.readme.to_string(),
+                    status: self.status.to_string(),
+                    voice: self.voice.to_string(),
+                    voice_guide: self.voice_guide.to_string(),
+                    playbook: self.playbook.to_string(),
+                    readable: self.readable,
+                    writable: self.writable,
+                    user_requested_writable: self.user_requested_writable,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MemoryVaultContextView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if !self.context_key.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.context_key)
+                                as u64;
+                }
+                if let Some(ref v) = self.head {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if !self.scope_kind.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.scope_kind)
+                                as u64;
+                }
+                if !self.readme.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.readme) as u64;
+                }
+                if !self.status.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.status) as u64;
+                }
+                if !self.voice.is_empty() {
+                    size
+                        += 1u64 + ::buffa::types::string_encoded_len(&self.voice) as u64;
+                }
+                if !self.voice_guide.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.voice_guide)
+                                as u64;
+                }
+                if !self.playbook.is_empty() {
+                    size
+                        += 1u64
+                            + ::buffa::types::string_encoded_len(&self.playbook) as u64;
+                }
+                if self.readable {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.writable {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                if self.user_requested_writable {
+                    size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.context_key.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.context_key, buf);
+                }
+                if let Some(ref v) = self.head {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if !self.scope_kind.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.scope_kind, buf);
+                }
+                if !self.readme.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.readme, buf);
+                }
+                if !self.status.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.status, buf);
+                }
+                if !self.voice.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.voice, buf);
+                }
+                if !self.voice_guide.is_empty() {
+                    ::buffa::types::put_string_field(7u32, &self.voice_guide, buf);
+                }
+                if !self.playbook.is_empty() {
+                    ::buffa::types::put_string_field(8u32, &self.playbook, buf);
+                }
+                if self.readable {
+                    ::buffa::types::put_bool_field(9u32, self.readable, buf);
+                }
+                if self.writable {
+                    ::buffa::types::put_bool_field(10u32, self.writable, buf);
+                }
+                if self.user_requested_writable {
+                    ::buffa::types::put_bool_field(
+                        11u32,
+                        self.user_requested_writable,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MemoryVaultContextView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.context_key) {
+                    __map.serialize_entry("contextKey", self.context_key)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.head {
+                    __map.serialize_entry("head", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.scope_kind) {
+                    __map.serialize_entry("scopeKind", self.scope_kind)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.readme) {
+                    __map.serialize_entry("readme", self.readme)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
+                    __map.serialize_entry("status", self.status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.voice) {
+                    __map.serialize_entry("voice", self.voice)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.voice_guide) {
+                    __map.serialize_entry("voiceGuide", self.voice_guide)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.playbook) {
+                    __map.serialize_entry("playbook", self.playbook)?;
+                }
+                if self.readable {
+                    __map.serialize_entry("readable", &self.readable)?;
+                }
+                if self.writable {
+                    __map.serialize_entry("writable", &self.writable)?;
+                }
+                if self.user_requested_writable {
+                    __map
+                        .serialize_entry(
+                            "userRequestedWritable",
+                            &self.user_requested_writable,
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MemoryVaultContextView<'a> {
+            const PACKAGE: &'static str = "briar.worker.v1";
+            const NAME: &'static str = "MemoryVaultContext";
+            const FULL_NAME: &'static str = "briar.worker.v1.MemoryVaultContext";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.worker.v1.MemoryVaultContext";
+        }
+        ::buffa::impl_default_view_instance!(MemoryVaultContextView);
+        ::buffa::impl_view_reborrow!(MemoryVaultContextView);
+        /** Self-contained, `'static` owned view of a `MemoryVaultContext` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemoryVaultContextView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemoryVaultContextView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MemoryVaultContextOwnedView(
+            ::buffa::OwnedView<MemoryVaultContextView<'static>>,
+        );
+        impl MemoryVaultContextOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MemoryVaultContext,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MemoryVaultContextOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MemoryVaultContextView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MemoryVaultContextView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::MemoryVaultContext {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Covers the vault head and the current permissions.
+            ///
+            /// Field 1: `context_key`
+            #[must_use]
+            pub fn context_key(&self) -> &'_ str {
+                self.0.reborrow().context_key
+            }
+            /// Field 2: `head`
+            #[must_use]
+            pub fn head(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().head
+            }
+            /// "dm", "group" or "project".
+            ///
+            /// Field 3: `scope_kind`
+            #[must_use]
+            pub fn scope_kind(&self) -> &'_ str {
+                self.0.reborrow().scope_kind
+            }
+            /// The application-owned README, for the trusted run instructions.
+            ///
+            /// Field 4: `readme`
+            #[must_use]
+            pub fn readme(&self) -> &'_ str {
+                self.0.reborrow().readme
+            }
+            /// One line saying what is allowed now; follows the README.
+            ///
+            /// Field 5: `status`
+            #[must_use]
+            pub fn status(&self) -> &'_ str {
+                self.0.reborrow().status
+            }
+            /// Record bodies for \<voice-memory\>, \<voice-guide\> and \<playbook-memory\>.
+            /// Empty when the record is missing or recall is off.
+            ///
+            /// Field 6: `voice`
+            #[must_use]
+            pub fn voice(&self) -> &'_ str {
+                self.0.reborrow().voice
+            }
+            /// Field 7: `voice_guide`
+            #[must_use]
+            pub fn voice_guide(&self) -> &'_ str {
+                self.0.reborrow().voice_guide
+            }
+            /// Field 8: `playbook`
+            #[must_use]
+            pub fn playbook(&self) -> &'_ str {
+                self.0.reborrow().playbook
+            }
+            /// Field 9: `readable`
+            #[must_use]
+            pub fn readable(&self) -> bool {
+                self.0.reborrow().readable
+            }
+            /// Field 10: `writable`
+            #[must_use]
+            pub fn writable(&self) -> bool {
+                self.0.reborrow().writable
+            }
+            /// Field 11: `user_requested_writable`
+            #[must_use]
+            pub fn user_requested_writable(&self) -> bool {
+                self.0.reborrow().user_requested_writable
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<MemoryVaultContextView<'static>>>
+        for MemoryVaultContextOwnedView {
+            fn from(inner: ::buffa::OwnedView<MemoryVaultContextView<'static>>) -> Self {
+                MemoryVaultContextOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MemoryVaultContextOwnedView>
+        for ::buffa::OwnedView<MemoryVaultContextView<'static>> {
+            fn from(wrapper: MemoryVaultContextOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<MemoryVaultContextView<'static>>>
+        for MemoryVaultContextOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<MemoryVaultContextView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MemoryVaultContext {
+            type View<'a> = MemoryVaultContextView<'a>;
+            type ViewHandle = MemoryVaultContextOwnedView;
+        }
+        impl ::serde::Serialize for MemoryVaultContextOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         #[derive(Clone, Debug, Default)]
         pub struct EnrollManagedComputerRequestView<'a> {
             /// Field 1: `managed_computer_id`
@@ -138002,6 +149785,34 @@ pub mod __buffa {
                     ),
                 }
             }
+            pub mod get_memory_vault_context_response {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum State<'a> {
+                    None(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::MemoryVaultContextNoneView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Unchanged(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::MemoryVaultContextUnchangedView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Context(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::MemoryVaultContextView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                }
+            }
             pub mod managed_computer_setup_to_agent {
                 #[allow(unused_imports)]
                 use super::*;
@@ -139206,6 +151017,81 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod get_memory_vault_context_response {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum State {
+                None(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::MemoryVaultContextNone,
+                    >,
+                ),
+                Unchanged(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::MemoryVaultContextUnchanged,
+                    >,
+                ),
+                Context(
+                    ::buffa::alloc::boxed::Box<super::super::super::MemoryVaultContext>,
+                ),
+            }
+            impl ::buffa::Oneof for State {}
+            impl From<super::super::super::MemoryVaultContextNone> for State {
+                fn from(v: super::super::super::MemoryVaultContextNone) -> Self {
+                    Self::None(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::MemoryVaultContextNone>
+            for ::core::option::Option<State> {
+                fn from(v: super::super::super::MemoryVaultContextNone) -> Self {
+                    Self::Some(State::from(v))
+                }
+            }
+            impl From<super::super::super::MemoryVaultContextUnchanged> for State {
+                fn from(v: super::super::super::MemoryVaultContextUnchanged) -> Self {
+                    Self::Unchanged(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::MemoryVaultContextUnchanged>
+            for ::core::option::Option<State> {
+                fn from(v: super::super::super::MemoryVaultContextUnchanged) -> Self {
+                    Self::Some(State::from(v))
+                }
+            }
+            impl From<super::super::super::MemoryVaultContext> for State {
+                fn from(v: super::super::super::MemoryVaultContext) -> Self {
+                    Self::Context(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::MemoryVaultContext>
+            for ::core::option::Option<State> {
+                fn from(v: super::super::super::MemoryVaultContext) -> Self {
+                    Self::Some(State::from(v))
+                }
+            }
+            impl serde::Serialize for State {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::None(v) => {
+                            map.serialize_entry("none", v)?;
+                        }
+                        Self::Unchanged(v) => {
+                            map.serialize_entry("unchanged", v)?;
+                        }
+                        Self::Context(v) => {
+                            map.serialize_entry("context", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod managed_computer_setup_to_agent {
             #[allow(unused_imports)]
             use super::*;
@@ -139817,6 +151703,24 @@ pub mod __buffa {
         reg.register_json_any(super::__EXECUTE_DM_SCHEDULE_TOOL_REQUEST_JSON_ANY);
         reg.register_json_any(super::__DM_SCHEDULE_SUMMARY_JSON_ANY);
         reg.register_json_any(super::__EXECUTE_DM_SCHEDULE_TOOL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_CLAIM_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_RECORD_SUMMARY_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_LIST_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_LIST_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_READ_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_READ_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_SEARCH_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_SEARCH_HIT_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_SEARCH_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_JOURNAL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_JOURNAL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_SAVE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_SAVE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_MEMORY_VAULT_CONTEXT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_MEMORY_VAULT_CONTEXT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_CONTEXT_NONE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_CONTEXT_UNCHANGED_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_VAULT_CONTEXT_JSON_ANY);
         reg.register_json_any(super::__ENROLL_MANAGED_COMPUTER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ENROLL_MANAGED_COMPUTER_RESPONSE_JSON_ANY);
         reg.register_json_any(
@@ -140512,6 +152416,78 @@ pub use self::__buffa::view::DmScheduleSummaryOwnedView;
 pub use self::__buffa::view::ExecuteDmScheduleToolResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ExecuteDmScheduleToolResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultClaimView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultClaimOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultRecordSummaryView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultRecordSummaryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultListRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultListRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultListResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultListResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultReadRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultReadRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultReadResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultReadResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSearchRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSearchRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSearchHitView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSearchHitOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSearchResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSearchResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultJournalRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultJournalRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultJournalResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultJournalResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSaveRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSaveRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSaveResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultSaveResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryVaultContextRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryVaultContextRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryVaultContextResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryVaultContextResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultContextNoneView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultContextNoneOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultContextUnchangedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultContextUnchangedOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultContextView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryVaultContextOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::EnrollManagedComputerRequestView;
 #[doc(inline)]

@@ -133,6 +133,7 @@ function assertIsolatedClassificationInput(input: DetachedProviderTurnInput) {
     input.organizationContextManifestPath || input.delegationTargets?.length ||
     input.skillCatalog || input.computerUseBinding || input.computerUseMcpServerPath ||
     input.dmMessagePublicationBinding || input.dmMessageMcpServerPath ||
+    input.memoryVaultInstructions ||
     input.runKind === "computerUse" || input.onPayload || input.onConversationId) {
     throw new Error("detached_provider_no_tools_invalid_context");
   }
@@ -187,6 +188,7 @@ export async function runDetachedProviderClassification(
       computerUseMcpServerPath: null,
       dmMessagePublicationBinding: undefined,
       dmMessageMcpServerPath: null,
+      memoryVaultInstructions: null,
       signal,
       onConversationId: undefined,
       onPayload: async (message) => {

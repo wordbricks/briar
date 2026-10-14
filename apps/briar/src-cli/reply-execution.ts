@@ -35,6 +35,12 @@ import {
 } from "./dm-message-invocation";
 import { findAgentBundle } from "./agent-bundle-path";
 import {
+  closeMemoryVault,
+  openMemoryVaultInvocation,
+  runWithMemoryVault,
+  type MemoryVaultInvocation,
+} from "./memory-vault-invocation";
+import {
   ChannelAgentReplyProviderOutputSchema,
   type ChannelAgentReplyTurn,
   type ParsedChannelReplyAgentResult,
@@ -205,11 +211,14 @@ async function runClaimedProjectAgentTask(
     git: typeof runGit;
     // Tests observe the resume-scoped transcript range through this factory.
     createTranscriptSequencer?: typeof createDetachedTranscriptSequencer;
+    /** See `ChannelReplyRuntime.memoryToolsPath`. */
+    memoryToolsPath?: string | null;
   } = {
     allocateWorktree: allocateAnalysisWorktree,
     removeWorktree: removeAnalysisWorktree,
     runProviderTurn: runDetachedProviderTurn,
     git: runGit,
+    memoryToolsPath: undefined,
   },
 ) {
   const workspaceId = project.executionWorker?.workspaceId;
@@ -222,9 +231,19 @@ async function runClaimedProjectAgentTask(
     git: runtime.git,
   });
   let taskError: unknown;
+  let memoryVault: MemoryVaultInvocation | null = null;
   try {
     const workspacePath = worktree.path;
     reportCheckpoint?.({ workspacePath });
+    memoryVault = await openMemoryVaultInvocation({
+      queue: createWorkerQueueClient(config.apiUrl, workerToken),
+      projectId: project.id,
+      workerId,
+      work: task,
+      personFacing: false,
+      signal,
+      scriptPath: memoryToolsScriptPath(runtime),
+    });
     const agent: DetachedAgent = {
       ...detachedAgentWithActiveSkill(task.agent, task.activeSkill),
       scope: { kind: "project", workspaceId, projectId: project.id },
@@ -271,7 +290,7 @@ async function runClaimedProjectAgentTask(
     if (conversationId) reportCheckpoint?.({ conversationId });
     const turn = await (async () => {
       try {
-        return await runtime.runProviderTurn({
+        return await runWithMemoryVault(memoryVault, {
           agent,
           prompt,
           workspacePath,
@@ -296,7 +315,7 @@ async function runClaimedProjectAgentTask(
               transcriptEventFromSidecar(payload, sequence),
             );
           },
-        });
+        }, (turnInput) => runtime.runProviderTurn(turnInput));
       } finally {
         // Transcript telemetry remains optional, but buffered progress deserves
         // one final upload attempt before the durable task result is settled.
@@ -316,6 +335,7 @@ async function runClaimedProjectAgentTask(
     taskError = error;
     throw error;
   } finally {
+    await closeMemoryVault(memoryVault);
     try {
       await runtime.removeWorktree({
         repositoryPath: project.repositoryPath,
@@ -433,8 +453,17 @@ async function runClaimedIssueReply(
     },
   });
   activeReplyActivityPublishers.set(issue.workId, activityPublisher);
+  let memoryVault: MemoryVaultInvocation | null = null;
   const cleanupContext = () =>
     cleanupChannelReplyResources([
+      {
+        label: "issue reply memory vault",
+        run: async () => {
+          const vault = memoryVault;
+          memoryVault = null;
+          await closeMemoryVault(vault);
+        },
+      },
       {
         label: "issue reply attachments",
         run: async () => {
@@ -462,6 +491,14 @@ async function runClaimedIssueReply(
         })),
     );
     const attachments = agentImageAttachments(downloadedImages);
+    memoryVault = await openMemoryVaultInvocation({
+      queue: createWorkerQueueClient(config.apiUrl, workerToken),
+      projectId: project.id,
+      workerId: registered.workerId,
+      work: issue,
+      personFacing: true,
+      signal,
+    });
     const agent = detachedReplyAgent({
       workId: issue.workId,
       provider,
@@ -531,7 +568,7 @@ async function runClaimedIssueReply(
       turnAttachments: typeof attachments | undefined,
     ) => {
       try {
-        return await runDetachedProviderTurn({
+        return await runWithMemoryVault(memoryVault, {
           agent,
           prompt: turnPrompt,
           workspacePath,
@@ -567,7 +604,7 @@ async function runClaimedIssueReply(
               );
             }
           },
-        });
+        }, (turnInput) => runDetachedProviderTurn(turnInput));
       } finally {
         // The durable reply result remains more important than optional
         // transcript data, but buffered events must get one final send chance.
@@ -684,6 +721,13 @@ type ChannelReplyRuntime = {
   prepareProviderTurn: typeof prepareDetachedProviderTurn;
   workspaceRoot: string;
   dmMessageMcpServerPath?: string;
+  /**
+   * The `tools memory` bundle. Present and undefined (the production default)
+   * finds the one this Worker shipped; null, or a runtime without the key,
+   * runs without a memory vault, so a hand-built test runtime never reaches
+   * a real server for vault context.
+   */
+  memoryToolsPath?: string | null;
   /** Tests observe worktree allocation through this runner. */
   git?: typeof runGit;
 };
@@ -702,7 +746,12 @@ const defaultChannelReplyRuntime = (): ChannelReplyRuntime => ({
   runProviderTurn: runDetachedProviderTurn,
   prepareProviderTurn: prepareDetachedProviderTurn,
   workspaceRoot: configDirectory,
+  memoryToolsPath: undefined,
 });
+
+/** `undefined` asks `openMemoryVaultInvocation` to find the shipped bundle. */
+const memoryToolsScriptPath = (runtime: { memoryToolsPath?: string | null }) =>
+  Object.hasOwn(runtime, "memoryToolsPath") ? runtime.memoryToolsPath : null;
 
 /*
   The server chooses this Agent's emoji from the message itself the moment it
@@ -855,6 +904,7 @@ async function foldChannelReplySteer(input: {
  */
 const channelReplySetupSteps = [
   "workspace",
+  "memoryVault",
   "memory",
   "message",
   "organizationContext",
@@ -1032,6 +1082,26 @@ async function runClaimedChannelReplyTurn(
     return pending;
   };
   /*
+    The memory vault answers per turn, but whether this reply has one at all is
+    known from the first context, fetched here beside the workspace. A reply
+    with a vault does not open the legacy DM memory brief: the two never feed
+    the same reply. `none` (vault off, older server, no Agent) keeps the
+    legacy path exactly as it was.
+  */
+  const memoryVault = await openMemoryVaultInvocation({
+    queue: workerQueueClient,
+    projectId: project.id,
+    workerId: registered.workerId,
+    work: reply,
+    personFacing: true,
+    citations: true,
+    signal: invocationSignal,
+    scriptPath: memoryToolsScriptPath(runtime),
+  });
+  const memoryVaultPending = memoryVault
+    ? measureSetup("memoryVault", () => memoryVault.prefetch())
+    : null;
+  /*
     The memory brief and the message relay need nothing but the claim: the
     brief writes into a private temporary directory of its own and the relay
     into a Unix socket beside it. Starting them here runs both against the
@@ -1041,6 +1111,7 @@ async function runClaimedChannelReplyTurn(
   const memoryDescriptor = reply.memory;
   const memoryPending = memoryDescriptor
     ? measureSetup("memory", async () => {
+      if (memoryVaultPending && await memoryVaultPending) return null;
       const invocation = await DmMemoryInvocation.create({
         queue: workerQueueClient,
         projectId: project.id,
@@ -1101,6 +1172,7 @@ async function runClaimedChannelReplyTurn(
       memoryPending,
       messagePending,
     ]);
+    await closeMemoryVault(memoryVault);
     if (memory.status === "fulfilled" && memory.value) {
       await memory.value.invocation.cleanup().catch(() => undefined);
     }
@@ -1245,6 +1317,10 @@ async function runClaimedChannelReplyTurn(
         label: "private DM memory",
         run: async () => memoryInvocation?.cleanup(),
       },
+      {
+        label: "memory vault",
+        run: async () => closeMemoryVault(memoryVault),
+      },
       ...(reply.scope.kind === "workspace"
         ? [{
             label: "workspace context",
@@ -1341,7 +1417,7 @@ async function runClaimedChannelReplyTurn(
       fallbackName: "Briar Channel",
       scope: reply.scope,
     });
-    const providerEnvironment = providerExecutionEnvironment(
+    const baseProviderEnvironment = providerExecutionEnvironment(
       config,
       agent.provider,
       {
@@ -1358,6 +1434,12 @@ async function runClaimedChannelReplyTurn(
         BRIAR_CHANNEL_REPLY_WORK_ID: reply.workId,
       },
     );
+    // The pre-warmed process is spawned with this environment, so the private
+    // `tools` directory is on its PATH from the start. It stays empty, and
+    // `tools` does not exist, until a turn's context gives this reply a vault.
+    const providerEnvironment = memoryVault
+      ? memoryVault.environment(baseProviderEnvironment)
+      : baseProviderEnvironment;
     /*
       The provider process is the last thing on the critical path that needs
       nothing from the steps below: which binary, which workspace, which
@@ -1557,6 +1639,8 @@ async function runClaimedChannelReplyTurn(
       );
     }
     const dmMessageMcpServerPath = publication ? publication.serverPath : null;
+    // Decided once, from the context fetched during setup.
+    const memoryVaultMode = Boolean(memoryVaultPending && await memoryVaultPending);
     const outputContract = providerStructuredOutputContract(
       agent.provider,
       ChannelAgentReplyProviderOutputSchema,
@@ -1577,7 +1661,8 @@ async function runClaimedChannelReplyTurn(
       repositoryRequestAvailable: repositoryRequestAvailable &&
         analysisWorktree === null,
       organizationContextAvailable: organizationContext !== null,
-      memoryLearningAvailable: reply.memoryLearningEnabled,
+      memoryLearningAvailable: memoryVaultMode ? false : reply.memoryLearningEnabled,
+      memoryVaultAvailable: memoryVaultMode,
       delegationTargets: reply.delegationTargets,
       delegation: reply.delegation,
       // An Agent-to-Agent hop only changes what this turn may say. Hop 1 stays
@@ -1602,6 +1687,8 @@ async function runClaimedChannelReplyTurn(
     let repositoryRounds = 0;
     /** One refusal per reply: a second context request is the model ignoring it. */
     let contextRefused = false;
+    /** The same for a legacy memory lookup requested beside a vault. */
+    let memoryLookupRefused = false;
     /**
      * Checks the project out mid-reply, once. A session keeps the checkout in
      * its cached analysis worktree so a retry or a steer of the same
@@ -1681,7 +1768,7 @@ async function runClaimedChannelReplyTurn(
       */
       const roundPreparedRunner = firstRound ? preparedRunner : null;
       timeline.startTurn();
-      const turn = await runtime.runProviderTurn({
+      const turn = await runWithMemoryVault(memoryVault, {
         agent,
         prompt: reply.routing ? [turnPrompt, executionContext?.prompt(), memoryInvocation?.prompt(), messageInvocation?.prompt()].filter(Boolean).join("\n\n") : turnPrompt,
         workspacePath,
@@ -1772,7 +1859,7 @@ async function runClaimedChannelReplyTurn(
           activityPublisher.observePayload(payload);
           generatedImages.observePayload(payload);
         },
-      }, roundPreparedRunner);
+      }, (turnInput) => runtime.runProviderTurn(turnInput, roundPreparedRunner));
       logSetupOnce();
       assertDetachedProviderTurnSucceeded(turn);
       if (!turn.resultText) {
@@ -1796,6 +1883,14 @@ async function runClaimedChannelReplyTurn(
       if (decodedTurn.case === "reply") {
         timeline.endTurn("reply");
         result = decodedTurn.result;
+        if (memoryVaultMode && result.memorySaveRequest) {
+          // Not offered with a vault: memory is saved with `tools memory`.
+          // The reply itself is still worth delivering.
+          console.error(
+            `channel reply ${reply.workId} returned memorySaveRequest with a memory vault; it was dropped`,
+          );
+          result = { ...result, memorySaveRequest: null };
+        }
         if (result.memorySaveRequest && !reply.memoryLearningEnabled) {
           throw new Error("memory_learning_unavailable");
         }
@@ -1839,6 +1934,19 @@ async function runClaimedChannelReplyTurn(
       }
       if (decodedTurn.case === "memory") {
         timeline.endTurn("memory");
+        if (memoryVaultMode && !memoryInvocation) {
+          // The legacy lookup does not exist beside a vault. Say so once and
+          // let the model use the tools, as for a refused context request.
+          if (memoryLookupRefused) throw new Error("memory_unavailable");
+          memoryLookupRefused = true;
+          repairRounds += 1;
+          conversationId = reply.routing ? null : turn.conversationId;
+          const refusal = "memoryRequests are not available to this reply and must be null. Read memory with `tools memory search` and `tools memory read` in your shell, then return the normal channel reply JSON.";
+          turnPrompt = conversationId
+            ? refusal
+            : [prompt, refusal, messageInvocation?.prompt()].filter(Boolean).join("\n\n");
+          continue;
+        }
         if (!memoryInvocation) throw new Error("memory_unavailable");
         if (lookupRounds >= 3) throw new Error("lookup_budget_exhausted");
         const memoryPrompt = await memoryInvocation.lookup(decodedTurn.request);
@@ -1974,6 +2082,7 @@ async function runClaimedChannelReplyTurn(
     // any path: used, replaced by a cold spawn, or never reached at all.
     await preparedRunner?.discard("reply_finished");
     logSetupOnce();
+    await closeMemoryVault(memoryVault);
     await messageInvocation?.cleanup({ terminal: publicationTerminal });
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {

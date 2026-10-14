@@ -1261,6 +1261,19 @@ export const channelMemoryCitationSchema = strict(Schema.Struct({
   version: Schema.Int.check(Schema.isGreaterThan(0)),
 }));
 
+/**
+ * A reply citation names either a legacy DM memory document (a UUID) or a
+ * memory vault record (its id, docs/plans/memory-vault-spec.md §5.1/§8), with
+ * the revision as `version`. The server decides which one the claim may cite;
+ * saving through `memorySaveRequest` stays legacy-only and UUID-only.
+ */
+export const channelReplyMemoryCitationSchema = strict(Schema.Struct({
+  documentId: Schema.String.check(Schema.isPattern(
+    /^(?:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[a-z0-9][a-z0-9-]{0,62})$/u,
+  )),
+  version: Schema.Int.check(Schema.isGreaterThan(0)),
+}));
+
 export const channelReplyCompletionFields = {
   document: Schema.NullOr(channelReplyDocumentSchema),
   issueProposal: Schema.NullOr(channelReplyIssueProposalSchema),
@@ -1286,7 +1299,7 @@ export const channelReplyCompletionSchema = strict(Schema.Struct({
   ),
   memoryCitations: Schema.optional(
     Schema.NullOr(
-      Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)),
+      Schema.Array(channelReplyMemoryCitationSchema).check(Schema.isMaxLength(10)),
     ),
   ),
   body: channelMessageBodySchema,

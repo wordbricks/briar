@@ -1,4 +1,5 @@
 import type { DmMemoryReference } from "../../src/lib/dm-memory-query-contract";
+import { readMemoryVaultCitations } from "./memory-vault/citations";
 
 /** Evaluated inside the transaction that publishes the reply. One JSON binding. */
 export const dmMemoryCitationsCurrent = (job: string) => `not exists (
@@ -50,6 +51,10 @@ export async function readDmMemoryCitations(db: D1Database, messageIds: string[]
     const values = references.get(row.message_id) ?? [];
     values.push({ documentId: row.document_id, version: row.version });
     references.set(row.message_id, values);
+  }
+  // Vault citations (memory-vault spec §8) surface the same way, by record handle.
+  for (const [messageId, cited] of await readMemoryVaultCitations(db, messageIds)) {
+    references.set(messageId, [...references.get(messageId) ?? [], ...cited]);
   }
   return references;
 }

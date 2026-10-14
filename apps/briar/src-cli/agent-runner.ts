@@ -651,6 +651,11 @@ export function detachedChannelReplyPrompt(input: {
   repositoryRequestAvailable?: boolean;
   organizationContextAvailable?: boolean;
   memoryLearningAvailable?: boolean;
+  /**
+   * The reply has a memory vault: memory is kept with `tools memory`, as the
+   * trusted instructions describe, never through memorySaveRequest.
+   */
+  memoryVaultAvailable?: boolean;
   delegationTargets?: readonly DetachedDelegationTarget[];
   delegation?: {
     delegatedByAgentName: string;
@@ -725,7 +730,9 @@ export function detachedChannelReplyPrompt(input: {
       inbound: input.inboundAgentMessage ?? null,
       hop: agentMessageHop,
     }),
-    input.memoryLearningAvailable
+    input.memoryVaultAvailable
+      ? "Memory is kept with the `tools memory` command described in the trusted instructions. memoryRequests and memorySaveRequest must be null; only a successful `tools memory` result is proof that something was saved."
+      : input.memoryLearningAvailable
       ? "Only when the authenticated user's own trigger directly asks to remember or correct memory, set memorySaveRequest to {documents:[{documentId,version}]} using only exact current memory references. Otherwise set it to null."
       : "Memory learning is unavailable for this reply. memorySaveRequest must be null, and you must not claim that conversation text was saved as memory.",
     "Attach a plan document only when the conversation asks for a written plan, proposal, or specification. The document is Markdown and is attached to your reply immediately; it changes no project state. Otherwise document must be null.",
@@ -937,6 +944,8 @@ export function detachedProviderRequest(input: {
   computerUseMcpServerPath?: string | null;
   dmMessagePublicationBinding?: DmMessagePublicationBinding;
   dmMessageMcpServerPath?: string | null;
+  /** Appended last: Briar's own instructions above it take precedence. */
+  memoryVaultInstructions?: string | null;
   /** Absent means `inherit`: the turn keeps the host user's tool catalog. */
   toolInheritance?: DetachedToolInheritance;
 }) {
@@ -987,6 +996,7 @@ export function detachedProviderRequest(input: {
           skillCatalog: input.skillCatalog ?? null,
         }),
         computerUseRoleInstructions,
+        input.memoryVaultInstructions || null,
       ].filter((value): value is string => value !== null).join("\n\n"),
       outputSchema,
       model: input.agent.model ?? undefined,

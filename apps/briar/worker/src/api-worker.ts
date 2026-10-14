@@ -11,6 +11,7 @@ import { handleAccountRoute } from "./account-routes";
 import { handleIssueConversationRoute } from "./issue-conversation-routes";
 import { handleChannelMessageRoute } from "./channel-message-routes";
 import { handleDmMemoryRoute } from "./dm-memory-routes";
+import { memoryVaultStoreFromEnv } from "./memory-vault/artifacts-git-store";
 import { handleChannelReplyResultRoute } from "./channel-reply-result-routes";
 import { handleManagedComputerRoute } from "./managed-computer-routes";
 import { handleTeamAgentRoute } from "./team-agent-routes";
@@ -178,7 +179,9 @@ async function route(
     return uploadResponse;
   }
 
-  const memoryResponse = await handleDmMemoryRoute({ request, url, auth, db });
+  const memoryResponse = await handleDmMemoryRoute({
+    request, url, auth, db, env, memoryVaultStore: memoryVaultStoreFromEnv(env),
+  });
   if (memoryResponse !== undefined) return memoryResponse;
 
   const channelMessageResponse = await handleChannelMessageRoute({
