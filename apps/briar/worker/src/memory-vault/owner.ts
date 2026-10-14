@@ -4,7 +4,7 @@ import type {
   DmMemoryDocumentDetail,
   DmMemoryRevisionPage,
 } from "../../../src/lib/dm-memory-contract";
-import { dmMemoryPageSize } from "../../../src/lib/dm-memory-contract";
+import { dmMemoryPageSize, dmMemoryTreeMaxDocuments } from "../../../src/lib/dm-memory-contract";
 import { sha256 } from "../crypto-digest";
 import { HttpError } from "../http-response";
 import { MemoryVaultError } from "./errors";
@@ -23,6 +23,7 @@ import {
 import { MEMORY_VAULT_README } from "./readme";
 import {
   README_PATH,
+  VAULT_FOLDERS,
   describeRecordFile,
   frontmatterTime,
   isValidRecordId,
@@ -53,6 +54,9 @@ import type { RecordUpsert, RevisionInsert, VaultRecordRow, VaultRow } from "./v
  * - `version` is the record revision; revisions come from the D1 revision map.
  * - Validity (`observedAt`/`validUntil`), language and sources are not part of
  *   a vault record: they are accepted on write and come back empty.
+ * - `path`, `recordType` and `recordStatus` are the record's own; the folder
+ *   tree (`wholeVault`) also lists the app-owned README.md, read only, under
+ *   the handle of the reserved id `readme`.
  */
 export type OwnerVaultDeps = {
   readonly db: D1Database;
@@ -72,6 +76,7 @@ export type OwnerSpace = {
 const clock = (deps: OwnerVaultDeps) => deps.now?.() ?? new Date();
 
 const notFound = () => new HttpError(404, "Memory not found", "memory_not_found");
+const readmeReadOnly = () => new HttpError(409, "README.md belongs to the application", "readme_read_only");
 const versionConflict = () => new HttpError(409, "Memory changed; reload it", "version_conflict");
 
 export const vaultForSpace = (db: D1Database, spaceId: string) =>
@@ -121,6 +126,44 @@ async function resolveRecord(db: D1Database, vault: VaultRow, documentId: string
   return { row, revision: options.version ?? null };
 }
 
+/** The handle README.md is listed under; `readme` is reserved, so no record shares it. */
+const readmeHandle = (vault: VaultRow) => vaultRecordHandle(vault.id, "readme");
+
+/** The owner's space whose README.md has this handle, if any. */
+async function locateReadme(db: D1Database, spaces: readonly OwnerSpace[], documentId: string) {
+  for (const space of spaces) {
+    const vault = await vaultForSpace(db, space.id);
+    if (vault && await readmeHandle(vault) === documentId.toLowerCase()) return { space, vault };
+  }
+  return null;
+}
+
+/** README.md as a read-only document, from the server's copy (the vault holds the same bytes). */
+async function readmeDocument(space: OwnerSpace, vault: VaultRow): Promise<DmMemoryDocument> {
+  return {
+    id: await readmeHandle(vault),
+    memorySpaceId: space.id,
+    kind: "observation",
+    title: README_PATH,
+    version: 1,
+    status: "active",
+    conflicted: false,
+    memoryClass: "note",
+    evidenceType: "observed",
+    protectedByUser: false,
+    sourceLanguage: "und",
+    observedAt: null,
+    validUntil: null,
+    createdAt: vault.created_at,
+    updatedAt: vault.created_at,
+    indexState: "ready",
+    path: README_PATH,
+    recordType: "readme",
+    recordStatus: null,
+    readOnly: true,
+  };
+}
+
 /** Finds which of the owner's spaces holds the document. */
 async function locate(db: D1Database, spaces: readonly OwnerSpace[], documentId: string, options: {
   readonly version?: number;
@@ -153,29 +196,51 @@ async function documentOf(space: OwnerSpace, vault: VaultRow, row: VaultRecordRo
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     indexState: "ready",
+    path: row.path,
+    recordType: row.record_type,
+    recordStatus: row.status,
+    readOnly: false,
   };
 }
 
 /**
- * One page of the space's records from the D1 index, newest id order like the
- * legacy list (by id). No Artifacts call: the dialog polls this every few
- * seconds, and the index moves in the same D1 batch as the vault head.
+ * One page of the space's records from the D1 index, in record id order like
+ * the legacy list. No Artifacts call: the dialog polls this every few seconds,
+ * and the index moves in the same D1 batch as the vault head.
+ *
+ * `wholeVault` is the folder tree's list: up to `dmMemoryTreeMaxDocuments`
+ * records per page instead of 50, README.md ahead of the first page, and the
+ * layout's folders so empty ones show too.
  */
-export async function listOwnerVaultDocuments(db: D1Database, space: OwnerSpace, cursor: string | undefined) {
+export async function listOwnerVaultDocuments(db: D1Database, space: OwnerSpace, cursor: string | undefined,
+  options: { readonly wholeVault?: boolean } = {}) {
+  const folders = options.wholeVault ? VAULT_FOLDERS : [];
   const vault = await vaultForSpace(db, space.id);
-  if (!vault) return { documents: [] as DmMemoryDocument[], nextCursor: null };
+  if (!vault) return { documents: [] as DmMemoryDocument[], nextCursor: null, folders };
+  const limit = options.wholeVault ? dmMemoryTreeMaxDocuments : dmMemoryPageSize;
   const rows = (await db.prepare(`select * from briar_memory_vault_records
     where vault_id = ? and deleted_at is null and record_id > ? order by record_id limit ?`)
-    .bind(vault.id, cursor ?? "", dmMemoryPageSize + 1).all<VaultRecordRow>()).results;
-  const page = rows.slice(0, dmMemoryPageSize);
+    .bind(vault.id, cursor ?? "", limit + 1).all<VaultRecordRow>()).results;
+  const page = rows.slice(0, limit);
+  // The README exists from the vault's first commit, so only a vault with a head has one.
+  const readme = options.wholeVault && cursor === undefined && vault.head_commit
+    ? [await readmeDocument(space, vault)]
+    : [];
   return {
-    documents: await Promise.all(page.map((row) => documentOf(space, vault, row, row.record_id))),
-    nextCursor: rows.length > dmMemoryPageSize ? page.at(-1)!.record_id : null,
+    documents: [...readme, ...await Promise.all(page.map((row) => documentOf(space, vault, row, row.record_id)))],
+    nextCursor: rows.length > limit ? page.at(-1)!.record_id : null,
+    folders,
   };
 }
 
 export async function getOwnerVaultDocument(deps: OwnerVaultDeps, spaces: readonly OwnerSpace[], documentId: string,
   version?: number): Promise<DmMemoryDocumentDetail> {
+  const readme = await locateReadme(deps.db, spaces, documentId);
+  if (readme) {
+    if (version !== undefined && version !== 1) throw new HttpError(404, "Memory revision not found", "memory_not_found");
+    // The whole file, heading included: it is shown, never edited.
+    return { ...await readmeDocument(readme.space, readme.vault), body: MEMORY_VAULT_README, sources: [] };
+  }
   const found = await locate(deps.db, spaces, documentId, { version });
   if (!found) throw notFound();
   const { space, vault, row } = found;
@@ -212,6 +277,9 @@ export async function getOwnerVaultDocument(deps: OwnerVaultDeps, spaces: readon
     version: revision,
     memoryClass: memoryClassOf(described.type),
     updatedAt: described.updatedAt ?? row.updated_at,
+    path,
+    recordType: described.type,
+    recordStatus: described.status,
     body: split.body,
     sources: [],
   };
@@ -272,6 +340,7 @@ export async function saveOwnerVaultRecord(deps: OwnerVaultDeps, input: {
   readonly body: string;
   readonly memoryClass: DmMemoryClass;
 }) {
+  if (input.documentId !== null && await locateReadme(deps.db, input.spaces, input.documentId)) throw readmeReadOnly();
   const existing = input.documentId === null
     ? null
     : await locate(deps.db, input.spaces, input.documentId);
@@ -371,6 +440,7 @@ export async function saveOwnerVaultRecord(deps: OwnerVaultDeps, input: {
  */
 export async function forgetOwnerVaultRecord(deps: OwnerVaultDeps, spaces: readonly OwnerSpace[], userId: string,
   documentId: string) {
+  if (await locateReadme(deps.db, spaces, documentId)) throw readmeReadOnly();
   const found = await locate(deps.db, spaces, documentId, { includeDeleted: true });
   if (!found) throw notFound();
   if (found.row.deleted_at === null) {
