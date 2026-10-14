@@ -81,7 +81,6 @@ import {
   worktreesEnabled,
   currentProject,
   openCodeUpstreamConfigured,
-  providerExecutionEnvironment,
 } from "./command-support";
 import {
   type Config,
@@ -112,9 +111,6 @@ import {
 } from "./channel-reply-timeline";
 import { installWorkerLogTimestamps } from "./worker-log-timestamps";
 import { loadManagedComputerCredential } from "./managed-computer-credential";
-import { runClaimedDmMemory } from "./dm-memory-learning";
-import { runDetachedProviderTurn } from "./detached-provider-turn";
-import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 import { ComputerUseBoxClient } from "./computer-use-box-client";
 import { COMPUTER_USE_CANARY_AGENT_ID } from "./computer-use-desktop-manager";
 import { agentBundleCandidates } from "./agent-bundle-path";
@@ -156,7 +152,6 @@ const workerRuntime = async ({
   providerVersions?: Readonly<Record<string, string>>;
   worktrees: boolean;
   workflowRequirements?: WorkerRuntimeInput["workflowRequirements"];
-  dmMemoryLearning: WorkerRuntimeInput["dmMemoryLearning"];
   computerUse?: WorkerRuntimeInput["computerUse"];
 }): Promise<WorkerRuntimeInput> => ({
   ...input,
@@ -182,8 +177,8 @@ const workerRuntime = async ({
       ? { protocol: 1 as const, providers }
       : undefined;
   })(),
-  // Advertised only with the `tools` bundle in place: a server that gives this
-  // Worker a vault stops giving it legacy memory, so the tools must exist.
+  // Advertised only with the `tools` bundle in place: the vault is the only
+  // memory a reply has, so the tools must exist before the server offers it.
   memoryVault: agentBundleCandidates(import.meta.dir, memoryToolsBundleName)
       .some((path) => Bun.file(path).size > 0)
     ? { protocol: 1 as const }
@@ -237,15 +232,6 @@ const probeWorkerRuntime = async (
     computerUse: await inspectComputerUseCapability(config, providers),
   };
 };
-
-const dmMemoryLearningCapability = (
-  providers: ReturnType<typeof healthyWorkerProviders>,
-  hasOpenRouterKey: boolean,
-): NonNullable<WorkerRuntimeInput["dmMemoryLearning"]> => ({
-  protocol: 2,
-  transports: ["agent", ...(hasOpenRouterKey ? ["openrouter" as const] : [])],
-  providers,
-});
 
 const runComputerUseCanary = async (): Promise<boolean> => {
   const client = await ComputerUseBoxClient.connect();
@@ -403,10 +389,6 @@ export async function registerProjectExecutionWorker(input: {
     providerCapabilities,
     providerVersions,
     worktrees: true,
-    dmMemoryLearning: dmMemoryLearningCapability(
-      providers,
-      openCodeUpstreamConfigured(config, "openrouter"),
-    ),
     computerUse,
   });
   const enrollment = createWorkerEnrollmentClient(config.apiUrl, input.userToken);
@@ -764,10 +746,6 @@ async function workerCommand() {
         providerCapabilities,
         providerVersions,
         worktrees: true,
-        dmMemoryLearning: dmMemoryLearningCapability(
-          providers,
-          openCodeUpstreamConfigured(config, "openrouter"),
-        ),
         computerUse,
       }),
       acceptingWork: false,
@@ -973,10 +951,6 @@ async function workerCommand() {
               healthy: item.healthy,
               detail: item.detail,
             })),
-            dmMemoryLearning: dmMemoryLearningCapability(
-              providers,
-              openCodeUpstreamConfigured(config, "openrouter"),
-            ),
             computerUse,
           }),
           refreshMaintenance,
@@ -1039,10 +1013,6 @@ async function workerCommand() {
                     healthy: item.healthy,
                     detail: item.detail,
                   })),
-                  dmMemoryLearning: dmMemoryLearningCapability(
-                    providers,
-                    openCodeUpstreamConfigured(config, "openrouter"),
-                  ),
                   computerUse,
                 }),
                 acceptingWork: false,
@@ -1075,20 +1045,6 @@ async function workerCommand() {
         });
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
-        if (issue.workType === "dmMemory") {
-          await runClaimedDmMemory({
-            rpc: workerQueueClient,
-            projectId: project.id,
-            claim: issue,
-            apiKey: config.openrouterApiKey ?? null,
-            signal,
-            agentEnvironment: (provider) =>
-              providerExecutionEnvironment(config, provider, process.env),
-            runAgentTurn: runDetachedProviderTurn,
-            prepareAgentEnvironment: prepareReadOnlyAgentEnvironment,
-          });
-          return;
-        }
         if (issue.workType === "mergeBatch") {
           const claim = issue;
           await executeClaimedMergeBatch({

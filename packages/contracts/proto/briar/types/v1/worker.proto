@@ -59,15 +59,15 @@ message WorkerCapabilities {
   reserved 4;
   reserved "organization_agent_context_protocol";
   repeated WorkflowRequirementHealth workflow_requirements = 5;
-  optional uint32 dm_memory_protocol = 6;
-  optional uint32 dm_memory_learning_requests = 7;
-  optional DmMemoryLearningCapability dm_memory_learning = 8;
+  // Legacy D1 memory protocol and learning; older Workers may still send them.
+  reserved 6, 7, 8;
+  reserved "dm_memory_protocol", "dm_memory_learning_requests", "dm_memory_learning";
   optional ComputerUseCapability computer_use = 9;
   optional DmPublicMessageCapability dm_public_messages = 10;
   optional DmPublicMessageCapability dm_reply_routing = 11;
   // Memory vault tools (`tools memory …`) and per-turn vault context
   // (docs/plans/memory-vault-spec.md). Absence and zero mean the Worker CLI
-  // predates the vault and gets no memory in a vault-backed scope.
+  // predates the vault and gets no memory.
   optional uint32 memory_vault_protocol = 12;
 }
 
@@ -77,13 +77,6 @@ message WorkerCapabilities {
 message DmPublicMessageCapability {
   uint32 protocol = 1;
   repeated AgentProvider providers = 2;
-}
-
-message DmMemoryLearningCapability {
-  uint32 protocol = 1;
-  string transport = 2;
-  repeated string transports = 3;
-  repeated AgentProvider providers = 4;
 }
 
 message WorkerRuntimeAdvertisement {

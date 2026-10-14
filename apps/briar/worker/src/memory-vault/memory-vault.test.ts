@@ -413,12 +413,10 @@ describe("memory vault", () => {
       expect(await getMemoryVaultContext(deps, unassigned.caller, { knownContextKey: null })).toEqual({ kind: "none" });
     });
 
-    it("turns every tool off with MEMORY_VAULT_ENABLED=false", async () => {
-      const deps = memoryVaultDeps(db, { env: { MEMORY_VAULT_ENABLED: "false" } });
+    it("reports memory_unavailable without an Artifacts binding instead of failing the run", async () => {
+      const deps = memoryVaultDeps(db, { store: null });
       const group = await fixture.claimChannel("channel", fixture.ownerId);
-      await failsWith(save(deps, group.caller, { id: "x", type: "fact", content: "x" }), "memory_disabled");
-      await failsWith(read(deps, group.caller, "README.md"), "memory_disabled");
-      expect(await getMemoryVaultContext(deps, group.caller, { knownContextKey: null })).toEqual({ kind: "none" });
+      await failsWith(save(deps, group.caller, { id: "x", type: "fact", content: "x" }), "memory_unavailable");
     });
   });
 
@@ -549,7 +547,7 @@ describe("memory vault", () => {
       createWorkerQueueService({
         request: new Request("https://briar.example", { headers: { authorization } }),
         db,
-        env: { DB: db, MEMORY_VAULT_ENABLED: "true" } as unknown as Env,
+        env: { DB: db } as unknown as Env,
       }, { memoryVaultStore: () => deps.store }),
     ), { router: { interceptors: [connectErrorInterceptor] } });
     const client = createClient(WorkerQueueService, transport(`Bearer ${fixture.workerToken}`));

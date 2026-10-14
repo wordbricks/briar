@@ -8,7 +8,6 @@ import {
   excludeForgottenDmSources,
 } from "./dm-memory-claim";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
-import { memoryVaultEnabled } from "./memory-vault/flag";
 import {
   captureDmPublicMessageClaim,
   listDmPublicMessagesForReply,
@@ -514,13 +513,11 @@ async function claimedChannelReplyPayload(
     })).map(agentMessageTargetJson)
     : [];
   // An Agent-to-Agent DM has no owner, so it can never carry DM memory.
-  const memoryBinding = channel.kind === "dm" && !agentDirectMessage
+  const personDirectMessage = channel.kind === "dm" && !agentDirectMessage;
+  const memoryBinding = personDirectMessage
     ? await bindDmMemoryReplyClaim(db, {
         jobId: job.id,
         claimTokenHash,
-        supportsMemory: runtime.proto.capabilities?.dmMemoryProtocol === 1,
-        enabled: String(env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
-        vaultCutover: memoryVaultEnabled(env),
         vaultCapable: runtime.proto.capabilities?.memoryVaultProtocol === 1,
       })
     : null;
@@ -642,13 +639,13 @@ async function claimedChannelReplyPayload(
     leaseExpiresAt: job.lease_expires_at,
     activity,
     acknowledgementReaction: heldAcknowledgement ? heldAcknowledgement.emoji : null,
+    /*
+      Every person's DM, not only one whose live roster bound a memory space:
+      a superset of the vault's eligibility, so the Worker redacts this reply's
+      failure text whenever it could echo a private conversation.
+    */
+    directMessage: personDirectMessage,
     handoffContext: memoryBinding ? null : handoffContext,
-    memory: memoryBinding?.memory ?? null,
-    // After the vault cutover the agent keeps memory with `tools memory`;
-    // the legacy learning requests have nowhere to go (spec §11).
-    memoryLearningEnabled:
-      runtime.proto.capabilities?.dmMemoryLearningRequests === 1 &&
-      memoryBinding !== null && !memoryVaultEnabled(env),
     session: {
       id: job.channel_reply_session.id,
       threadId: job.channel_reply_session.thread_root_message_id,

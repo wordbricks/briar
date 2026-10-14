@@ -103,9 +103,8 @@ try {
   });
   const configPath = await step("generate config + apply migrations (local D1)", prepareApi);
   const config = JSON.parse(await readFile(configPath, "utf8"));
-  check("1", "dev config binds MEMORY_ARTIFACTS to the e2e namespace (remote) and turns the vault on",
-    config.artifacts?.length === 1 && config.artifacts[0].namespace === e2eNamespace && config.artifacts[0].remote === true &&
-      config.vars.MEMORY_VAULT_ENABLED === "true",
+  check("1", "dev config binds MEMORY_ARTIFACTS to the e2e namespace (remote)",
+    config.artifacts?.length === 1 && config.artifacts[0].namespace === e2eNamespace && config.artifacts[0].remote === true,
     config.artifacts);
   check("1", "no production-only remote bindings in the dev config (AI, Vectorize, routes)",
     !config.ai && !config.vectorize && !config.routes && JSON.stringify(config).includes("briar-memory\"") === false);
@@ -138,7 +137,7 @@ try {
     session("session-1", "model", await post(state.userA.token, state.workspaceId, state.dmA, s1Message), model ?? undefined));
   results.set("session1", s1);
   check("3", "session 1 ran without error", !s1.error, s1.error);
-  check("3", "claim carried no legacy DM memory descriptor; the vault context was served", s1.legacyMemoryDescriptor === "none" && s1.hasVault === true,
+  check("3", "the vault context was served", s1.hasVault === true,
     { scope: s1.context?.scopeKind, status: s1.context?.status });
   check("3", "instructions = Briar context + memory section; prompt starts with the vault tags; tools first on PATH",
     typeof s1.instructions === "string" && s1.instructions.indexOf("# Memory vault") > 0 &&

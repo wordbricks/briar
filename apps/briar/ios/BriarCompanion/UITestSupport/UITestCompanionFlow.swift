@@ -436,6 +436,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             return UITestAPIClient.createIssueMessageResponse(request)
         }
 
+        /// A vault record as the server sends it: kind, status, evidence, language
+        /// and index state are fixed legacy values, and a record has no sources.
         private func memoryDocument(detail: Bool, version: UInt32? = nil) -> BriarAPI_DmMemoryDocument {
             var document = BriarAPI_DmMemoryDocument()
             document.id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
@@ -447,19 +449,14 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             document.memoryClass = .profile
             document.evidenceType = .explicitUser
             document.protectedByUser = true
-            document.sourceLanguage = "ko"
+            document.sourceLanguage = "und"
             document.createdAt = Google_Protobuf_Timestamp(
                 date: Date(timeIntervalSince1970: 1_788_220_800)
             )
             document.updatedAt = document.createdAt
-            document.indexState = .pending
+            document.indexState = .ready
             if detail {
                 document.body = "합성 데이터: 설명은 결론부터 제시한다."
-                var source = BriarAPI_DmMemorySource()
-                source.type = .userEditEvent
-                source.id = "fixture-edit"
-                source.version = 1
-                document.sources = [source]
             }
             return document
         }
@@ -468,8 +465,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             var response = BriarAPI_ListDmMemoriesResponse()
             response.eligible = true
             var capabilities = BriarAPI_DmMemoryCapabilities()
-            capabilities.recall = false
-            capabilities.automaticLearning = false
+            capabilities.recall = true
+            capabilities.automaticLearning = true
             response.capabilities = capabilities
             var space = BriarAPI_DmMemorySpace()
             space.id = "99999999-9999-4999-8999-999999999999"

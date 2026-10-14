@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
 import { applyRemoteD1Migrations } from "./apply-remote-d1-migrations";
 import { verifyProductionGitTarget } from "./production-git-target";
 import { withRemoteOperationLease } from "./remote-operation-lease";
+import { runWorkerDeployInOrder, WorkerDeployOrder } from "./worker-deploy-order";
 
 const WorkerDevPort = Schema.NumberFromString.check(
   Schema.isInt(),
@@ -129,10 +130,13 @@ export async function runWorkerDeploy(
   runner: (args: string[], signal?: AbortSignal) => Promise<number> = runWrangler,
   migrate: (signal?: AbortSignal) => Promise<number> = migrateRemoteD1,
   signal?: AbortSignal,
+  order: WorkerDeployOrder = "migrations-first",
 ): Promise<number> {
-  const migrationExitCode = await migrate(signal);
-  if (migrationExitCode !== 0) return migrationExitCode;
-  return runner(["deploy", "--keep-vars", "--secrets-file", secretsPath], signal);
+  return runWorkerDeployInOrder({
+    order,
+    migrate: () => migrate(signal),
+    deploy: () => runner(["deploy", "--keep-vars", "--secrets-file", secretsPath], signal),
+  });
 }
 
 const main = Effect.fn("withWorkerSecrets.main")(
@@ -185,6 +189,17 @@ const main = Effect.fn("withWorkerSecrets.main")(
           })),
         )
       : undefined;
+    // `BRIAR_WORKER_DEPLOY_ORDER=code-first` for a migration that drops what
+    // the live code still reads (worker-deploy-order.ts).
+    const deployOrderInput = process.env.BRIAR_WORKER_DEPLOY_ORDER?.trim();
+    const deployOrder: WorkerDeployOrder = deployOrderInput
+      ? yield* Schema.decodeUnknownEffect(WorkerDeployOrder)(deployOrderInput).pipe(
+          Effect.mapError((cause) => new WorkerSecretsError({
+            cause,
+            message: "BRIAR_WORKER_DEPLOY_ORDER must be migrations-first or code-first.",
+          })),
+        )
+      : "migrations-first";
     const exitCode = mode === "deploy"
       ? yield* Effect.gen(function* workerDeployLeaseEffect() {
           const headSha = yield* verifyProductionGitTarget();
@@ -197,6 +212,7 @@ const main = Effect.fn("withWorkerSecrets.main")(
             runWrangler,
             migrateRemoteD1,
             signal,
+            deployOrder,
           ));
         })
       : yield* Effect.tryPromise({

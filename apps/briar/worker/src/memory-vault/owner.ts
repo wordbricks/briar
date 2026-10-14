@@ -38,14 +38,14 @@ import type { RecordUpsert, RevisionInsert, VaultRecordRow, VaultRow } from "./v
 
 /**
  * Owner operations on a DM vault (spec §9): the app's DM memory dialog keeps
- * its `DmMemoryService` shapes and is served from the vault once
- * `MEMORY_VAULT_ENABLED` is on. The caller (`app-connect-dm-memory.ts`) has
+ * the `DmMemoryService` shapes it had before the vault. The caller
+ * (`app-connect-dm-memory.ts`) has
  * already authorized the owner exactly as before (`ownerFor`) and passes the
  * owner's own spaces; nothing here widens who may see a space.
  *
  * Mapping to the legacy document shape:
- * - `id` is the record's handle (`handles.ts`); a legacy document id that the
- *   migration mapped to a record also resolves, so old citations still open.
+ * - `id` is the record's handle (`handles.ts`). Citations of the retired D1
+ *   memory were rewritten to handles when its tables were dropped (0222).
  * - `title` is the body's leading `# ` heading (how the app and the migration
  *   store a title), else the record id; the heading is not repeated in `body`.
  * - `memoryClass`: `person` → profile, `timeline-*` → log, anything else → note.
@@ -106,11 +106,7 @@ export function recordIdFromTitle(title: string) {
 
 type ResolvedRecord = { readonly row: VaultRecordRow; readonly revision: number | null };
 
-/**
- * A document id from the app → the vault record: the record's handle, or a
- * legacy document id the migration mapped (with the mapped revision when the
- * app asks for a legacy version).
- */
+/** A document id from the app → the vault record it is the handle of. */
 async function resolveRecord(db: D1Database, vault: VaultRow, documentId: string, options: {
   readonly version?: number;
   readonly includeDeleted?: boolean;
@@ -120,18 +116,9 @@ async function resolveRecord(db: D1Database, vault: VaultRow, documentId: string
     .bind(vault.id, options.includeDeleted ? 1 : 0).all<VaultRecordRow>()).results;
   const handles = await vaultRecordHandles(vault.id, rows.map((row) => row.record_id));
   const byHandle = handles.get(documentId.toLowerCase());
-  if (byHandle) {
-    const row = rows.find((candidate) => candidate.record_id === byHandle)!;
-    return { row, revision: options.version ?? null };
-  }
-  const mapped = await db.prepare(`select record_id, revision from briar_memory_vault_legacy_map
-    where vault_id = ? and document_id = ? and (? is null or document_version = ?)
-    order by document_version desc limit 1`)
-    .bind(vault.id, documentId.toLowerCase(), options.version ?? null, options.version ?? null)
-    .first<{ record_id: string; revision: number }>();
-  const row = mapped ? rows.find((candidate) => candidate.record_id === mapped.record_id) : undefined;
-  if (!mapped || !row) return null;
-  return { row, revision: options.version === undefined ? null : mapped.revision };
+  if (!byHandle) return null;
+  const row = rows.find((candidate) => candidate.record_id === byHandle)!;
+  return { row, revision: options.version ?? null };
 }
 
 /** Finds which of the owner's spaces holds the document. */
@@ -379,7 +366,7 @@ export async function saveOwnerVaultRecord(deps: OwnerVaultDeps, input: {
 /**
  * Forget as the owner (spec §10): the record leaves the head now, its D1
  * revisions, claim reads and citations go, the space's revocation epoch moves,
- * legacy documents mapped to it are purged, and the scheduled purge job
+ * and the scheduled purge job
  * rebuilds history without it. Repeating it reports the purge state.
  */
 export async function forgetOwnerVaultRecord(deps: OwnerVaultDeps, spaces: readonly OwnerSpace[], userId: string,

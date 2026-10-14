@@ -113,9 +113,7 @@ describe("provider structured output contracts", () => {
       },
       agentMessage: null,
       contextRequests: null,
-      memoryRequests: null,
       memoryCitations: null,
-      memorySaveRequest: null,
     } as const;
     const contextOutput = {
       body: null,
@@ -127,9 +125,7 @@ describe("provider structured output contracts", () => {
       skillExecutionProposal: null,
       delegation: null,
       agentMessage: null,
-      memoryRequests: null,
       memoryCitations: null,
-      memorySaveRequest: null,
       contextRequests: [{
         resource: "issues",
         projectId: "project-1",
@@ -167,7 +163,6 @@ describe("provider structured output contracts", () => {
           },
           agentMessage: null,
           memoryCitations: null,
-          memorySaveRequest: null,
         },
         attachmentPaths: ["auth.html"],
       });
@@ -210,14 +205,16 @@ describe("provider structured output contracts", () => {
         case: "context",
         requests: { contextRequests: contextOutput.contextRequests },
       });
-      expect(contract.decode({
+      // The legacy memory lookup and save fields are gone from the contract.
+      expect(() => contract.decode({
         ...contextOutput,
         contextRequests: null,
         memoryRequests: [{ operation: "search", queries: ["metric units"] }],
-      })).toEqual({
-        case: "memory",
-        request: { operation: "search", queries: ["metric units"] },
-      });
+      })).toThrow();
+      expect(() => contract.decode({
+        ...replyOutput,
+        memorySaveRequest: null,
+      })).toThrow();
       expect(() => contract.decode({
         ...contextOutput,
         body: "Mixed reply and context lookup",
@@ -239,9 +236,7 @@ describe("provider structured output contracts", () => {
       delegation: null,
       agentMessage: null,
       contextRequests: null,
-      memoryRequests: null,
       memoryCitations: null,
-      memorySaveRequest: null,
     } as const;
     const request = { reason: "Read src-cli/worktree.ts to answer accurately" };
 
@@ -261,7 +256,7 @@ describe("provider structured output contracts", () => {
       ).toMatchObject({ case: "reply" });
       expect(contract.decode({ ...base, body: "A plain answer" }))
         .toMatchObject({ case: "reply" });
-      // A request is never also a completion, a lookup, or memory data.
+      // A request is never also a completion or memory data.
       expect(() =>
         contract.decode({ ...base, body: "Mixed", repositoryRequest: request })
       ).toThrow();
@@ -269,7 +264,7 @@ describe("provider structured output contracts", () => {
         contract.decode({
           ...base,
           repositoryRequest: request,
-          memoryRequests: [{ operation: "search", queries: ["units"] }],
+          memoryCitations: [{ documentId: "bay-area", version: 4 }],
         })
       ).toThrow();
       expect(() =>
@@ -292,7 +287,7 @@ describe("provider structured output contracts", () => {
     /*
       A lookup turn is replayed to the provider through the same codec. An
       Agent message reappearing there would send a message the Agent never
-      chose, so both lookup cases must encode it as null.
+      chose, so every request turn must encode it as null.
     */
     const encode = Schema.encodeSync(ChannelAgentReplyProviderOutputSchema);
 
@@ -307,10 +302,6 @@ describe("provider structured output contracts", () => {
           cursor: null,
         }],
       },
-    })).toMatchObject({ agentMessage: null, delegation: null, body: null });
-    expect(encode({
-      case: "memory",
-      request: { operation: "search", queries: ["metric units"] },
     })).toMatchObject({ agentMessage: null, delegation: null, body: null });
     expect(encode({
       case: "repository",
@@ -340,9 +331,7 @@ describe("Claude Code provider schemas", () => {
     },
     agentMessage: null,
     contextRequests: null,
-    memoryRequests: null,
     memoryCitations: null,
-    memorySaveRequest: null,
   } as const;
 
   it("drops format while the codec keeps enforcing it", () => {

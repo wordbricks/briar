@@ -1,4 +1,5 @@
 import { fromJsonString, toJsonString } from "@bufbuild/protobuf";
+import * as Predicate from "effect/Predicate";
 import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   type WorkerRuntimeAdvertisement,
@@ -272,7 +273,27 @@ export const workerRuntimeMetadataFromProto = (
   };
 };
 
+/**
+ * Capabilities removed from the proto (reserved in `WorkerCapabilities`) that
+ * a stored advertisement may still carry: a row written by a Worker CLI up to
+ * 1.2.232 keeps the retired D1 memory capabilities until the Worker next
+ * heartbeats, and an offline Worker never does. Only these names are dropped;
+ * any other unknown key still fails the read.
+ */
+const RETIRED_CAPABILITY_KEYS = ["dmMemoryProtocol", "dmMemoryLearningRequests", "dmMemoryLearning"] as const;
+
+const withoutRetiredCapabilities = (value: string) => {
+  const parsed: unknown = JSON.parse(value);
+  if (!Predicate.isObject(parsed) || !Predicate.hasProperty(parsed, "capabilities")) return value;
+  const capabilities = parsed.capabilities;
+  if (!Predicate.isObject(capabilities)) return value;
+  if (!RETIRED_CAPABILITY_KEYS.some((key) => key in capabilities)) return value;
+  const kept = Object.fromEntries(Object.entries(capabilities)
+    .filter(([key]) => !(RETIRED_CAPABILITY_KEYS as readonly string[]).includes(key)));
+  return JSON.stringify({ ...parsed, capabilities: kept });
+};
+
 export const workerRuntimeMetadataFromStoredProtoJson = (value: string) =>
   workerRuntimeMetadataFromProto(
-    fromJsonString(WorkerRuntimeAdvertisementSchema, value),
+    fromJsonString(WorkerRuntimeAdvertisementSchema, withoutRetiredCapabilities(value)),
   );

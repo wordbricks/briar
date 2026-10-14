@@ -44,13 +44,6 @@ service WorkerQueueService {
   rpc RecordMergeBatchValidation(RecordMergeBatchValidationRequest) returns (RecordMergeBatchValidationResponse);
   rpc CompleteMergeBatchPublication(CompleteMergeBatchPublicationRequest) returns (CompleteMergeBatchPublicationResponse);
   rpc BlockMergeBatch(BlockMergeBatchRequest) returns (BlockMergeBatchResponse);
-  rpc CheckDmMemoryClaim(CheckDmMemoryClaimRequest) returns (CheckDmMemoryClaimResponse);
-  rpc GetDmMemoryBrief(GetDmMemoryBriefRequest) returns (GetDmMemoryBriefResponse);
-  rpc LookupDmMemory(LookupDmMemoryRequest) returns (LookupDmMemoryResponse);
-  rpc ReserveDmMemoryLearningCall(ReserveDmMemoryLearningCallRequest) returns (ReserveDmMemoryLearningCallResponse);
-  rpc SubmitDmMemoryLearningProposal(SubmitDmMemoryLearningProposalRequest) returns (SubmitDmMemoryLearningProposalResponse);
-  rpc SubmitDmMemoryLearningVerification(SubmitDmMemoryLearningVerificationRequest) returns (SubmitDmMemoryLearningVerificationResponse);
-  rpc FailDmMemoryLearning(FailDmMemoryLearningRequest) returns (FailDmMemoryLearningResponse);
   // Memory vault tools (docs/plans/memory-vault-spec.md §6, §7).
   rpc MemoryVaultList(MemoryVaultListRequest) returns (MemoryVaultListResponse);
   rpc MemoryVaultRead(MemoryVaultReadRequest) returns (MemoryVaultReadResponse);
@@ -339,8 +332,10 @@ message ClaimedWork {
     ClaimedChannelReply channel_reply = 3;
     ClaimedProjectAgentTask project_agent_task = 4;
     ClaimedMergeBatch merge_batch = 5;
-    ClaimedDmMemoryLearning dm_memory = 6;
   }
+  // Legacy DM memory learning jobs (removed with the D1 memory system).
+  reserved 6;
+  reserved "dm_memory";
 }
 
 message RenewWorkLeaseRequest {
@@ -360,18 +355,16 @@ message WorkClaimIdentity {
     ChannelReplyClaimIdentity channel_reply = 12;
     ProjectAgentTaskClaimIdentity project_agent_task = 13;
     MergeBatchClaimIdentity merge_batch = 14;
-    DmMemoryLearningClaimIdentity dm_memory = 15;
   }
+  // Legacy DM memory learning jobs (removed with the D1 memory system).
+  reserved 15;
+  reserved "dm_memory";
 }
 
 message IssueClaimIdentity {}
 message IssueReplyClaimIdentity {}
 message ProjectAgentTaskClaimIdentity {}
 message MergeBatchClaimIdentity {}
-message DmMemoryLearningClaimIdentity {
-  string workspace_id = 1;
-  string input_hash = 2;
-}
 
 message ChannelReplyClaimIdentity {
   string workspace_id = 1;
@@ -385,8 +378,10 @@ message RenewWorkLeaseResponse {
     ChannelReplyLeaseRenewal channel_reply = 12;
     ProjectAgentTaskLeaseRenewal project_agent_task = 13;
     MergeBatchLeaseRenewal merge_batch = 14;
-    DmMemoryLearningLeaseRenewal dm_memory = 15;
   }
+  // Legacy DM memory learning jobs (removed with the D1 memory system).
+  reserved 15;
+  reserved "dm_memory";
 }
 
 message CheckpointChannelReplySessionRequest {
@@ -570,8 +565,12 @@ message ChannelReplySuccess {
   string body = 1;
   optional string conversation_id = 2;
   repeated briar.types.v1.UploadReference attachments = 3;
+  // Vault records this claim read, as `{document_id: <record id>, version:
+  // <revision>}` (docs/plans/memory-vault-spec.md §8).
   repeated briar.app.v1.DmMemoryReference memory_citations = 4;
-  optional DmMemorySaveRequest memory_save_request = 5;
+  // Legacy D1 memory save request; older Workers may still send it.
+  reserved 5;
+  reserved "memory_save_request";
   // Optional DM reaction selected with the reply; invalid values retain the acknowledgement.
   optional string acknowledgement_reaction = 6;
   // The FINAL batch already published for this reply. Completion verifies the
@@ -590,10 +589,6 @@ message ChannelReplySuccess {
     ChannelReplyDelegationAction delegation = 12;
     ChannelReplyAgentMessageAction agent_message = 13;
   }
-}
-
-message DmMemorySaveRequest {
-  repeated briar.app.v1.DmMemoryReference documents = 1;
 }
 
 message CompleteChannelReplyRequest {
@@ -648,40 +643,6 @@ message PublishDmMessageBatchResponse {
   bool replayed = 5;
 }
 
-message DmMemoryClaimIdentity {
-  string project_id = 1;
-  string worker_id = 2;
-  WorkClaimIdentity work = 3;
-  uint64 revocation_epoch = 4;
-}
-
-message CheckDmMemoryClaimRequest {
-  DmMemoryClaimIdentity claim = 1;
-}
-
-message CheckDmMemoryClaimResponse {
-  briar.app.v1.DmMemoryDescriptor memory = 1;
-}
-
-message GetDmMemoryBriefRequest {
-  DmMemoryClaimIdentity claim = 1;
-}
-
-message GetDmMemoryBriefResponse {
-  briar.app.v1.DmMemoryDescriptor memory = 1;
-  google.protobuf.Value brief = 2;
-}
-
-message LookupDmMemoryRequest {
-  DmMemoryClaimIdentity claim = 1;
-  string request_id = 2;
-  google.protobuf.Value request = 3;
-}
-
-message LookupDmMemoryResponse {
-  google.protobuf.Value response = 1;
-}
-
 message PublishReplyActivityRequest {
   string reply_job_id = 1;
   uint64 sequence = 2;
@@ -708,99 +669,6 @@ message ChannelReplyLeaseRenewal {
 
 message MergeBatchLeaseRenewal {
   string batch_id = 1;
-}
-
-message DmMemoryLearningLeaseRenewal {}
-
-message ClaimedDmMemoryLearning {
-  string work_id = 1;
-  string run_id = 2;
-  string workspace_id = 3;
-  string worker_id = 4;
-  string source_key = 5;
-  string title = 6;
-  string claim_token = 7;
-  google.protobuf.Timestamp claimed_at = 8;
-  google.protobuf.Timestamp lease_expires_at = 9;
-  string input_hash = 10;
-  bytes snapshot_json = 11;
-}
-
-enum DmMemoryLearningStage {
-  DM_MEMORY_LEARNING_STAGE_UNSPECIFIED = 0;
-  DM_MEMORY_LEARNING_STAGE_PROPOSING = 1;
-  DM_MEMORY_LEARNING_STAGE_VERIFYING = 2;
-}
-
-enum DmMemoryLearningFailure {
-  DM_MEMORY_LEARNING_FAILURE_UNSPECIFIED = 0;
-  DM_MEMORY_LEARNING_FAILURE_INVALID_PROPOSAL = 1;
-  DM_MEMORY_LEARNING_FAILURE_VERIFICATION_REJECTED = 2;
-  DM_MEMORY_LEARNING_FAILURE_STALE = 3;
-  DM_MEMORY_LEARNING_FAILURE_SCOPE_REVOKED = 4;
-  DM_MEMORY_LEARNING_FAILURE_BUDGET_EXHAUSTED = 5;
-  DM_MEMORY_LEARNING_FAILURE_MODEL_UNAVAILABLE = 6;
-  DM_MEMORY_LEARNING_FAILURE_MODEL_TIMEOUT = 7;
-  DM_MEMORY_LEARNING_FAILURE_MODEL_CREDENTIALS = 8;
-  DM_MEMORY_LEARNING_FAILURE_MODEL_CONFIGURATION = 9;
-  DM_MEMORY_LEARNING_FAILURE_INPUT_CAPACITY = 10;
-}
-
-message DmMemoryLearningUsage {
-  uint64 input_tokens = 1;
-  uint64 output_tokens = 2;
-  optional uint64 cost_micro_usd = 3;
-}
-
-message DmMemoryLearningRequestIdentity {
-  string project_id = 1;
-  string worker_id = 2;
-  WorkClaimIdentity work = 3;
-}
-
-message ReserveDmMemoryLearningCallRequest {
-  DmMemoryLearningRequestIdentity claim = 1;
-  string call_id = 2;
-  DmMemoryLearningStage stage = 3;
-}
-
-message SubmitDmMemoryLearningProposalRequest {
-  DmMemoryLearningRequestIdentity claim = 1;
-  string call_id = 2;
-  bytes proposal_json = 3;
-  DmMemoryLearningUsage usage = 4;
-}
-
-message SubmitDmMemoryLearningVerificationRequest {
-  DmMemoryLearningRequestIdentity claim = 1;
-  string call_id = 2;
-  string proposal_id = 3;
-  string proposal_hash = 4;
-  bytes verification_json = 5;
-  DmMemoryLearningUsage usage = 6;
-}
-
-message FailDmMemoryLearningRequest {
-  DmMemoryLearningRequestIdentity claim = 1;
-  DmMemoryLearningFailure code = 2;
-  optional string call_id = 3;
-  optional DmMemoryLearningUsage usage = 4;
-}
-
-message ReserveDmMemoryLearningCallResponse {
-  bytes json = 1;
-}
-
-message SubmitDmMemoryLearningProposalResponse {
-  bytes json = 1;
-}
-
-message SubmitDmMemoryLearningVerificationResponse {
-  bytes json = 1;
-}
-
-message FailDmMemoryLearningResponse {
-  bool released = 1;
 }
 
 message HandoffWorkRequest {
@@ -1331,8 +1199,10 @@ message ClaimedChannelReply {
   google.protobuf.Struct snapshot = 24;
   // Trigger-message files with claim-scoped raw download URLs.
   repeated QueuedAttachment trigger_attachments = 25;
-  optional briar.app.v1.DmMemoryDescriptor memory = 26;
-  bool memory_learning_enabled = 27;
+  // Legacy D1 memory descriptor and learning flag. DM memory is the vault,
+  // reached through `tools memory` and GetMemoryVaultContext.
+  reserved 26, 27;
+  reserved "memory", "memory_learning_enabled";
   // Agents this claim may message directly. Empty whenever the reply is not
   // eligible to start an Agent-to-Agent conversation.
   repeated ChannelAgentMessageTarget agent_message_targets = 28;
@@ -1358,6 +1228,11 @@ message ClaimedChannelReply {
   // one, so a steer restart or a lease-expiry retry neither re-publishes the
   // placeholder nor spends a provider turn choosing the emoji again.
   optional string acknowledgement_reaction = 36;
+  // The reply answers a person in a 1:1 DM with this Agent. Its failure text
+  // and provider block messages can echo the DM, recalled memory or the prompt,
+  // so the Worker reports only a fixed failure code and the block headline.
+  // Absent means an older server: the Worker redacts as if true.
+  optional bool direct_message = 37;
 }
 
 message PublishedDmMessageBatch {
@@ -1717,7 +1592,7 @@ message GetMemoryVaultContextRequest {
 
 message GetMemoryVaultContextResponse {
   oneof state {
-    // This run has no vault (memory switched off or no Agent): inject nothing.
+    // This run has no vault (no Agent): inject nothing.
     MemoryVaultContextNone none = 1;
     // Head and permissions are unchanged since known_context_key.
     MemoryVaultContextUnchanged unchanged = 2;

@@ -183,7 +183,8 @@ describe("channel message body length migration", () => {
       "briar_channel_messages_thread_idx",
       "briar_channel_messages_webhook_event_idx",
     ]);
-    expect((await objects("trigger")).length).toBe(16);
+    // 0222 dropped four legacy DM memory triggers on this table.
+    expect((await objects("trigger")).length).toBe(12);
   });
 
   it("stores a message the old bound rejected and still rejects a longer one", async () => {

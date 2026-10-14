@@ -47,12 +47,10 @@ import {
 import {
   assertReadable,
   assertWritable,
-  memoryVaultEnabled,
   resolveMemoryVaultScope,
   vaultAccess,
   vaultStatusLine,
   type MemoryVaultClaim,
-  type MemoryVaultEnv,
   type MemoryVaultWorker,
   type ResolvedVaultScope,
   type VaultAccess,
@@ -77,8 +75,7 @@ import {
 
 export type MemoryVaultDeps = {
   readonly db: D1Database;
-  readonly env: MemoryVaultEnv;
-  /** Null when this deployment has no Artifacts binding. */
+  /** Null when this deployment has no Artifacts binding: every Artifacts read or write is `memory_unavailable`. */
   readonly store: VaultGitStore | null;
   readonly now?: () => Date;
   readonly sleep?: (milliseconds: number) => Promise<void>;
@@ -124,11 +121,8 @@ async function openScope(deps: MemoryVaultDeps, caller: MemoryVaultCaller): Prom
     worker: caller.worker,
     observedAt: clock(deps).toISOString(),
   });
-  if (!memoryVaultEnabled(deps.env)) {
-    throw new MemoryVaultError("memory_disabled", "Memory is not available in this deployment");
-  }
   if (!scope) throw new MemoryVaultError("memory_disabled", "This run has no Agent, so it has no memory");
-  return { scope, access: vaultAccess(deps.env, scope) };
+  return { scope, access: vaultAccess(scope) };
 }
 
 /** The existing vault, synced with its repository, or null before the first write. */
@@ -154,7 +148,7 @@ const writableVault = (deps: MemoryVaultDeps, scope: ResolvedVaultScope): Promis
 /**
  * The vault for `key`, created (row, repository and its `README.md` commit) if
  * missing and synced with its repository. Also the entry point for writers
- * without a claim: the owner in the app and the legacy migration.
+ * without a claim: the owner in the app.
  */
 export async function openVaultForWrite(
   deps: Pick<MemoryVaultDeps, "db" | "store" | "now">,
@@ -865,8 +859,8 @@ export async function getMemoryVaultContext(deps: MemoryVaultDeps, caller: Memor
     worker: caller.worker,
     observedAt: clock(deps).toISOString(),
   });
-  if (!scope || !memoryVaultEnabled(deps.env)) return { kind: "none" };
-  const access = vaultAccess(deps.env, scope);
+  if (!scope) return { kind: "none" };
+  const access = vaultAccess(scope);
   let vault = await findVault(deps.db, scope.key);
   const known = contextKeyOf(vault?.head_commit ?? null, scope.key.scopeKind, access);
   if (input.knownContextKey === known) return { kind: "unchanged", contextKey: known };
