@@ -30,6 +30,18 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.235",
+        date: "2026년 10월 14일",
+        title: "기억을 폴더 구조로 봅니다",
+        summary:
+          "DM 기억 창이 에이전트 기억 저장소를 폴더 트리로 보여줍니다.",
+        items: [
+          "DM 기억 창에서 일지, 인물, 지식, 작업 흐름 등 기억 폴더를 접고 펼치며 볼 수 있습니다.",
+          "각 파일에 기억 종류와 버전이 표시되고, 누르면 내용과 이력을 보거나 수정·삭제할 수 있습니다.",
+          "에이전트에게 주는 기억 안내(README)를 읽기 전용으로 볼 수 있습니다.",
+        ],
+      },
+      {
         version: "1.2.234",
         date: "2026년 10월 14일",
         title: "에이전트 기억이 새 저장소 하나로 정리되었습니다",
@@ -2114,6 +2126,18 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.235",
+        date: "October 14, 2026",
+        title: "Browse memory as folders",
+        summary:
+          "The DM memory window shows the agent's memory store as a folder tree.",
+        items: [
+          "Expand and collapse memory folders such as the timeline, people, knowledge and workstreams in the DM memory window.",
+          "Each file shows its memory type and version; open it to read, review history, edit or delete.",
+          "The memory guide agents receive (README) is visible read-only.",
+        ],
+      },
       {
         version: "1.2.234",
         date: "October 14, 2026",
