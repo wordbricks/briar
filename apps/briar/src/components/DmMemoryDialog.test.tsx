@@ -96,8 +96,15 @@ describe("DM memory management", () => {
   const items = () => [...dialog().querySelectorAll<HTMLElement>('[role="treeitem"]')];
   /** The tree row whose own name (not its secondary label) is `name`. */
   const item = (name: string) => items().find((node) => node.querySelector("span.truncate")?.textContent === name);
-  async function edit() {
+  const preview = () => dialog().querySelector<HTMLElement>('section[aria-label="Memory preview"]')!;
+  const paneShown = () => dialog().querySelector("[data-memory-pane]")!.getAttribute("data-memory-pane");
+  const treePane = () => dialog().querySelector('[role="tree"]')!.parentElement!;
+  const click = async (label: string) => { await act(async () => button(label).click()); };
+  async function openFile() {
     await act(async () => item("synthetic-memory.md")!.click());
+  }
+  async function edit() {
+    await openFile(); await click("Edit");
   }
   const key = async (target: HTMLElement, value: string) => {
     await act(async () => { target.dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true })); });
@@ -112,14 +119,21 @@ describe("DM memory management", () => {
     client.history.mockResolvedValue({ documentId: detail.id, currentVersion: 2, nextCursor: null,
       revisions: [{ version: 1, createdAt: detail.createdAt, memoryClass: detail.memoryClass,
         protectedByUser: true, validUntil: null, origin: "user_edit" }] });
-    await render(); await edit();
-    await act(async () => button("Revision history").click());
+    await render(); await openFile();
+    expect(preview().querySelector(".markdown-content")?.textContent).toBe("Current version");
+    await click("Revision history");
     const revision = [...dialog().querySelectorAll("button")].find((node) => node.textContent?.startsWith("v1 ·"))!;
     await act(async () => revision.click());
-    expect(dialog().querySelector("pre")?.textContent).toBe(detail.body);
-    expect(dialog().querySelector("textarea")?.value).toBe("Current version");
-    expect(dialog().textContent).toContain("Earlier version · read only");
+    // The revision opens in the right pane, rendered, with no way to edit it.
+    const earlier = preview().querySelector('section[aria-label="Earlier version · read only · v1"]')!;
+    expect(earlier.querySelector(".markdown-content")?.textContent).toBe(detail.body);
+    expect(revision.getAttribute("aria-pressed")).toBe("true");
+    expect(dialog().querySelector("textarea")).toBeNull();
+    expect(button("Edit")).toBeUndefined();
     expect(client.get).toHaveBeenLastCalledWith(scope, detail.id, undefined, 1);
+    await click("Back to file");
+    expect(preview().querySelector(".markdown-content")?.textContent).toBe("Current version");
+    expect(button("Edit")).toBeDefined();
   });
 
   it("M01 does not claim saved while the server write is pending", async () => {
@@ -128,8 +142,14 @@ describe("DM memory management", () => {
     await render(); await edit(); await submit();
     expect(button("Saving").disabled).toBe(true);
     expect(dialog().querySelector('[role="status"]')?.textContent).not.toBe("Saved");
+    client.get.mockResolvedValue({ ...detail, version: 2, body: "Saved text" });
     await act(async () => finish({ documentId: detail.id, version: 2, replayed: false }));
     expect(dialog().querySelector('[role="status"]')?.textContent).toBe("Saved");
+    // The saved file stays selected and its preview shows the new revision.
+    expect(dialog().querySelector("form")).toBeNull();
+    expect(client.get).toHaveBeenLastCalledWith(scope, detail.id);
+    expect(preview().querySelector(".markdown-content")?.textContent).toBe("Saved text");
+    expect(item("synthetic-memory.md")!.getAttribute("aria-selected")).toBe("true");
     expect(client.save.mock.calls[0]).toEqual([scope, {
       requestId: expect.any(String), memorySpaceId: spaceId, title: detail.title, body: detail.body,
       memoryClass: detail.memoryClass, expectedVersion: detail.version,
@@ -150,18 +170,23 @@ describe("DM memory management", () => {
   it("M18 exposes closed memories for management without an editable form", async () => {
     client.load.mockResolvedValue({ ...page, eligible: false,
       spaces: page.spaces.map((space) => ({ ...space, status: "closed", useEnabled: false })) });
-    await render(); await edit();
+    await render(); await openFile();
     expect(dialog().textContent).toContain("closed after a participant change");
-    expect(dialog().querySelector("textarea")?.disabled).toBe(true);
+    expect(preview().textContent).toContain(detail.body);
+    expect(button("Edit")).toBeUndefined();
+    expect(dialog().querySelector("textarea")).toBeNull();
     expect(button("Save")).toBeUndefined();
+    expect(button("Revision history")).toBeDefined();
     expect(button("Export Markdown").disabled).toBe(false);
     expect(dialog().querySelector('[aria-label="Forget memory"]')).not.toBeNull();
   });
   it("shows no legacy learning, validity or index state", async () => {
     // Vault records carry no sources; the server sends an empty list.
     client.get.mockResolvedValue({ ...detail, sources: [] });
-    await render(); await edit();
-    const text = dialog().textContent ?? "";
+    await render(); await openFile();
+    const read = dialog().textContent ?? "";
+    await click("Edit");
+    const text = read + (dialog().textContent ?? "");
     for (const legacy of ["Learning", "learning", "Valid until", "Observed at", "Source language", "Awaiting index", "Searchable", "needs review"]) {
       expect(text).not.toContain(legacy);
     }
@@ -244,22 +269,113 @@ describe("DM memory management", () => {
 
     // Enter on a file opens it.
     expect(client.get).not.toHaveBeenCalled();
+    item("synthetic-memory.md")!.focus();
     await key(item("synthetic-memory.md")!, "Enter");
     expect(client.get).toHaveBeenCalledWith(scope, detail.id);
-    expect(dialog().querySelector("textarea")?.value).toBe(detail.body);
+    expect(preview().querySelector(".markdown-content")?.textContent).toBe(detail.body);
+    // On a wide screen the tree stays in view, so focus stays on the row.
+    expect(document.activeElement).toBe(item("synthetic-memory.md"));
+    expect(item("synthetic-memory.md")!.getAttribute("aria-selected")).toBe("true");
   });
 
-  it("opens a file into the detail view with its path, history, edit and forget", async () => {
+  it("starts with an empty preview pane beside the tree", async () => {
+    await render();
+    expect(paneShown()).toBe("tree");
+    expect(preview().childElementCount).toBe(0);
+    expect(preview().textContent).toBe("");
+    expect(items().some((node) => node.getAttribute("aria-selected") === "true")).toBe(false);
+    expect(client.get).not.toHaveBeenCalled();
+  });
+
+  it("previews a file with its path, meta line and rendered Markdown, and forgets it back to the empty pane", async () => {
+    client.get.mockResolvedValue({ ...detail, body: "## Tone\n\n- Lead with the answer\n- Keep it short" });
     client.remove.mockResolvedValue({ deleted: true, purgeState: "pending" } as Awaited<ReturnType<DmMemoryClient["remove"]>>);
-    await render(); await edit();
+    await render(); await openFile();
+    expect(paneShown()).toBe("preview");
     expect(item("synthetic-memory.md")!.getAttribute("aria-selected")).toBe("true");
-    expect(dialog().textContent).toContain("entities/people/synthetic-memory.md");
-    expect(dialog().querySelector<HTMLInputElement>("form input")!.value).toBe(detail.title);
-    expect(button("Save")).toBeDefined();
+    expect(preview().querySelector("h3")?.textContent).toBe(detail.title);
+    expect(preview().textContent).toContain("entities/people/synthetic-memory.md");
+    expect(preview().querySelector("[data-memory-meta]")?.textContent).toMatch(/^person · r1 · User protected · Updated at /u);
+    expect(preview().querySelector(".markdown-content h2")?.textContent).toBe("Tone");
+    expect([...preview().querySelectorAll(".markdown-content li")].map((node) => node.textContent))
+      .toEqual(["Lead with the answer", "Keep it short"]);
+    expect(button("Edit")).toBeDefined();
     expect(button("Revision history")).toBeDefined();
-    await act(async () => dialog().querySelector<HTMLButtonElement>('[aria-label="Forget memory"]')!.click());
+    await act(async () => preview().querySelector<HTMLButtonElement>('[aria-label="Forget memory"]')!.click());
     expect(client.remove).toHaveBeenCalledWith(scope, detail.id);
+    expect(paneShown()).toBe("tree");
+    expect(preview().textContent).toBe("");
+    expect(items().some((node) => node.getAttribute("aria-selected") === "true")).toBe(false);
+    expect(dialog().querySelector('[role="status"]')?.textContent).toContain("Memory deleted");
+    expect(document.activeElement?.getAttribute("role")).toBe("treeitem");
+  });
+
+  it("edits in place in the right pane and cancels back to the preview", async () => {
+    await render(); await edit();
+    const form = preview().querySelector("form")!;
+    expect(form.querySelector<HTMLInputElement>("input")!.value).toBe(detail.title);
+    expect(form.querySelector("textarea")!.value).toBe(detail.body);
+    expect(document.activeElement).toBe(form.querySelector("input"));
+    expect(button("Revision history")).toBeUndefined();
+    expect(item("synthetic-memory.md")!.getAttribute("aria-selected")).toBe("true");
+    await click("Cancel");
     expect(dialog().querySelector("form")).toBeNull();
+    expect(preview().querySelector(".markdown-content")?.textContent).toBe(detail.body);
+    expect(client.save).not.toHaveBeenCalled();
+  });
+
+  it("opens Add memory as a form in the right pane and previews the new file after saving", async () => {
+    const created = { ...detail, id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", title: "New note", body: "Fresh", path: "knowledge/facts/new-note.md" };
+    client.save.mockResolvedValue({ documentId: created.id, version: 1, replayed: false });
+    client.get.mockResolvedValue(created);
+    await render(); await click("Add memory");
+    expect(paneShown()).toBe("preview");
+    expect(preview().querySelector("h3")?.textContent).toBe("Add memory");
+    const form = preview().querySelector("form")!;
+    expect(form.querySelector<HTMLInputElement>("input")!.value).toBe("");
+    await click("Cancel");
+    expect(paneShown()).toBe("tree");
+    expect(preview().textContent).toBe("");
+
+    await click("Add memory");
+    const input = preview().querySelector<HTMLInputElement>("form input")!;
+    const text = preview().querySelector<HTMLTextAreaElement>("form textarea")!;
+    await act(async () => {
+      for (const [field, value] of [[input, "New note"], [text, "Fresh"]] as const) {
+        Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value")!.set!.call(field, value);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await submit();
+    expect(client.save).toHaveBeenCalledWith(scope, expect.objectContaining({ title: "New note", body: "Fresh", memorySpaceId: spaceId }), undefined);
+    expect(client.get).toHaveBeenLastCalledWith(scope, created.id);
+    expect(preview().querySelector("h3")?.textContent).toBe("New note");
+    expect(preview().querySelector(".markdown-content")?.textContent).toBe("Fresh");
+  });
+
+  it("shows one pane at a time below the breakpoint, with a back control to the tree", async () => {
+    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({ matches: query.includes("max-width"), media: query })));
+    try {
+      await render();
+      // Tree first: the preview pane is hidden until the wide layout shows both.
+      expect(treePane().className.split(" ")).toContain("flex");
+      expect(preview().className.split(" ")).toEqual(expect.arrayContaining(["hidden", "md:flex"]));
+      await openFile();
+      expect(paneShown()).toBe("preview");
+      expect(treePane().className.split(" ")).toEqual(expect.arrayContaining(["hidden", "md:flex"]));
+      expect(preview().className.split(" ")).toContain("flex");
+      expect(preview().className.split(" ")).not.toContain("hidden");
+      // The tree just disappeared, so focus moves to the preview's heading.
+      expect(document.activeElement).toBe(preview().querySelector("h3"));
+      const back = preview().querySelector<HTMLButtonElement>('[aria-label="Back to folders"]')!;
+      expect(back.className.split(" ")).toContain("md:hidden");
+      await act(async () => back.click());
+      expect(paneShown()).toBe("tree");
+      expect(treePane().className.split(" ")).not.toContain("hidden");
+      expect(document.activeElement).toBe(item("synthetic-memory.md"));
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("shows README.md read only, without edit, history or forget", async () => {
@@ -268,7 +384,9 @@ describe("DM memory management", () => {
     await render();
     await act(async () => item("README.md")!.click());
     expect(client.get).toHaveBeenCalledWith(scope, readme.id);
-    expect(dialog().querySelector("pre")?.textContent).toBe(readme.body);
+    expect(preview().querySelector(".markdown-content h1")?.textContent).toBe("Memory vault");
+    expect(preview().querySelector("[data-memory-meta]")?.textContent).toBe("readme · Read only");
+    expect(button("Edit")).toBeUndefined();
     expect(dialog().textContent).toContain("You can read it but not edit or delete it.");
     expect(dialog().querySelector("textarea")).toBeNull();
     expect(dialog().querySelector("form input")).toBeNull();
@@ -280,10 +398,12 @@ describe("DM memory management", () => {
   it("lists records from a server before the folder tree at the root under their titles", async () => {
     client.load.mockResolvedValue({ ...page, folders: [],
       documents: [{ ...summary, path: null, recordType: null, recordStatus: null }] });
+    client.get.mockResolvedValue({ ...detail, path: null, recordType: null, recordStatus: null });
     await render();
     expect(items().map((node) => node.querySelector("span.truncate")!.textContent)).toEqual(["memory", detail.title]);
     expect(item(detail.title)!.textContent).toContain("profile · r1");
     await act(async () => item(detail.title)!.click());
-    expect(dialog().querySelector("textarea")?.value).toBe(detail.body);
+    expect(preview().querySelector(".markdown-content")?.textContent).toBe(detail.body);
+    expect(preview().querySelector("[data-memory-meta]")?.textContent).toMatch(/^profile · r1 · /u);
   });
 });
