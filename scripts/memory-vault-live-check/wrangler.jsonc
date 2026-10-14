@@ -1,0 +1,14 @@
+// Throwaway Worker for the memory vault live check. Deployed under a random
+// name by scripts/memory-vault-live-check.ts and deleted right after; never
+// part of the production deploy. Its Artifacts namespace is separate from the
+// production `briar-memory` namespace.
+{
+  "$schema": "../../apps/briar/node_modules/wrangler/config-schema.json",
+  "name": "briar-memory-vault-live-check",
+  "main": "worker.ts",
+  "compatibility_date": "2026-07-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "limits": { "cpu_ms": 300000 },
+  "artifacts": [{ "binding": "MEMORY_ARTIFACTS", "namespace": "briar-memory-live-check" }]
+}

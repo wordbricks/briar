@@ -24,6 +24,8 @@ import {
   listChannelAgents,
 } from "./channels";
 import { sha256 } from "./crypto-digest";
+import { acceptMemoryVaultCitations } from "./memory-vault/citations";
+import { memoryVaultEnabled } from "./memory-vault/flag";
 import { completeIssueAgentReplyOutput } from "./issue-agent-reply-completion-repository";
 import {
   failIssueAgentReply,
@@ -129,7 +131,10 @@ export type ReplyCompletionApplicationServices = {
     typeof findDmFinalPublicMessageForReply;
   readonly getDmFinalPublicMessageBatch: typeof getDmFinalPublicMessageBatch;
   readonly getDmPublicMessageClaim: typeof getDmPublicMessageClaim;
+  readonly acceptMemoryVaultCitations: typeof acceptMemoryVaultCitations;
 };
+
+const LEGACY_DOCUMENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 const applicationServices: ReplyCompletionApplicationServices = {
   sha256,
@@ -163,6 +168,7 @@ const applicationServices: ReplyCompletionApplicationServices = {
   findDmFinalPublicMessageForReply,
   getDmFinalPublicMessageBatch,
   getDmPublicMessageClaim,
+  acceptMemoryVaultCitations,
 };
 
 /**
@@ -991,7 +997,21 @@ export async function completeChannelReplyApplication(
         );
       }
       const result = resolved.outcome.completion;
-      if (result.memorySaveRequest) {
+      /*
+        After the vault cutover the agent cites vault records and keeps memory
+        with its tools; a legacy save request (an old Worker CLI) has no
+        learning pipeline left to run it, so it is dropped rather than failing
+        the reply (memory-vault spec §8, §11).
+      */
+      const vaultCutover = memoryVaultEnabled(input.env);
+      const memorySaveRequest = vaultCutover ? null : result.memorySaveRequest;
+      if (vaultCutover && result.memorySaveRequest) {
+        console.warn(JSON.stringify({
+          message: "legacy memory save request dropped after the memory vault cutover",
+          jobId: scope.workId,
+        }));
+      }
+      if (memorySaveRequest) {
         const binding = await services.executionWorkerBindingById(
           input.db,
           scope.deviceId,
@@ -1023,7 +1043,7 @@ export async function completeChannelReplyApplication(
       if (
         claimed.agent_message_hop === 1 &&
         (result.delegation || result.agentMessage || artifactRequested ||
-          result.memorySaveRequest)
+          memorySaveRequest)
       ) {
         throw new ReplyCompletionApplicationError(
           "invalid_request",
@@ -1145,6 +1165,32 @@ export async function completeChannelReplyApplication(
           );
         }
       }
+      /*
+        A UUID names a legacy DM memory document and keeps the legacy check
+        inside the completion transaction; anything else is a vault record id
+        (memory-vault spec §8), kept only if this claim read that revision and
+        it is still current. Unaccepted vault citations are dropped, not fatal.
+      */
+      const citations = result.memoryCitations ?? [];
+      const legacyCitations = citations.filter((citation) => LEGACY_DOCUMENT_ID.test(citation.documentId));
+      const vaultCandidates = citations.filter((citation) => !LEGACY_DOCUMENT_ID.test(citation.documentId));
+      const vaultCitations = vaultCandidates.length > 0
+        ? await services.acceptMemoryVaultCitations(input.db, {
+            claimTokenHash: scope.claimTokenHash,
+            citations: vaultCandidates.map((citation) => ({
+              documentId: citation.documentId,
+              version: citation.version,
+            })),
+          })
+        : null;
+      if (vaultCitations?.rejected.length) {
+        // Only records this claim read at their current revision may be cited.
+        console.warn(JSON.stringify({
+          message: "memory vault citations rejected",
+          jobId: scope.workId,
+          rejected: vaultCitations.rejected.length,
+        }));
+      }
       completed = await services.completeChannelReply(input.db, claimed, {
         jobId: scope.workId,
         deviceId: scope.deviceId,
@@ -1152,8 +1198,10 @@ export async function completeChannelReplyApplication(
         claimTokenHash: scope.claimTokenHash,
         body: publishedFinal?.finalBody ?? result.body,
         acknowledgementReaction: result.acknowledgementReaction,
-        memoryCitations: result.memoryCitations,
-        memorySaveRequest: result.memorySaveRequest,
+        memoryCitations: legacyCitations,
+        memorySaveRequest,
+        memoryVaultCitations: vaultCitations?.accepted ?? [],
+        memoryVaultCutover: vaultCutover,
         document,
         issueProposal,
         issueBatchProposal,

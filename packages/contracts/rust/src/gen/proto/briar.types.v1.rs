@@ -9206,6 +9206,18 @@ pub struct WorkerCapabilities {
         DmPublicMessageCapability,
         ::buffa::Inline<DmPublicMessageCapability>,
     >,
+    /// Memory vault tools (`tools memory …`) and per-turn vault context
+    /// (docs/plans/memory-vault-spec.md). Absence and zero mean the Worker CLI
+    /// predates the vault and gets no memory in a vault-backed scope.
+    ///
+    /// Field 12: `memory_vault_protocol`
+    #[serde(
+        rename = "memoryVaultProtocol",
+        alias = "memory_vault_protocol",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub memory_vault_protocol: ::core::option::Option<u32>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9223,6 +9235,7 @@ impl ::core::fmt::Debug for WorkerCapabilities {
             .field("computer_use", &self.computer_use)
             .field("dm_public_messages", &self.dm_public_messages)
             .field("dm_reply_routing", &self.dm_reply_routing)
+            .field("memory_vault_protocol", &self.memory_vault_protocol)
             .finish()
     }
 }
@@ -9246,6 +9259,13 @@ impl WorkerCapabilities {
     ///Sets [`Self::dm_memory_learning_requests`] to `Some(value)`, consuming and returning `self`.
     pub fn with_dm_memory_learning_requests(mut self, value: u32) -> Self {
         self.dm_memory_learning_requests = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::memory_vault_protocol`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_memory_vault_protocol(mut self, value: u32) -> Self {
+        self.memory_vault_protocol = Some(value);
         self
     }
 }
@@ -9334,6 +9354,9 @@ impl ::buffa::Message for WorkerCapabilities {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(v) = self.memory_vault_protocol {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -9408,6 +9431,9 @@ impl ::buffa::Message for WorkerCapabilities {
                 buf,
             );
             self.dm_reply_routing.write_to(__cache, buf);
+        }
+        if let Some(v) = self.memory_vault_protocol {
+            ::buffa::types::put_uint32_field(12u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9526,6 +9552,15 @@ impl ::buffa::Message for WorkerCapabilities {
                     ctx,
                 )?;
             }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.memory_vault_protocol = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9544,6 +9579,7 @@ impl ::buffa::Message for WorkerCapabilities {
         self.computer_use = ::buffa::MessageField::none();
         self.dm_public_messages = ::buffa::MessageField::none();
         self.dm_reply_routing = ::buffa::MessageField::none();
+        self.memory_vault_protocol = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -25975,6 +26011,12 @@ pub mod __buffa {
             pub dm_reply_routing: ::buffa::MessageFieldView<
                 super::super::__buffa::view::DmPublicMessageCapabilityView<'a>,
             >,
+            /// Memory vault tools (`tools memory …`) and per-turn vault context
+            /// (docs/plans/memory-vault-spec.md). Absence and zero mean the Worker CLI
+            /// predates the vault and gets no memory in a vault-backed scope.
+            ///
+            /// Field 12: `memory_vault_protocol`
+            pub memory_vault_protocol: ::core::option::Option<u32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for WorkerCapabilitiesView<'a> {
@@ -26159,6 +26201,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.memory_vault_protocol = Some(
+                            ::buffa::types::decode_uint32(&mut cur)?,
+                        );
+                    }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -26286,6 +26337,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    memory_vault_protocol: self.memory_vault_protocol,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -26365,6 +26417,9 @@ pub mod __buffa {
                         += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if let Some(v) = self.memory_vault_protocol {
+                    size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -26440,6 +26495,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.dm_reply_routing.write_to(__cache, buf);
+                }
+                if let Some(v) = self.memory_vault_protocol {
+                    ::buffa::types::put_uint32_field(12u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -26534,6 +26592,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("dmReplyRouting", __v)?;
                     }
+                }
+                if let ::core::option::Option::Some(__v) = self.memory_vault_protocol {
+                    __map
+                        .serialize_entry(
+                            "memoryVaultProtocol",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -26709,6 +26774,15 @@ pub mod __buffa {
                 super::super::__buffa::view::DmPublicMessageCapabilityView<'_>,
             > {
                 &self.0.reborrow().dm_reply_routing
+            }
+            /// Memory vault tools (`tools memory …`) and per-turn vault context
+            /// (docs/plans/memory-vault-spec.md). Absence and zero mean the Worker CLI
+            /// predates the vault and gets no memory in a vault-backed scope.
+            ///
+            /// Field 12: `memory_vault_protocol`
+            #[must_use]
+            pub fn memory_vault_protocol(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().memory_vault_protocol
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<WorkerCapabilitiesView<'static>>>

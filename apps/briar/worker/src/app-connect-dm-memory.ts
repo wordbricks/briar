@@ -45,6 +45,7 @@ import type { BriarAuth } from "./auth";
 import { requireChannelAccess } from "./channel-route-access";
 import {
   deleteDmMemory,
+  ensureWriteSpace,
   getDmMemory,
   listDmMemories,
   listDmMemorySpaces,
@@ -56,6 +57,17 @@ import {
 import { retryDmLearningJob } from "./dm-memory-learning-retry";
 import { readDmLearningStatus } from "./dm-memory-learning-status";
 import { HttpError } from "./http-response";
+import { memoryVaultStoreFromEnv } from "./memory-vault/artifacts-git-store";
+import { memoryVaultEnabled } from "./memory-vault/flag";
+import type { VaultGitStore } from "./memory-vault/git-store";
+import {
+  forgetOwnerVaultRecord,
+  getOwnerVaultDocument,
+  listOwnerVaultDocuments,
+  listOwnerVaultRevisions,
+  saveOwnerVaultRecord,
+  type OwnerVaultDeps,
+} from "./memory-vault/owner";
 import { getWorkspaceRole } from "./workspace-repository";
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
@@ -66,6 +78,29 @@ export type AppConnectDmMemoryInput = {
   readonly auth: BriarAuth;
   readonly db: D1Database;
   readonly env: Env;
+  /** Tests inject a store; production uses the `MEMORY_ARTIFACTS` binding. */
+  readonly memoryVaultStore?: VaultGitStore | null;
+};
+
+/**
+ * After the vault cutover (`MEMORY_VAULT_ENABLED`) every DM memory space is
+ * served from its vault (memory-vault spec §9): same RPC shapes, record
+ * handles as document ids, owner writes as protected `user:<id>` saves and
+ * deletes as forget. Authorization is unchanged (`ownerFor`, then only the
+ * owner's own spaces).
+ */
+const vaultServed = (input: AppConnectDmMemoryInput) => memoryVaultEnabled(input.env);
+
+const vaultDeps = (input: AppConnectDmMemoryInput): OwnerVaultDeps => ({
+  db: input.db,
+  store: input.memoryVaultStore === undefined ? memoryVaultStoreFromEnv(input.env) : input.memoryVaultStore,
+});
+
+/** Vault document ids are opaque to clients; bound them before they reach SQL. */
+const opaqueDocumentId = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 200) throw new ConnectError("document_id is invalid", Code.InvalidArgument);
+  return trimmed;
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
@@ -312,6 +347,25 @@ const createAppDmMemoryService = (
 ): ServiceImpl<typeof DmMemoryService> => ({
   listDmMemories: async (request) => {
     const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    if (vaultServed(input)) {
+      const page = await listDmMemories(
+        input.db,
+        owner,
+        request.memorySpaceId === undefined ? undefined : canonicalUuid(request.memorySpaceId),
+      );
+      const space = (await listDmMemorySpaces(input.db, owner)).find((candidate) => candidate.id === page.selectedSpaceId);
+      const vaultPage = space
+        ? await listOwnerVaultDocuments(input.db, space, request.cursor === undefined ? undefined : opaqueDocumentId(request.cursor))
+        : { documents: [], nextCursor: null };
+      return create(DmMemoryService.method.listDmMemories.output, {
+        eligible: page.eligible,
+        capabilities: { recall: true, automaticLearning: true },
+        spaces: page.spaces.map(protoSpace),
+        selectedSpaceId: page.selectedSpaceId ?? undefined,
+        documents: vaultPage.documents.map(protoDocument),
+        nextCursor: vaultPage.nextCursor ?? undefined,
+      });
+    }
     const page = await listDmMemories(
       input.db,
       owner,
@@ -338,6 +392,15 @@ const createAppDmMemoryService = (
 
   getDmMemoryDocument: async (request) => {
     const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    if (vaultServed(input)) {
+      const document = await getOwnerVaultDocument(
+        vaultDeps(input),
+        await listDmMemorySpaces(input.db, owner),
+        opaqueDocumentId(request.documentId),
+        request.version,
+      );
+      return create(DmMemoryService.method.getDmMemoryDocument.output, { document: protoDocument(document) });
+    }
     const document = await getDmMemory(
       input.db,
       owner,
@@ -351,12 +414,19 @@ const createAppDmMemoryService = (
 
   listDmMemoryRevisions: async (request) => {
     const owner = await ownerFor(input, request.workspaceId, request.channelId);
-    const page = await listDmMemoryRevisions(
-      input.db,
-      owner,
-      canonicalUuid(request.documentId),
-      request.cursor,
-    );
+    const page = vaultServed(input)
+      ? await listOwnerVaultRevisions(
+          input.db,
+          await listDmMemorySpaces(input.db, owner),
+          opaqueDocumentId(request.documentId),
+          request.cursor,
+        )
+      : await listDmMemoryRevisions(
+          input.db,
+          owner,
+          canonicalUuid(request.documentId),
+          request.cursor,
+        );
     return create(DmMemoryService.method.listDmMemoryRevisions.output, {
       documentId: page.documentId,
       currentVersion: page.currentVersion,
@@ -374,6 +444,31 @@ const createAppDmMemoryService = (
 
   createDmMemoryDocument: async (request) => {
     const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    if (vaultServed(input)) {
+      const decoded = decodeCreate({
+        requestId: canonicalUuid(request.requestId),
+        memorySpaceId: request.memorySpaceId === undefined ? undefined : canonicalUuid(request.memorySpaceId),
+        title: request.title,
+        body: request.body,
+        memoryClass: domainMemoryClass(request.memoryClass),
+        sourceLanguage: request.sourceLanguage,
+        observedAt: optionalIso(request.observedAt),
+        validUntil: optionalIso(request.validUntil),
+        sourceMessage: sourceMessage(request.sourceMessage),
+      });
+      const result = await saveOwnerVaultRecord(vaultDeps(input), {
+        space: await ensureWriteSpace(input.db, owner, decoded.memorySpaceId),
+        spaces: await listDmMemorySpaces(input.db, owner),
+        userId: owner.userId,
+        requestId: decoded.requestId,
+        documentId: null,
+        expectedVersion: null,
+        title: decoded.title,
+        body: decoded.body,
+        memoryClass: decoded.memoryClass,
+      });
+      return create(DmMemoryService.method.createDmMemoryDocument.output, result);
+    }
     const result = await saveDmMemory(input.db, owner, decodeCreate({
       requestId: canonicalUuid(request.requestId),
       memorySpaceId: request.memorySpaceId === undefined
@@ -396,6 +491,35 @@ const createAppDmMemoryService = (
 
   updateDmMemoryDocument: async (request) => {
     const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    if (vaultServed(input)) {
+      const decoded = decodeEdit({
+        requestId: canonicalUuid(request.requestId),
+        memorySpaceId: request.memorySpaceId === undefined ? undefined : canonicalUuid(request.memorySpaceId),
+        expectedVersion: request.expectedVersion,
+        title: request.title,
+        body: request.body,
+        memoryClass: domainMemoryClass(request.memoryClass),
+        sourceLanguage: request.sourceLanguage,
+        observedAt: optionalIso(request.observedAt),
+        validUntil: optionalIso(request.validUntil),
+        sourceMessage: sourceMessage(request.sourceMessage),
+      });
+      const spaces = await listDmMemorySpaces(input.db, owner);
+      const result = await saveOwnerVaultRecord(vaultDeps(input), {
+        space: decoded.memorySpaceId === undefined
+          ? null
+          : spaces.find((space) => space.id === decoded.memorySpaceId) ?? null,
+        spaces,
+        userId: owner.userId,
+        requestId: decoded.requestId,
+        documentId: opaqueDocumentId(request.documentId),
+        expectedVersion: decoded.expectedVersion,
+        title: decoded.title,
+        body: decoded.body,
+        memoryClass: decoded.memoryClass,
+      });
+      return create(DmMemoryService.method.updateDmMemoryDocument.output, result);
+    }
     const documentId = canonicalUuid(request.documentId);
     const result = await saveDmMemory(input.db, owner, decodeEdit({
       requestId: canonicalUuid(request.requestId),
@@ -420,6 +544,15 @@ const createAppDmMemoryService = (
 
   deleteDmMemoryDocument: async (request) => {
     const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    if (vaultServed(input)) {
+      const result = await forgetOwnerVaultRecord(
+        vaultDeps(input),
+        await listDmMemorySpaces(input.db, owner),
+        owner.userId,
+        opaqueDocumentId(request.documentId),
+      );
+      return create(DmMemoryService.method.deleteDmMemoryDocument.output, result);
+    }
     const result = await deleteDmMemory(
       input.db,
       owner,
@@ -449,6 +582,10 @@ const createAppDmMemoryService = (
 
   retryDmMemoryLearning: async (request) => {
     const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    // The legacy learning pipeline does not run for vault-served spaces.
+    if (vaultServed(input)) {
+      return create(DmMemoryService.method.retryDmMemoryLearning.output, { accepted: false, replayed: false });
+    }
     const result = await retryDmLearningJob(
       input.db,
       owner,

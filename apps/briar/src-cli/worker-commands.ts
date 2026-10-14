@@ -118,6 +118,7 @@ import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 import { ComputerUseBoxClient } from "./computer-use-box-client";
 import { COMPUTER_USE_CANARY_AGENT_ID } from "./computer-use-desktop-manager";
 import { agentBundleCandidates } from "./agent-bundle-path";
+import { memoryToolsBundleName } from "./memory-vault-invocation";
 import { defaultComputerUseScreenshotDirectory } from "./computer-use-native-executor";
 import { supportsComputerUseProvider } from
   "../src/lib/computer-use-contract";
@@ -181,6 +182,12 @@ const workerRuntime = async ({
       ? { protocol: 1 as const, providers }
       : undefined;
   })(),
+  // Advertised only with the `tools` bundle in place: a server that gives this
+  // Worker a vault stops giving it legacy memory, so the tools must exist.
+  memoryVault: agentBundleCandidates(import.meta.dir, memoryToolsBundleName)
+      .some((path) => Bun.file(path).size > 0)
+    ? { protocol: 1 as const }
+    : undefined,
   updateRequestId: sandboxWorkerRuntimeMetadata().updateRequestId,
   versions: workerRuntimeVersions({
     briar: cliVersion,

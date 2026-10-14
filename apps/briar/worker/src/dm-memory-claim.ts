@@ -18,10 +18,25 @@ export const dmMemoryClaimAccess = (space: ClaimSpace): DmMemoryAccess => ({
   agentId: space.agent_id, spaceId: space.id, revocationEpoch: space.revocation_epoch,
 });
 
-/** Binds only the live one-user/one-Agent roster. The caller never chooses an owner or space. */
+/**
+ * Binds only the live one-user/one-Agent roster. The caller never chooses an owner or space.
+ *
+ * The fence is written for every eligible DM, whatever the Worker supports: the
+ * memory vault resolves a DM claim's scope through it, and forget and settings
+ * changes end resumed conversations through its revocation epoch. After the
+ * vault cutover (`MEMORY_VAULT_ENABLED`) no claim gets the legacy descriptor
+ * (fence protocol 0, so the legacy brief and lookup refuse it); a vault-capable
+ * Worker still resumes its conversation while the epoch is unchanged.
+ */
 export async function bindDmMemoryReplyClaim(db: D1Database, input: {
   jobId: string; claimTokenHash: string; supportsMemory: boolean; enabled: boolean;
+  /** `MEMORY_VAULT_ENABLED`: DM memory is served by the vault, never by the legacy D1 path. */
+  vaultCutover?: boolean;
+  /** The Worker reads memory from the vault (`capabilities.memoryVaultProtocol = 1`). */
+  vaultCapable?: boolean;
 }) {
+  const legacyMemory = input.supportsMemory && !input.vaultCutover;
+  const resumable = legacyMemory || (input.vaultCutover === true && input.vaultCapable === true);
   const now = new Date().toISOString();
   await db.prepare(`insert into briar_dm_memory_spaces
     (id, organization_id, channel_id, owner_user_id, agent_id, roster_epoch, created_at, updated_at)
@@ -50,7 +65,7 @@ export async function bindDmMemoryReplyClaim(db: D1Database, input: {
       on conflict (job_id) do update set claim_token_hash = excluded.claim_token_hash,
         space_id = excluded.space_id, revocation_epoch = excluded.revocation_epoch,
         protocol = excluded.protocol, created_at = excluded.created_at returning space_id`)
-      .bind(input.jobId, input.claimTokenHash, input.supportsMemory ? 1 : 0, now, selected.id,
+      .bind(input.jobId, input.claimTokenHash, legacyMemory ? 1 : 0, now, selected.id,
         input.jobId, input.claimTokenHash, now),
     // A steer resumes the same native transcript. Keep its discovered citation
     // authority only while the memory scope has not been revoked.
@@ -61,7 +76,7 @@ export async function bindDmMemoryReplyClaim(db: D1Database, input: {
           join briar_dm_memory_spaces space on space.id = session.memory_space_id
           where job.id = briar_dm_memory_discovered_refs.job_id and job.steer_revision > 0
             and space.id = ? and session.memory_revocation_epoch = space.revocation_epoch)`)
-      .bind(input.claimTokenHash, input.jobId, input.claimTokenHash, input.supportsMemory ? 1 : 0,
+      .bind(input.claimTokenHash, input.jobId, input.claimTokenHash, legacyMemory ? 1 : 0,
         input.jobId, input.claimTokenHash, now, selected.id),
     db.prepare(`update briar_channel_reply_sessions as session
       set conversation_id = case when ? = 1 and session.memory_space_id = ?
@@ -70,7 +85,7 @@ export async function bindDmMemoryReplyClaim(db: D1Database, input: {
         memory_space_id = ?, memory_revocation_epoch = (select revocation_epoch from briar_dm_memory_spaces where id = ?)
       where session.id = (select session_id from briar_channel_agent_reply_jobs where id = ?)
         and ${gate}`)
-      .bind(input.supportsMemory ? 1 : 0, selected.id, selected.id, selected.id, selected.id, input.jobId,
+      .bind(resumable ? 1 : 0, selected.id, selected.id, selected.id, selected.id, input.jobId,
         input.jobId, input.claimTokenHash, now),
     db.prepare(`delete from briar_channel_reply_lookups where job_id = ? and claim_token_hash <> ? and ${gate}`)
       .bind(input.jobId, input.claimTokenHash, input.jobId, input.claimTokenHash, now),
@@ -79,7 +94,7 @@ export async function bindDmMemoryReplyClaim(db: D1Database, input: {
   ]);
   if (bound.results.length !== 1) throw new HttpError(409, "Memory claim changed", "memory_scope_revoked");
   const space = await readDmMemoryClaim(db, input.jobId, input.claimTokenHash, false);
-  return { memory: input.supportsMemory ? dmMemoryDescriptor(space, input.enabled) : null, spaceId: space.id };
+  return { memory: legacyMemory ? dmMemoryDescriptor(space, input.enabled) : null, spaceId: space.id };
 }
 
 export async function readDmMemoryClaim(db: D1Database, jobId: string, claimTokenHash: string, requireProtocol = true) {

@@ -22,6 +22,44 @@ import { cleanupExpiredChannelReplySessions } from "./channels";
 import { maintainUploadCleanup } from "./upload-repository";
 import { runDmMemoryMaintenance } from "./dm-memory-indexing";
 import { flushWhatsAppOutbox } from "./whatsapp-outbox";
+import { memoryVaultStoreFromEnv } from "./memory-vault/artifacts-git-store";
+import { runMemoryVaultMaintenance as runMemoryVaultMaintenanceWithStore } from "./memory-vault/forget";
+import { memoryVaultEnabled } from "./memory-vault/flag";
+import { runLegacyMemoryMigration } from "./memory-vault/legacy-migration";
+
+/**
+ * Memory vault purges (every minute) and the orphan repository sweep (every six
+ * hours). A failure is logged and reported, never allowed to fail the other
+ * scheduled work.
+ */
+async function runMemoryVaultMaintenance(env: Env, cadence: "minute" | "six_hourly") {
+  const store = memoryVaultStoreFromEnv(env);
+  let maintenance: Awaited<ReturnType<typeof runMemoryVaultMaintenanceWithStore>> | { error: string };
+  try {
+    maintenance = await runMemoryVaultMaintenanceWithStore({ db: env.DB, store }, cadence);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ message: "Memory vault maintenance failed", cadence, error: message }));
+    maintenance = { error: message };
+  }
+  if (cadence !== "minute" || !store || !legacyMemoryMigrationEnabled(env)) return maintenance;
+  // One DM space per minute moves from D1 memory into its vault (docs/operations/memory-vault.md).
+  try {
+    return { ...maintenance, legacyMigration: await runLegacyMemoryMigration({ db: env.DB, store }) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ message: "Legacy memory migration failed", error: message }));
+    return { ...maintenance, legacyMigration: { error: message } };
+  }
+}
+
+/**
+ * The legacy D1 → vault migration runs while the vault serves memory, and
+ * before that when `MEMORY_VAULT_MIGRATION_ENABLED` is on (rollout step 3:
+ * migrate first, then switch the vault on).
+ */
+const legacyMemoryMigrationEnabled = (env: Env) =>
+  memoryVaultEnabled(env) || String(env.MEMORY_VAULT_MIGRATION_ENABLED) === "true";
 
 export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
@@ -38,6 +76,7 @@ export type ScheduledTaskDependencies = {
   runDmMemoryMaintenance: typeof runDmMemoryMaintenance;
   runDueDmSchedules: typeof runDueDmSchedules;
   flushWhatsAppOutbox: typeof flushWhatsAppOutbox;
+  runMemoryVaultMaintenance: typeof runMemoryVaultMaintenance;
 };
 
 interface DashboardChangePruneFailure {
@@ -59,6 +98,7 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   runDmMemoryMaintenance,
   runDueDmSchedules,
   flushWhatsAppOutbox,
+  runMemoryVaultMaintenance,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
 const LOG_MAINTENANCE_CRON = "17 */6 * * *";
@@ -73,7 +113,7 @@ export async function handleScheduledTask(
   if (controller.cron === GITHUB_RECONCILIATION_CRON) {
     ctx.waitUntil((async () => {
       try {
-        const [github, mergeQueue, managedComputerRetirements, dmMemory, whatsapp, dmSchedules] =
+        const [github, mergeQueue, managedComputerRetirements, dmMemory, whatsapp, dmSchedules, memoryVault] =
           await Promise.all([
           dependencies.reconcileGithubMergedRuns(env.DB),
           dependencies.reconcileEnabledMergeQueueRuns(env.DB, observedAt),
@@ -85,6 +125,7 @@ export async function handleScheduledTask(
           dependencies.runDmMemoryMaintenance(env, observedAt),
           dependencies.flushWhatsAppOutbox(env, env.DB, observedAt),
           dependencies.runDueDmSchedules(env.DB, new Date().toISOString()),
+          dependencies.runMemoryVaultMaintenance(env, "minute"),
         ]);
         await Promise.all([
           flushWorkspaceInboxRealtimeOutbox(env, env.DB),
@@ -99,6 +140,7 @@ export async function handleScheduledTask(
           dmMemory,
           whatsapp,
           dmSchedules,
+          memoryVault,
         }));
       } catch (error) {
         console.error(JSON.stringify({
@@ -141,7 +183,7 @@ export async function handleScheduledTask(
         }));
       }
       const [archive, expired, cleanup, slackRevocations, github, managedComputers,
-        channelReplySessions, uploads] =
+        channelReplySessions, uploads, memoryVault] =
         await Promise.all([
         dependencies.archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
         dependencies.expireArchives(
@@ -165,6 +207,7 @@ export async function handleScheduledTask(
           env.ATTACHMENTS,
           observedAt,
         ),
+        dependencies.runMemoryVaultMaintenance(env, "six_hourly"),
       ]);
       await Promise.all([
         flushWorkspaceInboxRealtimeOutbox(env, env.DB),
@@ -188,6 +231,7 @@ export async function handleScheduledTask(
           reason: "ttl_expired",
         })),
         uploads,
+        memoryVault,
       }));
     } catch (error) {
       console.error(JSON.stringify({

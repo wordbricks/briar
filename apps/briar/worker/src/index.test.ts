@@ -51,6 +51,7 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
   })),
   runDueDmSchedules: vi.fn(async () => ({ scanned: 0, enqueued: 0 })),
   runDmMemoryMaintenance: vi.fn(async () => ({ expired: 0, indexing: null, cleanup: null })),
+  runMemoryVaultMaintenance: vi.fn(async () => ({ skipped: "no_artifacts_binding" as const })),
   cleanupExpiredChannelReplySessions: vi.fn(async () => []),
   maintainUploadCleanup: vi.fn(async () => ({
     enqueuedUploads: 0,
@@ -310,6 +311,7 @@ describe("Worker HTTP contract", () => {
     await Promise.all(minute.pending);
     expect(minuteDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
     expect(minuteDependencies.runDmMemoryMaintenance).toHaveBeenCalledOnce();
+    expect(minuteDependencies.runMemoryVaultMaintenance).toHaveBeenCalledWith(scheduledEnv, "minute");
     expect(minuteDependencies.flushWhatsAppOutbox).toHaveBeenCalledOnce();
     expect(
       minuteDependencies.reconcileEnabledMergeQueueRuns,

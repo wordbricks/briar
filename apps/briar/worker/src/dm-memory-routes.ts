@@ -6,6 +6,9 @@ import {
   listDmMemorySpaces,
 } from "./dm-memory-repository";
 import { HttpError } from "./http-response";
+import { memoryVaultEnabled } from "./memory-vault/flag";
+import type { VaultGitStore } from "./memory-vault/git-store";
+import { exportOwnerVaultEntries } from "./memory-vault/owner";
 import { getWorkspaceRole } from "./workspace-repository";
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
@@ -19,6 +22,9 @@ export async function handleDmMemoryRoute(input: {
   url: URL;
   auth: BriarAuth;
   db: D1Database;
+  /** `MEMORY_VAULT_ENABLED` decides whether the export is the vault's head tree. */
+  env?: Pick<Env, "MEMORY_VAULT_ENABLED">;
+  memoryVaultStore?: VaultGitStore | null;
 }): Promise<Response | undefined> {
   const { request, url, auth, db } = input;
   const match = url.pathname.match(
@@ -54,6 +60,13 @@ export async function handleDmMemoryRoute(input: {
   const selected = spaces.find((space) => space.id === spaceId);
   if (!selected) {
     throw new HttpError(404, "Memory space not found", "memory_not_found");
+  }
+  // After the vault cutover the export is the vault's head tree (memory-vault spec §9).
+  if (input.env && memoryVaultEnabled(input.env)) {
+    return dmMemoryZipResponse(
+      exportOwnerVaultEntries({ db, store: input.memoryVaultStore ?? null }, selected),
+      selected.id,
+    );
   }
   return dmMemoryZipResponse(
     exportDmMemoryEntries(db, owner, selected.id),

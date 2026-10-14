@@ -1,5 +1,11 @@
 # Briar DM 기억 관리 SPEC
 
+> **저장소 이전 (2026-10).** 기억 본문의 저장소는 Cloudflare Artifacts의 memory
+> vault로 옮겨졌다([memory-vault-spec.md](memory-vault-spec.md)). opt-in, 명시적
+> 저장·수정·삭제, 보호 문서, 인용 계약은 그대로 유효하다. `MEMORY_VAULT_ENABLED=true`
+> 이후 이 문서의 D1 저장·검색·자동 학습 경로는 꺼지고 D1 행은 롤백용으로 남는다.
+> 운영 절차는 [memory-vault.md](../operations/memory-vault.md).
+
 상태: 저장·관리 기반 PR #1497, 검색 PR #1499, DM 실행 연결 PR #1500, 자동 학습
 PR #1501이 main에 반영됐다. 명시적 기억 관리·색인·회상에 이어, 사용자가 연결한
 Agent를 재사용하는 자동 학습이 품질 gate를 통과해 활성화됐고, 이후 조직 정책과 운영
