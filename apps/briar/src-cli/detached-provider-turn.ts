@@ -121,6 +121,12 @@ export type DetachedProviderTurnInput = {
   computerUseMcpServerPath?: string | null;
   dmMessagePublicationBinding?: DmMessagePublicationBinding;
   dmMessageMcpServerPath?: string | null;
+  /**
+   * The memory vault section of this turn's trusted instructions (README and
+   * status line). Appended after Briar's own instructions and re-sent on every
+   * turn, including resumed conversations.
+   */
+  memoryVaultInstructions?: string | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   diagnosticContext?: DetachedProviderTurnDiagnosticContext;
@@ -509,6 +515,7 @@ export async function executeDetachedProviderTurn(
     computerUseMcpServerPath: input.computerUseMcpServerPath,
     dmMessagePublicationBinding: input.dmMessagePublicationBinding,
     dmMessageMcpServerPath: input.dmMessageMcpServerPath,
+    memoryVaultInstructions: input.memoryVaultInstructions,
     toolInheritance: input.toolInheritance,
     agentBinary,
   }).request;

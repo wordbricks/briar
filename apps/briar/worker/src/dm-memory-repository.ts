@@ -67,7 +67,7 @@ async function requireSpace(db: D1Database, owner: DmMemoryOwner, spaceId: strin
   return row;
 }
 
-async function ensureWriteSpace(db: D1Database, owner: DmMemoryOwner, spaceId?: string) {
+export async function ensureWriteSpace(db: D1Database, owner: DmMemoryOwner, spaceId?: string) {
   if (spaceId) return requireSpace(db, owner, spaceId);
   const now = new Date().toISOString();
   await db.prepare(`insert into briar_dm_memory_spaces (

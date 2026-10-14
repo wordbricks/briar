@@ -41,6 +41,12 @@
       "type": "Data",
       "globs": ["**/*.png"],
       "fallthrough": true
+    },
+    {
+      // The memory vault README is application-owned text served verbatim.
+      "type": "Text",
+      "globs": ["**/memory-vault-readme.md"],
+      "fallthrough": true
     }
   ],
   "placement": {
@@ -50,6 +56,12 @@
     "DM_MEMORY_INDEX_ENABLED": "true",
     "DM_MEMORY_RETRIEVAL_ENABLED": "true",
     "DM_MEMORY_MINIMUM_SCORE": "0.5",
+    // Memory vault on Cloudflare Artifacts (docs/plans/memory-vault-spec.md).
+    // Off until the live check and the D1 → vault migration have run.
+    "MEMORY_VAULT_ENABLED": "false",
+    // Runs the D1 → vault migration (one DM space per minute) before the
+    // vault is switched on; docs/operations/memory-vault.md, rollout.
+    "MEMORY_VAULT_MIGRATION_ENABLED": "false",
     // Agent-to-Agent turns (the recipient's run plus the sender's relay run)
     // one organization may spend per hour.
     "AGENT_MESSAGE_HOURLY_LIMIT": "30",
@@ -115,6 +127,8 @@
       "remote": true
     }
   ],
+  // One Git repo per memory vault; writes are pushes from an in-memory clone.
+  "artifacts": [{ "binding": "MEMORY_ARTIFACTS", "namespace": "briar-memory", "remote": true }],
   "durable_objects": {
     "bindings": [
       {

@@ -169,6 +169,17 @@ import {
   getDmMemoryClaimBrief,
   lookupDmMemoryClaim,
 } from "./dm-memory-claim-application";
+import {
+  getMemoryVaultContextRpc,
+  memoryVaultConnectServices,
+  memoryVaultJournalRpc,
+  memoryVaultListRpc,
+  memoryVaultReadRpc,
+  memoryVaultSaveRpc,
+  memoryVaultSearchRpc,
+} from "./worker-connect-memory-vault";
+import type { VaultGitStore } from "./memory-vault/git-store";
+import { memoryVaultEnabled } from "./memory-vault/flag";
 
 export type WorkerConnectQueueInput = {
   readonly request: Request;
@@ -226,6 +237,8 @@ export type WorkerQueueServices = {
   readonly submitDmLearningVerification: typeof submitDmLearningVerification;
   readonly renewDmLearningClaim: typeof renewDmLearningClaim;
   readonly failDmLearningClaim: typeof failDmLearningClaim;
+  /** The memory vault's Git store; tests inject an in-memory one. */
+  readonly memoryVaultStore: (env: Env) => VaultGitStore | null;
 };
 
 const workerQueueServices: WorkerQueueServices = {
@@ -273,6 +286,7 @@ const workerQueueServices: WorkerQueueServices = {
   submitDmLearningVerification,
   renewDmLearningClaim,
   failDmLearningClaim,
+  ...memoryVaultConnectServices,
 };
 
 const requiredWork = (value: WorkClaimIdentity | undefined) => {
@@ -479,7 +493,9 @@ async function claimWork(
     });
     if (issue) return { work: workerClaimMessage(issue) };
 
-    const learning = await services.claimDmLearningJob(input.db, {
+    // After the vault cutover the agent maintains memory with its tools; the
+    // legacy learning jobs would write D1 memory the vault never sees.
+    const learning = memoryVaultEnabled(input.env) ? null : await services.claimDmLearningJob(input.db, {
       workspaceId: worker.principal.workspaceId,
       deviceId: worker.principal.deviceId,
       workerId: claimInput.workerId,
@@ -1736,6 +1752,12 @@ export function createWorkerQueueService(
       submitDmMemoryLearningVerificationRpc(input, request, services),
     failDmMemoryLearning: (request) =>
       failDmMemoryLearningRpc(input, request, services),
+    memoryVaultList: (request) => memoryVaultListRpc(input, request, services),
+    memoryVaultRead: (request) => memoryVaultReadRpc(input, request, services),
+    memoryVaultSearch: (request) => memoryVaultSearchRpc(input, request, services),
+    memoryVaultJournal: (request) => memoryVaultJournalRpc(input, request, services),
+    memoryVaultSave: (request) => memoryVaultSaveRpc(input, request, services),
+    getMemoryVaultContext: (request) => getMemoryVaultContextRpc(input, request, services),
   };
 }
 
