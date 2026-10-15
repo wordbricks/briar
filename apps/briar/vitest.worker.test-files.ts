@@ -33,6 +33,7 @@ export const workerD1TestFiles = [
   "worker/src/memory-vault/memory-vault.test.ts",
   "worker/src/memory-vault/memory-vault-forget.test.ts",
   "worker/src/memory-vault/memory-vault-dm.test.ts",
+  "worker/src/agent-workspace-tools/agent-workspace-tools.test.ts",
   "worker/src/dm-public-message.test.ts",
   "worker/src/github-db.test.ts",
   "worker/src/github-integration-db.test.ts",

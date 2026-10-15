@@ -232,6 +232,8 @@ export function RunPage({
   const processNowDisabled = !onProcessNow || run.executionReadiness === "waiting" || run.status !== "queued" && !canReassign || isClaimed && !canReassign || isProcessing;
   const assignee = mentionMembers.find(member => member.userId === run.assigneeUserId) ?? null;
   const creator = mentionMembers.find(member => member.userId === run.createdByUserId) ?? null;
+  // An agent-created issue has no creating person; the two never coexist.
+  const creatorName = run.createdByAgent ? run.createdByAgent.name : creator?.name ?? t("run.creatorUnknown");
   const {
     toast
   } = useToast();
@@ -1568,9 +1570,9 @@ export function RunPage({
                       <SelectMenu align="end" className="run-assignee-select" disabled={isUpdatingIssue || !onUpdateIssue} label={t("issue.assignee")} onValueChange={updateIssueAssignee} options={assigneeOptions} searchEmptyMessage={t("workspace.noResults")} searchPlaceholder={t("workspace.search")} searchable={assigneeOptions.length > 8} size="small" value={run.assigneeUserId ?? ""} />
                     </span>
                   </label>
-                  <div aria-label={`${t("run.creator")}: ${creator?.name ?? t("run.creatorUnknown")}`} className="run-property" title={t("run.creator")}>
-                    <span className="run-property-icon assignee"><UserRound size={15} /></span>
-                    <span className="run-property-copy"><strong>{creator?.name ?? t("run.creatorUnknown")}</strong></span>
+                  <div aria-label={`${t("run.creator")}: ${creatorName}`} className="run-property" title={t("run.creator")}>
+                    <span className="run-property-icon assignee">{run.createdByAgent ? <Bot size={15} /> : <UserRound size={15} />}</span>
+                    <span className="run-property-copy"><strong>{creatorName}</strong></span>
                   </div>
                   {run.relatedMessage && onRelatedMessageOpen ? <button aria-label={t("run.openRelatedMessage")} className="run-property run-property-button run-related-message-property" onClick={() => onRelatedMessageOpen(run.relatedMessage!)} title={t("run.openRelatedMessage")} type="button">
                       <span className="run-property-icon related-message"><MessageSquare size={15} /></span>

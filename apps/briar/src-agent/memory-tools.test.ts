@@ -43,7 +43,7 @@ describe("tools memory argv", () => {
   });
 
   it.each([
-    [["files", "list"], /only "tools memory"/u],
+    [["files", "list"], /use "tools memory", "tools issue" or "tools channel"/u],
     [["memory", "delete", "x"], /unknown command/u],
     [["memory", "list", "extra"], /takes no arguments/u],
     [["memory", "list", "--bogus"], /unknown option --bogus/u],

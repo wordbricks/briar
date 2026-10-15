@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: c3db3b54b4797c17b21c052c8f3f6c8d5fff64f89311e2e04be54b61ec5e9f4f
--- snapshot-digest: c2438cd10e7ebc8625ebe06b6f4e0b8ccd6f59ebeaf1f5055263f610574b067b
+-- migrations-digest: 22025eb924b62e445e56a18328ba595fab9aac41f9302efaed0028b8c556a607
+-- snapshot-digest: 009b17aa1b89d1d1c5a0de2b2ba0a46bca0faa84db6e3c0e595f93da1d8eb724
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3699,6 +3699,20 @@ CREATE TABLE briar_dm_memory_setting_requests (
   unique (space_id, request_id)
 ) strict;
 -- @statement
+CREATE TABLE briar_agent_workspace_tool_requests (
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  work_id text not null check (length(work_id) between 1 and 200),
+  request_key text not null check (length(request_key) between 1 and 128),
+  operation text not null check (length(operation) between 1 and 32),
+  payload_hash text not null
+    check (length(payload_hash) = 64 and payload_hash not glob '*[^0-9a-f]*'),
+  agent_id text references briar_project_agents (id) on delete set null,
+  result_json text not null check (json_valid(result_json)),
+  created_at text not null,
+  primary key (organization_id, work_id, request_key)
+) strict;
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -5076,6 +5090,10 @@ where completed_at is null;
 -- @statement
 CREATE INDEX briar_memory_vault_reply_citations_record
 on briar_memory_vault_reply_citations (vault_id, record_id);
+-- @statement
+CREATE INDEX briar_agent_workspace_tool_requests_channel_post_rate
+on briar_agent_workspace_tool_requests (organization_id, created_at)
+where operation = 'channel.post';
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN

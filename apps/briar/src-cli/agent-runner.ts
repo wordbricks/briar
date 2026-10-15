@@ -943,6 +943,8 @@ export function detachedProviderRequest(input: {
   dmMessageMcpServerPath?: string | null;
   /** Appended last: Briar's own instructions above it take precedence. */
   memoryVaultInstructions?: string | null;
+  /** Briar's issue and channel tools; placed before the memory vault section. */
+  workspaceToolsInstructions?: string | null;
   /** Absent means `inherit`: the turn keeps the host user's tool catalog. */
   toolInheritance?: DetachedToolInheritance;
 }) {
@@ -993,6 +995,7 @@ export function detachedProviderRequest(input: {
           skillCatalog: input.skillCatalog ?? null,
         }),
         computerUseRoleInstructions,
+        input.workspaceToolsInstructions || null,
         input.memoryVaultInstructions || null,
       ].filter((value): value is string => value !== null).join("\n\n"),
       outputSchema,

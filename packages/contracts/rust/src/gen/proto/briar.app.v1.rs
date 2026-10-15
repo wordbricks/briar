@@ -96915,6 +96915,19 @@ pub struct DashboardRun {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub related_issues: ::buffa::alloc::vec::Vec<IssueDependencyReference>,
+    /// Set when an agent created the issue with `tools issue create`
+    /// (created_by_user_id is then absent).
+    ///
+    /// Field 75: `created_by_agent`
+    #[serde(
+        rename = "createdByAgent",
+        alias = "created_by_agent",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub created_by_agent: ::buffa::MessageField<
+        IssueCreatorAgent,
+        ::buffa::Inline<IssueCreatorAgent>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -96995,6 +97008,7 @@ impl ::core::fmt::Debug for DashboardRun {
             .field("parent", &self.parent)
             .field("sub_issues", &self.sub_issues)
             .field("related_issues", &self.related_issues)
+            .field("created_by_agent", &self.created_by_agent)
             .finish()
     }
 }
@@ -97718,6 +97732,14 @@ impl ::buffa::Message for DashboardRun {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.created_by_agent.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.created_by_agent.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -98082,6 +98104,14 @@ impl ::buffa::Message for DashboardRun {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if self.created_by_agent.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                75u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.created_by_agent.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -98861,6 +98891,17 @@ impl ::buffa::Message for DashboardRun {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.related_issues.push(elem);
             }
+            75u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.created_by_agent.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -98942,6 +98983,7 @@ impl ::buffa::Message for DashboardRun {
         self.parent = ::buffa::MessageField::none();
         self.sub_issues.clear();
         self.related_issues.clear();
+        self.created_by_agent = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -99601,6 +99643,175 @@ pub mod dashboard_run {
         }
     }
 }
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct IssueCreatorAgent {
+    /// Absent when the creating run had no assigned Agent.
+    ///
+    /// Field 1: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub agent_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The Agent's name, or "\<provider\> agent" for a run without one.
+    ///
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for IssueCreatorAgent {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("IssueCreatorAgent")
+            .field("agent_id", &self.agent_id)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl IssueCreatorAgent {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.IssueCreatorAgent";
+}
+impl IssueCreatorAgent {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::agent_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_agent_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.agent_id = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(IssueCreatorAgent);
+impl ::buffa::MessageName for IssueCreatorAgent {
+    const PACKAGE: &'static str = "briar.app.v1";
+    const NAME: &'static str = "IssueCreatorAgent";
+    const FULL_NAME: &'static str = "briar.app.v1.IssueCreatorAgent";
+    const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.IssueCreatorAgent";
+}
+impl ::buffa::Message for IssueCreatorAgent {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let Some(ref v) = self.agent_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(ref v) = self.agent_id {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .agent_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.agent_id = ::core::option::Option::None;
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for IssueCreatorAgent {
+    const PROTO_FQN: &'static str = "briar.app.v1.IssueCreatorAgent";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for IssueCreatorAgent {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ISSUE_CREATOR_AGENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/briar.app.v1.IssueCreatorAgent",
+    to_json: ::buffa::type_registry::any_to_json::<IssueCreatorAgent>,
+    from_json: ::buffa::type_registry::any_from_json::<IssueCreatorAgent>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -292667,6 +292878,13 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::IssueDependencyReferenceView<'a>,
             >,
+            /// Set when an agent created the issue with `tools issue create`
+            /// (created_by_user_id is then absent).
+            ///
+            /// Field 75: `created_by_agent`
+            pub created_by_agent: ::buffa::MessageFieldView<
+                super::super::__buffa::view::IssueCreatorAgentView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DashboardRunView<'a> {
@@ -293537,6 +293755,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    75u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.created_by_agent.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.created_by_agent = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::IssueCreatorAgentView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -294002,6 +294245,15 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    created_by_agent: match self.created_by_agent.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::IssueCreatorAgent,
+                                ::buffa::Inline<super::super::IssueCreatorAgent>,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -294392,6 +294644,14 @@ pub mod __buffa {
                         += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                             + inner_size as u64;
                 }
+                if self.created_by_agent.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.created_by_agent.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                            + inner_size as u64;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u64;
                 ::buffa::saturate_size(size)
             }
@@ -294758,6 +295018,14 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
+                if self.created_by_agent.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        75u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    self.created_by_agent.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -295112,6 +295380,14 @@ pub mod __buffa {
                 }
                 if !self.related_issues.is_empty() {
                     __map.serialize_entry("relatedIssues", &*self.related_issues)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .created_by_agent
+                        .as_option()
+                    {
+                        __map.serialize_entry("createdByAgent", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -295721,6 +295997,18 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().related_issues
             }
+            /// Set when an agent created the issue with `tools issue create`
+            /// (created_by_user_id is then absent).
+            ///
+            /// Field 75: `created_by_agent`
+            #[must_use]
+            pub fn created_by_agent(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::IssueCreatorAgentView<'_>,
+            > {
+                &self.0.reborrow().created_by_agent
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<DashboardRunView<'static>>>
         for DashboardRunOwnedView {
@@ -295745,6 +296033,299 @@ pub mod __buffa {
             type ViewHandle = DashboardRunOwnedView;
         }
         impl ::serde::Serialize for DashboardRunOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        #[derive(Clone, Debug, Default)]
+        pub struct IssueCreatorAgentView<'a> {
+            /// Absent when the creating run had no assigned Agent.
+            ///
+            /// Field 1: `agent_id`
+            pub agent_id: ::core::option::Option<&'a str>,
+            /// The Agent's name, or "\<provider\> agent" for a run without one.
+            ///
+            /// Field 2: `name`
+            pub name: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for IssueCreatorAgentView<'a> {
+            type Owned = super::super::IssueCreatorAgent;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            #[inline]
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.agent_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::IssueCreatorAgent,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::IssueCreatorAgent,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::IssueCreatorAgent {
+                    agent_id: self.agent_id.map(|s| s.to_string()),
+                    name: self.name.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for IssueCreatorAgentView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u64;
+                if let Some(ref v) = self.agent_id {
+                    size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+                }
+                if !self.name.is_empty() {
+                    size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u64;
+                ::buffa::saturate_size(size)
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::EncodeSink,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(ref v) = self.agent_id {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for IssueCreatorAgentView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.agent_id {
+                    __map.serialize_entry("agentId", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for IssueCreatorAgentView<'a> {
+            const PACKAGE: &'static str = "briar.app.v1";
+            const NAME: &'static str = "IssueCreatorAgent";
+            const FULL_NAME: &'static str = "briar.app.v1.IssueCreatorAgent";
+            const TYPE_URL: &'static str = "type.googleapis.com/briar.app.v1.IssueCreatorAgent";
+        }
+        ::buffa::impl_default_view_instance!(IssueCreatorAgentView);
+        ::buffa::impl_view_reborrow!(IssueCreatorAgentView);
+        /** Self-contained, `'static` owned view of a `IssueCreatorAgent` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`IssueCreatorAgentView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`IssueCreatorAgentView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct IssueCreatorAgentOwnedView(
+            ::buffa::OwnedView<IssueCreatorAgentView<'static>>,
+        );
+        impl IssueCreatorAgentOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    IssueCreatorAgentOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    IssueCreatorAgentOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+            /// message's encoded size exceeds the 2 GiB protobuf limit, or
+            /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::IssueCreatorAgent,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    IssueCreatorAgentOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`IssueCreatorAgentView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &IssueCreatorAgentView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// Infallible: this type's constructors wire-decode their
+            /// buffer, and a view produced by wire decoding always
+            /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+            /// whose contract also governs handles converted from a raw
+            /// [`::buffa::OwnedView`].
+            #[must_use]
+            pub fn to_owned_message(&self) -> super::super::IssueCreatorAgent {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Absent when the creating run had no assigned Agent.
+            ///
+            /// Field 1: `agent_id`
+            #[must_use]
+            pub fn agent_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().agent_id
+            }
+            /// The Agent's name, or "\<provider\> agent" for a run without one.
+            ///
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<IssueCreatorAgentView<'static>>>
+        for IssueCreatorAgentOwnedView {
+            fn from(inner: ::buffa::OwnedView<IssueCreatorAgentView<'static>>) -> Self {
+                IssueCreatorAgentOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<IssueCreatorAgentOwnedView>
+        for ::buffa::OwnedView<IssueCreatorAgentView<'static>> {
+            fn from(wrapper: IssueCreatorAgentOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<IssueCreatorAgentView<'static>>>
+        for IssueCreatorAgentOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<IssueCreatorAgentView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::IssueCreatorAgent {
+            type View<'a> = IssueCreatorAgentView<'a>;
+            type ViewHandle = IssueCreatorAgentOwnedView;
+        }
+        impl ::serde::Serialize for IssueCreatorAgentOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -373979,6 +374560,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_RUN_EVENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ISSUE_DEPENDENCY_REFERENCE_JSON_ANY);
         reg.register_json_any(super::__DASHBOARD_RUN_JSON_ANY);
+        reg.register_json_any(super::__ISSUE_CREATOR_AGENT_JSON_ANY);
         reg.register_json_any(super::__TRACKER_REFERENCE_JSON_ANY);
         reg.register_json_any(super::__WAITING_CHECKPOINT_JSON_ANY);
         reg.register_json_any(super::__WORKER_ICON_JSON_ANY);
@@ -375569,6 +376151,10 @@ pub use self::__buffa::view::IssueDependencyReferenceOwnedView;
 pub use self::__buffa::view::DashboardRunView;
 #[doc(inline)]
 pub use self::__buffa::view::DashboardRunOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueCreatorAgentView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueCreatorAgentOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::TrackerReferenceView;
 #[doc(inline)]

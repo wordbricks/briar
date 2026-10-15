@@ -127,6 +127,11 @@ export type DetachedProviderTurnInput = {
    * turn, including resumed conversations.
    */
   memoryVaultInstructions?: string | null;
+  /**
+   * The `tools issue` / `tools channel` section of this turn's trusted
+   * instructions (docs/plans/agent-workspace-tools.md); re-sent every turn.
+   */
+  workspaceToolsInstructions?: string | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   diagnosticContext?: DetachedProviderTurnDiagnosticContext;
@@ -516,6 +521,7 @@ export async function executeDetachedProviderTurn(
     dmMessagePublicationBinding: input.dmMessagePublicationBinding,
     dmMessageMcpServerPath: input.dmMessageMcpServerPath,
     memoryVaultInstructions: input.memoryVaultInstructions,
+    workspaceToolsInstructions: input.workspaceToolsInstructions,
     toolInheritance: input.toolInheritance,
     agentBinary,
   }).request;

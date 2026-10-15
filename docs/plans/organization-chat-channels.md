@@ -23,8 +23,9 @@ Status: implemented (1~4단계). Updated 2026-08-06.
 - **Ideas 기능은 폐기됐다**(`apps/briar/migrations/0075_remove_ideas.sql`). 계획서는
   이제 `briar_channel_message_documents`가 제목·마크다운·대상 프로젝트를
   직접 들고 있으며 채널 밖에 독립적으로 존재하지 않는다. 계획서를 여러 이슈로
-  한 번에 쪼개는 경로는 함께 사라졌고, 채널에서의 이슈 생성은 에이전트의
-  이슈 생성 제안(한 건씩)으로만 이뤄진다.
+  한 번에 쪼개는 경로는 함께 사라졌다. 채널 답글의 이슈 생성 제안(한 건씩)은
+  그대로 남아 있지만, 2026-10부터 에이전트는 `tools issue create`로 이슈를 직접
+  만들 수도 있다([agent-workspace-tools.md](agent-workspace-tools.md)).
 - **채널 답글 트랜스크립트 미기록**. `briar_agent_transcript_sessions.project_id`가
   NOT NULL이라 프로젝트 없는 실행을 담을 수 없다.
 - **채널 첨부 미구현**. 계획서는 첨부가 아니라 문서 카드로 처리한다.
@@ -357,9 +358,13 @@ create table briar_channel_action_proposals (
 );
 ```
 
-에이전트는 이슈를 직접 만들지 않는다. 제안을 남기고 인증된 사용자가 수락할
-때만 적용되는 기존 `briar_issue_action_proposals`의 human-in-the-loop 규칙을
-그대로 따른다.
+~~에이전트는 이슈를 직접 만들지 않는다.~~ **2026-10-15에 뒤집혔다.** 사용자
+결정으로 에이전트는 `tools issue …`/`tools channel …`
+([agent-workspace-tools.md](agent-workspace-tools.md))를 통해 승인 없이 이슈를
+만들고, 메모를 남기고, 상태를 옮기고, 소속 채널에 글을 쓴다. 남은 human-in-the-loop
+경계는 하나다: 이슈를 `queued`로 보내 Auto Hunt 실행을 시작하는 일은 여전히 기존
+실행 제안(`briar_issue_execution_proposals`)을 사람이 승인해야 한다. 이 절의
+채널 액션 제안 테이블과 수락 흐름은 답글 JSON 경로에 그대로 남아 있다.
 
 ### 변경 피드
 

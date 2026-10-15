@@ -172,6 +172,9 @@ export const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
   difficulty: issueDifficultyFromProto(run.difficulty),
   assigneeUserId: run.assigneeUserId ?? null,
   createdByUserId: run.createdByUserId ?? null,
+  createdByAgent: run.createdByAgent
+    ? { agentId: run.createdByAgent.agentId ?? null, name: run.createdByAgent.name }
+    : null,
   subscribers: run.subscribers.map((subscriber) => ({
     userId: subscriber.userId,
     subscribedAt: requiredTimestamp(
