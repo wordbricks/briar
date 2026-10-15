@@ -192,6 +192,16 @@ message DashboardRun {
   optional IssueDependencyReference parent = 72;
   repeated IssueDependencyReference sub_issues = 73;
   repeated IssueDependencyReference related_issues = 74;
+  // Set when an agent created the issue with `tools issue create`
+  // (created_by_user_id is then absent).
+  optional IssueCreatorAgent created_by_agent = 75;
+}
+
+message IssueCreatorAgent {
+  // Absent when the creating run had no assigned Agent.
+  optional string agent_id = 1;
+  // The Agent's name, or "<provider> agent" for a run without one.
+  string name = 2;
 }
 
 message TrackerReference {

@@ -3478,12 +3478,18 @@ struct RunDetailView: View {
                 )
                 LabeledContent(
                     L10n.text("등록자", locale: locale),
-                    value: members.first { $0.userId == run.createdByUserId }?.name
-                        ?? L10n.text("알 수 없음", locale: locale)
+                    value: creatorName
                 )
                 LabeledContent(L10n.text("실행 Worker", locale: locale), value: assignedWorkerLabel)
             }
         }
+    }
+
+    /// An agent-created issue has no creating person; the two never coexist.
+    private var creatorName: String {
+        if let agent = run.createdByAgent { return agent.name }
+        return members.first { $0.userId == run.createdByUserId }?.name
+            ?? L10n.text("알 수 없음", locale: locale)
     }
 
     private var assignedWorkerLabel: String {

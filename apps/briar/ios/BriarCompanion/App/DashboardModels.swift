@@ -32,6 +32,12 @@ struct IssueSubscriber: Codable, Equatable, Hashable, Sendable {
     let subscribedAt: Date
 }
 
+/// The agent behind an issue created with `tools issue create`; `agentId` is nil for a run without an assigned Agent.
+struct IssueCreatorAgent: Codable, Equatable, Hashable, Sendable {
+    let agentId: String?
+    let name: String
+}
+
 struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let workspaceId: UUID?
@@ -56,6 +62,8 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
     let difficulty: IssueDifficulty?
     let assigneeUserId: String?
     let createdByUserId: String?
+    /// Set instead of `createdByUserId` when an agent created the issue.
+    let createdByAgent: IssueCreatorAgent?
     let subscribers: [IssueSubscriber]?
     let issueDescription: String?
     let relatedMessage: RelatedMessageReference?
@@ -118,6 +126,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         difficulty: IssueDifficulty? = nil,
         assigneeUserId: String? = nil,
         createdByUserId: String? = nil,
+        createdByAgent: IssueCreatorAgent? = nil,
         subscribers: [IssueSubscriber]? = nil,
         issueDescription: String? = nil,
         relatedMessage: RelatedMessageReference? = nil,
@@ -179,6 +188,7 @@ struct DashboardRun: Codable, Equatable, Identifiable, Sendable {
         self.difficulty = difficulty
         self.assigneeUserId = assigneeUserId
         self.createdByUserId = createdByUserId
+        self.createdByAgent = createdByAgent
         self.subscribers = subscribers
         self.issueDescription = issueDescription
         self.relatedMessage = relatedMessage

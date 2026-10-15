@@ -312,6 +312,12 @@ export type RunEvidence = {
   canonical: boolean;
 };
 
+/** The agent behind an agent-created issue; agentId is null for a run without an assigned Agent. */
+export type IssueCreatorAgent = {
+  agentId: string | null;
+  name: string;
+};
+
 export type HuntRun = {
   id: string;
   workspaceId?: string | null;
@@ -350,6 +356,8 @@ export type HuntRun = {
   difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   createdByUserId?: string | null;
+  /** Set instead of createdByUserId when an agent created the issue with `tools issue create`. */
+  createdByAgent?: IssueCreatorAgent | null;
   subscribers: IssueSubscriber[];
   repository: string;
   branch: string | null;
