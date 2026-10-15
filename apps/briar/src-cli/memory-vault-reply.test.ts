@@ -291,7 +291,7 @@ describe("memory vault in the channel reply runner", () => {
     expect(prompts[1]!.startsWith("<voice-memory>")).toBe(true);
   });
 
-  it("runs the reply without memory when the server says none", async () => {
+  it("runs the reply without memory, but with issue and channel tools, when the server says none", async () => {
     const seen: DetachedProviderTurnInput[] = [];
     let bin = "";
     const observed = await exerciseChannelReply("none", async (turn) => {
@@ -301,11 +301,12 @@ describe("memory vault in the channel reply runner", () => {
     });
     expect(observed.failure).toBeUndefined();
     const [turn] = seen;
-    expect(turn!.memoryVaultInstructions).toBeUndefined();
+    expect(turn!.memoryVaultInstructions).toBeNull();
+    expect(turn!.workspaceToolsInstructions).toContain("# Briar issues and channels");
     expect(turn!.prompt).not.toContain("<voice-memory>");
     expect(turn!.prompt).toContain("Memory is unavailable for this reply.");
     expect(observed.calls.filter((call) => call === "vault-context")).toHaveLength(1);
-    // The pre-warm PATH entry is an empty private directory: no `tools` is offered.
+    // `tools` is still on PATH for `tools issue` / `tools channel`.
     expect(bin).toMatch(/briar-memory-tools-/u);
   });
 });

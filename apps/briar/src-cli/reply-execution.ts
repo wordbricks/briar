@@ -233,6 +233,7 @@ async function runClaimedProjectAgentTask(
       workerId,
       work: task,
       personFacing: false,
+      workspaceTools: true,
       signal,
       scriptPath: memoryToolsScriptPath(runtime),
     });
@@ -489,6 +490,7 @@ async function runClaimedIssueReply(
       workerId: registered.workerId,
       work: issue,
       personFacing: true,
+      workspaceTools: true,
       signal,
     });
     const agent = detachedReplyAgent({
@@ -1077,6 +1079,7 @@ async function runClaimedChannelReplyTurn(
     workerId: registered.workerId,
     work: reply,
     personFacing: true,
+    workspaceTools: true,
     citations: true,
     signal: signal,
     scriptPath: memoryToolsScriptPath(runtime),

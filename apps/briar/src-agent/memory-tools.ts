@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
@@ -8,13 +9,23 @@ import {
   memoryToolsDeadlineMs,
   memoryToolsMaxContentBytes,
   memoryToolsProtocolVersion,
+  type AgentToolsCommand,
   type MemoryToolError,
   type MemoryToolsCommand,
   type MemoryToolsConfig,
 } from "./memory-tools-protocol";
+import {
+  parseWorkspaceToolsArgv,
+  workspaceToolsHelp,
+  WorkspaceUsageError,
+  type ParsedWorkspaceCommand,
+} from "./workspace-tools";
+import { decodeWorkspaceToolsCommand, workspaceToolsMaxBodyBytes } from "./workspace-tools-protocol";
 
 /*
-  `tools memory …`: the agent's command for the memory vault. It runs inside
+  `tools memory …`, `tools issue …`, `tools channel …`: the agent's command for
+  the memory vault and for Briar's issues and channels
+  (docs/plans/agent-workspace-tools.md). It runs inside
   the provider's sandbox with no network and no credential of its own. It
   writes one request into the turn's file relay in the workspace and prints
   the Worker CLI's answer as exactly one JSON object on stdout.
@@ -42,6 +53,13 @@ Commands:
 
 Output is one JSON object on stdout. Exit 0 on success, 1 on a tool error
 ({"error":{"code","message","retryable"}}), 2 on a usage error.`;
+
+/** `tools --help`: every tool family. */
+export const toolsHelp = `Usage: tools <memory|issue|channel> <command> [options]
+
+${memoryToolsHelp.replace(/^Usage: tools memory <command> \[options\]\n\n/u, "Memory:\n")}
+
+${workspaceToolsHelp}`;
 
 type Flag = {
   readonly name: string;
@@ -99,7 +117,7 @@ export function parseMemoryToolsArgv(argv: readonly string[]): ParsedMemoryTools
     if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h" || argv[0] === "help") {
       return { kind: "help" };
     }
-    if (argv[0] !== "memory") usage(`unknown tool "${argv[0]}"; only "tools memory" exists`);
+    if (argv[0] !== "memory") usage(`unknown tool "${argv[0]}"; use "tools memory", "tools issue" or "tools channel"`);
     const name = argv[1];
     if (name === undefined || name === "--help" || name === "-h" || name === "help") return { kind: "help" };
     if (!isCommand(name)) usage(`unknown command "${name}"`);
@@ -259,9 +277,10 @@ export async function runMemoryTools(argv: readonly string[], io: MemoryToolsIo)
     configPath = rest[1];
     rest = rest.slice(2);
   }
+  if (rest[0] === "issue" || rest[0] === "channel") return runWorkspaceTools(rest, configPath, io);
   const parsed = parseMemoryToolsArgv(rest);
   if (parsed.kind === "help") {
-    emit({ help: memoryToolsHelp });
+    emit({ help: rest[0] === "memory" ? memoryToolsHelp : toolsHelp });
     return 0;
   }
   if (parsed.kind === "usage") {
@@ -296,6 +315,36 @@ export async function runMemoryTools(argv: readonly string[], io: MemoryToolsIo)
     emit({ error: unavailable("Memory tools are not available outside an active Briar turn") });
     return 1;
   }
+  const response = await relay(command, config, io, {
+    unavailable,
+    timeout: "Memory did not answer in time; the operation may or may not have been applied. Read before retrying a write.",
+    unreachable: "Memory is unreachable from this turn",
+    unreadable: "Memory returned an unreadable answer",
+  });
+  if (!response.ok) {
+    emit({ error: response.error });
+    return 1;
+  }
+  emit(response.bodyBase64 === undefined
+    ? response.result
+    : { ...response.result, body: Buffer.from(response.bodyBase64, "base64").toString("utf8") });
+  return 0;
+}
+
+const workspaceUnavailable = (message: string): MemoryToolError => toolError("unavailable", message, true);
+
+/** Relays one frame and prints the answer; shared by every tool family. */
+async function relay(
+  command: AgentToolsCommand,
+  config: MemoryToolsConfig,
+  io: MemoryToolsIo,
+  messages: {
+    readonly unavailable: (message: string) => MemoryToolError;
+    readonly timeout: string;
+    readonly unreachable: string;
+    readonly unreadable: string;
+  },
+): Promise<{ ok: true; result: Readonly<Record<string, unknown>>; bodyBase64?: string } | { ok: false; error: MemoryToolError }> {
   const frame = Buffer.from(JSON.stringify({
     version: memoryToolsProtocolVersion,
     invocationId: config.invocationId,
@@ -308,29 +357,89 @@ export async function runMemoryTools(argv: readonly string[], io: MemoryToolsIo)
       exchangeDmFileRelay(directory, request, { deadlineMs: memoryToolsDeadlineMs })))(config.relayDirectory, frame);
   } catch (error) {
     const reason = error instanceof Error ? error.message : "";
-    emit({
+    return {
+      ok: false,
       error: reason === "dm_file_relay_payload_invalid"
         ? toolError("invalid_request", "The request is too large")
-        : unavailable(reason.includes("timeout")
-          ? "Memory did not answer in time; the operation may or may not have been applied. Read before retrying a write."
-          : "Memory is unreachable from this turn"),
-    });
-    return 1;
+        : messages.unavailable(reason.includes("timeout") ? messages.timeout : messages.unreachable),
+    };
   }
-  let response: ReturnType<typeof decodeMemoryToolsResponseFrame>;
   try {
-    response = decodeMemoryToolsResponseFrame(responseBytes);
+    return decodeMemoryToolsResponseFrame(responseBytes);
   } catch {
-    emit({ error: unavailable("Memory returned an unreadable answer") });
+    return { ok: false, error: messages.unavailable(messages.unreadable) };
+  }
+}
+
+async function readBody(parsed: ParsedWorkspaceCommand, io: MemoryToolsIo): Promise<Uint8Array | null> {
+  const source = parsed.body;
+  if (source === null) return null;
+  if (source.kind === "text") return Buffer.from(source.text, "utf8");
+  return source.kind === "stdin" ? io.readStdin() : io.readContentFile(source.path);
+}
+
+/** `tools issue …` / `tools channel …`. */
+async function runWorkspaceTools(argv: readonly string[], configPath: string | undefined, io: MemoryToolsIo) {
+  const emit = (value: unknown) => io.write(`${JSON.stringify(value)}\n`);
+  let parsed: ParsedWorkspaceCommand | null;
+  try {
+    parsed = parseWorkspaceToolsArgv(argv);
+  } catch (error) {
+    if (!(error instanceof WorkspaceUsageError)) throw error;
+    emit({ error: { ...toolError("invalid_request", `${error.message}. Run \`tools ${argv[0]} --help\`.`), usage: true } });
+    return 2;
+  }
+  if (parsed === null) {
+    emit({ help: workspaceToolsHelp });
+    return 0;
+  }
+  let body: Uint8Array | null;
+  try {
+    body = await readBody(parsed, io);
+  } catch {
+    emit({ error: toolError("invalid_request", "The body file could not be read") });
+    return 2;
+  }
+  if (parsed.bodyField !== null && (body === null || Buffer.from(body).toString("utf8").trim() === "")) {
+    emit({ error: { ...toolError("invalid_request", `"${argv[0]} ${argv[1]}" needs text: an argument, --body-file F, or stdin. Run \`tools ${argv[0]} --help\`.`), usage: true } });
+    return 2;
+  }
+  if (body !== null && body.byteLength > workspaceToolsMaxBodyBytes) {
+    emit({ error: toolError("invalid_request", "The text exceeds 48 KiB; shorten it or split it") });
     return 1;
   }
+  const isWrite = ["issue.create", "issue.note", "issue.status", "issue.update", "channel.post"]
+    .includes(parsed.command.command);
+  let command: AgentToolsCommand;
+  try {
+    // Validated here as well, so a malformed value is a usage error before any relay.
+    command = decodeWorkspaceToolsCommand({
+      ...parsed.command,
+      ...(isWrite ? { requestKey: parsed.requestKey ?? randomUUID() } : {}),
+      ...(parsed.bodyField !== null && body !== null
+        ? { [parsed.bodyField]: Buffer.from(body).toString("base64") }
+        : {}),
+    });
+  } catch {
+    emit({ error: { ...toolError("invalid_request", `Invalid arguments. Run \`tools ${argv[0]} --help\`.`), usage: true } });
+    return 2;
+  }
+  const config = await readConfig(configPath);
+  if (!config) {
+    emit({ error: workspaceUnavailable("Briar tools are not available outside an active Briar turn") });
+    return 1;
+  }
+  const response = await relay(command, config, io, {
+    unavailable: workspaceUnavailable,
+    timeout: "Briar did not answer in time; the write may or may not have been applied. Retry it with the same --request-key, or read before writing again.",
+    unreachable: "Briar is unreachable from this turn",
+    unreadable: "Briar returned an unreadable answer",
+  });
   if (!response.ok) {
     emit({ error: response.error });
     return 1;
   }
-  emit(response.bodyBase64 === undefined
-    ? response.result
-    : { ...response.result, body: Buffer.from(response.bodyBase64, "base64").toString("utf8") });
+  emit(response.result);
   return 0;
 }
 

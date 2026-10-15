@@ -9,19 +9,30 @@ import {
   RevisionConflictDetailSchema,
 } from "@briar/contracts/gen/briar/types/v1/error_pb";
 import type {
+  AgentWorkspaceClaim,
   MemoryVaultClaim,
   MemoryVaultRecordSummary,
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+import { agentProviderToProto } from "../src/lib/agent-provider-proto";
+import type { AgentProvider } from "../src/lib/agent-provider";
 import {
   decodeMemoryToolsRequestFrame,
   memoryToolsDeadlineMs,
   memoryToolsMaxContentBytes,
   memoryToolsProtocolVersion,
+  type AgentToolsCommand,
   type MemoryToolError,
   type MemoryToolsCommand,
   type MemoryToolsConfig,
   type MemoryToolsResponseFrame,
 } from "../src-agent/memory-tools-protocol";
+import { isWorkspaceToolsCommandName, type WorkspaceToolsCommand } from "../src-agent/workspace-tools-protocol";
+import {
+  executeWorkspaceToolsCommand,
+  workspaceToolError,
+  workspaceToolsInstructions,
+  type WorkspaceToolsQueue,
+} from "./workspace-tools-executor";
 import { findAgentBundle } from "./agent-bundle-path";
 import { FILE_RELAY_MAX_BYTES, startDmFileRelay } from "./dm-file-relay";
 import type { DetachedProviderTurnInput } from "./detached-provider-turn";
@@ -69,7 +80,7 @@ export type MemoryVaultQueue = Pick<
   | "memoryVaultJournal"
   | "memoryVaultSave"
   | "getMemoryVaultContext"
->;
+> & WorkspaceToolsQueue;
 
 /** What `GetMemoryVaultContext` returned for a vault, cached across turns. */
 export type MemoryVaultContext = {
@@ -94,6 +105,12 @@ export type MemoryVaultInvocationInput = {
   readonly personFacing: boolean;
   /** Channel replies cite memory through `memoryCitations` in their reply JSON. */
   readonly citations?: boolean;
+  /**
+   * Also serve `tools issue …` / `tools channel …` on this run's turns
+   * (docs/plans/agent-workspace-tools.md). A turn then gets `tools` even when
+   * the run has no memory vault.
+   */
+  readonly workspaceTools?: boolean;
   /** Runtime and bundle the `tools` launcher executes. */
   readonly launcher: { readonly runtimePath: string; readonly scriptPath: string };
   readonly signal?: AbortSignal;
@@ -105,8 +122,12 @@ export type MemoryVaultInvocationInput = {
 
 /** Per-turn result of `prepareTurn`. */
 export type MemoryVaultTurn = {
-  readonly context: MemoryVaultContext;
-  readonly instructions: string;
+  /** Null when the turn has workspace tools but the run has no vault. */
+  readonly context: MemoryVaultContext | null;
+  /** The memory vault section of the trusted instructions; null without a vault. */
+  readonly instructions: string | null;
+  /** The workspace tools section of the trusted instructions; null when they are off. */
+  readonly workspaceInstructions: string | null;
   readonly promptPrefix: string;
   readonly relayDirectory: string;
   cleanup(): Promise<void>;
@@ -258,6 +279,8 @@ export class MemoryVaultInvocation {
   private cached: MemoryVaultContext | null = null;
   private prefetched: Promise<MemoryVaultContext | null> | null = null;
   private activeRelay: string | null = null;
+  /** The provider of the turn being served; recorded as the author provider of notes and posts. */
+  private turnProvider: AgentProvider | null = null;
   private launcherWritten = false;
   private closed = false;
   private shutdown: Promise<void> | undefined;
@@ -321,6 +344,16 @@ export class MemoryVaultInvocation {
       projectId: this.input.projectId,
       workerId: this.input.workerId,
       work: workClaimIdentityToProto(this.input.work),
+    };
+  }
+
+  private workspaceClaim(provider: AgentProvider): AgentWorkspaceClaim {
+    return {
+      $typeName: "briar.worker.v1.AgentWorkspaceClaim",
+      projectId: this.input.projectId,
+      workerId: this.input.workerId,
+      work: workClaimIdentityToProto(this.input.work),
+      agentProvider: agentProviderToProto(provider),
     };
   }
 
@@ -404,11 +437,13 @@ export class MemoryVaultInvocation {
    * opens the turn's relay and the `tools` command. Null means the turn runs
    * without memory: no instructions, no tags and no working `tools`.
    */
-  async prepareTurn(workspacePath: string): Promise<MemoryVaultTurn | null> {
+  async prepareTurn(workspacePath: string, provider?: AgentProvider): Promise<MemoryVaultTurn | null> {
     const pending = this.prefetched ?? this.fetchContext();
     this.prefetched = null;
     const context = await pending;
-    if (!context || this.closed) return null;
+    const workspace = this.input.workspaceTools === true && provider !== undefined;
+    if ((!context && !workspace) || this.closed) return null;
+    this.turnProvider = workspace ? provider : null;
     const relay = await startDmFileRelay(workspacePath, this.socketPath, {
       prefix: ".briar-memory-relay-",
       deadlineMs: memoryToolsDeadlineMs,
@@ -424,8 +459,9 @@ export class MemoryVaultInvocation {
     let cleaned: Promise<void> | null = null;
     return {
       context,
-      instructions: memoryVaultInstructions(context, { citations: this.input.citations }),
-      promptPrefix: memoryVaultTurnPrefix(context, this.input.personFacing),
+      instructions: context ? memoryVaultInstructions(context, { citations: this.input.citations }) : null,
+      workspaceInstructions: workspace ? workspaceToolsInstructions(this.input.work) : null,
+      promptPrefix: context ? memoryVaultTurnPrefix(context, this.input.personFacing) : "",
       relayDirectory: relay.directory,
       cleanup: () => cleaned ??= (async () => {
         try { await this.clearConfig(relay.directory); } finally { await relay.cleanup(); }
@@ -460,6 +496,7 @@ export class MemoryVaultInvocation {
   private async clearConfig(relayDirectory: string) {
     if (this.activeRelay !== relayDirectory) return;
     this.activeRelay = null;
+    this.turnProvider = null;
     await rm(this.configPath, { force: true });
   }
 
@@ -514,7 +551,30 @@ export class MemoryVaultInvocation {
   }
 
   /** Executes one validated, authorized tool command against the server. */
-  private async execute(command: MemoryToolsCommand, signal: AbortSignal): Promise<MemoryToolsResponseFrame> {
+  private async execute(command: AgentToolsCommand, signal: AbortSignal): Promise<MemoryToolsResponseFrame> {
+    if (isWorkspaceToolsCommandName(command.command)) {
+      return this.executeWorkspace(command as WorkspaceToolsCommand, signal);
+    }
+    if (this.cached === null) {
+      return { ok: false, error: { code: "memory_unavailable", message: "This run has no memory", retryable: false } };
+    }
+    return this.executeMemory(command as MemoryToolsCommand, signal);
+  }
+
+  private async executeWorkspace(command: WorkspaceToolsCommand, signal: AbortSignal): Promise<MemoryToolsResponseFrame> {
+    const provider = this.turnProvider;
+    if (provider === null) {
+      return { ok: false, error: { code: "unavailable", message: "Issue and channel tools are not available in this run", retryable: false } };
+    }
+    try {
+      return await executeWorkspaceToolsCommand(this.input.queue, this.workspaceClaim(provider), command,
+        (run) => this.call(run, { signal }));
+    } catch (error) {
+      return { ok: false, error: workspaceToolError(error) };
+    }
+  }
+
+  private async executeMemory(command: MemoryToolsCommand, signal: AbortSignal): Promise<MemoryToolsResponseFrame> {
     const claim = this.claim();
     switch (command.command) {
       case "list": {
@@ -781,7 +841,7 @@ export async function runWithMemoryVault<T>(
   if (!vault) return run(input);
   let turn: MemoryVaultTurn | null = null;
   try {
-    turn = await vault.prepareTurn(input.workspacePath);
+    turn = await vault.prepareTurn(input.workspacePath, input.agent.provider);
   } catch (error) {
     log(`memory vault turn setup failed for ${input.diagnosticContext?.workId ?? "unknown work"}: ${
       error instanceof Error ? error.message.slice(0, 200) : "unknown"
@@ -793,6 +853,7 @@ export async function runWithMemoryVault<T>(
       ...input,
       prompt: turn.promptPrefix ? `${turn.promptPrefix}\n\n${input.prompt}` : input.prompt,
       memoryVaultInstructions: turn.instructions,
+      workspaceToolsInstructions: turn.workspaceInstructions,
       environment: vault.environment(input.environment),
     });
   } finally {
