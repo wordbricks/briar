@@ -85,12 +85,15 @@ const usage = (message: string): never => {
   throw new WorkspaceUsageError(message);
 };
 
-const priorityNames: Readonly<Record<string, number>> = { urgent: 1, high: 2, medium: 3, low: 4 };
+const priorityNames = { urgent: 1, high: 2, medium: 3, low: 4 } as const;
+
+const isPriorityName = (value: string): value is keyof typeof priorityNames => Object.hasOwn(priorityNames, value);
 
 const priority = (raw: string) => {
-  const value = priorityNames[raw.toLowerCase()] ?? (/^[1-4]$/u.test(raw) ? Number(raw) : null);
-  if (value === null) return usage("--priority must be 1-4 or urgent, high, medium, low");
-  return value;
+  const name = raw.toLowerCase();
+  if (isPriorityName(name)) return priorityNames[name];
+  if (/^[1-4]$/u.test(raw)) return Number(raw);
+  return usage("--priority must be 1-4 or urgent, high, medium, low");
 };
 
 const limit = (raw: string) => {
