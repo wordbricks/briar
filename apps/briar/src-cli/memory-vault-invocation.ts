@@ -54,6 +54,10 @@ import type {
   claim token and the Worker token stay in this process, and the server derives
   the vault from the claim alone.
 
+  The same relay serves `tools issue …` and `tools channel …`
+  (docs/plans/agent-workspace-tools.md) when the run opts in with
+  `workspaceTools`; such a run gets the relay on every turn, vault or not.
+
   Transport, per sandbox mode (the same route as the DM message command):
   `tools` writes its request file into `.briar-memory-relay-*` in the turn's
   workspace; this process watches that directory and forwards the frame over
