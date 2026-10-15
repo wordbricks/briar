@@ -405,6 +405,7 @@ async function runClaimedIssueInRuntime(
         workerId,
         work: issue,
         personFacing: false,
+        workspaceTools: true,
         signal,
       })
     : null;

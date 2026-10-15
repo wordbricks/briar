@@ -911,6 +911,17 @@ public nonisolated struct BriarAPI_DashboardRun: @unchecked Sendable {
     set {_uniqueStorage()._relatedIssues = newValue}
   }
 
+  /// Set when an agent created the issue with `tools issue create`
+  /// (created_by_user_id is then absent).
+  public var createdByAgent: BriarAPI_IssueCreatorAgent {
+    get {_storage._createdByAgent ?? BriarAPI_IssueCreatorAgent()}
+    set {_uniqueStorage()._createdByAgent = newValue}
+  }
+  /// Returns true if `createdByAgent` has been explicitly set.
+  public var hasCreatedByAgent: Bool {_storage._createdByAgent != nil}
+  /// Clears the value of `createdByAgent`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedByAgent() {_uniqueStorage()._createdByAgent = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum ExecutionReadiness: SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -1076,6 +1087,31 @@ public nonisolated struct BriarAPI_DashboardRun: @unchecked Sendable {
   public init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public nonisolated struct BriarAPI_IssueCreatorAgent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Absent when the creating run had no assigned Agent.
+  public var agentID: String {
+    get {_agentID ?? String()}
+    set {_agentID = newValue}
+  }
+  /// Returns true if `agentID` has been explicitly set.
+  public var hasAgentID: Bool {self._agentID != nil}
+  /// Clears the value of `agentID`. Subsequent reads from it will return its default value.
+  public mutating func clearAgentID() {self._agentID = nil}
+
+  /// The Agent's name, or "<provider> agent" for a run without one.
+  public var name: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _agentID: String? = nil
 }
 
 public nonisolated struct BriarAPI_TrackerReference: Sendable {
@@ -2616,7 +2652,7 @@ nonisolated extension BriarAPI_IssueDependencyReference: SwiftProtobuf.Message, 
 
 nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DashboardRun"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}run_number\0\u{3}current_attempt\0\u{3}current_revision\0\u{3}source_key\0\u{3}source_created_at\0\u{1}title\0\u{1}status\0\u{3}workflow_stage\0\u{1}workflow\0\u{3}paused_at\0\u{3}resume_requested_at\0\u{1}checkpoint\0\u{1}progress\0\u{1}detail\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{3}created_by_user_id\0\u{1}subscribers\0\u{3}issue_description\0\u{3}related_message\0\u{1}attachments\0\u{1}prerequisites\0\u{1}dependents\0\u{3}execution_readiness\0\u{3}waiting_on_prerequisite_count\0\u{3}result_summary\0\u{3}structured_result\0\u{3}result_reviews\0\u{3}pull_request_urls\0\u{1}branch\0\u{3}commit_sha\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{3}requested_provider\0\u{3}requested_model\0\u{3}requested_effort\0\u{3}requested_worker_id\0\u{3}requested_by_user_id\0\u{3}dispatch_mode\0\u{3}dispatched_at\0\u{3}claimed_by\0\u{3}claimed_at\0\u{3}worker_id\0\u{3}started_at\0\u{3}updated_at\0\u{3}completed_at\0\u{3}last_event_at\0\u{3}event_count\0\u{1}source\0\u{1}repository\0\u{1}tracker\0\u{3}waiting_checkpoint\0\u{3}issue_checkpoints\0\u{3}execution_metrics\0\u{3}target_sha\0\u{3}staging_qa_status\0\u{3}production_qa_status\0\u{3}staging_qa_detail\0\u{3}production_qa_detail\0\u{4}\u{2}lease_expires_at\0\u{3}claim_attempts\0\u{3}agent_id\0\u{3}workspace_id\0\u{3}team_id\0\u{3}planning_project_id\0\u{3}planning_project_name\0\u{1}parent\0\u{3}sub_issues\0\u{3}related_issues\0\u{b}context\0\u{c}@\u{1}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}run_number\0\u{3}current_attempt\0\u{3}current_revision\0\u{3}source_key\0\u{3}source_created_at\0\u{1}title\0\u{1}status\0\u{3}workflow_stage\0\u{1}workflow\0\u{3}paused_at\0\u{3}resume_requested_at\0\u{1}checkpoint\0\u{1}progress\0\u{1}detail\0\u{1}priority\0\u{1}difficulty\0\u{3}assignee_user_id\0\u{3}created_by_user_id\0\u{1}subscribers\0\u{3}issue_description\0\u{3}related_message\0\u{1}attachments\0\u{1}prerequisites\0\u{1}dependents\0\u{3}execution_readiness\0\u{3}waiting_on_prerequisite_count\0\u{3}result_summary\0\u{3}structured_result\0\u{3}result_reviews\0\u{3}pull_request_urls\0\u{1}branch\0\u{3}commit_sha\0\u{3}preferred_provider\0\u{3}preferred_model\0\u{3}preferred_effort\0\u{3}full_auto\0\u{3}requested_provider\0\u{3}requested_model\0\u{3}requested_effort\0\u{3}requested_worker_id\0\u{3}requested_by_user_id\0\u{3}dispatch_mode\0\u{3}dispatched_at\0\u{3}claimed_by\0\u{3}claimed_at\0\u{3}worker_id\0\u{3}started_at\0\u{3}updated_at\0\u{3}completed_at\0\u{3}last_event_at\0\u{3}event_count\0\u{1}source\0\u{1}repository\0\u{1}tracker\0\u{3}waiting_checkpoint\0\u{3}issue_checkpoints\0\u{3}execution_metrics\0\u{3}target_sha\0\u{3}staging_qa_status\0\u{3}production_qa_status\0\u{3}staging_qa_detail\0\u{3}production_qa_detail\0\u{4}\u{2}lease_expires_at\0\u{3}claim_attempts\0\u{3}agent_id\0\u{3}workspace_id\0\u{3}team_id\0\u{3}planning_project_id\0\u{3}planning_project_name\0\u{1}parent\0\u{3}sub_issues\0\u{3}related_issues\0\u{3}created_by_agent\0\u{b}context\0\u{c}@\u{1}\u{1}")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -2692,6 +2728,7 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
     var _parent: BriarAPI_IssueDependencyReference? = nil
     var _subIssues: [BriarAPI_IssueDependencyReference] = []
     var _relatedIssues: [BriarAPI_IssueDependencyReference] = []
+    var _createdByAgent: BriarAPI_IssueCreatorAgent? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -2775,6 +2812,7 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
       _parent = source._parent
       _subIssues = source._subIssues
       _relatedIssues = source._relatedIssues
+      _createdByAgent = source._createdByAgent
     }
   }
 
@@ -2866,6 +2904,7 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
         case 72: try { try decoder.decodeSingularMessageField(value: &_storage._parent) }()
         case 73: try { try decoder.decodeRepeatedMessageField(value: &_storage._subIssues) }()
         case 74: try { try decoder.decodeRepeatedMessageField(value: &_storage._relatedIssues) }()
+        case 75: try { try decoder.decodeSingularMessageField(value: &_storage._createdByAgent) }()
         default: break
         }
       }
@@ -3097,6 +3136,9 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
       if !_storage._relatedIssues.isEmpty {
         try visitor.visitRepeatedMessageField(value: _storage._relatedIssues, fieldNumber: 74)
       }
+      try { if let v = _storage._createdByAgent {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 75)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3179,6 +3221,7 @@ nonisolated extension BriarAPI_DashboardRun: SwiftProtobuf.Message, SwiftProtobu
         if _storage._parent != rhs_storage._parent {return false}
         if _storage._subIssues != rhs_storage._subIssues {return false}
         if _storage._relatedIssues != rhs_storage._relatedIssues {return false}
+        if _storage._createdByAgent != rhs_storage._createdByAgent {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -3202,6 +3245,45 @@ nonisolated extension BriarAPI_DashboardRun.Source: SwiftProtobuf._ProtoNameProv
 
 nonisolated extension BriarAPI_DashboardRun.QaStatus: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0QA_STATUS_UNSPECIFIED\0\u{1}QA_STATUS_PENDING\0\u{1}QA_STATUS_PASSED\0\u{1}QA_STATUS_SKIPPED\0")
+}
+
+nonisolated extension BriarAPI_IssueCreatorAgent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".IssueCreatorAgent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}agent_id\0\u{1}name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self._agentID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._agentID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    } }()
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: BriarAPI_IssueCreatorAgent, rhs: BriarAPI_IssueCreatorAgent) -> Bool {
+    if lhs._agentID != rhs._agentID {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }
 
 nonisolated extension BriarAPI_TrackerReference: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

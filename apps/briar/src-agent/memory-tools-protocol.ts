@@ -1,4 +1,9 @@
 import { isAbsolute } from "node:path";
+import {
+  decodeWorkspaceToolsCommand,
+  isWorkspaceToolsCommandName,
+  type WorkspaceToolsCommand,
+} from "./workspace-tools-protocol";
 
 /*
   The local wire between `tools memory …` (running inside the provider's
@@ -59,11 +64,14 @@ export type MemoryToolsCommand =
       readonly contentBase64: string;
     };
 
+/** Every command the `tools` launcher relays: memory, issue and channel. */
+export type AgentToolsCommand = MemoryToolsCommand | WorkspaceToolsCommand;
+
 export type MemoryToolsRequestFrame = {
   readonly version: 1;
   readonly invocationId: string;
   readonly capability: string;
-  readonly command: MemoryToolsCommand;
+  readonly command: AgentToolsCommand;
 };
 
 export type MemoryToolError = {
@@ -187,7 +195,9 @@ export function decodeMemoryToolsRequestFrame(bytes: Uint8Array): MemoryToolsReq
     version: 1,
     invocationId: value.invocationId,
     capability: value.capability,
-    command: decodeMemoryToolsCommand(value.command),
+    command: isRecord(value.command) && isWorkspaceToolsCommandName(value.command.command)
+      ? decodeWorkspaceToolsCommand(value.command)
+      : decodeMemoryToolsCommand(value.command),
   };
 }
 

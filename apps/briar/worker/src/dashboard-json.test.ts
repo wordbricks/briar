@@ -95,3 +95,21 @@ describe("dashboard relationship projection", () => {
     });
   });
 });
+
+describe("dashboard issue creator", () => {
+  it("names the agent that created an issue with the workspace tools, and nothing else", () => {
+    const withContext = (context: unknown) => dashboardRunJson({
+      ...run,
+      context_json: context === null ? null : JSON.stringify(context),
+    } as HuntRunRow, []);
+    expect(withContext({
+      origin: "briar-agent-tool",
+      createdByAgent: { id: "agent-1", name: "Planner" },
+      createdByProvider: "codex",
+    }).createdByAgent).toEqual({ agentId: "agent-1", name: "Planner" });
+    expect(withContext({ origin: "briar-agent-tool", createdByAgent: null, createdByProvider: "claude" }).createdByAgent)
+      .toEqual({ agentId: null, name: "claude agent" });
+    expect(withContext({ origin: "briar-channel", createdByAgent: { id: "x", name: "Spoof" } }).createdByAgent).toBeNull();
+    expect(withContext(null).createdByAgent).toBeNull();
+  });
+});

@@ -54,6 +54,26 @@ const parseRelatedMessageReference = (value: unknown) => {
   };
 };
 
+/**
+ * The agent that created the issue with `tools issue create`
+ * (agent-workspace-tools/issues.ts writes `origin`, `createdByAgent` and
+ * `createdByProvider` into the run context). Null for every other origin.
+ */
+export const parseIssueCreatorAgent = (context: Readonly<Record<string, unknown>> | null) => {
+  if (context?.origin !== "briar-agent-tool") return null;
+  const agent = context.createdByAgent;
+  if (typeof agent === "object" && agent !== null && !Array.isArray(agent)) {
+    const { id, name } = agent as Record<string, unknown>;
+    if (typeof id === "string" && typeof name === "string" && name.trim()) {
+      return { agentId: id, name: name.trim() };
+    }
+  }
+  const provider = context.createdByProvider;
+  return typeof provider === "string" && provider.trim()
+    ? { agentId: null, name: `${provider.trim()} agent` }
+    : null;
+};
+
 export const dashboardEventJson = (
   event: HuntEventRow,
   actorNames: ReadonlyMap<string, string> = new Map(),
@@ -166,6 +186,7 @@ export function dashboardRunJson(
     difficulty: run.issue_difficulty,
     assigneeUserId: run.assignee_user_id,
     createdByUserId: run.created_by_user_id ?? null,
+    createdByAgent: parseIssueCreatorAgent(context as Readonly<Record<string, unknown>> | null),
     subscribers: issueSubscribers(run),
     repository: run.repository,
     branch: run.branch,
