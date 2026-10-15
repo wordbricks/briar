@@ -131,6 +131,17 @@ import {
 } from "./dm-public-message-application";
 import { publishDmPublicMessageBatchInputFromProto } from "./dm-public-message-mappers";
 import {
+  agentChannelListRpc,
+  agentChannelPostRpc,
+  agentChannelReadRpc,
+  agentIssueCreateRpc,
+  agentIssueListRpc,
+  agentIssueNoteRpc,
+  agentIssueSetStatusRpc,
+  agentIssueShowRpc,
+  agentIssueUpdateRpc,
+} from "./worker-connect-agent-workspace";
+import {
   getMemoryVaultContextRpc,
   memoryVaultConnectServices,
   memoryVaultJournalRpc,
@@ -1320,6 +1331,15 @@ export function createWorkerQueueService(
     memoryVaultJournal: (request) => memoryVaultJournalRpc(input, request, services),
     memoryVaultSave: (request) => memoryVaultSaveRpc(input, request, services),
     getMemoryVaultContext: (request) => getMemoryVaultContextRpc(input, request, services),
+    agentIssueList: (request) => agentIssueListRpc(input, request, services),
+    agentIssueShow: (request) => agentIssueShowRpc(input, request, services),
+    agentIssueCreate: (request) => agentIssueCreateRpc(input, request, services),
+    agentIssueNote: (request) => agentIssueNoteRpc(input, request, services),
+    agentIssueSetStatus: (request) => agentIssueSetStatusRpc(input, request, services),
+    agentIssueUpdate: (request) => agentIssueUpdateRpc(input, request, services),
+    agentChannelList: (request) => agentChannelListRpc(input, request, services),
+    agentChannelRead: (request) => agentChannelReadRpc(input, request, services),
+    agentChannelPost: (request) => agentChannelPostRpc(input, request, services),
   };
 }
 

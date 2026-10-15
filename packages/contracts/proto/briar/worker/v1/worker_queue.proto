@@ -51,6 +51,17 @@ service WorkerQueueService {
   rpc MemoryVaultJournal(MemoryVaultJournalRequest) returns (MemoryVaultJournalResponse);
   rpc MemoryVaultSave(MemoryVaultSaveRequest) returns (MemoryVaultSaveResponse);
   rpc GetMemoryVaultContext(GetMemoryVaultContextRequest) returns (GetMemoryVaultContextResponse);
+  // Agent workspace tools: `tools issue …` and `tools channel …`
+  // (docs/plans/agent-workspace-tools.md).
+  rpc AgentIssueList(AgentIssueListRequest) returns (AgentIssueListResponse);
+  rpc AgentIssueShow(AgentIssueShowRequest) returns (AgentIssueShowResponse);
+  rpc AgentIssueCreate(AgentIssueCreateRequest) returns (AgentIssueCreateResponse);
+  rpc AgentIssueNote(AgentIssueNoteRequest) returns (AgentIssueNoteResponse);
+  rpc AgentIssueSetStatus(AgentIssueSetStatusRequest) returns (AgentIssueSetStatusResponse);
+  rpc AgentIssueUpdate(AgentIssueUpdateRequest) returns (AgentIssueUpdateResponse);
+  rpc AgentChannelList(AgentChannelListRequest) returns (AgentChannelListResponse);
+  rpc AgentChannelRead(AgentChannelReadRequest) returns (AgentChannelReadResponse);
+  rpc AgentChannelPost(AgentChannelPostRequest) returns (AgentChannelPostResponse);
 }
 
 // Ephemeral reply activity uses the short-lived capability returned with a
@@ -1624,4 +1635,197 @@ message MemoryVaultContext {
   bool readable = 9;
   bool writable = 10;
   bool user_requested_writable = 11;
+}
+
+// Agent workspace tools (docs/plans/agent-workspace-tools.md). The caller never
+// names an organization, team or acting Agent: the server derives all three
+// from the claim. Issue tools act on the team the Worker binding authenticated
+// for; channel tools act on the non-DM organization channels whose roster
+// holds the claim's Agent. Tool failures are Connect errors carrying
+// briar.types.v1.ApplicationErrorDetail with a stable code (claim_inactive,
+// not_found, invalid_request, not_allowed, no_agent, issue_in_execution,
+// own_run, rate_limited, idempotency_conflict, conflict, unavailable).
+// Writes carry a request key; a repeated (claim work, request key) with the
+// same payload returns the stored result with replayed = true, and with a
+// different payload fails with idempotency_conflict.
+message AgentWorkspaceClaim {
+  string project_id = 1;
+  string worker_id = 2;
+  // An active issue, issue_reply, channel_reply or project_agent_task claim.
+  // Other or unknown variants fail closed.
+  WorkClaimIdentity work = 3;
+  // The provider running this turn; recorded as the author provider of
+  // agent-written notes and posts.
+  briar.types.v1.AgentProvider agent_provider = 4;
+}
+
+message AgentIssueSummary {
+  string id = 1;
+  // The team issue key, e.g. "AH-123".
+  string key = 2;
+  string title = 3;
+  // backlog, queued, running, blocked, failed, completed or cancelled.
+  string status = 4;
+  bool paused = 5;
+  optional uint32 priority = 6;
+  string updated_at = 7;
+}
+
+message AgentIssueListRequest {
+  AgentWorkspaceClaim claim = 1;
+  repeated string statuses = 2;
+  optional string text = 3;
+  optional string cursor = 4;
+  optional uint32 limit = 5;
+}
+
+message AgentIssueListResponse {
+  repeated AgentIssueSummary issues = 1;
+  optional string next_cursor = 2;
+}
+
+message AgentIssueShowRequest {
+  AgentWorkspaceClaim claim = 1;
+  // An issue id or issue key.
+  string issue = 2;
+}
+
+message AgentIssueNoteView {
+  string id = 1;
+  optional string parent_message_id = 2;
+  string author_name = 3;
+  bool author_is_agent = 4;
+  string body = 5;
+  string created_at = 6;
+}
+
+message AgentIssueShowResponse {
+  AgentIssueSummary issue = 1;
+  optional string description = 2;
+  optional string workflow_stage = 3;
+  optional string result_summary = 4;
+  optional string parent_key = 5;
+  // The most recent conversation messages, oldest first.
+  repeated AgentIssueNoteView notes = 6;
+  bool notes_truncated = 7;
+  optional string pending_execution_approval_id = 8;
+}
+
+message AgentIssueCreateRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string title = 3;
+  optional string description = 4;
+  optional uint32 priority = 5;
+  // An issue id or issue key in the same team.
+  optional string parent = 6;
+  // Asks a person to approve execution. The issue is still created in backlog.
+  bool request_execution = 7;
+}
+
+message AgentIssueCreateResponse {
+  AgentIssueSummary issue = 1;
+  // Set when request_execution asked for approval.
+  optional string execution_approval_id = 2;
+  bool replayed = 3;
+}
+
+message AgentIssueNoteRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string issue = 3;
+  string body = 4;
+}
+
+message AgentIssueNoteResponse {
+  string message_id = 1;
+  AgentIssueSummary issue = 2;
+  bool replayed = 3;
+}
+
+message AgentIssueSetStatusRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string issue = 3;
+  // backlog, blocked, completed or cancelled; queued asks for execution approval.
+  string status = 4;
+  optional string reason = 5;
+}
+
+message AgentIssueSetStatusResponse {
+  AgentIssueSummary issue = 1;
+  // "moved", "unchanged", or "approval_requested" for queued.
+  string outcome = 2;
+  optional string execution_approval_id = 3;
+  bool replayed = 4;
+}
+
+message AgentIssueUpdateRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string issue = 3;
+  optional string title = 4;
+  optional string description = 5;
+  optional uint32 priority = 6;
+}
+
+message AgentIssueUpdateResponse {
+  AgentIssueSummary issue = 1;
+  bool replayed = 2;
+}
+
+message AgentChannelSummary {
+  string id = 1;
+  string name = 2;
+  optional string topic = 3;
+  // The channel this channel-reply claim is answering in.
+  bool current = 4;
+}
+
+message AgentChannelListRequest {
+  AgentWorkspaceClaim claim = 1;
+}
+
+message AgentChannelListResponse {
+  repeated AgentChannelSummary channels = 1;
+}
+
+message AgentChannelMessageView {
+  string id = 1;
+  optional string parent_message_id = 2;
+  string author_name = 3;
+  bool author_is_agent = 4;
+  string body = 5;
+  string created_at = 6;
+}
+
+message AgentChannelReadRequest {
+  AgentWorkspaceClaim claim = 1;
+  // A channel id or channel name.
+  string channel = 2;
+  // A root message id: read that thread instead of the timeline.
+  optional string thread = 3;
+  optional string cursor = 4;
+  optional uint32 limit = 5;
+}
+
+message AgentChannelReadResponse {
+  AgentChannelSummary channel = 1;
+  // Oldest first within the page; next_cursor pages further back.
+  repeated AgentChannelMessageView messages = 2;
+  optional string next_cursor = 3;
+}
+
+message AgentChannelPostRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string channel = 3;
+  optional string thread = 4;
+  string body = 5;
+}
+
+message AgentChannelPostResponse {
+  string message_id = 1;
+  AgentChannelSummary channel = 2;
+  bool replayed = 3;
 }
