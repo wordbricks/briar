@@ -194,7 +194,8 @@ final class ChannelRelayTests: XCTestCase {
 
         await store.openChannel(originChannelID)
         XCTAssertEqual(store.channels.map(\.id), [originChannelID])
-        XCTAssertEqual(scenario.markReadCalls, 1)
+        // The read mark is written from a detached task after the open.
+        await waitUntil { scenario.markReadCalls == 1 }
         store.applicationDidEnterBackground()
     }
 
