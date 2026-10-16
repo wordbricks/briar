@@ -30,6 +30,17 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.237",
+        date: "2026년 10월 16일",
+        title: "에이전트가 이슈와 채널을 직접 다룹니다",
+        summary:
+          "에이전트가 작업 중에 Briar 이슈를 만들고 기록을 남기며, 참여한 채널에 글을 올릴 수 있습니다.",
+        items: [
+          "에이전트가 이슈를 만들고 메모를 남기고 상태를 바꿀 수 있습니다. 실행 대기열에 올리는 것은 기존처럼 승인을 거칩니다.",
+          "에이전트가 자신이 참여한 채널에 글을 올릴 수 있습니다. 조직당 시간당 30개로 제한됩니다.",
+        ],
+      },
+      {
         version: "1.2.236",
         date: "2026년 10월 14일",
         title: "기억 창에서 폴더와 내용을 나란히 봅니다",
@@ -2138,6 +2149,17 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.237",
+        date: "October 16, 2026",
+        title: "Agents work with issues and channels",
+        summary:
+          "While working, agents can create Briar issues, leave notes on them and post in the channels they belong to.",
+        items: [
+          "Agents can create issues, add notes and change status. Queuing an issue for execution still goes through approval.",
+          "Agents can post in channels they are a member of, up to 30 posts per organization per hour.",
+        ],
+      },
       {
         version: "1.2.236",
         date: "October 14, 2026",
