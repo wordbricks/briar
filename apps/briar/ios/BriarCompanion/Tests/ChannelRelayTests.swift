@@ -194,7 +194,8 @@ final class ChannelRelayTests: XCTestCase {
 
         await store.openChannel(originChannelID)
         XCTAssertEqual(store.channels.map(\.id), [originChannelID])
-        XCTAssertEqual(scenario.markReadCalls, 1)
+        // The read mark is written from a detached task after the open.
+        await waitUntil { scenario.markReadCalls == 1 }
         store.applicationDidEnterBackground()
     }
 
@@ -308,8 +309,10 @@ final class ChannelRelayTests: XCTestCase {
     private func waitUntil(
         _ predicate: @escaping @MainActor () -> Bool
     ) async {
-        for _ in 0 ..< 200 where !predicate() {
-            await Task.yield()
+        // Bounded by time, not yields: a loaded simulator can starve the
+        // store's fetch task for more than a few hundred yields.
+        for _ in 0 ..< 500 where !predicate() {
+            try? await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertTrue(predicate())
     }
