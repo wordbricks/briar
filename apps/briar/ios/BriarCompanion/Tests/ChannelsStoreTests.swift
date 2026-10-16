@@ -217,9 +217,9 @@ final class ChannelsStoreTests: XCTestCase {
 
         XCTAssertEqual(store.messages.map(\.id), [messageID])
         XCTAssertFalse(store.loading)
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< 500 {
             if await read.requestCount() == 1 { break }
-            await Task.yield()
+            try await Task.sleep(for: .milliseconds(10))
         }
         let readRequestCount = await read.requestCount()
         XCTAssertEqual(readRequestCount, 1)
@@ -554,8 +554,10 @@ final class ChannelsStoreTests: XCTestCase {
     private func waitUntil(
         _ predicate: @escaping @MainActor () -> Bool
     ) async {
-        for _ in 0 ..< 100 where !predicate() {
-            await Task.yield()
+        // Bounded by time, not yields: a loaded simulator can starve the
+        // store's fetch task for more than a few hundred yields.
+        for _ in 0 ..< 500 where !predicate() {
+            try? await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertTrue(predicate())
     }

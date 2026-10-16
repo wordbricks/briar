@@ -119,7 +119,10 @@ bundle_id="$(jq -r '.bundleIdentifier' <<<"$resolved")"
 
 echo "[ios-release] Running contract, native Swift, accessibility/layout, and Tauri Android gates."
 # The Android regression build must not receive Apple release credentials.
-env -u APPLE_API_KEY -u APPLE_API_ISSUER -u APPLE_API_KEY_CONTENT bun run mobile:ci
+# BRIAR_MOBILE_CI_JOBS=1 runs the iPhone, iPad and Production builds one at a
+# time; on a busy host the parallel simulators time out the iPad audit.
+env -u APPLE_API_KEY -u APPLE_API_ISSUER -u APPLE_API_KEY_CONTENT bun run mobile:ci \
+  ${BRIAR_MOBILE_CI_JOBS:+--jobs "$BRIAR_MOBILE_CI_JOBS"}
 
 release_temp="$(mktemp -d "$release_temp_base/briar-ios-release.XXXXXX")"
 private_keys="$release_temp/private_keys"
