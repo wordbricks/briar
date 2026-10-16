@@ -308,8 +308,10 @@ final class ChannelRelayTests: XCTestCase {
     private func waitUntil(
         _ predicate: @escaping @MainActor () -> Bool
     ) async {
-        for _ in 0 ..< 200 where !predicate() {
-            await Task.yield()
+        // Bounded by time, not yields: a loaded simulator can starve the
+        // store's fetch task for more than a few hundred yields.
+        for _ in 0 ..< 500 where !predicate() {
+            try? await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertTrue(predicate())
     }
