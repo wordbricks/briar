@@ -16,6 +16,7 @@ import { planningProjectsAtom } from "../planning/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { issueMessagesAtom, runEventsAtom } from "../run-detail/atoms";
 import { sessionErrorAtom, tokenAtom, userAtom } from "../session/atoms";
+import { ApiError } from "../../lib/api/errors";
 import { applySyncEvent } from "../sync/apply";
 import { teamSyncApiAtom } from "../sync/loader";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
@@ -152,6 +153,10 @@ class IssueServer {
     resumeHuntRun: async (_token, projectId, runId, _checkpoint, requestId) => {
       this.resumeRequestIds.push(requestId ?? "");
       this.guard(`resume:${projectId}:${runId}`);
+      return { runId } as never;
+    },
+    moveHuntRun: async (_token, projectId, runId, placement) => {
+      this.guard(`move:${projectId}:${runId}:${placement.status}`);
       return { runId } as never;
     },
     acceptIssueActionProposal: async (_token, projectId, runId, proposalId) => {
@@ -405,6 +410,49 @@ describe("resumeRun", () => {
     const { actions } = harness({ runs: [runOf("run-1")] });
     await expect(actions.resumeRun("run-1")).rejects.toThrow(
       "이 앱 버전에서는 현재 대기 지점을 안전하게 확인할 수 없습니다. 새로고침하거나 앱을 업데이트해 주세요.",
+    );
+  });
+});
+
+describe("moveRun", () => {
+  it("moves the run and refreshes the board", async () => {
+    const { actions, registry, server } = harness({ runs: [runOf("run-1")] });
+    server.snapshot = snapshotOf([runOf("run-1", { status: "blocked" })]);
+    await actions.moveRun("run-1", { status: "blocked", workflowStage: null });
+    expect(server.calls).toEqual([`move:${teamId}:run-1:blocked`]);
+    expect(registry.get(runAtom("run-1"))?.status).toBe("blocked");
+  });
+
+  it("refreshes and explains the conflict when the board changed elsewhere", async () => {
+    const { actions, server } = harness({ runs: [runOf("run-1")] });
+    server.failWith = new ApiError(409, "stale board");
+    await expect(
+      actions.moveRun("run-1", { status: "blocked", workflowStage: null }),
+    ).rejects.toThrow(
+      "다른 화면에서 상태가 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다.",
+    );
+  });
+
+  it("asks to retry when the move cannot be saved", async () => {
+    const { actions, server } = harness({ runs: [runOf("run-1")] });
+    server.failWith = new Error("network down");
+    await expect(
+      actions.moveRun("run-1", { status: "blocked", workflowStage: null }),
+    ).rejects.toThrow(
+      "상태 변경을 저장하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+    );
+  });
+
+  it("records the from-to detail in demo mode", async () => {
+    const { actions, registry } = harness({
+      demoMode: true,
+      token: null,
+      runs: [runOf("run-1", { status: "queued" })],
+    });
+    await actions.moveRun("run-1", { status: "blocked", workflowStage: null });
+    const events = registry.get(runEventsAtom("run-1"));
+    expect(events.at(-1)?.detail).toBe(
+      "사용자가 작업을 대기에서 차단 상태로 이동했습니다.",
     );
   });
 });
