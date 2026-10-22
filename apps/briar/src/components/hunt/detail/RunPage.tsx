@@ -27,8 +27,9 @@ import { defaultIssueDetailTab, type IssueDetailTab } from "@/lib/issue-detail-t
 import { issueAttachmentReference, issueAttachmentReferences, removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { clampConversationPaneWidth, conversationPaneWidthDefault, conversationPaneWidthMax, conversationPaneWidthMin, loadConversationPaneWidth, saveConversationPaneWidth } from "@/lib/conversation-pane-width";
 import { loadRunCostEstimate } from "@/lib/api";
-import { copyIssueId, copyIssueShareLink, shareIssueLink } from "@/lib/issue-links";
+import { copyIssueId, copyIssueShareLink, shareIssueLink, webAppIssueKeyUrl } from "@/lib/issue-links";
 import { formatIssueKey } from "@/lib/issue-key";
+import { webMode } from "@/state/platform";
 import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, WorkspaceMember, PlanningProject, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider, type ModelEffort } from "@/lib/team-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
@@ -963,12 +964,16 @@ export function RunPage({
       setIsSubmittingRework(false);
     }
   };
+  const canonicalIssueUrl = webMode
+    ? webAppIssueKeyUrl(formatIssueKey(issueKeyPrefix, run.runNumber))
+    : null;
   const shareIssue = async () => {
     try {
       const result = await shareIssueLink({
         projectId,
         runId: run.id,
-        title: run.title
+        title: run.title,
+        urlOverride: canonicalIssueUrl ?? undefined
       });
       if (result === "copied") {
         toast(t("issue.linkCopied"), {
@@ -985,7 +990,8 @@ export function RunPage({
     try {
       await copyIssueShareLink({
         projectId,
-        runId: run.id
+        runId: run.id,
+        urlOverride: canonicalIssueUrl ?? undefined
       });
       toast(t("issue.linkCopied"), {
         tone: "success"
@@ -1750,4 +1756,4 @@ export function RunPage({
         </DialogContent>
       </Dialog>
     </MainContent>;
-}
+    }

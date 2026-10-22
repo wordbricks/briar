@@ -38,6 +38,7 @@ export const workerD1TestFiles = [
   "worker/src/github-db.test.ts",
   "worker/src/github-integration-db.test.ts",
   "worker/src/hierarchy-repository.test.ts",
+  "worker/src/hunt-run-key-query.test.ts",
   "worker/src/inbox-read-state-repository.test.ts",
   "worker/src/inbox-realtime.test.ts",
   "worker/src/index.test.ts",
