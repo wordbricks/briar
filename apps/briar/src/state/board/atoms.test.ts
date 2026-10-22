@@ -8,7 +8,16 @@ import { activePlanningProjectIdAtom } from "../dialogs/atoms";
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { teamsByIdAtom } from "../entities/teams";
 import { upsertMany } from "../entities/upsert";
-import { companionStatusAtom } from "../navigation/atoms";
+import {
+  companionStatusAtom,
+  navigationHistoryAtom,
+} from "../navigation/atoms";
+import { createNavigationHistory } from "../navigation/history";
+import {
+  issueNavigationLocation,
+  type AppNavigationLocation,
+} from "../../lib/app-navigation";
+import { applySyncEvent } from "../sync/apply";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import {
   teamGeneratedAtAtom,
@@ -32,7 +41,10 @@ import {
   boardVisibleColumnIdsAtom,
   companionRunIdsAtom,
   resetBoardPropertyFilters,
+  persistBoardViewState,
+  readStoredBoardViewState,
   resetBoardViewState,
+  restoreBoardViewState,
 } from "./atoms";
 import { emptyIssuePropertyFilters } from "./filters";
 
@@ -332,5 +344,88 @@ describe("board atoms", () => {
     expect(registry.get(boardSourceAtom)).toBe("all");
     expect(registry.get(boardStatusAtom)).toBe("all");
     expect(registry.get(boardViewAtom)).toBe("kanban");
+  });
+});
+
+describe("board view persistence", () => {
+  const memoryStorage = () => {
+    const map = new Map<string, string>();
+    return {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, value: string) => void map.set(key, value),
+      map,
+    };
+  };
+
+  it("round-trips the board's search, tabs, view and property filters", () => {
+    const registry = createTestRegistry();
+    const storage = memoryStorage();
+    registry.set(boardQueryAtom, "브라이어");
+    registry.set(boardSourceAtom, "issue");
+    registry.set(boardStatusAtom, "active");
+    registry.set(boardViewAtom, "list");
+    registry.set(boardPropertyFiltersAtom, {
+      ...emptyIssuePropertyFilters(),
+      status: ["running"],
+      priority: ["high"],
+    });
+    persistBoardViewState(registry, "team-1", storage);
+
+    const restored = createTestRegistry();
+    expect(restoreBoardViewState(restored, "team-1", storage)).toBe(true);
+    expect(restored.get(boardQueryAtom)).toBe("브라이어");
+    expect(restored.get(boardSourceAtom)).toBe("issue");
+    expect(restored.get(boardStatusAtom)).toBe("active");
+    expect(restored.get(boardViewAtom)).toBe("list");
+    expect(restored.get(boardPropertyFiltersAtom)).toEqual({
+      ...emptyIssuePropertyFilters(),
+      status: ["running"],
+      priority: ["high"],
+    });
+
+    const empty = memoryStorage();
+    const fresh = createTestRegistry();
+    expect(restoreBoardViewState(fresh, "team-1", empty)).toBe(false);
+  });
+
+  it("rejects malformed stored state", () => {
+    const storage = memoryStorage();
+    storage.map.set("briar:board-view:team-1", '{"query":1}');
+    expect(readStoredBoardViewState("team-1", storage)).toBeNull();
+    storage.map.set("briar:board-view:team-1", "not json");
+    expect(readStoredBoardViewState("team-1", storage)).toBeNull();
+    storage.map.set(
+      "briar:board-view:team-1",
+      '{"query":"x","source":"nope","status":"all","view":"list","propertyFilters":{}}',
+    );
+    expect(readStoredBoardViewState("team-1", storage)).toBeNull();
+    storage.map.set(
+      "briar:board-view:team-1",
+      '{"query":"x","source":"all","status":"all","view":"list","propertyFilters":{"status":"running"}}',
+    );
+    expect(readStoredBoardViewState("team-1", storage)).toBeNull();
+  });
+});
+
+describe("sync writes and navigation", () => {
+  it("applying sync events never moves the navigation location", () => {
+    const registry = createTestRegistry();
+    const history = createNavigationHistory<AppNavigationLocation>(
+      issueNavigationLocation(teamId, "run-1"),
+    );
+    registry.set(navigationHistoryAtom, history);
+
+    applySyncEvent(registry, {
+      kind: "run-changed",
+      teamId,
+      run: runOf({ id: "run-1" }),
+    });
+    applySyncEvent(registry, {
+      kind: "run-deleted",
+      teamId,
+      runId: "run-1",
+    });
+
+    expect(registry.get(navigationHistoryAtom)).toBe(history);
   });
 });
