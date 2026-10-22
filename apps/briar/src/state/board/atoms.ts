@@ -104,6 +104,165 @@ export function resetBoardPropertyFilters(registry: AtomRegistry) {
   registry.set(boardPropertyFiltersAtom, emptyIssuePropertyFilters());
 }
 
+/*
+  Reload persistence.
+
+  Mounting used to wipe the search box, the tabs and the kanban/list toggle,
+  so a reload or a board refresh lost the slice of the list the user was
+  looking at. The four fields are mirrored into localStorage per team and
+  restored on mount instead of reset; a team switch still clears the property
+  filters exactly as before. Storage failures (private mode, quota) are
+  ignored: persistence is a convenience, never a reason to break the board.
+*/
+export type StoredBoardViewState = {
+  readonly query: string;
+  readonly source: SourceFilter;
+  readonly status: StatusFilter;
+  readonly view: DashboardView;
+  readonly propertyFilters: IssuePropertyFilters;
+};
+
+const boardViewStorageKey = (teamId: string) => `briar:board-view:${teamId}`;
+
+const storedSources: readonly SourceFilter[] = [
+  "all",
+  "issue",
+  "error",
+  "feedback",
+];
+const storedStatuses: readonly StatusFilter[] = [
+  "all",
+  "active",
+  "attention",
+  "completed",
+];
+const storedViews: readonly DashboardView[] = ["kanban", "list"];
+
+const storedPropertyFilterKeys = [
+  "status",
+  "source",
+  "priority",
+  "assignee",
+  "agent",
+  "creator",
+  "updated",
+] as const;
+
+function readStoredPropertyFilters(
+  value: unknown,
+): IssuePropertyFilters | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as Record<string, unknown>;
+  const filters = emptyIssuePropertyFilters();
+  for (const key of storedPropertyFilterKeys) {
+    const entries = candidate[key];
+    if (
+      !Array.isArray(entries) ||
+      entries.some((entry) => typeof entry !== "string")
+    ) {
+      return null;
+    }
+    filters[key] = entries as string[];
+  }
+  return filters;
+}
+
+export function readStoredBoardViewState(
+  teamId: string,
+  storage: Pick<Storage, "getItem"> | null = typeof window === "undefined"
+    ? null
+    : window.localStorage,
+): StoredBoardViewState | null {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(boardViewStorageKey(teamId));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const candidate = parsed as Record<string, unknown>;
+    if (typeof candidate.query !== "string") return null;
+    if (!storedSources.includes(candidate.source as SourceFilter)) return null;
+    if (!storedStatuses.includes(candidate.status as StatusFilter)) {
+      return null;
+    }
+    if (!storedViews.includes(candidate.view as DashboardView)) return null;
+    const propertyFilters = readStoredPropertyFilters(
+      candidate.propertyFilters,
+    );
+    if (!propertyFilters) return null;
+    return {
+      query: candidate.query,
+      source: candidate.source as SourceFilter,
+      status: candidate.status as StatusFilter,
+      view: candidate.view as DashboardView,
+      propertyFilters,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Remembers the board's current view state for the team's next mount. */
+export function persistBoardViewState(
+  registry: AtomRegistry,
+  teamId: string,
+  storage: Pick<Storage, "setItem"> | null = typeof window === "undefined"
+    ? null
+    : window.localStorage,
+): void {
+  if (!storage || !teamId) return;
+  const state: StoredBoardViewState = {
+    query: registry.get(boardQueryAtom),
+    source: registry.get(boardSourceAtom),
+    status: registry.get(boardStatusAtom),
+    view: registry.get(boardViewAtom),
+    propertyFilters: registry.get(boardPropertyFiltersAtom),
+  };
+  try {
+    storage.setItem(boardViewStorageKey(teamId), JSON.stringify(state));
+  } catch {
+    // Storage is best effort; the board keeps working without it.
+  }
+}
+
+/**
+ * Applies the team's remembered view state. Returns false when nothing was
+ * stored, so the caller can fall back to the defaults.
+ */
+export function restoreBoardViewState(
+  registry: AtomRegistry,
+  teamId: string,
+  storage: Pick<Storage, "getItem"> | null = typeof window === "undefined"
+    ? null
+    : window.localStorage,
+): boolean {
+  const stored = readStoredBoardViewState(teamId, storage);
+  if (!stored) return false;
+  if (registry.get(boardQueryAtom) !== stored.query) {
+    registry.set(boardQueryAtom, stored.query);
+  }
+  if (registry.get(boardSourceAtom) !== stored.source) {
+    registry.set(boardSourceAtom, stored.source);
+  }
+  if (registry.get(boardStatusAtom) !== stored.status) {
+    registry.set(boardStatusAtom, stored.status);
+  }
+  if (registry.get(boardViewAtom) !== stored.view) {
+    registry.set(boardViewAtom, stored.view);
+  }
+  if (
+    selectedIssuePropertyFilterCount(
+      registry.get(boardPropertyFiltersAtom),
+    ) !==
+      selectedIssuePropertyFilterCount(stored.propertyFilters) ||
+    JSON.stringify(registry.get(boardPropertyFiltersAtom)) !==
+      JSON.stringify(stored.propertyFilters)
+  ) {
+    registry.set(boardPropertyFiltersAtom, stored.propertyFilters);
+  }
+  return true;
+}
+
 /**
  * Puts the board's view state back to its defaults, which is what mounting the
  * board used to do by construction. Fields that already hold their default are
