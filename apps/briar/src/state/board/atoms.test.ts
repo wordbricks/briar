@@ -41,7 +41,9 @@ import {
   boardVisibleColumnIdsAtom,
   companionRunIdsAtom,
   resetBoardPropertyFilters,
+  persistBoardScroll,
   persistBoardViewState,
+  readStoredBoardScroll,
   readStoredBoardViewState,
   resetBoardViewState,
   restoreBoardViewState,
@@ -404,6 +406,28 @@ describe("board view persistence", () => {
       '{"query":"x","source":"all","status":"all","view":"list","propertyFilters":{"status":"running"}}',
     );
     expect(readStoredBoardViewState("team-1", storage)).toBeNull();
+  });
+
+  it("round-trips the board's scroll offset per team", () => {
+    const storage = memoryStorage();
+    persistBoardScroll("team-1", 482.6, storage);
+    expect(readStoredBoardScroll("team-1", storage)).toBe(483);
+    expect(readStoredBoardScroll("team-2", storage)).toBeNull();
+
+    persistBoardScroll("team-2", 96, storage);
+    expect(readStoredBoardScroll("team-1", storage)).toBe(483);
+    expect(readStoredBoardScroll("team-2", storage)).toBe(96);
+  });
+
+  it("rejects unusable stored scroll offsets", () => {
+    const storage = memoryStorage();
+    expect(readStoredBoardScroll("team-1", storage)).toBeNull();
+    storage.map.set("briar:board-scroll:team-1", "not a number");
+    expect(readStoredBoardScroll("team-1", storage)).toBeNull();
+    storage.map.set("briar:board-scroll:team-1", "0");
+    expect(readStoredBoardScroll("team-1", storage)).toBeNull();
+    storage.map.set("briar:board-scroll:team-1", "-12");
+    expect(readStoredBoardScroll("team-1", storage)).toBeNull();
   });
 });
 
