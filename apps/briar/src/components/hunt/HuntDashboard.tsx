@@ -28,7 +28,9 @@ import {
   boardSourceAtom,
   boardStatusAtom,
   boardViewAtom,
+  persistBoardScroll,
   persistBoardViewState,
+  readStoredBoardScroll,
   resetBoardPropertyFilters,
   resetBoardViewState,
   restoreBoardViewState,
@@ -412,6 +414,54 @@ function HuntDashboardContent({
   }, [activeTeamId, registry]);
 
   const issuesLoading = !dashboardLoaded && !noProject && !error && !recoveryError;
+  /*
+    Scroll is remembered per team alongside the view state: the board listens
+    for scrolls of its kanban/list container in the capture phase (scroll does
+    not bubble), persists the offset, and the next mount puts it back once the
+    first loaded page has rendered.
+  */
+  const restoredBoardScrollRef = useRef(false);
+  useEffect(() => {
+    if (!activeTeamId) return;
+    let persistTimer: number | null = null;
+    const onScroll = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (
+        !target.classList.contains("kanban-board") &&
+        !target.classList.contains("issue-list")
+      ) {
+        return;
+      }
+      if (persistTimer !== null) window.clearTimeout(persistTimer);
+      const scrollTop = target.scrollTop;
+      persistTimer = window.setTimeout(() => {
+        persistTimer = null;
+        persistBoardScroll(activeTeamId, scrollTop);
+      }, 150);
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("scroll", onScroll, true);
+      if (persistTimer !== null) window.clearTimeout(persistTimer);
+    };
+  }, [activeTeamId]);
+  useEffect(() => {
+    if (restoredBoardScrollRef.current || !activeTeamId || issuesLoading) {
+      return;
+    }
+    restoredBoardScrollRef.current = true;
+    const stored = readStoredBoardScroll(activeTeamId);
+    if (stored === null) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const scroller = document.querySelector<HTMLElement>(
+          "#issues .kanban-board, #issues .issue-list",
+        );
+        if (scroller) scroller.scrollTop = stored;
+      });
+    });
+  }, [activeTeamId, issuesLoading]);
   const displayedError = error ?? recoveryError;
   const lastDisplayedErrorRef = useRef<string | null>(null);
   useEffect(() => {
