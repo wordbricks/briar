@@ -263,6 +263,50 @@ export function restoreBoardViewState(
   return true;
 }
 
+const boardScrollStorageKey = (teamId: string) => `briar:board-scroll:${teamId}`;
+
+/**
+ * Remembers how far the team's board was scrolled, so a reload lands on the
+ * same slice of the list the user was looking at. Stored separately from the
+ * view state: the two change on different triggers (every scroll vs every
+ * filter edit). Best effort like the rest of the persistence.
+ */
+export function readStoredBoardScroll(
+  teamId: string,
+  storage: Pick<Storage, "getItem"> | null = typeof window === "undefined"
+    ? null
+    : window.localStorage,
+): number | null {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(boardScrollStorageKey(teamId));
+    if (!raw) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Remembers the board's scroll offset for the team's next mount. */
+export function persistBoardScroll(
+  teamId: string,
+  scrollTop: number,
+  storage: Pick<Storage, "setItem"> | null = typeof window === "undefined"
+    ? null
+    : window.localStorage,
+): void {
+  if (!storage || !teamId || !Number.isFinite(scrollTop)) return;
+  try {
+    storage.setItem(
+      boardScrollStorageKey(teamId),
+      String(Math.max(0, Math.round(scrollTop))),
+    );
+  } catch {
+    // Storage is best effort; the board keeps working without it.
+  }
+}
+
 /**
  * Puts the board's view state back to its defaults, which is what mounting the
  * board used to do by construction. Fields that already hold their default are
