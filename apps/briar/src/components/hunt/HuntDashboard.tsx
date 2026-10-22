@@ -20,11 +20,18 @@ import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, Cre
 import { sortAgentProviders, type AgentProvider } from "@/lib/team-llm";
 import {
   boardLoadedAtom,
+  boardPropertyFiltersAtom,
+  boardQueryAtom,
   boardRunAtom,
   boardRunKey,
   boardScopedRunIdsAtom,
+  boardSourceAtom,
+  boardStatusAtom,
+  boardViewAtom,
+  persistBoardViewState,
   resetBoardPropertyFilters,
   resetBoardViewState,
+  restoreBoardViewState,
 } from "@/state/board/atoms";
 import {
   runAgentAssociationAtom,
@@ -365,10 +372,43 @@ function HuntDashboardContent({
     exactly as the effect keyed on the team id used to.
   */
   useEffect(() => {
-    resetBoardViewState(registry);
+    const teamId = registry.get(activeTeamIdAtom);
+    if (!teamId || !restoreBoardViewState(registry, teamId)) {
+      resetBoardViewState(registry);
+    }
+    // Mount only: restores what a reload wiped. Team switches are handled by
+    // the property-filter effect below and must not re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry]);
+  const boardQuery = useAtomValue(boardQueryAtom);
+  const boardSource = useAtomValue(boardSourceAtom);
+  const boardStatus = useAtomValue(boardStatusAtom);
+  const boardView = useAtomValue(boardViewAtom);
+  const boardPropertyFilters = useAtomValue(boardPropertyFiltersAtom);
   useEffect(() => {
-    resetBoardPropertyFilters(registry);
+    if (!activeTeamId) return;
+    persistBoardViewState(registry, activeTeamId);
+  }, [
+    registry,
+    activeTeamId,
+    boardQuery,
+    boardSource,
+    boardStatus,
+    boardView,
+    boardPropertyFilters,
+  ]);
+  const previousTeamIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Mount is a restore, not a switch: clearing here would wipe the property
+    // filters the restore just brought back. Real team switches still clear.
+    if (previousTeamIdRef.current === null) {
+      previousTeamIdRef.current = activeTeamId;
+      return;
+    }
+    if (previousTeamIdRef.current !== activeTeamId) {
+      previousTeamIdRef.current = activeTeamId;
+      resetBoardPropertyFilters(registry);
+    }
   }, [activeTeamId, registry]);
 
   const issuesLoading = !dashboardLoaded && !noProject && !error && !recoveryError;
