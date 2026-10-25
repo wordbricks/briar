@@ -20,11 +20,20 @@ import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, Cre
 import { sortAgentProviders, type AgentProvider } from "@/lib/team-llm";
 import {
   boardLoadedAtom,
+  boardPropertyFiltersAtom,
+  boardQueryAtom,
   boardRunAtom,
   boardRunKey,
   boardScopedRunIdsAtom,
+  boardSourceAtom,
+  boardStatusAtom,
+  boardViewAtom,
+  persistBoardScroll,
+  persistBoardViewState,
+  readStoredBoardScroll,
   resetBoardPropertyFilters,
   resetBoardViewState,
+  restoreBoardViewState,
 } from "@/state/board/atoms";
 import {
   runAgentAssociationAtom,
@@ -365,13 +374,94 @@ function HuntDashboardContent({
     exactly as the effect keyed on the team id used to.
   */
   useEffect(() => {
-    resetBoardViewState(registry);
+    const teamId = registry.get(activeTeamIdAtom);
+    if (!teamId || !restoreBoardViewState(registry, teamId)) {
+      resetBoardViewState(registry);
+    }
+    // Mount only: restores what a reload wiped. Team switches are handled by
+    // the property-filter effect below and must not re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry]);
+  const boardQuery = useAtomValue(boardQueryAtom);
+  const boardSource = useAtomValue(boardSourceAtom);
+  const boardStatus = useAtomValue(boardStatusAtom);
+  const boardView = useAtomValue(boardViewAtom);
+  const boardPropertyFilters = useAtomValue(boardPropertyFiltersAtom);
   useEffect(() => {
-    resetBoardPropertyFilters(registry);
+    if (!activeTeamId) return;
+    persistBoardViewState(registry, activeTeamId);
+  }, [
+    registry,
+    activeTeamId,
+    boardQuery,
+    boardSource,
+    boardStatus,
+    boardView,
+    boardPropertyFilters,
+  ]);
+  const previousTeamIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Mount is a restore, not a switch: clearing here would wipe the property
+    // filters the restore just brought back. Real team switches still clear.
+    if (previousTeamIdRef.current === null) {
+      previousTeamIdRef.current = activeTeamId;
+      return;
+    }
+    if (previousTeamIdRef.current !== activeTeamId) {
+      previousTeamIdRef.current = activeTeamId;
+      resetBoardPropertyFilters(registry);
+    }
   }, [activeTeamId, registry]);
 
   const issuesLoading = !dashboardLoaded && !noProject && !error && !recoveryError;
+  /*
+    Scroll is remembered per team alongside the view state: the board listens
+    for scrolls of its kanban/list container in the capture phase (scroll does
+    not bubble), persists the offset, and the next mount puts it back once the
+    first loaded page has rendered.
+  */
+  const restoredBoardScrollRef = useRef(false);
+  useEffect(() => {
+    if (!activeTeamId) return;
+    let persistTimer: number | null = null;
+    const onScroll = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (
+        !target.classList.contains("kanban-board") &&
+        !target.classList.contains("issue-list")
+      ) {
+        return;
+      }
+      if (persistTimer !== null) window.clearTimeout(persistTimer);
+      const scrollTop = target.scrollTop;
+      persistTimer = window.setTimeout(() => {
+        persistTimer = null;
+        persistBoardScroll(activeTeamId, scrollTop);
+      }, 150);
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("scroll", onScroll, true);
+      if (persistTimer !== null) window.clearTimeout(persistTimer);
+    };
+  }, [activeTeamId]);
+  useEffect(() => {
+    if (restoredBoardScrollRef.current || !activeTeamId || issuesLoading) {
+      return;
+    }
+    restoredBoardScrollRef.current = true;
+    const stored = readStoredBoardScroll(activeTeamId);
+    if (stored === null) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const scroller = document.querySelector<HTMLElement>(
+          "#issues .kanban-board, #issues .issue-list",
+        );
+        if (scroller) scroller.scrollTop = stored;
+      });
+    });
+  }, [activeTeamId, issuesLoading]);
   const displayedError = error ?? recoveryError;
   const lastDisplayedErrorRef = useRef<string | null>(null);
   useEffect(() => {

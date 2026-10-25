@@ -6,7 +6,7 @@ import { activePlanningProjectIdAtom } from "@/state/dialogs/atoms";
 import { createTestRegistry } from "@/state/registry";
 import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/types";
 import { demoDashboard, demoRunEvents } from "@/lib/demo-data";
 import * as api from "@/lib/api";
@@ -21,6 +21,16 @@ import { runMatchesIssuePropertyFilters, type IssuePropertyFilters } from "@/sta
 import { createIssueDraftStorageKey } from "@/lib/create-issue-draft";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
+/*
+  The dashboard persists the board's view state and scroll offset to
+  localStorage now, and mounts restore it. Tests share one jsdom window, so
+  each starts from empty storage instead of inheriting the previous test's
+  board slice.
+*/
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
 const dashboardProps = {
   error: null,
   isCreatingIssue: false,

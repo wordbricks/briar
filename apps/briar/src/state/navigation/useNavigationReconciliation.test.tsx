@@ -13,6 +13,14 @@ import {
   settingsNavigationLocation,
 } from "../../lib/app-navigation";
 import { organizationChannelsAtom } from "../entities/channels";
+import {
+  boardQueryAtom,
+  boardSourceAtom,
+  boardStatusAtom,
+  boardViewAtom,
+  persistBoardScroll,
+  readStoredBoardScroll,
+} from "../board/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { channelApiAtom } from "../channels/api";
 import {
@@ -738,6 +746,95 @@ describe("the DM page's latest conversation", () => {
 
     expect(registry.get(activePageAtom)).toBe("issues");
     expect(registry.get(activeChannelIdAtom)).toBeNull();
+    await view.cleanup();
+  });
+});
+
+describe("inbound events while an issue is open", () => {
+  /*
+    Option 1's other half: a card stays open, with its search, view and
+    scroll, when life happens around it. A new DM and a board refresh are
+    data events, not navigation events — they must never move the user or
+    reset the board they are looking at. These two cases pin that contract
+    so the reload persistence work cannot be undone by a future sync path.
+  */
+
+  const seedOpenIssue = async (registry: AtomRegistry) => {
+    await act(async () => {
+      actions.navigateToIssue("run-1", teamA.id);
+    });
+    await flush();
+    await act(async () => {
+      registry.set(boardQueryAtom, "로그");
+      registry.set(boardSourceAtom, "issue");
+      registry.set(boardStatusAtom, "active");
+      registry.set(boardViewAtom, "list");
+      persistBoardScroll(teamA.id, 120);
+    });
+    await flush();
+    expect(registry.get(activePageAtom)).toBe("issues");
+    expect(registry.get(activeRunIdAtom)).toBe("run-1");
+    expect(registry.get(navigationTeamIdAtom)).toBe(teamA.id);
+  };
+
+  const expectContextIntact = (registry: AtomRegistry, before: unknown) => {
+    expect(registry.get(navigationLocationAtom)).toEqual(before);
+    expect(registry.get(activePageAtom)).toBe("issues");
+    expect(registry.get(activeRunIdAtom)).toBe("run-1");
+    expect(registry.get(activeChannelIdAtom)).toBeNull();
+    expect(registry.get(desktopActiveChannelIdAtom)).toBeNull();
+    expect(registry.get(boardQueryAtom)).toBe("로그");
+    expect(registry.get(boardSourceAtom)).toBe("issue");
+    expect(registry.get(boardStatusAtom)).toBe("active");
+    expect(registry.get(boardViewAtom)).toBe("list");
+    expect(readStoredBoardScroll(teamA.id)).toBe(120);
+  };
+
+  it("keeps the open issue, board state and scroll when a direct message arrives", async () => {
+    window.localStorage.removeItem(`briar:board-scroll:${teamA.id}`);
+    const registry = harness();
+    const view = await mount(registry);
+    await seedOpenIssue(registry);
+    const before = registry.get(navigationLocationAtom);
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "channel-catalog-delta",
+        workspaceId: workspace.id,
+        channels: [
+          {
+            ...channelOf("dm-new"),
+            kind: "dm",
+            hasUnread: true,
+            lastMessageAt: "2026-10-23T09:00:00.000Z",
+            lastMessagePreview: "새 메시지",
+          },
+        ],
+        removedChannelIds: [],
+        reset: false,
+      });
+    });
+    await flush();
+    expectContextIntact(registry, before);
+    await view.cleanup();
+  });
+
+  it("keeps the open issue, board state and scroll when the board refreshes", async () => {
+    window.localStorage.removeItem(`briar:board-scroll:${teamA.id}`);
+    const registry = harness();
+    const view = await mount(registry);
+    await seedOpenIssue(registry);
+    const before = registry.get(navigationLocationAtom);
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "run-changed",
+        run: demoDashboard.runs[0],
+        teamId: teamA.id,
+      });
+    });
+    await flush();
+    expectContextIntact(registry, before);
     await view.cleanup();
   });
 });
