@@ -36,9 +36,7 @@ const event = (
   qaStatus: null,
   stagingQaDetail: null,
   productionQaDetail: null,
-  executionPlan: null,
-  progress: null,
-  blocked: null,
+  context: null,
   ...overrides,
 });
 
