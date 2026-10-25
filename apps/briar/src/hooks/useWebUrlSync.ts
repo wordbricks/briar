@@ -5,6 +5,7 @@ import {
   pageFromNavigationLocation,
   projectIdFromNavigationLocation,
   runIdFromNavigationLocation,
+  type AppNavigationLocation,
 } from "../lib/app-navigation";
 import { formatIssueKey } from "../lib/issue-key";
 import {
@@ -38,7 +39,7 @@ import type { HuntRun, Team } from "../types";
 
 /** The path a navigation location should show, or null to leave the URL alone. */
 export function urlPathForLocation(
-  location: string,
+  location: AppNavigationLocation,
   runsById: ReadonlyMap<string, HuntRun>,
   teams: readonly Team[],
 ): string | null {
