@@ -127,18 +127,33 @@ export async function moveHuntRun(
     currentRank >= 0 &&
     targetRank >= 0 &&
     targetRank < currentRank;
+  const statusLabels = {
+    backlog: "백로그",
+    queued: "대기",
+    blocked: "차단",
+    failed: "실패",
+    completed: "완료",
+    cancelled: "취소",
+  } as const;
   const targetLabel =
     input.status === "running"
       ? workflow.stages.find((stage) => stage.id === targetWorkflowStage)?.label
-      : {
-          backlog: "백로그",
-          queued: "대기",
-          blocked: "차단",
-          failed: "실패",
-          completed: "완료",
-          cancelled: "취소",
-        }[input.status];
-  const detail = `사용자가 작업을 ${targetLabel ?? input.status} 상태로 이동했습니다.`;
+      : statusLabels[input.status as keyof typeof statusLabels];
+  /*
+    Where the card came from, so the history reads "대기에서 진행 상태로"
+    instead of only naming the destination. A paused card reports the pause,
+    matching how the board labels it.
+  */
+  const sourceLabel = run.paused_at
+    ? "일시정지"
+    : run.status === "running"
+      ? workflow.stages.find((stage) => stage.id === run.workflow_stage)?.label
+      : statusLabels[run.status as keyof typeof statusLabels];
+  const target = targetLabel ?? input.status;
+  const detail =
+    sourceLabel && sourceLabel !== target
+      ? `사용자가 작업을 ${sourceLabel}에서 ${target} 상태로 이동했습니다.`
+      : `사용자가 작업을 ${target} 상태로 이동했습니다.`;
   const eventId = crypto.randomUUID();
   const recordedAt = new Date().toISOString();
   const targetAttempt =
