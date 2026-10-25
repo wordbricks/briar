@@ -14,7 +14,12 @@ import {
   type AppNavigationLocation,
 } from "../../lib/app-navigation";
 import type { IssueDetailTab } from "../../lib/issue-detail-tab";
-import { parseWebAppIssuePath, type BriarLinkTarget } from "../../lib/issue-links";
+import {
+  parseWebAppIssueKeyPath,
+  parseWebAppIssuePath,
+  parseWebAppPagePath,
+  type BriarLinkTarget,
+} from "../../lib/issue-links";
 import {
   activeChannelIdAtom,
   organizationDirectMessagesAtom,
@@ -105,8 +110,13 @@ export const pendingBriarLinkAtom = Atom.make<BriarLinkTarget | null>(
 
 function initialWebAppLink(): BriarLinkTarget | null {
   if (!webMode || typeof window === "undefined") return null;
-  const target = parseWebAppIssuePath(window.location.pathname);
-  return target ? { kind: "issue", ...target } : null;
+  const pathname = window.location.pathname;
+  const target = parseWebAppIssuePath(pathname);
+  if (target) return { kind: "issue", ...target };
+  const issueKey = parseWebAppIssueKeyPath(pathname);
+  if (issueKey) return { kind: "issueKey", issueKey };
+  const page = parseWebAppPagePath(pathname);
+  return page ? { kind: "page", page } : null;
 }
 
 /** The inbox notification the user clicked, waiting for the session to settle. */
