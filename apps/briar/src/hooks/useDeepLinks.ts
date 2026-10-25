@@ -302,10 +302,12 @@ export function useDeepLinks({
       }
       const prefix = keyMatch[1].toUpperCase();
       const runNumber = Number(keyMatch[2]);
-      const team = teams.find(
-        (candidate) =>
-          normalizeIssueKeyPrefix(candidate.issueKeyPrefix ?? "") === prefix,
-      );
+      const hasPrefix = (candidate: (typeof teams)[number]) =>
+        normalizeIssueKeyPrefix(candidate.issueKeyPrefix ?? "") === prefix;
+      const team =
+        teams.find(
+          (candidate) => candidate.id === activeTeamId && hasPrefix(candidate),
+        ) ?? teams.find(hasPrefix);
       // Teams may still be loading; the effect reruns when they arrive.
       if (!team) return;
 
@@ -355,11 +357,20 @@ export function useDeepLinks({
       fetchingIssueKeyRef.current = target.issueKey;
       void (async () => {
         try {
-          const result = await resolvers.listDashboardRunsRpc(token, team.id, {
-            query: target.issueKey,
-            pageSize: 10,
-          });
-          const match = result.runs.find((run) => run.runNumber === runNumber);
+          let cursor: string | null = null;
+          let result: Awaited<
+            ReturnType<typeof resolvers.listDashboardRunsRpc>
+          >;
+          let match: (typeof result.runs)[number] | undefined;
+          do {
+            result = await resolvers.listDashboardRunsRpc(token, team.id, {
+              query: target.issueKey,
+              pageSize: 50,
+              cursor,
+            });
+            match = result.runs.find((run) => run.runNumber === runNumber);
+            cursor = result.nextCursor;
+          } while (!match && cursor);
           if (!match) throw new Error("issue key not found");
           const currentRuns = registry.get(runsByIdAtom);
           const nextRuns = new Map(currentRuns);
