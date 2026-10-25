@@ -12,6 +12,9 @@ import { resolveIssueHierarchyLocation } from "../lib/api";
 import type { ChannelSummary } from "../lib/channels-contract";
 import { projectNavigationLocation } from "../lib/app-navigation";
 import { navigateToIssueLink } from "../lib/issue-link-navigation";
+import { listDashboardRunsRpc } from "../lib/app-rpc/dashboard";
+import { normalizeIssueKeyPrefix } from "../lib/issue-key";
+import { useRegistry } from "../state/registry";
 import { useChannelActions } from "../state/channels/actions";
 import {
   appMenuSettingsListenerAtom,
@@ -48,7 +51,7 @@ import { useLocalWorkspaceActions } from "../state/local-workspace/actions";
 import { companionMode, lockedTeamIdAtom } from "../state/platform";
 import { loadingAtom, tokenAtom, userAtom } from "../state/session/atoms";
 import { useTeamActions } from "../state/team/actions";
-import { teamRunIdsAtom } from "../state/entities/runs";
+import { runsByIdAtom, teamRunIdsAtom } from "../state/entities/runs";
 import {
   activeTeamIdAtom,
   loadedTeamIdAtom,
@@ -92,11 +95,13 @@ export const companionChannelPage = (
 export interface DeepLinkResolvers {
   readonly resolveIssueHierarchyLocation: typeof resolveIssueHierarchyLocation;
   readonly navigateToIssueLink: typeof navigateToIssueLink;
+  readonly listDashboardRunsRpc: typeof listDashboardRunsRpc;
 }
 
 const liveResolvers: DeepLinkResolvers = {
   resolveIssueHierarchyLocation,
   navigateToIssueLink,
+  listDashboardRunsRpc,
 };
 
 export interface UseDeepLinksInput {
@@ -108,6 +113,7 @@ export function useDeepLinks({
 }: UseDeepLinksInput = {}): void {
   const { t } = useI18n();
   const { toast } = useToast();
+  const registry = useRegistry();
   const resolvers: DeepLinkResolvers = { ...liveResolvers, ...resolverOverrides };
 
   /*
@@ -173,6 +179,12 @@ export function useDeepLinks({
     inbox does not hold yet returns `false` and is retried on the next pass.
   */
   const sentInboxReceiptFor = useRef<string | null>(null);
+
+  /*
+    The issue-key fetch in flight, keyed so the effect rerunning on unrelated
+    state does not fetch the same key twice.
+  */
+  const fetchingIssueKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!pendingBriarLink || !user || loading) return;
@@ -281,6 +293,119 @@ export function useDeepLinks({
       });
       return;
     }
+    if (pendingBriarLink.kind === "issueKey") {
+      const target = pendingBriarLink;
+      const keyMatch = target.issueKey.match(/^([A-Za-z0-9]{1,3})-(\d{1,9})$/u);
+      if (!keyMatch) {
+        setPendingBriarLink(null);
+        return;
+      }
+      const prefix = keyMatch[1].toUpperCase();
+      const runNumber = Number(keyMatch[2]);
+      const hasPrefix = (candidate: (typeof teams)[number]) =>
+        normalizeIssueKeyPrefix(candidate.issueKeyPrefix ?? "") === prefix;
+      const team =
+        teams.find(
+          (candidate) => candidate.id === activeTeamId && hasPrefix(candidate),
+        ) ?? teams.find(hasPrefix);
+      // Teams may still be loading; the effect reruns when they arrive.
+      if (!team) return;
+
+      const openResolvedRun = (runId: string) => {
+        setRequestedSessionId(null);
+        setRequestedRunMessageId(null);
+        setRequestedRunInitialTab(null);
+        setRequestedRunId(runId);
+        setCompanionPage("issues");
+        setCompanionStatus("all");
+        navigateToIssue(runId, team.id);
+        setPendingBriarLink(null);
+      };
+
+      const storedRunId = ((): string | null => {
+        const runs = registry.get(runsByIdAtom);
+        const ids = registry.get(teamRunIdsAtom(team.id));
+        if (ids) {
+          for (const id of ids) {
+            const run = runs.get(id);
+            if (run && run.runNumber === runNumber) return id;
+          }
+          return null;
+        }
+        for (const run of runs.values()) {
+          if (
+            run.runNumber === runNumber &&
+            (run.teamId === team.id || run.teamId == null)
+          ) {
+            return run.id;
+          }
+        }
+        return null;
+      })();
+      if (storedRunId) {
+        openResolvedRun(storedRunId);
+        return;
+      }
+
+      /*
+        The card is outside the loaded page, so resolve the key through the
+        list query: the worker matches an issue key or bare number against
+        run_number. Fetch once per key.
+      */
+      if (!token) return;
+      if (fetchingIssueKeyRef.current === target.issueKey) return;
+      fetchingIssueKeyRef.current = target.issueKey;
+      void (async () => {
+        try {
+          let cursor: string | null = null;
+          let result: Awaited<
+            ReturnType<typeof resolvers.listDashboardRunsRpc>
+          >;
+          let match: (typeof result.runs)[number] | undefined;
+          do {
+            result = await resolvers.listDashboardRunsRpc(token, team.id, {
+              query: target.issueKey,
+              pageSize: 50,
+              cursor,
+            });
+            match = result.runs.find((run) => run.runNumber === runNumber);
+            cursor = result.nextCursor;
+          } while (!match && cursor);
+          if (!match) throw new Error("issue key not found");
+          const currentRuns = registry.get(runsByIdAtom);
+          const nextRuns = new Map(currentRuns);
+          for (const run of result.runs) nextRuns.set(run.id, run);
+          registry.set(runsByIdAtom, nextRuns);
+          const currentIds = registry.get(teamRunIdsAtom(team.id));
+          if (currentIds) {
+            const known = new Set(currentIds);
+            const prepended = result.runs
+              .map((run) => run.id)
+              .filter((id) => !known.has(id));
+            if (prepended.length > 0) {
+              registry.set(teamRunIdsAtom(team.id), [
+                ...prepended,
+                ...currentIds,
+              ]);
+            }
+          }
+          openResolvedRun(match.id);
+        } catch {
+          setPendingBriarLink(null);
+          toast(t("navigation.issueLinkIssueUnavailable"), { tone: "error" });
+          navigateToPage("issues", team.id);
+        } finally {
+          fetchingIssueKeyRef.current = null;
+        }
+      })();
+      return;
+    }
+    if (pendingBriarLink.kind === "page") {
+      const page = pendingBriarLink.page;
+      setPendingBriarLink(null);
+      navigateToPage(page);
+      return;
+    }
     if (!teams.some((team) => team.id === pendingBriarLink.projectId)) {
       return;
     }
@@ -331,6 +456,7 @@ export function useDeepLinks({
     toast,
     token,
     user,
+    registry,
   ]);
 
   /*

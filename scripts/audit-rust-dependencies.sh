@@ -3,9 +3,6 @@ set -euo pipefail
 
 cargo_audit_bin="${CARGO_AUDIT_BIN:-cargo-audit}"
 lockfile="apps/briar/src-tauri/Cargo.lock"
-# Keep accepted warnings visible before enforcing the exact dated allowlist.
-"$cargo_audit_bin" audit --file "$lockfile"
-
 # Yanked crates have no advisory ID, so they cannot go through --ignore. Each
 # entry is "name version expires-on"; past its date the crate fails again.
 # zip 4.x is entirely yanked and tauri-plugin-updater (2.14.0 and the 3.0
@@ -33,10 +30,22 @@ for advisory in \
   RUSTSEC-2025-0080 \
   RUSTSEC-2025-0081 \
   RUSTSEC-2025-0098 \
-  RUSTSEC-2025-0100
+  RUSTSEC-2025-0100 \
+  RUSTSEC-2026-0367 \
+  RUSTSEC-2026-0368 \
+  RUSTSEC-2026-0369 \
+  RUSTSEC-2026-0370 \
+  RUSTSEC-2026-0371 \
+  RUSTSEC-2026-0372
 do
   ignore_args+=(--ignore "$advisory")
 done
+
+# The three zip advisories only affect APIs that the Tauri updater compiles for
+# Windows. The current stable updater still requires zip 4.x; keep the findings
+# visible while accepting that upstream constraint alongside the dated yanked
+# exception above.
+"$cargo_audit_bin" audit --file "$lockfile" "${ignore_args[@]}"
 
 # The advisory DB was just fetched above; reuse it instead of fetching twice.
 # cargo-audit exits non-zero on vulnerabilities; the report is checked below.

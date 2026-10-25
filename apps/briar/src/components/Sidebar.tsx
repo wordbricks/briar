@@ -51,6 +51,7 @@ import {
   SidebarDirectMessages,
   type SidebarDirectMessageActions,
 } from "./SidebarDirectMessages";
+import { webMode } from "../state/platform";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import { TeamIcon, teamIconComponent } from "./TeamIcon";
 import {
@@ -679,7 +680,7 @@ export function Sidebar({
         <a
           aria-current={activePage === "inbox" ? "page" : undefined}
           className={activePage === "inbox" ? "active" : ""}
-          href="#inbox"
+          href={webMode ? "/app/inbox" : "#inbox"}
           onClick={(event) => {
             event.preventDefault();
             onInboxOpen();
@@ -701,7 +702,7 @@ export function Sidebar({
             className={`sidebar-primary-subnav-link${
               activePage === "my-issues" ? " active" : ""
             }`}
-            href="#my-issues"
+            href={webMode ? "/app/my-issues" : "#my-issues"}
             onClick={(event) => {
               event.preventDefault();
               onMyIssuesOpen();
@@ -753,7 +754,7 @@ export function Sidebar({
                   className={`sidebar-project-view${
                     activePage === "issues" ? " active" : ""
                   }`}
-                  href="#issues"
+                  href={webMode ? "/app/issues" : "#issues"}
                   onClick={(event) => {
                     event.preventDefault();
                     onIssuesOpen();
@@ -783,7 +784,7 @@ export function Sidebar({
                   className={`sidebar-project-view${
                     activePage === "agents" ? " active" : ""
                   }`}
-                  href="#agents"
+                  href={webMode ? "/app/agents" : "#agents"}
                   onClick={(event) => {
                     event.preventDefault();
                     onAgentsOpen();
@@ -851,7 +852,7 @@ export function Sidebar({
                   className={`sidebar-project-view${
                     activePage === "schedule" ? " active" : ""
                   }`}
-                  href="#schedule"
+                  href={webMode ? "/app/schedule" : "#schedule"}
                   onClick={(event) => {
                     event.preventDefault();
                     onScheduleOpen();
@@ -1193,7 +1194,7 @@ export function Sidebar({
                         className={`sidebar-project-view${
                           isActive && activePage === "issues" ? " active" : ""
                         }`}
-                        href="#issues"
+                        href={webMode ? "/app/issues" : "#issues"}
                         onClick={(event) => {
                           event.preventDefault();
                           openProjectPage(onIssuesOpen);
@@ -1227,7 +1228,7 @@ export function Sidebar({
                         className={`sidebar-project-view${
                           isActive && activePage === "agents" ? " active" : ""
                         }`}
-                        href="#agents"
+                        href={webMode ? "/app/agents" : "#agents"}
                         onClick={(event) => {
                           event.preventDefault();
                           openProjectPage(onAgentsOpen);
@@ -1316,7 +1317,7 @@ export function Sidebar({
                         className={`sidebar-project-view${
                           isActive && activePage === "schedule" ? " active" : ""
                         }`}
-                        href="#schedule"
+                        href={webMode ? "/app/schedule" : "#schedule"}
                         onClick={(event) => {
                           event.preventDefault();
                           openProjectPage(onScheduleOpen);
@@ -1350,7 +1351,7 @@ export function Sidebar({
                 </div>
                 <div className="account-popover-separator" />
                 <a
-                  href="#settings"
+                  href={webMode ? "/app/settings" : "#settings"}
                   onClick={(event) => {
                     event.preventDefault();
                     setIsAccountMenuOpen(false);
