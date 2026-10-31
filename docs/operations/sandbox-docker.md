@@ -281,3 +281,44 @@ briar sandbox view --name gx10        # 에이전트 화면을 브라우저 noVN
 `infrastructure/managed-computers/provider-runtime/`나 `image-lock.env`의
 Bun/Node 버전, OpenCode·Grok 버전과 SHA-256을 바꾸면 `bun run sandbox:generate`로
 자산을 다시 생성해야 하며 `bun run check`의 `sandbox:check`가 이를 강제한다.
+
+### Chrome profile lock recovery
+
+The desktop launcher serializes requests with a lock on each display's profile
+volume. It sends new URLs to a responsive Chrome singleton socket, checking its
+cookie and peer user; it does not use Chrome's fallback that kills an
+unresponsive browser. A timeout returns an error and leaves the browser running.
+
+After an abnormal Chrome exit, the launcher removes only `SingletonLock`,
+`SingletonSocket`, and `SingletonCookie` when the saved lock identities and
+browser process start time prove that the previous owner has exited in the same
+boot and PID namespace. Cookies, saved passwords, preferences, and other display
+profiles are not removed or copied. The existing shared-login seed/capture
+allowlist remains responsible for login synchronization.
+
+For image replacement through `sandbox up`, the host can authorize recovery of
+an old container's default hostname only after Docker successfully removes that
+exact stopped container. Before removal it verifies Briar ownership, the named
+Computer Use volume mount, the ordinary local volume driver without remote or
+bind options, and that no other container attaches that volume. Shared volumes,
+custom hostnames, missing inspection data, and legacy locks without an owner
+record remain locked unless that explicit retirement proof is available.
+Hostname differences and missing PIDs by themselves never authorize cleanup.
+New managed containers also receive a unique host-issued token. Docker retains
+it on same-container restarts. When the token and recorded lock identity still
+match but the PID namespace has changed, the recorded browser belonged to the
+previous, terminated incarnation of that same container. A different container
+sharing the volume has a different token and receives no recovery authority.
+Old containers without this token, and direct Docker replacements without
+retirement proof, require operator ownership verification for unknown locks.
+
+The launcher is a base-image desktop asset. `bun run sandbox:generate` embeds the
+same source in the CLI for new sandbox image builds. A CLI/provider-only
+`sandbox update` or managed runtime archive does not replace the installed
+launcher. Roll out a newly built image to a drained, stopped sandbox with
+`sandbox up`; managed computers require the reviewed desktop image/artifact
+rollout described in `managed-computer-pilot.md`. Do not purge the Computer Use
+volume. Verify normal launch, live reuse, crash recovery, and login persistence
+on the target Linux Chrome/Chromium version before broad rollout. Rolling back
+the image preserves the profile data; older launchers simply do not consume the
+new owner metadata.

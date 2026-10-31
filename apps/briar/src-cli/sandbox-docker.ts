@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import * as Schema from "effect/Schema";
 import {
   DEFAULT_DEBIAN_MIRROR,
@@ -330,12 +331,61 @@ async function ensureSandboxImage(
   return tag;
 }
 
+/**
+ * A default Docker hostname identifies the exact container we are about to
+ * remove. Issue recovery authority only for its exclusively attached, ordinary
+ * local volume: a shared/NFS/bind volume cannot establish remote owner death.
+ * Removal below must succeed before this value reaches a replacement container.
+ */
+export async function sandboxRetirementHostname(
+  docker: DockerRunner,
+  name: string,
+): Promise<{ containerId: string; hostname: string } | undefined> {
+  const inspected = await docker(["inspect", "--format", "{{json .}}", sandboxContainerName(name)]);
+  if (!inspected.ok) return undefined;
+  const RetirementContainer = Schema.Struct({
+    Id: Schema.String,
+    State: Schema.Struct({ Running: Schema.Boolean, Paused: Schema.Boolean }),
+    Config: Schema.Struct({ Hostname: Schema.String, Labels: Schema.Record(Schema.String, Schema.String) }),
+    Mounts: Schema.Array(Schema.Struct({
+      Type: Schema.String, Name: Schema.optional(Schema.String), Destination: Schema.String,
+    })),
+  });
+  const RetirementVolume = Schema.Array(Schema.Struct({
+    Name: Schema.String, Driver: Schema.String, Scope: Schema.String,
+    Options: Schema.NullOr(Schema.Record(Schema.String, Schema.String)),
+  }));
+  try {
+    const candidate = Schema.decodeUnknownSync(RetirementContainer)(JSON.parse(inspected.output));
+    if (candidate.State.Running || candidate.State.Paused ||
+      !/^[0-9a-f]{64}$/u.test(candidate.Id) || candidate.Config.Hostname !== candidate.Id.slice(0, 12) ||
+      candidate.Config.Labels[SANDBOX_OWNER_LABEL] !== "1" ||
+      candidate.Config.Labels[SANDBOX_NAME_LABEL] !== name) return undefined;
+    const volumeName = sandboxComputerUseVolume(name);
+    const mount = candidate.Mounts.find((item) => item.Destination === SANDBOX_COMPUTER_USE_ROOT);
+    if (mount?.Type !== "volume" || mount.Name !== volumeName) return undefined;
+    const volume = await docker(["volume", "inspect", volumeName]);
+    if (!volume.ok) return undefined;
+    const volumes = Schema.decodeUnknownSync(RetirementVolume)(JSON.parse(volume.output));
+    const local = volumes[0];
+    if (volumes.length !== 1 || local?.Name !== volumeName || local.Driver !== "local" ||
+      local.Scope !== "local" || (local.Options !== null && Object.keys(local.Options).length > 0)) return undefined;
+    const attachments = await docker(["ps", "--all", "--no-trunc", "--filter", `volume=${volumeName}`, "--format", "{{.ID}}"]);
+    if (!attachments.ok || attachments.output.trim() !== candidate.Id) return undefined;
+    return { containerId: candidate.Id, hostname: candidate.Config.Hostname };
+  } catch {
+    // Unknown inspection data must never grant permission to unlink locks.
+    return undefined;
+  }
+}
+
 export function sandboxRunArguments(input: {
   readonly name: string;
   readonly runtimeSha256: string;
   readonly imageTag: string;
   readonly gpus: boolean;
   readonly viewPort?: number;
+  readonly retiredBrowserHostname?: string;
 }): string[] {
   const viewPort = input.viewPort ?? DEFAULT_SANDBOX_VIEW_PORT;
   return [
@@ -362,6 +412,10 @@ export function sandboxRunArguments(input: {
     "--restart",
     "unless-stopped",
     "--init",
+    // A new token for each container, retained by Docker across its restarts.
+    // It binds launcher owner records to this container rather than a hostname.
+    "--env",
+    `BRIAR_BROWSER_CONTAINER_TOKEN=${randomUUID()}`,
     "--shm-size",
     "1g",
     "--volume",
@@ -371,6 +425,7 @@ export function sandboxRunArguments(input: {
     // 0700 directory on its first mount.
     "--volume",
     `${sandboxComputerUseVolume(input.name)}:${SANDBOX_COMPUTER_USE_ROOT}`,
+    ...(input.retiredBrowserHostname ? ["--env", `BRIAR_RETIRED_BROWSER_HOSTNAME=${input.retiredBrowserHostname}`] : []),
     ...(input.gpus ? ["--gpus", "all"] : []),
     input.imageTag,
   ];
@@ -407,17 +462,20 @@ export async function ensureSandbox(
     inspected.gpus !== input.gpus ||
     inspected.viewPort !== (input.viewPort ?? DEFAULT_SANDBOX_VIEW_PORT)
   );
+  let retiredBrowserHostname: string | undefined;
   if (stale) {
     if (inspected.running) {
       throw new Error(`Sandbox ${input.name} is running. Use \`briar sandbox update --name ${input.name}\` for runtime updates. Image/configuration replacement requires a drained, stopped sandbox; it will not be force-removed.`);
     }
     input.log?.(`Replacing ${containerName} with runtime ${input.runtimeSha256.slice(0, 12)}`);
-    const removed = await docker(["rm", containerName]);
+    const retirement = await sandboxRetirementHostname(docker, input.name);
+    const removed = await docker(["rm", retirement?.containerId ?? containerName]);
     if (!removed.ok) {
       throw new Error(
         `Could not replace the sandbox with the current runtime: ${removed.output}`,
       );
     }
+    retiredBrowserHostname = retirement?.hostname;
   }
   const current = stale ? missingContainer : inspected;
   if (current.exists && !current.running) {
@@ -432,6 +490,7 @@ export async function ensureSandbox(
       imageTag,
       gpus: input.gpus,
       viewPort: input.viewPort,
+      retiredBrowserHostname,
     }));
     if (!created.ok) {
       throw new Error(`Could not create the sandbox: ${created.output}`);

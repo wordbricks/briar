@@ -29,10 +29,229 @@ if [ -n "$profile_directory" ]; then
       exit 2
       ;;
   esac
+  for directory in /var/lib/briar-computer-use /var/lib/briar-computer-use/profiles "$profile_directory"; do
+    if [ -L "$directory" ]; then
+      echo "Computer Use profile directories must not be symbolic links" >&2
+      exit 2
+    fi
+  done
   /usr/bin/install -d -m 0700 "$profile_directory"
   # The shared login store moves cookies and saved passwords between display
   # profiles, so the encryption key must not depend on a per-session keyring.
-  set -- --user-data-dir="$profile_directory" --password-store=basic
+  exec /usr/bin/python3 - "$profile_directory" "$url" <<'BRIAR_BROWSER_PY'
+import errno
+import fcntl
+import json
+import os
+from pathlib import Path
+import socket
+import stat
+import struct
+import subprocess
+import sys
+import time
+
+LOCKS = ('SingletonLock', 'SingletonSocket', 'SingletonCookie')
+
+
+def snapshot(profile):
+    result = {}
+    for name in LOCKS:
+        path = profile / name
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            continue
+        if not stat.S_ISLNK(info.st_mode):
+            raise RuntimeError(f'{name} is not a Chrome symlink; profile left unchanged')
+        result[name] = [info.st_dev, info.st_ino, os.readlink(path)]
+    return result
+
+
+def process_start(pid):
+    try:
+        # comm may contain spaces and parentheses. starttime is field 22.
+        return Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[19]
+    except FileNotFoundError:
+        return None
+
+
+def runtime_identity():
+    return [Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+            os.readlink('/proc/self/ns/pid'), process_start(1)]
+
+
+def owner_pid(links):
+    target = links.get('SingletonLock', [0, 0, ''])[2]
+    host, separator, pid = target.rpartition('-')
+    if not separator or not pid.isdecimal() or int(pid) < 1:
+        raise RuntimeError('Chrome lock owner is malformed; profile left unchanged')
+    return host, int(pid)
+
+
+def notify(profile, links, url):
+    """Chromium singleton IPC, without its kill-an-unresponsive-owner fallback."""
+    endpoint = links.get('SingletonSocket', [0, 0, ''])[2]
+    cookie = links.get('SingletonCookie', [0, 0, ''])[2]
+    if not endpoint or not cookie or not os.path.isabs(endpoint):
+        return None
+    remote_cookie = Path(endpoint).parent / 'SingletonCookie'
+    try:
+        if os.readlink(remote_cookie) != cookie:
+            return None
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(5)
+            connection.connect(endpoint)
+            if os.readlink(remote_cookie) != cookie or snapshot(profile) != links:
+                raise RuntimeError('Chrome ownership changed while connecting; retry the request')
+            pid, uid, _ = struct.unpack('3i', connection.getsockopt(
+                socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize('3i')))
+            if uid != os.getuid():
+                raise RuntimeError('Chrome socket belongs to another user; profile left unchanged')
+            message = '\0'.join(['START', os.getcwd(), '/usr/bin/google-chrome-stable',
+                                  '--new-window', url]).encode()
+            if len(message) > 32768:
+                raise RuntimeError('Browser URL exceeds Chrome IPC limit')
+            connection.sendall(message)
+            connection.shutdown(socket.SHUT_WR)
+            response = b''
+            while len(response) < 3:
+                chunk = connection.recv(3 - len(response))
+                if not chunk:
+                    break
+                response += chunk
+            if response != b'ACK':
+                raise RuntimeError('Existing Chrome did not acknowledge the URL; browser left running')
+            return pid
+    except OSError as error:
+        if error.errno in (errno.ENOENT, errno.ECONNREFUSED):
+            return None
+        raise RuntimeError('Existing Chrome is inaccessible or unresponsive; profile left unchanged') from error
+
+
+def record_owner(profile, links, peer_pid):
+    host, pid = owner_pid(links)
+    # SO_PEERCRED is namespace-relative; do not attribute a foreign socket to a
+    # coincidentally equal local PID. An exact browser command line is required.
+    if host != socket.gethostname() or pid != peer_pid:
+        return
+    start = process_start(pid)
+    if start is None:
+        return
+    args = Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')
+    if os.fsencode(f'--user-data-dir={profile}') not in args:
+        return
+    if snapshot(profile) != links or process_start(pid) != start:
+        return
+    record = {'runtime': runtime_identity(), 'pid': pid, 'start': start, 'links': links,
+              'container': os.environ.get('BRIAR_BROWSER_CONTAINER_TOKEN', '')}
+    temporary = profile / '.briar-browser-owner.tmp'
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW
+    with os.fdopen(os.open(temporary, flags, 0o600), 'w') as output:
+        json.dump(record, output)
+        output.flush()
+        os.fsync(output.fileno())
+    os.replace(temporary, profile / '.briar-browser-owner.json')
+
+
+def recover(profile, links, retired_hostname=''):
+    host, pid = owner_pid(links)
+    proven_dead = False
+    try:
+        record = json.loads((profile / '.briar-browser-owner.json').read_text())
+        current_runtime = runtime_identity()
+        same_runtime = record['runtime'] == current_runtime
+        container = os.environ.get('BRIAR_BROWSER_CONTAINER_TOKEN', '')
+        # Docker preserves the host-issued random token on restart, but creates
+        # a new PID namespace only after the previous container processes exit.
+        # Moving/sharing the volume with another managed container gives it a
+        # different token, so namespace/PID absence alone still proves nothing.
+        restarted_container = (bool(container) and record.get('container') == container
+                               and host == socket.gethostname() and not same_runtime)
+        proven_dead = (record['links'] == links and record['pid'] == pid
+                       and ((same_runtime and process_start(pid) != record['start'])
+                            or restarted_container))
+    except (FileNotFoundError, ValueError, KeyError, TypeError):
+        pass
+    # This capability is issued by the host only after removal of the exact
+    # Docker container, with its default unique hostname and exclusive local
+    # volume verified. A hostname mismatch alone is never evidence of death.
+    proven_dead = proven_dead or (bool(retired_hostname) and host == retired_hostname)
+    if not proven_dead:
+        raise RuntimeError(f'Cannot prove Chrome owner {host}-{pid} has exited; '
+                           'profile left unchanged. Stop the owning runtime and use '
+                           'Briar sandbox image replacement, or have its operator verify ownership.')
+    if snapshot(profile) != links:
+        raise RuntimeError('Chrome ownership changed during recovery; retry the request')
+    # Only unlink the three entries; never follow their targets or touch login data.
+    for name in ('SingletonSocket', 'SingletonCookie', 'SingletonLock'):
+        if name in links:
+            (profile / name).unlink()
+
+
+def open_browser(profile, url):
+    # flock is on the profile volume, shared by concurrent launch/recovery calls.
+    # Never unlink this file: doing so would split the serialization domain.
+    fd = os.open(profile / '.briar-browser-launch.lock',
+                 os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'r+') as guard:
+        deadline = time.monotonic() + 25
+        while True:
+            try:
+                fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Another browser launch is still in progress; retry the request')
+                time.sleep(0.1)
+        links = snapshot(profile)
+        if links:
+            peer = notify(profile, links, url)
+            if peer is not None:
+                record_owner(profile, links, peer)
+                return
+            recover(profile, links, os.environ.get('BRIAR_RETIRED_BROWSER_HOSTNAME', ''))
+        # No shell interpolation, no inherited flock FD, no second Chrome launch
+        # against an active singleton. Keep a bounded startup observation window.
+        with open(os.devnull, 'r+b') as null:
+            child = subprocess.Popen(['/usr/bin/google-chrome-stable', '--no-first-run',
+                '--no-default-browser-check', f'--user-data-dir={profile}',
+                '--password-store=basic', '--new-window', url],
+                stdin=null, stdout=null, stderr=null, start_new_session=True)
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            links = snapshot(profile)
+            if all(name in links for name in LOCKS):
+                # Probe readiness without sending the URL a second time. The
+                # peer credentials and cookie establish the browser's identity.
+                endpoint = links['SingletonSocket'][2]
+                try:
+                    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+                        probe.settimeout(1)
+                        probe.connect(endpoint)
+                        pid, uid, _ = struct.unpack('3i', probe.getsockopt(
+                            socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize('3i')))
+                        if uid == os.getuid() and os.readlink(
+                                Path(endpoint).parent / 'SingletonCookie') == links['SingletonCookie'][2]:
+                            record_owner(profile, links, pid)
+                            return
+                except OSError:
+                    pass
+            code = child.poll()
+            if code is not None:
+                raise RuntimeError(f'Chrome exited during startup (status {code}); profile preserved')
+            time.sleep(0.1)
+        raise RuntimeError('Chrome startup was not confirmed within 20 seconds; '
+                           'process and profile preserved, retry after checking the display')
+
+
+if __name__ == '__main__':
+    try:
+        open_browser(Path(sys.argv[1]), sys.argv[2])
+    except (OSError, RuntimeError) as error:
+        print(f'briar-open-browser: {error}', file=sys.stderr)
+        sys.exit(1)
+BRIAR_BROWSER_PY
 else
   set --
 fi
