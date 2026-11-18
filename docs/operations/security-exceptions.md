@@ -108,3 +108,25 @@ new unmaintained, unsound, or yanked advisory therefore fail the gate.
   3.0.3 is affected), so there is nothing to override to.
 - Removal condition: remove the ignore when a patched `braces` is published or
   the landing build stops depending on it.
+
+## GHSA-fc5q-39xc-vjpf — temporary build tooling exception
+
+- Recorded: 2026-11-18
+- Review by: 2026-12-18
+- Dependency paths: `vite -> tinyglobby -> fdir -> picomatch@4.0.5`,
+  `vitest -> tinyglobby -> fdir -> picomatch@4.0.5`,
+  `@typescript-eslint/typescript-estree -> fast-glob -> micromatch ->
+  picomatch@2.3.2`, and `vinext -> vite-plugin-commonjs ->
+  vite-plugin-dynamic-import -> fast-glob -> micromatch -> picomatch@2.3.2`.
+- Finding: regular-expression denial of service when `picomatch` parses a
+  single-branch repeated extglob pattern.
+- Scope: build, test, and lint tooling only. Every path above runs on glob
+  patterns written in this repository; no tool expands patterns from users,
+  requests, or other untrusted input.
+- Production exposure: none. Neither the generated landing Worker nor the
+  `briar-api` Worker bundle contains `picomatch`.
+- Upstream status: the advisory lists no patched version (every release
+  through 4.0.7 on the 4.x line and 2.3.2 on the 2.x line is affected), so
+  there is nothing to override to.
+- Removal condition: remove the ignore when a patched `picomatch` is
+  published or the build, test, and lint toolchain stops depending on it.

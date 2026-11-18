@@ -34,7 +34,7 @@
     "drizzle-kit": "0.31.10",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
-    "react-server-dom-webpack": "19.2.8",
+    "react-server-dom-webpack": "19.2.9",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vinext": "0.0.50",

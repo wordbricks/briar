@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 22025eb924b62e445e56a18328ba595fab9aac41f9302efaed0028b8c556a607
--- snapshot-digest: 009b17aa1b89d1d1c5a0de2b2ba0a46bca0faa84db6e3c0e595f93da1d8eb724
+-- migrations-digest: 0750632f3d73957ec94d6635c527569f78340380e5cd8a7de87e85693408d2de
+-- snapshot-digest: 55c089024ab8a93ea77221096c51996ad7a50b06aa842537c2fc40c420a1d8d6
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1556,7 +1556,6 @@ CREATE TABLE briar_upload_cleanup_queue (
 -- @statement
 CREATE TABLE IF NOT EXISTS "account" (
   "id" text primary key not null,
-  "issuer" text not null,
   "accountId" text not null,
   "providerId" text not null,
   "userId" text not null references "user" ("id") on delete cascade,
@@ -4456,9 +4455,6 @@ CREATE INDEX briar_upload_cleanup_queue_due_idx
   );
 -- @statement
 CREATE INDEX "account_userId_idx" on "account" ("userId");
--- @statement
-CREATE UNIQUE INDEX "account_issuer_accountId_uidx"
-  on "account" ("issuer", "accountId");
 -- @statement
 CREATE UNIQUE INDEX "deviceCode_deviceCode_uidx"
   on "deviceCode" ("deviceCode");

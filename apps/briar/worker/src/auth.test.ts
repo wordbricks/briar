@@ -143,8 +143,8 @@ describe("email OTP authentication", () => {
       ),
       db.prepare(
         `insert into account (
-           id, issuer, accountId, providerId, userId, createdAt, updatedAt
-         ) values (?, 'https://accounts.google.com', ?, 'google', ?, ?, ?)`,
+           id, accountId, providerId, userId, createdAt, updatedAt
+         ) values (?, ?, 'google', ?, ?, ?)`,
       ).bind(
         "google-account",
         "google-subject",

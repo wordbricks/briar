@@ -6,4 +6,5 @@ set -euo pipefail
 bun audit --audit-level high \
   --ignore GHSA-w3rx-r6r6-pgpr \
   --ignore GHSA-5p2g-fcmc-qvqq \
-  --ignore GHSA-vfj7-8cjw-p6xm
+  --ignore GHSA-vfj7-8cjw-p6xm \
+  --ignore GHSA-fc5q-39xc-vjpf
