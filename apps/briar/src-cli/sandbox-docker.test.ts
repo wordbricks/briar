@@ -18,6 +18,7 @@ import {
   sandboxHomeVolume,
   sandboxName,
   sandboxRunArguments,
+  sandboxRetirementHostname,
   stopSandbox,
 } from "./sandbox-docker";
 import { SANDBOX_SCHEMA_VERSION, sandboxImageTag } from "./sandbox-image";
@@ -536,5 +537,59 @@ describe("ensureDockerContext", () => {
     const fake = fakeDocker();
     await expect(ensureDockerContext(fake.docker, { name, host: "gx10" }))
       .rejects.toThrow("ssh://");
+  });
+});
+
+
+describe("browser recovery authority after container retirement", () => {
+  const id = "a".repeat(64);
+  const volumeName = sandboxComputerUseVolume(name);
+  const candidate = () => ({
+    Id: id,
+    State: { Running: false, Paused: false },
+    Config: { Hostname: id.slice(0, 12), Labels: { [SANDBOX_OWNER_LABEL]: "1", [SANDBOX_NAME_LABEL]: name } },
+    Mounts: [{ Type: "volume", Name: volumeName, Destination: "/var/lib/briar-computer-use" }],
+  });
+  const volume = () => [{ Name: volumeName, Driver: "local", Scope: "local", Options: null as Record<string, string> | null }];
+  function retirementDocker(options: {
+    container?: ReturnType<typeof candidate>;
+    volumes?: ReturnType<typeof volume>;
+    attachments?: string;
+    unavailable?: boolean;
+  } = {}): DockerRunner {
+    return async (args) => ({
+      ok: !options.unavailable,
+      output: args[0] === "inspect" ? JSON.stringify(options.container ?? candidate()) :
+        args[0] === "volume" ? JSON.stringify(options.volumes ?? volume()) : options.attachments ?? id,
+    });
+  }
+
+  it("issues proof only for the unique stopped owner of an ordinary local volume", async () => {
+    expect(await sandboxRetirementHostname(retirementDocker(), name)).toEqual({ containerId: id, hostname: id.slice(0, 12) });
+    expect(sandboxRunArguments({ name, runtimeSha256, imageTag: "image", gpus: false,
+      retiredBrowserHostname: id.slice(0, 12) })).toContain(`BRIAR_RETIRED_BROWSER_HOSTNAME=${id.slice(0, 12)}`);
+    expect(sandboxRunArguments({ name, runtimeSha256, imageTag: "image", gpus: false }).join(" ")).not.toContain("BRIAR_RETIRED_BROWSER_HOSTNAME");
+  });
+
+  it("rejects live, paused, custom-hostname, and unowned containers", async () => {
+    for (const alter of [
+      (value: ReturnType<typeof candidate>) => { value.State.Running = true; },
+      (value: ReturnType<typeof candidate>) => { value.State.Paused = true; },
+      (value: ReturnType<typeof candidate>) => { value.Config.Hostname = "shared-host"; },
+      (value: ReturnType<typeof candidate>) => { value.Config.Labels[SANDBOX_OWNER_LABEL] = "0"; },
+      (value: ReturnType<typeof candidate>) => { value.Mounts[0]!.Type = "bind"; },
+    ]) {
+      const container = candidate();
+      alter(container);
+      expect(await sandboxRetirementHostname(retirementDocker({ container }), name)).toBeUndefined();
+    }
+  });
+
+  it("rejects shared, network, and uninspectable volumes", async () => {
+    const network = volume();
+    network[0]!.Options = { type: "nfs", device: ":/profiles" };
+    expect(await sandboxRetirementHostname(retirementDocker({ volumes: network }), name)).toBeUndefined();
+    expect(await sandboxRetirementHostname(retirementDocker({ attachments: `${id}\n${"b".repeat(64)}` }), name)).toBeUndefined();
+    expect(await sandboxRetirementHostname(retirementDocker({ unavailable: true }), name)).toBeUndefined();
   });
 });
