@@ -43,6 +43,7 @@ const request: RunnerRequest = {
   networkAccess: false,
   attachments: [],
   additionalDirectories: [],
+  toolInheritance: "inherit",
   providerBinaryPath: "/usr/local/bin/acp-agent",
 };
 
@@ -547,6 +548,38 @@ describe("ACP runner library", () => {
     ).toBe('{"action":"respond"}');
     expect(resolveAcpFinalMessage(state, undefined, undefined)).toBe(
       '```json\\n{"action":"respond"}\\n```',
+    );
+  });
+
+  it("never answers with a typed progress message", () => {
+    const state = createAcpEventState();
+    const progress = (text: string) =>
+      normalizeAcpSessionUpdate(
+        {
+          sessionId: "session-1",
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text },
+          },
+        },
+        state,
+      );
+
+    progress('{"progress":"저장소 구조를 확인하겠습니다"}');
+    normalizeAcpSessionUpdate(
+      {
+        sessionId: "session-1",
+        update: { sessionUpdate: "tool_call", toolCallId: "tool-1" },
+      },
+      state,
+    );
+    progress('{"progress":"테스트를 실행하겠습니다"}');
+    finalizeAcpMessage(state, "end_turn");
+
+    // Both segments are still emitted to the work log, but neither is adopted
+    // as the turn's answer, so the runner falls back to the prompt result.
+    expect(resolveAcpFinalMessage(state, "The answer.", undefined)).toBe(
+      "The answer.",
     );
   });
 });

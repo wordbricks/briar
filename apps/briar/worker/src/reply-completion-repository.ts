@@ -12,7 +12,7 @@ export type ReplyKind = "issue" | "channel";
 
 export type ReplyClaimScope = {
   replyKind: ReplyKind;
-  organizationId: string;
+  workspaceId: string;
   projectId: string;
   workId: string;
   runId: string;
@@ -55,7 +55,7 @@ export type ReplyCompletionCommit = ReplyClaimScope & {
 
 const replyUploadScope = (scope: ReplyClaimScope): UploadScope => ({
   purpose: scope.replyKind === "issue" ? "issue_reply" : "channel_reply",
-  organizationId: scope.organizationId,
+  workspaceId: scope.workspaceId,
   projectId: scope.projectId,
   channelId: null,
   userId: null,
@@ -121,7 +121,7 @@ export function replyCompletionReceiptStatement(
     .bind(
       input.requestId,
       input.replyKind,
-      input.organizationId,
+      input.workspaceId,
       input.projectId,
       input.workId,
       input.runId,

@@ -39,7 +39,7 @@ type TestTransport = {
   stop: () => void;
 };
 
-const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const workspaceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const channelId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const projectId = "11111111-1111-4111-8111-111111111111";
 const runId = "22222222-2222-4222-8222-222222222222";
@@ -114,7 +114,7 @@ const scenarios = [
     ) {
       return new ChannelActivityRealtimeTransport({
         token: "token",
-        organizationId,
+        workspaceId,
         channelId,
         createTicket,
         createWebSocket,

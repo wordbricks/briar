@@ -46,7 +46,7 @@ type PromotionCheck = {
   valid: boolean;
   eligible: boolean;
   totalCents: number;
-  limitReason: "user" | "organization" | "fleet" | null;
+  limitReason: "user" | "workspace" | "fleet" | null;
 };
 
 const pollingStates = new Set<ManagedComputer["state"]>([
@@ -79,7 +79,7 @@ function managedComputerErrorKey(error: unknown) {
       "managedComputer.error.applicationsDisabled",
     MANAGED_COMPUTER_FLEET_LIMIT: "managedComputer.error.fleetLimit",
     MANAGED_COMPUTER_ORGANIZATION_LIMIT:
-      "managedComputer.error.organizationLimit",
+      "managedComputer.error.workspaceLimit",
     MANAGED_COMPUTER_USER_LIMIT: "managedComputer.error.userLimit",
     MANAGED_COMPUTER_PROMOTION_INVALID:
       "managedComputer.error.promotionInvalid",
@@ -116,14 +116,14 @@ export function managedComputerSetupProjects(
 
 export function ManagedComputersCard({
   boundProjectIdsByDeviceId,
-  organizationId,
+  workspaceId,
   onProjectConnected,
   projects,
   token,
   workerBindingsLoaded,
 }: {
   boundProjectIdsByDeviceId: Record<string, string[]>;
-  organizationId: string;
+  workspaceId: string;
   onProjectConnected: () => void;
   projects: Project[];
   token: string;
@@ -154,8 +154,8 @@ export function ManagedComputersCard({
     if (!token) return;
     try {
       const [nextProduct, nextComputers] = await Promise.all([
-        loadManagedComputerProduct(token, organizationId),
-        loadManagedComputers(token, organizationId),
+        loadManagedComputerProduct(token, workspaceId),
+        loadManagedComputers(token, workspaceId),
       ]);
       setProduct(nextProduct);
       setComputers(nextComputers.computers.filter((computer) => computer.state !== "terminated"));
@@ -164,7 +164,7 @@ export function ManagedComputersCard({
     } finally {
       setLoading(false);
     }
-  }, [organizationId, token]);
+  }, [workspaceId, token]);
 
   useEffect(() => {
     void refresh();
@@ -201,7 +201,7 @@ export function ManagedComputersCard({
     try {
       const result = await validateManagedComputerPromotion(
         token,
-        organizationId,
+        workspaceId,
         code,
       );
       setPromotion(result);
@@ -217,7 +217,7 @@ export function ManagedComputersCard({
     setSubmitting(true);
     setError(null);
     try {
-      const result = await applyForManagedComputer(token, organizationId, {
+      const result = await applyForManagedComputer(token, workspaceId, {
         code,
         requestId,
       });
@@ -239,7 +239,7 @@ export function ManagedComputersCard({
     try {
       const result = await retryManagedComputer(
         token,
-        organizationId,
+        workspaceId,
         computer.id,
         crypto.randomUUID(),
       );
@@ -261,7 +261,7 @@ export function ManagedComputersCard({
     try {
       const result = await retireManagedComputer(
         token,
-        organizationId,
+        workspaceId,
         computer.id,
       );
       setComputers((current) => current.map((candidate) =>
@@ -282,7 +282,7 @@ export function ManagedComputersCard({
     setTerminatingId(computer.id);
     setError(null);
     try {
-      await terminateManagedComputer(token, organizationId, computer.id);
+      await terminateManagedComputer(token, workspaceId, computer.id);
       setComputers((current) => current.filter((candidate) => candidate.id !== computer.id));
       setTerminateCandidate(null);
       onProjectConnected();
@@ -726,7 +726,7 @@ export function ManagedComputersCard({
         <ManagedComputerRemoteDesktop
           computer={remoteComputer}
           onClose={() => setRemoteComputer(null)}
-          organizationId={organizationId}
+          workspaceId={workspaceId}
           token={token}
         />
       ) : null}
@@ -743,7 +743,7 @@ export function ManagedComputersCard({
             if (!open) setSetupComputer(null);
           }}
           open
-          organizationId={organizationId}
+          workspaceId={workspaceId}
           projects={setupProjects}
           token={token}
         />

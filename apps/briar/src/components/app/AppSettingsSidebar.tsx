@@ -3,16 +3,13 @@ import { lazy, Suspense, useMemo } from "react";
 
 import { settingsAccountSelection } from "../../lib/settings-account-selection";
 import {
-  visibleOrganizations as scopedOrganizations,
+  visibleWorkspaces as scopedWorkspaces,
   visibleTeams,
 } from "../../lib/team-window-scope";
 import { settingsNavigationLocation } from "../../lib/app-navigation";
 import { isSidebarOpenAtom } from "../../state/dialogs/atoms";
 import { settingsTargetAtom } from "../../state/navigation/atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { lockedTeamIdAtom } from "../../state/platform";
 import { activeTeamIdAtom, teamsAtom } from "../../state/team/atoms";
 import type { AppNavigationLocation } from "../../lib/app-navigation";
@@ -22,7 +19,7 @@ import type { UnifiedSettingsTarget } from "../UnifiedSettingsSidebar";
   The navigation column the three settings pages share.
 
   It is passed down as an element rather than rendered by each page, so the
-  shell used to rebuild it — with the organization and team lists, the open
+  shell used to rebuild it — with the workspace and team lists, the open
   target and the sidebar flag — on every render. All four are in the store, so
   the column reads them itself and the shell hands the pages one stable node.
 
@@ -40,8 +37,8 @@ export interface AppSettingsSidebarProps {
   readonly onBack: () => void;
   /** Records the chosen section in history, still the shell's. */
   readonly onNavigate: (location: AppNavigationLocation) => void;
-  /** Selecting an organization, still the session facade's. */
-  readonly onSelectOrganization: (organizationId: string) => void;
+  /** Selecting a workspace, still the session facade's. */
+  readonly onSelectWorkspace: (workspaceId: string) => void;
   /** Selecting a team, still the session facade's. */
   readonly onSelectTeam: (teamId: string) => void;
 }
@@ -49,23 +46,23 @@ export interface AppSettingsSidebarProps {
 export function AppSettingsSidebar({
   onBack,
   onNavigate,
-  onSelectOrganization,
+  onSelectWorkspace,
   onSelectTeam,
 }: AppSettingsSidebarProps) {
   const [activeTarget, setActiveTarget] = useAtom(settingsTargetAtom);
   const isOpen = useAtomValue(isSidebarOpenAtom);
-  const organizations = useAtomValue(organizationsAtom);
+  const workspaces = useAtomValue(workspacesAtom);
   const teams = useAtomValue(teamsAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
   const scopedTeams = useMemo(
     () => visibleTeams(teams, lockedTeamId),
     [lockedTeamId, teams],
   );
   const organizationOptions = useMemo(
-    () => scopedOrganizations(organizations, teams, lockedTeamId),
-    [lockedTeamId, organizations, teams],
+    () => scopedWorkspaces(workspaces, teams, lockedTeamId),
+    [lockedTeamId, workspaces, teams],
   );
   return (
     <Suspense fallback={<div className="lazy-view-placeholder h-full w-full" />}>
@@ -78,16 +75,16 @@ export function AppSettingsSidebar({
           onNavigate(settingsNavigationLocation(target));
           const selection = settingsAccountSelection(
             target,
-            activeOrganizationId,
+            activeWorkspaceId,
             activeTeamId,
           );
-          if (selection?.scope === "organization") {
-            onSelectOrganization(selection.organizationId);
+          if (selection?.scope === "workspace") {
+            onSelectWorkspace(selection.workspaceId);
           } else if (selection?.scope === "project") {
             onSelectTeam(selection.projectId);
           }
         }}
-        organizations={organizationOptions}
+        workspaces={organizationOptions}
         projects={scopedTeams}
       />
     </Suspense>

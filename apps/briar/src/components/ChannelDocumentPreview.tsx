@@ -19,12 +19,12 @@ import { MarkdownContent } from "./MarkdownContent";
 export function ChannelDocumentPreview({
   channelId,
   document,
-  organizationId,
+  workspaceId,
   token,
 }: {
   channelId: string;
   document: ChannelMessageDocument;
-  organizationId: string;
+  workspaceId: string;
   token: string;
 }) {
   const { t } = useI18n();
@@ -41,7 +41,7 @@ export function ChannelDocumentPreview({
     try {
       const response = await loadChannelMessageDocument(
         token,
-        organizationId,
+        workspaceId,
         channelId,
         document.messageId,
       );
@@ -55,7 +55,7 @@ export function ChannelDocumentPreview({
     } finally {
       if (requestGeneration.current === generation) setLoading(false);
     }
-  }, [channelId, document.messageId, organizationId, t, token]);
+  }, [channelId, document.messageId, workspaceId, t, token]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);

@@ -4,7 +4,7 @@ import { isAbsolute } from "node:path";
 export type ManagedComputerCredential = {
   credential: string;
   deviceId: string;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   apiOrigin: string;
 };
@@ -36,7 +36,10 @@ export function decodeManagedComputerCredential(
     ? record.credential
     : "";
   const deviceId = typeof record.deviceId === "string" ? record.deviceId : "";
-  const organizationId = typeof record.organizationId === "string"
+  // On-disk key stays `organizationId`: the file is written once per instance
+  // by the oneshot enrollment unit, so already-enrolled machines never rewrite
+  // it. Only the in-memory field carries the new name.
+  const workspaceId = typeof record.organizationId === "string"
     ? record.organizationId
     : "";
   const managedComputerId = typeof record.managedComputerId === "string"
@@ -53,7 +56,7 @@ export function decodeManagedComputerCredential(
     !credentialPattern.test(credential) ||
     deviceId !== `managed-${managedComputerId}` ||
     !uuidPattern.test(managedComputerId) ||
-    !uuidPattern.test(organizationId) ||
+    !uuidPattern.test(workspaceId) ||
     parsedOrigin.protocol !== "https:" ||
     parsedOrigin.origin !== apiOrigin.replace(/\/$/u, "") ||
     parsedOrigin.pathname !== "/" ||
@@ -65,7 +68,7 @@ export function decodeManagedComputerCredential(
   return {
     credential,
     deviceId,
-    organizationId,
+    workspaceId,
     managedComputerId,
     apiOrigin: parsedOrigin.origin,
   };

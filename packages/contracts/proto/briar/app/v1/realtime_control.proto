@@ -12,8 +12,8 @@ service RealtimeService {
 }
 
 message CreateRealtimeTicketRequest {
-  message OrganizationNotifications {
-    string organization_id = 1;
+  message WorkspaceNotifications {
+    string workspace_id = 1;
   }
 
   message IssueActivity {
@@ -22,12 +22,12 @@ message CreateRealtimeTicketRequest {
   }
 
   message ChannelActivity {
-    string organization_id = 1;
+    string workspace_id = 1;
     string channel_id = 2;
   }
 
   oneof scope {
-    OrganizationNotifications organization_notifications = 1;
+    WorkspaceNotifications workspace_notifications = 1;
     IssueActivity issue_activity = 2;
     ChannelActivity channel_activity = 3;
   }

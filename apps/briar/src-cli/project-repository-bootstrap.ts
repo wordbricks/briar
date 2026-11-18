@@ -105,7 +105,7 @@ export async function ensureRepository(
   const repository = credential.repository;
   if (
     credential.projectId.length === 0 ||
-    credential.organizationId.length === 0 ||
+    credential.workspaceId.length === 0 ||
     credential.repositoryId <= 0n ||
     credential.cloneUrl !== `https://github.com/${repository}.git`
   ) {
@@ -120,7 +120,7 @@ export async function ensureRepository(
   const repositoryName = repository.split("/")[1]!;
   const projectRoot = join(
     workspaceRoot,
-    credential.organizationId,
+    credential.workspaceId,
     credential.projectId,
   );
   const repositoryPath = join(projectRoot, repositoryName);

@@ -57,7 +57,7 @@ describe("managed computer promotion configuration", () => {
 describe("managed computer retry presentation", () => {
   const failedComputer: ManagedComputerRow = {
     id: "managed-computer",
-    organization_id: "organization",
+    organization_id: "workspace",
     requester_user_id: "owner",
     entitlement_id: "entitlement",
     provider: "aws",

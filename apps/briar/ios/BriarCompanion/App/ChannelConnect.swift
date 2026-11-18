@@ -77,7 +77,7 @@ extension ChannelSummary {
         }
         self.init(
             id: try channelUUID(message.id),
-            organizationId: try channelUUID(message.organizationID),
+            organizationId: try channelUUID(message.workspaceID),
             slug: message.slug,
             name: message.name,
             topic: message.hasTopic ? message.topic : nil,
@@ -128,7 +128,7 @@ extension DirectMessageParticipant {
 }
 
 extension OrganizationMember {
-    init(connectMessage message: BriarAPI_OrganizationMember) throws {
+    init(connectMessage message: BriarAPI_WorkspaceMember) throws {
         guard !message.userID.isEmpty, message.hasCreatedAt else {
             throw MobileAPIError.invalidResponse
         }

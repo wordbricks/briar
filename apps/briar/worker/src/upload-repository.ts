@@ -16,7 +16,7 @@ export type UploadPurpose =
 
 export type UploadScope = {
   purpose: UploadPurpose;
-  organizationId: string;
+  workspaceId: string;
   projectId: string | null;
   channelId: string | null;
   userId: string | null;
@@ -119,7 +119,7 @@ const batchMatches = (
 ) =>
   row.request_id === input.requestId &&
   row.purpose === input.purpose &&
-  row.organization_id === input.organizationId &&
+  row.organization_id === input.workspaceId &&
   sameNullable(row.project_id, input.projectId) &&
   sameNullable(row.channel_id, input.channelId) &&
   sameNullable(row.user_id, input.userId) &&
@@ -147,7 +147,7 @@ export async function prepareUploadRows(
       ...file,
       position,
       uploadId,
-      objectKey: `uploads/${input.purpose}/${input.organizationId}/${input.requestId}/${uploadId}`,
+      objectKey: `uploads/${input.purpose}/${input.workspaceId}/${input.requestId}/${uploadId}`,
     };
   });
   const creationNonce = crypto.randomUUID();
@@ -165,7 +165,7 @@ export async function prepareUploadRows(
       .bind(
         input.requestId,
         input.purpose,
-        input.organizationId,
+        input.workspaceId,
         input.projectId,
         input.channelId,
         input.userId,
@@ -287,7 +287,7 @@ const scopeSql = `batch.purpose = ? and batch.organization_id = ?
 
 const scopeBindings = (scope: UploadScope) => [
   scope.purpose,
-  scope.organizationId,
+  scope.workspaceId,
   scope.projectId,
   scope.channelId,
   scope.userId,

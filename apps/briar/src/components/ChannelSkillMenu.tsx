@@ -30,6 +30,7 @@ export function ChannelSkillMenu({
       {suggestions.map((target, index) => (
         <li key={`${target.agentId}:${target.skill.id}`}>
           <button
+            aria-label={`${target.skill.name}, ${target.agentName}, ${target.skill.description}`}
             aria-selected={index === activeSuggestionIndex}
             className={index === activeSuggestionIndex ? "active" : undefined}
             id={`${id}-option-${index}`}

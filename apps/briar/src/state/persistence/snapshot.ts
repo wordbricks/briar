@@ -8,8 +8,8 @@ import type {
   ExecutionWorker,
   HuntRun,
   IssueConversationNotification,
-  Organization,
-  OrganizationMember,
+  Workspace,
+  WorkspaceMember,
   Project,
   SessionUser,
   Team,
@@ -17,12 +17,12 @@ import type {
   TeamSettings,
 } from "../../types";
 import {
-  channelCatalogOrganizationIdsAtom,
+  channelCatalogWorkspaceIdsAtom,
   channelsByIdAtom,
   organizationChannelIdsAtom,
 } from "../entities/channels";
 import { membersByIdAtom, teamMemberIdsAtom } from "../entities/members";
-import { teamOrganizationProvidersAtom } from "../entities/providers";
+import { teamWorkspaceProvidersAtom } from "../entities/providers";
 import {
   retainedTeamIdsAtom,
   TEAM_RETENTION_LIMIT,
@@ -30,10 +30,7 @@ import {
 import { runsByIdAtom, teamRunIdsAtom } from "../entities/runs";
 import { teamsByIdAtom } from "../entities/teams";
 import { teamWorkerIdsAtom, workersByIdAtom } from "../entities/workers";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import type { AtomRegistry } from "../registry";
 import { userAtom } from "../session/atoms";
 import {
@@ -52,7 +49,7 @@ import {
 
   The store is normalized and the views read it through per-team families, so a
   snapshot is that store written out: the entity maps, the per-team projections
-  those families hold, the organization's channel index, and the account they
+  those families hold, the workspace's channel index, and the account they
   belong to. Nothing else — the snapshot exists to put the last screen back on
   the display, not to be a second source of truth.
 
@@ -103,31 +100,31 @@ export interface PersistedTeamState {
   readonly memberIds: readonly string[] | null;
 }
 
-/** An organization's channel list in render order. */
+/** An workspace's channel list in render order. */
 export interface PersistedChannelIndex {
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly channelIds: readonly string[];
 }
 
 /**
- * Everything one account's work in one organization needs to render again. Keyed
- * by `${userId}:${organizationId}`, so switching either one reads a different
+ * Everything one account's work in one workspace needs to render again. Keyed
+ * by `${userId}:${workspaceId}`, so switching either one reads a different
  * record rather than merging two accounts' work.
  */
 export interface ClientSnapshot {
   readonly schemaVersion: number;
   readonly userId: string;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly savedAt: string;
   readonly session: {
     readonly user: SessionUser;
-    readonly organizations: readonly Organization[];
+    readonly workspaces: readonly Workspace[];
     /**
      * The teams the account can open. The shell resolves the selected team
      * against this list, so a snapshot without it would render an empty app.
      */
     readonly teams: readonly Project[];
-    readonly activeOrganizationId: string | null;
+    readonly activeWorkspaceId: string | null;
     readonly activeTeamId: string | null;
   };
   readonly entities: {
@@ -139,7 +136,7 @@ export interface ClientSnapshot {
      */
     readonly teams: readonly { readonly teamId: string; readonly team: Team }[];
     readonly workers: readonly ExecutionWorker[];
-    readonly members: readonly OrganizationMember[];
+    readonly members: readonly WorkspaceMember[];
     readonly channels: readonly ChannelSummary[];
   };
   readonly teamState: readonly PersistedTeamState[];
@@ -173,13 +170,13 @@ const identified = (key: string) =>
 const ClientSnapshotSchema = Schema.Struct({
   schemaVersion: Schema.Literal(SNAPSHOT_SCHEMA_VERSION),
   userId: Schema.String,
-  organizationId: Schema.String,
+  workspaceId: Schema.String,
   savedAt: Schema.String,
   session: Schema.Struct({
     user: identified("id"),
-    organizations: Schema.Array(identified("id")),
+    workspaces: Schema.Array(identified("id")),
     teams: Schema.Array(identified("id")),
-    activeOrganizationId: Schema.NullOr(Schema.String),
+    activeWorkspaceId: Schema.NullOr(Schema.String),
     activeTeamId: Schema.NullOr(Schema.String),
   }),
   entities: Schema.Struct({
@@ -211,7 +208,7 @@ const ClientSnapshotSchema = Schema.Struct({
   ),
   channelIndex: Schema.Array(
     Schema.Struct({
-      organizationId: Schema.String,
+      workspaceId: Schema.String,
       channelIds: Schema.Array(Schema.String),
     }),
   ),
@@ -253,27 +250,27 @@ function resolveAll<T>(
 
 /**
  * The store as it stands, or `null` when there is nothing worth writing — no
- * account, or no organization to key the record by.
+ * account, or no workspace to key the record by.
  *
- * Only teams of the active organization are collected: the record is keyed by
- * that organization, and `state/sync/apply.ts` drops the others from memory the
+ * Only teams of the active workspace are collected: the record is keyed by
+ * that workspace, and `state/sync/apply.ts` drops the others from memory the
  * moment the account switches away.
  */
 export function collectSnapshot(registry: AtomRegistry): ClientSnapshot | null {
   const user = registry.get(userAtom);
-  const organizationId = registry.get(activeOrganizationIdAtom);
-  if (!user || !organizationId) return null;
+  const workspaceId = registry.get(activeWorkspaceIdAtom);
+  if (!user || !workspaceId) return null;
 
   const teams = registry.get(teamsAtom);
   const organizationTeamIds = new Set(
     teams
-      .filter((team) => team.organizationId === organizationId)
+      .filter((team) => team.workspaceId === workspaceId)
       .map((team) => team.id),
   );
   /*
     The most recently synced teams, never more than the retention limit. The
     retained list can hold more while a view has pinned teams across it ("내
-    이슈" reads every team of the organization), and those extra boards are a
+    이슈" reads every team of the workspace), and those extra boards are a
     live memory decision, not one to write to disk on every debounce.
   */
   const teamIds = registry
@@ -304,7 +301,7 @@ export function collectSnapshot(registry: AtomRegistry): ClientSnapshot | null {
         channel: notifications.channel,
       },
       organizationProviders: registry.get(
-        teamOrganizationProvidersAtom(teamId),
+        teamWorkspaceProvidersAtom(teamId),
       ),
       cursor: registry.get(teamCursorAtom(teamId)),
       payloadCursor: registry.get(teamPayloadCursorAtom(teamId)),
@@ -318,21 +315,21 @@ export function collectSnapshot(registry: AtomRegistry): ClientSnapshot | null {
   }
 
   const channelIds =
-    registry.get(organizationChannelIdsAtom(organizationId)) ?? null;
+    registry.get(organizationChannelIdsAtom(workspaceId)) ?? null;
   const channelIndex: PersistedChannelIndex[] = channelIds
-    ? [{ organizationId, channelIds }]
+    ? [{ workspaceId, channelIds }]
     : [];
 
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     userId: user.id,
-    organizationId,
+    workspaceId,
     savedAt: new Date().toISOString(),
     session: {
       user,
-      organizations: registry.get(organizationsAtom),
+      workspaces: registry.get(workspacesAtom),
       teams,
-      activeOrganizationId: organizationId,
+      activeWorkspaceId: workspaceId,
       activeTeamId: registry.get(activeTeamIdAtom),
     },
     entities: {
@@ -395,7 +392,7 @@ export function applySnapshot(
           : null,
       });
       registry.set(
-        teamOrganizationProvidersAtom(team.teamId),
+        teamWorkspaceProvidersAtom(team.teamId),
         team.organizationProviders ? [...team.organizationProviders] : null,
       );
       registry.set(teamCursorAtom(team.teamId), team.cursor);
@@ -420,21 +417,21 @@ export function applySnapshot(
     );
 
     for (const index of snapshot.channelIndex) {
-      registry.set(organizationChannelIdsAtom(index.organizationId), [
+      registry.set(organizationChannelIdsAtom(index.workspaceId), [
         ...index.channelIds,
       ]);
     }
     registry.set(
-      channelCatalogOrganizationIdsAtom,
-      snapshot.channelIndex.map((index) => index.organizationId),
+      channelCatalogWorkspaceIdsAtom,
+      snapshot.channelIndex.map((index) => index.workspaceId),
     );
 
     registry.set(userAtom, snapshot.session.user);
-    registry.set(organizationsAtom, [...snapshot.session.organizations]);
+    registry.set(workspacesAtom, [...snapshot.session.workspaces]);
     registry.set(teamsAtom, [...snapshot.session.teams]);
     registry.set(
-      activeOrganizationIdAtom,
-      snapshot.session.activeOrganizationId,
+      activeWorkspaceIdAtom,
+      snapshot.session.activeWorkspaceId,
     );
     registry.set(activeTeamIdAtom, snapshot.session.activeTeamId);
   });

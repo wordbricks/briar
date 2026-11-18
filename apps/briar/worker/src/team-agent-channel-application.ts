@@ -2,7 +2,7 @@ import {
   channelJson,
   getClaimedChannelReplyChannel,
   getProjectAgentChannel,
-  getProjectOrganizationChannel,
+  getProjectWorkspaceChannel,
   isChannelRootMessage,
   listChannelMessagePage,
 } from "./channels";
@@ -28,7 +28,7 @@ export class TeamAgentChannelApplicationError extends Error {
 export type TeamAgentChannelApplicationServices = {
   readonly getClaimedChannelReplyChannel: typeof getClaimedChannelReplyChannel;
   readonly getProjectAgentChannel: typeof getProjectAgentChannel;
-  readonly getProjectOrganizationChannel: typeof getProjectOrganizationChannel;
+  readonly getProjectWorkspaceChannel: typeof getProjectWorkspaceChannel;
   readonly isChannelRootMessage: typeof isChannelRootMessage;
   readonly listChannelMessagePage: typeof listChannelMessagePage;
 };
@@ -37,7 +37,7 @@ const teamAgentChannelApplicationServices:
   TeamAgentChannelApplicationServices = {
     getClaimedChannelReplyChannel,
     getProjectAgentChannel,
-    getProjectOrganizationChannel,
+    getProjectWorkspaceChannel,
     isChannelRootMessage,
     listChannelMessagePage,
   };
@@ -70,7 +70,7 @@ export async function listTeamAgentChannelMessagesApplication(
     input.channelId,
   );
   if (!channel) {
-    const organizationChannel = await services.getProjectOrganizationChannel(
+    const organizationChannel = await services.getProjectWorkspaceChannel(
       input.db,
       input.projectId,
       input.channelId,
@@ -98,12 +98,15 @@ export async function listTeamAgentChannelMessagesApplication(
     );
   }
 
+  // An Agent reads the conversation as it works, so it still sees the answers
+  // an older round trip copied back, which the person's own view leaves out.
   const page = await services.listChannelMessagePage(input.db, {
     channelId: channel.id,
     parentMessageId: input.parentMessageId,
     cursor: input.cursor,
     limit: input.limit,
     includeRepliesInTimeline: channel.kind === "dm",
+    includeAgentAnswerCopies: true,
   });
   if (!page) {
     return applicationError(
@@ -125,7 +128,7 @@ export async function listTeamAgentChannelMessagesApplication(
 export async function listClaimedChannelReplyMessagesApplication(
   input: {
     readonly db: D1Database;
-    readonly organizationId: string;
+    readonly workspaceId: string;
     readonly deviceId: string;
     readonly jobId: string;
     readonly parentMessageId: string | null;
@@ -140,7 +143,7 @@ export async function listClaimedChannelReplyMessagesApplication(
     ...overrides,
   };
   const channel = await services.getClaimedChannelReplyChannel(input.db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     jobId: input.jobId,
     deviceId: input.deviceId,
     observedAt: input.observedAt,
@@ -168,12 +171,15 @@ export async function listClaimedChannelReplyMessagesApplication(
     );
   }
 
+  // An Agent reads the conversation as it works, so it still sees the answers
+  // an older round trip copied back, which the person's own view leaves out.
   const page = await services.listChannelMessagePage(input.db, {
     channelId: channel.id,
     parentMessageId: input.parentMessageId,
     cursor: input.cursor,
     limit: input.limit,
     includeRepliesInTimeline: channel.kind === "dm",
+    includeAgentAnswerCopies: true,
   });
   if (!page) {
     return applicationError(

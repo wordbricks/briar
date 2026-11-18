@@ -10,7 +10,7 @@ import {
   mapLinearPriority,
 } from "../../src/lib/linear-import";
 import * as Schema from "effect/Schema";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import {
   fetchLinearIssuesForTeams,
   fetchLinearViewerAndTeams,
@@ -117,7 +117,7 @@ const requireDevelopmentProject = async (
       "Project not found",
     );
   }
-  if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+  if (!hasWorkspaceCapability(project.member_role, "development:manage")) {
     throw new LinearImportApplicationError(
       "development_management_required",
       "Development management permission required",

@@ -11,7 +11,7 @@ import { createReactTestRoot, flush, renderReactTestRoot } from "../test/react";
 import type {
   ManagedComputer,
   ManagedComputerRemoteSessionTicket,
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
   ProjectAgent,
 } from "../types";
 import {
@@ -73,7 +73,7 @@ class FakeRfbClient {
 
 const managedComputer: ManagedComputer = {
   id: "computer-1",
-  organizationId: "organization-1",
+  workspaceId: "workspace-1",
   requesterUserId: "user-1",
   state: "ready",
   provider: "aws",
@@ -90,7 +90,7 @@ const managedComputer: ManagedComputer = {
   updatedAt: "2026-09-02T00:00:00.000Z",
 };
 
-const organizationWorker: OrganizationExecutionWorker = {
+const organizationWorker: WorkspaceExecutionWorker = {
   deviceId: "device-1",
   ownerUserId: "user-1",
   ownerName: "Jay",
@@ -242,7 +242,7 @@ describe("DmComputerPanel", () => {
             skills: [],
             createdAt: "2026-09-02T00:00:00.000Z",
           }]}
-          organizationId="organization-1"
+          workspaceId="workspace-1"
           services={services}
           token="session-token"
         />
@@ -253,7 +253,7 @@ describe("DmComputerPanel", () => {
     const rfb = noVncState.instances[0]!;
     expect(createRemoteSession).toHaveBeenCalledWith(
       "session-token",
-      "organization-1",
+      "workspace-1",
       "computer-1",
       expect.objectContaining({ agentId: "agent-1" }),
     );
@@ -315,7 +315,7 @@ describe("DmComputerPanel", () => {
     expect(nativeClipboardWrite).toHaveBeenCalledTimes(3);
     expect(endRemoteSession).toHaveBeenCalledWith(
       "session-token",
-      "organization-1",
+      "workspace-1",
       "computer-1",
       "remote-session-1",
     );
@@ -324,7 +324,7 @@ describe("DmComputerPanel", () => {
   async function openScreen() {
     const testRoot = createReactTestRoot({ attachToDocument: true });
     await renderReactTestRoot(testRoot.root, <I18nProvider>
-      <DmComputerPanel agents={[dmAgent()]} organizationId="organization-1" services={services} token="session-token" />
+      <DmComputerPanel agents={[dmAgent()]} workspaceId="workspace-1" services={services} token="session-token" />
     </I18nProvider>);
     await vi.waitFor(() => expect(noVncState.instances).toHaveLength(1));
     const rfb = noVncState.instances[0]!;
@@ -426,7 +426,7 @@ describe("DmComputerPanel", () => {
     await act(async () => next.emit("connect"));
     expect(next.viewOnly).toBe(true);
     expect(control.getAttribute("aria-checked")).toBe("false");
-    expect(createRemoteSession).toHaveBeenLastCalledWith("session-token", "organization-1", "computer-1", expect.objectContaining({ reconnectSessionId: ticket.session.id }));
+    expect(createRemoteSession).toHaveBeenLastCalledWith("session-token", "workspace-1", "computer-1", expect.objectContaining({ reconnectSessionId: ticket.session.id }));
     await act(async () => control.click());
     await act(async () => rfb.emit("disconnect"));
     expect(next.viewOnly).toBe(false);
@@ -467,7 +467,7 @@ describe("DmComputerPanel", () => {
           onAvailabilityChange={onAvailabilityChange}
           onClose={onClose}
           open={open}
-          organizationId="organization-1"
+          workspaceId="workspace-1"
           services={services}
           token="session-token"
         />
@@ -512,7 +512,7 @@ describe("DmComputerPanel", () => {
         <DmComputerPanel
           agents={[]}
           onAvailabilityChange={onAvailabilityChange}
-          organizationId="organization-1"
+          workspaceId="workspace-1"
           services={services}
           token="session-token"
         />
@@ -531,7 +531,7 @@ describe("DmComputerPanel", () => {
       <I18nProvider>
         <DmComputerPanel
           agents={[dmAgent()]}
-          organizationId="organization-1"
+          workspaceId="workspace-1"
           services={services}
           token="session-token"
         />
@@ -565,7 +565,7 @@ describe("DmComputerPanel", () => {
       <I18nProvider>
         <DmComputerPanel
           agents={[dmAgent()]}
-          organizationId="organization-1"
+          workspaceId="workspace-1"
           services={services}
           token="session-token"
         />
@@ -603,7 +603,7 @@ describe("DmComputerPanel", () => {
       <I18nProvider>
         <DmComputerPanel
           agents={[dmAgent()]}
-          organizationId="organization-1"
+          workspaceId="workspace-1"
           services={services}
           token="session-token"
         />

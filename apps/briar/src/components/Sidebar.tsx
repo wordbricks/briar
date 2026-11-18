@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { collapseLinkedAutoHuntSessions } from "../state/agent-sessions/model";
 import type { AutoHuntSession } from "../types";
 import { useI18n, type Locale } from "../i18n";
+import { cn } from "../lib/utils";
 import {
   isLocalTeamRepositoryReady,
   localTeamConnectionState,
@@ -35,7 +36,7 @@ import type {
   ChannelVisibility,
 } from "../lib/channels-contract";
 import type {
-  Organization,
+  Workspace,
   PlanningProject,
   Project,
   ProjectAgent,
@@ -50,11 +51,19 @@ import {
   SidebarDirectMessages,
   type SidebarDirectMessageActions,
 } from "./SidebarDirectMessages";
+import { webMode } from "../state/platform";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import { TeamIcon, teamIconComponent } from "./TeamIcon";
 import {
+  sidebarModeOptionActiveClass,
+  sidebarModeOptionClass,
+  sidebarUnreadDotClass,
+  sidebarWorkspaceMenuClass,
+  sidebarWorkspaceMenuItemClass,
+} from "./sidebar-classes";
+import {
   SidebarCollapsibleSection,
-  SidebarOrganizationChannels,
+  SidebarWorkspaceChannels,
   SidebarProjectChannels,
 } from "./SidebarChannels";
 import { UpdateControl } from "./UpdateControl";
@@ -71,8 +80,8 @@ type SidebarPage =
   | "inbox"
   | "my-issues"
   | "project-settings"
-  | "organization-create"
-  | "organization-settings"
+  | "workspace-create"
+  | "workspace-settings"
   | "settings";
 
 const EMPTY_CHANNELS: ChannelSummary[] = [];
@@ -80,7 +89,7 @@ const EMPTY_SIDEBAR_SECTIONS: ChannelSidebarSection[] = [];
 
 export function Sidebar({
   activePage,
-  activeOrganizationId,
+  activeWorkspaceId,
   activeProjectId,
   activePlanningProjectId,
   activeChannelId,
@@ -113,15 +122,15 @@ export function Sidebar({
   onChannelSettings,
   onIssuesOpen,
   onCreateIssue,
-  onAddOrganization,
-  onOrganizationChange,
+  onAddWorkspace,
+  onWorkspaceChange,
   onProjectChange,
   onProjectOpenInNewWindow,
   onProjectRepositoryOpen,
   onProjectSettings,
   onSettings,
   onLogout,
-  organizations,
+  workspaces,
   projects,
   planningProjects = [],
   projectReadiness,
@@ -136,7 +145,7 @@ export function Sidebar({
   user,
 }: {
   activePage: SidebarPage;
-  activeOrganizationId: string | null;
+  activeWorkspaceId: string | null;
   activeProjectId: string | null;
   activePlanningProjectId?: string | null;
   activeChannelId?: string | null;
@@ -144,7 +153,7 @@ export function Sidebar({
   channels?: ChannelSummary[];
   channelsLoading?: boolean;
   connectedTeamIds: string[] | null;
-  /** The active organization's DMs, listed while the DMs half is on. */
+  /** The active workspace's DMs, listed while the DMs half is on. */
   directMessages?: ChannelSummary[];
   /** A new DM is being composed, so the list's New row is the current one. */
   isComposingDirectMessage?: boolean;
@@ -179,15 +188,15 @@ export function Sidebar({
   onChannelSettings?: (channelId: string) => void;
   onIssuesOpen: () => void;
   onCreateIssue: (projectId: string) => void;
-  onAddOrganization: () => void;
-  onOrganizationChange: (organizationId: string) => void;
+  onAddWorkspace: () => void;
+  onWorkspaceChange: (workspaceId: string) => void;
   onProjectChange: (projectId: string) => void;
   onProjectOpenInNewWindow?: (projectId: string) => Promise<void>;
   onProjectRepositoryOpen: (projectId: string) => void;
   onProjectSettings: (projectId: string) => void;
   onSettings: () => void;
   onLogout: () => void;
-  organizations: Organization[];
+  workspaces: Workspace[];
   projects: Project[];
   planningProjects?: PlanningProject[];
   projectReadiness: Record<string, RepositoryReadiness>;
@@ -210,7 +219,7 @@ export function Sidebar({
 }) {
   const { locale, setLocale, t } = useI18n();
   const { toast } = useToast();
-  const [isOrganizationMenuOpen, setIsOrganizationMenuOpen] = useState(false);
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const organizationMenuRef = useRef<HTMLDivElement | null>(null);
   // Teams start expanded; only explicitly collapsed IDs are stored.
   const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(
@@ -229,8 +238,8 @@ export function Sidebar({
   const languageTriggerRef = useRef<HTMLButtonElement>(null);
 
   const catalog = channels ?? EMPTY_CHANNELS;
-  const organizationRole = organizations.find(
-    (organization) => organization.id === activeOrganizationId,
+  const organizationRole = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId,
   )?.role ?? null;
   const activeChannelProjectId = catalog.find(
     (channel) => channel.id === activeChannelId,
@@ -247,24 +256,24 @@ export function Sidebar({
   }, [activeChannelProjectId, activePage]);
 
   useEffect(() => {
-    if (!isOrganizationMenuOpen) return;
+    if (!isWorkspaceMenuOpen) return;
     const focusTarget =
       organizationMenuRef.current?.querySelector<HTMLButtonElement>(
         '[role="menuitemradio"][aria-checked="true"]',
       ) ??
       organizationMenuRef.current?.querySelector<HTMLButtonElement>(
-        ".sidebar-organization-menu [role='menuitem']",
+        ".sidebar-workspace-menu [role='menuitem']",
       );
     focusTarget?.focus();
 
     const closeOnOutsidePress = (event: PointerEvent) => {
       if (!organizationMenuRef.current?.contains(event.target as Node)) {
-        setIsOrganizationMenuOpen(false);
+        setIsWorkspaceMenuOpen(false);
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setIsOrganizationMenuOpen(false);
+      setIsWorkspaceMenuOpen(false);
       organizationMenuRef.current
         ?.querySelector<HTMLButtonElement>(".sidebar-brand")
         ?.focus();
@@ -276,7 +285,7 @@ export function Sidebar({
       document.removeEventListener("pointerdown", closeOnOutsidePress);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isOrganizationMenuOpen]);
+  }, [isWorkspaceMenuOpen]);
 
   useEffect(() => {
     if (!openProjectMenuId) return;
@@ -339,23 +348,23 @@ export function Sidebar({
     { locale: "en", label: t("language.en") },
     { locale: "zh", label: t("language.zh") },
   ];
-  const activeOrganization =
-    organizations.find(
-      (organization) =>
-        organization.id ===
+  const activeWorkspace =
+    workspaces.find(
+      (workspace) =>
+        workspace.id ===
         projects.find((project) => project.id === projectWindowProjectId)
-          ?.organizationId,
+          ?.workspaceId,
     ) ??
-    organizations.find(
-      (organization) => organization.id === activeOrganizationId,
+    workspaces.find(
+      (workspace) => workspace.id === activeWorkspaceId,
     ) ??
-    organizations.find(
-      (organization) =>
-        organization.id ===
+    workspaces.find(
+      (workspace) =>
+        workspace.id ===
         projects.find((project) => project.id === activeProjectId)
-          ?.organizationId,
+          ?.workspaceId,
     ) ??
-    organizations[0] ??
+    workspaces[0] ??
     null;
   const isProjectWindow = Boolean(projectWindowProjectId);
   // The toggle has no state of its own: the DM page is the DMs half and every
@@ -364,9 +373,9 @@ export function Sidebar({
   const projectWindowProject = isProjectWindow
     ? projects.find((project) => project.id === projectWindowProjectId) ?? null
     : null;
-  const visibleProjects = activeOrganization
+  const visibleProjects = activeWorkspace
     ? projects.filter(
-        (project) => project.organizationId === activeOrganization.id,
+        (project) => project.workspaceId === activeWorkspace.id,
       )
     : projects;
   useEffect(() => {
@@ -446,7 +455,10 @@ export function Sidebar({
       inert={!isOpen ? true : undefined}
       id="app-sidebar"
     >
-      <div className="sidebar-toolbar" data-tauri-drag-region />
+      <div
+        className="flex h-[46px] flex-none basis-[46px] items-center pl-[var(--traffic-light-safe-inset)]"
+        data-tauri-drag-region
+      />
 
       {isProjectWindow ? (
         <button
@@ -455,7 +467,14 @@ export function Sidebar({
               ? t("sidebar.openProjectHome", { name: projectWindowProject.name })
               : t("sidebar.projectUnavailable")
           }
-          className="sidebar-project-window-brand"
+          className={cn(
+            "mx-2.5 flex h-[42px] w-[calc(100%-20px)] shrink-0 grow-0 basis-[42px] items-center gap-[9px]",
+            "cursor-pointer rounded-[9px] bg-transparent px-2 text-left text-sidebar-foreground-strong",
+            "not-disabled:hover:bg-sidebar-hover not-disabled:active:scale-[.985] disabled:cursor-default",
+            "[&>img]:flex-none [&>svg]:flex-none",
+            "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sidebar-focus",
+          )}
+          data-briar-sidebar-project-brand=""
           disabled={!projectWindowProject}
           onClick={onLobbyOpen}
           type="button"
@@ -463,53 +482,63 @@ export function Sidebar({
           {projectWindowProject ? (
             <TeamIcon className="size-5" project={projectWindowProject} />
           ) : null}
-          <span>
+          <span className="min-w-0 truncate text-md/[20px] font-bold tracking-[-.25px]">
             {projectWindowProject?.name ?? t("sidebar.projectUnavailable")}
           </span>
         </button>
       ) : (
         <div
-          className="sidebar-organization-switcher"
+          className="relative flex h-[42px] flex-none basis-[42px] items-center gap-1.5 px-2.5"
+          data-briar-sidebar-workspace-switcher=""
           ref={organizationMenuRef}
         >
         <button
-          aria-expanded={isOrganizationMenuOpen}
+          aria-expanded={isWorkspaceMenuOpen}
           aria-haspopup="menu"
-          aria-label={t("sidebar.organizationSwitcher")}
-          className="sidebar-brand"
+          aria-label={t("sidebar.workspaceSwitcher")}
+          className={cn(
+            "flex h-8.5 min-w-0 flex-auto cursor-pointer items-center gap-[5px] rounded-[8px] px-[7px]",
+            "bg-transparent text-left text-md/[20px] font-bold tracking-[-.25px] text-sidebar-foreground-strong",
+            "hover:bg-sidebar-hover aria-expanded:bg-sidebar-hover active:scale-[.985]",
+            "[&>span]:min-w-0 [&>span]:truncate",
+            "[&>svg]:flex-none [&>svg]:text-sidebar-foreground-muted",
+            "[&>svg]:transition-[transform] [&>svg]:duration-[160ms] [&>svg]:ease-[cubic-bezier(.2,.8,.2,1)]",
+            "motion-reduce:[&>svg]:transition-none",
+            "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sidebar-focus",
+          )}
           onClick={() => {
             setOpenProjectMenuId(null);
             setIsAccountMenuOpen(false);
             setIsLanguageMenuOpen(false);
-            setIsOrganizationMenuOpen((open) => !open);
+            setIsWorkspaceMenuOpen((open) => !open);
           }}
           type="button"
         >
-          {activeOrganization?.logo ? (
+          {activeWorkspace?.logo ? (
             <img
               alt=""
-              className="sidebar-organization-logo"
-              src={activeOrganization.logo}
+              className="size-5 flex-none rounded-[5px] object-cover"
+              src={activeWorkspace.logo}
             />
           ) : null}
-          <span>{activeOrganization?.name ?? "Briar"}</span>
+          <span>{activeWorkspace?.name ?? "Briar"}</span>
           <ChevronDown
             aria-hidden="true"
-            className={isOrganizationMenuOpen ? "open" : ""}
+            className={isWorkspaceMenuOpen ? "rotate-180" : ""}
             size={14}
             strokeWidth={1.8}
           />
         </button>
-        {isOrganizationMenuOpen && (
+        {isWorkspaceMenuOpen && (
           <div
-            aria-label={t("sidebar.organizationMenu")}
-            className="sidebar-organization-menu"
+            aria-label={t("sidebar.workspaceMenu")}
+            className={sidebarWorkspaceMenuClass}
             onKeyDown={(event) => {
               if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
               event.preventDefault();
               const items = Array.from(
                 organizationMenuRef.current?.querySelectorAll<HTMLButtonElement>(
-                  ".sidebar-organization-menu button",
+                  ".sidebar-workspace-menu button",
                 ) ?? [],
               );
               const current = Math.max(
@@ -522,64 +551,85 @@ export function Sidebar({
             role="menu"
           >
             <div
-              aria-label={t("sidebar.organizationList")}
-              className="sidebar-organization-menu-group organization-list"
+              aria-label={t("sidebar.workspaceList")}
+              className="grid gap-px"
               role="group"
             >
-              {organizations.map((organization) => (
+              {workspaces.map((workspace) => (
                 <button
-                  aria-checked={organization.id === activeOrganization?.id}
-                  key={organization.id}
+                  aria-checked={workspace.id === activeWorkspace?.id}
+                  key={workspace.id}
                   onClick={() => {
-                    onOrganizationChange(organization.id);
-                    setIsOrganizationMenuOpen(false);
+                    onWorkspaceChange(workspace.id);
+                    setIsWorkspaceMenuOpen(false);
                   }}
+                  className={sidebarWorkspaceMenuItemClass}
                   role="menuitemradio"
                   type="button"
                 >
-                  {organization.logo ? (
+                  {workspace.logo ? (
                     <img
                       alt=""
-                      className="sidebar-organization-list-logo"
-                      src={organization.logo}
+                      className="size-4 rounded-[4px] object-cover"
+                      src={workspace.logo}
                     />
                   ) : (
-                    <Building2 aria-hidden="true" size={15} strokeWidth={1.7} />
+                    <Building2
+                      aria-hidden="true"
+                      className="text-sidebar-foreground-muted"
+                      size={15}
+                      strokeWidth={1.7}
+                    />
                   )}
-                  <span>{organization.name}</span>
-                  {organization.id === activeOrganization?.id ? (
-                    <Check aria-hidden="true" size={15} strokeWidth={1.8} />
+                  <span>{workspace.name}</span>
+                  {workspace.id === activeWorkspace?.id ? (
+                    <Check
+                      aria-hidden="true"
+                      className="text-sidebar-icon-accent"
+                      size={15}
+                      strokeWidth={1.8}
+                    />
                   ) : null}
                 </button>
               ))}
             </div>
             <div
-              className="sidebar-organization-menu-separator"
+              className="-mx-[7px] my-1.5 h-px bg-sidebar-border"
               role="separator"
             />
             <button
-              className="sidebar-organization-add"
+              className={cn(
+                sidebarWorkspaceMenuItemClass,
+                "grid-cols-[18px_minmax(0,1fr)] font-semibold",
+              )}
               onClick={() => {
-                setIsOrganizationMenuOpen(false);
-                onAddOrganization();
+                setIsWorkspaceMenuOpen(false);
+                onAddWorkspace();
               }}
               role="menuitem"
               type="button"
             >
-              <Plus aria-hidden="true" size={15} strokeWidth={1.7} />
-              <span>{t("sidebar.addOrganization")}</span>
+              <Plus
+                aria-hidden="true"
+                className="text-sidebar-icon-accent"
+                size={15}
+                strokeWidth={1.7}
+              />
+              <span>{t("sidebar.addWorkspace")}</span>
             </button>
           </div>
         )}
         <div
           aria-label={t("sidebar.modeToggle")}
-          className="sidebar-mode-toggle"
+          className="ml-auto inline-flex flex-none items-center gap-0.5 rounded-[9px] bg-sidebar-accent p-0.5"
+          data-briar-sidebar-mode-toggle=""
           role="group"
         >
           <button
             aria-label={t("sidebar.modeChats")}
             aria-pressed={sidebarMode === "dms"}
-            className={`sidebar-mode-option${sidebarMode === "dms" ? " active" : ""}`}
+            className={cn(sidebarModeOptionClass, sidebarMode === "dms" && sidebarModeOptionActiveClass)}
+            data-briar-sidebar-mode-option=""
             onClick={() => {
               if (sidebarMode !== "dms") onDmsOpen();
             }}
@@ -590,14 +640,16 @@ export function Sidebar({
             {sidebarMode !== "dms" && unreadDmCount > 0 ? (
               <i
                 aria-label={t("dm.unreadCount", { count: unreadDmCount })}
-                className="sidebar-mode-unread"
+                className="absolute top-[3px] right-[3px] size-[7px] rounded-full bg-sidebar-icon-accent shadow-[0_0_0_2px_var(--sidebar-fallback)]"
+                data-briar-sidebar-mode-unread=""
               />
             ) : null}
           </button>
           <button
             aria-label={t("sidebar.modeWork")}
             aria-pressed={sidebarMode === "work"}
-            className={`sidebar-mode-option${sidebarMode === "work" ? " active" : ""}`}
+            className={cn(sidebarModeOptionClass, sidebarMode === "work" && sidebarModeOptionActiveClass)}
+            data-briar-sidebar-mode-option=""
             onClick={() => {
               if (sidebarMode !== "work") onWorkOpen();
             }}
@@ -628,7 +680,7 @@ export function Sidebar({
         <a
           aria-current={activePage === "inbox" ? "page" : undefined}
           className={activePage === "inbox" ? "active" : ""}
-          href="#inbox"
+          href={webMode ? "/app/inbox" : "#inbox"}
           onClick={(event) => {
             event.preventDefault();
             onInboxOpen();
@@ -639,7 +691,8 @@ export function Sidebar({
           {unreadInboxCount > 0 && (
             <i
               aria-label={t("inbox.unreadCount", { count: unreadInboxCount })}
-              className="sidebar-unread-dot"
+              className={sidebarUnreadDotClass}
+              data-briar-sidebar-unread=""
             />
           )}
         </a>
@@ -649,7 +702,7 @@ export function Sidebar({
             className={`sidebar-primary-subnav-link${
               activePage === "my-issues" ? " active" : ""
             }`}
-            href="#my-issues"
+            href={webMode ? "/app/my-issues" : "#my-issues"}
             onClick={(event) => {
               event.preventDefault();
               onMyIssuesOpen();
@@ -676,7 +729,7 @@ export function Sidebar({
             topLevel
           />
         ) : !isProjectWindow && onChannelOpen ? (
-          <SidebarOrganizationChannels
+          <SidebarWorkspaceChannels
             activeChannelId={activeChannelId}
             activePage={activePage}
             channels={catalog}
@@ -701,7 +754,7 @@ export function Sidebar({
                   className={`sidebar-project-view${
                     activePage === "issues" ? " active" : ""
                   }`}
-                  href="#issues"
+                  href={webMode ? "/app/issues" : "#issues"}
                   onClick={(event) => {
                     event.preventDefault();
                     onIssuesOpen();
@@ -731,7 +784,7 @@ export function Sidebar({
                   className={`sidebar-project-view${
                     activePage === "agents" ? " active" : ""
                   }`}
-                  href="#agents"
+                  href={webMode ? "/app/agents" : "#agents"}
                   onClick={(event) => {
                     event.preventDefault();
                     onAgentsOpen();
@@ -799,7 +852,7 @@ export function Sidebar({
                   className={`sidebar-project-view${
                     activePage === "schedule" ? " active" : ""
                   }`}
-                  href="#schedule"
+                  href={webMode ? "/app/schedule" : "#schedule"}
                   onClick={(event) => {
                     event.preventDefault();
                     onScheduleOpen();
@@ -1038,7 +1091,7 @@ export function Sidebar({
                             return next;
                           });
                         }}
-                        toggleClassName="sidebar-project-channels-toggle"
+                        nested
                       >
                         <div
                           className="sidebar-planning-project-list"
@@ -1141,7 +1194,7 @@ export function Sidebar({
                         className={`sidebar-project-view${
                           isActive && activePage === "issues" ? " active" : ""
                         }`}
-                        href="#issues"
+                        href={webMode ? "/app/issues" : "#issues"}
                         onClick={(event) => {
                           event.preventDefault();
                           openProjectPage(onIssuesOpen);
@@ -1175,7 +1228,7 @@ export function Sidebar({
                         className={`sidebar-project-view${
                           isActive && activePage === "agents" ? " active" : ""
                         }`}
-                        href="#agents"
+                        href={webMode ? "/app/agents" : "#agents"}
                         onClick={(event) => {
                           event.preventDefault();
                           openProjectPage(onAgentsOpen);
@@ -1264,7 +1317,7 @@ export function Sidebar({
                         className={`sidebar-project-view${
                           isActive && activePage === "schedule" ? " active" : ""
                         }`}
-                        href="#schedule"
+                        href={webMode ? "/app/schedule" : "#schedule"}
                         onClick={(event) => {
                           event.preventDefault();
                           openProjectPage(onScheduleOpen);
@@ -1298,7 +1351,7 @@ export function Sidebar({
                 </div>
                 <div className="account-popover-separator" />
                 <a
-                  href="#settings"
+                  href={webMode ? "/app/settings" : "#settings"}
                   onClick={(event) => {
                     event.preventDefault();
                     setIsAccountMenuOpen(false);

@@ -12,9 +12,11 @@ import {
   executionWorkerUpdateStatus,
   failExecutionWorkerUpdate,
   hasExecutionWorkerReadinessChanged,
+  PLANNED_UPDATE_HANDOFF_READINESS_DETAIL,
   reapStalledHuntRuns,
   recordWorkerHeartbeat,
   requestExecutionWorkerUpdate,
+  restoreExecutionWorkersAfterUpdate,
   updateExecutionWorkerLabel,
   workerStateAt,
 } from "./workers";
@@ -75,7 +77,7 @@ export async function prepareWorkerUpdateHandoffApplication(input: {
   if (input.requestId && existing && existing.id !== input.requestId) invalid("A different update is already pending");
   const update = await requestExecutionWorkerUpdate(input.db, {
     id: input.requestId ?? crypto.randomUUID(),
-    organizationId: input.principal.organizationId,
+    workspaceId: input.principal.workspaceId,
     deviceId: input.principal.deviceId,
     requestedByUserId: input.principal.ownerUserId,
     targetVersion: input.targetVersion,
@@ -163,7 +165,7 @@ export async function finishWorkerUpdateApplication(input: {
         !runtime.providerHealth.some((provider) => provider.healthy);
     })) invalid("Every sandbox worker must report the new healthy runtime first");
   }
-  await input.db.prepare(
+  const finished = await input.db.prepare(
     `update briar_execution_worker_update_requests
      set status = ?, handoff_error = ?, completed_at = ?, updated_at = ?,
          handoff_state = case when ? then 'failed' else handoff_state end
@@ -172,6 +174,15 @@ export async function finishWorkerUpdateApplication(input: {
     terminalStatus, input.error ?? null, input.observedAt, input.observedAt, input.cancel && Boolean(input.error) ? 1 : 0,
     input.requestId, input.principal.deviceId,
   ).run();
+  // Cancels and failures leave the device drained on purpose; only a completed
+  // update undoes the drain it caused.
+  if (terminalStatus === "completed" && finished.meta.changes > 0) {
+    await restoreExecutionWorkersAfterUpdate(
+      input.db,
+      input.principal.deviceId,
+      input.observedAt,
+    );
+  }
   return {};
 }
 
@@ -193,7 +204,7 @@ export async function failWorkerUpdateHandoffApplication(input: {
   }
   await failExecutionWorkerUpdate(input.db, {
     requestId: input.requestId,
-    organizationId: input.principal.organizationId,
+    workspaceId: input.principal.workspaceId,
     deviceId: input.principal.deviceId,
     error,
     observedAt: input.observedAt,
@@ -269,7 +280,7 @@ export async function heartbeatWorkerApplication(input: {
     readinessDetail: updateFailed
       ? "원격 런타임 업데이트에 실패했습니다."
       : updateIsPending
-        ? "계획된 업데이트 handoff를 진행 중입니다."
+        ? PLANNED_UPDATE_HANDOFF_READINESS_DETAIL
         : input.readinessDetail ?? null,
     observedAt: input.observedAt,
   });
@@ -283,7 +294,7 @@ export async function heartbeatWorkerApplication(input: {
   ) {
     await recordPreservedWorkerBinding(input.db, {
       requestId: `worker-restart:${binding.id}:${binding.last_heartbeat_at}`,
-      organizationId: input.principal.organizationId,
+      workspaceId: input.principal.workspaceId,
       projectId: binding.project_id,
       deviceId: input.principal.deviceId,
       workerId: binding.id,
@@ -303,7 +314,7 @@ export async function heartbeatWorkerApplication(input: {
   }
   if (hasExecutionWorkerReadinessChanged(binding, worker)) {
     await auditExecutionEvent(input.db, {
-      organizationId: input.principal.organizationId,
+      workspaceId: input.principal.workspaceId,
       projectId: binding.project_id,
       workerId: binding.id,
       actorDeviceId: input.principal.deviceId,

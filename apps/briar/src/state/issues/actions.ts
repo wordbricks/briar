@@ -54,9 +54,9 @@ import type {
 } from "../../types";
 import { runTask, type TaskAction } from "../actions";
 import { createAgentSessionActions } from "../agent-sessions/actions";
-import { demoOrganization, demoUser, emptyDashboard } from "../demo-fixtures";
+import { demoWorkspace, demoUser, emptyDashboard } from "../demo-fixtures";
 import { runAtom, teamRunIdsAtom, teamRunsAtom } from "../entities/runs";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { demoMode as platformDemoMode } from "../platform";
 import { planningProjectsAtom } from "../planning/atoms";
 import { useRegistry, type AtomRegistry } from "../registry";
@@ -255,7 +255,7 @@ export function createIssueActions(
 
   /**
    * One run of the board on screen, or `null` when that board does not list it.
-   * The store is organization wide, so the membership check is what keeps these
+   * The store is workspace wide, so the membership check is what keeps these
    * actions reading the same list the `dashboard.runs.find` they replaced did.
    */
   const boardRun = (teamId: string, runId: string): HuntRun | null =>
@@ -393,7 +393,7 @@ export function createIssueActions(
           const user = registry.get(userAtom);
           const run: HuntRun = {
             id: crypto.randomUUID(),
-            workspaceId: project.organizationId ?? demoOrganization.id,
+            workspaceId: project.workspaceId ?? demoWorkspace.id,
             teamId,
             projectId,
             projectName: planningProject?.name ?? null,
@@ -463,7 +463,7 @@ export function createIssueActions(
           Atom.batch(() => {
             registry.set(runEventsAtom(run.id), [initialEvent]);
             registry.set(activeTeamIdAtom, teamId);
-            registry.set(activeOrganizationIdAtom, project.organizationId);
+            registry.set(activeWorkspaceIdAtom, project.workspaceId);
             if (onActiveBoard) {
               applySyncEvent(registry, { kind: "run-changed", run, teamId });
             } else {
@@ -1350,20 +1350,34 @@ export function createIssueActions(
                 : isRegression
                   ? run.currentRevision + 1
                   : run.currentRevision;
+            const statusLabels = {
+              backlog: "백로그",
+              queued: "대기",
+              blocked: "차단",
+              failed: "실패",
+              completed: "완료",
+              cancelled: "취소",
+            } as const;
             const targetLabel =
               placement.status === "running"
                 ? run.workflow.stages.find(
                     (stage) => stage.id === workflowStage,
                   )?.label
-                : {
-                    backlog: "백로그",
-                    queued: "대기",
-                    blocked: "차단",
-                    failed: "실패",
-                    completed: "완료",
-                    cancelled: "취소",
-                  }[placement.status];
-            const detail = `사용자가 작업을 ${targetLabel ?? placement.status} 상태로 이동했습니다.`;
+                : statusLabels[
+                    placement.status as keyof typeof statusLabels
+                  ];
+            const sourceLabel = run.pausedAt
+              ? "일시정지"
+              : run.status === "running"
+                ? run.workflow.stages.find(
+                    (stage) => stage.id === run.workflowStage,
+                  )?.label
+                : statusLabels[run.status as keyof typeof statusLabels];
+            const target = targetLabel ?? placement.status;
+            const detail =
+              sourceLabel && sourceLabel !== target
+                ? `사용자가 작업을 ${sourceLabel}에서 ${target} 상태로 이동했습니다.`
+                : `사용자가 작업을 ${target} 상태로 이동했습니다.`;
             recordRunEvent(run.id, {
               id: crypto.randomUUID(),
               attempt: currentAttempt,
@@ -1408,7 +1422,19 @@ export function createIssueActions(
           return;
         }
         const token = requireToken();
-        await api.moveHuntRun(token, teamId, runId, placement);
+        try {
+          await api.moveHuntRun(token, teamId, runId, placement);
+        } catch (caught) {
+          if (isApiErrorStatus(caught, 409)) {
+            await refresh();
+            throw new Error(
+              "다른 화면에서 상태가 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다.",
+            );
+          }
+          throw new Error(
+            "상태 변경을 저장하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+          );
+        }
         await refresh();
       });
     },

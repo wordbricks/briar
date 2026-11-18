@@ -1,8 +1,8 @@
-import type { OrganizationMember } from "@/types";
+import type { WorkspaceMember } from "@/types";
 export function IssueAssigneeAvatar({
   member
 }: {
-  member: OrganizationMember;
+  member: WorkspaceMember;
 }) {
   return member.image ? <img alt="" className="issue-assignee-avatar" src={member.image} /> : <span aria-hidden="true" className="issue-assignee-avatar fallback">
       {member.name.trim().charAt(0).toUpperCase() || "?"}

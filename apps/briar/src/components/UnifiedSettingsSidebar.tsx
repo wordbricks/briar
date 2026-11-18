@@ -30,21 +30,21 @@ import {
 } from "@/components/settings";
 import { cn } from "@/lib/utils";
 import { useI18n } from "../i18n";
-import type { Organization, Project } from "../types";
+import type { Workspace, Project } from "../types";
 import {
   appSettingsNavigationItems,
   type SettingsSection,
 } from "./app-settings-navigation";
-import type { OrganizationSettingsSection } from "./OrganizationSettings";
+import type { WorkspaceSettingsSection } from "./WorkspaceSettings";
 import type { TeamSettingsSection } from "./TeamSettings";
 import { TeamIcon } from "./TeamIcon";
 
 export type UnifiedSettingsTarget =
   | { scope: "application"; section: SettingsSection }
   | {
-      scope: "organization";
-      organizationId: string;
-      section: OrganizationSettingsSection;
+      scope: "workspace";
+      workspaceId: string;
+      section: WorkspaceSettingsSection;
     }
   | {
       scope: "project";
@@ -87,7 +87,7 @@ function SettingsTreeGroup<
   onExpandedIdChange: Dispatch<SetStateAction<string | null>>;
   onNavigate: (target: UnifiedSettingsTarget) => void;
   renderEntityIcon: (entity: Entity) => ReactNode;
-  scope: "organization" | "project";
+  scope: "workspace" | "project";
   targetFor: (entity: Entity, section: Section) => UnifiedSettingsTarget;
 }) {
   const matches = (value: string) =>
@@ -171,28 +171,28 @@ export function UnifiedSettingsSidebar({
   isOpen,
   onBack,
   onNavigate,
-  organizations,
+  workspaces,
   projects,
 }: {
   activeTarget: UnifiedSettingsTarget;
   isOpen: boolean;
   onBack: () => void;
   onNavigate: (target: UnifiedSettingsTarget) => void;
-  organizations: Organization[];
+  workspaces: Workspace[];
   projects: Project[];
 }) {
   const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedOrganizationId, setExpandedOrganizationId] = useState<
+  const [expandedWorkspaceId, setExpandedWorkspaceId] = useState<
     string | null
-  >(activeTarget.scope === "organization" ? activeTarget.organizationId : null);
+  >(activeTarget.scope === "workspace" ? activeTarget.workspaceId : null);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(
     activeTarget.scope === "project" ? activeTarget.projectId : null,
   );
 
   useEffect(() => {
-    if (activeTarget.scope === "organization") {
-      setExpandedOrganizationId(activeTarget.organizationId);
+    if (activeTarget.scope === "workspace") {
+      setExpandedWorkspaceId(activeTarget.workspaceId);
     }
     if (activeTarget.scope === "project") {
       setExpandedProjectId(activeTarget.projectId);
@@ -212,33 +212,33 @@ export function UnifiedSettingsSidebar({
     [t],
   );
   const organizationItems = useMemo<
-    NavigationItem<OrganizationSettingsSection>[]
+    NavigationItem<WorkspaceSettingsSection>[]
   >(
     () => [
       {
         id: "general",
         icon: <Building2 size={16} strokeWidth={1.75} />,
-        label: t("organization.general"),
+        label: t("workspace.general"),
       },
       {
         id: "members",
         icon: <Users size={16} strokeWidth={1.75} />,
-        label: t("organization.membersAndInvites"),
+        label: t("workspace.membersAndInvites"),
       },
       {
         id: "agents",
         icon: <Bot size={16} strokeWidth={1.75} />,
-        label: t("organization.agents"),
+        label: t("workspace.agents"),
       },
       {
         id: "workers",
         icon: <Cpu size={16} strokeWidth={1.75} />,
-        label: t("organization.workers"),
+        label: t("workspace.workers"),
       },
       {
         id: "integrations",
         icon: <Plug size={16} strokeWidth={1.75} />,
-        label: t("organization.integrations"),
+        label: t("workspace.integrations"),
       },
     ],
     [t],
@@ -327,28 +327,28 @@ export function UnifiedSettingsSidebar({
 
         <SettingsTreeGroup
           activeEntityId={
-            activeTarget.scope === "organization"
-              ? activeTarget.organizationId
+            activeTarget.scope === "workspace"
+              ? activeTarget.workspaceId
               : null
           }
           activeSection={
-            activeTarget.scope === "organization" ? activeTarget.section : null
+            activeTarget.scope === "workspace" ? activeTarget.section : null
           }
           defaultSection="general"
-          entities={organizations}
-          expandedId={expandedOrganizationId}
-          groupLabel={t("organization.settingsLabel")}
+          entities={workspaces}
+          expandedId={expandedWorkspaceId}
+          groupLabel={t("workspace.settingsLabel")}
           items={organizationItems}
           normalizedQuery={normalizedQuery}
-          onExpandedIdChange={setExpandedOrganizationId}
+          onExpandedIdChange={setExpandedWorkspaceId}
           onNavigate={onNavigate}
           renderEntityIcon={() => (
             <Building2 size={16} strokeWidth={1.75} />
           )}
-          scope="organization"
-          targetFor={(organization, section) => ({
-            scope: "organization",
-            organizationId: organization.id,
+          scope="workspace"
+          targetFor={(workspace, section) => ({
+            scope: "workspace",
+            workspaceId: workspace.id,
             section,
           })}
         />

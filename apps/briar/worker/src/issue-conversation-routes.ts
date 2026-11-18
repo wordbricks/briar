@@ -31,7 +31,7 @@ import {
   json,
 } from "./http-response";
 import { sha256 } from "./crypto-digest";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import { issueAttachmentResponse } from "./issue-attachment-service";
 import {
   issueAgentReplyJson,
@@ -53,9 +53,9 @@ import {
 } from "./issue-message-mutation-repository";
 import { decodeIssueMessageMutationReceiptResponse } from "./issue-mutation-receipt-contract";
 import { resolveIssueAttachmentUploads } from "./issue-attachment-upload-repository";
-import { getOrganizationRole } from "./organization-repository";
+import { getWorkspaceRole } from "./workspace-repository";
 import { issueProcessingAgentSkillRow } from "./agent-skills";
-import { wakeOrganizationWorkers } from "./worker-wake-hub";
+import { wakeWorkspaceWorkers } from "./worker-wake-hub";
 
 type RequireRunExecutionProject = (
   db: D1Database,
@@ -167,7 +167,7 @@ export async function createProjectIssueMessage(
   },
 ) {
   const project = await requireIssueConversationProject(input);
-  if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
+  if (!hasWorkspaceCapability(project.member_role, "conversations:write")) {
     throw new HttpError(403, "Conversation editing permission required");
   }
   const run = await getHuntRunForProject(input.db, project.id, input.runId);
@@ -212,7 +212,7 @@ export async function createProjectIssueMessage(
     throw new HttpError(400, "Agent-authored messages cannot invoke Agents");
   }
   const requestHash = await sha256(JSON.stringify({
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     projectId: project.id,
     runId: input.runId,
     userId: input.userId,
@@ -262,13 +262,13 @@ export async function createProjectIssueMessage(
   for (const mentionedUserId of mentionedUserIds) {
     if (
       !mentionedUserId ||
-      !(await getOrganizationRole(
+      !(await getWorkspaceRole(
         input.db,
         project.organization_id,
         mentionedUserId,
       ))
     ) {
-      throw new HttpError(400, "Mentioned member is not in this organization");
+      throw new HttpError(400, "Mentioned member is not in this workspace");
     }
   }
   const explicitlyMentionedAgents = new Map<
@@ -346,7 +346,7 @@ export async function createProjectIssueMessage(
   const createdAt = new Date().toISOString();
   const uploads = await resolveIssueAttachmentUploads(input.db, {
     purpose: "issue_message",
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     projectId: project.id,
     userId: input.userId,
     mutationId: messageId,
@@ -434,7 +434,7 @@ export async function createProjectIssueMessage(
   });
   try {
     await commitIssueMessageMutation(input.db, {
-      organizationId: project.organization_id,
+      workspaceId: project.organization_id,
       projectId: project.id,
       runId: input.runId,
       userId: input.userId,
@@ -475,7 +475,7 @@ export async function createProjectIssueMessage(
   // The reply jobs are claimable as soon as this commit lands, so push beats
   // the Worker's idle poll by up to a full backoff interval.
   if (input.env && replies.length > 0) {
-    wakeOrganizationWorkers(
+    wakeWorkspaceWorkers(
       input.env,
       project.organization_id,
       "issue_reply_enqueued",
@@ -492,7 +492,7 @@ export async function updateProjectIssueMessage(
   },
 ) {
   const project = await requireIssueConversationProject(input);
-  if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
+  if (!hasWorkspaceCapability(project.member_role, "conversations:write")) {
     throw new HttpError(403, "Conversation editing permission required");
   }
   const request = decodeIssueMessageEditInput(input.request);
@@ -556,7 +556,7 @@ export async function deleteProjectIssueMessage(
   },
 ) {
   const project = await requireIssueConversationProject(input);
-  if (!hasOrganizationCapability(project.member_role, "conversations:write")) {
+  if (!hasWorkspaceCapability(project.member_role, "conversations:write")) {
     throw new HttpError(403, "Conversation editing permission required");
   }
   const message = await getIssueMessage(

@@ -12,8 +12,8 @@ import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { commitTeamSettings } from "../sync/commit";
 import { getTeamSyncLoader } from "../sync/loader";
 import { activeTeamIdAtom, renderedTeamSettingsAtom } from "../team/atoms";
-import { resolveWorkspaceApi, workspaceModes, type WorkspaceApi } from "../workspace/api";
-import { connectedTeamIdsAtom, healthAtom } from "../workspace/atoms";
+import { resolveWorkspaceApi, workspaceModes, type WorkspaceApi } from "../local-workspace/api";
+import { connectedTeamIdsAtom, healthAtom } from "../local-workspace/atoms";
 import { velenAtom } from "./atoms";
 
 /*
@@ -23,7 +23,7 @@ import { velenAtom } from "./atoms";
   Both write team settings, so both keep the same local-then-server ordering the
   workflow writes use: the Velen organization is written to this device's config
   first and rolled back if the server refuses, because a config pointing at an
-  organization the team never accepted would let an agent query the wrong data.
+  workspace the team never accepted would let an agent query the wrong data.
 */
 
 export interface IntegrationActionDeps {
@@ -137,7 +137,7 @@ export function createIntegrationActions(
       }
       const normalized = org?.trim() || null;
       /*
-        Clearing the organization clears what depended on it. A data source and
+        Clearing the workspace clears what depended on it. A data source and
         a Linear connection are both addressed through the Velen organization,
         so leaving them behind would point the team at rows it can no longer
         reach.

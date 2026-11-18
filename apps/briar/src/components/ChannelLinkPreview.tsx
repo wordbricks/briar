@@ -42,7 +42,7 @@ function readPreviewCache(url: string) {
 
 function loadCachedPreview(
   token: string,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   url: string,
 ) {
@@ -50,7 +50,7 @@ function loadCachedPreview(
   if (cached?.pending) return cached.pending;
   if (cached) return Promise.resolve(cached.preview);
 
-  const pending = loadChannelLinkPreview(token, organizationId, channelId, url)
+  const pending = loadChannelLinkPreview(token, workspaceId, channelId, url)
     .then(({ preview }) => {
       storePreview(url, preview, cacheTtlMs);
       return preview;
@@ -137,12 +137,12 @@ function resolveChannelLinkPreviewState(
 export function ChannelLinkPreview({
   channelId,
   message,
-  organizationId,
+  workspaceId,
   token,
 }: {
   channelId: string;
   message: Pick<ChannelMessage, "body" | "blocks" | "deletedAt" | "optimistic">;
-  organizationId: string;
+  workspaceId: string;
   token: string;
 }) {
   const { t } = useI18n();
@@ -180,7 +180,7 @@ export function ChannelLinkPreview({
       };
     }
 
-    void loadCachedPreview(token, organizationId, channelId, targetUrl)
+    void loadCachedPreview(token, workspaceId, channelId, targetUrl)
       .then((preview) => {
         if (!active) return;
         setState({
@@ -195,7 +195,7 @@ export function ChannelLinkPreview({
     return () => {
       active = false;
     };
-  }, [channelId, organizationId, targetUrl, token]);
+  }, [channelId, workspaceId, targetUrl, token]);
 
   if (!targetUrl) return null;
   if (current.loading) {

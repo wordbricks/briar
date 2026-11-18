@@ -11,7 +11,7 @@ describe("issue execution runtime scope", () => {
       executionWorker: {
         deviceId: "device-1",
         workerId: "worker-1",
-        organizationId: "organization-1",
+        workspaceId: "workspace-1",
         label: "Worker",
         maxConcurrentSessions: 1,
       },
@@ -24,11 +24,11 @@ describe("issue execution runtime scope", () => {
     };
     const config = {
       apiUrl: "https://briar.example",
-      userToken: "user-token-with-organization-access",
+      userToken: "user-token-with-workspace-access",
       workerDeviceIdentity: "briar_device_machine-identity",
       managedComputer: {
         managedComputerId: "computer-1",
-        credentialFile: "/credentials/organization-wide.json",
+        credentialFile: "/credentials/workspace-wide.json",
       },
       teams: [project, otherProject],
     } as unknown as Config;
@@ -53,8 +53,8 @@ describe("issue execution runtime scope", () => {
     });
     expect(JSON.stringify(runtime)).not.toContain("project-2");
     expect(JSON.stringify(runtime)).not.toContain("other-project-secret");
-    expect(JSON.stringify(runtime)).not.toContain("organization-access");
-    expect(JSON.stringify(runtime)).not.toContain("organization-wide");
+    expect(JSON.stringify(runtime)).not.toContain("workspace-access");
+    expect(JSON.stringify(runtime)).not.toContain("workspace-wide");
     expect(runtime.userToken).toBeUndefined();
     expect(runtime.managedComputer).toBeUndefined();
   });

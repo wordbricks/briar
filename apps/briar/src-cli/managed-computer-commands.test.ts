@@ -82,7 +82,7 @@ describe("managed-computer sync", () => {
       loadCredential: async () => ({
         credential: "worker-credential-must-not-be-printed",
         deviceId: "managed-22222222-2222-4222-8222-222222222222",
-        organizationId: "33333333-3333-4333-8333-333333333333",
+        workspaceId: "33333333-3333-4333-8333-333333333333",
         managedComputerId: "22222222-2222-4222-8222-222222222222",
         apiOrigin,
       }),

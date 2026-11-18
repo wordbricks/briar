@@ -8,18 +8,16 @@ import {
   StructuredRunResult_Impact,
   StructuredRunResult_Importance,
   StructuredRunResult_Outcome,
-  StructuredRunResult_Urgency,
-} from "@briar/contracts/gen/briar/app/v1/common_pb";
+  StructuredRunResult_Urgency} from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   AgentService,
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
   AgentSkillKind,
-  type CreateOrganizationAgentRequest,
+  type CreateWorkspaceAgentRequest,
   type CreateProjectAgentRequest,
   ProjectAgentScheduleIntervalUnit as ProtoProjectAgentScheduleIntervalUnit,
-  ProjectAgentScheduleNotificationLevel
-    as ProtoProjectAgentScheduleNotificationLevel,
+  ProjectAgentScheduleNotificationLevel as ProtoProjectAgentScheduleNotificationLevel,
   ProjectAgentScheduleRecurrence as ProtoProjectAgentScheduleRecurrence,
   ProjectAgentScheduleRunStatus as ProtoProjectAgentScheduleRunStatus,
   type ProjectAgentScheduleWrite,
@@ -30,18 +28,14 @@ import {
   ProjectAgentSessionTrigger,
   ProjectAgentSessionType,
   type ProjectAgentSkillInput,
-  type UpdateOrganizationAgentRequest,
-  type UpdateProjectAgentRequest,
-} from "@briar/contracts/gen/briar/app/v1/agent_pb";
+  type UpdateWorkspaceAgentRequest,
+  type UpdateProjectAgentRequest} from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import {
-  ProjectAgentWorkLogEntryStatus,
-} from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
+  ProjectAgentWorkLogEntryStatus} from "@briar/contracts/gen/briar/app/v1/agent_transcript_pb";
 import {
-  AgentActivityKind,
-} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
+  AgentActivityKind} from "@briar/contracts/gen/briar/types/v1/agent_event_pb";
 import {
-  ComputerUsePolicy as ProtoComputerUsePolicy,
-} from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
+  ComputerUsePolicy as ProtoComputerUsePolicy} from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   Code,
@@ -69,15 +63,15 @@ import type { BriarAuth } from "./auth";
 import { HttpError } from "./http-response";
 
 import { appStructuredResult, appWorkflow } from "./app-connect-mappers";
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceRole } from "./workspace-repository";
 import {
-  createOrganizationAgent,
-  deleteOrganizationAgent,
-  listOrganizationAgents,
-  updateOrganizationAgent,
-} from "./organization-agents";
-import { appOrganizationAgent } from "./app-connect-agent-mappers";
+  createWorkspaceAgent,
+  deleteWorkspaceAgent,
+  listWorkspaceAgents,
+  updateWorkspaceAgent,
+} from "./workspace-agents";
+import { appWorkspaceAgent } from "./app-connect-agent-mappers";
 import {
   createTeamAgentApplication,
   deleteTeamAgentApplication,
@@ -119,7 +113,7 @@ import {
 } from "./team-agent-task-repository";
 import { getTeam } from "./team-command-repository";
 import {
-  decodeOrganizationAgentWrite,
+  decodeWorkspaceAgentWrite,
   decodeTeamAgentInput,
   decodeTeamAgentScheduleInput,
   decodeTeamAgentSessionInput,
@@ -520,8 +514,8 @@ const domainStructuredImpact = (value: StructuredRunResult_Impact) => {
       return "issue" as const;
     case StructuredRunResult_Impact.PROJECT:
       return "project" as const;
-    case StructuredRunResult_Impact.ORGANIZATION:
-      return "organization" as const;
+    case StructuredRunResult_Impact.WORKSPACE:
+      return "workspace" as const;
     default:
       throw new ConnectError(
         "structured result impact is required",
@@ -884,9 +878,9 @@ const updateProjectWrite = (input: UpdateProjectAgentRequest) =>
   });
 
 const organizationWrite = (
-  input: CreateOrganizationAgentRequest | UpdateOrganizationAgentRequest,
+  input: CreateWorkspaceAgentRequest | UpdateWorkspaceAgentRequest,
 ) =>
-  decodeOrganizationAgentWrite({
+  decodeWorkspaceAgentWrite({
     name: input.name,
     provider: domainAgentProvider(input.provider),
     model: input.model ?? null,
@@ -1077,21 +1071,21 @@ export const createAppAgentService = (
   { request, auth, db, env, context }: AppConnectAgentInput,
   services: AppConnectAgentServices = appConnectAgentServices,
 ): ServiceImpl<typeof AgentService> => ({
-  createOrganizationAgent: async (input) => {
+  createWorkspaceAgent: async (input) => {
     const session = await services.requireSession(auth, request);
-    const organizationId = decodeUuid(input.organizationId);
-    const role = await getOrganizationRole(
+    const workspaceId = decodeUuid(input.workspaceId);
+    const role = await getWorkspaceRole(
       db,
-      organizationId,
+      workspaceId,
       session.user.id,
     );
-    if (!hasOrganizationCapability(role, "development:manage")) {
+    if (!hasWorkspaceCapability(role, "development:manage")) {
       throw new HttpError(403, "Development management permission required");
     }
     const write = organizationWrite(input);
-    const agent = await createOrganizationAgent(db, {
+    const agent = await createWorkspaceAgent(db, {
       id: crypto.randomUUID(),
-      organizationId,
+      workspaceId,
       name: write.name,
       provider: write.provider,
       model: write.model,
@@ -1103,23 +1097,23 @@ export const createAppAgentService = (
       createdAt: new Date().toISOString(),
     });
     if (!agent) throw new HttpError(500, "Agent was not created");
-    return { agent: appOrganizationAgent(agent) };
+    return { agent: appWorkspaceAgent(agent) };
   },
 
-  updateOrganizationAgent: async (input) => {
+  updateWorkspaceAgent: async (input) => {
     const session = await services.requireSession(auth, request);
-    const organizationId = decodeUuid(input.organizationId);
-    const role = await getOrganizationRole(
+    const workspaceId = decodeUuid(input.workspaceId);
+    const role = await getWorkspaceRole(
       db,
-      organizationId,
+      workspaceId,
       session.user.id,
     );
-    if (!hasOrganizationCapability(role, "development:manage")) {
+    if (!hasWorkspaceCapability(role, "development:manage")) {
       throw new HttpError(403, "Development management permission required");
     }
     const write = organizationWrite(input);
-    const agent = await updateOrganizationAgent(db, {
-      organizationId,
+    const agent = await updateWorkspaceAgent(db, {
+      workspaceId,
       agentId: decodeUuid(input.agentId),
       name: write.name,
       provider: write.provider,
@@ -1131,46 +1125,46 @@ export const createAppAgentService = (
       skills: write.skills ?? [],
       updatedAt: new Date().toISOString(),
     });
-    if (!agent) throw new HttpError(404, "Organization agent not found");
-    return { agent: appOrganizationAgent(agent) };
+    if (!agent) throw new HttpError(404, "Workspace agent not found");
+    return { agent: appWorkspaceAgent(agent) };
   },
 
-  deleteOrganizationAgent: async (input) => {
+  deleteWorkspaceAgent: async (input) => {
     const session = await services.requireSession(auth, request);
-    const organizationId = decodeUuid(input.organizationId);
-    const role = await getOrganizationRole(
+    const workspaceId = decodeUuid(input.workspaceId);
+    const role = await getWorkspaceRole(
       db,
-      organizationId,
+      workspaceId,
       session.user.id,
     );
-    if (!hasOrganizationCapability(role, "development:manage")) {
+    if (!hasWorkspaceCapability(role, "development:manage")) {
       throw new HttpError(403, "Development management permission required");
     }
-    const deleted = await deleteOrganizationAgent(
+    const deleted = await deleteWorkspaceAgent(
       db,
-      organizationId,
+      workspaceId,
       decodeUuid(input.agentId),
     );
-    if (!deleted) throw new HttpError(404, "Organization agent not found");
+    if (!deleted) throw new HttpError(404, "Workspace agent not found");
     return { deleted: true };
   },
 
-  listOrganizationAgents: async (input) => {
+  listWorkspaceAgents: async (input) => {
     const session = await services.requireSession(auth, request);
-    const organizationId = decodeUuid(input.organizationId);
-    const role = await getOrganizationRole(
+    const workspaceId = decodeUuid(input.workspaceId);
+    const role = await getWorkspaceRole(
       db,
-      organizationId,
+      workspaceId,
       session.user.id,
     );
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new HttpError(404, "Organization not found");
+    if (!hasWorkspaceCapability(role, "workspace:read")) {
+      throw new HttpError(404, "Workspace not found");
     }
     return {
-      agents: (await listOrganizationAgents(db, organizationId)).map(
-        appOrganizationAgent,
+      agents: (await listWorkspaceAgents(db, workspaceId)).map(
+        appWorkspaceAgent,
       ),
-      canManage: hasOrganizationCapability(role, "development:manage"),
+      canManage: hasWorkspaceCapability(role, "development:manage"),
     };
   },
 
@@ -1183,7 +1177,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1207,7 +1201,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1233,7 +1227,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1287,7 +1281,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1312,7 +1306,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1337,7 +1331,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1403,7 +1397,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1451,7 +1445,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1652,7 +1646,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1766,7 +1760,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }
@@ -1946,7 +1940,7 @@ export const createAppAgentService = (
       services.getTeam,
     );
     if (
-      !hasOrganizationCapability(project.member_role, "development:manage")
+      !hasWorkspaceCapability(project.member_role, "development:manage")
     ) {
       throw new HttpError(403, "Development management permission required");
     }

@@ -16,16 +16,13 @@ import {
   requestedChannelIdAtom,
   requestedChannelMessageAtom,
   requestedChannelSettingsIdAtom,
-  visibleOrganizationChannelsAtom,
+  visibleWorkspaceChannelsAtom,
 } from "../../state/channels/atoms";
-import {
-  activeOrganizationAtom,
-  activeOrganizationIdAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceAtom, activeWorkspaceIdAtom } from "../../state/workspace/atoms";
 import { useRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import {
-  activeOrganizationTeamsAtom,
+  activeWorkspaceTeamsAtom,
   activeTeamAtom,
 } from "../../state/team/atoms";
 
@@ -59,8 +56,8 @@ type ChannelsShellProps = Omit<
   | "onInitialSettingsHandled"
   | "onRequestedMessageOpen"
   | "onViewingChannelChange"
-  | "organizationId"
-  | "organizationName"
+  | "workspaceId"
+  | "workspaceName"
   | "projects"
   | "requestedMessage"
   | "token"
@@ -72,13 +69,13 @@ type ChannelsShellProps = Omit<
  * the navigation phase moves it.
  */
 export function ChannelsWithCatalog(props: ChannelsShellProps) {
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
-  const organization = useAtomValue(activeOrganizationAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
+  const workspace = useAtomValue(activeWorkspaceAtom);
   const token = useAtomValue(tokenAtom);
   const user = useAtomValue(userAtom);
-  const channels = useAtomValue(visibleOrganizationChannelsAtom);
+  const channels = useAtomValue(visibleWorkspaceChannelsAtom);
   const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
-  const projects = useAtomValue(activeOrganizationTeamsAtom);
+  const projects = useAtomValue(activeWorkspaceTeamsAtom);
   const initialInviteChannelId = useAtomValue(initialChannelInviteIdAtom);
   const initialSettingsChannelId = useAtomValue(
     requestedChannelSettingsIdAtom,
@@ -86,13 +83,13 @@ export function ChannelsWithCatalog(props: ChannelsShellProps) {
   const requestedMessage = useAtomValue(requestedChannelMessageAtom);
   const {
     clearRequestedChannelMessage,
-    replaceOrganizationChannels,
+    replaceWorkspaceChannels,
     setViewingChannel,
   } = useChannelActions();
   const registry = useRegistry();
-  // The id is the gate, not the resolved organization: the shell rendered this
-  // view from the id alone while the organization list was still loading.
-  if (!organizationId || !token) return null;
+  // The id is the gate, not the resolved workspace: the shell rendered this
+  // view from the id alone while the workspace list was still loading.
+  if (!workspaceId || !token) return null;
   return (
     <Channels
       {...props}
@@ -103,15 +100,15 @@ export function ChannelsWithCatalog(props: ChannelsShellProps) {
       initialSettingsChannelId={
         props.inboxDetail ? null : initialSettingsChannelId
       }
-      onChannelsChange={replaceOrganizationChannels}
+      onChannelsChange={replaceWorkspaceChannels}
       onInitialInviteHandled={() =>
         registry.set(initialChannelInviteIdAtom, null)}
       onInitialSettingsHandled={() =>
         registry.set(requestedChannelSettingsIdAtom, null)}
       onRequestedMessageOpen={clearRequestedChannelMessage}
       onViewingChannelChange={setViewingChannel}
-      organizationId={organizationId}
-      organizationName={organization?.name}
+      workspaceId={workspaceId}
+      workspaceName={workspace?.name}
       projects={projects}
       requestedMessage={requestedMessage}
       token={token}
@@ -126,8 +123,8 @@ type DirectMessagesShellProps = Omit<
   | "currentUserId"
   | "onChannelsChange"
   | "onViewingChannelChange"
-  | "organizationId"
-  | "organizationName"
+  | "workspaceId"
+  | "workspaceName"
   | "projects"
   | "token"
 >;
@@ -140,8 +137,8 @@ type DirectMessageConversationPaneShellProps = Omit<
   | "currentUserId"
   | "onChannelsChange"
   | "onViewingChannelChange"
-  | "organizationId"
-  | "organizationName"
+  | "workspaceId"
+  | "workspaceName"
   | "projects"
   | "token"
 >;
@@ -153,17 +150,17 @@ type DirectMessageConversationPaneShellProps = Omit<
 export function DirectMessageConversationPaneWithCatalog(
   props: DirectMessageConversationPaneShellProps,
 ) {
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
-  const organization = useAtomValue(activeOrganizationAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
+  const workspace = useAtomValue(activeWorkspaceAtom);
   const token = useAtomValue(tokenAtom);
   const user = useAtomValue(userAtom);
   const channels = useAtomValue(organizationDirectMessagesAtom);
   const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
   const composing = useAtomValue(directMessageComposeAtom);
-  const projects = useAtomValue(activeOrganizationTeamsAtom);
-  const { replaceOrganizationChannels, setViewingChannel } =
+  const projects = useAtomValue(activeWorkspaceTeamsAtom);
+  const { replaceWorkspaceChannels, setViewingChannel } =
     useChannelActions();
-  if (!organizationId || !token) return null;
+  if (!workspaceId || !token) return null;
   return (
     <DirectMessageConversationPane
       {...props}
@@ -171,10 +168,10 @@ export function DirectMessageConversationPaneWithCatalog(
       channels={channels}
       composing={composing}
       currentUserId={user?.id ?? null}
-      onChannelsChange={replaceOrganizationChannels}
+      onChannelsChange={replaceWorkspaceChannels}
       onViewingChannelChange={setViewingChannel}
-      organizationId={organizationId}
-      organizationName={organization?.name}
+      workspaceId={workspaceId}
+      workspaceName={workspace?.name}
       projects={projects}
       token={token}
     />
@@ -183,26 +180,26 @@ export function DirectMessageConversationPaneWithCatalog(
 
 /** The companion direct message view, reading the same catalog filtered to DMs. */
 export function DirectMessagesWithCatalog(props: DirectMessagesShellProps) {
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
-  const organization = useAtomValue(activeOrganizationAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
+  const workspace = useAtomValue(activeWorkspaceAtom);
   const token = useAtomValue(tokenAtom);
   const user = useAtomValue(userAtom);
   const channels = useAtomValue(organizationDirectMessagesAtom);
   const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
-  const projects = useAtomValue(activeOrganizationTeamsAtom);
-  const { replaceOrganizationChannels, setViewingChannel } =
+  const projects = useAtomValue(activeWorkspaceTeamsAtom);
+  const { replaceWorkspaceChannels, setViewingChannel } =
     useChannelActions();
-  if (!organizationId || !token) return null;
+  if (!workspaceId || !token) return null;
   return (
     <DirectMessages
       {...props}
       channelCatalogCursor={channelCatalogCursor}
       channels={channels}
       currentUserId={user?.id ?? null}
-      onChannelsChange={replaceOrganizationChannels}
+      onChannelsChange={replaceWorkspaceChannels}
       onViewingChannelChange={setViewingChannel}
-      organizationId={organizationId}
-      organizationName={organization?.name}
+      workspaceId={workspaceId}
+      workspaceName={workspace?.name}
       projects={projects}
       token={token}
     />
@@ -216,7 +213,7 @@ type CompanionChannelsShellProps = Omit<
   | "onRequestedChannelOpen"
   | "onRequestedMessageOpen"
   | "onViewingChannelChange"
-  | "organizationId"
+  | "workspaceId"
   | "projects"
   | "requestedChannelId"
   | "requestedMessage"
@@ -232,16 +229,16 @@ export function CompanionChannelsWithCatalog(
   props: CompanionChannelsShellProps,
 ) {
   const registry = useRegistry();
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
   const token = useAtomValue(tokenAtom);
   const user = useAtomValue(userAtom);
   const activeTeam = useAtomValue(activeTeamAtom);
-  const projects = useAtomValue(activeOrganizationTeamsAtom);
+  const projects = useAtomValue(activeWorkspaceTeamsAtom);
   const requestedMessage = useAtomValue(requestedChannelMessageAtom);
   const requestedChannelId = useAtomValue(requestedChannelIdAtom);
   const { clearRequestedChannelMessage, setViewingChannel } =
     useChannelActions();
-  if (!organizationId) return null;
+  if (!workspaceId) return null;
   return (
     <CompanionChannels
       {...props}
@@ -250,7 +247,7 @@ export function CompanionChannelsWithCatalog(
       onRequestedChannelOpen={() => registry.set(requestedChannelIdAtom, null)}
       onRequestedMessageOpen={clearRequestedChannelMessage}
       onViewingChannelChange={setViewingChannel}
-      organizationId={organizationId}
+      workspaceId={workspaceId}
       projects={projects}
       requestedChannelId={requestedChannelId}
       requestedMessage={requestedMessage}

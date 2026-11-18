@@ -13,6 +13,7 @@ import {
 } from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type { WorkerExecutionCheckpoint } from "./worker";
 import {
+  channelReplyFromProto,
   claimedWorkFromProto,
   type ChannelActivityCredential,
   type ClaimedChannelReply,
@@ -63,7 +64,7 @@ export const workClaimIdentityToProto = (
             case: "channelReply",
             value: {
               $typeName: "briar.worker.v1.ChannelReplyClaimIdentity",
-              organizationId: work.organizationId,
+              workspaceId: work.workspaceId,
             },
           }
         : work.workType === "projectAgentTask"
@@ -73,16 +74,7 @@ export const workClaimIdentityToProto = (
                 $typeName: "briar.worker.v1.ProjectAgentTaskClaimIdentity",
               },
             }
-          : work.workType === "dmMemory"
-            ? {
-                case: "dmMemory",
-                value: {
-                  $typeName: "briar.worker.v1.DmMemoryLearningClaimIdentity",
-                  organizationId: work.organizationId,
-                  inputHash: work.inputHash,
-                },
-              }
-            : {
+          : {
               case: "mergeBatch",
               value: { $typeName: "briar.worker.v1.MergeBatchClaimIdentity" },
             },
@@ -108,7 +100,7 @@ export function createWorkerQueueClient(
 export function createWorkerQueueOperations(client: WorkerQueueClient) {
   return {
     claimWork: async (input: {
-      organizationId: string;
+      workspaceId: string;
       projectId: string;
       workerId: string;
       claimedBy: string;
@@ -123,13 +115,13 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
           const raw = response.work.work;
           if (raw.case !== "channelReply") throw cause;
           const scope = raw.value.scope?.scope;
-          const organizationId = scope?.case === "organization"
-            ? scope.value.organizationId
+          const workspaceId = scope?.case === "workspace"
+            ? scope.value.workspaceId
             : scope?.case === "project"
-            ? scope.value.organizationId
+            ? scope.value.workspaceId
             : "";
           if (
-            organizationId !== input.organizationId ||
+            workspaceId !== input.workspaceId ||
             !raw.value.workId ||
             !raw.value.runId ||
             !raw.value.claimToken
@@ -150,7 +142,7 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
                 claimToken: raw.value.claimToken,
                 work: {
                   case: "channelReply",
-                  value: { organizationId },
+                  value: { workspaceId: workspaceId },
                 },
               },
               outcome: {
@@ -213,15 +205,51 @@ export function createWorkerQueueOperations(client: WorkerQueueClient) {
       };
     },
 
+    resolveDmReplyRouting: async (input: {
+      projectId: string; workerId: string; work: ClaimedChannelReply;
+      decision: { action: string; targetJobId?: string | null; response?: string | null };
+    }) => {
+      const result = await client.resolveDmReplyRouting({
+        projectId: input.projectId, workerId: input.workerId, work: workClaimIdentityToProto(input.work),
+        decision: { action: input.decision.action, targetJobId: input.decision.targetJobId ?? undefined, response: input.decision.response ?? undefined },
+      });
+      if (!result.decision) throw new Error("DM routing response omitted decision");
+      return result.decision;
+    },
+    /*
+      Folds a steer that landed after the claim into the same claim, before the
+      first provider turn. `null` means nothing was pending and the caller keeps
+      the claim payload it already holds; a payload means the turn must be built
+      from that one instead, with no re-claim and no restart.
+    */
+    refreshChannelReplyClaim: async (input: {
+      projectId: string;
+      workerId: string;
+      work: ClaimedChannelReply;
+      signal?: AbortSignal;
+    }): Promise<ClaimedChannelReply | null> => {
+      const response = await client.refreshChannelReplyClaim({
+        projectId: input.projectId,
+        workerId: input.workerId,
+        work: workClaimIdentityToProto(input.work),
+      }, input.signal ? { signal: input.signal } : undefined);
+      if (!response.steered) return null;
+      if (!response.reply) {
+        throw new Error("Channel reply steer fold omitted its claim payload");
+      }
+      return channelReplyFromProto(response.reply);
+    },
     acknowledgeChannelReplySteer: async (input: {
       projectId: string;
       workerId: string;
       work: ClaimedChannelReply;
+      stopUnconfirmed?: boolean;
     }) => {
       const response = await client.acknowledgeChannelReplySteer({
         projectId: input.projectId,
         workerId: input.workerId,
         work: workClaimIdentityToProto(input.work),
+        stopUnconfirmed: input.stopUnconfirmed ?? false,
       });
       return response.released;
     },

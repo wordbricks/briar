@@ -24,7 +24,7 @@ declare const teamIdBrand: unique symbol;
 declare const planningProjectIdBrand: unique symbol;
 
 /**
- * The top of the hierarchy: `briar_organizations.id`. "Organization" is the
+ * The top of the hierarchy: `briar_organizations.id`. "Workspace" is the
  * old product name for it and still names the table, its columns and the
  * protobuf service; queries surface the same value aliased as `workspace_id`
  * (`team.organization_id as workspace_id`), and there is no separate

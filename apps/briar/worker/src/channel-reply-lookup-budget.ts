@@ -11,13 +11,22 @@ export type ReplyLookupReservation = {
   memoryRevision: number | null; revocationEpoch: number | null; cachedJson: string | null;
 };
 
+/**
+ * `briar_channel_reply_lookups.kind` is CHECK-constrained to the pre-rename
+ * spelling, so the stored value stays `organization` while the domain calls it
+ * `workspace`. Changing the stored value would be a D1 table rebuild, not a
+ * rename.
+ */
+const storedLookupKind = { memory: "memory", workspace: "organization" } as const;
+
 export async function reserveReplyLookup(db: D1Database, input: {
-  jobId: string; claimTokenHash: string; requestId: string; kind: "memory" | "organization";
+  jobId: string; claimTokenHash: string; requestId: string; kind: "memory" | "workspace";
   request: unknown; queries?: readonly string[]; memoryRevision: number | null; revocationEpoch: number | null;
 }): Promise<ReplyLookupReservation> {
   const now = new Date().toISOString();
   const leaseExpiresAt = new Date(Date.now() + 7_000).toISOString();
   const leaseToken = crypto.randomUUID();
+  const storedKind = storedLookupKind[input.kind];
   // Hashes are claim-salted, never written to logs, and removed on forgetting.
   const salt = `${input.jobId}:${input.claimTokenHash}:`;
   const requestHash = await sha256(salt + JSON.stringify([input.kind, input.request]));
@@ -45,8 +54,8 @@ export async function reserveReplyLookup(db: D1Database, input: {
         union select value from json_each(?)
       )) <= 6
     on conflict (job_id, claim_token_hash, request_id) do nothing`)
-    .bind(...keys, input.kind, requestHash, JSON.stringify(queryHashes), input.memoryRevision, input.revocationEpoch,
-      leaseToken, leaseExpiresAt, input.jobId, input.claimTokenHash, input.kind, requestHash,
+    .bind(...keys, storedKind, requestHash, JSON.stringify(queryHashes), input.memoryRevision, input.revocationEpoch,
+      leaseToken, leaseExpiresAt, input.jobId, input.claimTokenHash, storedKind, requestHash,
       input.memoryRevision, input.revocationEpoch, now, input.jobId, input.claimTokenHash, now,
       input.jobId, input.claimTokenHash, input.jobId, input.claimTokenHash, JSON.stringify(queryHashes)).run();
   let row = await read();
@@ -101,12 +110,7 @@ export async function cleanupAbandonedReplyLookups(db: D1Database, now: string) 
     where (job.status <> 'running' or julianday(job.lease_expires_at) <= julianday(?))
       and not (job.status = 'queued' and job.steer_revision > job.applied_steer_revision
         and job.lease_expires_at is not null and job.lease_expires_at > ?)
-      and (exists (select 1 from briar_channel_reply_lookups lookup where lookup.job_id = job.id)
-        or exists (select 1 from briar_dm_memory_discovered_refs ref where ref.job_id = job.id))
+      and exists (select 1 from briar_channel_reply_lookups lookup where lookup.job_id = job.id)
     order by job.updated_at limit 100`;
-  // Both reads run in the same transaction. A completed reply no longer needs its discovery set.
-  await db.batch([
-    db.prepare(`delete from briar_channel_reply_lookups where job_id in (${staleJobs})`).bind(now, now),
-    db.prepare(`delete from briar_dm_memory_discovered_refs where job_id in (${staleJobs})`).bind(now, now),
-  ]);
+  await db.prepare(`delete from briar_channel_reply_lookups where job_id in (${staleJobs})`).bind(now, now).run();
 }

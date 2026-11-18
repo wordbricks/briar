@@ -207,8 +207,11 @@ describe("IssueList keyboard navigation", () => {
     await renderList(runs);
 
     await act(async () => {
-      row(runs[1]!.id).dispatchEvent(new MouseEvent("pointerdown", {
-        bubbles: true
+      // A mouse-shaped pointer event must identify its pointer type; otherwise
+      // the context menu treats it as touch and opens after its long-press timer.
+      row(runs[1]!.id).dispatchEvent(new PointerEvent("pointerdown", {
+        bubbles: true,
+        pointerType: "mouse"
       }));
     });
     await act(async () => outside().focus());

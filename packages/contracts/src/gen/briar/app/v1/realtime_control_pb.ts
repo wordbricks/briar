@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/app/v1/realtime_control.proto.
  */
 export const file_briar_app_v1_realtime_control: GenFile = /*@__PURE__*/
-  fileDesc("CiNicmlhci9hcHAvdjEvcmVhbHRpbWVfY29udHJvbC5wcm90bxIMYnJpYXIuYXBwLnYxIuYDChtDcmVhdGVSZWFsdGltZVRpY2tldFJlcXVlc3QSaQoab3JnYW5pemF0aW9uX25vdGlmaWNhdGlvbnMYASABKAsyQy5icmlhci5hcHAudjEuQ3JlYXRlUmVhbHRpbWVUaWNrZXRSZXF1ZXN0Lk9yZ2FuaXphdGlvbk5vdGlmaWNhdGlvbnNIABJRCg5pc3N1ZV9hY3Rpdml0eRgCIAEoCzI3LmJyaWFyLmFwcC52MS5DcmVhdGVSZWFsdGltZVRpY2tldFJlcXVlc3QuSXNzdWVBY3Rpdml0eUgAElUKEGNoYW5uZWxfYWN0aXZpdHkYAyABKAsyOS5icmlhci5hcHAudjEuQ3JlYXRlUmVhbHRpbWVUaWNrZXRSZXF1ZXN0LkNoYW5uZWxBY3Rpdml0eUgAGjQKGU9yZ2FuaXphdGlvbk5vdGlmaWNhdGlvbnMSFwoPb3JnYW5pemF0aW9uX2lkGAEgASgJGjMKDUlzc3VlQWN0aXZpdHkSEgoKcHJvamVjdF9pZBgBIAEoCRIOCgZydW5faWQYAiABKAkaPgoPQ2hhbm5lbEFjdGl2aXR5EhcKD29yZ2FuaXphdGlvbl9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJQgcKBXNjb3BlIisKHENyZWF0ZVJlYWx0aW1lVGlja2V0UmVzcG9uc2USCwoDdXJsGAEgASgJMoABCg9SZWFsdGltZVNlcnZpY2USbQoUQ3JlYXRlUmVhbHRpbWVUaWNrZXQSKS5icmlhci5hcHAudjEuQ3JlYXRlUmVhbHRpbWVUaWNrZXRSZXF1ZXN0GiouYnJpYXIuYXBwLnYxLkNyZWF0ZVJlYWx0aW1lVGlja2V0UmVzcG9uc2VCDLoCCUJyaWFyQVBJX2IGcHJvdG8z");
+  fileDesc("CiNicmlhci9hcHAvdjEvcmVhbHRpbWVfY29udHJvbC5wcm90bxIMYnJpYXIuYXBwLnYxItcDChtDcmVhdGVSZWFsdGltZVRpY2tldFJlcXVlc3QSYwoXd29ya3NwYWNlX25vdGlmaWNhdGlvbnMYASABKAsyQC5icmlhci5hcHAudjEuQ3JlYXRlUmVhbHRpbWVUaWNrZXRSZXF1ZXN0LldvcmtzcGFjZU5vdGlmaWNhdGlvbnNIABJRCg5pc3N1ZV9hY3Rpdml0eRgCIAEoCzI3LmJyaWFyLmFwcC52MS5DcmVhdGVSZWFsdGltZVRpY2tldFJlcXVlc3QuSXNzdWVBY3Rpdml0eUgAElUKEGNoYW5uZWxfYWN0aXZpdHkYAyABKAsyOS5icmlhci5hcHAudjEuQ3JlYXRlUmVhbHRpbWVUaWNrZXRSZXF1ZXN0LkNoYW5uZWxBY3Rpdml0eUgAGi4KFldvcmtzcGFjZU5vdGlmaWNhdGlvbnMSFAoMd29ya3NwYWNlX2lkGAEgASgJGjMKDUlzc3VlQWN0aXZpdHkSEgoKcHJvamVjdF9pZBgBIAEoCRIOCgZydW5faWQYAiABKAkaOwoPQ2hhbm5lbEFjdGl2aXR5EhQKDHdvcmtzcGFjZV9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJQgcKBXNjb3BlIisKHENyZWF0ZVJlYWx0aW1lVGlja2V0UmVzcG9uc2USCwoDdXJsGAEgASgJMoABCg9SZWFsdGltZVNlcnZpY2USbQoUQ3JlYXRlUmVhbHRpbWVUaWNrZXQSKS5icmlhci5hcHAudjEuQ3JlYXRlUmVhbHRpbWVUaWNrZXRSZXF1ZXN0GiouYnJpYXIuYXBwLnYxLkNyZWF0ZVJlYWx0aW1lVGlja2V0UmVzcG9uc2VCDLoCCUJyaWFyQVBJX2IGcHJvdG8z");
 
 /**
  * @generated from message briar.app.v1.CreateRealtimeTicketRequest
@@ -21,10 +21,10 @@ export type CreateRealtimeTicketRequest = Message<"briar.app.v1.CreateRealtimeTi
    */
   scope: {
     /**
-     * @generated from field: briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications organization_notifications = 1;
+     * @generated from field: briar.app.v1.CreateRealtimeTicketRequest.WorkspaceNotifications workspace_notifications = 1;
      */
-    value: CreateRealtimeTicketRequest_OrganizationNotifications;
-    case: "organizationNotifications";
+    value: CreateRealtimeTicketRequest_WorkspaceNotifications;
+    case: "workspaceNotifications";
   } | {
     /**
      * @generated from field: briar.app.v1.CreateRealtimeTicketRequest.IssueActivity issue_activity = 2;
@@ -48,20 +48,20 @@ export const CreateRealtimeTicketRequestSchema: GenMessage<CreateRealtimeTicketR
   messageDesc(file_briar_app_v1_realtime_control, 0);
 
 /**
- * @generated from message briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications
+ * @generated from message briar.app.v1.CreateRealtimeTicketRequest.WorkspaceNotifications
  */
-export type CreateRealtimeTicketRequest_OrganizationNotifications = Message<"briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications"> & {
+export type CreateRealtimeTicketRequest_WorkspaceNotifications = Message<"briar.app.v1.CreateRealtimeTicketRequest.WorkspaceNotifications"> & {
   /**
-   * @generated from field: string organization_id = 1;
+   * @generated from field: string workspace_id = 1;
    */
-  organizationId: string;
+  workspaceId: string;
 };
 
 /**
- * Describes the message briar.app.v1.CreateRealtimeTicketRequest.OrganizationNotifications.
- * Use `create(CreateRealtimeTicketRequest_OrganizationNotificationsSchema)` to create a new message.
+ * Describes the message briar.app.v1.CreateRealtimeTicketRequest.WorkspaceNotifications.
+ * Use `create(CreateRealtimeTicketRequest_WorkspaceNotificationsSchema)` to create a new message.
  */
-export const CreateRealtimeTicketRequest_OrganizationNotificationsSchema: GenMessage<CreateRealtimeTicketRequest_OrganizationNotifications> = /*@__PURE__*/
+export const CreateRealtimeTicketRequest_WorkspaceNotificationsSchema: GenMessage<CreateRealtimeTicketRequest_WorkspaceNotifications> = /*@__PURE__*/
   messageDesc(file_briar_app_v1_realtime_control, 0, 0);
 
 /**
@@ -91,9 +91,9 @@ export const CreateRealtimeTicketRequest_IssueActivitySchema: GenMessage<CreateR
  */
 export type CreateRealtimeTicketRequest_ChannelActivity = Message<"briar.app.v1.CreateRealtimeTicketRequest.ChannelActivity"> & {
   /**
-   * @generated from field: string organization_id = 1;
+   * @generated from field: string workspace_id = 1;
    */
-  organizationId: string;
+  workspaceId: string;
 
   /**
    * @generated from field: string channel_id = 2;

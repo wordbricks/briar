@@ -27,9 +27,10 @@ import { defaultIssueDetailTab, type IssueDetailTab } from "@/lib/issue-detail-t
 import { issueAttachmentReference, issueAttachmentReferences, removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { clampConversationPaneWidth, conversationPaneWidthDefault, conversationPaneWidthMax, conversationPaneWidthMin, loadConversationPaneWidth, saveConversationPaneWidth } from "@/lib/conversation-pane-width";
 import { loadRunCostEstimate } from "@/lib/api";
-import { copyIssueId, copyIssueShareLink, shareIssueLink } from "@/lib/issue-links";
+import { copyIssueId, copyIssueShareLink, shareIssueLink, webAppIssueKeyUrl } from "@/lib/issue-links";
 import { formatIssueKey } from "@/lib/issue-key";
-import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, OrganizationMember, PlanningProject, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
+import { webMode } from "@/state/platform";
+import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, WorkspaceMember, PlanningProject, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider, type ModelEffort } from "@/lib/team-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useI18n } from "@/i18n";
@@ -121,7 +122,7 @@ export function RunPage({
   onUpdateIssuePreferences = async () => undefined,
   onUpdateIssueSubscription,
   onViewingIssueConversationChange,
-  organizationId = null,
+  workspaceId = null,
   performedAgentName = null,
   performedAgentProvider = null,
   performedAgentModel = null,
@@ -172,7 +173,7 @@ export function RunPage({
   onLoadRunEvidenceImage?: (image: RunEvidenceImage) => Promise<Blob>;
   onCompleteResultReview?: () => Promise<unknown>;
   issueProjects?: PlanningProject[];
-  mentionMembers?: OrganizationMember[];
+  mentionMembers?: WorkspaceMember[];
   mentionAgents?: ProjectAgent[];
   onMove: (placement: HuntRunPlacement) => Promise<unknown>;
   onMoveIssueProject?: (targetProjectId: string) => Promise<unknown>;
@@ -207,7 +208,7 @@ export function RunPage({
   onUpdateIssuePreferences?: (input: IssueExecutionPreferences) => Promise<unknown>;
   onUpdateIssueSubscription?: (subscribed: boolean) => Promise<unknown>;
   onViewingIssueConversationChange?: (runId: string | null) => void;
-  organizationId?: string | null;
+  workspaceId?: string | null;
   performedAgentName?: string | null;
   performedAgentProvider?: AgentProvider | null;
   performedAgentModel?: string | null;
@@ -232,6 +233,8 @@ export function RunPage({
   const processNowDisabled = !onProcessNow || run.executionReadiness === "waiting" || run.status !== "queued" && !canReassign || isClaimed && !canReassign || isProcessing;
   const assignee = mentionMembers.find(member => member.userId === run.assigneeUserId) ?? null;
   const creator = mentionMembers.find(member => member.userId === run.createdByUserId) ?? null;
+  // An agent-created issue has no creating person; the two never coexist.
+  const creatorName = run.createdByAgent ? run.createdByAgent.name : creator?.name ?? t("run.creatorUnknown");
   const {
     toast
   } = useToast();
@@ -961,12 +964,16 @@ export function RunPage({
       setIsSubmittingRework(false);
     }
   };
+  const canonicalIssueUrl = webMode
+    ? webAppIssueKeyUrl(formatIssueKey(issueKeyPrefix, run.runNumber))
+    : null;
   const shareIssue = async () => {
     try {
       const result = await shareIssueLink({
         projectId,
         runId: run.id,
-        title: run.title
+        title: run.title,
+        urlOverride: canonicalIssueUrl ?? undefined
       });
       if (result === "copied") {
         toast(t("issue.linkCopied"), {
@@ -983,7 +990,8 @@ export function RunPage({
     try {
       await copyIssueShareLink({
         projectId,
-        runId: run.id
+        runId: run.id,
+        urlOverride: canonicalIssueUrl ?? undefined
       });
       toast(t("issue.linkCopied"), {
         tone: "success"
@@ -1439,14 +1447,14 @@ export function RunPage({
                     </div> : activeDetailTab === "agentActivity" ? <IssueAgentActivityPanel activity={agentActivity} error={workerEvents.error} id={`${detailTabsId}-agent-activity-panel`} isLive={workerExecutionIsLive && hasWorkerExecution && followsLatestSession} labelledBy={`${detailTabsId}-agent-activity-tab`} loading={workerEvents.isLoading || transcriptSessions.isLoading && agentActivity.length === 0} onSelectSession={setSelectedTranscriptSessionId} provider={activityProvider} selectedSessionId={selectedTranscriptSessionId} sessions={transcriptSessions.sessions} /> : activeDetailTab === "statusHistory" ? <IssueStatusHistoryPanel events={runEvents} id={`${detailTabsId}-status-history-panel`} labelledBy={`${detailTabsId}-status-history-tab`} loadError={runEventsLoadError} loading={runEventsLoading} onRetry={() => void loadRunEvents()} workflow={run.workflow} /> : <RunEvidencePanel id={`${detailTabsId}-evidence-panel`} labelledBy={`${detailTabsId}-evidence-tab`} onLoad={onLoadRunEvidence} onLoadImage={onLoadRunEvidenceImage} run={run} />}
                 </section>
                 {usesConversationTab ? <div aria-labelledby={`${detailTabsId}-conversation-tab`} className="issue-conversation-tab-panel" hidden={activeDetailTab !== "conversation"} id={`${detailTabsId}-conversation-panel`} role="tabpanel">
-                    <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
+                    <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} workspaceId={workspaceId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
                   </div> : null}
                 </div>
                 <IssueWorkflowProgress onCheckpointsChange={onUpdateIssueCheckpoints} run={run} />
               </div>
               {!usesConversationTab ? <>
                   <div aria-label={t("run.resizeContentPanels")} aria-orientation="vertical" aria-valuemax={conversationPaneWidthMax} aria-valuemin={conversationPaneWidthMin} aria-valuenow={effectiveConversationPaneWidth} className="run-page-conversation-resizer" role="separator" tabIndex={0} {...conversationResizeProps} />
-                  <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} organizationId={organizationId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
+                  <IssueConversation currentUserId={currentUserId} executionRuns={availableRuns} highlightedMessageId={highlightedMessageId} inboxSyncSignal={conversationInboxSyncSignal} mentionMembers={mentionMembers} mentionAgents={mentionAgents} onAcceptIssueAction={onAcceptIssueAction} onAcceptIssueExecution={onAcceptIssueExecution} onAcceptSkillExecution={onAcceptSkillExecution} executionPolicy={executionPolicy} executionWorkers={executionWorkers} onDelete={onDeleteIssueMessage} onEdit={onEditIssueMessage} onIssueOpen={onDependencyOpen} onLoadAttachment={onLoadAttachment} onLoad={onLoadIssueMessages} onSend={onSendIssueMessage} onUpdateSubscription={onUpdateIssueSubscription} workspaceId={workspaceId} run={run} projectId={projectId} token={token} showsScrollToLatest={companionMode} />
                 </> : null}
               {isPropertiesOpen ? <div className="run-properties-layer" onClick={event => {
               if (event.target === event.currentTarget) {
@@ -1539,7 +1547,7 @@ export function RunPage({
                   {canEditTeam ? <label aria-label={`${t("issue.team")}: ${teamLabel}`} className="run-property run-property-editable" title={t("issue.team")}>
                       <span className="run-property-icon team"><Users size={15} /></span>
                       <span className="run-property-copy">
-                        <SelectMenu align="end" className="run-team-select" disabled={isUpdatingIssue} label={t("issue.team")} onValueChange={updateIssueTeam} options={teamOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={teamOptions.length > 8} size="small" value={teamValue} />
+                        <SelectMenu align="end" className="run-team-select" disabled={isUpdatingIssue} label={t("issue.team")} onValueChange={updateIssueTeam} options={teamOptions} searchEmptyMessage={t("workspace.noResults")} searchPlaceholder={t("workspace.search")} searchable={teamOptions.length > 8} size="small" value={teamValue} />
                       </span>
                     </label> : <div aria-label={`${t("issue.team")}: ${teamLabel}`} className="run-property" title={t("issue.team")}>
                       <span className="run-property-icon team"><Users size={15} /></span>
@@ -1548,7 +1556,7 @@ export function RunPage({
                   {canEditProject ? <label aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property run-property-editable" title={t("issue.project")}>
                       <span className="run-property-icon project"><TeamIcon className="run-project-option-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
                       <span className="run-property-copy">
-                        <SelectMenu align="end" className="run-project-select" disabled={isUpdatingIssue} label={t("issue.project")} onValueChange={updateIssueProject} options={projectOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={projectOptions.length > 8} size="small" value={projectValue} />
+                        <SelectMenu align="end" className="run-project-select" disabled={isUpdatingIssue} label={t("issue.project")} onValueChange={updateIssueProject} options={projectOptions} searchEmptyMessage={t("workspace.noResults")} searchPlaceholder={t("workspace.search")} searchable={projectOptions.length > 8} size="small" value={projectValue} />
                       </span>
                     </label> : <div aria-label={`${t("issue.project")}: ${projectLabel}`} className="run-property" title={t("issue.project")}>
                       <span className="run-property-icon project"><TeamIcon className="run-project-option-icon" project={currentProject ?? { name: projectLabel, icon: null }} /></span>
@@ -1565,12 +1573,12 @@ export function RunPage({
                   <label aria-label={`${t("issue.assignee")}: ${assignee?.name ?? t("run.unassigned")}`} className="run-property run-property-editable" title={t("issue.assignee")}>
                     <span className="run-property-icon assignee"><UserRound size={15} /></span>
                     <span className="run-property-copy">
-                      <SelectMenu align="end" className="run-assignee-select" disabled={isUpdatingIssue || !onUpdateIssue} label={t("issue.assignee")} onValueChange={updateIssueAssignee} options={assigneeOptions} searchEmptyMessage={t("organization.noResults")} searchPlaceholder={t("organization.search")} searchable={assigneeOptions.length > 8} size="small" value={run.assigneeUserId ?? ""} />
+                      <SelectMenu align="end" className="run-assignee-select" disabled={isUpdatingIssue || !onUpdateIssue} label={t("issue.assignee")} onValueChange={updateIssueAssignee} options={assigneeOptions} searchEmptyMessage={t("workspace.noResults")} searchPlaceholder={t("workspace.search")} searchable={assigneeOptions.length > 8} size="small" value={run.assigneeUserId ?? ""} />
                     </span>
                   </label>
-                  <div aria-label={`${t("run.creator")}: ${creator?.name ?? t("run.creatorUnknown")}`} className="run-property" title={t("run.creator")}>
-                    <span className="run-property-icon assignee"><UserRound size={15} /></span>
-                    <span className="run-property-copy"><strong>{creator?.name ?? t("run.creatorUnknown")}</strong></span>
+                  <div aria-label={`${t("run.creator")}: ${creatorName}`} className="run-property" title={t("run.creator")}>
+                    <span className="run-property-icon assignee">{run.createdByAgent ? <Bot size={15} /> : <UserRound size={15} />}</span>
+                    <span className="run-property-copy"><strong>{creatorName}</strong></span>
                   </div>
                   {run.relatedMessage && onRelatedMessageOpen ? <button aria-label={t("run.openRelatedMessage")} className="run-property run-property-button run-related-message-property" onClick={() => onRelatedMessageOpen(run.relatedMessage!)} title={t("run.openRelatedMessage")} type="button">
                       <span className="run-property-icon related-message"><MessageSquare size={15} /></span>
@@ -1748,4 +1756,4 @@ export function RunPage({
         </DialogContent>
       </Dialog>
     </MainContent>;
-}
+    }

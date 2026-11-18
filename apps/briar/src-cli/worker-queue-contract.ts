@@ -1,16 +1,10 @@
 import type { JsonObject } from "@bufbuild/protobuf";
-import * as Schema from "effect/Schema";
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
-import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
-import { ComputerUsePolicy as ProtoComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
-import {
-  DmMemoryBriefState,
-  type DmMemoryDescriptor as ProtoDmMemoryDescriptor,
-} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
+import { AgentProvider as ProtoAgentProvider} from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { ComputerUsePolicy as ProtoComputerUsePolicy} from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import {
   WorkflowCheckpoint_Position,
-  type AutoHuntWorkflow as ProtoAutoHuntWorkflow,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
+  type AutoHuntWorkflow as ProtoAutoHuntWorkflow} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
@@ -25,7 +19,6 @@ import {
   DmMessagePublicationKind,
   type ChannelActivityCredential as ProtoChannelActivityCredential,
   type ClaimedChannelReply as ProtoClaimedChannelReply,
-  type ClaimedDmMemoryLearning as ProtoClaimedDmMemoryLearning,
   type ClaimedHandoffContext as ProtoClaimedHandoffContext,
   type ClaimedIssue as ProtoClaimedIssue,
   type ClaimedIssueReply as ProtoClaimedIssueReply,
@@ -36,8 +29,7 @@ import {
   type DetachedAgentSkill as ProtoDetachedAgentSkill,
   type DetachedAgentSkillExecutionTarget as ProtoDetachedAgentSkillExecutionTarget,
   type QueuedAttachment as ProtoQueuedAttachment,
-  type QueuedIssueMessage as ProtoQueuedIssueMessage,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  type QueuedIssueMessage as ProtoQueuedIssueMessage} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import {
   autoHuntRequirementKinds,
   normalizeAutoHuntWorkflow,
@@ -46,10 +38,6 @@ import {
 } from "../src/lib/auto-hunt-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
 import { MERGE_QUEUE_VALIDATION_CONTEXT } from "../src/lib/merge-queue-validation-contract";
-import {
-  ClaimedDmMemory as ClaimedDmMemorySchema,
-  DmLearningSnapshot,
-} from "../src/lib/dm-memory-learning-contract";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -73,28 +61,6 @@ const safeNumber = (value: bigint, field: string): number => {
     throw new Error(`Worker claim ${field} exceeds JavaScript's safe integer range`);
   }
   return number;
-};
-
-export const dmMemoryDescriptorFromProto = (
-  value: ProtoDmMemoryDescriptor,
-) => {
-  if (value.protocol !== 1) {
-    throw new Error("Worker claim has unsupported DM memory protocol");
-  }
-  return {
-    protocol: 1 as const,
-    memorySpaceId: value.memorySpaceId,
-    memoryRevision: safeNumber(value.memoryRevision, "dmMemory.memoryRevision"),
-    revocationEpoch: safeNumber(value.revocationEpoch, "dmMemory.revocationEpoch"),
-    searchEnabled: value.searchEnabled,
-    briefState: value.briefState === DmMemoryBriefState.AVAILABLE
-      ? "available" as const
-      : value.briefState === DmMemoryBriefState.DISABLED
-      ? "disabled" as const
-      : (() => {
-          throw new Error("Worker claim has invalid DM memory brief state");
-        })(),
-  };
 };
 
 const agentProvider = (value: ProtoAgentProvider): AgentProvider => {
@@ -490,15 +456,15 @@ const channelScope = (
 ) => {
   const scope = required(value.scope, "channelReply.scope").scope;
   switch (scope.case) {
-    case "organization":
+    case "workspace":
       return {
-        kind: "organization" as const,
-        organizationId: scope.value.organizationId,
+        kind: "workspace" as const,
+        workspaceId: scope.value.workspaceId,
       };
     case "project":
       return {
         kind: "project" as const,
-        organizationId: scope.value.organizationId,
+        workspaceId: scope.value.workspaceId,
         projectId: scope.value.projectId,
       };
     default:
@@ -532,14 +498,14 @@ const sessionClaimReason = (
   }
 };
 
-const channelReplyFromProto = (
+export const channelReplyFromProto = (
   value: ProtoClaimedChannelReply,
 ) => {
   const scope = channelScope(value);
   const mapped = {
     ...common({ ...value, claimAttempts: 1 }),
     workType: "channelReply" as const,
-    organizationId: scope.organizationId,
+    workspaceId: scope.workspaceId,
     channelId: value.channelId,
     projectId: scope.kind === "project" ? scope.projectId : null,
     scope,
@@ -573,10 +539,16 @@ const channelReplyFromProto = (
       ? skillExecutionTarget(value.skillExecutionTarget)
       : null,
     activity: activity(value.activity),
-    organizationContext: value.organizationContextSnapshotAt
+    // Absent on an older server and on a first attempt alike: either way this
+    // claim has no reaction of its own on the trigger message yet.
+    acknowledgementReaction: value.acknowledgementReaction ?? null,
+    // A 1:1 DM reply reports only redacted failure text. An older server does
+    // not send the field; `null` is redacted as well (fail closed).
+    directMessage: value.directMessage ?? null,
+    organizationContext: value.workspaceContextSnapshotAt
       ? {
           snapshotAt: isoTimestamp(
-            value.organizationContextSnapshotAt,
+            value.workspaceContextSnapshotAt,
             "organizationContextSnapshotAt",
           ),
         }
@@ -609,10 +581,9 @@ const channelReplyFromProto = (
           claimReason: sessionClaimReason(value.session.claimReason),
         }
       : null,
+    routing: value.routing ? { action: value.routing.action, proposedAction: value.routing.proposedAction ?? null, targetJobId: value.routing.targetJobId ?? null, response: value.routing.response ?? null } : null,
     snapshot: required(value.snapshot, "channelReply.snapshot"),
     triggerAttachments: value.triggerAttachments,
-    memory: value.memory ? dmMemoryDescriptorFromProto(value.memory) : null,
-    memoryLearningEnabled: value.memoryLearningEnabled,
     agentMessageTargets: value.agentMessageTargets.map((target) => ({
       agentId: target.agentId,
       agentName: target.agentName,
@@ -631,12 +602,12 @@ const channelReplyFromProto = (
       : null,
     agentMessageHop: value.agentMessageHop,
   };
-  if (scope.kind === "organization") {
+  if (scope.kind === "workspace") {
     if (!mapped.organizationContext || mapped.delegation || mapped.skillExecutionTarget) {
-      throw new Error("Worker organization reply has inconsistent scope data");
+      throw new Error("Worker workspace reply has inconsistent scope data");
     }
   } else if (mapped.organizationContext || mapped.delegationTargets.length > 0) {
-    // Delegation stays an Organization Agent path inside a channel thread.
+    // Delegation stays a Workspace Agent path inside a channel thread.
     // Agent messages are a DM feature open to both scopes, so
     // agentMessageTargets is deliberately absent from this rule.
     throw new Error("Worker project reply has inconsistent scope data");
@@ -804,27 +775,6 @@ const mergeBatchDomain = (
   };
 };
 
-const claimedDmMemoryFromProto = (value: ProtoClaimedDmMemoryLearning) =>
-  Schema.decodeUnknownSync(ClaimedDmMemorySchema)({
-    workType: "dmMemory",
-    workId: value.workId,
-    runId: value.runId,
-    organizationId: value.organizationId,
-    workerId: value.workerId,
-    sourceKey: value.sourceKey,
-    title: value.title,
-    claimToken: value.claimToken,
-    claimedAt: isoTimestamp(value.claimedAt, "dmMemory.claimedAt"),
-    leaseExpiresAt: isoTimestamp(
-      value.leaseExpiresAt,
-      "dmMemory.leaseExpiresAt",
-    ),
-    inputHash: value.inputHash,
-    snapshot: Schema.decodeUnknownSync(DmLearningSnapshot)(
-      JSON.parse(new TextDecoder().decode(value.snapshotJson)),
-    ),
-  });
-
 export type QueuedAttachment = ReturnType<typeof attachment>;
 export type QueuedIssueMessage = ReturnType<typeof issueMessage>;
 export type DetachedAgentSkill = ReturnType<typeof agentSkill>;
@@ -840,14 +790,12 @@ export type ClaimedProjectAgentTask = ReturnType<
 export type ClaimedIssueReply = ReturnType<typeof issueReplyFromProto>;
 export type ClaimedChannelReply = ReturnType<typeof channelReplyFromProto>;
 export type ClaimedMergeBatch = ReturnType<typeof mergeBatchDomain>;
-export type ClaimedDmMemory = ReturnType<typeof claimedDmMemoryFromProto>;
 export type ClaimedWork =
   | ClaimedRun
   | ClaimedIssueReply
   | ClaimedChannelReply
   | ClaimedProjectAgentTask
-  | ClaimedMergeBatch
-  | ClaimedDmMemory;
+  | ClaimedMergeBatch;
 
 const assertMergeBatch = (claim: ClaimedMergeBatch): ClaimedMergeBatch => {
   const expectedState = {
@@ -914,8 +862,6 @@ export function claimedWorkFromProto(value: ProtoClaimedWork): ClaimedWork {
       return projectAgentTaskFromProto(value.work.value);
     case "mergeBatch":
       return mergeBatchFromProto(value.work.value);
-    case "dmMemory":
-      return claimedDmMemoryFromProto(value.work.value);
     default:
       throw new Error("Worker claim omitted work variant");
   }

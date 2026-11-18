@@ -156,6 +156,32 @@ export type InboxCategory =
   | "important"
   | "activity";
 
+/**
+ * Where an inbox message came from, as the list shows and filters it: issue
+ * run updates and issue conversations are both "issue", a channel thread reply
+ * is "channel", and an agent session notice is "agent".
+ */
+export type InboxOrigin = "issue" | "channel" | "agent";
+
+/** The origin filter choices; "all" keeps every origin, including agent. */
+export const inboxOriginFilters = ["all", "issue", "channel"] as const;
+export type InboxOriginFilter = (typeof inboxOriginFilters)[number];
+
+export function inboxMessageOrigin(
+  message: Pick<InboxMessage, "kind">,
+): InboxOrigin {
+  if (message.kind === "channel") return "channel";
+  if (message.kind === "session") return "agent";
+  return "issue";
+}
+
+export function inboxOriginFilterMatches(
+  origin: InboxOrigin,
+  filter: InboxOriginFilter,
+) {
+  return filter === "all" || origin === filter;
+}
+
 export function inboxIssueMessageVersion(
   run: Pick<
     HuntRun,
@@ -267,7 +293,7 @@ export function buildCurrentInboxMessages(
         id: `channel:${notification.id}`,
         kind: "channel",
         // Dashboard loading already scopes this projection to the active
-        // project's organization. Retaining the active project keeps the
+        // project's workspace. Retaining the active project keeps the
         // existing persisted Inbox/project filtering contract compatible.
         projectId: dashboard.team.id,
         projectName: dashboard.team.name,
@@ -430,7 +456,7 @@ export function inboxMessageSnapshotsEqual(
 }
 
 /**
- * The organization feed intentionally sends compact summaries. A row whose
+ * The workspace feed intentionally sends compact summaries. A row whose
  * canonical read version is unchanged therefore keeps the richer copy the
  * selected team or the session log already produced, along with the active
  * channel association.
@@ -616,15 +642,15 @@ export function classifyInboxMessage(
   return "activity";
 }
 
-export function filterInboxMessagesByOrganization<T extends InboxMessage>(
+export function filterInboxMessagesByWorkspace<T extends InboxMessage>(
   messages: readonly T[],
   projects: readonly Project[],
-  organizationId: string | null,
+  workspaceId: string | null,
 ): T[] {
-  if (!organizationId) return [];
+  if (!workspaceId) return [];
   const projectIds = new Set(
     projects
-      .filter((project) => project.organizationId === organizationId)
+      .filter((project) => project.workspaceId === workspaceId)
       .map((project) => project.id),
   );
   return messages.filter((message) => projectIds.has(message.projectId));

@@ -6,7 +6,7 @@ import {
   beginManagedComputerRetirement,
   createSandboxManagedComputer,
   deleteSandboxManagedComputer,
-  listOrganizationManagedComputers,
+  listWorkspaceManagedComputers,
   managedComputerByDeviceId,
   managedComputerById,
   markManagedComputerTerminated,
@@ -34,8 +34,8 @@ import {
   managedComputerSetupAgentStatus,
   managedComputerSetupClientSocket,
 } from "./managed-computer-setup-relay-service";
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceRole } from "./workspace-repository";
 import { getTeam } from "./team-command-repository";
 import { readLatestVersion } from "./releases";
 import { sha256 } from "./crypto-digest";
@@ -47,7 +47,7 @@ import {
   deleteExecutionWorker,
   bindExecutionWorkerProject,
   executionWorkerDeviceForBinding,
-  listOrganizationExecutionWorkers,
+  listWorkspaceExecutionWorkers,
   registerExecutionWorker,
   requestExecutionWorkerUpdate,
   unbindExecutionWorker,
@@ -116,7 +116,7 @@ export async function registerProjectExecutionWorkerApplication(input: {
   const registration = await registerExecutionWorker(input.db, input.projectId, {
     id: crypto.randomUUID(),
     deviceId: crypto.randomUUID(),
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     ownerUserId: input.userId,
     label: input.label,
     deviceIdentityHash: await sha256(input.deviceIdentity),
@@ -127,7 +127,7 @@ export async function registerProjectExecutionWorkerApplication(input: {
   });
   return {
     ...registration,
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     workerToken,
   };
 }
@@ -143,13 +143,13 @@ export async function bindProjectExecutionWorkerApplication(input: {
   const project = await projectManagement(input);
   const binding = await bindExecutionWorkerProject(input.db, input.projectId, {
     id: crypto.randomUUID(),
-    organizationId: project.organization_id,
+    workspaceId: project.organization_id,
     ownerUserId: input.userId,
     deviceIdentityHash: await sha256(input.deviceIdentity),
     runtime: input.runtime,
     observedAt: input.observedAt,
   });
-  return { ...binding, organizationId: project.organization_id };
+  return { ...binding, workspaceId: project.organization_id };
 }
 
 export async function unbindProjectExecutionWorkerApplication(input: {
@@ -173,7 +173,7 @@ export async function unbindProjectExecutionWorkerApplication(input: {
   if (!device || device.organization_id !== project.organization_id) {
     const recovered = await recoverMissingWorkerHardDelete(input.db, {
       requestId: input.requestId,
-      organizationId: project.organization_id,
+      workspaceId: project.organization_id,
       projectId: input.projectId,
       workerId: input.workerId,
       operation: "binding_delete",
@@ -194,7 +194,7 @@ export async function unbindProjectExecutionWorkerApplication(input: {
     input.observedAt,
     {
       requestId: input.requestId,
-      organizationId: project.organization_id,
+      workspaceId: project.organization_id,
       workerId: input.workerId,
       reason: input.reason,
     },
@@ -211,20 +211,20 @@ export async function unbindProjectExecutionWorkerApplication(input: {
 
 const organizationRole = async (
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ) => {
-  const role = await getOrganizationRole(db, organizationId, userId);
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    applicationError("organization_not_found", "Organization not found");
+  const role = await getWorkspaceRole(db, workspaceId, userId);
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    applicationError("organization_not_found", "Workspace not found");
   }
   return role;
 };
 
 const requireDevelopmentManagement = (
-  role: Awaited<ReturnType<typeof getOrganizationRole>>,
+  role: Awaited<ReturnType<typeof getWorkspaceRole>>,
 ) => {
-  if (!hasOrganizationCapability(role, "development:manage")) {
+  if (!hasWorkspaceCapability(role, "development:manage")) {
     applicationError(
       "development_management_required",
       "Development management permission required",
@@ -235,23 +235,23 @@ const requireDevelopmentManagement = (
 export async function listExecutionWorkersApplication(input: {
   db: D1Database;
   releases: Pick<R2Bucket, "get">;
-  organizationId: string;
+  workspaceId: string;
   userId: string;
   observedAt: string;
 }) {
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   return {
-    workers: await listOrganizationExecutionWorkers(
+    workers: await listWorkspaceExecutionWorkers(
       input.db,
-      input.organizationId,
+      input.workspaceId,
       input.observedAt,
     ),
     latestVersion: await readLatestVersion(input.releases),
-    canManage: hasOrganizationCapability(role, "development:manage"),
+    canManage: hasWorkspaceCapability(role, "development:manage"),
     generatedAt: input.observedAt,
   };
 }
@@ -259,20 +259,20 @@ export async function listExecutionWorkersApplication(input: {
 export async function requestExecutionWorkerUpdateApplication(input: {
   db: D1Database;
   releases: Pick<R2Bucket, "get">;
-  organizationId: string;
+  workspaceId: string;
   deviceId: string;
   userId: string;
   observedAt: string;
 }) {
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   const device = (
-    await listOrganizationExecutionWorkers(
+    await listWorkspaceExecutionWorkers(
       input.db,
-      input.organizationId,
+      input.workspaceId,
       input.observedAt,
     )
   ).find((candidate) => candidate.deviceId === input.deviceId);
@@ -305,7 +305,7 @@ export async function requestExecutionWorkerUpdateApplication(input: {
   }
   const updateRequest = await requestExecutionWorkerUpdate(input.db, {
     id: crypto.randomUUID(),
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     deviceId: input.deviceId,
     requestedByUserId: input.userId,
     targetVersion,
@@ -322,7 +322,7 @@ export async function requestExecutionWorkerUpdateApplication(input: {
 
 export async function updateExecutionWorkerApplication(input: {
   db: D1Database;
-  organizationId: string;
+  workspaceId: string;
   deviceId: string;
   userId: string;
   update: {
@@ -335,7 +335,7 @@ export async function updateExecutionWorkerApplication(input: {
 }) {
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   const device = await input.db
@@ -344,7 +344,7 @@ export async function updateExecutionWorkerApplication(input: {
        from briar_execution_worker_devices
        where id = ? and organization_id = ?`,
     )
-    .bind(input.deviceId, input.organizationId)
+    .bind(input.deviceId, input.workspaceId)
     .first<{ id: string }>();
   if (!device) return applicationError("worker_not_found", "Worker not found");
   requireDevelopmentManagement(role);
@@ -371,7 +371,7 @@ export async function updateExecutionWorkerApplication(input: {
 export async function deleteExecutionWorkerApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   deviceId: string;
   userId: string;
   requestId: string;
@@ -386,7 +386,7 @@ export async function deleteExecutionWorkerApplication(input: {
   }
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   const device = await input.db
@@ -395,12 +395,12 @@ export async function deleteExecutionWorkerApplication(input: {
        from briar_execution_worker_devices
        where id = ? and organization_id = ?`,
     )
-    .bind(input.deviceId, input.organizationId)
+    .bind(input.deviceId, input.workspaceId)
     .first<{ id: string }>();
   if (!device) {
     const recovered = await recoverMissingWorkerHardDelete(input.db, {
       requestId: input.requestId,
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       projectId: null,
       deviceId: input.deviceId,
       workerId: null,
@@ -420,7 +420,7 @@ export async function deleteExecutionWorkerApplication(input: {
       input.observedAt,
       {
         requestId: input.requestId,
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         projectId: null,
         workerId: null,
         reason: managedComputer
@@ -452,30 +452,30 @@ export async function deleteExecutionWorkerApplication(input: {
 export async function getManagedComputerProductApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   userId: string;
 }) {
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   return {
     ...managedComputerProductResponse(input.env),
-    canApply: hasOrganizationCapability(role, "development:manage"),
+    canApply: hasWorkspaceCapability(role, "development:manage"),
   };
 }
 
 export async function listManagedComputersApplication(input: {
   db: D1Database;
-  organizationId: string;
+  workspaceId: string;
   userId: string;
   observedAt: string;
 }) {
-  await organizationRole(input.db, input.organizationId, input.userId);
-  const computers = await listOrganizationManagedComputers(
+  await organizationRole(input.db, input.workspaceId, input.userId);
+  const computers = await listWorkspaceManagedComputers(
     input.db,
-    input.organizationId,
+    input.workspaceId,
   );
   const refreshed = await Promise.all(computers.map((computer) =>
     computer.state === "needs_setup"
@@ -494,15 +494,15 @@ export async function listManagedComputersApplication(input: {
 
 export async function getManagedComputerApplication(input: {
   db: D1Database;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   userId: string;
   observedAt: string;
 }) {
-  await organizationRole(input.db, input.organizationId, input.userId);
+  await organizationRole(input.db, input.workspaceId, input.userId);
   let computer = await organizationManagedComputer(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
   );
   if (!computer) {
@@ -530,14 +530,14 @@ export async function getManagedComputerApplication(input: {
 export async function validateManagedComputerPromotionApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   userId: string;
   code: string;
   observedAt: string;
 }) {
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   requireDevelopmentManagement(role);
@@ -547,7 +547,7 @@ export async function validateManagedComputerPromotionApplication(input: {
 export async function applyForManagedComputerApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   userId: string;
   code: string;
   requestId: string;
@@ -555,7 +555,7 @@ export async function applyForManagedComputerApplication(input: {
 }) {
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   requireDevelopmentManagement(role);
@@ -565,7 +565,7 @@ export async function applyForManagedComputerApplication(input: {
 export async function retryManagedComputerApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   userId: string;
   requestId: string;
@@ -573,14 +573,14 @@ export async function retryManagedComputerApplication(input: {
 }) {
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   requireDevelopmentManagement(role);
   const result = await retryManagedComputerProvisioning(input.db, input.env, input);
   const computer = await organizationManagedComputer(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
   );
   if (!computer) {
@@ -595,20 +595,20 @@ export async function retryManagedComputerApplication(input: {
 export async function retireManagedComputerApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   userId: string;
   observedAt: string;
 }) {
   const role = await organizationRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   requireDevelopmentManagement(role);
   const existing = await organizationManagedComputer(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
   );
   if (!existing) {
@@ -626,12 +626,12 @@ export async function retireManagedComputerApplication(input: {
   }
   const transitioned = await beginManagedComputerRetirement(input.db, {
     managedComputerId: input.managedComputerId,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     observedAt: input.observedAt,
   });
   const computer = transitioned ?? await organizationManagedComputer(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
   );
   if (!computer) {
@@ -648,7 +648,7 @@ export async function retireManagedComputerApplication(input: {
   }
   if (transitioned) {
     await recordManagedComputerAuditEvent(input.db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       managedComputerId: input.managedComputerId,
       actorUserId: input.userId,
       action: "draining_started",
@@ -681,17 +681,17 @@ export async function retireManagedComputerApplication(input: {
 
 export async function registerSandboxComputerApplication(input: {
   db: D1Database;
-  organizationId: string;
+  workspaceId: string;
   deviceId: string;
   label: string;
   userId: string;
   apiOrigin: string;
   observedAt: string;
 }) {
-  await organizationRole(input.db, input.organizationId, input.userId);
+  await organizationRole(input.db, input.workspaceId, input.userId);
   if (
     !await userOwnsExecutionWorkerDevice(input.db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       userId: input.userId,
       deviceId: input.deviceId,
     })
@@ -704,7 +704,7 @@ export async function registerSandboxComputerApplication(input: {
   const computer = await createSandboxManagedComputer(input.db, {
     managedComputerId: crypto.randomUUID(),
     entitlementId: crypto.randomUUID(),
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     userId: input.userId,
     deviceId: input.deviceId,
     apiOrigin: input.apiOrigin,
@@ -718,7 +718,7 @@ export async function registerSandboxComputerApplication(input: {
     );
   }
   await recordManagedComputerAuditEvent(input.db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     managedComputerId: computer.id,
     actorUserId: input.userId,
     action: "ready",
@@ -731,15 +731,15 @@ export async function registerSandboxComputerApplication(input: {
 export async function unregisterSandboxComputerApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   deviceId: string;
   userId: string;
   observedAt: string;
 }) {
-  await organizationRole(input.db, input.organizationId, input.userId);
+  await organizationRole(input.db, input.workspaceId, input.userId);
   if (
     !await userOwnsExecutionWorkerDevice(input.db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       userId: input.userId,
       deviceId: input.deviceId,
     })
@@ -748,7 +748,7 @@ export async function unregisterSandboxComputerApplication(input: {
   }
   const existing = await sandboxManagedComputerByDevice(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.deviceId,
   );
   if (!existing) return { removed: false };
@@ -758,14 +758,14 @@ export async function unregisterSandboxComputerApplication(input: {
     observedAt: input.observedAt,
   });
   await recordManagedComputerAuditEvent(input.db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     managedComputerId: existing.id,
     actorUserId: input.userId,
     action: "terminated",
     detail: { provider: "sandbox", deviceId: input.deviceId },
     occurredAt: input.observedAt,
   });
-  await deleteSandboxManagedComputer(input.db, input.organizationId, input.deviceId);
+  await deleteSandboxManagedComputer(input.db, input.workspaceId, input.deviceId);
   return { removed: true };
 }
 
@@ -781,16 +781,16 @@ const rejectSandboxLifecycle = (
 export async function terminateManagedComputerApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   userId: string;
   observedAt: string;
 }) {
-  const role = await organizationRole(input.db, input.organizationId, input.userId);
+  const role = await organizationRole(input.db, input.workspaceId, input.userId);
   requireDevelopmentManagement(role);
   const existing = await organizationManagedComputer(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
   );
   if (!existing) {
@@ -817,7 +817,7 @@ export async function terminateManagedComputerApplication(input: {
   );
   const computer = transitioned ?? await organizationManagedComputer(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
   );
   if (!computer || computer.state !== "terminated") {
@@ -833,7 +833,7 @@ export async function terminateManagedComputerApplication(input: {
   });
   if (transitioned) {
     await recordManagedComputerAuditEvent(input.db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       managedComputerId: computer.id,
       actorUserId: input.userId,
       action: "terminated",
@@ -846,23 +846,23 @@ export async function terminateManagedComputerApplication(input: {
 
 const managedComputerControlAccess = async (input: {
   db: D1Database;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   userId: string;
   kind: "remote" | "setup";
   observedAt: string;
 }) => {
-  const role = await getOrganizationRole(
+  const role = await getWorkspaceRole(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
   );
   const computer = await organizationManagedComputer(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.managedComputerId,
   );
-  if (computer && hasOrganizationCapability(role, "development:manage")) {
+  if (computer && hasWorkspaceCapability(role, "development:manage")) {
     return computer;
   }
   if (input.kind === "remote") {
@@ -872,7 +872,7 @@ const managedComputerControlAccess = async (input: {
     );
     if (attemptedComputer) {
       await recordManagedComputerRemoteRejection(input.db, {
-        organizationId: attemptedComputer.organization_id,
+        workspaceId: attemptedComputer.organization_id,
         managedComputerId: attemptedComputer.id,
         actorUserId: input.userId,
         reasonCode: computer ? "permission_denied" : "organization_mismatch",
@@ -893,7 +893,7 @@ const managedComputerControlAccess = async (input: {
 export async function createManagedComputerRemoteSessionApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   userId: string;
   requestId: string;
@@ -913,7 +913,7 @@ export async function createManagedComputerRemoteSessionApplication(input: {
     );
   } catch (error) {
     await recordManagedComputerRemoteRejection(input.db, {
-      organizationId: computer.organization_id,
+      workspaceId: computer.organization_id,
       managedComputerId: computer.id,
       actorUserId: input.userId,
       reasonCode: "origin_rejected",
@@ -923,7 +923,7 @@ export async function createManagedComputerRemoteSessionApplication(input: {
   }
   return createManagedComputerRemoteSessionTicket(input.db, input.env, {
     requestUrl: input.requestUrl,
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     managedComputerId: input.managedComputerId,
     controllerUserId: input.userId,
     requestId: input.requestId,
@@ -936,7 +936,7 @@ export async function createManagedComputerRemoteSessionApplication(input: {
 export async function endManagedComputerRemoteSessionApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   remoteSessionId: string;
   userId: string;
@@ -953,7 +953,7 @@ export async function endManagedComputerRemoteSessionApplication(input: {
     );
   } catch (error) {
     await recordManagedComputerRemoteRejection(input.db, {
-      organizationId: computer.organization_id,
+      workspaceId: computer.organization_id,
       managedComputerId: computer.id,
       actorUserId: input.userId,
       reasonCode: "origin_rejected",
@@ -966,7 +966,7 @@ export async function endManagedComputerRemoteSessionApplication(input: {
     input.env,
     {
       sessionId: input.remoteSessionId,
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       managedComputerId: input.managedComputerId,
       actorUserId: input.userId,
       reason: "user_ended",
@@ -985,7 +985,7 @@ export async function endManagedComputerRemoteSessionApplication(input: {
 export async function createManagedComputerSetupSessionApplication(input: {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   projectId: string;
   requestId: string;
@@ -995,7 +995,7 @@ export async function createManagedComputerSetupSessionApplication(input: {
 }) {
   await managedComputerControlAccess({ ...input, kind: "setup" });
   const result = await issueManagedComputerSetupSession(input.db, input.env, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     managedComputerId: input.managedComputerId,
     projectId: input.projectId,
     userId: input.userId,
@@ -1018,7 +1018,7 @@ export async function createManagedComputerSetupSessionApplication(input: {
 
 export async function getManagedComputerSetupStatusApplication(input: {
   db: D1Database;
-  organizationId: string;
+  workspaceId: string;
   managedComputerId: string;
   userId: string;
   observedAt: string;

@@ -2,11 +2,12 @@ import { useAtomValue } from "@effect/atom-react";
 import { lazy, Suspense, type ReactNode } from "react";
 
 import { useI18n } from "../../i18n";
-import { leaveOrganizationInvitationRoute } from "../../lib/organization-invitation";
+import { leaveWorkspaceInvitationRoute } from "../../lib/workspace-invitation";
 import { CompanionEmptyState } from "../CompanionHeader";
 import { SessionLoadingScreen } from "../SessionLoadingScreen";
 import { LoginScreenWithSession } from "./LoginScreenWithSession";
-import { useOrganizationActions } from "../../state/organization/actions";
+import { useWorkspaceActions } from "../../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../../state/local-workspace/actions";
 import { companionMode, webMode } from "../../state/platform";
 import { appErrorAtom } from "../../state/app-error";
 import { useSessionActions } from "../../state/session/actions";
@@ -24,18 +25,18 @@ import { teamsAtom } from "../../state/team/atoms";
   The order is a contract: the restore gate first so no screen flashes the login
   form at a user who is already signed in, then the invitation route, then the
   first-run onboarding, then sign-in, and only then the "you have no
-  organization yet" setup. The companion shell honours the first four only while
+  workspace yet" setup. The companion shell honours the first four only while
   signed out — a signed-in companion goes straight to its own screens, and shows
-  the empty state instead of the desktop's organization setup.
+  the empty state instead of the desktop's workspace setup.
 
   Every gate reads the session from the store and signs in through the session
   actions; what it takes as props is the three flags the shell derives from
   onboarding storage and the invitation flow's own callbacks.
 */
 
-const FirstOrganizationSetup = lazy(() =>
-  import("../FirstOrganizationSetup").then((m) => ({
-    default: m.FirstOrganizationSetup,
+const FirstWorkspaceSetup = lazy(() =>
+  import("../FirstWorkspaceSetup").then((m) => ({
+    default: m.FirstWorkspaceSetup,
   })),
 );
 const InitialOnboarding = lazy(() =>
@@ -56,13 +57,13 @@ export interface AuthGateProps {
   readonly invitationToken: string | null;
   readonly acceptingInvitation: boolean;
   readonly onAcceptInvitation: () => Promise<void>;
-  /** A token pasted into the first-organization setup starts the join screen. */
-  readonly onJoinOrganization: (token: string) => void;
+  /** A token pasted into the first-workspace setup starts the join screen. */
+  readonly onJoinWorkspace: (token: string) => void;
   readonly showsInitialOnboarding: boolean;
   readonly onInitialOnboardingComplete: () => void;
-  readonly showsFirstOrganizationSetup: boolean;
-  /** The first organization was created for this user. */
-  readonly onOrganizationCreated: (userId: string) => void;
+  readonly showsFirstWorkspaceSetup: boolean;
+  /** The first workspace was created for this user. */
+  readonly onWorkspaceCreated: (userId: string) => void;
   /** The shell, rendered once no gate owns the screen. */
   readonly children: ReactNode;
 }
@@ -73,9 +74,9 @@ export function AuthGate({
   invitationToken,
   onAcceptInvitation,
   onInitialOnboardingComplete,
-  onJoinOrganization,
-  onOrganizationCreated,
-  showsFirstOrganizationSetup,
+  onJoinWorkspace,
+  onWorkspaceCreated,
+  showsFirstWorkspaceSetup,
   showsInitialOnboarding,
 }: AuthGateProps) {
   const { locale } = useI18n();
@@ -85,7 +86,7 @@ export function AuthGate({
   const loginCode = useAtomValue(loginCodeAtom);
   const restoringSession = useAtomValue(restoringSessionAtom);
   const error = useAtomValue(appErrorAtom);
-  const { addOrganization, checkOrganizationHandle } = useOrganizationActions();
+  const { addWorkspace, checkWorkspaceHandle } = useWorkspaceActions();
   const {
     cancelLogin,
     login,
@@ -114,7 +115,7 @@ export function AuthGate({
             onAccept={onAcceptInvitation}
             onCancelLogin={cancelLogin}
             onLeave={() => {
-              leaveOrganizationInvitationRoute();
+              leaveWorkspaceInvitationRoute();
               window.location.reload();
             }}
             onLogin={(method) => void login({ method, locale })}
@@ -168,7 +169,7 @@ export function AuthGate({
     /*
       A signed-in companion never sees the desktop gates: it went past them
       before this branch, and its own "nothing to show yet" screen is the empty
-      state rather than the organization setup.
+      state rather than the workspace setup.
     */
     if (!user) return signedOutGate();
     if (teams.length === 0) {
@@ -181,16 +182,16 @@ export function AuthGate({
     return signedOutGate();
   }
 
-  if (showsFirstOrganizationSetup) {
+  if (showsFirstWorkspaceSetup) {
     return (
       <Suspense fallback={lazyViewFallback}>
-        <FirstOrganizationSetup
-          onCheckHandle={checkOrganizationHandle}
+        <FirstWorkspaceSetup
+          onCheckHandle={checkWorkspaceHandle}
           onCreate={async (input) => {
-            await addOrganization(input);
-            onOrganizationCreated(user.id);
+            await addWorkspace(input);
+            onWorkspaceCreated(user.id);
           }}
-          onJoin={onJoinOrganization}
+          onJoin={onJoinWorkspace}
           onLogout={() => void logout()}
           user={user}
         />

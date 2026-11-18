@@ -384,7 +384,7 @@ public nonisolated struct BriarAPI_User: Sendable {
   fileprivate var _image: String? = nil
 }
 
-public nonisolated struct BriarAPI_OrganizationMember: Sendable {
+public nonisolated struct BriarAPI_WorkspaceMember: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -547,7 +547,7 @@ public nonisolated struct BriarAPI_RelatedMessageReference: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -732,7 +732,7 @@ public nonisolated struct BriarAPI_StructuredRunResult: Sendable {
     case unspecified // = 0
     case issue // = 1
     case project // = 2
-    case organization // = 3
+    case workspace // = 3
     case UNRECOGNIZED(Int)
 
     public init() {
@@ -744,7 +744,7 @@ public nonisolated struct BriarAPI_StructuredRunResult: Sendable {
       case 0: self = .unspecified
       case 1: self = .issue
       case 2: self = .project
-      case 3: self = .organization
+      case 3: self = .workspace
       default: self = .UNRECOGNIZED(rawValue)
       }
     }
@@ -754,7 +754,7 @@ public nonisolated struct BriarAPI_StructuredRunResult: Sendable {
       case .unspecified: return 0
       case .issue: return 1
       case .project: return 2
-      case .organization: return 3
+      case .workspace: return 3
       case .UNRECOGNIZED(let i): return i
       }
     }
@@ -764,7 +764,7 @@ public nonisolated struct BriarAPI_StructuredRunResult: Sendable {
       .unspecified,
       .issue,
       .project,
-      .organization,
+      .workspace,
     ]
 
   }
@@ -1534,8 +1534,8 @@ nonisolated extension BriarAPI_User: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-nonisolated extension BriarAPI_OrganizationMember: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".OrganizationMember"
+nonisolated extension BriarAPI_WorkspaceMember: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WorkspaceMember"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_id\0\u{1}name\0\u{1}email\0\u{1}image\0\u{1}role\0\u{3}created_at\0\u{3}project_ids\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1585,7 +1585,7 @@ nonisolated extension BriarAPI_OrganizationMember: SwiftProtobuf.Message, SwiftP
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_OrganizationMember, rhs: BriarAPI_OrganizationMember) -> Bool {
+  public static func ==(lhs: BriarAPI_WorkspaceMember, rhs: BriarAPI_WorkspaceMember) -> Bool {
     if lhs.userID != rhs.userID {return false}
     if lhs.name != rhs.name {return false}
     if lhs.email != rhs.email {return false}
@@ -1757,7 +1757,7 @@ nonisolated extension BriarAPI_MessageAuthor: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension BriarAPI_RelatedMessageReference: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RelatedMessageReference"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}message_id\0\u{3}root_message_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}message_id\0\u{3}root_message_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1765,7 +1765,7 @@ nonisolated extension BriarAPI_RelatedMessageReference: SwiftProtobuf.Message, S
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.messageID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.rootMessageID) }()
@@ -1775,8 +1775,8 @@ nonisolated extension BriarAPI_RelatedMessageReference: SwiftProtobuf.Message, S
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -1791,7 +1791,7 @@ nonisolated extension BriarAPI_RelatedMessageReference: SwiftProtobuf.Message, S
   }
 
   public static func ==(lhs: BriarAPI_RelatedMessageReference, rhs: BriarAPI_RelatedMessageReference) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.messageID != rhs.messageID {return false}
     if lhs.rootMessageID != rhs.rootMessageID {return false}
@@ -1882,7 +1882,7 @@ nonisolated extension BriarAPI_StructuredRunResult.Urgency: SwiftProtobuf._Proto
 }
 
 nonisolated extension BriarAPI_StructuredRunResult.Impact: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0IMPACT_UNSPECIFIED\0\u{1}IMPACT_ISSUE\0\u{1}IMPACT_PROJECT\0\u{1}IMPACT_ORGANIZATION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0IMPACT_UNSPECIFIED\0\u{1}IMPACT_ISSUE\0\u{1}IMPACT_PROJECT\0\u{1}IMPACT_WORKSPACE\0")
 }
 
 nonisolated extension BriarAPI_ResultReview: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

@@ -12,6 +12,9 @@ import { resolveIssueHierarchyLocation } from "../lib/api";
 import type { ChannelSummary } from "../lib/channels-contract";
 import { projectNavigationLocation } from "../lib/app-navigation";
 import { navigateToIssueLink } from "../lib/issue-link-navigation";
+import { listDashboardRunsRpc } from "../lib/app-rpc/dashboard";
+import { normalizeIssueKeyPrefix } from "../lib/issue-key";
+import { useRegistry } from "../state/registry";
 import { useChannelActions } from "../state/channels/actions";
 import {
   appMenuSettingsListenerAtom,
@@ -21,7 +24,7 @@ import {
 } from "../state/deep-links/atoms";
 import { useInboxActions } from "../state/inbox/actions";
 import {
-  activeOrganizationChannelsAtom,
+  activeWorkspaceChannelsAtom,
   channelCatalogCursorAtom,
   channelsLoadingAtom,
   requestedChannelIdAtom,
@@ -42,15 +45,13 @@ import {
   requestedRunMessageIdAtom,
   requestedSessionIdAtom,
 } from "../state/navigation/atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../state/organization/atoms";
-import { useOrganizationActions } from "../state/organization/actions";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../state/workspace/atoms";
+import { useWorkspaceActions } from "../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../state/local-workspace/actions";
 import { companionMode, lockedTeamIdAtom } from "../state/platform";
 import { loadingAtom, tokenAtom, userAtom } from "../state/session/atoms";
 import { useTeamActions } from "../state/team/actions";
-import { teamRunIdsAtom } from "../state/entities/runs";
+import { runsByIdAtom, teamRunIdsAtom } from "../state/entities/runs";
 import {
   activeTeamIdAtom,
   loadedTeamIdAtom,
@@ -63,13 +64,13 @@ import {
   The listeners themselves are `state/deep-links` atoms: they register on first
   observation and unregister through a finalizer, so this hook only mounts them.
   What is left here is the resolver — it drains `pendingBriarLinkAtom` once the
-  session, the organization and the channel catalog it needs have settled, and
+  session, the workspace and the channel catalog it needs have settled, and
   `pendingInboxNotificationTarget` the same way.
 
   The resolver's shape is what kept it in the app shell: it waits on state it
   does not own and then writes request atoms that a dozen views read. It reads
   the waiting conditions and where the user already is from atoms now, and moves
-  through the navigation actions, the team and organization actions and the
+  through the navigation actions, the team and workspace actions and the
   inbox's own read marker — nothing is handed in at all.
 */
 
@@ -94,11 +95,13 @@ export const companionChannelPage = (
 export interface DeepLinkResolvers {
   readonly resolveIssueHierarchyLocation: typeof resolveIssueHierarchyLocation;
   readonly navigateToIssueLink: typeof navigateToIssueLink;
+  readonly listDashboardRunsRpc: typeof listDashboardRunsRpc;
 }
 
 const liveResolvers: DeepLinkResolvers = {
   resolveIssueHierarchyLocation,
   navigateToIssueLink,
+  listDashboardRunsRpc,
 };
 
 export interface UseDeepLinksInput {
@@ -110,6 +113,7 @@ export function useDeepLinks({
 }: UseDeepLinksInput = {}): void {
   const { t } = useI18n();
   const { toast } = useToast();
+  const registry = useRegistry();
   const resolvers: DeepLinkResolvers = { ...liveResolvers, ...resolverOverrides };
 
   /*
@@ -126,14 +130,14 @@ export function useDeepLinks({
   const user = useAtomValue(userAtom);
   const loading = useAtomValue(loadingAtom);
   const token = useAtomValue(tokenAtom);
-  const organizations = useAtomValue(organizationsAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaces = useAtomValue(workspacesAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const teams = useAtomValue(teamsAtom);
   const activeTeamId = useAtomValue(activeTeamIdAtom);
   const loadedTeamId = useAtomValue(loadedTeamIdAtom);
   // Only the id list: a run's own edits never move the fallback below.
   const loadedRunIds = useAtomValue(teamRunIdsAtom(loadedTeamId ?? ""));
-  const organizationChannels = useAtomValue(activeOrganizationChannelsAtom);
+  const organizationChannels = useAtomValue(activeWorkspaceChannelsAtom);
   const channelsLoading = useAtomValue(channelsLoadingAtom);
   const channelCatalogCursor = useAtomValue(channelCatalogCursorAtom);
   const [pendingBriarLink, setPendingBriarLink] = useAtom(pendingBriarLinkAtom);
@@ -153,7 +157,7 @@ export function useDeepLinks({
   const navigationUserBoundaryChanged = useAtomValue(
     navigationUserBoundaryChangedAtom,
   );
-  const { markOrganizationChannelRead, selectChannel } = useChannelActions();
+  const { markWorkspaceChannelRead, selectChannel } = useChannelActions();
   const {
     navigateToChannel,
     navigateToIssue,
@@ -161,7 +165,7 @@ export function useDeepLinks({
     replaceNavigationLocation,
   } = useNavigationActions();
   const { ensureTeamSelected, selectTeam } = useTeamActions();
-  const { selectOrganization } = useOrganizationActions();
+  const { selectWorkspace } = useWorkspaceActions();
   const { markRead: markInboxRead } = useInboxActions();
   /*
     The notification whose read receipt this window has already sent.
@@ -176,19 +180,25 @@ export function useDeepLinks({
   */
   const sentInboxReceiptFor = useRef<string | null>(null);
 
+  /*
+    The issue-key fetch in flight, keyed so the effect rerunning on unrelated
+    state does not fetch the same key twice.
+  */
+  const fetchingIssueKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!pendingBriarLink || !user || loading) return;
     if (pendingBriarLink.kind === "channel") {
       setRequestedRunMessageId(null);
       if (
-        !organizations.some(
-          (organization) => organization.id === pendingBriarLink.organizationId,
+        !workspaces.some(
+          (workspace) => workspace.id === pendingBriarLink.workspaceId,
         )
       ) {
         return;
       }
-      if (pendingBriarLink.organizationId !== activeOrganizationId) {
-        selectOrganization(pendingBriarLink.organizationId);
+      if (pendingBriarLink.workspaceId !== activeWorkspaceId) {
+        selectWorkspace(pendingBriarLink.workspaceId);
         return;
       }
       if (channelsLoading || channelCatalogCursor === null) {
@@ -213,7 +223,7 @@ export function useDeepLinks({
           : null,
       );
       selectChannel(pendingBriarLink.channelId);
-      markOrganizationChannelRead(pendingBriarLink.channelId);
+      markWorkspaceChannelRead(pendingBriarLink.channelId);
       if (companionMode) {
         setCompanionPage(
           companionChannelPage(organizationChannels, pendingBriarLink.channelId),
@@ -226,7 +236,7 @@ export function useDeepLinks({
           )?.kind === "dm"
             ? "dms"
             : "channels",
-          pendingBriarLink.organizationId,
+          pendingBriarLink.workspaceId,
         );
       }
       setPendingBriarLink(null);
@@ -283,6 +293,119 @@ export function useDeepLinks({
       });
       return;
     }
+    if (pendingBriarLink.kind === "issueKey") {
+      const target = pendingBriarLink;
+      const keyMatch = target.issueKey.match(/^([A-Za-z0-9]{1,3})-(\d{1,9})$/u);
+      if (!keyMatch) {
+        setPendingBriarLink(null);
+        return;
+      }
+      const prefix = keyMatch[1].toUpperCase();
+      const runNumber = Number(keyMatch[2]);
+      const hasPrefix = (candidate: (typeof teams)[number]) =>
+        normalizeIssueKeyPrefix(candidate.issueKeyPrefix ?? "") === prefix;
+      const team =
+        teams.find(
+          (candidate) => candidate.id === activeTeamId && hasPrefix(candidate),
+        ) ?? teams.find(hasPrefix);
+      // Teams may still be loading; the effect reruns when they arrive.
+      if (!team) return;
+
+      const openResolvedRun = (runId: string) => {
+        setRequestedSessionId(null);
+        setRequestedRunMessageId(null);
+        setRequestedRunInitialTab(null);
+        setRequestedRunId(runId);
+        setCompanionPage("issues");
+        setCompanionStatus("all");
+        navigateToIssue(runId, team.id);
+        setPendingBriarLink(null);
+      };
+
+      const storedRunId = ((): string | null => {
+        const runs = registry.get(runsByIdAtom);
+        const ids = registry.get(teamRunIdsAtom(team.id));
+        if (ids) {
+          for (const id of ids) {
+            const run = runs.get(id);
+            if (run && run.runNumber === runNumber) return id;
+          }
+          return null;
+        }
+        for (const run of runs.values()) {
+          if (
+            run.runNumber === runNumber &&
+            (run.teamId === team.id || run.teamId == null)
+          ) {
+            return run.id;
+          }
+        }
+        return null;
+      })();
+      if (storedRunId) {
+        openResolvedRun(storedRunId);
+        return;
+      }
+
+      /*
+        The card is outside the loaded page, so resolve the key through the
+        list query: the worker matches an issue key or bare number against
+        run_number. Fetch once per key.
+      */
+      if (!token) return;
+      if (fetchingIssueKeyRef.current === target.issueKey) return;
+      fetchingIssueKeyRef.current = target.issueKey;
+      void (async () => {
+        try {
+          let cursor: string | null = null;
+          let result: Awaited<
+            ReturnType<typeof resolvers.listDashboardRunsRpc>
+          >;
+          let match: (typeof result.runs)[number] | undefined;
+          do {
+            result = await resolvers.listDashboardRunsRpc(token, team.id, {
+              query: target.issueKey,
+              pageSize: 50,
+              cursor,
+            });
+            match = result.runs.find((run) => run.runNumber === runNumber);
+            cursor = result.nextCursor;
+          } while (!match && cursor);
+          if (!match) throw new Error("issue key not found");
+          const currentRuns = registry.get(runsByIdAtom);
+          const nextRuns = new Map(currentRuns);
+          for (const run of result.runs) nextRuns.set(run.id, run);
+          registry.set(runsByIdAtom, nextRuns);
+          const currentIds = registry.get(teamRunIdsAtom(team.id));
+          if (currentIds) {
+            const known = new Set(currentIds);
+            const prepended = result.runs
+              .map((run) => run.id)
+              .filter((id) => !known.has(id));
+            if (prepended.length > 0) {
+              registry.set(teamRunIdsAtom(team.id), [
+                ...prepended,
+                ...currentIds,
+              ]);
+            }
+          }
+          openResolvedRun(match.id);
+        } catch {
+          setPendingBriarLink(null);
+          toast(t("navigation.issueLinkIssueUnavailable"), { tone: "error" });
+          navigateToPage("issues", team.id);
+        } finally {
+          fetchingIssueKeyRef.current = null;
+        }
+      })();
+      return;
+    }
+    if (pendingBriarLink.kind === "page") {
+      const page = pendingBriarLink.page;
+      setPendingBriarLink(null);
+      navigateToPage(page);
+      return;
+    }
     if (!teams.some((team) => team.id === pendingBriarLink.projectId)) {
       return;
     }
@@ -301,22 +424,22 @@ export function useDeepLinks({
     // when the effect runs, so it is deliberately not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    activeOrganizationId,
+    activeWorkspaceId,
     activeTeamId,
     channelCatalogCursor,
     channelsLoading,
     ensureTeamSelected,
     loading,
-    markOrganizationChannelRead,
+    markWorkspaceChannelRead,
     navigateToChannel,
     navigateToIssue,
     navigateToPage,
     organizationChannels,
-    organizations,
+    workspaces,
     lockedTeamId,
     pendingBriarLink,
     selectChannel,
-    selectOrganization,
+    selectWorkspace,
     selectTeam,
     setActivePlanningProjectId,
     setCompanionPage,
@@ -333,6 +456,7 @@ export function useDeepLinks({
     toast,
     token,
     user,
+    registry,
   ]);
 
   /*
@@ -397,7 +521,7 @@ export function useDeepLinks({
       pendingInboxNotificationTarget.kind === "channel" &&
       (channelsLoading ||
         channelCatalogCursor === null ||
-        activeOrganizationId !== targetProject.organizationId)
+        activeWorkspaceId !== targetProject.workspaceId)
     ) {
       return;
     }
@@ -439,7 +563,7 @@ export function useDeepLinks({
         rootMessageId,
       });
       selectChannel(pendingInboxNotificationTarget.targetId);
-      markOrganizationChannelRead(pendingInboxNotificationTarget.targetId);
+      markWorkspaceChannelRead(pendingInboxNotificationTarget.targetId);
       if (companionMode) {
         setCompanionPage(
           companionChannelPage(
@@ -455,7 +579,7 @@ export function useDeepLinks({
           )?.kind === "dm"
             ? "dms"
             : "channels",
-          targetProject.organizationId,
+          targetProject.workspaceId,
           targetProject.id,
         );
       }
@@ -469,13 +593,13 @@ export function useDeepLinks({
     }
     setPendingInboxNotificationTarget(null);
   }, [
-    activeOrganizationId,
+    activeWorkspaceId,
     activeTeamId,
     channelCatalogCursor,
     channelsLoading,
     loading,
     markInboxRead,
-    markOrganizationChannelRead,
+    markWorkspaceChannelRead,
     navigateToChannel,
     navigateToIssue,
     navigateToPage,

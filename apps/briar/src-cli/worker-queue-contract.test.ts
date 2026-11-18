@@ -1,13 +1,12 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { describe, expect, it } from "vitest";
-import { AgentProvider as ProtoAgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
+import { AgentProvider as ProtoAgentProvider} from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
-  ClaimedWorkSchema,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  ClaimedWorkSchema} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { claimedWorkFromProto } from "./worker-queue-contract";
 
-const organizationId = "77777777-7777-4777-8777-777777777777";
+const workspaceId = "77777777-7777-4777-8777-777777777777";
 const projectId = "88888888-8888-4888-8888-888888888888";
 
 const projectAgentTaskClaim = (resumeCount?: number) =>
@@ -44,7 +43,7 @@ const decodeProjectAgentTask = (resumeCount?: number) => {
 };
 
 const channelReplyClaim = (overrides: {
-  scope: "organization" | "project";
+  scope: "workspace" | "project";
   delegationTargets?: boolean;
   agentMessageTargets?: boolean;
 }) =>
@@ -55,14 +54,14 @@ const channelReplyClaim = (overrides: {
         workId: "33333333-3333-4333-8333-333333333333",
         channelId: "44444444-4444-4444-8444-444444444444",
         scope: {
-          scope: overrides.scope === "organization"
+          scope: overrides.scope === "workspace"
             ? {
-                case: "organization",
-                value: { organizationId: organizationId },
+                case: "workspace",
+                value: { workspaceId: workspaceId },
               }
             : {
                 case: "project",
-                value: { organizationId: organizationId, projectId },
+                value: { workspaceId: workspaceId, projectId },
               },
         },
         runId: "55555555-5555-4555-8555-555555555555",
@@ -80,11 +79,11 @@ const channelReplyClaim = (overrides: {
         claimToken: "briar_channel_claim_test",
         claimedAt: timestampFromDate(new Date("2026-09-06T08:00:00.000Z")),
         leaseExpiresAt: timestampFromDate(new Date("2026-09-06T08:15:00.000Z")),
-        // Only an organization claim carries the manifest, and the decoder
+        // Only a workspace claim carries the manifest, and the decoder
         // requires it for that scope.
-        ...(overrides.scope === "organization"
+        ...(overrides.scope === "workspace"
           ? {
-              organizationContextSnapshotAt: timestampFromDate(
+              workspaceContextSnapshotAt: timestampFromDate(
                 new Date("2026-09-06T07:59:00.000Z"),
               ),
             }
@@ -126,8 +125,8 @@ const decodeChannelReply = (
 describe("claimed channel reply Agent message decoding", () => {
   it("accepts Agent message targets in both reply scopes", () => {
     // Agent messages start in a DM, so a Project Agent claim carries targets
-    // even though delegation stays an Organization Agent path.
-    for (const scope of ["organization", "project"] as const) {
+    // even though delegation stays a Workspace Agent path.
+    for (const scope of ["workspace", "project"] as const) {
       const claim = decodeChannelReply({ scope, agentMessageTargets: true });
       expect(claim.agentMessageTargets).toEqual([{
         agentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -150,7 +149,7 @@ describe("claimed channel reply Agent message decoding", () => {
   it("rejects a claim offering both delegation and Agent message targets", () => {
     expect(() =>
       decodeChannelReply({
-        scope: "organization",
+        scope: "workspace",
         delegationTargets: true,
         agentMessageTargets: true,
       })

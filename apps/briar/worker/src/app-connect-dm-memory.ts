@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   DmMemoryClass as ProtoDmMemoryClass,
   DmMemoryDocumentKind as ProtoDmMemoryDocumentKind,
@@ -7,15 +7,6 @@ import {
   DmMemoryDocumentStatus as ProtoDmMemoryDocumentStatus,
   DmMemoryEvidenceType as ProtoDmMemoryEvidenceType,
   DmMemoryIndexState as ProtoDmMemoryIndexState,
-  DmMemoryLearningFailureCode as ProtoDmMemoryLearningFailureCode,
-  DmMemoryLearningConfigurationSchema,
-  DmMemoryLearningJobKind as ProtoDmMemoryLearningJobKind,
-  DmMemoryLearningJobSchema,
-  DmMemoryLearningJobStage as ProtoDmMemoryLearningJobStage,
-  DmMemoryLearningJobStatus as ProtoDmMemoryLearningJobStatus,
-  DmMemoryLearningStatusSchema,
-  DmMemoryLearningModelSchema,
-  DmMemoryLearningRetryableJobSchema,
   DmMemoryRevisionOrigin as ProtoDmMemoryRevisionOrigin,
   DmMemoryRevisionSchema,
   DmMemoryService,
@@ -33,31 +24,36 @@ import {
 import {
   dmMemoryCreateInput,
   dmMemoryEditInput,
-  dmMemoryLearningRetryInput,
   dmMemorySettingsInput,
   type DmMemoryClass,
   type DmMemoryDocument,
   type DmMemoryDocumentDetail,
-  type DmMemoryLearningStatus,
   type DmMemorySource,
   type DmMemorySpace,
 } from "../../src/lib/dm-memory-contract";
 import type { BriarAuth } from "./auth";
 import { requireChannelAccess } from "./channel-route-access";
 import {
-  deleteDmMemory,
-  getDmMemory,
-  listDmMemories,
+  dmMemorySpaceJson,
+  dmMemorySpacePage,
+  ensureWriteSpace,
   listDmMemorySpaces,
-  listDmMemoryRevisions,
-  saveDmMemory,
   updateDmMemorySettings,
   type DmMemoryOwner,
-} from "./dm-memory-repository";
-import { retryDmLearningJob } from "./dm-memory-learning-retry";
-import { readDmLearningStatus } from "./dm-memory-learning-status";
+} from "./dm-memory-spaces";
 import { HttpError } from "./http-response";
-import { getOrganizationRole } from "./organization-repository";
+import { memoryVaultStoreFromEnv } from "./memory-vault/artifacts-git-store";
+import type { VaultGitStore } from "./memory-vault/git-store";
+import { VAULT_FOLDERS } from "./memory-vault/records";
+import {
+  forgetOwnerVaultRecord,
+  getOwnerVaultDocument,
+  listOwnerVaultDocuments,
+  listOwnerVaultRevisions,
+  saveOwnerVaultRecord,
+  type OwnerVaultDeps,
+} from "./memory-vault/owner";
+import { getWorkspaceRole } from "./workspace-repository";
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
@@ -67,6 +63,28 @@ export type AppConnectDmMemoryInput = {
   readonly auth: BriarAuth;
   readonly db: D1Database;
   readonly env: Env;
+  /** Tests inject a store; production uses the `MEMORY_ARTIFACTS` binding. */
+  readonly memoryVaultStore?: VaultGitStore | null;
+};
+
+/**
+ * The owner's DM memory dialog, served from each space's vault (memory-vault
+ * spec §9): record handles as document ids, owner writes as protected
+ * `user:<id>` saves, deletes as forget. Authorization: `ownerFor`, then only
+ * the owner's own spaces. Without the `MEMORY_ARTIFACTS` binding, reads of
+ * the D1 index still work and anything touching Artifacts reports
+ * `memory_unavailable`.
+ */
+const vaultDeps = (input: AppConnectDmMemoryInput): OwnerVaultDeps => ({
+  db: input.db,
+  store: input.memoryVaultStore === undefined ? memoryVaultStoreFromEnv(input.env) : input.memoryVaultStore,
+});
+
+/** Vault document ids are opaque to clients; bound them before they reach SQL. */
+const opaqueDocumentId = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 200) throw new ConnectError("document_id is invalid", Code.InvalidArgument);
+  return trimmed;
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
@@ -74,7 +92,6 @@ const canonicalUuid = (value: string) => decodeUuid(value).toLowerCase();
 const decodeCreate = decodeRequestSync(dmMemoryCreateInput);
 const decodeEdit = decodeRequestSync(dmMemoryEditInput);
 const decodeSettings = decodeRequestSync(dmMemorySettingsInput);
-const decodeLearningRetry = decodeRequestSync(dmMemoryLearningRetryInput);
 
 const domainMemoryClass = (value: ProtoDmMemoryClass): DmMemoryClass => {
   switch (value) {
@@ -143,83 +160,6 @@ const protoRevisionOrigin = (
   }
 };
 
-const protoLearningJobKind = (value: "extract" | "explicit_request" | "consolidate") => {
-  switch (value) {
-    case "extract": return ProtoDmMemoryLearningJobKind.EXTRACT;
-    case "explicit_request": return ProtoDmMemoryLearningJobKind.EXPLICIT_REQUEST;
-    case "consolidate": return ProtoDmMemoryLearningJobKind.CONSOLIDATE;
-  }
-};
-
-const protoLearningJobStatus = (value: DmMemoryLearningStatus["lastJob"] extends infer T
-  ? NonNullable<T> extends { status: infer S } ? S : never
-  : never) => {
-  switch (value) {
-    case "pending": return ProtoDmMemoryLearningJobStatus.PENDING;
-    case "running": return ProtoDmMemoryLearningJobStatus.RUNNING;
-    case "retry_wait": return ProtoDmMemoryLearningJobStatus.RETRY_WAIT;
-    case "failed": return ProtoDmMemoryLearningJobStatus.FAILED;
-    case "cancelled": return ProtoDmMemoryLearningJobStatus.CANCELLED;
-    case "succeeded": return ProtoDmMemoryLearningJobStatus.SUCCEEDED;
-    case "no_change": return ProtoDmMemoryLearningJobStatus.NO_CHANGE;
-  }
-};
-
-const protoLearningJobStage = (value: "proposing" | "verifying" | "committing") => {
-  switch (value) {
-    case "proposing": return ProtoDmMemoryLearningJobStage.PROPOSING;
-    case "verifying": return ProtoDmMemoryLearningJobStage.VERIFYING;
-    case "committing": return ProtoDmMemoryLearningJobStage.COMMITTING;
-  }
-};
-
-const protoLearningFailureCode = (value: NonNullable<NonNullable<DmMemoryLearningStatus["lastJob"]>["errorCode"]>) => {
-  switch (value) {
-    case "invalid_proposal": return ProtoDmMemoryLearningFailureCode.INVALID_PROPOSAL;
-    case "verification_rejected": return ProtoDmMemoryLearningFailureCode.VERIFICATION_REJECTED;
-    case "stale": return ProtoDmMemoryLearningFailureCode.STALE;
-    case "scope_revoked": return ProtoDmMemoryLearningFailureCode.SCOPE_REVOKED;
-    case "budget_exhausted": return ProtoDmMemoryLearningFailureCode.BUDGET_EXHAUSTED;
-    case "model_unavailable": return ProtoDmMemoryLearningFailureCode.MODEL_UNAVAILABLE;
-    case "model_timeout": return ProtoDmMemoryLearningFailureCode.MODEL_TIMEOUT;
-    case "model_credentials": return ProtoDmMemoryLearningFailureCode.MODEL_CREDENTIALS;
-    case "model_configuration": return ProtoDmMemoryLearningFailureCode.MODEL_CONFIGURATION;
-    case "input_capacity": return ProtoDmMemoryLearningFailureCode.INPUT_CAPACITY;
-  }
-};
-
-const protoLearningStatus = (status: DmMemoryLearningStatus | null) => status === null
-  ? undefined
-  : create(DmMemoryLearningStatusSchema, {
-    configuration: status.configuration === null
-      ? undefined
-      : create(DmMemoryLearningConfigurationSchema, {
-          proposer: create(DmMemoryLearningModelSchema, status.configuration.proposer),
-          verifier: create(DmMemoryLearningModelSchema, status.configuration.verifier),
-          spaceDailyCalls: status.configuration.spaceDailyCalls,
-          spaceDailyMicroUsd: BigInt(status.configuration.spaceDailyMicroUsd),
-          costTracked: status.configuration.costTracked,
-          agentProvider: status.configuration.agentProvider,
-          agentProviderVerified: status.configuration.agentProviderVerified,
-          workerAvailable: status.configuration.workerAvailable,
-        }),
-    callsToday: status.callsToday,
-    reservedMicroUsdToday: BigInt(status.reservedMicroUsdToday),
-    pendingJobs: status.pendingJobs,
-    failedJobs: status.failedJobs,
-    lastJob: status.lastJob === null ? undefined : create(DmMemoryLearningJobSchema, {
-      id: status.lastJob.id,
-      kind: protoLearningJobKind(status.lastJob.kind),
-      status: protoLearningJobStatus(status.lastJob.status),
-      stage: status.lastJob.stage === null ? undefined : protoLearningJobStage(status.lastJob.stage),
-      errorCode: status.lastJob.errorCode === null ? undefined : protoLearningFailureCode(status.lastJob.errorCode),
-      updatedAt: timestamp(status.lastJob.updatedAt),
-    }),
-    retryableJob: status.retryableJob == null
-      ? undefined
-      : create(DmMemoryLearningRetryableJobSchema, status.retryableJob),
-  });
-
 const timestamp = (value: string) => timestampFromDate(new Date(value));
 const optionalTimestamp = (value: string | null) => value === null
   ? undefined
@@ -266,6 +206,10 @@ const protoDocument = (
       version: source.version,
     }))
     : [],
+  path: document.path ?? undefined,
+  recordType: document.recordType ?? undefined,
+  recordStatus: document.recordStatus ?? undefined,
+  readOnly: document.readOnly,
 });
 
 const checkedNumber = (value: bigint, field: string) => {
@@ -277,22 +221,22 @@ const checkedNumber = (value: bigint, field: string) => {
 
 const ownerFor = async (
   input: AppConnectDmMemoryInput,
-  organizationIdValue: string,
+  workspaceIdValue: string,
   channelIdValue: string,
 ): Promise<DmMemoryOwner> => {
   const session = await requireSession(input.auth, input.request);
   const owner = {
-    organizationId: canonicalUuid(organizationIdValue),
+    workspaceId: canonicalUuid(workspaceIdValue),
     channelId: canonicalUuid(channelIdValue),
     userId: session.user.id,
   };
-  if (!await getOrganizationRole(input.db, owner.organizationId, owner.userId)) {
-    throw new HttpError(404, "Organization not found");
+  if (!await getWorkspaceRole(input.db, owner.workspaceId, owner.userId)) {
+    throw new HttpError(404, "Workspace not found");
   }
   if ((await listDmMemorySpaces(input.db, owner)).length === 0) {
     await requireChannelAccess(
       input.db,
-      owner.organizationId,
+      owner.workspaceId,
       owner.channelId,
       owner.userId,
     );
@@ -300,62 +244,54 @@ const ownerFor = async (
   return owner;
 };
 
-const optionalIso = (value: Parameters<typeof timestampDate>[0] | undefined) =>
-  value === undefined ? null : timestampDate(value).toISOString();
-
-const sourceMessage = (value: { id: string; version: number } | undefined) =>
-  value === undefined
-    ? undefined
-    : { id: canonicalUuid(value.id), version: value.version };
-
 const createAppDmMemoryService = (
   input: AppConnectDmMemoryInput,
 ): ServiceImpl<typeof DmMemoryService> => ({
+  // source_language, observed_at, valid_until and source_message on writes are
+  // legacy fields older clients still send; the vault does not store them.
   listDmMemories: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
-    const page = await listDmMemories(
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    const page = await dmMemorySpacePage(
       input.db,
       owner,
-      request.memorySpaceId === undefined
-        ? undefined
-        : canonicalUuid(request.memorySpaceId),
-      request.cursor === undefined ? undefined : canonicalUuid(request.cursor),
+      request.memorySpaceId === undefined ? undefined : canonicalUuid(request.memorySpaceId),
     );
-    const learning = await readDmLearningStatus(input.db, owner, page.selectedSpaceId);
+    const vaultPage = page.selected
+      ? await listOwnerVaultDocuments(
+          input.db,
+          page.selected,
+          request.cursor === undefined ? undefined : opaqueDocumentId(request.cursor),
+          { wholeVault: request.wholeVault },
+        )
+      : { documents: [], nextCursor: null, folders: request.wholeVault ? VAULT_FOLDERS : [] };
     return create(DmMemoryService.method.listDmMemories.output, {
       eligible: page.eligible,
-      capabilities: {
-        ...page.capabilities,
-        recall: String(input.env.DM_MEMORY_RETRIEVAL_ENABLED) === "true",
-        automaticLearning: true,
-      },
-      spaces: page.spaces.map(protoSpace),
-      selectedSpaceId: page.selectedSpaceId ?? undefined,
-      documents: page.documents.map(protoDocument),
-      nextCursor: page.nextCursor ?? undefined,
-      learning: protoLearningStatus(learning),
+      capabilities: { recall: true, automaticLearning: true },
+      spaces: page.spaces.map((space) => protoSpace(dmMemorySpaceJson(space))),
+      selectedSpaceId: page.selected?.id,
+      documents: vaultPage.documents.map(protoDocument),
+      nextCursor: vaultPage.nextCursor ?? undefined,
+      folders: [...vaultPage.folders],
     });
   },
 
   getDmMemoryDocument: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
-    const document = await getDmMemory(
-      input.db,
-      owner,
-      canonicalUuid(request.documentId),
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    const document = await getOwnerVaultDocument(
+      vaultDeps(input),
+      await listDmMemorySpaces(input.db, owner),
+      opaqueDocumentId(request.documentId),
       request.version,
     );
-    return create(DmMemoryService.method.getDmMemoryDocument.output, {
-      document: protoDocument(document),
-    });
+    return create(DmMemoryService.method.getDmMemoryDocument.output, { document: protoDocument(document) });
   },
 
   listDmMemoryRevisions: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
-    const page = await listDmMemoryRevisions(
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    const page = await listOwnerVaultRevisions(
       input.db,
-      owner,
-      canonicalUuid(request.documentId),
+      await listDmMemorySpaces(input.db, owner),
+      opaqueDocumentId(request.documentId),
       request.cursor,
     );
     return create(DmMemoryService.method.listDmMemoryRevisions.output, {
@@ -374,63 +310,68 @@ const createAppDmMemoryService = (
   },
 
   createDmMemoryDocument: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
-    const result = await saveDmMemory(input.db, owner, decodeCreate({
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    const decoded = decodeCreate({
       requestId: canonicalUuid(request.requestId),
-      memorySpaceId: request.memorySpaceId === undefined
-        ? undefined
-        : canonicalUuid(request.memorySpaceId),
+      memorySpaceId: request.memorySpaceId === undefined ? undefined : canonicalUuid(request.memorySpaceId),
       title: request.title,
       body: request.body,
       memoryClass: domainMemoryClass(request.memoryClass),
-      sourceLanguage: request.sourceLanguage,
-      observedAt: optionalIso(request.observedAt),
-      validUntil: optionalIso(request.validUntil),
-      sourceMessage: sourceMessage(request.sourceMessage),
-    }));
-    return create(DmMemoryService.method.createDmMemoryDocument.output, {
-      documentId: result.documentId,
-      version: result.version,
-      replayed: result.replayed,
     });
+    const result = await saveOwnerVaultRecord(vaultDeps(input), {
+      space: await ensureWriteSpace(input.db, owner, decoded.memorySpaceId),
+      spaces: await listDmMemorySpaces(input.db, owner),
+      userId: owner.userId,
+      requestId: decoded.requestId,
+      documentId: null,
+      expectedVersion: null,
+      title: decoded.title,
+      body: decoded.body,
+      memoryClass: decoded.memoryClass,
+    });
+    return create(DmMemoryService.method.createDmMemoryDocument.output, result);
   },
 
   updateDmMemoryDocument: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
-    const documentId = canonicalUuid(request.documentId);
-    const result = await saveDmMemory(input.db, owner, decodeEdit({
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    const decoded = decodeEdit({
       requestId: canonicalUuid(request.requestId),
-      memorySpaceId: request.memorySpaceId === undefined
-        ? undefined
-        : canonicalUuid(request.memorySpaceId),
+      memorySpaceId: request.memorySpaceId === undefined ? undefined : canonicalUuid(request.memorySpaceId),
       expectedVersion: request.expectedVersion,
       title: request.title,
       body: request.body,
       memoryClass: domainMemoryClass(request.memoryClass),
-      sourceLanguage: request.sourceLanguage,
-      observedAt: optionalIso(request.observedAt),
-      validUntil: optionalIso(request.validUntil),
-      sourceMessage: sourceMessage(request.sourceMessage),
-    }), documentId);
-    return create(DmMemoryService.method.updateDmMemoryDocument.output, {
-      documentId: result.documentId,
-      version: result.version,
-      replayed: result.replayed,
     });
+    const spaces = await listDmMemorySpaces(input.db, owner);
+    const result = await saveOwnerVaultRecord(vaultDeps(input), {
+      space: decoded.memorySpaceId === undefined
+        ? null
+        : spaces.find((space) => space.id === decoded.memorySpaceId) ?? null,
+      spaces,
+      userId: owner.userId,
+      requestId: decoded.requestId,
+      documentId: opaqueDocumentId(request.documentId),
+      expectedVersion: decoded.expectedVersion,
+      title: decoded.title,
+      body: decoded.body,
+      memoryClass: decoded.memoryClass,
+    });
+    return create(DmMemoryService.method.updateDmMemoryDocument.output, result);
   },
 
   deleteDmMemoryDocument: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
-    const result = await deleteDmMemory(
-      input.db,
-      owner,
-      canonicalUuid(request.documentId),
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
+    const result = await forgetOwnerVaultRecord(
+      vaultDeps(input),
+      await listDmMemorySpaces(input.db, owner),
+      owner.userId,
+      opaqueDocumentId(request.documentId),
     );
     return create(DmMemoryService.method.deleteDmMemoryDocument.output, result);
   },
 
   updateDmMemorySettings: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
+    const owner = await ownerFor(input, request.workspaceId, request.channelId);
     const space = await updateDmMemorySettings(input.db, owner, decodeSettings({
       requestId: canonicalUuid(request.requestId),
       memorySpaceId: request.memorySpaceId === undefined
@@ -442,24 +383,10 @@ const createAppDmMemoryService = (
       ),
       useEnabled: request.useEnabled,
       autoEnabled: request.autoEnabled,
-    }), { learningAvailable: true });
+    }));
     return create(DmMemoryService.method.updateDmMemorySettings.output, {
       space: protoSpace(space),
     });
-  },
-
-  retryDmMemoryLearning: async (request) => {
-    const owner = await ownerFor(input, request.organizationId, request.channelId);
-    const result = await retryDmLearningJob(
-      input.db,
-      owner,
-      canonicalUuid(request.jobId),
-      decodeLearningRetry({
-        requestId: canonicalUuid(request.requestId),
-        revocationEpoch: checkedNumber(request.revocationEpoch, "revocation_epoch"),
-      }),
-    );
-    return create(DmMemoryService.method.retryDmMemoryLearning.output, result);
   },
 });
 

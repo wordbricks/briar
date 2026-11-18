@@ -99,7 +99,7 @@ export const TeamAgentInput = strictSchema(Schema.Struct({
   ),
 }).check(uniqueAgentSkillNames));
 
-export const OrganizationAgentWrite = strictSchema(
+export const WorkspaceAgentWrite = strictSchema(
   organizationAgentInputSchema.check(uniqueAgentSkillNames),
 );
 
@@ -433,8 +433,8 @@ export const decodeTeamAgentInputOption = Schema.decodeUnknownOption(
   TeamAgentInput,
   { errors: "all", onExcessProperty: "error" },
 );
-export const decodeOrganizationAgentWrite = decodeRequestSync(
-  OrganizationAgentWrite,
+export const decodeWorkspaceAgentWrite = decodeRequestSync(
+  WorkspaceAgentWrite,
 );
 export const decodeTeamAgentSessionInput = decodeRequestSync(
   TeamAgentSessionInput,

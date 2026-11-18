@@ -30,14 +30,14 @@ final class RealtimeConnectTests: XCTestCase {
 
         let recorded = requests.values
         XCTAssertEqual(recorded.count, 3)
-        guard case .organizationNotifications(let organization)? = recorded[0].scope else {
+        guard case .workspaceNotifications(let organization)? = recorded[0].scope else {
             return XCTFail("Expected organization notifications scope")
         }
-        XCTAssertEqual(organization.organizationID, coreUUIDString(organizationID))
+        XCTAssertEqual(organization.workspaceID, coreUUIDString(organizationID))
         guard case .channelActivity(let channel)? = recorded[1].scope else {
             return XCTFail("Expected channel activity scope")
         }
-        XCTAssertEqual(channel.organizationID, coreUUIDString(organizationID))
+        XCTAssertEqual(channel.workspaceID, coreUUIDString(organizationID))
         XCTAssertEqual(channel.channelID, coreUUIDString(channelID))
         guard case .issueActivity(let issue)? = recorded[2].scope else {
             return XCTFail("Expected issue activity scope")

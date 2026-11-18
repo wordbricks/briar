@@ -27,7 +27,7 @@ import { LinearApiError } from "./linear";
 import { linearImportApplicationServices } from "./linear-import-application";
 import { requireConnectHandlerForRequest } from "./test-helpers/connect";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
 const ownerId = "linear-import-owner";
 const viewerId = "linear-import-viewer";
@@ -95,7 +95,7 @@ describe("LinearImportService", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Linear Import', 'linear-import', ?, ?)`,
-      ).bind(organizationId, observedAt, observedAt),
+      ).bind(workspaceId, observedAt, observedAt),
       ...[
         [ownerId, "owner"],
         [viewerId, "viewer"],
@@ -104,7 +104,7 @@ describe("LinearImportService", () => {
           `insert into briar_organization_members (
              organization_id, user_id, role, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
-        ).bind(organizationId, userId, role, observedAt, observedAt)
+        ).bind(workspaceId, userId, role, observedAt, observedAt)
       ),
       db.prepare(
         `insert into briar_projects (
@@ -114,7 +114,7 @@ describe("LinearImportService", () => {
       ).bind(
         projectId,
         ownerId,
-        organizationId,
+        workspaceId,
         "a".repeat(64),
         observedAt,
         observedAt,
@@ -123,7 +123,7 @@ describe("LinearImportService", () => {
         `insert into briar_project_members (
            project_id, organization_id, user_id, created_at, updated_at
          ) values (?, ?, ?, ?, ?)`,
-      ).bind(projectId, organizationId, viewerId, observedAt, observedAt),
+      ).bind(projectId, workspaceId, viewerId, observedAt, observedAt),
       db.prepare(
         `insert into briar_project_settings (
            project_id, github_repository, workflow_json,

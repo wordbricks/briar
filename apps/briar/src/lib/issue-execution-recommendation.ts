@@ -25,16 +25,16 @@ const recommendedModelsByDifficulty = {
     {
       provider: "agy",
       effort: null,
-      signatures: [["gemini", "3", "7", "flash", "high"]],
+      signatures: [["gemini", "3", "8", "flash", "high"]],
     },
     {
+      // OpenCode advertises no efforts at all — neither per model nor as
+      // provider defaults — so naming one here would make the entry
+      // unmatchable rather than more precise.
       provider: "opencode",
-      effort: "high",
-      exactAliases: [
-        "deepseek-v4-flash",
-        "opencode-go/deepseek-v4-flash",
-      ],
-      signatures: [["deepseek", "v4", "flash", "0731"]],
+      effort: null,
+      exactAliases: ["opencode-go/glm-5.3-flash"],
+      signatures: [["glm", "5", "3", "flash"]],
     },
     {
       provider: "codex",
@@ -48,41 +48,54 @@ const recommendedModelsByDifficulty = {
       signatures: [["sonnet", "5"]],
     },
     {
+      // Only the dated build is designated: the undated `deepseek-v4-flash`
+      // is a materially weaker model that happens to share the family name.
       provider: "openrouter",
-      effort: "high",
-      exactAliases: ["deepseek-v4-flash"],
+      effort: null,
       signatures: [["deepseek", "v4", "flash", "0731"]],
     },
   ],
   normal: [
     {
       provider: "codex",
-      effort: "max",
-      signatures: [["gpt", "5", "6", "luna"]],
+      effort: "high",
+      signatures: [["gpt", "5", "6", "sol"]],
     },
     {
-      provider: "claude",
-      effort: "high",
-      exactAliases: ["opus", "claude-opus"],
-      signatures: [["opus", "5"]],
+      // Alias-only on purpose. A signature cannot say "not the flash build",
+      // and `["glm", "5", "3"]` is a prefix of `glm-5.3-flash`, so a catalog
+      // that lists flash first would quietly hand this tier the cheap model.
+      provider: "opencode",
+      effort: null,
+      exactAliases: ["opencode-go/glm-5.3"],
+      signatures: [],
     },
     {
       provider: "grok",
       effort: "high",
       signatures: [["grok", "4", "6"]],
     },
+    {
+      // Claude exposes one row per family, and nothing sits in this tier's
+      // band: Sonnet 5 is below it and Opus 5 above. Effort is the only lever
+      // left, so normal takes Opus a step down from what hard asks for.
+      provider: "claude",
+      effort: "medium",
+      exactAliases: ["opus", "claude-opus"],
+      signatures: [["opus", "5"]],
+    },
   ],
   hard: [
-    {
-      provider: "codex",
-      effort: "xhigh",
-      signatures: [["gpt", "5", "6", "sol"]],
-    },
     {
       provider: "claude",
       effort: "high",
       exactAliases: ["opus", "claude-opus"],
       signatures: [["opus", "5"]],
+    },
+    {
+      provider: "codex",
+      effort: "xhigh",
+      signatures: [["gpt", "5", "6", "sol"]],
     },
   ],
   expert: [

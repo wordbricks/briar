@@ -22,7 +22,7 @@ import {
   registerAppChannelService,
 } from "./app-connect-channel";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const channelId = "22222222-2222-4222-8222-222222222222";
 const messageId = "33333333-3333-4333-8333-333333333333";
 const userId = "44444444-4444-4444-8444-444444444444";
@@ -119,6 +119,7 @@ describe("app Channel Connect adapter", () => {
               title: "Implement Connect",
               description: null,
               priority: 1,
+              attachmentIds: [],
             },
             executeAfterCreate: true,
           },
@@ -139,7 +140,7 @@ describe("app Channel Connect adapter", () => {
     });
 
     const result = await client.createChannelMessage({
-      organizationId,
+      workspaceId: workspaceId,
       channelId,
       clientMessageId,
       body: "Please create the issue",
@@ -151,7 +152,7 @@ describe("app Channel Connect adapter", () => {
     await flushBackgroundTasks();
 
     expect(createMessage).toHaveBeenCalledWith(expect.objectContaining({
-      organizationId,
+      workspaceId,
       channelId,
       userId,
       attachmentIds: [],
@@ -182,7 +183,7 @@ describe("app Channel Connect adapter", () => {
     const createChannel = vi.fn<AppConnectChannelServices["createChannel"]>();
     createChannel.mockResolvedValue({
       id: channelId,
-      organization_id: organizationId,
+      organization_id: workspaceId,
       kind: "channel",
       dm_key: null,
       slug: "release-notes",
@@ -210,7 +211,7 @@ describe("app Channel Connect adapter", () => {
     });
 
     const result = await client.createChannel({
-      organizationId,
+      workspaceId: workspaceId,
       name: "  Release Notes  ",
       slug: "  RELEASE-NOTES  ",
       topic: "  Shipping  ",
@@ -219,7 +220,7 @@ describe("app Channel Connect adapter", () => {
     await flushBackgroundTasks();
 
     expect(createChannel).toHaveBeenCalledWith(expect.objectContaining({
-      organizationId,
+      workspaceId,
       userId,
       command: {
         name: "Release Notes",
@@ -233,7 +234,7 @@ describe("app Channel Connect adapter", () => {
 
     createChannel.mockClear();
     await expect(client.createChannel({
-      organizationId,
+      workspaceId: workspaceId,
       name: "Release Notes",
       visibility: ChannelVisibility.UNSPECIFIED,
     })).rejects.toMatchObject({ code: Code.InvalidArgument });
@@ -246,7 +247,7 @@ describe("app Channel Connect adapter", () => {
     >().mockResolvedValue({
       channels: [{
         id: channelId,
-        organizationId,
+        workspaceId,
         kind: "dm",
         slug: "agent-dm",
         name: "Agent A, Agent B",
@@ -275,13 +276,13 @@ describe("app Channel Connect adapter", () => {
     });
 
     const result = await client.listAgentDirectMessages({
-      organizationId,
+      workspaceId: workspaceId,
       agentId,
     });
     await flushBackgroundTasks();
 
     expect(listAgentDirectMessages).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationId, userId, agentId }),
+      expect.objectContaining({ workspaceId, userId, agentId }),
     );
     // Nobody may post in these conversations, and the flag is what every
     // reader keys the read-only surface off.
@@ -301,7 +302,7 @@ describe("app Channel Connect adapter", () => {
     });
 
     await client.setChannelMember({
-      organizationId,
+      workspaceId: workspaceId,
       channelId,
       userId: "target-member",
       membership: { case: "add", value: {} },
@@ -309,7 +310,7 @@ describe("app Channel Connect adapter", () => {
     await flushBackgroundTasks();
 
     expect(setChannelMember).toHaveBeenCalledWith(expect.objectContaining({
-      organizationId,
+      workspaceId,
       channelId,
       userId,
       targetUserId: "target-member",
@@ -318,7 +319,7 @@ describe("app Channel Connect adapter", () => {
 
     setChannelMember.mockClear();
     await expect(client.setChannelMember({
-      organizationId,
+      workspaceId: workspaceId,
       channelId,
       userId: "target-member",
     })).rejects.toMatchObject({ code: Code.InvalidArgument });

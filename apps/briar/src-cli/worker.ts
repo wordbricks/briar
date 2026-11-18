@@ -14,7 +14,9 @@ import { homedir, hostname, platform } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import type { ModelEffort } from "../src/lib/agent-provider-contract";
 import type { AgentProvider } from "../src/lib/agent-provider";
+import type { WorkerWakeReason } from "../src/lib/worker-wake-protocol";
 import type { WorkerWakeSource } from "./worker-wake-client";
+import { channelReplySnapshotChannelKind } from "./channel-reply-workspace";
 
 export type ClaimedIssue = {
   workType?:
@@ -22,10 +24,15 @@ export type ClaimedIssue = {
     | "issueReply"
     | "channelReply"
     | "projectAgentTask"
-    | "dmMemory"
     | "mergeBatch";
   workId?: string;
   session?: { id: string } | null;
+  routing?: { action: string } | null;
+  /**
+   * The claim's untrusted prompt snapshot. The loop reads nothing out of it but
+   * the channel kind, which decides how often a reply renews its lease.
+   */
+  snapshot?: unknown;
   /** Immutable identity of one run claim/execution attempt. */
   executionId?: string;
   runId: string;
@@ -126,6 +133,14 @@ export type WorkerLoopDependencies<Issue extends ClaimedIssue = ClaimedIssue> = 
     maxConcurrentSessions?: number;
     updateDirective?: WorkerLoopUpdateDirective | null;
   } | void>;
+  /**
+   * Whether a channel reply's first provider turn has started. Before it has,
+   * a lease conflict is almost always the steer the reply's own setup is about
+   * to fold into the same claim, so the renewal defers to it instead of
+   * throwing a claim away that is still perfectly usable. Absent means the old
+   * behaviour: every conflict aborts.
+   */
+  replyTurnStarted?: (issue: Issue) => boolean;
   /** Run the agent for one claimed issue. */
   runIssue: (
     issue: Issue,
@@ -169,6 +184,13 @@ export type WorkerLoopOptions = {
   maxErrorDelayMs?: number;
 };
 
+/** The idle wait a claim attempt followed, as `claim latency:` reports it. */
+type WorkerIdleWait = {
+  waitedMs: number;
+  /** The wake that cut the wait short, or what the wait was there for. */
+  wake: WorkerWakeReason | "poll" | "heartbeat";
+};
+
 export type WorkerLoopResult = {
   processed: number;
   failures: number;
@@ -182,6 +204,20 @@ export const DEFAULT_DRAIN_HEARTBEAT_INTERVAL_MS = 10_000;
 export const DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS = 30_000;
 /** A 15-minute server lease leaves ample recovery margin at this cadence. */
 export const DEFAULT_LEASE_RENEW_INTERVAL_MS = 5 * 60_000;
+/**
+ * How often a direct-message reply renews while it runs.
+ *
+ * The renewal is the only thing that asks the server whether the person has
+ * said something else, and a plain DM used to ask every five minutes: a second
+ * message sent seconds after the first was noticed only when the finished
+ * answer was refused. Five seconds is what a routing reply already used.
+ */
+export const DM_REPLY_STEER_POLL_MS = 5_000;
+
+/** Whether a claim is a direct-message reply, which is steered mid-turn. */
+const isDirectMessageReply = (issue: ClaimedIssue) =>
+  issue.workType === "channelReply" &&
+  channelReplySnapshotChannelKind(issue.snapshot) === "dm";
 export const DEFAULT_MAX_ERROR_DELAY_MS = 5 * 60_000;
 export const DEFAULT_MAX_CONCURRENT_SESSIONS = 1;
 export const MAX_CONCURRENT_SESSIONS = 16;
@@ -283,10 +319,10 @@ export function idleDelayWithBackoffMs(
  * How long to wait after an empty claim.
  *
  * A server delay shorter than the base idle delay is a deliberate "come back
- * soon" hint - a DM reply inside its settle window, say - and is honored
- * exactly: stretching it to the poll interval would strand work the server
- * knows is about to be claimable. Anything else keeps the historical
- * behaviour, where the server delay is only ever a floor under the backoff.
+ * soon" hint from the server and is honored exactly: stretching it to the poll
+ * interval would strand work the server knows is about to be claimable.
+ * Anything else keeps the historical behaviour, where the server delay is only
+ * ever a floor under the backoff.
  */
 export function emptyClaimDelayMs(input: {
   serverDelayMs: number | null;
@@ -357,7 +393,6 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     Promise<{ issue: Issue; error: unknown | null; handedOff: boolean; steered?: boolean }>
   >();
   const activeControllers = new Map<string, AbortController>();
-  const atomicLearningControllers = new Set<AbortController>();
   let activeSlotCount = 0;
   let updateDirective: WorkerLoopUpdateDirective | null = null;
   const serialTails = new Map<string, Promise<void>>();
@@ -396,17 +431,21 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     if (updateDirective) {
       acceptingWork = false;
       for (const controller of activeControllers.values()) {
-        // Memory learning commits a budgeted proposer/verifier transaction. It has
-        // no resumable provider conversation; finish this bounded system job instead
-        // of replaying a charged call. The updater cancels if draining exceeds 120s.
-        if (atomicLearningControllers.has(controller)) continue;
         if (!controller.signal.aborted) {
           controller.abort(new WorkerUpdateDrainError());
         }
       }
     }
   };
+  /*
+    What the claim about to be attempted waited on, so `claim latency:` can say
+    whether a slow reply lost its seconds to the poll interval, to the
+    heartbeat, or to the claim RPC itself.
+  */
+  let heartbeatBlockedMs = 0;
+  let idleWait: WorkerIdleWait = { waitedMs: 0, wake: "poll" };
   const reportState = async () => {
+    const startedAt = dependencies.now();
     try {
       applyHeartbeat(
         await dependencies.heartbeat(activeSlotCount > 0 ? "busy" : "ready"),
@@ -419,10 +458,15 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     } catch (error) {
       consecutiveHeartbeatFailures += 1;
       throw new WorkerHeartbeatError(error);
+    } finally {
+      heartbeatBlockedMs = Math.max(0, dependencies.now() - startedAt);
     }
   };
   const beat = async () => {
-    if (dependencies.now() < nextHeartbeatAt) return;
+    if (dependencies.now() < nextHeartbeatAt) {
+      heartbeatBlockedMs = 0;
+      return;
+    }
     await reportState();
   };
 
@@ -433,8 +477,13 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
   const leaseWaits = new Set<AbortController>();
   let leaseWakeVersion = 0;
   let wakePending = false;
+  /** The reason of the most recent server wake, and how many have arrived. */
+  let lastWakeReason: WorkerWakeReason | null = null;
+  let wakeCount = 0;
   const unsubscribeWake = dependencies.wake?.subscribe((reason) => {
     wakePending = true;
+    lastWakeReason = reason;
+    wakeCount += 1;
     // Work exists now, so the empty-queue backoff must start over rather than
     // keep the fleet at its 60s ceiling.
     consecutiveEmptyClaims = 0;
@@ -452,7 +501,10 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     unsubscribeWake?.();
     return result;
   };
-  const idleSleep = async (milliseconds: number, controller?: AbortController) => {
+  const waitWhileIdle = async (
+    milliseconds: number,
+    controller?: AbortController,
+  ) => {
     if (!dependencies.wake) {
       if (controller) {
         await dependencies.sleep(milliseconds, controller.signal);
@@ -474,17 +526,51 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       wakePending = false;
     }
   };
+  /**
+   * The idle wait, accounted for the next claim. `waiting` is what the wait was
+   * for — the empty-queue poll or the next heartbeat — and a wake that lands
+   * during it (or one already pending when it starts) replaces that with its
+   * own reason.
+   */
+  const idleSleep = async (
+    milliseconds: number,
+    waiting: "poll" | "heartbeat",
+    controller?: AbortController,
+  ) => {
+    const startedAt = dependencies.now();
+    const pendingWakeReason = wakePending ? lastWakeReason : null;
+    const wakesBefore = wakeCount;
+    try {
+      await waitWhileIdle(milliseconds, controller);
+    } finally {
+      const wokenBy = wakeCount > wakesBefore ? lastWakeReason : pendingWakeReason;
+      idleWait = {
+        waitedMs: Math.max(0, dependencies.now() - startedAt),
+        wake: wokenBy === null ? waiting : wokenBy,
+      };
+    }
+  };
 
-  const execute = async (issue: Issue, waitForTurn: Promise<void>) => {
+  const execute = async (
+    issue: Issue,
+    waitForTurn: Promise<void>,
+    claimedAtWakeVersion: number,
+  ) => {
     const renewal = new AbortController();
     const execution = new AbortController();
     const key = executionKey(issue);
     activeControllers.set(key, execution);
-    if (issue.workType === "dmMemory") atomicLearningControllers.add(execution);
     let checkpoint: WorkerExecutionCheckpoint = {};
     const leaseRenewal: LeaseRenewalState = { failure: null };
     const renewalLoop = (async () => {
-      let observedWakeVersion = leaseWakeVersion;
+      /*
+        The version from before the claim RPC, not from here: a wake that landed
+        while the claim was in flight is exactly the one that matters — the
+        server sends it when a message is folded into the job being handed out —
+        and reading the counter here would swallow it and then wait a whole
+        interval before asking again.
+      */
+      let observedWakeVersion = claimedAtWakeVersion;
       while (!renewal.signal.aborted) {
         const leaseWait = new AbortController();
         const stopWait = () => leaseWait.abort();
@@ -493,7 +579,14 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         try {
           if (observedWakeVersion === leaseWakeVersion) {
             await dependencies.sleep(
-              leaseRenewDelayMs(leaseRenewIntervalMs, dependencies.random),
+              leaseRenewDelayMs(
+                issue.workType === "channelReply" &&
+                    (issue.routing !== null && issue.routing !== undefined ||
+                      isDirectMessageReply(issue))
+                  ? Math.min(leaseRenewIntervalMs, DM_REPLY_STEER_POLL_MS)
+                  : leaseRenewIntervalMs,
+                dependencies.random,
+              ),
               leaseWait.signal,
             );
           }
@@ -509,6 +602,27 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
             `lease renewed for ${issue.sourceKey} (${issue.runId})`,
           );
         } catch (error) {
+          /*
+            A steer makes the server refuse the renewal, and before the first
+            provider turn that is not a reason to throw the claim away: the
+            reply's own setup asks for the folded claim right before it runs the
+            provider, inside this same claim. Keep renewing until it does. Only
+            a direct message is ever steered, so any other channel reply keeps
+            aborting at once: its conflict is a real claim loss. A routing reply
+            is excluded too: its classification turn owns the decision the
+            server is waiting on, and it still aborts as it always has.
+          */
+          if (
+            isDirectMessageReply(issue) && !issue.routing &&
+            dependencies.replyTurnStarted?.(issue) === false
+          ) {
+            dependencies.log(
+              `lease renewal deferred to the steer fold for ${issue.sourceKey}: ${
+                describe(error)
+              }`,
+            );
+            continue;
+          }
           leaseRenewal.failure = { error };
           dependencies.log(
             `lease renewal failed for ${issue.sourceKey}: ${describe(error)}`,
@@ -586,11 +700,10 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       execution.abort();
       await renewalLoop;
       activeControllers.delete(key);
-      atomicLearningControllers.delete(execution);
     }
   };
 
-  const schedule = (issue: Issue) => {
+  const schedule = (issue: Issue, claimedAtWakeVersion: number) => {
     const runKey = serialKey(issue);
     const previous = runKey
       ? (serialTails.get(runKey) ?? Promise.resolve())
@@ -604,12 +717,13 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       tail = previous.then(() => current);
       serialTails.set(runKey, tail);
     }
-    const execution = execute(issue, previous).finally(() => {
-      releaseTurn();
-      if (runKey && tail && serialTails.get(runKey) === tail) {
-        serialTails.delete(runKey);
-      }
-    });
+    const execution = execute(issue, previous, claimedAtWakeVersion)
+      .finally(() => {
+        releaseTurn();
+        if (runKey && tail && serialTails.get(runKey) === tail) {
+          serialTails.delete(runKey);
+        }
+      });
     active.set(executionKey(issue), execution);
   };
 
@@ -628,7 +742,13 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         processed + active.size < maxIssues
       ) {
         const repliesOnly = activeSlotCount >= maxConcurrentSessions;
+        const claimedAtWakeVersion = leaseWakeVersion;
+        const claimStartedAt = dependencies.now();
         const claim = await dependencies.claim({ repliesOnly });
+        const claimRpcMs = Math.max(0, dependencies.now() - claimStartedAt);
+        const claimWait = idleWait;
+        // The next claim in this burst waited on nothing but this one.
+        idleWait = { waitedMs: 0, wake: "poll" };
         const issue = isWorkerClaimResult(claim) ? claim.work : claim;
         if (!issue) {
           queueWasEmpty = true;
@@ -655,7 +775,21 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
         }
         consecutiveEmptyClaims = 0;
         dependencies.log(`claimed ${issue.sourceKey} (${issue.runId})`);
-        schedule(issue);
+        /*
+          Where the seconds before this claim went. `waitedMs` is the idle wait
+          the loop was in, `wake` says what ended it — a server push names
+          itself — `rpcMs` is the claim call and `heartbeatMs` is what the
+          heartbeat right before it cost. A reply that reaches the Worker late
+          is one of these four and this line says which.
+        */
+        dependencies.log(`claim latency: ${JSON.stringify({
+          workId: issue.workId ?? null,
+          rpcMs: Math.round(claimRpcMs),
+          waitedMs: Math.round(claimWait.waitedMs),
+          wake: claimWait.wake,
+          heartbeatMs: Math.round(heartbeatBlockedMs),
+        })}`);
+        schedule(issue, claimedAtWakeVersion);
         if (!isReplyWork(issue)) activeSlotCount += 1;
         await reportState();
       }
@@ -698,7 +832,10 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
           0,
           nextHeartbeatAt - dependencies.now(),
         );
-        await idleSleep(Math.min(emptyQueueDelayMs, heartbeatDelayMs));
+        await idleSleep(
+          Math.min(emptyQueueDelayMs, heartbeatDelayMs),
+          heartbeatDelayMs < emptyQueueDelayMs ? "heartbeat" : "poll",
+        );
       }
       continue;
     }
@@ -708,10 +845,11 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
       0,
       nextHeartbeatAt - dependencies.now(),
     );
-    const waitDelayMs =
-      queueWasEmpty && activeSlotCount < maxConcurrentSessions
-        ? Math.min(emptyQueueDelayMs, heartbeatDelayMs)
-        : heartbeatDelayMs;
+    const pollingWhileActive = queueWasEmpty &&
+      activeSlotCount < maxConcurrentSessions;
+    const waitDelayMs = pollingWhileActive
+      ? Math.min(emptyQueueDelayMs, heartbeatDelayMs)
+      : heartbeatDelayMs;
     // Wake for the next heartbeat even when every execution slot is occupied.
     // Otherwise a long-running issue makes the server report the live worker
     // as stale until that issue finishes. A server wake ends this wait too, so
@@ -719,7 +857,13 @@ export async function runWorkerLoop<Issue extends ClaimedIssue>(
     const waitController = new AbortController();
     const outcome = await Promise.race([
       executionFinished,
-      idleSleep(waitDelayMs, waitController).then(() => null),
+      idleSleep(
+        waitDelayMs,
+        pollingWhileActive && emptyQueueDelayMs <= heartbeatDelayMs
+          ? "poll"
+          : "heartbeat",
+        waitController,
+      ).then(() => null),
     ]);
     waitController.abort();
     if (!outcome) continue;

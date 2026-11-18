@@ -1,4 +1,4 @@
-import { createOrganizationRealtimeTicket } from "./app-rpc/realtime";
+import { createWorkspaceRealtimeTicket } from "./app-rpc/realtime";
 import {
   WebSocketRealtimeTransport,
   type RealtimeTransport,
@@ -10,35 +10,35 @@ export const INBOX_REALTIME_DEBOUNCE_MS = 300;
 export const MAX_CHANNEL_DELTA_PAGES_PER_SYNC = 20;
 export const MAX_PROJECT_DELTA_PAGES_PER_SYNC = 20;
 
-type SharedOrganizationRealtime = {
+type SharedWorkspaceRealtime = {
   consumers: number;
   transport: WebSocketRealtimeTransport;
 };
 
 const organizationRealtimeTransports = new Map<
   string,
-  SharedOrganizationRealtime
+  SharedWorkspaceRealtime
 >();
 
-export type OrganizationRealtimeTicketFactory = (
+export type WorkspaceRealtimeTicketFactory = (
   token: string,
-  organizationId: string,
+  workspaceId: string,
   signal: AbortSignal,
 ) => Promise<string>;
 
-function createOrganizationRealtimeTransport(
+function createWorkspaceRealtimeTransport(
   token: string,
-  organizationId: string,
-  createTicket: OrganizationRealtimeTicketFactory,
+  workspaceId: string,
+  createTicket: WorkspaceRealtimeTicketFactory,
 ): RealtimeTransport {
-  const key = `${organizationId}\0${token}`;
+  const key = `${workspaceId}\0${token}`;
   let shared = organizationRealtimeTransports.get(key);
   if (!shared) {
     shared = {
       consumers: 0,
       transport: new WebSocketRealtimeTransport({
         createTicket: (signal) =>
-          createTicket(token, organizationId, signal),
+          createTicket(token, workspaceId, signal),
       }),
     };
     organizationRealtimeTransports.set(key, shared);
@@ -68,31 +68,31 @@ function createOrganizationRealtimeTransport(
 
 export function createChannelRealtimeTransport(
   token: string,
-  organizationId: string,
-  createTicket: OrganizationRealtimeTicketFactory =
-    createOrganizationRealtimeTicket,
+  workspaceId: string,
+  createTicket: WorkspaceRealtimeTicketFactory =
+    createWorkspaceRealtimeTicket,
 ) {
-  return createOrganizationRealtimeTransport(
+  return createWorkspaceRealtimeTransport(
     token,
-    organizationId,
+    workspaceId,
     createTicket,
   );
 }
 
 export function createProjectRealtimeTransport(
   token: string,
-  organizationId: string,
-  createTicket: OrganizationRealtimeTicketFactory =
-    createOrganizationRealtimeTicket,
+  workspaceId: string,
+  createTicket: WorkspaceRealtimeTicketFactory =
+    createWorkspaceRealtimeTicket,
 ) {
-  return createChannelRealtimeTransport(token, organizationId, createTicket);
+  return createChannelRealtimeTransport(token, workspaceId, createTicket);
 }
 
 export function createInboxRealtimeTransport(
   token: string,
-  organizationId: string,
-  createTicket: OrganizationRealtimeTicketFactory =
-    createOrganizationRealtimeTicket,
+  workspaceId: string,
+  createTicket: WorkspaceRealtimeTicketFactory =
+    createWorkspaceRealtimeTicket,
 ) {
-  return createChannelRealtimeTransport(token, organizationId, createTicket);
+  return createChannelRealtimeTransport(token, workspaceId, createTicket);
 }

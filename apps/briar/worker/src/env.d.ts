@@ -72,7 +72,7 @@ interface Env {
   MANAGED_COMPUTER_REMOTE: DurableObjectNamespace<
     import("./managed-computer-remote-relay").ManagedComputerRemoteSessionHub
   >;
-  /** Organization-scoped push channel that wakes idle execution Workers. */
+  /** Workspace-scoped push channel that wakes idle execution Workers. */
   WORKER_WAKE: DurableObjectNamespace<
     import("./worker-wake-hub").WorkerWakeHub
   >;

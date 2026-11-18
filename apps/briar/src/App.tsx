@@ -7,11 +7,12 @@ import { AuthGate } from "./components/app/AuthGate";
 import { CompanionShell } from "./components/app/CompanionShell";
 import { DesktopShell } from "./components/app/DesktopShell";
 import { loadProjectMergeActivity } from "./lib/app-rpc/github";
-import { useOrganizationViewData } from "./hooks/useOrganizationViewData";
+import { useWorkspaceViewData } from "./hooks/useWorkspaceViewData";
 import { useAgentDispatch } from "./hooks/useAgentDispatch";
 import { useAppShortcuts } from "./hooks/useAppShortcuts";
 import { useCommandPaletteItems } from "./hooks/useCommandPaletteItems";
 import { useDeepLinks } from "./hooks/useDeepLinks";
+import { useWebUrlSync } from "./hooks/useWebUrlSync";
 import { useInvitationFlow } from "./hooks/useInvitationFlow";
 import { useIssueAgents } from "./hooks/useIssueAgents";
 import { useLaunchIntro } from "./hooks/useLaunchIntro";
@@ -34,7 +35,7 @@ import {
   requestedSessionIdAtom,
 } from "./state/navigation/atoms";
 import { companionMode, lockedTeamId, remoteMode } from "./state/platform";
-import { organizationsAtom } from "./state/organization/atoms";
+import { workspacesAtom } from "./state/workspace/atoms";
 import { useTeamActions } from "./state/team/actions";
 import {
   activeTeamAtom,
@@ -47,7 +48,7 @@ import {
   clearFirstRunTutorialPending,
   hasPendingFirstRunTutorial,
   markFirstRunTutorialPending,
-  shouldShowFirstOrganizationSetup as resolveShouldShowFirstOrganizationSetup,
+  shouldShowFirstWorkspaceSetup as resolveShouldShowFirstWorkspaceSetup,
 } from "./lib/team-onboarding";
 import { openTeamWindow } from "./lib/team-window";
 import type { AppZoomCommands } from "./lib/app-zoom";
@@ -75,7 +76,7 @@ export function App({
   const user = useAtomValue(userAtom);
   const token = useAtomValue(tokenAtom);
   const teams = useAtomValue(teamsAtom);
-  const organizations = useAtomValue(organizationsAtom);
+  const workspaces = useAtomValue(workspacesAtom);
   // The store says `null` for "no team selected"; the views that take it as a
   // prop have always spelled that `undefined`.
   const activeTeam = useAtomValue(activeTeamAtom) ?? undefined;
@@ -89,11 +90,11 @@ export function App({
   const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
 
   const {
-    loadOrganizationTeamDashboard,
+    loadWorkspaceTeamDashboard,
     loadTeamHomeUsage,
     loadUsageReport,
-    openOrganizationIssue,
-  } = useOrganizationViewData();
+    openWorkspaceIssue,
+  } = useWorkspaceViewData();
   const loadTeamHomeMerges = useCallback(
     (teamId: string, signal: AbortSignal) => {
       if (!token) {
@@ -119,6 +120,7 @@ export function App({
   const isKeyboardShortcutsOpen = useAtomValue(isKeyboardShortcutsOpenAtom);
 
   useDeepLinks();
+  useWebUrlSync();
   const {
     beginTeamReconnect,
     clearTrigger: clearRepositorySetupTrigger,
@@ -147,17 +149,17 @@ export function App({
     !remoteMode &&
     !hasCompletedOnboarding &&
     !invitation.hasCurrentUserInvitationProgress;
-  const shouldShowFirstOrganizationSetup =
-    resolveShouldShowFirstOrganizationSetup({
+  const shouldShowFirstWorkspaceSetup =
+    resolveShouldShowFirstWorkspaceSetup({
       hasUser: user !== null,
-      organizationCount: organizations.length,
+      organizationCount: workspaces.length,
       projectCount: teams.length,
       remoteMode,
     });
   const shouldShowFirstRunTutorial = Boolean(
     !remoteMode &&
       user &&
-      organizations.length > 0 &&
+      workspaces.length > 0 &&
       !isCreatingTeam &&
       !teamConnection &&
       !invitation.invitationToken &&
@@ -188,7 +190,7 @@ export function App({
       !teamConnection &&
       !invitation.invitationToken &&
       !shouldShowInitialOnboarding &&
-      !shouldShowFirstOrganizationSetup &&
+      !shouldShowFirstWorkspaceSetup &&
       !shouldShowFirstRunTutorial &&
       !isLaunchIntroVisible
   );
@@ -242,11 +244,11 @@ export function App({
         all: issueAgents,
         rememberAgent: rememberIssueAgent,
       }}
-      loadOrganizationProjectDashboard={loadOrganizationTeamDashboard}
+      loadWorkspaceProjectDashboard={loadWorkspaceTeamDashboard}
       loadProjectHomeMerges={loadTeamHomeMerges}
       loadProjectHomeUsage={loadTeamHomeUsage}
       loadUsageReport={loadUsageReport}
-      openOrganizationIssue={openOrganizationIssue}
+      openWorkspaceIssue={openWorkspaceIssue}
       openProjectInNewWindow={openTeamInNewWindow}
       repositorySetup={{
         beginTeamReconnect,
@@ -270,13 +272,13 @@ export function App({
           markInitialOnboardingComplete();
           setHasCompletedOnboarding(true);
         }}
-        onJoinOrganization={invitation.beginInvitation}
-        onOrganizationCreated={(userId) => {
+        onJoinWorkspace={invitation.beginInvitation}
+        onWorkspaceCreated={(userId) => {
           markFirstRunTutorialPending(userId);
           setPendingFirstRunTutorialUserId(userId);
           resetNavigation(homeNavigationPage);
         }}
-        showsFirstOrganizationSetup={shouldShowFirstOrganizationSetup}
+        showsFirstWorkspaceSetup={shouldShowFirstWorkspaceSetup}
         showsInitialOnboarding={shouldShowInitialOnboarding}
       >
         {shell}

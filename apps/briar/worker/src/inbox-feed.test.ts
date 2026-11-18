@@ -73,7 +73,7 @@ function projectData(
   };
 }
 
-describe("organization Inbox feed", () => {
+describe("workspace Inbox feed", () => {
   it("includes messages from every project without an active-project input", () => {
     const first = projectData(
       "11111111-1111-4111-8111-111111111111",
@@ -124,7 +124,7 @@ describe("organization Inbox feed", () => {
     ]));
   });
 
-  it("associates organization channel notifications with a stable project", () => {
+  it("associates workspace channel notifications with a stable project", () => {
     const first = projectData(
       "11111111-1111-4111-8111-111111111111",
       "First project",

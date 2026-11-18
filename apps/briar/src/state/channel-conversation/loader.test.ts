@@ -9,7 +9,7 @@ import {
   testChannelMessage,
   testChannelSummary,
 } from "../../test/channel-conversation";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import {
@@ -60,7 +60,7 @@ const detail = (
 function signedInRegistry(): AtomRegistry {
   return createTestRegistry([
     [tokenAtom, "token"],
-    [activeOrganizationIdAtom, "org-1"],
+    [activeWorkspaceIdAtom, "org-1"],
   ]);
 }
 
@@ -329,7 +329,12 @@ describe("channel conversation loader", () => {
       status: "pending",
       projectId: "project-1",
       payload: {
-        issue: { title: "Follow-up", description: null, priority: 2 },
+        issue: {
+          title: "Follow-up",
+          description: null,
+          priority: 2,
+          attachmentIds: [],
+        },
         executeAfterCreate: false,
       },
       resultRunId: null,

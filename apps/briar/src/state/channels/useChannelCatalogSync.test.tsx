@@ -11,14 +11,14 @@ import type {
 } from "../../lib/channels-contract";
 import { createReactTestRoot } from "../../test/react";
 import { organizationChannelIdsAtom } from "../entities/channels";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { channelApiAtom, type ChannelApi } from "./api";
 import {
   activeChannelIdAtom,
-  activeOrganizationChannelsAtom,
+  activeWorkspaceChannelsAtom,
   channelCatalogCursorAtom,
   channelsLoadingAtom,
 } from "./atoms";
@@ -33,7 +33,7 @@ const channel = (
   overrides: Partial<ChannelSummary> = {},
 ): ChannelSummary => ({
   id,
-  organizationId: "org-a",
+  workspaceId: "org-a",
   kind: "channel",
   slug: id,
   name: id,
@@ -82,23 +82,23 @@ class CatalogServer {
   deltas: ChannelDelta[] = [];
   listFailures = 0;
   readonly listRequests: string[] = [];
-  readonly deltaRequests: { organizationId: string; since: number }[] = [];
+  readonly deltaRequests: { workspaceId: string; since: number }[] = [];
   notify: ((notification: { topic: string; cursor: number }) => void) | null =
     null;
 
   readonly api: Partial<ChannelApi> = {
-    listChannels: async (_token, organizationId) => {
-      this.listRequests.push(organizationId);
+    listChannels: async (_token, workspaceId) => {
+      this.listRequests.push(workspaceId);
       if (this.listFailures > 0) {
         this.listFailures -= 1;
         throw new Error("catalog unavailable");
       }
-      const catalog = this.catalogs.get(organizationId) ??
+      const catalog = this.catalogs.get(workspaceId) ??
         { channels: [], cursor: 0 };
       return { ...catalog, sidebarSections: catalog.sidebarSections ?? [] };
     },
-    loadChannelDelta: async (_token, organizationId, since) => {
-      this.deltaRequests.push({ organizationId, since });
+    loadChannelDelta: async (_token, workspaceId, since) => {
+      this.deltaRequests.push({ workspaceId, since });
       return this.deltas.shift() ?? emptyDelta(since);
     },
     createChannelRealtimeTransport: (() => ({
@@ -136,9 +136,9 @@ const settle = async () => {
   });
 };
 
-const harness = (server: CatalogServer, organizationId: string | null) =>
+const harness = (server: CatalogServer, workspaceId: string | null) =>
   createTestRegistry([
-    [activeOrganizationIdAtom, organizationId],
+    [activeWorkspaceIdAtom, workspaceId],
     [tokenAtom, "token-1"],
     [lockedTeamIdAtom, null],
     [channelApiAtom, server.api],
@@ -154,7 +154,7 @@ afterEach(() => {
 });
 
 describe("useChannelCatalogSync", () => {
-  it("loads the catalog for the active organization", async () => {
+  it("loads the catalog for the active workspace", async () => {
     const server = new CatalogServer();
     server.catalogs.set("org-a", { channels: [channel("general")], cursor: 4 });
     const registry = harness(server, "org-a");
@@ -164,7 +164,7 @@ describe("useChannelCatalogSync", () => {
 
     expect(server.listRequests).toEqual(["org-a"]);
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["general"]);
     expect(registry.get(channelCatalogCursorAtom)).toBe(4);
     expect(registry.get(channelsLoadingAtom)).toBe(false);
@@ -172,11 +172,11 @@ describe("useChannelCatalogSync", () => {
     await view.cleanup();
   });
 
-  it("drops the previous organization's catalog and selection on a switch", async () => {
+  it("drops the previous workspace's catalog and selection on a switch", async () => {
     const server = new CatalogServer();
     server.catalogs.set("org-a", { channels: [channel("general")], cursor: 4 });
     server.catalogs.set("org-b", {
-      channels: [channel("other", { organizationId: "org-b" })],
+      channels: [channel("other", { workspaceId: "org-b" })],
       cursor: 9,
     });
     const registry = harness(server, "org-a");
@@ -184,18 +184,18 @@ describe("useChannelCatalogSync", () => {
     await settle();
     registry.set(activeChannelIdAtom, "general");
 
-    await act(async () => registry.set(activeOrganizationIdAtom, "org-b"));
+    await act(async () => registry.set(activeWorkspaceIdAtom, "org-b"));
     await settle();
 
     expect(registry.get(organizationChannelIdsAtom("org-a"))).toBeNull();
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["other"]);
     expect(registry.get(activeChannelIdAtom)).toBeNull();
     expect(registry.get(channelCatalogCursorAtom)).toBe(9);
 
-    // Returning does not resurrect what was open in the first organization.
-    await act(async () => registry.set(activeOrganizationIdAtom, "org-a"));
+    // Returning does not resurrect what was open in the first workspace.
+    await act(async () => registry.set(activeWorkspaceIdAtom, "org-a"));
     await settle();
     expect(registry.get(activeChannelIdAtom)).toBeNull();
 
@@ -220,7 +220,7 @@ describe("useChannelCatalogSync", () => {
 
     expect(server.listRequests).toEqual(["org-a", "org-a"]);
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["general"]);
 
     await view.cleanup();
@@ -242,11 +242,11 @@ describe("useChannelCatalogSync", () => {
     await settle();
 
     expect(server.deltaRequests[0]).toEqual({
-      organizationId: "org-a",
+      workspaceId: "org-a",
       since: 4,
     });
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["announcements"]);
 
     await view.cleanup();
@@ -278,7 +278,7 @@ describe("useChannelCatalogSync", () => {
     */
     expect(seen.map((delta) => delta.cursor)).toEqual([5]);
     expect(
-      registry.get(activeOrganizationChannelsAtom).map((item) => item.id),
+      registry.get(activeWorkspaceChannelsAtom).map((item) => item.id),
     ).toEqual(["announcements", "general"]);
 
     unsubscribe();
@@ -288,7 +288,7 @@ describe("useChannelCatalogSync", () => {
   it("loads nothing without a token", async () => {
     const server = new CatalogServer();
     const registry = createTestRegistry([
-      [activeOrganizationIdAtom, "org-a"],
+      [activeWorkspaceIdAtom, "org-a"],
       [tokenAtom, null],
       [lockedTeamIdAtom, null],
       [channelApiAtom, server.api],

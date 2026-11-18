@@ -10,7 +10,7 @@ import type {
   ChannelSummary,
 } from "../../lib/channels-contract";
 import type { AgentSkillExecutionProposal, HuntRun } from "../../types";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
@@ -313,11 +313,11 @@ export function createChannelConversationLoader(
     }
   };
 
-  /** The token and organization every read needs, or `null` when signed out. */
+  /** The token and workspace every read needs, or `null` when signed out. */
   const credentials = () => {
     const token = registry.get(tokenAtom);
-    const organizationId = registry.get(activeOrganizationIdAtom);
-    return token && organizationId ? { token, organizationId } : null;
+    const workspaceId = registry.get(activeWorkspaceIdAtom);
+    return token && workspaceId ? { token, workspaceId } : null;
   };
 
   const loadConversation = async (
@@ -331,7 +331,7 @@ export function createChannelConversationLoader(
   ): Promise<ChannelConversationLoadResult | null> => {
     const session = credentials();
     if (!session) return null;
-    const { token, organizationId } = session;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     const context = captureSurface();
     const version = ++requestVersion;
@@ -346,7 +346,7 @@ export function createChannelConversationLoader(
           requestedMessage.rootMessageId !== requestedMessage.messageId
           ? api.listChannelMessages(
               token,
-              organizationId,
+              workspaceId,
               channelId,
               requestedMessage.rootMessageId,
               { signal },
@@ -355,7 +355,7 @@ export function createChannelConversationLoader(
               (cause: unknown) => ({ ok: false as const, cause }),
             )
           : null;
-      const result = await api.loadChannel(token, organizationId, channelId, {
+      const result = await api.loadChannel(token, workspaceId, channelId, {
         messageLimit,
         signal,
       });
@@ -418,7 +418,7 @@ export function createChannelConversationLoader(
         } else {
           requestedThreadResult = await api.listChannelMessages(
             token,
-            organizationId,
+            workspaceId,
             channelId,
             target.rootMessageId,
             { signal },
@@ -442,7 +442,7 @@ export function createChannelConversationLoader(
           requestedThreadResult ??
           (await api.listChannelMessages(
             token,
-            organizationId,
+            workspaceId,
             channelId,
             target.rootMessageId,
             { signal },
@@ -495,14 +495,14 @@ export function createChannelConversationLoader(
     ) {
       return { applied: false, nextCursor: cursor };
     }
-    const { token, organizationId } = session;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     const context = captureSurface();
     registry.set(channelEarlierMessagesLoadingAtom(channelId), true);
     try {
       const result = await api.listChannelMessages(
         token,
-        organizationId,
+        workspaceId,
         channelId,
         undefined,
         { limit: pageSize, cursor },
@@ -537,7 +537,7 @@ export function createChannelConversationLoader(
   ): Promise<boolean> => {
     const session = credentials();
     if (!session) return false;
-    const { token, organizationId } = session;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     invalidateSurface(channelId, rootMessageId);
     const version = requestVersion;
@@ -560,7 +560,7 @@ export function createChannelConversationLoader(
     try {
       const result = await api.listChannelMessages(
         token,
-        organizationId,
+        workspaceId,
         channelId,
         rootMessageId,
       );
@@ -599,7 +599,7 @@ export function createChannelConversationLoader(
   ) => {
     const session = credentials();
     if (!session) return null;
-    const { token, organizationId } = session;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     const context = captureSurface();
     const version = ++requestVersion;
@@ -608,7 +608,7 @@ export function createChannelConversationLoader(
     if (item.parentMessageId) {
       const result = await api.listChannelMessages(
         token,
-        organizationId,
+        workspaceId,
         channelId,
         item.parentMessageId,
       );
@@ -621,7 +621,7 @@ export function createChannelConversationLoader(
         messages: result.messages,
       });
     } else {
-      const result = await api.loadChannel(token, organizationId, channelId, {
+      const result = await api.loadChannel(token, workspaceId, channelId, {
         messageLimit: pageSize,
       });
       if (isStale()) return latestProposals.get(proposalId) ?? null;

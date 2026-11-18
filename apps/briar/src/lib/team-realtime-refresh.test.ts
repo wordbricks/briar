@@ -68,8 +68,8 @@ describe("project realtime refresh", () => {
     const stop = startTeamRealtimeRefresh({
       token: "token",
       targets: [
-        { id: "project-a", organizationId: "organization-1" },
-        { id: "project-b", organizationId: "organization-1" },
+        { id: "project-a", workspaceId: "workspace-1" },
+        { id: "project-b", workspaceId: "workspace-1" },
       ],
       refresh,
       fallbackMs: 300_000,
@@ -99,7 +99,7 @@ describe("project realtime refresh", () => {
     const refresh = vi.fn();
     startTeamRealtimeRefresh({
       token: "token",
-      targets: [{ id: "project-a", organizationId: "organization-1" }],
+      targets: [{ id: "project-a", workspaceId: "workspace-1" }],
       refresh,
       fallbackMs: 300_000,
       environment: currentEnvironment.value,

@@ -120,6 +120,7 @@ describe("Channel domain to protobuf mapping", () => {
                 title: "Map the Worker",
                 description: null,
                 priority: 1,
+                attachmentIds: [],
               },
             }],
             dependencies: [],

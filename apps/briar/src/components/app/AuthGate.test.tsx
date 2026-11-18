@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { I18nProvider } from "../../i18n";
 import { demoDashboard } from "../../lib/demo-data";
-import { organizationsAtom } from "../../state/organization/atoms";
+import { workspacesAtom } from "../../state/workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import {
   restoringSessionAtom,
@@ -21,7 +21,7 @@ import { activeTeamIdAtom } from "../../state/team/atoms";
 import type {
   DashboardPayload,
   HuntRun,
-  Organization,
+  Workspace,
   Project,
   SessionUser,
 } from "../../types";
@@ -32,7 +32,7 @@ import { AuthGate, type AuthGateProps } from "./AuthGate";
 
   The order these cases pin down is the one `App.tsx` used to encode as an
   if/else chain: restore, invitation, first-run onboarding, sign-in, and only
-  then the "no organization yet" setup. Everything the gates read about the
+  then the "no workspace yet" setup. Everything the gates read about the
   session comes from the store, which is what the last case checks — a run
   edit is not a reason for the gate or the shell to render again.
 */
@@ -45,8 +45,8 @@ const user: SessionUser = {
 
 const team: Project = { ...demoDashboard.team, id: "team-a", name: "Team A" };
 
-const organization: Organization = {
-  id: team.organizationId,
+const workspace: Workspace = {
+  id: team.workspaceId,
   name: "Org",
   handle: "org",
   logo: null,
@@ -73,9 +73,9 @@ const gateProps: Omit<AuthGateProps, "children"> = {
   invitationToken: null,
   onAcceptInvitation: async () => undefined,
   onInitialOnboardingComplete: () => undefined,
-  onJoinOrganization: () => undefined,
-  onOrganizationCreated: () => undefined,
-  showsFirstOrganizationSetup: false,
+  onJoinWorkspace: () => undefined,
+  onWorkspaceCreated: () => undefined,
+  showsFirstWorkspaceSetup: false,
   showsInitialOnboarding: false,
 };
 
@@ -111,7 +111,7 @@ const signedIn = (): AtomRegistry =>
     [restoringSessionAtom, false],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
-    [organizationsAtom, [organization]],
+    [workspacesAtom, [workspace]],
   ]);
 
 beforeEach(() => {
@@ -176,9 +176,9 @@ describe("AuthGate", () => {
     await view.cleanup();
   });
 
-  it("keeps the first-organization setup ahead of the shell", async () => {
+  it("keeps the first-workspace setup ahead of the shell", async () => {
     const registry = signedIn();
-    const view = await mount(registry, { showsFirstOrganizationSetup: true });
+    const view = await mount(registry, { showsFirstWorkspaceSetup: true });
     await flush(8);
     expect(view.container.querySelector("[data-testid=shell]")).toBeNull();
     await view.cleanup();

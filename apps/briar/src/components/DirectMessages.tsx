@@ -33,7 +33,7 @@ import {
 } from "../lib/direct-messages";
 import type { AutoHuntSession } from "../types";
 import { cn } from "../lib/utils";
-import type { OrganizationMember, Project } from "../types";
+import type { WorkspaceMember, Project } from "../types";
 import { Channels } from "./Channels";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
@@ -71,12 +71,12 @@ type Candidate =
 
 type DirectMessagesProps = {
   isSidebarOpen: boolean;
-  organizationId: string;
-  organizationName?: string;
+  workspaceId: string;
+  workspaceName?: string;
   token: string;
   currentUserId: string | null;
   channels: ChannelSummary[];
-  projects?: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  projects?: readonly Pick<Project, "id" | "name" | "workspaceId">[];
   activeChannelId: string | null;
   channelCatalogCursor: number | null;
   onChannelSelect: (channelId: string | null) => void;
@@ -161,19 +161,19 @@ export const formatConversationTime = (value: string, localeTag: string) => {
 };
 
 /**
- * The recipient picker for a new conversation. It loads the organization's
+ * The recipient picker for a new conversation. It loads the workspace's
  * members and agents once on mount, and reports the conversation it created
  * (or found — a DM with the same participants is reused by the server).
  */
 export function DirectMessageCompose({
-  organizationId,
+  workspaceId,
   token,
   currentUserId,
   isSidebarOpen = true,
   onChannelsChange,
   onCreated,
 }: {
-  organizationId: string;
+  workspaceId: string;
   token: string;
   currentUserId: string | null;
   /** When false the recipient row leaves room for the window controls. */
@@ -197,11 +197,11 @@ export function DirectMessageCompose({
     let cancelled = false;
     setLoadingCandidates(true);
     setError(null);
-    void listDirectMessageRecipients(token, organizationId)
+    void listDirectMessageRecipients(token, workspaceId)
       .then(({ members, agents }) => {
         if (cancelled) return;
         const memberCandidates: Candidate[] = members.map(
-          (member: OrganizationMember) => ({
+          (member: WorkspaceMember) => ({
             type: "user",
             id: member.userId,
             name: member.name,
@@ -235,7 +235,7 @@ export function DirectMessageCompose({
     return () => {
       cancelled = true;
     };
-  }, [currentUserId, organizationId, t, token]);
+  }, [currentUserId, workspaceId, t, token]);
 
   const filteredCandidates = useMemo(() => {
     const query = candidateSearch.trim().toLocaleLowerCase();
@@ -270,7 +270,7 @@ export function DirectMessageCompose({
     setSubmitting(true);
     setError(null);
     try {
-      const result = await createDirectMessage(token, organizationId, {
+      const result = await createDirectMessage(token, workspaceId, {
         memberIds: selected.filter((candidate) => candidate.type === "user").map(
           (candidate) => candidate.id,
         ),
@@ -443,14 +443,14 @@ type DirectMessageConversationPaneProps = Omit<
 /**
  * The desktop DM page: one conversation, full width. The list lives in the
  * sidebar, so with nothing open this shows the recipient picker — either
- * because the user asked for a new conversation, or because the organization
+ * because the user asked for a new conversation, or because the workspace
  * has none yet. While the catalog is still loading it shows neither, since the
  * navigation is about to open the latest conversation.
  */
 export function DirectMessageConversationPane({
   isSidebarOpen,
-  organizationId,
-  organizationName,
+  workspaceId,
+  workspaceName,
   token,
   currentUserId,
   channels,
@@ -484,7 +484,7 @@ export function DirectMessageConversationPane({
     enabled: catalogLoaded,
     onChannelSelect,
     onNavigateBack: () => onNavigateBack?.(),
-    organizationId,
+    workspaceId,
     token,
   });
   const showCompose = composing ||
@@ -504,7 +504,7 @@ export function DirectMessageConversationPane({
           isSidebarOpen={isSidebarOpen}
           onChannelsChange={onChannelsChange}
           onCreated={onChannelSelect}
-          organizationId={organizationId}
+          workspaceId={workspaceId}
           token={token}
         />
       ) : agentConversation.loading ||
@@ -537,8 +537,8 @@ export function DirectMessageConversationPane({
           onRequestedMessageOpen={agentConversation.clearRequestedMessage}
           onSkillSessionAccepted={onSkillSessionAccepted}
           onViewingChannelChange={onViewingChannelChange}
-          organizationId={organizationId}
-          organizationName={organizationName}
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
           projects={projects}
           requestedMessage={agentConversation.requestedMessage}
           surface="dm"
@@ -552,8 +552,8 @@ export function DirectMessageConversationPane({
 /** The companion DM view: the conversation list beside the open conversation. */
 export function DirectMessages({
   isSidebarOpen,
-  organizationId,
-  organizationName,
+  workspaceId,
+  workspaceName,
   token,
   currentUserId,
   channels,
@@ -604,7 +604,7 @@ export function DirectMessages({
     enabled: channelCatalogCursor !== null,
     onChannelSelect: openConversation,
     onNavigateBack: () => onChannelSelect(null),
-    organizationId,
+    workspaceId,
     token,
   });
   // The phone shows one pane at a time: the conversation takes over as soon as
@@ -732,7 +732,7 @@ export function DirectMessages({
               setCreating(false);
               onChannelSelect(channelId);
             }}
-            organizationId={organizationId}
+            workspaceId={workspaceId}
             token={token}
           />
         ) : agentConversation.loading ? (
@@ -760,8 +760,8 @@ export function DirectMessages({
             onRequestedMessageOpen={agentConversation.clearRequestedMessage}
             onSkillSessionAccepted={onSkillSessionAccepted}
             onViewingChannelChange={onViewingChannelChange}
-            organizationId={organizationId}
-            organizationName={organizationName}
+            workspaceId={workspaceId}
+            workspaceName={workspaceName}
             projects={projects}
             requestedMessage={agentConversation.requestedMessage}
             surface="dm"

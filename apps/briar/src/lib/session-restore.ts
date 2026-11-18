@@ -1,12 +1,12 @@
 import { isApiErrorStatus } from "./api";
-import type { Organization, Project, SessionUser } from "../types";
+import type { Workspace, Project, SessionUser } from "../types";
 
 type SessionRestoreDependencies = {
   clearToken: () => Promise<void>;
-  loadOrganizations: (
+  loadWorkspaces: (
     token: string,
     signal?: AbortSignal,
-  ) => Promise<Organization[]>;
+  ) => Promise<Workspace[]>;
   loadTeams: (token: string, signal?: AbortSignal) => Promise<Project[]>;
   loadSession: (token: string, signal?: AbortSignal) => Promise<SessionUser>;
   readToken: () => Promise<string | null>;
@@ -48,13 +48,13 @@ export type SessionRestoreResult =
       token: string;
       user: SessionUser;
       projects: Project[];
-      organizations: Organization[];
+      workspaces: Workspace[];
     }
   | { status: "retry"; error: unknown };
 
 export async function restoreStoredSession({
   clearToken,
-  loadOrganizations,
+  loadWorkspaces,
   loadTeams,
   loadSession,
   readToken,
@@ -96,9 +96,9 @@ export async function restoreStoredSession({
   }
 
   try {
-    const [projects, organizations] = await Promise.all([
+    const [projects, workspaces] = await Promise.all([
       abortable(loadTeams(token, signal), signal),
-      abortable(loadOrganizations(token, signal), signal),
+      abortable(loadWorkspaces(token, signal), signal),
     ]);
     clearTimeout(timeout);
     return {
@@ -106,7 +106,7 @@ export async function restoreStoredSession({
       token,
       user,
       projects,
-      organizations,
+      workspaces,
     };
   } catch (error) {
     clearTimeout(timeout);

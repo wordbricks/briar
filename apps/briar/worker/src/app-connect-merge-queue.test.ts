@@ -9,7 +9,7 @@ import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
 const guardedProjectId = "33333333-3333-4333-8333-333333333333";
 const runId = "44444444-4444-4444-8444-444444444444";
@@ -77,7 +77,7 @@ describe("MergeQueueService", () => {
            id, name, handle, created_at, updated_at
          ) values (?, 'Merge Queue', 'merge-queue', ?, ?)`,
         )
-        .bind(organizationId, observedAt, observedAt),
+        .bind(workspaceId, observedAt, observedAt),
       ...[
         [ownerId, "owner"],
         [viewerId, "viewer"],
@@ -88,7 +88,7 @@ describe("MergeQueueService", () => {
              organization_id, user_id, role, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(organizationId, userId, role, observedAt, observedAt),
+          .bind(workspaceId, userId, role, observedAt, observedAt),
       ),
       ...[
         [projectId, "Merge Queue Project", "a".repeat(64)],
@@ -101,7 +101,7 @@ describe("MergeQueueService", () => {
              created_at, updated_at
            ) values (?, ?, ?, ?, ?, ?, ?)`,
           )
-          .bind(id, ownerId, organizationId, name, tokenHash, observedAt, observedAt),
+          .bind(id, ownerId, workspaceId, name, tokenHash, observedAt, observedAt),
       ),
       ...[projectId, guardedProjectId].map((id) =>
         db
@@ -110,7 +110,7 @@ describe("MergeQueueService", () => {
              project_id, organization_id, user_id, created_at, updated_at
            ) values (?, ?, ?, ?, ?)`,
           )
-          .bind(id, organizationId, viewerId, observedAt, observedAt),
+          .bind(id, workspaceId, viewerId, observedAt, observedAt),
       ),
       ...[
         [projectId, 701, "wordbricks/briar"],
@@ -137,7 +137,7 @@ describe("MergeQueueService", () => {
            'merge-queue-owner', ?, 'connected', ?, null, ?
          )`,
         )
-        .bind(organizationId, ownerId, observedAt, observedAt),
+        .bind(workspaceId, ownerId, observedAt, observedAt),
       ...[
         [701, "briar", "wordbricks/briar"],
         [702, "guarded", "wordbricks/guarded"],

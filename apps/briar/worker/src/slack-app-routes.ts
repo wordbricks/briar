@@ -12,10 +12,10 @@ import {
 import { HttpError, json } from "./http-response";
 import { integrationHtml as html } from "./integration-http";
 import {
-  listOrganizationTeams,
+  listWorkspaceTeams,
   type TeamRow,
 } from "./team-repository";
-import { flushOrganizationInboxRealtimeOutbox } from "./realtime-scheduling";
+import { flushWorkspaceInboxRealtimeOutbox } from "./realtime-scheduling";
 import { createIssueFromServerFilesApplication } from "./server-issue-create-application";
 import {
   buildSlackCreateIssueModal,
@@ -78,7 +78,7 @@ async function openSlackCreateIssueModal(
       installation.token_iv,
       env.SLACK_TOKEN_ENCRYPTION_KEY,
     );
-    const projects = await listOrganizationTeams(
+    const projects = await listWorkspaceTeams(
       env.DB,
       installation.organization_id,
     );
@@ -368,7 +368,7 @@ async function handleSlackInteractionRequest(
     });
   }
   const project = (
-    await listOrganizationTeams(env.DB, installation.organization_id)
+    await listWorkspaceTeams(env.DB, installation.organization_id)
   ).find((candidate) => candidate.id === submission.projectId);
   if (!project) {
     return Response.json({
@@ -391,7 +391,7 @@ async function handleSlackInteractionRequest(
     installation.installed_by_user_id,
     token,
   ).finally(() =>
-    flushOrganizationInboxRealtimeOutbox(env, env.DB).catch((error) => {
+    flushWorkspaceInboxRealtimeOutbox(env, env.DB).catch((error) => {
       console.error(JSON.stringify({
         message: "Inbox realtime flush after Slack submission failed",
         error: error instanceof Error ? error.message : String(error),
@@ -451,7 +451,7 @@ async function handleSlackOAuthCallback(request: Request, env: Env) {
     await upsertSlackInstallation(env.DB, {
       teamId: authorization.teamId,
       teamName: authorization.teamName,
-      organizationId: oauthState.organization_id,
+      workspaceId: oauthState.organization_id,
       defaultProjectId: oauthState.default_project_id,
       botUserId: authorization.botUserId,
       encryptedBotToken: encrypted.encryptedToken,

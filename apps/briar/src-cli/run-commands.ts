@@ -404,7 +404,7 @@ async function listChannelMessagesCommand() {
   // A Worker execution session reads the channel it is replying in through its
   // own claim. It holds no Project Agent token, and the server derives the
   // channel from the reply job rather than from anything this process passes.
-  // The claim also stands in for the repository lookup: an organization Agent
+  // The claim also stands in for the repository lookup: a workspace Agent
   // answering a DM runs outside any connected repository.
   const claimScoped = claimScopedChannelRead();
   if (claimScoped) {

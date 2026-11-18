@@ -4,6 +4,12 @@
 @import "./fonts.css";
 
 /*
+  `prefers-reduced-transparency` has no built-in Tailwind variant, and the
+  sidebar's frosted surfaces need to drop their blur when a reader asks for it.
+*/
+@custom-variant reduced-transparency (@media (prefers-reduced-transparency: reduce));
+
+/*
   Briar design system base.
   Legacy screen styles remain in ../styles.css and consume the same CSS variables.
 */
@@ -44,10 +50,27 @@
   --color-ring: var(--ring);
 
   --color-sidebar: var(--sidebar);
+  --color-sidebar-fallback: var(--sidebar-fallback);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-foreground-strong: var(--sidebar-foreground-strong);
+  --color-sidebar-foreground-secondary: var(--sidebar-foreground-secondary);
+  --color-sidebar-foreground-muted: var(--sidebar-foreground-muted);
+  --color-sidebar-foreground-icon: var(--sidebar-foreground-icon);
+  --color-sidebar-foreground-disabled: var(--sidebar-foreground-disabled);
   --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-border-strong: var(--sidebar-border-strong);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-focus: var(--sidebar-focus);
+  --color-sidebar-icon-accent: var(--sidebar-icon-accent);
+  --color-sidebar-icon-accent-ring: var(--sidebar-icon-accent-ring);
+  --color-sidebar-scroll-thumb: var(--sidebar-scroll-thumb);
+  --color-sidebar-popover: var(--sidebar-popover);
+  --color-sidebar-popover-foreground: var(--sidebar-popover-foreground);
+  --color-sidebar-success: var(--sidebar-success);
+  --color-sidebar-success-ring: var(--sidebar-success-ring);
 
   --color-ink: var(--ink);
   --color-ink-3: var(--ink-3);

@@ -10,7 +10,7 @@ import { TooltipProvider } from "../ui/tooltip";
 import { demoDashboard } from "../../lib/demo-data";
 import { inboxDetailLabel } from "../../lib/inbox-detail-label";
 import { inboxDetailTargetAtom } from "../../state/inbox-selection";
-import { activeOrganizationIdAtom } from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../../state/workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
@@ -79,7 +79,7 @@ const harness = (runs: HuntRun[] = [run]): AtomRegistry => {
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
-    [activeOrganizationIdAtom, team.organizationId],
+    [activeWorkspaceIdAtom, team.workspaceId],
   ]);
   applySyncEvent(registry, {
     kind: "team-snapshot",

@@ -20,14 +20,14 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// Small invalidation frames pushed over the organization WebSocket. Durable
+/// Small invalidation frames pushed over the workspace WebSocket. Durable
 /// snapshots and cursors remain authoritative in the app Connect services.
-public nonisolated struct BriarRealtime_OrganizationNotification: Sendable {
+public nonisolated struct BriarRealtime_WorkspaceNotification: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var notification: BriarRealtime_OrganizationNotification.OneOf_Notification? = nil
+  public var notification: BriarRealtime_WorkspaceNotification.OneOf_Notification? = nil
 
   public var ready: BriarRealtime_Ready {
     get {
@@ -268,8 +268,8 @@ public nonisolated struct BriarRealtime_IssueActivityScope: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "briar.realtime.v1"
 
-nonisolated extension BriarRealtime_OrganizationNotification: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".OrganizationNotification"
+nonisolated extension BriarRealtime_WorkspaceNotification: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WorkspaceNotification"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}ready\0\u{3}channels_changed\0\u{3}inbox_changed\0\u{3}project_changed\0\u{3}project_agent_sessions_changed\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -379,7 +379,7 @@ nonisolated extension BriarRealtime_OrganizationNotification: SwiftProtobuf.Mess
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarRealtime_OrganizationNotification, rhs: BriarRealtime_OrganizationNotification) -> Bool {
+  public static func ==(lhs: BriarRealtime_WorkspaceNotification, rhs: BriarRealtime_WorkspaceNotification) -> Bool {
     if lhs.notification != rhs.notification {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

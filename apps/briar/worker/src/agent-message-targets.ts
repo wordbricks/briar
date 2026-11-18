@@ -1,13 +1,13 @@
 import { hydrateAgentSkills } from "./agent-skills";
-import type { OrganizationAgentRow } from "./organization-agents";
+import type { WorkspaceAgentRow } from "./workspace-agents";
 
 /*
-  Plan §3.5: an Agent may write to every Organization Agent, plus the Agents of
+  Plan §3.5: an Agent may write to every Workspace Agent, plus the Agents of
   the projects the person who started the round trip can reach. Membership of
   the conversation's roster is deliberately not a condition — the answer comes
   back through the sender rather than being posted where the target lives.
 
-  Organization owners and co-owners reach every project; everybody else needs a
+  Workspace owners and co-owners reach every project; everybody else needs a
   `briar_project_members` row. The same query runs at claim time and again when
   the send is applied, so a project a member lost in between drops its Agents
   from both the offered list and the accepted one.
@@ -38,8 +38,8 @@ const agentMessageTargetSelect = `
     )
   order by agent.project_id is not null, agent.name, agent.id`;
 
-export type AgentMessageTargetAgent = OrganizationAgentRow & {
-  skills: NonNullable<OrganizationAgentRow["skills"]>;
+export type AgentMessageTargetAgent = WorkspaceAgentRow & {
+  skills: NonNullable<WorkspaceAgentRow["skills"]>;
 };
 
 export type AgentMessageTarget = {
@@ -59,7 +59,7 @@ export type AgentMessageTarget = {
 export async function listAgentMessageTargetAgents(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     viewerUserId: string | null;
     excludeAgentId: string;
   },
@@ -68,12 +68,12 @@ export async function listAgentMessageTargetAgents(
   const rows = await db
     .prepare(agentMessageTargetSelect)
     .bind(
-      input.organizationId,
+      input.workspaceId,
       input.excludeAgentId,
       input.viewerUserId,
       input.viewerUserId,
     )
-    .all<OrganizationAgentRow>();
+    .all<WorkspaceAgentRow>();
   return hydrateAgentSkills(db, rows.results);
 }
 

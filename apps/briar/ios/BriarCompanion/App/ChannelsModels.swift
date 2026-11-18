@@ -942,6 +942,8 @@ struct ChannelAgentSummary: Codable, Equatable, Identifiable, Sendable {
     let responsibility: String
     let createdAt: Date
 
+    var skills: [ProjectAgent.Skill] = []
+
     var id: UUID { agentId }
 }
 
@@ -1140,5 +1142,37 @@ enum ChannelGrouping {
             let order = left.name.localizedCaseInsensitiveCompare(right.name)
             return order == .orderedAscending
         }
+    }
+}
+
+
+struct ChannelSkillCommand: Equatable, Identifiable, Sendable {
+    let agentID: UUID
+    let agentName: String
+    let skill: ProjectAgent.Skill
+    var id: String { "\(agentID):\(skill.id)" }
+    var invocation: String { "/\(skill.name) " }
+
+    static func candidates(agents: [ChannelAgentSummary]) -> [Self] {
+        agents.flatMap { agent in
+            agent.skills.map { Self(agentID: agent.agentId, agentName: agent.name, skill: $0) }
+        }
+    }
+
+    static func suggestions(in draft: String, candidates: [Self], selected: Self?) -> [Self] {
+        guard draft.hasPrefix("/"), !draft.contains(where: \.isNewline),
+              selected == nil else { return [] }
+        let query = draft.dropFirst().trimmingCharacters(in: .whitespaces).lowercased()
+        return candidates.filter {
+            query.isEmpty || "\($0.skill.name) \($0.skill.description ?? "") \($0.agentName)"
+                .lowercased().contains(query)
+        }
+    }
+
+    static func retained(_ selected: Self?, in draft: String, candidates: [Self]) -> Self? {
+        guard let selected, draft.hasPrefix(selected.invocation),
+              candidates.contains(where: { $0.id == selected.id && $0.invocation == selected.invocation })
+        else { return nil }
+        return selected
     }
 }

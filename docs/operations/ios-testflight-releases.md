@@ -92,6 +92,41 @@ finds a release blocker, fix the SwiftUI implementation, increment the build
 number, repeat the full gate, and submit the corrected native build. There is no
 Tauri iOS rollback binary or source-retention policy.
 
+## 2026-10-16 — 1.2.237 (1)
+
+- App: Briar Companion (`app.briar.companion`)
+- Marketing version: `1.2.237`
+- App Store Connect build: `1`
+- App Store Connect build ID: `c181d0eb-c51a-4475-a8ea-c8f3b9356569`
+- Latest main commit: `f85357e5fdc0f4f4d55241d527a04cd5b45b3ca5`
+- Release source commit: `0c54f80873b26e61b6358fd6aef588a9ebf66bdf`
+- Implementation: native SwiftUI
+- Toolchain: Xcode 26.6, iOS 26.5 SDK
+- Minimum iOS version: 17.0
+- App Store Connect processing state: `VALID`
+- TestFlight state: `IN_BETA_TESTING`
+- Automatic tester notification: enabled
+- External beta state: `READY_FOR_BETA_SUBMISSION`
+- IPA SHA-256: `02d99986309652ba7dfbfe0e2601f617b7ba8035818633e2ac8d11996061251a`
+
+This is the first TestFlight build since 1.2.216. The release source is main
+(v1.2.237) plus three gate fixes from #1880. The contracts crate `Cargo.lock`
+was left on connectrpc 0.9.0 when #1853 pinned `=0.9.1`, so `contracts:check`
+failed under `--locked`. `testOrdinaryChannelsStillJoinTheCatalogAndAreMarkedRead`
+failed on every run because it read `markReadCalls` before the detached
+read-mark task ran. On a heavily loaded host the parallel iPhone and iPad
+simulators made the iPad accessibility audit time out twice, while the same test
+passed alone in 13 seconds. This run used `BRIAR_MOBILE_CI_JOBS=1`, which the
+release script now passes to `mobile:ci --jobs`.
+
+The serial gate passed the shared API contract, Swift unit and iPhone UI tests,
+the iPad accessibility and largest Dynamic Type layout test, Production analyze
+and build checks, session/download/log security checks, and the Tauri Android
+regression build. Archive identity, App Store provisioning, distribution
+signature, exported IPA signature, and the IPA checksum were verified before
+upload. App Store Connect accepted the build as `VALID` and placed it in
+internal TestFlight testing with automatic tester notification.
+
 ## 2026-09-08 — 1.2.216 (1)
 
 - App: Briar Companion (`app.briar.companion`)

@@ -12,7 +12,7 @@ import {
 import { channelApiAtom } from "../channels/api";
 import { activeChannelIdAtom } from "../channels/atoms";
 import { organizationChannelsAtom } from "../entities/channels";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
@@ -40,7 +40,7 @@ const teamOf = (id: string, overrides: Partial<Project> = {}): Project => ({
   ...demoDashboard.team,
   id,
   name: id,
-  organizationId: "org-a",
+  workspaceId: "org-a",
   ...overrides,
 });
 const teamA = teamOf("team-a");
@@ -51,7 +51,7 @@ const channelOf = (
   overrides: Partial<ChannelSummary> = {},
 ): ChannelSummary => ({
   id,
-  organizationId: "org-a",
+  workspaceId: "org-a",
   kind: "channel",
   slug: id,
   name: id,
@@ -78,18 +78,18 @@ const channelOf = (
 
 const harness = ({
   activeTeamId = teamA.id,
-  activeOrganizationId = "org-a" as string | null,
+  activeWorkspaceId = "org-a" as string | null,
   channels = [] as ChannelSummary[],
 }: {
   activeTeamId?: string | null;
-  activeOrganizationId?: string | null;
+  activeWorkspaceId?: string | null;
   channels?: ChannelSummary[];
 } = {}) => {
   const reads: string[] = [];
   const registry: AtomRegistry = createTestRegistry([
     [teamsAtom, [teamA, teamB]],
     [activeTeamIdAtom, activeTeamId],
-    [activeOrganizationIdAtom, activeOrganizationId],
+    [activeWorkspaceIdAtom, activeWorkspaceId],
     [tokenAtom, "token-1"],
     [
       channelApiAtom,
@@ -107,7 +107,7 @@ const harness = ({
   if (channels.length > 0) {
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: "org-a",
+      workspaceId: "org-a",
       channels,
     });
   }
@@ -135,7 +135,7 @@ describe("navigation actions", () => {
     );
   });
 
-  it("sends the organization pages to the organization location", () => {
+  it("sends the workspace pages to the workspace location", () => {
     const { actions, registry } = harness();
 
     actions.navigateToPage("inbox");
@@ -150,11 +150,11 @@ describe("navigation actions", () => {
   });
 
   it("leaves a page that belongs to neither as itself", () => {
-    const { actions, registry } = harness({ activeOrganizationId: null });
+    const { actions, registry } = harness({ activeWorkspaceId: null });
 
-    actions.navigateToPage("organization-create");
+    actions.navigateToPage("workspace-create");
 
-    expect(registry.get(navigationLocationAtom)).toBe("organization-create");
+    expect(registry.get(navigationLocationAtom)).toBe("workspace-create");
   });
 
   it("opens an issue only when a team owns it", () => {
@@ -190,8 +190,8 @@ describe("navigation actions", () => {
     expect(reads).toEqual(["channel-a"]);
   });
 
-  it("does nothing with a channel and no organization to put it in", () => {
-    const { actions, registry } = harness({ activeOrganizationId: null });
+  it("does nothing with a channel and no workspace to put it in", () => {
+    const { actions, registry } = harness({ activeWorkspaceId: null });
 
     actions.navigateToChannel("channel-a", "channels");
 
@@ -226,7 +226,7 @@ describe("navigation actions", () => {
     expect(registry.get(activeChannelIdAtom)).toBeNull();
   });
 
-  it("ignores a channel fallback reported for another organization", () => {
+  it("ignores a channel fallback reported for another workspace", () => {
     const { actions, registry } = harness({
       channels: [channelOf("channel-a")],
     });
@@ -234,8 +234,8 @@ describe("navigation actions", () => {
     const location = registry.get(navigationLocationAtom);
 
     // The view reporting the fallback is the one that is leaving; the
-    // organization already moved on.
-    registry.set(activeOrganizationIdAtom, "org-b");
+    // workspace already moved on.
+    registry.set(activeWorkspaceIdAtom, "org-b");
     actions.handleDesktopChannelFallback(null, "channels");
 
     expect(registry.get(navigationLocationAtom)).toBe(location);

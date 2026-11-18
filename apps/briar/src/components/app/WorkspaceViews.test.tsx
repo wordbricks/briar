@@ -14,7 +14,7 @@ import {
   connectedTeamIdsAtom,
   healthAtom,
   teamReadinessAtom,
-} from "../../state/workspace/atoms";
+} from "../../state/local-workspace/atoms";
 import { createReactTestRoot, flush, type ReactTestRoot } from "../../test/react";
 import { createRenderCounter } from "../../test/render-count";
 import type { DashboardPayload, Project, SessionUser } from "../../types";

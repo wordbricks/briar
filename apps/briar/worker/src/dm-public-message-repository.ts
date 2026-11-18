@@ -25,7 +25,7 @@ export async function captureDmPublicMessageClaim(
   db: D1Database,
   input: {
     jobId: string;
-    organizationId: string;
+    workspaceId: string;
     workerId: string;
     deviceId: string;
     claimTokenHash: string;
@@ -91,24 +91,25 @@ export async function captureDmPublicMessageClaim(
   ).bind(
     input.observedAt,
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.workerId,
     input.deviceId,
     input.claimTokenHash,
     input.observedAt,
   ).run();
-  return getDmPublicMessageClaim(db, input);
+  return getDmPublicMessageClaim(db, { ...input, control: "classification" });
 }
 
 export async function getDmPublicMessageClaim(
   db: D1Database,
   input: {
     jobId: string;
-    organizationId: string;
+    workspaceId: string;
     workerId: string;
     deviceId: string;
     claimTokenHash: string;
     observedAt: string;
+    control?: "classification" | "routing" | "stop" | "stop-unconfirmed";
   },
 ) {
   return db.prepare(
@@ -153,9 +154,16 @@ export async function getDmPublicMessageClaim(
      join briar_execution_worker_devices device on device.id = binding.device_id
      where job.id = ? and job.organization_id = ?
        and job.claimed_worker_id = ? and job.claimed_device_id = ?
-       and job.claim_token_hash = ? and job.status = 'running'
-       and job.lease_expires_at > ?
-       and job.steer_revision = job.applied_steer_revision
+       and job.claim_token_hash = ?
+       and ${input.control === "routing" ?
+         "job.status = 'completed' and job.routing_action in ('steer', 'cancel') and job.routing_receipt_id is not null and job.updated_at <= ?" :
+         input.control === "stop-unconfirmed" ?
+         "(job.status = 'running' or (job.status = 'completed' and job.stop_requested_at is not null)) and job.updated_at <= ?" :
+         input.control === "stop" ?
+         "job.status = 'completed' and job.stop_requested_at is not null and job.stop_requested_at <= ?" :
+         input.control === "classification" ?
+         "job.status = 'running' and job.lease_expires_at > ? and job.steer_revision = job.applied_steer_revision" :
+         "job.status = 'running' and job.lease_expires_at > ? and job.steer_revision = job.applied_steer_revision and coalesce(job.routing_action, 'new') <> 'pending'"}
        and binding.state <> 'disabled' and device.state <> 'disabled'
        and device.organization_id = job.organization_id
        and ${publicMessageCapabilitySql("job")}
@@ -167,7 +175,7 @@ export async function getDmPublicMessageClaim(
             where channel_id = job.channel_id) = 1`,
   ).bind(
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.workerId,
     input.deviceId,
     input.claimTokenHash,
@@ -202,7 +210,7 @@ export async function findDmPublicMessageByClaimRequest(
   db: D1Database,
   input: {
     jobId: string;
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     workerId: string;
     deviceId: string;
@@ -221,7 +229,7 @@ export async function findDmPublicMessageByClaimRequest(
   ).bind(
     input.requestId,
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.workerId,
     input.deviceId,
@@ -245,13 +253,13 @@ export async function findDmPublicMessageByRequestId(
 
 export async function listDmPublicMessagesForReply(
   db: D1Database,
-  input: { jobId: string; organizationId: string },
+  input: { jobId: string; workspaceId: string },
 ) {
   const rows = await db.prepare(
     `select * from briar_dm_public_message_batches
      where origin_reply_job_id = ? and organization_id = ?
      order by first_sequence, id`,
-  ).bind(input.jobId, input.organizationId).all<DmPublicMessageBatchRow>();
+  ).bind(input.jobId, input.workspaceId).all<DmPublicMessageBatchRow>();
   const batches: DmPublishedMessageBatch[] = [];
   for (const row of rows.results) batches.push((await hydratedBatch(db, row))!);
   return batches;
@@ -262,7 +270,7 @@ export async function getDmFinalPublicMessageBatch(
   input: {
     batchId: string;
     jobId: string;
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     ownerUserId: string;
     agentId: string;
@@ -282,7 +290,7 @@ export async function getDmFinalPublicMessageBatch(
   ).bind(
     input.batchId,
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.ownerUserId,
     input.agentId,
@@ -314,7 +322,7 @@ export async function findDmFinalPublicMessageForReply(
   return hydratedBatch(db, row);
 }
 
-export async function commitDmPublicMessageBatch(
+export function dmPublicMessageBatchStatements(
   db: D1Database,
   input: {
     scope: DmPublicMessageClaimRow;
@@ -326,6 +334,9 @@ export async function commitDmPublicMessageBatch(
     deviceId: string;
     claimTokenHash: string;
     createdAt: string;
+    /** Internal control receipt only; never exposed by the publication RPC. */
+    control?: "routing" | "stop" | "stop-unconfirmed";
+    routingReceiptId?: string;
   },
 ) {
   const batchId = crypto.randomUUID();
@@ -381,8 +392,14 @@ export async function commitDmPublicMessageBatch(
          and job.claimed_worker_id = claim.worker_id
          and job.claimed_device_id = claim.device_id
          and job.claim_token_hash = claim.claim_token_hash
-         and job.status = 'running' and job.lease_expires_at > ?
-         and job.steer_revision = job.applied_steer_revision
+         and ${input.control === "routing" ?
+           "job.status in ('running', 'completed') and job.routing_action in ('steer', 'cancel') and job.routing_receipt_id is not null and job.updated_at <= ?" :
+           input.control === "stop-unconfirmed" ?
+           "job.error = 'dm_reply_stop_unconfirmed' and job.status in ('running', 'completed') and job.updated_at <= ?" :
+           input.control === "stop" ?
+           "job.status = 'completed' and job.stop_requested_at is not null and job.stop_requested_at <= ?" :
+           "job.status = 'running' and job.lease_expires_at > ? and job.steer_revision = job.applied_steer_revision and coalesce(job.routing_action, 'new') <> 'pending'"}
+         and (? is null or job.routing_receipt_id = ?)
          and job.applied_steer_revision = claim.input_revision
          and binding.state <> 'disabled' and device.state <> 'disabled'
          and device.organization_id = job.organization_id
@@ -423,6 +440,7 @@ export async function commitDmPublicMessageBatch(
       input.deviceId,
       input.claimTokenHash,
       input.createdAt,
+      input.routingReceiptId ?? null, input.routingReceiptId ?? null,
       input.requestId,
     ),
   ];
@@ -486,6 +504,13 @@ export async function commitDmPublicMessageBatch(
       batchId,
     ),
   );
+  return { batchId, statements };
+}
+
+export async function commitDmPublicMessageBatch(
+  db: D1Database, input: Parameters<typeof dmPublicMessageBatchStatements>[1],
+) {
+  const { batchId, statements } = dmPublicMessageBatchStatements(db, input);
   await db.batch(statements);
   const stored = await db.prepare(
     `select * from briar_dm_public_message_batches where id = ?`,

@@ -14,11 +14,11 @@ import {
   listDashboardChanges,
 } from "./dashboard-change-repository";
 import {
-  getOrganizationInvitationByTokenHash,
-  listOrganizationInvitations,
-  listOrganizationMembers,
-  listOrganizations,
-} from "./organization-repository";
+  getWorkspaceInvitationByTokenHash,
+  listWorkspaceInvitations,
+  listWorkspaceMembers,
+  listWorkspaces,
+} from "./workspace-repository";
 import { listTeams } from "./team-repository";
 import {
   acceptWorkspaceInvitation,
@@ -81,9 +81,9 @@ import {
   listHuntRunEvents,
   listHuntRunEventsPage,
   resolveHuntEventActorNames,
-  listOrganizationIssueSubscriptionRunIds,
-  listOrganizationStatusTrayRuns,
-  listOrganizationUsageRuns,
+  listWorkspaceIssueSubscriptionRunIds,
+  listWorkspaceStatusTrayRuns,
+  listWorkspaceUsageRuns,
   isWorkspaceHandleAvailable,
   issueProjectAgentToken,
   listTeamAgents,
@@ -463,7 +463,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await registerExecutionWorker(db, projectId, {
       id: "legacy-worker",
       deviceId: "lifecycle-device",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       label: "Lifecycle Worker",
       deviceIdentityHash: "c".repeat(64),
@@ -985,7 +985,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       expect.objectContaining({ run_id: changedRunId, user_id: "owner" }),
     ]);
     await expect(
-      listOrganizationStatusTrayRuns(db, projectId, "owner"),
+      listWorkspaceStatusTrayRuns(db, projectId, "owner"),
     ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1168,10 +1168,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     );
   });
 
-  it("loads uncapped lightweight usage runs across an organization", async () => {
+  it("loads uncapped lightweight usage runs across a workspace", async () => {
     const usageProject = await createTeam(db, {
       ownerUserId: "owner",
-      organizationId: projectId,
+      workspaceId: projectId,
       name: "Usage Project",
       agentTokenHash: "1".repeat(64),
     });
@@ -1321,14 +1321,14 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         recentAt,
       )
       .run();
-    const otherOrganization = await createWorkspace(db, {
-      name: "Other Usage Organization",
-      handle: "other-usage-organization",
+    const otherWorkspace = await createWorkspace(db, {
+      name: "Other Usage Workspace",
+      handle: "other-usage-workspace",
       ownerUserId: "owner",
     });
     const otherProject = await createTeam(db, {
       ownerUserId: "owner",
-      organizationId: otherOrganization.id,
+      workspaceId: otherWorkspace.id,
       name: "Other Usage Project",
       agentTokenHash: "f".repeat(64),
     });
@@ -1339,8 +1339,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
            workflow_snapshot_json, repository, started_at, completed_at,
            last_event_at, created_at, updated_at
          ) values (
-           'usage-other-organization', ?, 'issue', 'usage-other-organization',
-           'Other organization usage', 'completed', 'completed',
+           'usage-other-workspace', ?, 'issue', 'usage-other-workspace',
+           'Other workspace usage', 'completed', 'completed',
            ?, 'example/other', ?, ?, ?, ?, ?
          )`,
       )
@@ -1355,7 +1355,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       )
       .run();
 
-    const rows = await listOrganizationUsageRuns(
+    const rows = await listWorkspaceUsageRuns(
       db,
       projectId,
       atMinute(100),
@@ -1374,7 +1374,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).toBe(false);
     expect(rows.some((row) => row.id === "usage-paused")).toBe(true);
     expect(
-      rows.some((row) => row.id === "usage-other-organization"),
+      rows.some((row) => row.id === "usage-other-workspace"),
     ).toBe(false);
     expect(usageProjectRows[0]).not.toHaveProperty("workflow_snapshot_json");
     expect(
@@ -1526,7 +1526,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const selected = await registerExecutionWorker(db, projectId, {
       id: "direct-task-worker-selected",
       deviceId: "direct-task-device-selected",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       label: "Selected direct task Worker",
       deviceIdentityHash: "d".repeat(64),
@@ -1539,7 +1539,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     const other = await registerExecutionWorker(db, projectId, {
       id: "direct-task-worker-other",
       deviceId: "direct-task-device-other",
-      organizationId: projectId,
+      workspaceId: projectId,
       ownerUserId: "owner",
       label: "Other direct task Worker",
       deviceIdentityHash: "f".repeat(64),
@@ -2460,18 +2460,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     }
   });
 
-  it("allows duplicate organization names but enforces unique handles", async () => {
+  it("allows duplicate workspace names but enforces unique handles", async () => {
     await expect(
       isWorkspaceHandleAvailable(db, "another-example"),
     ).resolves.toBe(true);
-    const organization = await createWorkspace(db, {
+    const workspace = await createWorkspace(db, {
       name: "Example Org",
       handle: "another-example",
       ownerUserId: "owner",
     });
 
-    expect(organization.name).toBe("Example Org");
-    expect(organization.handle).toBe("another-example");
+    expect(workspace.name).toBe("Example Org");
+    expect(workspace.handle).toBe("another-example");
     await expect(
       isWorkspaceHandleAvailable(db, "another-example"),
     ).resolves.toBe(false);
@@ -2487,7 +2487,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
   it("deletes only a project owned by the requesting user", async () => {
     const project = await createTeam(db, {
       ownerUserId: "owner",
-      organizationId: projectId,
+      workspaceId: projectId,
       name: "Disposable",
       agentTokenHash: "d".repeat(64),
     });
@@ -2518,7 +2518,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(getTeamSettings(db, project.id)).resolves.toBeNull();
   });
 
-  it("scopes organization members to explicitly granted projects", async () => {
+  it("scopes workspace members to explicitly granted projects", async () => {
     await updateTeamSettings(db, projectId, {
       velenOrg: "example",
       dataSource: null,
@@ -2597,7 +2597,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       updateWorkspaceMemberProjects(db, projectId, "member", []),
     ).resolves.toBe("role_has_full_access");
-    const members = await listOrganizationMembers(db, projectId);
+    const members = await listWorkspaceMembers(db, projectId);
     expect(members.map((member) => member.email)).toEqual([
       "owner@example.com",
       "member@example.com",
@@ -2627,10 +2627,10 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeNull();
   });
 
-  it("invites an unregistered email and grants organization access on exact-email acceptance", async () => {
+  it("invites an unregistered email and grants workspace access on exact-email acceptance", async () => {
     const secondProject = await createTeam(db, {
       ownerUserId: "owner",
-      organizationId: projectId,
+      workspaceId: projectId,
       name: "Invitation-isolated project",
       agentTokenHash: "6".repeat(64),
     });
@@ -2653,7 +2653,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         initial_project_id: projectId,
       },
     });
-    await expect(listOrganizationInvitations(db, projectId)).resolves.toEqual([
+    await expect(listWorkspaceInvitations(db, projectId)).resolves.toEqual([
       expect.objectContaining({ id: "invitation-new-member" }),
     ]);
     await expect(
@@ -2696,7 +2696,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
         acceptedAt: atMinute(32),
       }),
     ).resolves.toMatchObject({ outcome: "already_accepted" });
-    await expect(listOrganizationInvitations(db, projectId)).resolves.toEqual(
+    await expect(listWorkspaceInvitations(db, projectId)).resolves.toEqual(
       [],
     );
   });
@@ -2730,7 +2730,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       invitation: { id: "invitation-replacement", role: "co-owner" },
     });
     await expect(
-      getOrganizationInvitationByTokenHash(db, "2".repeat(64)),
+      getWorkspaceInvitationByTokenHash(db, "2".repeat(64)),
     ).resolves.toMatchObject({ revoked_at: atMinute(41) });
     await expect(
       revokeWorkspaceInvitation(
@@ -2750,7 +2750,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toEqual({ outcome: "revoked" });
   });
 
-  it("deletes a personal account, its sole-member organization, and auth data", async () => {
+  it("deletes a personal account, its sole-member workspace, and auth data", async () => {
     const userId = "account-deletion-personal";
     const email = "account-deletion-personal@example.com";
     await executeSql(
@@ -2782,21 +2782,21 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          '${atMinute(30)}', 'approved'
        );`,
     );
-    const organization = await createWorkspace(db, {
-      name: "Disposable Organization",
+    const workspace = await createWorkspace(db, {
+      name: "Disposable Workspace",
       handle: "account-deletion-personal",
       ownerUserId: userId,
     });
     const project = await createTeam(db, {
       ownerUserId: userId,
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       name: "Disposable Project",
       agentTokenHash: "9".repeat(64),
     });
 
     const plan = await planAccountDeletion(db, userId);
-    expect(plan.blockedOrganizations).toEqual([]);
-    expect(plan.organizationIds).toEqual([organization.id]);
+    expect(plan.blockedWorkspaces).toEqual([]);
+    expect(plan.workspaceIds).toEqual([workspace.id]);
     expect(plan.projectIds).toEqual([project.id]);
     await expect(
       deleteAccountData(db, {
@@ -2828,7 +2828,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       db
         .prepare(`select id from briar_organizations where id = ?`)
-        .bind(organization.id)
+        .bind(workspace.id)
         .first(),
     ).resolves.toBeNull();
     await expect(
@@ -2848,7 +2848,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeNull();
   });
 
-  it("rechecks organization membership after the account deletion plan", async () => {
+  it("rechecks workspace membership after the account deletion plan", async () => {
     const ownerId = "account-deletion-race-owner";
     const ownerEmail = "account-deletion-race-owner@example.com";
     const memberId = "account-deletion-race-member";
@@ -2862,18 +2862,18 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          ('${memberId}', 'Race Member', '${memberEmail}', 1,
           '${atMinute(0)}', '${atMinute(0)}');`,
     );
-    const organization = await createWorkspace(db, {
-      name: "Account Deletion Race Organization",
+    const workspace = await createWorkspace(db, {
+      name: "Account Deletion Race Workspace",
       handle: "account-deletion-race",
       ownerUserId: ownerId,
     });
     const project = await createTeam(db, {
       ownerUserId: ownerId,
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       name: "Account Deletion Race Project",
       agentTokenHash: "8".repeat(64),
     });
-    const objectKey = `project-agent-spritesheets/${organization.id}/race.webp`;
+    const objectKey = `project-agent-spritesheets/${workspace.id}/race.webp`;
     await db.prepare(
       `insert into briar_project_agents (
          id, organization_id, project_id, name, provider, model,
@@ -2882,7 +2882,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
        ) values (?, ?, null, ?, 'codex', null, ?, ?, ?, '#3275d5', '', ?)`,
     ).bind(
       "account-deletion-race-agent",
-      organization.id,
+      workspace.id,
       "Race Agent",
       "Proves cleanup is not queued when deletion is blocked.",
       atMinute(0),
@@ -2891,15 +2891,15 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).run();
 
     await expect(planAccountDeletion(db, ownerId)).resolves.toMatchObject({
-      blockedOrganizations: [],
-      organizationIds: [organization.id],
+      blockedWorkspaces: [],
+      workspaceIds: [workspace.id],
       projectIds: [project.id],
     });
     await db.prepare(
       `insert into briar_organization_members
        (organization_id, user_id, role, created_at, updated_at)
        values (?, ?, 'developer', ?, ?)`,
-    ).bind(organization.id, memberId, atMinute(0), atMinute(0)).run();
+    ).bind(workspace.id, memberId, atMinute(0), atMinute(0)).run();
 
     await expect(deleteAccountData(db, {
       userId: ownerId,
@@ -2911,7 +2911,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.not.toBeNull();
     await expect(
       db.prepare(`select id from briar_organizations where id = ?`)
-        .bind(organization.id).first(),
+        .bind(workspace.id).first(),
     ).resolves.not.toBeNull();
     await expect(
       db.prepare(
@@ -2926,7 +2926,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
 
     await db.batch([
       db.prepare(`delete from briar_organizations where id = ?`)
-        .bind(organization.id),
+        .bind(workspace.id),
       db.prepare(`delete from "user" where id in (?, ?)`)
         .bind(ownerId, memberId),
     ]);
@@ -2948,22 +2948,22 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          '${atMinute(0)}', '${atMinute(0)}'
        );`,
     );
-    const organization = await createWorkspace(db, {
-      name: "Account Deletion Outbox Organization",
+    const workspace = await createWorkspace(db, {
+      name: "Account Deletion Outbox Workspace",
       handle: "account-deletion-outbox",
       ownerUserId: userId,
     });
     const project = await createTeam(db, {
       ownerUserId: userId,
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       name: "Account Deletion Outbox Project",
       agentTokenHash: "7".repeat(64),
     });
     const agentId = "account-deletion-outbox-agent";
     const channelId = "account-deletion-outbox-channel";
     const messageId = "account-deletion-outbox-message";
-    const spriteKey = `project-agent-spritesheets/${organization.id}/agent.webp`;
-    const attachmentKey = `channel-attachments/${organization.id}/image.png`;
+    const spriteKey = `project-agent-spritesheets/${workspace.id}/agent.webp`;
+    const attachmentKey = `channel-attachments/${workspace.id}/image.png`;
     await db.batch([
       db.prepare(
         `insert into briar_project_agents (
@@ -2973,9 +2973,9 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          ) values (?, ?, null, ?, 'codex', null, ?, ?, ?, '#3275d5', '', ?)`,
       ).bind(
         agentId,
-        organization.id,
+        workspace.id,
         "Outbox Agent",
-        "Organization-scoped cleanup fixture.",
+        "Workspace-scoped cleanup fixture.",
         atMinute(0),
         atMinute(0),
         spriteKey,
@@ -2987,7 +2987,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          ) values (?, ?, ?, ?, null, 'public', ?, ?, ?, ?)`,
       ).bind(
         channelId,
-        organization.id,
+        workspace.id,
         "account-deletion-outbox",
         "Outbox",
         project.id,
@@ -3017,7 +3017,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          ) values (?, ?, ?, ?, ?, 'image.png', 'image/png', 128, ?)`,
       ).bind(
         "account-deletion-outbox-attachment",
-        organization.id,
+        workspace.id,
         channelId,
         messageId,
         attachmentKey,
@@ -3032,7 +3032,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       ).bind(
         "T-ACCOUNT-DELETION-OUTBOX",
         "Account Deletion Outbox",
-        organization.id,
+        workspace.id,
         project.id,
         "B-ACCOUNT-DELETION-OUTBOX",
         encrypted.encryptedToken,
@@ -3063,13 +3063,13 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       {
         bucket: "attachments",
         object_key: attachmentKey,
-        project_id: `organization:${organization.id}`,
+        project_id: `workspace:${workspace.id}`,
         run_id: null,
       },
       {
         bucket: "attachments",
         object_key: spriteKey,
-        project_id: `organization:${organization.id}`,
+        project_id: `workspace:${workspace.id}`,
         run_id: null,
       },
     ]);
@@ -3199,8 +3199,8 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
          ('${memberId}', 'Shared Member', '${memberEmail}', 1,
           '${atMinute(0)}', '${atMinute(0)}');`,
     );
-    const organization = await createWorkspace(db, {
-      name: "Shared Organization",
+    const workspace = await createWorkspace(db, {
+      name: "Shared Workspace",
       handle: "account-deletion-shared",
       ownerUserId: ownerId,
     });
@@ -3208,29 +3208,29 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       `insert into briar_organization_members
        (organization_id, user_id, role, created_at, updated_at)
        values (?, ?, 'developer', ?, ?)`,
-    ).bind(organization.id, memberId, atMinute(0), atMinute(0)).run();
+    ).bind(workspace.id, memberId, atMinute(0), atMinute(0)).run();
     const sharedProject = await createTeam(db, {
       ownerUserId: ownerId,
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       name: "Shared Project",
       agentTokenHash: "5".repeat(64),
     });
 
     await expect(planAccountDeletion(db, ownerId)).resolves.toMatchObject({
-      blockedOrganizations: [{ id: organization.id, name: organization.name }],
-      organizationIds: [],
+      blockedWorkspaces: [{ id: workspace.id, name: workspace.name }],
+      workspaceIds: [],
     });
     const memberPlan = await planAccountDeletion(db, memberId);
     expect(memberPlan).toEqual({
-      blockedOrganizations: [],
-      organizationIds: [],
+      blockedWorkspaces: [],
+      workspaceIds: [],
       projectIds: [],
     });
     const memberAgentTokenHash = "4".repeat(64);
     await expect(
       updateWorkspaceMemberProjects(
         db,
-        organization.id,
+        workspace.id,
         memberId,
         [sharedProject.id],
       ),
@@ -3253,7 +3253,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     await expect(
       db
         .prepare(`select id from briar_organizations where id = ?`)
-        .bind(organization.id)
+        .bind(workspace.id)
         .first(),
     ).resolves.not.toBeNull();
     await expect(
@@ -3261,7 +3261,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
     ).resolves.toBeNull();
 
     await db.batch([
-      db.prepare(`delete from briar_organizations where id = ?`).bind(organization.id),
+      db.prepare(`delete from briar_organizations where id = ?`).bind(workspace.id),
       db.prepare(`delete from "user" where id = ?`).bind(ownerId),
     ]);
   });
@@ -3741,7 +3741,7 @@ describe("Briar Auto Hunt D1 lifecycle", () => {
       (await listIssueSubscriptions(db, projectId, runId)).map((row) => row.user_id),
     ).toEqual(["owner", "subscription-member"]);
     await expect(
-      listOrganizationIssueSubscriptionRunIds(
+      listWorkspaceIssueSubscriptionRunIds(
         db,
         projectId,
         "subscription-member",

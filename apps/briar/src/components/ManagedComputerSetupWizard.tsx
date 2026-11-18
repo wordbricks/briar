@@ -140,7 +140,7 @@ export function ManagedComputerSetupWizard({
   onComplete,
   onOpenChange,
   open,
-  organizationId,
+  workspaceId,
   projects,
   token,
 }: {
@@ -150,7 +150,7 @@ export function ManagedComputerSetupWizard({
   onComplete: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  organizationId: string;
+  workspaceId: string;
   projects: Project[];
   token: string;
 }) {
@@ -238,7 +238,7 @@ export function ManagedComputerSetupWizard({
     try {
       const ticket = await createSetupSession(
         token,
-        organizationId,
+        workspaceId,
         computer.id,
         { projectId, requestId: crypto.randomUUID() },
       );

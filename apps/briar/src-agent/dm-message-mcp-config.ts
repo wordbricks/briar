@@ -12,6 +12,8 @@ export type DmMessageMcpConfig = {
   readonly socketPath: string;
   readonly capability: string;
   readonly expiresAt: string;
+  readonly scheduleTools?: boolean;
+  readonly relayDirectory?: string;
 };
 
 export type PreparedDmMessageMcp = {
@@ -31,10 +33,13 @@ const decodeConfig = (value: unknown): DmMessageMcpConfig => {
   if (config.version !== 1 || typeof config.invocationId !== "string" ||
       typeof config.socketPath !== "string" || typeof config.capability !== "string" ||
       !/^[A-Za-z0-9_-]{22,128}$/u.test(config.capability) ||
-      typeof config.expiresAt !== "string") {
+      typeof config.expiresAt !== "string" ||
+      (config.scheduleTools !== undefined && typeof config.scheduleTools !== "boolean") ||
+      (config.relayDirectory !== undefined && typeof config.relayDirectory !== "string")) {
     throw new Error("DM message MCP config is invalid");
   }
   assertAbsolutePath(config.socketPath, "socketPath");
+  if (typeof config.relayDirectory === "string") assertAbsolutePath(config.relayDirectory, "relayDirectory");
   const expiresAt = new Date(config.expiresAt);
   if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
     throw new Error("DM message MCP config is expired");
@@ -43,7 +48,7 @@ const decodeConfig = (value: unknown): DmMessageMcpConfig => {
 };
 
 export const prepareDmMessageMcp = async (
-  request: RunnerRequest,
+  request: Pick<RunnerRequest, "dmMessageMcpServerPath" | "dmMessagePublicationBinding">,
 ): Promise<PreparedDmMessageMcp> => {
   const serverPath = request.dmMessageMcpServerPath?.trim() ?? "";
   const binding = request.dmMessagePublicationBinding;
@@ -63,6 +68,7 @@ export const prepareDmMessageMcp = async (
     socketPath: binding.socketPath,
     capability: Buffer.from(binding.capability).toString("base64url"),
     expiresAt: expiresAt.toISOString(),
+    scheduleTools: binding.scheduleTools,
   });
   const directory = await mkdtemp(join(tmpdir(), "briar-dm-message-"));
   await chmod(directory, 0o700);

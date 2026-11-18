@@ -25,6 +25,8 @@ export async function moveHuntRun(
     requestId: string;
     actor: string;
     occurredAt: string;
+    /** Keep an editor correction from racing a dispatch or claim. */
+    requireUnclaimedQueueCorrection?: boolean;
   },
 ): Promise<{
   outcome: HuntMoveOutcome;
@@ -125,18 +127,33 @@ export async function moveHuntRun(
     currentRank >= 0 &&
     targetRank >= 0 &&
     targetRank < currentRank;
+  const statusLabels = {
+    backlog: "백로그",
+    queued: "대기",
+    blocked: "차단",
+    failed: "실패",
+    completed: "완료",
+    cancelled: "취소",
+  } as const;
   const targetLabel =
     input.status === "running"
       ? workflow.stages.find((stage) => stage.id === targetWorkflowStage)?.label
-      : {
-          backlog: "백로그",
-          queued: "대기",
-          blocked: "차단",
-          failed: "실패",
-          completed: "완료",
-          cancelled: "취소",
-        }[input.status];
-  const detail = `사용자가 작업을 ${targetLabel ?? input.status} 상태로 이동했습니다.`;
+      : statusLabels[input.status as keyof typeof statusLabels];
+  /*
+    Where the card came from, so the history reads "대기에서 진행 상태로"
+    instead of only naming the destination. A paused card reports the pause,
+    matching how the board labels it.
+  */
+  const sourceLabel = run.paused_at
+    ? "일시정지"
+    : run.status === "running"
+      ? workflow.stages.find((stage) => stage.id === run.workflow_stage)?.label
+      : statusLabels[run.status as keyof typeof statusLabels];
+  const target = targetLabel ?? input.status;
+  const detail =
+    sourceLabel && sourceLabel !== target
+      ? `사용자가 작업을 ${sourceLabel}에서 ${target} 상태로 이동했습니다.`
+      : `사용자가 작업을 ${target} 상태로 이동했습니다.`;
   const eventId = crypto.randomUUID();
   const recordedAt = new Date().toISOString();
   const targetAttempt =
@@ -167,6 +184,11 @@ export async function moveHuntRun(
          from briar_hunt_runs
          where id = ? and project_id = ? and current_attempt = ?
            and last_event_at = ?
+           and (? = 0 or (
+             status in ('backlog', 'queued')
+             and dispatch_request_id is null
+             and claimed_by is null and lease_expires_at is null
+           ))
          on conflict(run_id, event_key) do nothing`,
       )
       .bind(
@@ -185,6 +207,7 @@ export async function moveHuntRun(
         projectId,
         run.current_attempt,
         run.last_event_at,
+        input.requireUnclaimedQueueCorrection ? 1 : 0,
       ),
     db
       .prepare(
@@ -205,6 +228,11 @@ export async function moveHuntRun(
              updated_at = ?
          where id = ? and project_id = ? and current_attempt = ?
            and last_event_at = ?
+           and (? = 0 or (
+             status in ('backlog', 'queued')
+             and dispatch_request_id is null
+             and claimed_by is null and lease_expires_at is null
+           ))
            and exists (
              select 1 from briar_hunt_events
              where id = ? and run_id = briar_hunt_runs.id
@@ -232,6 +260,7 @@ export async function moveHuntRun(
         projectId,
         run.current_attempt,
         run.last_event_at,
+        input.requireUnclaimedQueueCorrection ? 1 : 0,
         eventId,
       ),
     ...invalidatedStages.map((stage) =>

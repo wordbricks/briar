@@ -13,7 +13,7 @@ import { agentSessionEvent } from "./model";
   The reader still recognizes the original aggregate key, so an upgrade keeps
   the sessions it recorded yesterday and migrates them on the first write.
   Nothing about them is stored in the IndexedDB `ClientSnapshot`: that record
-  is the server's data for one organization and is discarded when the account
+  is the server's data for one workspace and is discarded when the account
   or schema changes, while these are this device's own log of what it ran.
 
   `Atom.kvs` was the other candidate. It wants an Effect runtime with a

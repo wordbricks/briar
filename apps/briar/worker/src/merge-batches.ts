@@ -1,4 +1,3 @@
-import { dmLearningCapacityTable } from "./dm-memory-capacity";
 import {
   MERGE_QUEUE_VALIDATION_CONTEXT,
 } from "../../src/lib/merge-queue-validation-contract";
@@ -1056,10 +1055,6 @@ export async function claimNextMergeBatch(
                     'enqueueing', 'waiting_tail', 'validating',
                     'publishing', 'draining'
                   ))
-              + (select count(*) from ${await dmLearningCapacityTable(db)} learning
-                    where learning.claimed_device_id = selected_device.id and learning.status = 'running'
-                      and learning.kind in ('extract', 'explicit_request', 'consolidate')
-                      and learning.lease_expires_at > ?)
              ) < selected_device.max_concurrent_sessions
          )
        order by case when exists (
@@ -1086,7 +1081,6 @@ export async function claimNextMergeBatch(
     input.claimedAt,
     input.workerId,
     input.deviceId,
-    input.claimedAt,
     input.claimedAt,
     input.claimedAt,
     input.claimedAt,

@@ -10,7 +10,7 @@ const now = "2026-09-06T00:00:00.000Z";
   inserts rather than through the production repository functions, which read
   rows back with catalog queries this migration has not reshaped yet.
 */
-const seedOrganization = async (db: D1Database) => {
+const seedWorkspace = async (db: D1Database) => {
   await executeD1Sql(db, `
     insert into "user" (
       id, name, email, emailVerified, createdAt, updatedAt
@@ -127,7 +127,7 @@ describe("Agent message relay migration", () => {
     await applyD1Migrations(db, {
       through: "0200_channel_sidebar_preferences.sql",
     });
-    await seedOrganization(db);
+    await seedWorkspace(db);
     await seedChannels(db);
     await insertOriginJob(db);
 

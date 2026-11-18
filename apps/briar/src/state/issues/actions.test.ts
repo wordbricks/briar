@@ -11,11 +11,12 @@ import type {
   SessionUser,
 } from "../../types";
 import { runAtom, teamRunIdsAtom } from "../entities/runs";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { planningProjectsAtom } from "../planning/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { issueMessagesAtom, runEventsAtom } from "../run-detail/atoms";
 import { sessionErrorAtom, tokenAtom, userAtom } from "../session/atoms";
+import { ApiError } from "../../lib/api/errors";
 import { applySyncEvent } from "../sync/apply";
 import { teamSyncApiAtom } from "../sync/loader";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
@@ -152,6 +153,10 @@ class IssueServer {
     resumeHuntRun: async (_token, projectId, runId, _checkpoint, requestId) => {
       this.resumeRequestIds.push(requestId ?? "");
       this.guard(`resume:${projectId}:${runId}`);
+      return { runId } as never;
+    },
+    moveHuntRun: async (_token, projectId, runId, placement) => {
+      this.guard(`move:${projectId}:${runId}:${placement.status}`);
       return { runId } as never;
     },
     acceptIssueActionProposal: async (_token, projectId, runId, proposalId) => {
@@ -409,6 +414,49 @@ describe("resumeRun", () => {
   });
 });
 
+describe("moveRun", () => {
+  it("moves the run and refreshes the board", async () => {
+    const { actions, registry, server } = harness({ runs: [runOf("run-1")] });
+    server.snapshot = snapshotOf([runOf("run-1", { status: "blocked" })]);
+    await actions.moveRun("run-1", { status: "blocked", workflowStage: null });
+    expect(server.calls).toEqual([`move:${teamId}:run-1:blocked`]);
+    expect(registry.get(runAtom("run-1"))?.status).toBe("blocked");
+  });
+
+  it("refreshes and explains the conflict when the board changed elsewhere", async () => {
+    const { actions, server } = harness({ runs: [runOf("run-1")] });
+    server.failWith = new ApiError(409, "stale board");
+    await expect(
+      actions.moveRun("run-1", { status: "blocked", workflowStage: null }),
+    ).rejects.toThrow(
+      "다른 화면에서 상태가 이미 변경되었습니다. 최신 상태를 다시 불러왔습니다.",
+    );
+  });
+
+  it("asks to retry when the move cannot be saved", async () => {
+    const { actions, server } = harness({ runs: [runOf("run-1")] });
+    server.failWith = new Error("network down");
+    await expect(
+      actions.moveRun("run-1", { status: "blocked", workflowStage: null }),
+    ).rejects.toThrow(
+      "상태 변경을 저장하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+    );
+  });
+
+  it("records the from-to detail in demo mode", async () => {
+    const { actions, registry } = harness({
+      demoMode: true,
+      token: null,
+      runs: [runOf("run-1", { status: "queued" })],
+    });
+    await actions.moveRun("run-1", { status: "blocked", workflowStage: null });
+    const events = registry.get(runEventsAtom("run-1"));
+    expect(events.at(-1)?.detail).toBe(
+      "사용자가 작업을 대기에서 차단 상태로 이동했습니다.",
+    );
+  });
+});
+
 describe("addIssue", () => {
   it("refreshes in place when the issue belongs to the selected team", async () => {
     const { actions, registry, server } = harness();
@@ -449,8 +497,8 @@ describe("addIssue", () => {
     expect(registry.get(teamRunIdsAtom(teamId))).toEqual([result.runId]);
     expect(registry.get(runAtom(result.runId))?.title).toBe("데모 이슈");
     expect(registry.get(runEventsAtom(result.runId))).toHaveLength(1);
-    expect(registry.get(activeOrganizationIdAtom)).toBe(
-      teamOf(teamId).organizationId,
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(
+      teamOf(teamId).workspaceId,
     );
   });
 });

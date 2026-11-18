@@ -1,5 +1,5 @@
-import { hasOrganizationCapability } from "./organization-access";
-import { getOrganizationRole } from "./organization-repository";
+import { hasWorkspaceCapability } from "./workspace-access";
+import { getWorkspaceRole } from "./workspace-repository";
 import { HttpError } from "./http-response";
 import {
   getChannel,
@@ -16,33 +16,33 @@ const AGENT_DIRECT_MESSAGE_READ_ONLY = "Agent conversations are read-only";
 
 export async function requireChannelAccess(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
 ) {
-  const role = await getOrganizationRole(db, organizationId, userId);
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    throw new HttpError(404, "Organization not found");
+  const role = await getWorkspaceRole(db, workspaceId, userId);
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    throw new HttpError(404, "Workspace not found");
   }
-  const channel = await getChannel(db, organizationId, channelId, userId);
+  const channel = await getChannel(db, workspaceId, channelId, userId);
   if (!channel) throw new HttpError(404, "Channel not found");
   return channel;
 }
 
 export async function requireChannelWriteAccess(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
 ) {
-  const role = await getOrganizationRole(db, organizationId, userId);
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    throw new HttpError(404, "Organization not found");
+  const role = await getWorkspaceRole(db, workspaceId, userId);
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    throw new HttpError(404, "Workspace not found");
   }
-  if (!hasOrganizationCapability(role, "conversations:write")) {
+  if (!hasWorkspaceCapability(role, "conversations:write")) {
     throw new HttpError(403, "Conversation editing permission required");
   }
-  const channel = await getChannel(db, organizationId, channelId, userId);
+  const channel = await getChannel(db, workspaceId, channelId, userId);
   if (!channel) throw new HttpError(404, "Channel not found");
   if (isAgentDirectMessage(channel)) {
     throw new HttpError(403, AGENT_DIRECT_MESSAGE_READ_ONLY);
@@ -52,15 +52,15 @@ export async function requireChannelWriteAccess(
 
 export async function requireChannelDeletionAccess(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
 ) {
-  const role = await getOrganizationRole(db, organizationId, userId);
-  if (!hasOrganizationCapability(role, "organization:read")) {
-    throw new HttpError(404, "Organization not found");
+  const role = await getWorkspaceRole(db, workspaceId, userId);
+  if (!hasWorkspaceCapability(role, "workspace:read")) {
+    throw new HttpError(404, "Workspace not found");
   }
-  const channel = await getChannelById(db, organizationId, channelId);
+  const channel = await getChannelById(db, workspaceId, channelId);
   if (!channel) throw new HttpError(404, "Channel not found");
   /*
     A direct message has no owner: everybody in it is a participant, and the
@@ -80,16 +80,16 @@ export async function requireChannelDeletionAccess(
       .first<{ present: number }>();
     if (participant) return channel;
   }
-  if (!hasOrganizationCapability(role, "conversations:write")) {
+  if (!hasWorkspaceCapability(role, "conversations:write")) {
     throw new HttpError(403, "Conversation editing permission required");
   }
   if (
-    !hasOrganizationCapability(role, "organization:update") &&
+    !hasWorkspaceCapability(role, "workspace:update") &&
     channel.created_by_user_id !== userId
   ) {
     throw new HttpError(
       403,
-      "Channel creator or organization owner access required",
+      "Channel creator or workspace owner access required",
     );
   }
   return channel;
@@ -97,13 +97,13 @@ export async function requireChannelDeletionAccess(
 
 export async function requireChannelWebhookManagement(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
 ) {
   const channel = await requireChannelAccess(
     db,
-    organizationId,
+    workspaceId,
     channelId,
     userId,
   );
@@ -113,15 +113,15 @@ export async function requireChannelWebhookManagement(
   if (channel.kind === "dm") {
     throw new HttpError(400, "Webhooks are not available in direct messages");
   }
-  const organizationRole = await getOrganizationRole(
+  const organizationRole = await getWorkspaceRole(
     db,
-    organizationId,
+    workspaceId,
     userId,
   );
-  if (hasOrganizationCapability(organizationRole, "organization:update")) {
+  if (hasWorkspaceCapability(organizationRole, "workspace:update")) {
     return channel;
   }
-  if (!hasOrganizationCapability(organizationRole, "conversations:write")) {
+  if (!hasWorkspaceCapability(organizationRole, "conversations:write")) {
     throw new HttpError(403, "Conversation editing permission required");
   }
   const membership = await db.prepare(

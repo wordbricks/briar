@@ -30,7 +30,7 @@ const channelWork = {
   workType: "channelReply",
   workId,
   runId,
-  organizationId: "55555555-5555-4555-8555-555555555555",
+  workspaceId: "55555555-5555-4555-8555-555555555555",
   claimToken: `briar_channel_claim_${"b".repeat(64)}`,
 } as ClaimedChannelReply;
 
@@ -161,6 +161,7 @@ describe("generated reply completion client", () => {
               title: "Follow up",
               description: null,
               priority: 2,
+              attachmentIds: [],
             },
           },
           issueBatchProposal: null,
@@ -255,7 +256,7 @@ describe("generated reply completion client", () => {
     })).rejects.toThrow("Channel reply action variants are mutually exclusive");
   });
 
-  it("completes a memory-rich result without a prepublished final receipt", async () => {
+  it("completes a result with memory citations and no prepublished final receipt", async () => {
     const completeChannel = vi.fn().mockResolvedValue({
       replayed: false,
       disposition: ReplyCompletionDisposition.COMPLETED,
@@ -281,7 +282,7 @@ describe("generated reply completion client", () => {
         conversationId: null,
         attachments: [],
         result: {
-          body: "I used and saved the requested memory.",
+          body: "I used the remembered preference.",
           document: null,
           issueProposal: null,
           issueBatchProposal: null,
@@ -290,9 +291,6 @@ describe("generated reply completion client", () => {
           delegation: null,
           agentMessage: null,
           memoryCitations: [{ documentId: "memory-1", version: 2 }],
-          memorySaveRequest: {
-            documents: [{ documentId: "memory-2", version: 1 }],
-          },
         },
       },
     })).resolves.toMatchObject({ disposition: "completed" });
@@ -301,9 +299,6 @@ describe("generated reply completion client", () => {
       case: "success",
       value: {
         memoryCitations: [{ documentId: "memory-1", version: 2 }],
-        memorySaveRequest: {
-          documents: [{ documentId: "memory-2", version: 1 }],
-        },
       },
     });
     expect(completeChannel.mock.calls[0]![0].outcome.value)

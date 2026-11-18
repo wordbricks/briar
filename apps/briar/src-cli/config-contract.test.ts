@@ -9,7 +9,7 @@ import {
 
 const managedComputerId = "44444444-4444-4444-8444-444444444444";
 const managedDeviceId = `managed-${managedComputerId}`;
-const organizationId = "55555555-5555-4555-8555-555555555555";
+const workspaceId = "55555555-5555-4555-8555-555555555555";
 
 const config = {
   apiUrl: "https://briar.example.com",
@@ -33,7 +33,7 @@ const config = {
   managedComputer: {
     managedComputerId,
     deviceId: managedDeviceId,
-    organizationId,
+    workspaceId,
     credentialFile: "/var/lib/briar/worker-credential.json",
   },
   teams: [
@@ -65,7 +65,7 @@ const config = {
       executionWorker: {
         deviceId: managedDeviceId,
         workerId: "managed-worker",
-        organizationId,
+        workspaceId,
         label: "Managed computer",
         maxConcurrentSessions: 1,
       },

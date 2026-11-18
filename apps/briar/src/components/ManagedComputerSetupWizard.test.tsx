@@ -62,7 +62,7 @@ afterEach(() => {
 
 const computer = {
   id: "11111111-1111-4111-8111-111111111111",
-  organizationId: "22222222-2222-4222-8222-222222222222",
+  workspaceId: "22222222-2222-4222-8222-222222222222",
   requesterUserId: "user-one",
   state: "needs_setup" as const,
   provider: "aws" as const,
@@ -90,7 +90,7 @@ describe("ManagedComputerSetupWizard", () => {
         onComplete={vi.fn()}
         onOpenChange={vi.fn()}
         open
-        organizationId={computer.organizationId}
+        workspaceId={computer.workspaceId}
         projects={[{
           id: "33333333-3333-4333-8333-333333333333",
           name: "Briar",
@@ -99,8 +99,8 @@ describe("ManagedComputerSetupWizard", () => {
           icon: null,
           iconName: null,
           iconColor: null,
-          organizationId: computer.organizationId,
-          organizationName: "Briar",
+          workspaceId: computer.workspaceId,
+          workspaceName: "Briar",
           role: "owner",
           createdAt: "2026-08-29T00:00:00.000Z",
         }]}
@@ -131,7 +131,7 @@ describe("ManagedComputerSetupWizard", () => {
       session: {
         id: "44444444-4444-4444-8444-444444444444",
         managedComputerId: computer.id,
-        organizationId: computer.organizationId,
+        workspaceId: computer.workspaceId,
         teamId: "33333333-3333-4333-8333-333333333333",
         status: "pending" as const,
         expiresAt: "2099-01-01T00:00:00.000Z",
@@ -154,7 +154,7 @@ describe("ManagedComputerSetupWizard", () => {
         onComplete={onComplete}
         onOpenChange={vi.fn()}
         open
-        organizationId={computer.organizationId}
+        workspaceId={computer.workspaceId}
         projects={[{
           id: "33333333-3333-4333-8333-333333333333",
           name: "Briar",
@@ -163,8 +163,8 @@ describe("ManagedComputerSetupWizard", () => {
           icon: null,
           iconName: null,
           iconColor: null,
-          organizationId: computer.organizationId,
-          organizationName: "Briar",
+          workspaceId: computer.workspaceId,
+          workspaceName: "Briar",
           role: "owner",
           createdAt: "2026-08-29T00:00:00.000Z",
         }]}

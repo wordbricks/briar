@@ -2,7 +2,7 @@ import type { ChannelSummary } from "./channels-contract";
 
 /**
  * A channel's project is its `defaultProjectId`. A channel without one belongs
- * to the whole organization; the Home list calls those common channels and
+ * to the whole workspace; the Home list calls those common channels and
  * shows them first, because they are the channels every member can act on.
  */
 export type ChannelGroup = {
@@ -18,7 +18,7 @@ export type ChannelGroupProject = { id: string; name: string };
 const byName = (left: ChannelSummary, right: ChannelSummary) =>
   left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
 
-/** Channels with no `defaultProjectId` stay in the organization-wide list. */
+/** Channels with no `defaultProjectId` stay in the workspace-wide list. */
 export function organizationSidebarChannels(
   channels: readonly ChannelSummary[],
 ): ChannelSummary[] {
@@ -35,7 +35,7 @@ export function projectSidebarChannels(
 
 /**
  * Orders groups as common, the active project, then every other project in the
- * organization by name. Archived channels are dropped, and a channel pointing
+ * workspace by name. Archived channels are dropped, and a channel pointing
  * at a project the caller cannot see keeps a neutral label rather than
  * disappearing — the channel itself is still readable.
  */

@@ -324,7 +324,7 @@ export const demoRunEvents: Record<string, HuntEvent[]> = Object.fromEntries(
 
 const runs: HuntRun[] = runSeeds.map(({ events, ...run }) => ({
   ...run,
-  workspaceId: "demo-organization",
+  workspaceId: "demo-workspace",
   teamId: "demo-project",
   projectId: "demo-project",
   projectName: "General",
@@ -341,8 +341,8 @@ export const demoDashboard: DashboardPayload = {
     icon: null,
     iconName: null,
     iconColor: null,
-    organizationId: "demo-organization",
-    organizationName: "Briar",
+    workspaceId: "demo-workspace",
+    workspaceName: "Briar",
     role: "owner",
     createdAt: ago(3_000),
   },

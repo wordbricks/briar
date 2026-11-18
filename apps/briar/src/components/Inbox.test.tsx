@@ -11,10 +11,11 @@ import {
 } from "../state/inbox/atoms";
 import {
   classifyInboxMessage,
+  inboxMessageOrigin,
   type InboxMessage,
   type InboxMessageWithReadState,
 } from "../state/inbox/model";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom, userAtom } from "../state/session/atoms";
 import { teamsAtom } from "../state/team/atoms";
@@ -37,8 +38,8 @@ const projects: Project[] = [
     icon: "data:image/webp;base64,briar-icon",
     iconName: null,
     iconColor: null,
-    organizationId: "organization-1",
-    organizationName: "Briar",
+    workspaceId: "workspace-1",
+    workspaceName: "Briar",
     role: "owner",
     createdAt: "2026-07-01T00:00:00.000Z",
   },
@@ -50,8 +51,8 @@ const projects: Project[] = [
     icon: "data:image/webp;base64,sprout-icon",
     iconName: null,
     iconColor: null,
-    organizationId: "organization-1",
-    organizationName: "Briar",
+    workspaceId: "workspace-1",
+    workspaceName: "Briar",
     role: "developer",
     createdAt: "2026-07-02T00:00:00.000Z",
   },
@@ -95,6 +96,7 @@ const summaryOf = (
   id: message.id,
   projectId: message.projectId,
   category: classifyInboxMessage(message),
+  origin: inboxMessageOrigin(message),
   isUnread: message.isUnread,
 });
 
@@ -136,7 +138,7 @@ describe("Inbox", () => {
       [userAtom, { id: "user-1", name: "Tester", email: "tester@briar.local" }],
       [tokenAtom, "token-1"],
       [teamsAtom, projects],
-      [activeOrganizationIdAtom, "organization-1"],
+      [activeWorkspaceIdAtom, "workspace-1"],
     ]);
     ({ cleanup, container, root } = createReactTestRoot({
       attachToDocument: true,

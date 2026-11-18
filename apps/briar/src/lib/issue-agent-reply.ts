@@ -1,4 +1,4 @@
-import type { OrganizationMember } from "../types";
+import type { WorkspaceMember } from "../types";
 import { mentionAtCaret as issueMentionAtCaret } from "./mention-token";
 
 export { issueMentionAtCaret };
@@ -12,7 +12,7 @@ export {
 } from "./issue-reply-decision";
 
 export function issueMentionHandle(
-  member: Pick<OrganizationMember, "email" | "userId">,
+  member: Pick<WorkspaceMember, "email" | "userId">,
 ) {
   const localPart = member.email.split("@")[0]?.toLowerCase() ?? "";
   const normalized = localPart

@@ -19,6 +19,7 @@ import {
   codexFinalMessage,
   codexInitializeRequest,
   codexModelListRequest,
+  codexPreparedRequestMismatch,
   codexServerRequestResponse,
   codexThreadRequest,
   codexTurnRequest,
@@ -26,6 +27,7 @@ import {
   createCodexAppServerState,
   normalizeCodexAppServerMessage,
 } from "./codex-runner-lib";
+import { codexComputerUseArgs } from "./computer-use-provider-adapters";
 import type { RunnerRequest } from "./runner-request";
 
 const request: RunnerRequest = {
@@ -39,6 +41,7 @@ const request: RunnerRequest = {
   networkAccess: true,
   attachments: [],
   additionalDirectories: [],
+  toolInheritance: "inherit",
   providerBinaryPath: "/usr/local/bin/codex",
 };
 
@@ -51,12 +54,20 @@ describe("Codex App Server runner", () => {
       "--config",
       "sandbox_workspace_write.network_access=true",
     ]);
-    expect(codexAppServerArgs({ networkAccess: false })).toEqual([
+    expect(
+      codexAppServerArgs({
+        networkAccess: false,
+        toolInheritance: "inherit",
+      }),
+    ).toEqual([
       "app-server",
       "--listen",
       "stdio://",
     ]);
-    expect(codexAppServerArgs({ networkAccess: true }, "aside")).toEqual([
+    expect(codexAppServerArgs(
+      { networkAccess: true, toolInheritance: "inherit" },
+      "aside",
+    )).toEqual([
       "app-server",
       "--listen",
       "stdio://",
@@ -68,7 +79,11 @@ describe("Codex App Server runner", () => {
       "sandbox_workspace_write.network_access=true",
     ]);
     expect(
-      codexAppServerArgs({ networkAccess: false, externalTools: false }),
+      codexAppServerArgs({
+        networkAccess: false,
+        externalTools: false,
+        toolInheritance: "inherit",
+      }),
     ).toEqual([
       "app-server",
       "--listen",
@@ -95,7 +110,11 @@ describe("Codex App Server runner", () => {
     ]);
     expect(
       codexAppServerArgs(
-        { networkAccess: false, externalTools: false },
+        {
+          networkAccess: false,
+          externalTools: false,
+          toolInheritance: "inherit",
+        },
         "aside",
       ),
     ).not.toContain('mcp_servers.aside.command="aside"');
@@ -153,12 +172,217 @@ describe("Codex App Server runner", () => {
     });
   });
 
+  it("drops only the user's tool catalog for a Briar-owned turn", () => {
+    // `briar` is not the classification lockdown: the sandbox permissions, web
+    // search, skills and project docs of an inheriting turn all stand. There is
+    // deliberately no `mcp_servers={}`: measured against codex-cli 0.153.4, that
+    // override merges into the user's table instead of replacing it, so the
+    // servers are refused by name on the thread request below.
+    expect(
+      codexAppServerArgs({ networkAccess: true, toolInheritance: "briar" }),
+    ).toEqual([
+      "app-server",
+      "--listen",
+      "stdio://",
+      "--disable",
+      "apps",
+      "--disable",
+      "plugins",
+      "--config",
+      "sandbox_workspace_write.network_access=true",
+    ]);
+    // Briar's own servers are still passed for a Briar-owned turn.
+    expect(
+      codexAppServerArgs(
+        { networkAccess: false, toolInheritance: "briar" },
+        "aside",
+        codexComputerUseArgs([
+          {
+            name: "briar-dm-message",
+            command: "/usr/bin/bun",
+            args: ["/bundles/dm-message-mcp-server.js"],
+            env: {},
+          },
+        ]),
+      ),
+    ).toEqual([
+      "app-server",
+      "--listen",
+      "stdio://",
+      "--disable",
+      "apps",
+      "--disable",
+      "plugins",
+      "--config",
+      'mcp_servers.aside.command="aside"',
+      "--config",
+      'mcp_servers.aside.args=["mcp"]',
+      "--config",
+      'mcp_servers.briar-dm-message.command="/usr/bin/bun"',
+      "--config",
+      'mcp_servers.briar-dm-message.args=["/bundles/dm-message-mcp-server.js"]',
+      "--config",
+      "mcp_servers.briar-dm-message.env={}",
+      "--config",
+      "mcp_servers.briar-dm-message.required=true",
+    ]);
+    // The classification lockdown keeps precedence over this axis.
+    expect(
+      codexAppServerArgs({
+        networkAccess: false,
+        externalTools: false,
+        toolInheritance: "briar",
+      }),
+    ).toEqual(
+      codexAppServerArgs({
+        networkAccess: false,
+        externalTools: false,
+        toolInheritance: "inherit",
+      }),
+    );
+    // A Briar-owned turn keeps the ordinary sandbox on its thread.
+    expect(
+      codexThreadRequest({ ...request, toolInheritance: "briar" }),
+    ).toMatchObject({
+      method: "thread/start",
+      params: { sandbox: "workspace-write" },
+    });
+  });
+
+  /*
+    Codex starts its MCP servers on the thread request, not at startup, so this
+    is the moment the user's servers are actually refused — and the moment
+    Briar's own must survive. Measured: with these names disabled the App Server
+    emitted no `mcpServer/startupStatus/updated` at all and started no process.
+  */
+  it("refuses the user's MCP servers on the thread a Briar-owned turn starts", () => {
+    const briarTurn: RunnerRequest = { ...request, toolInheritance: "briar" };
+    const state = createCodexAppServerState(undefined, [
+      "aside",
+      "briar-dm-message",
+    ]);
+
+    consumeCodexAppServerMessage(state, briarTurn, {
+      id: 2,
+      result: {
+        config: {
+          model: "gpt-5",
+          mcp_servers: {
+            playwright: {},
+            node_repl: {},
+            aside: {},
+            "briar-dm-message": {},
+          },
+          plugins: { "browser@openai-bundled": {} },
+        },
+      },
+    });
+    const transition = consumeCodexAppServerMessage(state, briarTurn, {
+      id: 6,
+      result: { apps: [{ id: "connector_figma", runtimeName: "Figma" }] },
+    });
+
+    expect(transition.outgoing[0]).toMatchObject({
+      method: "thread/start",
+      params: {
+        // The turn's own sandbox and instructions are untouched.
+        sandbox: "workspace-write",
+        developerInstructions: "Use the Briar workflow.",
+        config: {
+          features: { apps: false, plugins: false },
+          apps: { connector_figma: { enabled: false } },
+          mcp_servers: {
+            playwright: { enabled: false },
+            node_repl: { enabled: false },
+          },
+        },
+      },
+    });
+    const threadConfig = (transition.outgoing[0]?.params as {
+      config: { mcp_servers: Record<string, unknown> };
+    }).config;
+    expect(Object.keys(threadConfig.mcp_servers).sort())
+      .toEqual(["node_repl", "playwright"]);
+  });
+
+  it("keeps every configured MCP server for an inheriting turn", () => {
+    const state = createCodexAppServerState();
+
+    consumeCodexAppServerMessage(state, request, {
+      id: 2,
+      result: {
+        config: { model: "gpt-5", mcp_servers: { playwright: {} } },
+      },
+    });
+    const transition = consumeCodexAppServerMessage(state, request, {
+      id: 6,
+      result: { apps: [] },
+    });
+
+    expect(transition.outgoing[0]).toMatchObject({ method: "thread/start" });
+    expect((transition.outgoing[0]?.params as { config?: unknown }).config)
+      .toBeUndefined();
+  });
+
+  it("lets a prepared process serve only the turn it was prepared for", () => {
+    // What the App Server was started with, and what its thread is started
+    // with. The prompt, its instructions, the attachments and the output
+    // schema arrive with the turn and are none of this list's business.
+    const prepared: RunnerRequest = { ...request, message: "" };
+
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        message: "Answer the DM",
+        instructions: "A prompt-shaped instruction block",
+        attachments: [{ type: "image", path: "/tmp/a.png", name: "a.png", mimeType: "image/png" }],
+        outputSchema: { type: "object" },
+      }),
+    ).toBeNull();
+
+    // A memory-changed refresh drops the conversation the process resumed.
+    expect(
+      codexPreparedRequestMismatch(
+        { ...prepared, conversationId: "thread-1" },
+        { ...request, conversationId: undefined },
+      ),
+    ).toBe("conversationId");
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        workspaceRoot: "/worktree/checked-out",
+      }),
+    ).toBe("workspaceRoot");
+    expect(
+      codexPreparedRequestMismatch(prepared, { ...request, model: "gpt-5.1" }),
+    ).toBe("model");
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        toolInheritance: "briar",
+      }),
+    ).toBe("toolInheritance");
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        sandboxMode: "readOnly",
+      }),
+    ).toBe("sandboxMode");
+    expect(
+      codexPreparedRequestMismatch(prepared, {
+        ...request,
+        networkAccess: false,
+      }),
+    ).toBe("networkAccess");
+  });
+
   it("keeps the desktop sandbox, resume, and structured-output contract", () => {
     // Auto Hunt worktrees live outside the checkout, so their roots ride on
     // their own `--config` and leave network_access intact.
     expect(
       codexAppServerArgs({
         networkAccess: true,
+        toolInheritance: "inherit",
         additionalDirectories: [
           "/Users/dev/briar/worktrees/project-1",
           '/tmp/other "root"',
@@ -253,6 +477,39 @@ describe("Codex App Server runner", () => {
 
     expect(completed.completed).toBe(true);
     expect(codexFinalMessage(state)).toBe("Done");
+  });
+
+  it("never answers with a typed progress message", () => {
+    const state = createCodexAppServerState();
+    state.threadId = "thread-1";
+    state.turnId = "turn-1";
+
+    // Codex does not phase these as commentary, so only the progress shape
+    // keeps them out of the answer.
+    const completed = consumeCodexAppServerMessage(state, request, {
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-1",
+          status: "completed",
+          items: [
+            {
+              type: "agentMessage",
+              text: '{"progress":"현재 랜딩 구조를 확인하겠습니다"}',
+            },
+            {
+              type: "agentMessage",
+              phase: "final_answer",
+              text: '```json\n{"progress":"테스트를 실행하겠습니다"}\n```',
+            },
+          ],
+        },
+      },
+    });
+
+    expect(completed.completed).toBe(true);
+    expect(codexFinalMessage(state)).toBeNull();
   });
 
   it("maps App Server messages to the shared Agent event contract", () => {

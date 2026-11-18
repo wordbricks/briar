@@ -13,9 +13,11 @@
   (see migration 0184), and both tables sit under cascades that already run
   deep: `on delete cascade` from a channel, and the `on delete set null` a
   section deletion performs. Writing the two rows explicitly keeps the cascade
-  depth exactly where it was while still advancing the organization's cursor,
+  depth exactly where it was while still advancing the workspace's cursor,
   which is what makes another device refetch the summary.
 */
+
+import { agentAnswerCopySql } from "./channels";
 
 export type ChannelSidebarSectionRow = {
   id: string;
@@ -29,7 +31,7 @@ export type ChannelSidebarSectionRow = {
 
 export type ChannelSidebarSection = {
   id: string;
-  organizationId: string;
+  workspaceId: string;
   name: string;
   position: number;
   createdAt: string;
@@ -40,7 +42,7 @@ export const channelSidebarSectionJson = (
   row: ChannelSidebarSectionRow,
 ): ChannelSidebarSection => ({
   id: row.id,
-  organizationId: row.organization_id,
+  workspaceId: row.organization_id,
   name: row.name,
   position: row.position,
   createdAt: row.created_at,
@@ -48,15 +50,15 @@ export const channelSidebarSectionJson = (
 });
 
 /**
- * Records that one channel's summary changed and moves the organization's
+ * Records that one channel's summary changed and moves the workspace's
  * channel cursor forward, so `SyncChannels` hands the channel back to every
  * device that asks. `version` is the change table's autoincrement id, and the
- * greatest one an organization has is exactly what `last_insert_rowid()` gives
+ * greatest one a workspace has is exactly what `last_insert_rowid()` gives
  * the triggers that do this in SQL.
  */
 export async function recordChannelSummaryChange(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
 ): Promise<void> {
   await db
@@ -66,7 +68,7 @@ export async function recordChannelSummaryChange(
          created_at
        ) values (?, ?, 'channel', ?, 'upsert', datetime('now'))`,
     )
-    .bind(organizationId, channelId, channelId)
+    .bind(workspaceId, channelId, channelId)
     .run();
   await db
     .prepare(
@@ -76,13 +78,13 @@ export async function recordChannelSummaryChange(
        on conflict (organization_id) do update
          set current_version = excluded.current_version`,
     )
-    .bind(organizationId, organizationId)
+    .bind(workspaceId, workspaceId)
     .run();
 }
 
 export async function listChannelSidebarSections(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ) {
   const rows = await db
@@ -93,14 +95,14 @@ export async function listChannelSidebarSections(
        where organization_id = ? and user_id = ?
        order by position, created_at, id`,
     )
-    .bind(organizationId, userId)
+    .bind(workspaceId, userId)
     .all<ChannelSidebarSectionRow>();
   return rows.results;
 }
 
 export async function getChannelSidebarSection(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
   sectionId: string,
 ) {
@@ -111,7 +113,7 @@ export async function getChannelSidebarSection(
        from briar_channel_sidebar_sections
        where id = ? and organization_id = ? and user_id = ?`,
     )
-    .bind(sectionId, organizationId, userId)
+    .bind(sectionId, workspaceId, userId)
     .first<ChannelSidebarSectionRow>();
 }
 
@@ -119,7 +121,7 @@ export async function createChannelSidebarSection(
   db: D1Database,
   input: {
     id: string;
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     name: string;
     createdAt: string;
@@ -142,10 +144,10 @@ export async function createChannelSidebarSection(
     )
     .bind(
       input.id,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.name,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.createdAt,
       input.createdAt,
@@ -157,7 +159,7 @@ export async function renameChannelSidebarSection(
   db: D1Database,
   input: {
     sectionId: string;
-    organizationId: string;
+    workspaceId: string;
     userId: string;
     name: string;
     updatedAt: string;
@@ -175,7 +177,7 @@ export async function renameChannelSidebarSection(
       input.name,
       input.updatedAt,
       input.sectionId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
     )
     .first<ChannelSidebarSectionRow>();
@@ -188,7 +190,7 @@ export async function renameChannelSidebarSection(
  */
 export async function deleteChannelSidebarSection(
   db: D1Database,
-  input: { sectionId: string; organizationId: string; userId: string },
+  input: { sectionId: string; workspaceId: string; userId: string },
 ) {
   const affected = await db
     .prepare(
@@ -203,7 +205,7 @@ export async function deleteChannelSidebarSection(
        where id = ? and organization_id = ? and user_id = ?
        returning id`,
     )
-    .bind(input.sectionId, input.organizationId, input.userId)
+    .bind(input.sectionId, input.workspaceId, input.userId)
     .first<{ id: string }>();
   return {
     deleted: deleted !== null,
@@ -301,15 +303,23 @@ export async function clearChannelReadState(
     .run();
 }
 
-/** The newest message in the channel written by anybody but this user. */
+/**
+ * The newest message in the channel written by anybody but this user, ignoring
+ * the answers copied back from another Agent for the sender to read: the
+ * summary's own `has_unread` ignores them too, so counting one here would offer
+ * to make a conversation unread that comes straight back read.
+ */
 export async function latestForeignChannelMessageAt(
   db: D1Database,
   input: { userId: string; channelId: string },
 ) {
   const row = await db
     .prepare(
-      `select max(created_at) as created_at from briar_channel_messages
-       where channel_id = ? and ifnull(author_user_id, '') != ?`,
+      `select max(message.created_at) as created_at
+       from briar_channel_messages message
+       where message.channel_id = ?
+         and ifnull(message.author_user_id, '') != ?
+         and not ${agentAnswerCopySql("message")}`,
     )
     .bind(input.channelId, input.userId)
     .first<{ created_at: string | null }>();

@@ -5,15 +5,17 @@ import {
 } from "@connectrpc/connect";
 import {
   ApplicationErrorDetailSchema,
-  ValidationErrorDetailSchema,
-} from "@briar/contracts/gen/briar/types/v1/error_pb";
+  RevisionConflictDetailSchema,
+  RevisionConflictReason,
+  ValidationErrorDetailSchema} from "@briar/contracts/gen/briar/types/v1/error_pb";
 import * as SchemaIssue from "effect/SchemaIssue";
 import { agentSkillConflictMessage } from "./agent-skills";
 import { HttpError } from "./http-response";
+import { MemoryVaultError } from "./memory-vault/errors";
 import {
-  OrganizationAgentContextCursorError,
-  OrganizationAgentContextPageTooLargeError,
-} from "./organization-agent-context";
+  WorkspaceAgentContextCursorError,
+  WorkspaceAgentContextPageTooLargeError,
+} from "./workspace-agent-context";
 import { RequestDecodeError } from "./request-schema";
 import { ProjectWorkflowInputError } from "./run-request-contract";
 import { TranscriptLimitError, WorkerConflictError } from "./workers";
@@ -88,7 +90,7 @@ export const toConnectError = (error: unknown): ConnectError => {
       error,
     );
   }
-  if (error instanceof OrganizationAgentContextCursorError) {
+  if (error instanceof WorkspaceAgentContextCursorError) {
     return new ConnectError(
       error.message,
       Code.InvalidArgument,
@@ -97,7 +99,7 @@ export const toConnectError = (error: unknown): ConnectError => {
       error,
     );
   }
-  if (error instanceof OrganizationAgentContextPageTooLargeError) {
+  if (error instanceof WorkspaceAgentContextPageTooLargeError) {
     return new ConnectError(
       error.message,
       Code.ResourceExhausted,
@@ -122,6 +124,30 @@ export const toConnectError = (error: unknown): ConnectError => {
       Code.FailedPrecondition,
       undefined,
       undefined,
+      error,
+    );
+  }
+  if (error instanceof MemoryVaultError && error.details.currentRevision !== undefined) {
+    // The memory tools read the current revision from here to tell the agent
+    // what to re-read and merge.
+    return new ConnectError(
+      error.message,
+      connectCodeFromHttpStatus(error.status),
+      undefined,
+      [
+        { desc: ApplicationErrorDetailSchema, value: { code: error.vaultCode } },
+        {
+          desc: RevisionConflictDetailSchema,
+          value: {
+            resourceId: error.details.recordId ?? "",
+            expectedRevision: error.details.expectedRevision === undefined
+              ? undefined
+              : BigInt(error.details.expectedRevision),
+            actualRevision: BigInt(error.details.currentRevision),
+            reason: RevisionConflictReason.STALE_WRITE,
+          },
+        },
+      ],
       error,
     );
   }
@@ -153,6 +179,19 @@ export const connectErrorInterceptor: Interceptor =
     try {
       return await next(request);
     } catch (error) {
-      throw toConnectError(error);
+      const connectError = toConnectError(error);
+      // An unmapped exception reaches the client as a bare "Internal server
+      // error"; without this line the server keeps no record of what it was,
+      // and a failing Worker heartbeat can only be diagnosed by guesswork.
+      if (connectError.code === Code.Internal) {
+        console.error(JSON.stringify({
+          message: "connect request failed",
+          service: request.service.typeName,
+          method: request.method.name,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+          stack: error instanceof Error ? (error.stack ?? "").slice(0, 1_500) : undefined,
+        }));
+      }
+      throw connectError;
     }
   };

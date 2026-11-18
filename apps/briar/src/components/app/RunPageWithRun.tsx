@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { lazy, useMemo, type ComponentProps } from "react";
 
 import { teamMembersAtom } from "../../state/entities/members";
-import { teamOrganizationProvidersAtom } from "../../state/entities/providers";
+import { teamWorkspaceProvidersAtom } from "../../state/entities/providers";
 import { runAtom, teamRunsAtom } from "../../state/entities/runs";
 import { teamEntityAtom } from "../../state/entities/teams";
 import { teamWorkersAtom } from "../../state/entities/workers";
@@ -52,7 +52,7 @@ type ConnectedProps =
   | "isUpdatingIssue"
   | "issueKeyPrefix"
   | "mentionMembers"
-  | "organizationId"
+  | "workspaceId"
   | "run"
   | "token"
   | "onAcceptIssueAction"
@@ -105,7 +105,7 @@ export function RunPageWithRun({ runId, ...props }: RunPageWithRunProps) {
   const members = useAtomValue(teamMembersAtom(teamId));
   const executionPolicy = useAtomValue(teamExecutionPolicyAtom(teamId));
   const organizationProviders = useAtomValue(
-    teamOrganizationProvidersAtom(teamId),
+    teamWorkspaceProvidersAtom(teamId),
   );
   const teams = useAtomValue(teamsAtom);
   const user = useAtomValue(userAtom);
@@ -122,7 +122,7 @@ export function RunPageWithRun({ runId, ...props }: RunPageWithRunProps) {
   const runDetailActions = useRunDetailActions();
 
   /**
-   * The providers the account may pick from: the organization's list when the
+   * The providers the account may pick from: the workspace's list when the
    * payload carries one, and otherwise whatever the team's workers advertise.
    */
   const availableProviders = useMemo((): AgentProvider[] => {
@@ -220,8 +220,8 @@ export function RunPageWithRun({ runId, ...props }: RunPageWithRunProps) {
       isUpdatingIssue={isUpdatingIssue}
       issueKeyPrefix={team?.issueKeyPrefix}
       mentionMembers={members ?? []}
-      organizationId={
-        teams.find((team) => team.id === props.projectId)?.organizationId ?? null
+      workspaceId={
+        teams.find((team) => team.id === props.projectId)?.workspaceId ?? null
       }
       run={run}
       token={token}

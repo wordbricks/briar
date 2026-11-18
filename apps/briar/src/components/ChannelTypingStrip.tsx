@@ -17,25 +17,46 @@ import {
 import {
   activityForReplies,
   threadMessageIdSet,
+  typingAgentNamesForReplies,
 } from "../state/channel-conversation/model";
 import { ChannelTypingState } from "./ChannelTypingState";
 
 /*
   Who is answering, drawn where it is read.
 
-  The app has no per-user typing signal. A concrete commentary frame from the
-  channel's activity socket is the only state shown here; a queued or running
-  reply by itself stays silent. `use-channel-conversation.ts` once derived the
-  state from a `replies` prop and handed the result down as two props per row,
-  so a reply tick — one every few seconds while an agent works — re-rendered the
-  whole conversation to move a three-word line.
+  The app has no per-user typing signal, so two things say an agent is working:
+  the durable reply row (queued or running) and a commentary frame from the
+  channel's activity socket. The two surfaces weigh them differently.
 
-  These two components subscribe instead. A tick reaches the strip under the
-  message it belongs to and nothing else, which is what
-  `Channels.typing-strip.test.tsx` pins.
+  A channel shows the reply row on its own — "{name} is writing a reply…" — and
+  upgrades that line to "{name} · {headline}" once a frame arrives. It has to:
+  a runner is free to publish no commentary at all (a Codex-backed agent
+  answered a mention after two minutes having published nothing), and on a
+  channel that silence would otherwise be indistinguishable from the mention
+  having been dropped.
+
+  A DM shows only the frame. Its progress is a placeholder message row of its
+  own — `ChannelTypingPlaceholder.tsx` — where an empty "is writing a reply…"
+  row would be a message-shaped promise with nothing in it, so a reply without
+  commentary stays silent there. That is why `ChannelThreadTypingStrip` takes
+  `showPendingReplyNames` rather than deciding for itself: the DM surface can
+  open the shared thread panel too.
+
+  These two components subscribe instead of taking a `replies` prop, which
+  `use-channel-conversation.ts` once handed down per row — a reply tick, one
+  every few seconds while an agent works, re-rendered the whole conversation to
+  move a three-word line. A tick now reaches the strip under the message it
+  belongs to and nothing else, which is what `Channels.typing-strip.test.tsx`
+  pins.
 */
 
-/** The agents answering one root message. */
+/**
+ * The agents answering one root message.
+ *
+ * Channels only: both call sites render it under `channel.kind !== "dm"`
+ * (`Channels.tsx`, `CompanionChannels.tsx`), so the pending-reply names are
+ * always wanted here and there is no flag to pass.
+ */
 export function ChannelMessageTypingStrip({
   channelId,
   className,
@@ -61,17 +82,31 @@ export function ChannelMessageTypingStrip({
     <ChannelTypingState
       activityByAgentName={activityByAgentName}
       className={className}
+      pendingAgentNames={typingAgentNamesForReplies(
+        own,
+        agents,
+        new Set([messageId]),
+        fallbackAgentName,
+      )}
     />
   );
 }
 
-/** The agents answering anywhere inside the channel's open thread. */
+/**
+ * The agents answering anywhere inside the channel's open thread.
+ *
+ * `showPendingReplyNames` is the surface's answer, not this component's: the
+ * panel is shared, and a DM row offers "reply in thread" like any other, so
+ * only the caller knows whether a reply without commentary should be named.
+ */
 export function ChannelThreadTypingStrip({
   channelId,
   className,
+  showPendingReplyNames,
 }: {
   readonly channelId: string;
   readonly className?: string;
+  readonly showPendingReplyNames: boolean;
 }) {
   const { t } = useI18n();
   const replies = useAtomValue(channelPendingAgentRepliesAtom(channelId));
@@ -96,6 +131,16 @@ export function ChannelThreadTypingStrip({
     <ChannelTypingState
       activityByAgentName={activityByAgentName}
       className={className}
+      pendingAgentNames={
+        showPendingReplyNames
+          ? typingAgentNamesForReplies(
+              own,
+              agents,
+              messageIds,
+              fallbackAgentName,
+            )
+          : []
+      }
     />
   );
 }

@@ -37,7 +37,7 @@ import type {
   AutoHuntSession,
   IssueExecutionApprovalInput,
 } from "../../types";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import {
@@ -54,6 +54,7 @@ import {
   channelThreadSubscriptionAction,
   channelThreadSubscriptionPendingAtom,
 } from "./atoms";
+import { confirmChannelMessageDeletion } from "./delete-confirmation";
 import {
   channelConversationFailureAtom,
   reportChannelConversationError,
@@ -235,8 +236,8 @@ export function createChannelConversationActions(
   });
   const credentials = () => {
     const token = registry.get(tokenAtom);
-    const organizationId = registry.get(activeOrganizationIdAtom);
-    return token && organizationId ? { token, organizationId } : null;
+    const workspaceId = registry.get(activeWorkspaceIdAtom);
+    return token && workspaceId ? { token, workspaceId } : null;
   };
 
 
@@ -246,7 +247,7 @@ export function createChannelConversationActions(
   ) => {
     const session = credentials();
     if (!session || !channelId || !body.trim()) return;
-    const { token, organizationId } = session;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     const context = options.context();
     const { imageCache } = context;
@@ -333,7 +334,7 @@ export function createChannelConversationActions(
           agents.length === 1;
         const preferredDeviceId =
           hasAgentMention || implicitlyInvokesDirectAgent || selectedSkill
-            ? await api.currentExecutionWorkerDeviceId(organizationId)
+            ? await api.currentExecutionWorkerDeviceId(workspaceId)
             : null;
         const mentionedAgentIds = mentions
           .filter((mention) => mention.type === "agent")
@@ -343,7 +344,7 @@ export function createChannelConversationActions(
         }
         const result = await api.sendChannelMessage(
           token,
-          organizationId,
+          workspaceId,
           channelId,
           {
             body: body.trim(),
@@ -435,7 +436,7 @@ export function createChannelConversationActions(
     if (!session || !channelId || item.channelId !== channelId || !item.proposal) {
       return context.text.executionTargetUnavailable;
     }
-    const { token, organizationId } = session;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     const proposalId = item.proposal.id;
     const requestsExecution = channelIssueProposalRequestsExecution(
@@ -461,7 +462,7 @@ export function createChannelConversationActions(
           const result = execution
             ? await api.acceptChannelProposal(
                 token,
-                organizationId,
+                workspaceId,
                 channelId,
                 proposalId,
                 projectId,
@@ -469,7 +470,7 @@ export function createChannelConversationActions(
               )
             : await api.acceptChannelProposal(
                 token,
-                organizationId,
+                workspaceId,
                 channelId,
                 proposalId,
                 projectId,
@@ -557,7 +558,7 @@ export function createChannelConversationActions(
       !proposal ||
       proposal.status !== "pending"
     ) return;
-    const { token, organizationId } = session;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     const declineContext = loader.captureSurface();
     return runTask(
@@ -568,7 +569,7 @@ export function createChannelConversationActions(
         try {
           await api.declineChannelProposal(
             token,
-            organizationId,
+            workspaceId,
             channelId,
             proposal.id,
           );
@@ -599,7 +600,7 @@ export function createChannelConversationActions(
   ) => {
     const session = credentials();
     if (!session || !channelId) return;
-    const { token, organizationId } = session;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     const { currentUserId } = options.context();
     const reactionContext = loader.captureSurface();
@@ -618,7 +619,7 @@ export function createChannelConversationActions(
     try {
       const result = await api.toggleChannelMessageReaction(
         token,
-        organizationId,
+        workspaceId,
         channelId,
         item.id,
         emoji,
@@ -643,8 +644,12 @@ export function createChannelConversationActions(
     const session = credentials();
     const context = options.context();
     if (!session || !channelId || item.deletedAt) return;
-    if (!window.confirm(context.text.deleteMessageConfirm)) return;
-    const { token, organizationId } = session;
+    const confirmed = await confirmChannelMessageDeletion(
+      registry,
+      context.text.deleteMessageConfirm,
+    );
+    if (!confirmed) return;
+    const { token, workspaceId } = session;
     const api = resolveApi();
     const deletionContext = loader.captureSurface();
     return runTask(
@@ -655,7 +660,7 @@ export function createChannelConversationActions(
         try {
           const result = await api.deleteChannelMessage(
             token,
-            organizationId,
+            workspaceId,
             channelId,
             item.id,
           );
@@ -701,7 +706,7 @@ export function createChannelConversationActions(
         !parentId ||
         registry.get(channelThreadSubscriptionPendingAtom(channelId))
       ) return;
-      const { token, organizationId } = session;
+      const { token, workspaceId } = session;
       const api = resolveApi();
       const context = loader.captureSurface();
       return runTask(
@@ -712,7 +717,7 @@ export function createChannelConversationActions(
           try {
             const result = await api.updateChannelThreadSubscription(
               token,
-              organizationId,
+              workspaceId,
               channelId,
               parentId,
               subscribed,
@@ -755,7 +760,7 @@ export function createChannelConversationActions(
       }
       const result = await resolveApi().acceptChannelExecutionProposal(
         session.token,
-        session.organizationId,
+        session.workspaceId,
         item.channelId,
         proposal.id,
         input,
@@ -784,7 +789,7 @@ export function createChannelConversationActions(
       }
       const result = await resolveApi().acceptChannelSkillExecutionProposal(
         session.token,
-        session.organizationId,
+        session.workspaceId,
         item.channelId,
         proposal,
         input,

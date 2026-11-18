@@ -30,6 +30,188 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.237",
+        date: "2026년 10월 16일",
+        title: "에이전트가 이슈와 채널을 직접 다룹니다",
+        summary:
+          "에이전트가 작업 중에 Briar 이슈를 만들고 기록을 남기며, 참여한 채널에 글을 올릴 수 있습니다.",
+        items: [
+          "에이전트가 이슈를 만들고 메모를 남기고 상태를 바꿀 수 있습니다. 실행 대기열에 올리는 것은 기존처럼 승인을 거칩니다.",
+          "에이전트가 자신이 참여한 채널에 글을 올릴 수 있습니다. 조직당 시간당 30개로 제한됩니다.",
+        ],
+      },
+      {
+        version: "1.2.236",
+        date: "2026년 10월 14일",
+        title: "기억 창에서 폴더와 내용을 나란히 봅니다",
+        summary:
+          "DM 기억 창이 넓어지고, 왼쪽 폴더 트리에서 고른 기억을 오른쪽에서 바로 미리 봅니다.",
+        items: [
+          "기억 창이 커지고 왼쪽에 폴더 트리, 오른쪽에 선택한 기억의 미리보기가 표시됩니다.",
+          "미리보기에서 바로 편집하고 변경 이력을 보거나 삭제할 수 있습니다.",
+          "좁은 화면에서는 폴더와 미리보기를 한 화면씩 오갑니다.",
+        ],
+      },
+      {
+        version: "1.2.235",
+        date: "2026년 10월 14일",
+        title: "기억을 폴더 구조로 봅니다",
+        summary:
+          "DM 기억 창이 에이전트 기억 저장소를 폴더 트리로 보여줍니다.",
+        items: [
+          "DM 기억 창에서 일지, 인물, 지식, 작업 흐름 등 기억 폴더를 접고 펼치며 볼 수 있습니다.",
+          "각 파일에 기억 종류와 버전이 표시되고, 누르면 내용과 이력을 보거나 수정·삭제할 수 있습니다.",
+          "에이전트에게 주는 기억 안내(README)를 읽기 전용으로 볼 수 있습니다.",
+        ],
+      },
+      {
+        version: "1.2.234",
+        date: "2026년 10월 14일",
+        title: "에이전트 기억이 새 저장소 하나로 정리되었습니다",
+        summary:
+          "이전 기억 시스템을 걷어내고, 에이전트가 새 기억 저장소만 쓰도록 정리했습니다. 데스크톱 앱에서도 에이전트가 기억 도구를 쓸 수 있습니다.",
+        items: [
+          "데스크톱 앱이 에이전트 기억 도구를 함께 설치해, 이 컴퓨터의 에이전트도 작업 중 기억을 조회하고 기록합니다.",
+          "이전 기억 시스템(자동 학습, 검색 인덱스)을 제거했습니다. 기존 기억은 새 저장소로 옮겨 그대로 유지됩니다.",
+          "기억 설정 화면에서 이전 시스템 전용 항목을 정리했습니다.",
+          "DM 답변이 실패하면 대화 내용이 담길 수 있는 오류 문구 대신 고정된 안내만 표시합니다.",
+        ],
+      },
+      {
+        version: "1.2.233",
+        date: "2026년 10월 14일",
+        title: "에이전트가 일하면서 스스로 기억을 관리합니다",
+        summary:
+          "에이전트가 대화와 작업 중에 기억을 직접 조회하고 기록하며, 새 실행에서도 이어서 씁니다. 새 도메인 briar.onequery.dev, 모바일 화면 개선과 의존성 보안 업데이트도 포함됩니다.",
+        items: [
+          "에이전트 기억이 Cloudflare Artifacts에 버전 이력과 함께 저장되고, 에이전트가 작업 중 기억을 조회·검색·기록합니다.",
+          "DM 기억은 사용자별로, 그룹 채널과 프로젝트 기억은 각각 분리되어 서로 섞이지 않습니다.",
+          "답변 문체와 지속 규칙, 실수에서 배운 교훈을 기억해 다음 답변과 작업에 반영합니다.",
+          "기억을 삭제하면 과거 이력까지 지워집니다.",
+          "Briar의 기본 주소가 briar.onequery.dev로 바뀌었습니다. 기존 주소도 계속 동작합니다.",
+          "휴대폰 화면에서 내비게이션이 닫을 수 있는 서랍으로 바뀌고, 받은함·이슈 화면이 좁은 폭에 맞게 정리되었습니다.",
+          "보안 경고가 있던 의존성을 업데이트했습니다.",
+        ],
+      },
+      {
+        version: "1.2.232",
+        date: "2026년 9월 26일",
+        title: "이슈 관리와 알림이 더 선명해졌습니다",
+        summary:
+          "업데이트 시점으로 이슈를 찾고 알림 출처를 바로 구분할 수 있습니다. 대기열과 삭제 확인 동작을 다듬었고, transcript 저장 비용도 줄였습니다.",
+        items: [
+          "이슈 목록을 업데이트 시점으로 필터링할 수 있습니다.",
+          "알림에 이슈 대화와 채널 메시지를 구분하는 출처 배지가 표시되고, 출처별로 필터링할 수 있습니다.",
+          "담당자가 없는 queued 이슈를 Kanban 보드에서 backlog로 되돌릴 수 있습니다.",
+          "채널 삭제 확인이 시스템 팝업 대신 앱 안의 일관된 확인 화면으로 표시됩니다.",
+          "DM 확인 이모지가 메시지의 의도에 더 정확히 맞도록 판단 기준을 개선했습니다.",
+          "중복 transcript segment 인덱스를 제거해 데이터 변경 없이 D1 쓰기 및 저장 공간 부담을 줄였습니다.",
+        ],
+      },
+      {
+        version: "1.2.231",
+        date: "2026년 9월 10일",
+        title: "DM 답장 실패와 확인 이모지를 고쳤습니다",
+        summary:
+          "이슈 개수처럼 프로젝트 정보를 묻는 DM에 Agent가 답하지 못하고 실패하던 문제를 고쳤고, 메시지에 붙는 확인 이모지가 대부분 👀로만 나오던 것을 인사·질문·요청에 맞는 이모지로 바꿨습니다.",
+        items: [
+          "프로젝트 정보를 묻는 DM이 실패하지 않고 답장합니다.",
+          "확인 이모지가 인사(👋), 감사(🙏), 질문(🔍) 등 메시지 의도에 맞게 붙습니다.",
+          "워커가 DM 게시 프로바이더를 건강한 것만 광고해, 로그아웃된 CLI가 있어도 워커가 멈추지 않습니다.",
+        ],
+      },
+      {
+        version: "1.2.230",
+        date: "2026년 9월 10일",
+        title: "DM 답장이 훨씬 빨라졌습니다",
+        summary:
+          "메시지를 보내면 Agent가 읽었다는 이모지가 1~2초 안에 붙고, 답장도 이전보다 몇 배 빨리 도착합니다. 답장을 준비하는 과정에서 기다릴 필요가 없던 단계들을 걷어내고, 연속으로 보낸 메시지는 한 번의 답장으로 묶습니다.",
+        items: [
+          "메시지에 맞는 확인 이모지를 서버가 수신 즉시 골라 붙입니다. 답장이 늦어도 읽었다는 표시는 바로 보입니다.",
+          "인사나 질문 같은 일반 대화는 저장소를 준비하지 않고 바로 답합니다. 코드를 봐야 할 때만 Agent가 저장소를 요청합니다.",
+          "답장을 준비하는 단계들을 동시에 진행하고, Codex는 미리 띄워 둡니다.",
+          "답장을 만드는 도중 새 메시지가 오면 처음부터 다시 하지 않고 같은 답장에 합칩니다.",
+          "메시지를 보낸 뒤 워커가 받기까지 기다리던 2초 대기를 없앴습니다.",
+        ],
+      },
+      {
+        version: "1.2.229",
+        date: "2026년 9월 10일",
+        title: "사이드바 왼쪽 위가 깨지던 문제를 고쳤습니다",
+        summary:
+          "워크스페이스 로고가 원래 크기 그대로 펼쳐지면서 사이드바 위쪽의 검색창과 새 메시지 버튼을 덮던 문제를 고쳤습니다. 같은 원인으로 스타일이 빠져 있던 워크스페이스 목록, 워크스페이스 만들기 화면, 휴대폰 화면의 상단 메뉴도 함께 정상으로 돌아옵니다.",
+        items: [
+          "사이드바 맨 위의 워크스페이스 로고가 다시 제 크기로 보입니다.",
+          "워크스페이스를 고르는 목록과 워크스페이스 만들기 화면의 모양이 돌아왔습니다.",
+          "휴대폰 화면 상단의 워크스페이스 메뉴도 함께 고쳤습니다.",
+          "어두운 화면에서 위 화면들의 색이 다시 제대로 적용됩니다.",
+        ],
+      },
+      {
+        version: "1.2.228",
+        date: "2026년 9월 9일",
+        title: "DM 답장이 더 빨리 시작되고 잠깐의 서버 지연에도 끊기지 않습니다",
+        summary:
+          "에이전트에게 보낸 DM에 확인 이모지가 바로 붙고, 답장 준비 단계가 동시에 진행돼 첫 응답까지 걸리는 시간이 줄었습니다. 저장된 기억을 불러오는 요청이 잠시 지연되더라도 답장을 포기하지 않고 계속 진행합니다.",
+        items: [
+          "DM을 받자마자 확인 이모지를 붙이고, 모델이 고른 이모지로 곧 바꿉니다.",
+          "코드 저장소가 필요 없는 일반 대화 답장은 작업 폴더를 만들지 않아 더 빨리 시작합니다.",
+          "기억 요약, 첨부 파일, 스킬 목록 같은 답장 준비 단계를 한꺼번에 진행합니다.",
+          "답장을 준비하는 동안 새 메시지가 오면 처음부터 다시 시작하지 않고 같은 답장에 합칩니다.",
+          "기억 서버 응답이 잠시 늦으면 몇 차례 다시 시도하고, 그래도 안 되면 저장된 기억 없이 답장을 이어갑니다. 진행 중이던 컴퓨터 작업도 이 때문에 중단되지 않습니다.",
+          "워커의 주기적 상태 점검이 답장 처리를 기다리게 하지 않도록 뒤로 뺐습니다.",
+          "DM에 첨부한 파일이 승인된 제안으로 만들어지는 이슈에도 함께 전달됩니다.",
+        ],
+      },
+      {
+        version: "1.2.227",
+        date: "2026년 9월 9일",
+        title: "조직이라는 이름이 워크스페이스로 정리됐습니다",
+        summary:
+          "Briar의 최상위 공간을 부르는 이름이 화면마다 조직과 워크스페이스로 섞여 있었습니다. 이제 워크스페이스 하나로 통일했습니다. 데이터나 설정은 그대로이며 다시 로그인하실 필요는 없습니다.",
+        items: [
+          "앱 전체 문구를 워크스페이스로 맞췄습니다. 한국어·영어·중국어 모두 반영했습니다.",
+          "Slack 워크스페이스를 연결하는 화면처럼 두 이름이 함께 나오던 곳은 어느 쪽을 가리키는지 분명해졌습니다.",
+          "GitHub 조직과 Velen 조직은 각 서비스의 이름이므로 그대로 둡니다.",
+          "정리 과정에서 관리형 컴퓨터 등록과 대시보드 응답에 일부 식별자가 비어 나가던 문제를 함께 고쳤습니다.",
+        ],
+      },
+      {
+        version: "1.2.225",
+        date: "2026년 9월 9일",
+        title: "이슈 대화에서도 Agent가 답변 중인 것이 보입니다",
+        summary:
+          "이슈 대화에서 Agent를 멘션하면 답변이 큐에 들어간 순간부터 상태가 표시됩니다. 진행 문구가 아직 없어도 누가 답변 중인지 먼저 알려주고, 문구가 도착하면 그 내용으로 바뀝니다.",
+        items: [
+          "답변이 시작되면 \"OO님이 답변을 작성하고 있습니다…\"가 바로 뜹니다. 이전에는 Agent가 진행 문구를 보내지 않으면 아무것도 표시되지 않아, 멘션이 유실된 것과 구분할 수 없었습니다.",
+          "진행 문구가 도착하면 그 내용으로 승격되고, 이전 시도에서 남은 문구는 낡은 내용을 유지하는 대신 일반 문구로 되돌립니다.",
+          "채널에서 먼저 되살린 동작을 이슈 대화에 맞췄습니다. DM은 기존대로 구체적인 진행 문구가 있을 때만 표시합니다.",
+        ],
+      },
+      {
+        version: "1.2.224",
+        date: "2026년 9월 9일",
+        title: "DM 리액션에 쉬운 작업용 모델을 사용합니다",
+        summary:
+          "메시지에 맞는 이모지를 고를 때 기존 쉬운 작업용 모델 설정을 사용합니다. 본문 답변은 Agent에 지정한 모델을 그대로 사용합니다.",
+        items: [
+          "실행기에서 사용 가능한 쉬운 작업용 모델을 고릅니다. 후보가 없으면 Agent 설정을 사용하고, 선택 실패나 시간 초과에는 기존 기본 리액션을 표시합니다.",
+          "Luna의 실제 호출로 감사·축하·위로 리액션을 확인했습니다. 이번 소규모 비교에서는 속도 개선은 관측되지 않았습니다.",
+        ],
+      },
+      {
+        version: "1.2.223",
+        date: "2026년 9월 9일",
+        title: "난이도에 맞는 모델이 실제로 배정됩니다",
+        summary:
+          "난이도별 모델 배분을 최신 성능 지표 기준으로 다시 맞췄습니다. 보통·어려움이 쉬움보다 약한 모델로 시작하던 문제와, 일부 프로바이더가 아예 후보에서 빠져 있던 문제를 함께 고쳤습니다.",
+        items: [
+          "보통은 GPT-5.6 Sol로, 어려움은 Opus 5로 시작합니다. 이전에는 각 난이도의 첫 후보가 아래 난이도보다 약했습니다.",
+          "쉬움의 Gemini를 3.8 Flash로 올렸습니다. 가격이 같고 성능이 앞섭니다. OpenCode에는 GLM-5.3 계열을 붙였습니다.",
+          "OpenCode와 OpenRouter 후보가 한 번도 선택되지 않던 문제를 고쳤습니다. DeepSeek는 성능이 확인된 빌드만 지정합니다.",
+        ],
+      },
+      {
         version: "1.2.222",
         date: "2026년 9월 9일",
         title: "가장 어려운 일에 가장 강한 모델을 붙입니다",
@@ -1967,6 +2149,188 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.237",
+        date: "October 16, 2026",
+        title: "Agents work with issues and channels",
+        summary:
+          "While working, agents can create Briar issues, leave notes on them and post in the channels they belong to.",
+        items: [
+          "Agents can create issues, add notes and change status. Queuing an issue for execution still goes through approval.",
+          "Agents can post in channels they are a member of, up to 30 posts per organization per hour.",
+        ],
+      },
+      {
+        version: "1.2.236",
+        date: "October 14, 2026",
+        title: "Folders and memory side by side",
+        summary:
+          "The DM memory window is larger, with the folder tree on the left and a preview of the selected memory on the right.",
+        items: [
+          "A larger memory window shows the folder tree on the left and the selected memory's preview on the right.",
+          "Edit, review history or delete straight from the preview.",
+          "On narrow screens, move between the folders and the preview one screen at a time.",
+        ],
+      },
+      {
+        version: "1.2.235",
+        date: "October 14, 2026",
+        title: "Browse memory as folders",
+        summary:
+          "The DM memory window shows the agent's memory store as a folder tree.",
+        items: [
+          "Expand and collapse memory folders such as the timeline, people, knowledge and workstreams in the DM memory window.",
+          "Each file shows its memory type and version; open it to read, review history, edit or delete.",
+          "The memory guide agents receive (README) is visible read-only.",
+        ],
+      },
+      {
+        version: "1.2.234",
+        date: "October 14, 2026",
+        title: "Agent memory now lives in one store",
+        summary:
+          "The previous memory system is gone and agents use only the new memory store. Agents on the desktop app can now use their memory tools too.",
+        items: [
+          "The desktop app installs the agent memory tools, so agents on this computer can look up and record memory while they work.",
+          "The previous memory system (automatic learning and its search index) was removed. Existing memories were moved to the new store and are kept.",
+          "Memory settings no longer show options that only the previous system used.",
+          "When a DM reply fails, Briar shows a fixed notice instead of error text that could repeat the conversation.",
+        ],
+      },
+      {
+        version: "1.2.233",
+        date: "October 14, 2026",
+        title: "Agents keep their own memory while they work",
+        summary:
+          "Agents now look up and record memory during conversations and tasks, and pick it up again in later runs. This release also moves Briar to briar.onequery.dev, improves phone layouts and updates dependencies with security advisories.",
+        items: [
+          "Agent memory is stored in Cloudflare Artifacts with full version history, and agents read, search and record it while they work.",
+          "DM memory is kept per person, and group channel and project memory are kept separately, so they never mix.",
+          "Agents remember reply style, standing reply rules and lessons from their own mistakes, and apply them to later replies and tasks.",
+          "Deleting a memory also removes it from the stored history.",
+          "Briar's primary address is now briar.onequery.dev; the previous address keeps working.",
+          "On phones, navigation moves into a dismissible drawer, and the inbox and issue views fit narrow screens.",
+          "Dependencies with security advisories were updated.",
+        ],
+      },
+      {
+        version: "1.2.232",
+        date: "September 26, 2026",
+        title: "Clearer issue management and notification context",
+        summary:
+          "Issues can now be filtered by update time, and notification sources are visible at a glance. Queue and delete-confirmation behavior is more predictable, while transcript storage writes less redundant index data.",
+        items: [
+          "Filter the issue list by when issues were last updated.",
+          "Notification badges and filters distinguish issue conversations from channel messages.",
+          "Return unassigned queued issues to the backlog from the Kanban board.",
+          "Channel deletion uses a consistent in-app confirmation dialog instead of a system prompt.",
+          "DM acknowledgement emoji guidance better matches the intent of each message.",
+          "A redundant transcript segment index was removed, reducing D1 write and storage overhead without changing transcript data.",
+        ],
+      },
+      {
+        version: "1.2.231",
+        date: "September 10, 2026",
+        title: "Fixed failing DM replies and the acknowledgement emoji",
+        summary:
+          "A DM asking for project information, such as how many issues are open, could fail instead of being answered, and the acknowledgement emoji on your messages was almost always 👀. Both are fixed.",
+        items: [
+          "DMs that ask for project information are answered instead of failing.",
+          "The acknowledgement emoji now matches the message: a greeting gets 👋, thanks get 🙏, a question gets 🔍.",
+          "A worker only advertises healthy providers for DM publishing, so a signed-out CLI no longer takes the worker offline.",
+        ],
+      },
+      {
+        version: "1.2.230",
+        date: "September 10, 2026",
+        title: "DM replies are much faster",
+        summary:
+          "After you send a message, the Agent's acknowledgement emoji appears within a second or two, and the reply itself arrives several times faster than before. Steps that never needed to be waited on were taken off the path, and messages sent in a burst are answered together.",
+        items: [
+          "The server picks a fitting acknowledgement emoji the moment your message arrives, so you see it was read even when the reply takes longer.",
+          "Plain conversation such as a greeting or a question is answered without preparing the repository; the Agent asks for the repository only when it needs to read code.",
+          "Reply preparation steps now run at the same time, and Codex is started ahead of time.",
+          "A message that arrives while a reply is being written is folded into that reply instead of restarting it.",
+          "The two-second wait between your message and a worker picking it up is gone.",
+        ],
+      },
+      {
+        version: "1.2.229",
+        date: "September 10, 2026",
+        title: "Fixed the broken top-left corner of the sidebar",
+        summary:
+          "A workspace logo was drawn at its full original size and covered the search box and New message button at the top of the sidebar. The same cause had stripped the styling from the workspace list, the Create workspace screen, and the top menu on phones, and those are all back to normal too.",
+        items: [
+          "The workspace logo at the top of the sidebar is the right size again.",
+          "The workspace picker and the Create workspace screen look correct again.",
+          "The workspace menu at the top of the phone layout is fixed as well.",
+          "Dark mode colors apply correctly on all of those screens again.",
+        ],
+      },
+      {
+        version: "1.2.228",
+        date: "September 9, 2026",
+        title: "DM replies start sooner and survive brief server hiccups",
+        summary:
+          "A DM to an agent gets its acknowledgement reaction right away, and the reply setup steps now run together, so the first response arrives sooner. If loading stored memory stalls for a moment, the reply keeps going instead of giving up.",
+        items: [
+          "The acknowledgement reaction lands as soon as the DM is picked up and is swapped for the model's own choice shortly after.",
+          "Plain conversation replies that need no repository skip creating a working folder and start faster.",
+          "Memory brief, attachments and the skill catalog are prepared at the same time instead of one after another.",
+          "A message that arrives while a reply is being prepared is folded into the same reply rather than restarting it.",
+          "A slow memory server is retried a few times; if it still does not answer, the reply continues without stored memory, and an in-progress computer task is no longer cut short because of it.",
+          "The Worker's periodic health probes no longer sit in front of reply handling.",
+          "Files attached to a DM are carried over to the issue created from an approved proposal.",
+        ],
+      },
+      {
+        version: "1.2.227",
+        date: "September 9, 2026",
+        title: "Organizations are now workspaces",
+        summary:
+          "Briar's top-level space was called an organization on some screens and a workspace on others. It is a workspace everywhere now. Your data and settings are unchanged and you do not need to sign in again.",
+        items: [
+          "Every screen now says workspace, in English, Korean and Chinese.",
+          "Screens where both names appear at once — connecting a Slack workspace, for instance — now make clear which one is meant.",
+          "GitHub organizations and Velen organizations keep their own names, since those belong to those services.",
+          "The cleanup also surfaced and fixed cases where managed computer enrollment and dashboard responses returned an empty identifier.",
+        ],
+      },
+      {
+        version: "1.2.225",
+        date: "September 9, 2026",
+        title: "Issue conversations show that an Agent is replying",
+        summary:
+          "Mentioning an Agent in an issue conversation now shows a status line from the moment the reply is queued. It names the Agent first and upgrades to the concrete progress text once that arrives.",
+        items: [
+          "A queued or running reply shows \"<name> is writing a reply…\" right away. Previously nothing appeared unless the Agent published progress text, which was indistinguishable from a dropped mention.",
+          "A progress headline upgrades that line, and a headline left over from an earlier attempt falls back to the generic wording instead of lingering.",
+          "This matches the behaviour already restored for channels. DMs keep showing progress only when there is something concrete to show.",
+        ],
+      },
+      {
+        version: "1.2.224",
+        date: "September 9, 2026",
+        title: "DM reactions use the easy-task model settings",
+        summary:
+          "Contextual emoji selection now reuses the existing easy-task model policy. The reply body keeps the Agent's configured model.",
+        items: [
+          "Workers select an available easy-task model, retaining Agent settings when no candidate qualifies. Selection failure or timeout keeps the existing neutral reaction fallback.",
+          "Live Luna calls returned appropriate gratitude, celebration and empathy reactions. This small comparison did not show a latency improvement.",
+        ],
+      },
+      {
+        version: "1.2.223",
+        date: "September 9, 2026",
+        title: "Difficulty now picks the model it should",
+        summary:
+          "Model selection per difficulty was rebalanced against current capability scores. Normal and Hard had been starting with weaker models than Easy, and some providers were never being chosen at all.",
+        items: [
+          "Normal now leads with GPT-5.6 Sol and Hard with Opus 5. Each tier's first choice had been weaker than the tier below it.",
+          "Easy moved to Gemini 3.8 Flash, which costs the same as 3.7 and scores higher, and OpenCode gained the GLM-5.3 models.",
+          "Fixed OpenCode and OpenRouter candidates that could never be selected. DeepSeek is now pinned to the build whose capability is known.",
+        ],
+      },
       {
         version: "1.2.222",
         date: "September 9, 2026",

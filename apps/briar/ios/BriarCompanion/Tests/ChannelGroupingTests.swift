@@ -4,6 +4,34 @@ import XCTest
 /// Home grouping must match `src/lib/channel-grouping.ts` so both mobile
 /// surfaces order the same organization identically.
 final class ChannelGroupingTests: XCTestCase {
+    func testSkillSuggestionsFilterAndRetainOnlyValidInvocations() {
+        let agentID = UUID()
+        let skill = ProjectAgent.Skill(
+            id: UUID(), agentId: agentID, name: "Review code", instructions: "Review",
+            provider: .codex, model: nil, effort: nil, kind: .custom,
+            description: "Check changes", position: 0, createdAt: Date(), updatedAt: Date()
+        )
+        let agent = ChannelAgentSummary(
+            agentId: agentID, name: "Developer", avatar: nil, provider: "codex",
+            model: nil, projectId: nil, description: nil, responsibility: "Develop",
+            createdAt: Date(), skills: [skill]
+        )
+        let commands = ChannelSkillCommand.candidates(agents: [agent])
+        let target = commands[0]
+        for query in ["/", "/REVIEW", "/changes", "/developer"] {
+            XCTAssertEqual(ChannelSkillCommand.suggestions(in: query, candidates: commands, selected: nil), commands)
+        }
+        for query in ["text /", " /", "@Developer", "/missing", "/\n"] {
+            XCTAssertTrue(ChannelSkillCommand.suggestions(in: query, candidates: commands, selected: nil).isEmpty)
+        }
+        XCTAssertTrue(ChannelSkillCommand.suggestions(in: "/", candidates: [], selected: nil).isEmpty)
+        XCTAssertEqual(target.invocation, "/Review code ")
+        XCTAssertTrue(ChannelSkillCommand.suggestions(in: target.invocation, candidates: commands, selected: target).isEmpty)
+        XCTAssertEqual(ChannelSkillCommand.retained(target, in: "/Review code Check auth\nplease", candidates: commands), target)
+        XCTAssertNil(ChannelSkillCommand.retained(target, in: "/Review", candidates: commands))
+        XCTAssertNil(ChannelSkillCommand.retained(target, in: target.invocation, candidates: []))
+    }
+
     private let projectOne = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
     private let projectTwo = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
     private let projectThree = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!

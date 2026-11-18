@@ -3,7 +3,7 @@ import type { RealtimeTransport } from "./realtime-transport";
 
 export type TeamRealtimeTarget = {
   id: string;
-  organizationId?: string | null;
+  workspaceId?: string | null;
 };
 
 export type TeamRealtimeRefreshEnvironment = {
@@ -35,11 +35,11 @@ export type TeamRealtimeRefreshOptions = {
   fallbackMs: number;
   pauseWhenHidden?: boolean;
   environment?: TeamRealtimeRefreshEnvironment;
-  createTransport?: (token: string, organizationId: string) => RealtimeTransport;
+  createTransport?: (token: string, workspaceId: string) => RealtimeTransport;
 };
 
 /**
- * Uses the organization socket as the primary project invalidation signal and
+ * Uses the workspace socket as the primary project invalidation signal and
  * keeps one bounded fallback refresh for missed publishes or reconnect gaps.
  */
 export function startTeamRealtimeRefresh({
@@ -52,17 +52,17 @@ export function startTeamRealtimeRefresh({
   createTransport = createProjectRealtimeTransport,
 }: TeamRealtimeRefreshOptions) {
   const projectIds = [...new Set(targets.map((target) => target.id))];
-  const teamIdsByOrganization = new Map<string, Set<string>>();
+  const teamIdsByWorkspace = new Map<string, Set<string>>();
   for (const target of targets) {
-    if (!target.organizationId) continue;
-    const ids = teamIdsByOrganization.get(target.organizationId) ?? new Set();
+    if (!target.workspaceId) continue;
+    const ids = teamIdsByWorkspace.get(target.workspaceId) ?? new Set();
     ids.add(target.id);
-    teamIdsByOrganization.set(target.organizationId, ids);
+    teamIdsByWorkspace.set(target.workspaceId, ids);
   }
 
-  const transports = [...teamIdsByOrganization].map(
-    ([organizationId, organizationTeamIds]) => {
-      const transport = createTransport(token, organizationId);
+  const transports = [...teamIdsByWorkspace].map(
+    ([workspaceId, organizationTeamIds]) => {
+      const transport = createTransport(token, workspaceId);
       const unsubscribe = transport.subscribe((notification) => {
         if (
           notification.topic === "project-session" &&
@@ -74,7 +74,7 @@ export function startTeamRealtimeRefresh({
         ) {
           // Refreshing on the explicit ready frame closes any reconnect gap
           // without turning unrelated channel or Inbox traffic into session
-          // reads for every project in the organization.
+          // reads for every project in the workspace.
           refresh([...organizationTeamIds]);
         }
       });

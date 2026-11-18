@@ -10,7 +10,7 @@ export type WorkerLifecycleOperation =
 
 export type WorkerLifecycleTarget = {
   requestId: string;
-  organizationId: string;
+  workspaceId: string;
   projectId: string | null;
   deviceId: string;
   workerId: string | null;
@@ -87,7 +87,7 @@ const lifecycleTargetMatches = (
   row: WorkerLifecycleEventRow,
   target: WorkerLifecycleTarget & { operation: WorkerLifecycleOperation },
 ) =>
-  row.organization_id === target.organizationId &&
+  row.organization_id === target.workspaceId &&
   row.project_id === target.projectId &&
   row.device_id === target.deviceId &&
   row.worker_id === target.workerId &&
@@ -107,7 +107,7 @@ const logLifecycleEvent = (input: {
     message: "Execution Worker lifecycle observed",
     lifecycle: {
       requestId: input.context.requestId,
-      organizationId: input.context.organizationId,
+      workspaceId: input.context.workspaceId,
       projectId: input.context.projectId,
       deviceId: input.context.deviceId,
       workerId: input.context.workerId,
@@ -254,7 +254,7 @@ export async function beginWorkerHardDelete(
     )
     .bind(
       context.requestId,
-      context.organizationId,
+      context.workspaceId,
       context.projectId,
       context.deviceId,
       context.workerId,
@@ -422,7 +422,7 @@ export async function recordPreservedWorkerBinding(
     )
     .bind(
       context.requestId,
-      context.organizationId,
+      context.workspaceId,
       context.projectId,
       context.deviceId,
       context.workerId,

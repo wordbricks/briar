@@ -2,8 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   ProviderBlockReason,
-  ProviderBlockSchema,
-} from "@briar/contracts/gen/briar/types/v1/provider_block_pb";
+  ProviderBlockSchema} from "@briar/contracts/gen/briar/types/v1/provider_block_pb";
 import {
   ChannelReplyClaimIdentitySchema,
   ChannelReplyAgentMessageActionSchema,
@@ -14,8 +13,7 @@ import {
   CompleteIssueReplyRequestSchema,
   IssueReplyClaimIdentitySchema,
   ReplyIssueDraftSchema,
-  WorkClaimIdentitySchema,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  WorkClaimIdentitySchema} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { createHash } from "node:crypto";
 import { env as cloudflareEnv } from "cloudflare:workers";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -59,7 +57,7 @@ import {
 import { workerClaimRuntimeFixture } from "./test-helpers/worker-runtime";
 import type { channelReplyWorkerAvailability } from "./workers";
 
-const organizationId = "a9000000-0000-4000-8000-000000000001";
+const workspaceId = "a9000000-0000-4000-8000-000000000001";
 const projectId = "b9000000-0000-4000-8000-000000000001";
 const deviceId = "c9000000-0000-4000-8000-000000000001";
 const workerId = "d9000000-0000-4000-8000-000000000001";
@@ -110,7 +108,7 @@ describe("reply completion application", () => {
     BETTER_AUTH_SECRET: signingSecret,
   }) as unknown as Env;
   const worker = {
-    principal: { organizationId, deviceId },
+    principal: { workspaceId, deviceId },
     binding: { id: workerId, project_id: projectId },
   };
 
@@ -125,20 +123,20 @@ describe("reply completion application", () => {
         `insert into briar_organizations (
            id, name, handle, created_at, updated_at
          ) values (?, 'Reply Completion', 'reply-completion', ?, ?)`,
-      ).bind(organizationId, at(0), at(0)),
+      ).bind(workspaceId, at(0), at(0)),
     ]);
     await db.batch([
       db.prepare(
         `insert into briar_organization_members (
            organization_id, user_id, role, created_at, updated_at
          ) values (?, ?, 'owner', ?, ?)`,
-      ).bind(organizationId, ownerId, at(0), at(0)),
+      ).bind(workspaceId, ownerId, at(0), at(0)),
       db.prepare(
         `insert into briar_projects (
            id, owner_user_id, organization_id, name, agent_token_hash,
            created_at, updated_at
          ) values (?, ?, ?, 'Reply Project', ?, ?, ?)`,
-      ).bind(projectId, ownerId, organizationId, "a".repeat(64), at(0), at(0)),
+      ).bind(projectId, ownerId, workspaceId, "a".repeat(64), at(0), at(0)),
     ]);
     await db.batch([
       db.prepare(
@@ -160,7 +158,7 @@ describe("reply completion application", () => {
          ) values (?, ?, ?, 'Reply Device', ?, 'online', ?, ?, ?)`,
       ).bind(
         deviceId,
-        organizationId,
+        workspaceId,
         ownerId,
         "b".repeat(64),
         at(0),
@@ -270,7 +268,7 @@ describe("reply completion application", () => {
     const triggerMessageId = `e5000000-0000-4000-8000-${suffix}`;
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: `reply-completion-${sequence}`,
@@ -296,7 +294,7 @@ describe("reply completion application", () => {
       createdAt: at(sequence),
     });
     const [job] = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId,
       parentMessageId: triggerMessageId,
@@ -304,7 +302,7 @@ describe("reply completion application", () => {
       createdAt: at(sequence),
     });
     const claimToken = `briar_channel_claim_${suffix.padStart(64, "0")}`;
-    const claimed = await claimNextChannelAgentReply(db, organizationId, {
+    const claimed = await claimNextChannelAgentReply(db, workspaceId, {
       deviceId,
       workerId,
       ...workerClaimRuntimeFixture({
@@ -327,7 +325,7 @@ describe("reply completion application", () => {
     claimToken: claim.claimToken,
     work: {
       case: "channelReply",
-      value: create(ChannelReplyClaimIdentitySchema, { organizationId }),
+      value: create(ChannelReplyClaimIdentitySchema, { workspaceId: workspaceId }),
     },
   });
 
@@ -340,7 +338,7 @@ describe("reply completion application", () => {
       workerId,
       claim: {
         replyKind: "issue",
-        organizationId: null,
+        workspaceId: null,
         workId: claim.workId,
         runId: claim.runId,
         claimToken: claim.claimToken,
@@ -523,7 +521,7 @@ describe("reply completion application", () => {
       workerId,
       claim: {
         replyKind: "issue",
-        organizationId: null,
+        workspaceId: null,
         workId: claim.workId,
         runId: claim.runId,
         claimToken: claim.claimToken,
@@ -682,13 +680,13 @@ describe("reply completion application", () => {
     }, {
       worker: {
         ...worker,
-        principal: { organizationId, deviceId: crypto.randomUUID() },
+        principal: { workspaceId, deviceId: crypto.randomUUID() },
       },
       request: completion,
     }, {
       worker: {
         ...worker,
-        principal: { organizationId: crypto.randomUUID(), deviceId },
+        principal: { workspaceId: crypto.randomUUID(), deviceId },
       },
       request: completion,
     }, {
@@ -789,9 +787,9 @@ describe("reply completion application", () => {
     when this one completes, so the completion pushes a wake instead of leaving
     the next turn to the Worker's idle poll.
   */
-  it("wakes the organization's Workers when a channel reply completes", async () => {
+  it("wakes the workspace's Workers when a channel reply completes", async () => {
     const claim = await seedChannelClaim();
-    const wakes: Array<{ organizationId: string; reason: string }> = [];
+    const wakes: Array<{ workspaceId: string; reason: string }> = [];
     const completion = completeChannelReplyInputFromProto(create(
       CompleteChannelReplyRequestSchema,
       {
@@ -816,19 +814,19 @@ describe("reply completion application", () => {
       request: completion,
       observedAt: at(250 + sequence),
     }, {
-      wakeOrganizationWorkers: (_env, organizationId, reason) => {
-        wakes.push({ organizationId, reason });
+      wakeWorkspaceWorkers: (_env, workspaceId, reason) => {
+        wakes.push({ workspaceId, reason });
       },
     })).resolves.toMatchObject({ replayed: false, disposition: "completed" });
     expect(wakes).toEqual([
-      { organizationId, reason: "channel_reply_completed" },
+      { workspaceId, reason: "channel_reply_completed" },
     ]);
   });
 
   // The issue queue drains the same way, so its completion wakes too.
-  it("wakes the organization's Workers when an issue reply completes", async () => {
+  it("wakes the workspace's Workers when an issue reply completes", async () => {
     const claim = await seedClaim();
-    const wakes: Array<{ organizationId: string; reason: string }> = [];
+    const wakes: Array<{ workspaceId: string; reason: string }> = [];
     const completion = completeIssueReplyInputFromProto(create(
       CompleteIssueReplyRequestSchema,
       {
@@ -847,12 +845,12 @@ describe("reply completion application", () => {
       request: completion,
       observedAt: at(250 + sequence),
     }, {
-      wakeOrganizationWorkers: (_env, organizationId, reason) => {
-        wakes.push({ organizationId, reason });
+      wakeWorkspaceWorkers: (_env, workspaceId, reason) => {
+        wakes.push({ workspaceId, reason });
       },
     })).resolves.toMatchObject({ replayed: false, disposition: "completed" });
     expect(wakes).toEqual([
-      { organizationId, reason: "issue_reply_completed" },
+      { workspaceId, reason: "issue_reply_completed" },
     ]);
   });
 
@@ -899,7 +897,7 @@ describe("reply completion application", () => {
     // The D1 binding itself cannot be inspected by the assertion library, so
     // only the query the availability check received is compared.
     expect(availability.mock.calls[0]?.[1]).toMatchObject({
-      organizationId,
+      workspaceId,
       excludeWorkerId: workerId,
       provider: "codex",
     });

@@ -10,6 +10,33 @@ export const issueAttachmentMimeTypes = [
   "video/quicktime",
 ] as const;
 
+/**
+ * What `briar_issue_attachments.content_type` accepts, which is wider than what
+ * the issue composer above will upload.
+ *
+ * An issue created from an approved DM proposal carries the files that
+ * conversation held, and those may be PDF, Markdown or plain text; migration
+ * 0218 widened the column to match. Storing and showing a type is a separate
+ * decision from offering it in the composer's file picker, so
+ * `issueAttachmentMimeTypes` deliberately does not grow to meet this list.
+ */
+export const issueAttachmentStorageMimeTypes = [
+  ...issueAttachmentMimeTypes,
+  "text/html",
+  "application/pdf",
+  "text/markdown",
+  "text/plain",
+] as const;
+
+const storableMimeTypes = new Set<string>(issueAttachmentStorageMimeTypes);
+
+/** True when an issue can hold this file at all, whatever produced it. */
+export function isIssueAttachmentStorableType(
+  contentType: string | null | undefined,
+): boolean {
+  return storableMimeTypes.has(contentType?.trim().toLowerCase() ?? "");
+}
+
 // Wildcard media hints open the native photo picker on mobile platforms. The
 // exact allowlist below remains authoritative when the selected files return.
 export const issueAttachmentAccept = "image/*,video/*";
@@ -61,6 +88,27 @@ export function isIssueAttachmentImage(
   if (normalizedType.startsWith("image/")) return true;
   const inferred = issueAttachmentMimeTypeFromName(filename);
   return inferred?.startsWith("image/") ?? false;
+}
+
+/**
+ * How an issue attachment should be shown. A DM-sourced PDF, Markdown or text
+ * file is a document, not a video: the preview used to fall back to `<video>`
+ * for everything that was not an image, which rendered a broken player for a
+ * file the reader only wants to open.
+ */
+export type IssueAttachmentPreviewKind = "image" | "video" | "document";
+
+export function issueAttachmentPreviewKind(
+  contentType: string | null | undefined,
+  filename: string,
+): IssueAttachmentPreviewKind {
+  if (isIssueAttachmentImage(contentType, filename)) return "image";
+  const normalizedType = contentType?.trim().toLowerCase() ?? "";
+  if (normalizedType.startsWith("video/")) return "video";
+  if (normalizedType) return "document";
+  return issueAttachmentMimeTypeFromName(filename)?.startsWith("video/")
+    ? "video"
+    : "document";
 }
 
 /**

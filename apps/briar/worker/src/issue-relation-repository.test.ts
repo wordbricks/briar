@@ -16,7 +16,7 @@ import { transferredIssueRelationStatements } from "./issue-transfer-relations";
 describe("issue hierarchy and related issue repository", () => {
   let db: D1Database;
   const userId = "11111111-1111-4111-8111-111111111111";
-  const organizationId = "22222222-2222-4222-8222-222222222222";
+  const workspaceId = "22222222-2222-4222-8222-222222222222";
   const projectId = "33333333-3333-4333-8333-333333333333";
   const otherProjectId = "44444444-4444-4444-8444-444444444444";
   const parentA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
@@ -40,17 +40,17 @@ describe("issue hierarchy and related issue repository", () => {
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${userId}', 'Owner', 'owner@example.com', 1, '${now}', '${now}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values ('${organizationId}', 'Workspace', 'workspace', '${now}', '${now}');
+      values ('${workspaceId}', 'Workspace', 'workspace', '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${userId}', 'owner', '${now}', '${now}');
+      ) values ('${workspaceId}', '${userId}', 'owner', '${now}', '${now}');
       insert into briar_teams (
         id, owner_user_id, organization_id, name, agent_token_hash,
         issue_key_prefix, created_at, updated_at
       ) values
-        ('${projectId}', '${userId}', '${organizationId}', 'Project',
+        ('${projectId}', '${userId}', '${workspaceId}', 'Project',
          '${"a".repeat(64)}', 'PR', '${now}', '${now}'),
-        ('${otherProjectId}', '${userId}', '${organizationId}', 'Other',
+        ('${otherProjectId}', '${userId}', '${workspaceId}', 'Other',
          '${"b".repeat(64)}', 'OT', '${now}', '${now}');
     `);
     for (const [id, project, number] of [

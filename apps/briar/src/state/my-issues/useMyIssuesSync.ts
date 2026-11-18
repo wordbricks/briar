@@ -41,30 +41,30 @@ export type MyIssuesDashboardLoader = (
 
 /** The project composition a load pass covers, as one comparable value. */
 export const myIssuesCompositionKey = (
-  organizationId: string | null,
+  workspaceId: string | null,
   teamIds: readonly string[],
-) => JSON.stringify({ organizationId, teamIds: [...teamIds].sort() });
+) => JSON.stringify({ workspaceId, teamIds: [...teamIds].sort() });
 
 /**
  * Loads every listed project's board into the store and keeps the page's load
- * state current. `teamIds` is the organization's project list in sidebar order.
+ * state current. `teamIds` is the workspace's project list in sidebar order.
  */
 export function useMyIssuesSync(input: {
   readonly load: MyIssuesDashboardLoader;
-  readonly organizationId: string | null;
+  readonly workspaceId: string | null;
   readonly teamIds: readonly string[];
 }): void {
   const registry = useRegistry();
   const loadRef = useRef(input.load);
   loadRef.current = input.load;
   const retry = useAtomValue(myIssuesRetryAtom);
-  const key = myIssuesCompositionKey(input.organizationId, input.teamIds);
+  const key = myIssuesCompositionKey(input.workspaceId, input.teamIds);
 
   useEffect(() => {
     const teamIds = (JSON.parse(key) as { teamIds: string[] }).teamIds;
     registry.set(myIssuesTeamIdsAtom, teamIds);
     registry.set(pinnedTeamIdsAtom, teamIds);
-    // A project that left the organization leaves the filter menu with it.
+    // A project that left the workspace leaves the filter menu with it.
     const available = new Set(teamIds);
     registry.update(myIssuesSelectedProjectIdsAtom, (selected) =>
       selected.filter((teamId) => available.has(teamId)),

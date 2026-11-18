@@ -18,7 +18,7 @@ import { executeD1Sql } from "./test-helpers/d1-sql";
 
 describe("Slack D1 integration", () => {
   const db = env.DB;
-  const organizationId = "11111111-1111-4111-8111-111111111111";
+  const workspaceId = "11111111-1111-4111-8111-111111111111";
   const firstProjectId = "22222222-2222-4222-8222-222222222222";
   const secondProjectId = "33333333-3333-4333-8333-333333333333";
 
@@ -30,20 +30,20 @@ describe("Slack D1 integration", () => {
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('owner', 'Owner', 'owner@example.com', 1, '${now}', '${now}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values ('${organizationId}', 'Briar', 'briar', '${now}', '${now}');
+      values ('${workspaceId}', 'Briar', 'briar', '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', 'owner', 'owner', '${now}', '${now}');
+      ) values ('${workspaceId}', 'owner', 'owner', '${now}', '${now}');
       insert into user (id, name, email, emailVerified, createdAt, updatedAt)
       values ('member', 'Member', 'member@example.com', 1, '${now}', '${now}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', 'member', 'developer', '${now}', '${now}');
+      ) values ('${workspaceId}', 'member', 'developer', '${now}', '${now}');
       insert into briar_teams (
         id, owner_user_id, organization_id, name, agent_token_hash,
         created_at, updated_at
       ) values (
-        '${firstProjectId}', 'owner', '${organizationId}', 'First',
+        '${firstProjectId}', 'owner', '${workspaceId}', 'First',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         '${now}', '${now}'
       );
@@ -51,7 +51,7 @@ describe("Slack D1 integration", () => {
         id, owner_user_id, organization_id, name, agent_token_hash,
         created_at, updated_at
       ) values (
-        '${secondProjectId}', 'owner', '${organizationId}', 'Second',
+        '${secondProjectId}', 'owner', '${workspaceId}', 'Second',
         'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         '${now}', '${now}'
       );
@@ -63,7 +63,7 @@ describe("Slack D1 integration", () => {
     await createSlackOAuthState(db, {
       stateHash:
         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      organizationId,
+      workspaceId,
       defaultProjectId: firstProjectId,
       userId: "owner",
       createdAt: "2026-07-29T00:00:00.000Z",
@@ -77,7 +77,7 @@ describe("Slack D1 integration", () => {
         "2026-07-29T00:05:00.000Z",
       ),
     ).toMatchObject({
-      organization_id: organizationId,
+      organization_id: workspaceId,
       default_project_id: firstProjectId,
       user_id: "owner",
     });
@@ -90,11 +90,11 @@ describe("Slack D1 integration", () => {
     ).toBeNull();
   });
 
-  it("stores installations and changes only to a project in the organization", async () => {
+  it("stores installations and changes only to a project in the workspace", async () => {
     await upsertSlackInstallation(db, {
       teamId: "T123",
       teamName: "Briar Slack",
-      organizationId,
+      workspaceId,
       defaultProjectId: firstProjectId,
       botUserId: "U123",
       encryptedBotToken: "encrypted",
@@ -110,12 +110,12 @@ describe("Slack D1 integration", () => {
     expect(
       await updateSlackInstallationProject(
         db,
-        organizationId,
+        workspaceId,
         "T123",
         secondProjectId,
       ),
     ).toBe(true);
-    expect(await listSlackInstallations(db, organizationId)).toEqual([
+    expect(await listSlackInstallations(db, workspaceId)).toEqual([
       expect.objectContaining({
         team_id: "T123",
         default_project_id: secondProjectId,
@@ -125,7 +125,7 @@ describe("Slack D1 integration", () => {
     expect(
       await updateSlackInstallationProject(
         db,
-        organizationId,
+        workspaceId,
         "T123",
         "44444444-4444-4444-8444-444444444444",
       ),
@@ -137,7 +137,7 @@ describe("Slack D1 integration", () => {
     await upsertSlackInstallation(db, {
       teamId: "T-ATOMIC-DELETE",
       teamName: "Atomic Slack",
-      organizationId,
+      workspaceId,
       defaultProjectId: firstProjectId,
       botUserId: "U-ATOMIC-DELETE",
       encryptedBotToken: "encrypted-atomic",
@@ -148,7 +148,7 @@ describe("Slack D1 integration", () => {
 
     await expect(
       deleteSlackInstallation(db, {
-        organizationId,
+        workspaceId,
         teamId: "T-ATOMIC-DELETE",
         actorUserId: "member",
         observedAt,
@@ -180,7 +180,7 @@ describe("Slack D1 integration", () => {
     try {
       await expect(
         deleteSlackInstallation(db, {
-          organizationId,
+          workspaceId,
           teamId: "T-ATOMIC-DELETE",
           actorUserId: "owner",
           observedAt,
@@ -195,7 +195,7 @@ describe("Slack D1 integration", () => {
 
     await expect(
       deleteSlackInstallation(db, {
-        organizationId,
+        workspaceId,
         teamId: "T-ATOMIC-DELETE",
         actorUserId: "owner",
         observedAt,

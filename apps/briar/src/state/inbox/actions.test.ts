@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { demoDashboard } from "../../lib/demo-data";
 import { demoUser } from "../demo-fixtures";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom, userAtom } from "../session/atoms";
 import { teamsAtom } from "../team/atoms";
@@ -85,7 +85,7 @@ const harness = async (
     [userAtom, demoUser],
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
-    [activeOrganizationIdAtom, team.organizationId],
+    [activeWorkspaceIdAtom, team.workspaceId],
   ]);
   registry.set(inboxApiAtom, api);
   const stop = startInboxReadSync(registry, {
@@ -175,7 +175,7 @@ describe("inbox actions", () => {
     stop();
   });
 
-  it("reads the whole organization at once", async () => {
+  it("reads the whole workspace at once", async () => {
     const { registry, stop } = await harness([
       issue("issue:run-1", "v1"),
       issue("issue:run-2", "v2"),

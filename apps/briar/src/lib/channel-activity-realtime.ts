@@ -11,7 +11,7 @@ export class ChannelActivityRealtimeTransport
   constructor(
     input: {
       token: string;
-      organizationId: string;
+      workspaceId: string;
       channelId: string;
       createTicket?: (signal: AbortSignal) => Promise<string>;
       createWebSocket?: (url: string) => WebSocket;
@@ -21,7 +21,7 @@ export class ChannelActivityRealtimeTransport
       createTicket: input.createTicket ?? ((signal) =>
         createChannelActivityTicket(
           input.token,
-          input.organizationId,
+          input.workspaceId,
           input.channelId,
           signal,
         )),

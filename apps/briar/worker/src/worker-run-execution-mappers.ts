@@ -200,8 +200,8 @@ const structuredImpact = (value: StructuredRunResult_Impact) => {
       return "issue" as const;
     case StructuredRunResult_Impact.PROJECT:
       return "project" as const;
-    case StructuredRunResult_Impact.ORGANIZATION:
-      return "organization" as const;
+    case StructuredRunResult_Impact.WORKSPACE:
+      return "workspace" as const;
     case StructuredRunResult_Impact.UNSPECIFIED:
     default:
       throw new HttpError(400, "structured_result.impact is required");

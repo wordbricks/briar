@@ -2,7 +2,7 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 import { useEffect } from "react";
 
 import { browserAuthClient } from "../../lib/browser-auth-client";
-import { resolveActiveAccountSelection } from "../../lib/active-organization";
+import { resolveActiveAccountSelection } from "../../lib/active-workspace";
 import { restoreStoredSession } from "../../lib/session-restore";
 import { clearSessionToken, readSessionToken } from "../../lib/token-store";
 import {
@@ -12,12 +12,9 @@ import {
 } from "../persistence/hydration";
 import { demoMode, lockedTeamIdAtom, remoteMode, webMode } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
-import { getReadinessCoordinator } from "../workspace/api";
-import { applyInventoryObservation } from "../workspace/atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { getReadinessCoordinator } from "../local-workspace/api";
+import { applyInventoryObservation } from "../local-workspace/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import { clearSignedOutSession } from "./actions";
 import { resolveSessionApi } from "./api";
@@ -91,7 +88,7 @@ export function startSessionBootstrap(registry: AtomRegistry): () => void {
             await clearSessionToken();
           }
         : clearSessionToken,
-      loadOrganizations: remote.loadOrganizations,
+      loadWorkspaces: remote.loadWorkspaces,
       loadTeams: remote.loadTeams,
       loadSession: remote.loadSession,
       readToken: webMode
@@ -136,16 +133,16 @@ export function startSessionBootstrap(registry: AtomRegistry): () => void {
     }
     const selection = resolveActiveAccountSelection(
       result.user.id,
-      result.organizations,
+      result.workspaces,
       result.projects,
       registry.get(lockedTeamIdAtom),
     );
     /*
       A hydrated window is already showing one team, and
-      `resolveActiveAccountSelection` answers with the organization's first —
+      `resolveActiveAccountSelection` answers with the workspace's first —
       committing that would move the screen off the board the account was last
       on. The hydrated selection therefore survives as long as the account still
-      has that team, in the organization the selection resolved to.
+      has that team, in the workspace the selection resolved to.
     */
     const hydratedTeamId = adoptsHydratedSession(registry)
       ? registry.get(activeTeamIdAtom)
@@ -155,14 +152,14 @@ export function startSessionBootstrap(registry: AtomRegistry): () => void {
       result.projects.some(
         (team) =>
           team.id === hydratedTeamId &&
-          team.organizationId === selection.activeOrganizationId,
+          team.workspaceId === selection.activeWorkspaceId,
       );
     Atom.batch(() => {
       registry.set(tokenAtom, result.token);
       registry.set(userAtom, result.user);
       registry.set(teamsAtom, result.projects);
-      registry.set(organizationsAtom, result.organizations);
-      registry.set(activeOrganizationIdAtom, selection.activeOrganizationId);
+      registry.set(workspacesAtom, result.workspaces);
+      registry.set(activeWorkspaceIdAtom, selection.activeWorkspaceId);
       registry.set(
         activeTeamIdAtom,
         keepsHydratedTeam ? hydratedTeamId : selection.activeProjectId,

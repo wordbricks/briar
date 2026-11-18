@@ -38,7 +38,7 @@ function remoteError(status: number, code: string, message: string) {
 export async function recordManagedComputerRemoteRejection(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     managedComputerId: string;
     actorUserId?: string | null;
     remoteSessionId?: string | null;
@@ -47,7 +47,7 @@ export async function recordManagedComputerRemoteRejection(
   },
 ) {
   await recordManagedComputerRemoteAuditEvent(db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     managedComputerId: input.managedComputerId,
     remoteSessionId: input.remoteSessionId,
     actorUserId: input.actorUserId,
@@ -69,7 +69,7 @@ async function recordRemoteSessionConnectionRejection(
   const session = await managedComputerRemoteSessionById(db, input.sessionId);
   if (!session || session.managed_computer_id !== input.managedComputerId) return;
   await recordManagedComputerRemoteRejection(db, {
-    organizationId: session.organization_id,
+    workspaceId: session.organization_id,
     managedComputerId: session.managed_computer_id,
     remoteSessionId: session.id,
     actorUserId: session.controller_user_id,
@@ -244,7 +244,7 @@ export async function createManagedComputerRemoteSessionTicket(
   env: Env,
   input: {
     requestUrl: string;
-    organizationId: string;
+    workspaceId: string;
     managedComputerId: string;
     controllerUserId: string;
     requestId: string;
@@ -263,14 +263,14 @@ export async function createManagedComputerRemoteSessionTicket(
   const computer = assertRemoteComputerAvailable(
     await organizationManagedComputer(
       db,
-      input.organizationId,
+      input.workspaceId,
       input.managedComputerId,
     ),
   );
   const status = await managedComputerRemoteAgentStatus(env, computer.id);
   if (!status.agentConnected) {
     await recordManagedComputerRemoteAuditEvent(db, {
-      organizationId: computer.organization_id,
+      workspaceId: computer.organization_id,
       managedComputerId: computer.id,
       actorUserId: input.controllerUserId,
       action: "connection_rejected",
@@ -291,7 +291,7 @@ export async function createManagedComputerRemoteSessionTicket(
     observedAtMs + config.remoteDesktopTokenTtlSeconds * 1_000,
   ).toISOString();
   const existingByRequest = await managedComputerRemoteSessionByRequest(db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     controllerUserId: input.controllerUserId,
     requestId: input.requestId,
   });
@@ -305,7 +305,7 @@ export async function createManagedComputerRemoteSessionTicket(
   ) {
     await endManagedComputerRemoteSessionAndDisconnect(db, env, {
       sessionId: activeSession.id,
-      organizationId: activeSession.organization_id,
+      workspaceId: activeSession.organization_id,
       managedComputerId: activeSession.managed_computer_id,
       actorUserId: input.controllerUserId,
       reason: "controller_absent",
@@ -323,13 +323,13 @@ export async function createManagedComputerRemoteSessionTicket(
     input.reconnectSessionId ?? existingByRequest?.id;
   if (reconnectSessionId) {
     const reconnectCapacity = await managedComputerRemoteSessionCapacity(db, {
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       userId: input.controllerUserId,
       rateCutoff: new Date(observedAtMs - rateWindowMs).toISOString(),
     });
     if (reconnectCapacity.recent_user_count >= config.remoteDesktopRateLimit) {
       await recordManagedComputerRemoteAuditEvent(db, {
-        organizationId: computer.organization_id,
+        workspaceId: computer.organization_id,
         managedComputerId: computer.id,
         actorUserId: input.controllerUserId,
         action: "connection_rejected",
@@ -346,7 +346,7 @@ export async function createManagedComputerRemoteSessionTicket(
   let session = reconnectSessionId
     ? await reconnectManagedComputerRemoteSession(db, {
         sessionId: reconnectSessionId,
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         managedComputerId: input.managedComputerId,
         controllerUserId: input.controllerUserId,
         agentId: input.agentId,
@@ -361,7 +361,7 @@ export async function createManagedComputerRemoteSessionTicket(
     const sessionId = crypto.randomUUID();
     session = await createManagedComputerRemoteSession(db, {
       id: sessionId,
-      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       managedComputerId: input.managedComputerId,
       controllerUserId: input.controllerUserId,
       agentId: input.agentId,
@@ -371,7 +371,7 @@ export async function createManagedComputerRemoteSessionTicket(
       maxExpiresAt: new Date(
         observedAtMs + config.remoteDesktopMaxSessionMinutes * 60_000,
       ).toISOString(),
-      organizationSessionLimit: config.remoteDesktopOrganizationSessionLimit,
+      organizationSessionLimit: config.remoteDesktopWorkspaceSessionLimit,
       fleetSessionLimit: config.remoteDesktopFleetSessionLimit,
       rateLimit: config.remoteDesktopRateLimit,
       rateCutoff: new Date(observedAtMs - rateWindowMs).toISOString(),
@@ -383,7 +383,7 @@ export async function createManagedComputerRemoteSessionTicket(
     const [active, capacity] = await Promise.all([
       activeManagedComputerRemoteSession(db, input.managedComputerId),
       managedComputerRemoteSessionCapacity(db, {
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         userId: input.controllerUserId,
         rateCutoff: new Date(observedAtMs - rateWindowMs).toISOString(),
       }),
@@ -393,11 +393,11 @@ export async function createManagedComputerRemoteSessionTicket(
       : capacity.recent_user_count >= config.remoteDesktopRateLimit
         ? [429, "MANAGED_COMPUTER_REMOTE_RATE_LIMITED", "Too many remote desktop session requests"] as const
         : capacity.organization_count >=
-            config.remoteDesktopOrganizationSessionLimit
-          ? [409, "MANAGED_COMPUTER_REMOTE_ORGANIZATION_LIMIT", "Organization remote desktop limit reached"] as const
+            config.remoteDesktopWorkspaceSessionLimit
+          ? [409, "MANAGED_COMPUTER_REMOTE_ORGANIZATION_LIMIT", "Workspace remote desktop limit reached"] as const
           : [409, "MANAGED_COMPUTER_REMOTE_FLEET_LIMIT", "Remote desktop fleet limit reached"] as const;
     await recordManagedComputerRemoteAuditEvent(db, {
-      organizationId: computer.organization_id,
+      workspaceId: computer.organization_id,
       managedComputerId: computer.id,
       actorUserId: input.controllerUserId,
       action: "connection_rejected",
@@ -407,7 +407,7 @@ export async function createManagedComputerRemoteSessionTicket(
     throw remoteError(rejection[0], rejection[1], rejection[2]);
   }
   await recordManagedComputerRemoteAuditEvent(db, {
-    organizationId: session.organization_id,
+    workspaceId: session.organization_id,
     managedComputerId: session.managed_computer_id,
     remoteSessionId: session.id,
     actorUserId: session.controller_user_id,
@@ -441,7 +441,7 @@ export async function expireStaleManagedComputerRemoteSessionsAndDisconnect(
       ? "max_lifetime"
       : "connection_timeout";
     await recordManagedComputerRemoteAuditEvent(db, {
-      organizationId: session.organization_id,
+      workspaceId: session.organization_id,
       managedComputerId: session.managed_computer_id,
       remoteSessionId: session.id,
       actorUserId: session.controller_user_id,
@@ -589,7 +589,7 @@ export async function endManagedComputerRemoteSessionAndDisconnect(
   env: Env,
   input: {
     sessionId: string;
-    organizationId: string;
+    workspaceId: string;
     managedComputerId: string;
     actorUserId: string;
     reason: string;
@@ -599,7 +599,7 @@ export async function endManagedComputerRemoteSessionAndDisconnect(
   const session = await endManagedComputerRemoteSession(db, input);
   if (!session) return null;
   await recordManagedComputerRemoteAuditEvent(db, {
-    organizationId: session.organization_id,
+    workspaceId: session.organization_id,
     managedComputerId: session.managed_computer_id,
     remoteSessionId: session.id,
     actorUserId: input.actorUserId,
@@ -631,7 +631,7 @@ export async function endManagedComputerRemoteSessionsAndDisconnect(
   const sessions = await endManagedComputerRemoteSessionsForComputer(db, input);
   for (const session of sessions) {
     await recordManagedComputerRemoteAuditEvent(db, {
-      organizationId: session.organization_id,
+      workspaceId: session.organization_id,
       managedComputerId: session.managed_computer_id,
       remoteSessionId: session.id,
       actorUserId: null,

@@ -13,17 +13,17 @@ option swift_prefix = "BriarAPI_";
 // Pricing lookup, calendar-window validation, and cross-field usage invariants
 // remain domain concerns; this descriptor owns their language-neutral wire data.
 service ReportingService {
-  rpc ListOrganizationUsageRuns(ListOrganizationUsageRunsRequest) returns (ListOrganizationUsageRunsResponse);
+  rpc ListWorkspaceUsageRuns(ListWorkspaceUsageRunsRequest) returns (ListWorkspaceUsageRunsResponse);
   rpc GetProjectUsageSummary(GetProjectUsageSummaryRequest) returns (GetProjectUsageSummaryResponse);
   rpc ListStatusTrayRuns(ListStatusTrayRunsRequest) returns (ListStatusTrayRunsResponse);
   rpc GetRunCostEstimate(GetRunCostEstimateRequest) returns (GetRunCostEstimateResponse);
 }
 
-enum OrganizationUsageRange {
-  ORGANIZATION_USAGE_RANGE_UNSPECIFIED = 0;
-  ORGANIZATION_USAGE_RANGE_7_DAYS = 1;
-  ORGANIZATION_USAGE_RANGE_30_DAYS = 2;
-  ORGANIZATION_USAGE_RANGE_90_DAYS = 3;
+enum WorkspaceUsageRange {
+  WORKSPACE_USAGE_RANGE_UNSPECIFIED = 0;
+  WORKSPACE_USAGE_RANGE_7_DAYS = 1;
+  WORKSPACE_USAGE_RANGE_30_DAYS = 2;
+  WORKSPACE_USAGE_RANGE_90_DAYS = 3;
 }
 
 enum ProjectUsagePeriod {
@@ -169,12 +169,12 @@ message AgentUsageRun {
   repeated AgentUsageEstimatedCostRecord estimated_cost_records = 21;
 }
 
-message ListOrganizationUsageRunsRequest {
-  string organization_id = 1;
-  OrganizationUsageRange range = 2;
+message ListWorkspaceUsageRunsRequest {
+  string workspace_id = 1;
+  WorkspaceUsageRange range = 2;
 }
 
-message ListOrganizationUsageRunsResponse {
+message ListWorkspaceUsageRunsResponse {
   repeated AgentUsageRun runs = 1;
   google.protobuf.Timestamp generated_at = 2;
   AgentUsagePricing pricing = 3;
@@ -230,7 +230,7 @@ message StatusTrayRun {
 }
 
 message ListStatusTrayRunsRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message ListStatusTrayRunsResponse {

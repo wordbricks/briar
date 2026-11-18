@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file briar/types/v1/worker.proto.
  */
 export const file_briar_types_v1_worker: GenFile = /*@__PURE__*/
-  fileDesc("Chticmlhci90eXBlcy92MS93b3JrZXIucHJvdG8SDmJyaWFyLnR5cGVzLnYxIoQBChVBZ2VudEVmZm9ydENhcGFiaWxpdHkSCgoCaWQYASABKAkSDQoFbGFiZWwYAiABKAkSGAoLZGVzY3JpcHRpb24YAyABKAlIAIgBARIXCgppc19kZWZhdWx0GAQgASgISAGIAQFCDgoMX2Rlc2NyaXB0aW9uQg0KC19pc19kZWZhdWx0IscBChRBZ2VudE1vZGVsQ2FwYWJpbGl0eRIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRIXCgppc19kZWZhdWx0GAMgASgISACIAQESHgoRZGVmYXVsdF9lZmZvcnRfaWQYBCABKAlIAYgBARI2CgdlZmZvcnRzGAUgAygLMiUuYnJpYXIudHlwZXMudjEuQWdlbnRFZmZvcnRDYXBhYmlsaXR5Qg0KC19pc19kZWZhdWx0QhQKEl9kZWZhdWx0X2VmZm9ydF9pZCL7AQoXQWdlbnRQcm92aWRlckNhcGFiaWxpdHkSLwoIcHJvdmlkZXIYASABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyEjQKBm1vZGVscxgCIAMoCzIkLmJyaWFyLnR5cGVzLnYxLkFnZW50TW9kZWxDYXBhYmlsaXR5Ej4KD2RlZmF1bHRfZWZmb3J0cxgDIAMoCzIlLmJyaWFyLnR5cGVzLnYxLkFnZW50RWZmb3J0Q2FwYWJpbGl0eRIbChNhbGxvd19jdXN0b21fbW9kZWxzGAQgASgIEhIKBWVycm9yGAUgASgJSACIAQFCCAoGX2Vycm9yIk8KFlJlbW90ZVVwZGF0ZUNhcGFiaWxpdHkSEQoJc3VwcG9ydGVkGAEgASgIEhUKCHByb3RvY29sGAIgASgNSACIAQFCCwoJX3Byb3RvY29sIu4BChNBZ2VudFByb3ZpZGVySGVhbHRoEi8KCHByb3ZpZGVyGAEgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlchIRCglpbnN0YWxsZWQYAiABKAgSFQoNYXV0aGVudGljYXRlZBgDIAEoCBIPCgdoZWFsdGh5GAQgASgIEhMKBnJlYXNvbhgFIAEoCUgAiAEBEhcKD3VzYWdlX2V4aGF1c3RlZBgGIAEoCBIdChBtYXhfdXNlZF9wZXJjZW50GAcgASgBSAGIAQFCCQoHX3JlYXNvbkITChFfbWF4X3VzZWRfcGVyY2VudCJYChlXb3JrZmxvd1JlcXVpcmVtZW50SGVhbHRoEgoKAmlkGAEgASgJEg8KB2hlYWx0aHkYAiABKAgSEwoGZGV0YWlsGAMgASgJSACIAQFCCQoHX2RldGFpbCLYBQoSV29ya2VyQ2FwYWJpbGl0aWVzEkYKFXByb3ZpZGVyX2NhcGFiaWxpdGllcxgBIAMoCzInLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXJDYXBhYmlsaXR5EkMKDnJlbW90ZV91cGRhdGVzGAIgASgLMiYuYnJpYXIudHlwZXMudjEuUmVtb3RlVXBkYXRlQ2FwYWJpbGl0eUgAiAEBEhEKCXdvcmt0cmVlcxgDIAEoCBJIChV3b3JrZmxvd19yZXF1aXJlbWVudHMYBSADKAsyKS5icmlhci50eXBlcy52MS5Xb3JrZmxvd1JlcXVpcmVtZW50SGVhbHRoEh8KEmRtX21lbW9yeV9wcm90b2NvbBgGIAEoDUgBiAEBEigKG2RtX21lbW9yeV9sZWFybmluZ19yZXF1ZXN0cxgHIAEoDUgCiAEBEksKEmRtX21lbW9yeV9sZWFybmluZxgIIAEoCzIqLmJyaWFyLnR5cGVzLnYxLkRtTWVtb3J5TGVhcm5pbmdDYXBhYmlsaXR5SAOIAQESQAoMY29tcHV0ZXJfdXNlGAkgASgLMiUuYnJpYXIudHlwZXMudjEuQ29tcHV0ZXJVc2VDYXBhYmlsaXR5SASIAQESSgoSZG1fcHVibGljX21lc3NhZ2VzGAogASgLMikuYnJpYXIudHlwZXMudjEuRG1QdWJsaWNNZXNzYWdlQ2FwYWJpbGl0eUgFiAEBQhEKD19yZW1vdGVfdXBkYXRlc0IVChNfZG1fbWVtb3J5X3Byb3RvY29sQh4KHF9kbV9tZW1vcnlfbGVhcm5pbmdfcmVxdWVzdHNCFQoTX2RtX21lbW9yeV9sZWFybmluZ0IPCg1fY29tcHV0ZXJfdXNlQhUKE19kbV9wdWJsaWNfbWVzc2FnZXNKBAgEEAVSI29yZ2FuaXphdGlvbl9hZ2VudF9jb250ZXh0X3Byb3RvY29sIl8KGURtUHVibGljTWVzc2FnZUNhcGFiaWxpdHkSEAoIcHJvdG9jb2wYASABKA0SMAoJcHJvdmlkZXJzGAIgAygOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlciKHAQoaRG1NZW1vcnlMZWFybmluZ0NhcGFiaWxpdHkSEAoIcHJvdG9jb2wYASABKA0SEQoJdHJhbnNwb3J0GAIgASgJEhIKCnRyYW5zcG9ydHMYAyADKAkSMAoJcHJvdmlkZXJzGAQgAygOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlciKPAwoaV29ya2VyUnVudGltZUFkdmVydGlzZW1lbnQSNQoOYWdlbnRfcHJvdmlkZXIYASABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyEjwKD3Byb3ZpZGVyX2hlYWx0aBgDIAMoCzIjLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXJIZWFsdGgSOAoMY2FwYWJpbGl0aWVzGAQgASgLMiIuYnJpYXIudHlwZXMudjEuV29ya2VyQ2FwYWJpbGl0aWVzEkoKCHZlcnNpb25zGAUgAygLMjguYnJpYXIudHlwZXMudjEuV29ya2VyUnVudGltZUFkdmVydGlzZW1lbnQuVmVyc2lvbnNFbnRyeRIeChF1cGRhdGVfcmVxdWVzdF9pZBgGIAEoCUgAiAEBGi8KDVZlcnNpb25zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIUChJfdXBkYXRlX3JlcXVlc3RfaWRKBAgCEANSCXByb3ZpZGVyc0IOugILQnJpYXJUeXBlc19iBnByb3RvMw", [file_briar_types_v1_provider, file_briar_types_v1_computer_use]);
+  fileDesc("Chticmlhci90eXBlcy92MS93b3JrZXIucHJvdG8SDmJyaWFyLnR5cGVzLnYxIoQBChVBZ2VudEVmZm9ydENhcGFiaWxpdHkSCgoCaWQYASABKAkSDQoFbGFiZWwYAiABKAkSGAoLZGVzY3JpcHRpb24YAyABKAlIAIgBARIXCgppc19kZWZhdWx0GAQgASgISAGIAQFCDgoMX2Rlc2NyaXB0aW9uQg0KC19pc19kZWZhdWx0IscBChRBZ2VudE1vZGVsQ2FwYWJpbGl0eRIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRIXCgppc19kZWZhdWx0GAMgASgISACIAQESHgoRZGVmYXVsdF9lZmZvcnRfaWQYBCABKAlIAYgBARI2CgdlZmZvcnRzGAUgAygLMiUuYnJpYXIudHlwZXMudjEuQWdlbnRFZmZvcnRDYXBhYmlsaXR5Qg0KC19pc19kZWZhdWx0QhQKEl9kZWZhdWx0X2VmZm9ydF9pZCL7AQoXQWdlbnRQcm92aWRlckNhcGFiaWxpdHkSLwoIcHJvdmlkZXIYASABKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyEjQKBm1vZGVscxgCIAMoCzIkLmJyaWFyLnR5cGVzLnYxLkFnZW50TW9kZWxDYXBhYmlsaXR5Ej4KD2RlZmF1bHRfZWZmb3J0cxgDIAMoCzIlLmJyaWFyLnR5cGVzLnYxLkFnZW50RWZmb3J0Q2FwYWJpbGl0eRIbChNhbGxvd19jdXN0b21fbW9kZWxzGAQgASgIEhIKBWVycm9yGAUgASgJSACIAQFCCAoGX2Vycm9yIk8KFlJlbW90ZVVwZGF0ZUNhcGFiaWxpdHkSEQoJc3VwcG9ydGVkGAEgASgIEhUKCHByb3RvY29sGAIgASgNSACIAQFCCwoJX3Byb3RvY29sIu4BChNBZ2VudFByb3ZpZGVySGVhbHRoEi8KCHByb3ZpZGVyGAEgASgOMh0uYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlchIRCglpbnN0YWxsZWQYAiABKAgSFQoNYXV0aGVudGljYXRlZBgDIAEoCBIPCgdoZWFsdGh5GAQgASgIEhMKBnJlYXNvbhgFIAEoCUgAiAEBEhcKD3VzYWdlX2V4aGF1c3RlZBgGIAEoCBIdChBtYXhfdXNlZF9wZXJjZW50GAcgASgBSAGIAQFCCQoHX3JlYXNvbkITChFfbWF4X3VzZWRfcGVyY2VudCJYChlXb3JrZmxvd1JlcXVpcmVtZW50SGVhbHRoEgoKAmlkGAEgASgJEg8KB2hlYWx0aHkYAiABKAgSEwoGZGV0YWlsGAMgASgJSACIAQFCCQoHX2RldGFpbCLmBQoSV29ya2VyQ2FwYWJpbGl0aWVzEkYKFXByb3ZpZGVyX2NhcGFiaWxpdGllcxgBIAMoCzInLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXJDYXBhYmlsaXR5EkMKDnJlbW90ZV91cGRhdGVzGAIgASgLMiYuYnJpYXIudHlwZXMudjEuUmVtb3RlVXBkYXRlQ2FwYWJpbGl0eUgAiAEBEhEKCXdvcmt0cmVlcxgDIAEoCBJIChV3b3JrZmxvd19yZXF1aXJlbWVudHMYBSADKAsyKS5icmlhci50eXBlcy52MS5Xb3JrZmxvd1JlcXVpcmVtZW50SGVhbHRoEkAKDGNvbXB1dGVyX3VzZRgJIAEoCzIlLmJyaWFyLnR5cGVzLnYxLkNvbXB1dGVyVXNlQ2FwYWJpbGl0eUgBiAEBEkoKEmRtX3B1YmxpY19tZXNzYWdlcxgKIAEoCzIpLmJyaWFyLnR5cGVzLnYxLkRtUHVibGljTWVzc2FnZUNhcGFiaWxpdHlIAogBARJIChBkbV9yZXBseV9yb3V0aW5nGAsgASgLMikuYnJpYXIudHlwZXMudjEuRG1QdWJsaWNNZXNzYWdlQ2FwYWJpbGl0eUgDiAEBEiIKFW1lbW9yeV92YXVsdF9wcm90b2NvbBgMIAEoDUgEiAEBQhEKD19yZW1vdGVfdXBkYXRlc0IPCg1fY29tcHV0ZXJfdXNlQhUKE19kbV9wdWJsaWNfbWVzc2FnZXNCEwoRX2RtX3JlcGx5X3JvdXRpbmdCGAoWX21lbW9yeV92YXVsdF9wcm90b2NvbEoECAQQBUoECAYQB0oECAcQCEoECAgQCVIjb3JnYW5pemF0aW9uX2FnZW50X2NvbnRleHRfcHJvdG9jb2xSEmRtX21lbW9yeV9wcm90b2NvbFIbZG1fbWVtb3J5X2xlYXJuaW5nX3JlcXVlc3RzUhJkbV9tZW1vcnlfbGVhcm5pbmciXwoZRG1QdWJsaWNNZXNzYWdlQ2FwYWJpbGl0eRIQCghwcm90b2NvbBgBIAEoDRIwCglwcm92aWRlcnMYAiADKA4yHS5icmlhci50eXBlcy52MS5BZ2VudFByb3ZpZGVyIo8DChpXb3JrZXJSdW50aW1lQWR2ZXJ0aXNlbWVudBI1Cg5hZ2VudF9wcm92aWRlchgBIAEoDjIdLmJyaWFyLnR5cGVzLnYxLkFnZW50UHJvdmlkZXISPAoPcHJvdmlkZXJfaGVhbHRoGAMgAygLMiMuYnJpYXIudHlwZXMudjEuQWdlbnRQcm92aWRlckhlYWx0aBI4CgxjYXBhYmlsaXRpZXMYBCABKAsyIi5icmlhci50eXBlcy52MS5Xb3JrZXJDYXBhYmlsaXRpZXMSSgoIdmVyc2lvbnMYBSADKAsyOC5icmlhci50eXBlcy52MS5Xb3JrZXJSdW50aW1lQWR2ZXJ0aXNlbWVudC5WZXJzaW9uc0VudHJ5Eh4KEXVwZGF0ZV9yZXF1ZXN0X2lkGAYgASgJSACIAQEaLwoNVmVyc2lvbnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQhQKEl91cGRhdGVfcmVxdWVzdF9pZEoECAIQA1IJcHJvdmlkZXJzQg66AgtCcmlhclR5cGVzX2IGcHJvdG8z", [file_briar_types_v1_provider, file_briar_types_v1_computer_use]);
 
 /**
  * @generated from message briar.types.v1.AgentEffortCapability
@@ -245,21 +245,6 @@ export type WorkerCapabilities = Message<"briar.types.v1.WorkerCapabilities"> & 
   workflowRequirements: WorkflowRequirementHealth[];
 
   /**
-   * @generated from field: optional uint32 dm_memory_protocol = 6;
-   */
-  dmMemoryProtocol?: number | undefined;
-
-  /**
-   * @generated from field: optional uint32 dm_memory_learning_requests = 7;
-   */
-  dmMemoryLearningRequests?: number | undefined;
-
-  /**
-   * @generated from field: optional briar.types.v1.DmMemoryLearningCapability dm_memory_learning = 8;
-   */
-  dmMemoryLearning?: DmMemoryLearningCapability | undefined;
-
-  /**
    * @generated from field: optional briar.types.v1.ComputerUseCapability computer_use = 9;
    */
   computerUse?: ComputerUseCapability | undefined;
@@ -268,6 +253,20 @@ export type WorkerCapabilities = Message<"briar.types.v1.WorkerCapabilities"> & 
    * @generated from field: optional briar.types.v1.DmPublicMessageCapability dm_public_messages = 10;
    */
   dmPublicMessages?: DmPublicMessageCapability | undefined;
+
+  /**
+   * @generated from field: optional briar.types.v1.DmPublicMessageCapability dm_reply_routing = 11;
+   */
+  dmReplyRouting?: DmPublicMessageCapability | undefined;
+
+  /**
+   * Memory vault tools (`tools memory …`) and per-turn vault context
+   * (docs/plans/memory-vault-spec.md). Absence and zero mean the Worker CLI
+   * predates the vault and gets no memory.
+   *
+   * @generated from field: optional uint32 memory_vault_protocol = 12;
+   */
+  memoryVaultProtocol?: number | undefined;
 };
 
 /**
@@ -302,38 +301,6 @@ export type DmPublicMessageCapability = Message<"briar.types.v1.DmPublicMessageC
  */
 export const DmPublicMessageCapabilitySchema: GenMessage<DmPublicMessageCapability> = /*@__PURE__*/
   messageDesc(file_briar_types_v1_worker, 7);
-
-/**
- * @generated from message briar.types.v1.DmMemoryLearningCapability
- */
-export type DmMemoryLearningCapability = Message<"briar.types.v1.DmMemoryLearningCapability"> & {
-  /**
-   * @generated from field: uint32 protocol = 1;
-   */
-  protocol: number;
-
-  /**
-   * @generated from field: string transport = 2;
-   */
-  transport: string;
-
-  /**
-   * @generated from field: repeated string transports = 3;
-   */
-  transports: string[];
-
-  /**
-   * @generated from field: repeated briar.types.v1.AgentProvider providers = 4;
-   */
-  providers: AgentProvider[];
-};
-
-/**
- * Describes the message briar.types.v1.DmMemoryLearningCapability.
- * Use `create(DmMemoryLearningCapabilitySchema)` to create a new message.
- */
-export const DmMemoryLearningCapabilitySchema: GenMessage<DmMemoryLearningCapability> = /*@__PURE__*/
-  messageDesc(file_briar_types_v1_worker, 8);
 
 /**
  * @generated from message briar.types.v1.WorkerRuntimeAdvertisement
@@ -372,5 +339,5 @@ export type WorkerRuntimeAdvertisement = Message<"briar.types.v1.WorkerRuntimeAd
  * Use `create(WorkerRuntimeAdvertisementSchema)` to create a new message.
  */
 export const WorkerRuntimeAdvertisementSchema: GenMessage<WorkerRuntimeAdvertisement> = /*@__PURE__*/
-  messageDesc(file_briar_types_v1_worker, 9);
+  messageDesc(file_briar_types_v1_worker, 8);
 

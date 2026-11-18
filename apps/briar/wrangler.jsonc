@@ -17,6 +17,18 @@
     {
       "pattern": "briar.wordbricks.ai/device*",
       "zone_name": "wordbricks.ai"
+    },
+    {
+      "pattern": "briar.onequery.dev/app*",
+      "zone_name": "onequery.dev"
+    },
+    {
+      "pattern": "briar.onequery.dev/api/auth/*",
+      "zone_name": "onequery.dev"
+    },
+    {
+      "pattern": "briar.onequery.dev/device*",
+      "zone_name": "onequery.dev"
     }
   ],
   "rules": [
@@ -29,23 +41,23 @@
       "type": "Data",
       "globs": ["**/*.png"],
       "fallthrough": true
+    },
+    {
+      // The memory vault README is application-owned text served verbatim.
+      "type": "Text",
+      "globs": ["**/memory-vault-readme.md"],
+      "fallthrough": true
     }
   ],
   "placement": {
     "mode": "smart"
   },
   "vars": {
-    "DM_MEMORY_INDEX_ENABLED": "true",
-    "DM_MEMORY_RETRIEVAL_ENABLED": "true",
-    "DM_MEMORY_MINIMUM_SCORE": "0.5",
     // Agent-to-Agent turns (the recipient's run plus the sender's relay run)
     // one organization may spend per hour.
     "AGENT_MESSAGE_HOURLY_LIMIT": "30",
-    // How long a queued direct-message conversation turn waits before a Worker
-    // may claim it, so several short messages sent in a row become one reply.
-    "DM_REPLY_SETTLE_MS": "2000",
     "WHATSAPP_GRAPH_API_VERSION": "v25.0",
-    "WHATSAPP_APP_ORIGIN": "https://briar.wordbricks.ai",
+    "WHATSAPP_APP_ORIGIN": "https://briar.onequery.dev",
     "APNS_TEAM_ID": "QFJZ2V3829",
     "MANAGED_COMPUTER_AWS_REGION": "us-east-1",
     "MANAGED_COMPUTER_AWS_LAUNCH_TEMPLATE_ID": "lt-0bf7a358da7b03e93",
@@ -98,14 +110,11 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Workers AI picks the DM acknowledgement emoji (dm-acknowledgement-reaction.ts).
   "ai": { "binding": "DM_MEMORY_AI", "remote": true },
-  "vectorize": [
-    {
-      "binding": "DM_MEMORY_INDEX",
-      "index_name": "briar-dm-memory-prod-m3-v1",
-      "remote": true
-    }
-  ],
+  // One Git repo per memory vault (docs/plans/memory-vault-spec.md); writes are
+  // pushes from an in-memory clone. Without it memory reports memory_unavailable.
+  "artifacts": [{ "binding": "MEMORY_ARTIFACTS", "namespace": "briar-memory", "remote": true }],
   "durable_objects": {
     "bindings": [
       {

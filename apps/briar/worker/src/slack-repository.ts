@@ -107,7 +107,7 @@ export async function createSlackOAuthState(
   db: D1Database,
   input: {
     stateHash: string;
-    organizationId: string;
+    workspaceId: string;
     defaultProjectId: string;
     userId: string;
     expiresAt: string;
@@ -127,7 +127,7 @@ export async function createSlackOAuthState(
       )
       .bind(
         input.stateHash,
-        input.organizationId,
+        input.workspaceId,
         input.defaultProjectId,
         input.userId,
         input.expiresAt,
@@ -163,7 +163,7 @@ export async function upsertSlackInstallation(
   input: {
     teamId: string;
     teamName: string;
-    organizationId: string;
+    workspaceId: string;
     defaultProjectId: string;
     botUserId: string;
     encryptedBotToken: string;
@@ -192,7 +192,7 @@ export async function upsertSlackInstallation(
     .bind(
       input.teamId,
       input.teamName,
-      input.organizationId,
+      input.workspaceId,
       input.defaultProjectId,
       input.botUserId,
       input.encryptedBotToken,
@@ -227,7 +227,7 @@ export async function getSlackInstallation(
 
 export async function listSlackInstallations(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const result = await db
     .prepare(
@@ -235,14 +235,14 @@ export async function listSlackInstallations(
        where installation.organization_id = ?
        order by installation.created_at`,
     )
-    .bind(organizationId)
+    .bind(workspaceId)
     .all<SlackInstallationRow>();
   return result.results;
 }
 
 export async function updateSlackInstallationProject(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   teamId: string,
   projectId: string,
 ) {
@@ -259,10 +259,10 @@ export async function updateSlackInstallationProject(
     .bind(
       projectId,
       new Date().toISOString(),
-      organizationId,
+      workspaceId,
       teamId,
       projectId,
-      organizationId,
+      workspaceId,
     )
     .run();
   return result.meta.changes > 0;
@@ -271,7 +271,7 @@ export async function updateSlackInstallationProject(
 export async function deleteSlackInstallation(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     teamId: string;
     actorUserId: string;
     observedAt: string;
@@ -304,7 +304,7 @@ export async function deleteSlackInstallation(
         queueId,
         input.observedAt,
         input.observedAt,
-        input.organizationId,
+        input.workspaceId,
         input.teamId,
         input.actorUserId,
       ),
@@ -317,13 +317,13 @@ export async function deleteSlackInstallation(
              where queue.id = ? and queue.team_id = briar_slack_installations.team_id
            )`,
       )
-      .bind(input.organizationId, input.teamId, queueId),
+      .bind(input.workspaceId, input.teamId, queueId),
     db
       .prepare(
         `select 1 as present from briar_slack_installations
          where organization_id = ? and team_id = ?`,
       )
-      .bind(input.organizationId, input.teamId),
+      .bind(input.workspaceId, input.teamId),
   ]);
   if ((results[1]?.meta.changes ?? 0) > 0) return "deleted" as const;
   return (results[2]?.results?.length ?? 0) > 0

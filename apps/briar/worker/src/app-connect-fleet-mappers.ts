@@ -4,8 +4,7 @@ import {
   DashboardWorker_Readiness,
   DashboardWorker_State,
   WorkerIcon_Kind,
-  WorkerIconSchema,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  WorkerIconSchema} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import {
   ExecutionWorkerBindingSchema,
   ExecutionWorkerHandoffState,
@@ -27,15 +26,14 @@ import {
   ManagedComputerSocketTicketSchema,
   ManagedComputerSpecificationSchema,
   ManagedComputerState,
-  OrganizationExecutionWorkerSchema,
-} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+  WorkspaceExecutionWorkerSchema as WorkspaceExecutionWorkerSchema} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
 import type { ManagedComputerRow } from "./managed-computer-model";
 import type { managedComputerProductResponse } from "./managed-computer-service";
 import type { ManagedComputerRemoteSessionState as RemoteSessionState } from "./managed-computer-remote-model";
 import type { ManagedComputerSetupSessionRow } from "./managed-computer-model";
 import type {
   ExecutionWorkerState,
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
 } from "./workers";
 import { appAgentProvider } from "./app-connect-mappers";
 
@@ -99,9 +97,9 @@ export const appFleetWorkerIcon = (
   })
   : undefined;
 
-export const appOrganizationExecutionWorker = (
-  worker: OrganizationExecutionWorker,
-) => create(OrganizationExecutionWorkerSchema, {
+export const appWorkspaceExecutionWorker = (
+  worker: WorkspaceExecutionWorker,
+) => create(WorkspaceExecutionWorkerSchema, {
   deviceId: worker.deviceId,
   ownerUserId: worker.ownerUserId,
   ownerName: worker.ownerName,
@@ -152,7 +150,7 @@ const managedProvider = {
 export const appManagedComputer = (row: ManagedComputerRow) =>
   create(ManagedComputerSchema, {
     id: row.id,
-    organizationId: row.organization_id,
+    workspaceId: row.organization_id,
     requesterUserId: row.requester_user_id,
     state: managedState[row.state],
     provider: managedProvider[row.provider],
@@ -199,8 +197,8 @@ export const appManagedComputerPromotionLimitReason = (
       return undefined;
     case "user":
       return ManagedComputerPromotionLimitReason.USER;
-    case "organization":
-      return ManagedComputerPromotionLimitReason.ORGANIZATION;
+    case "workspace":
+      return ManagedComputerPromotionLimitReason.WORKSPACE;
     case "fleet":
       return ManagedComputerPromotionLimitReason.FLEET;
     default:
@@ -269,7 +267,7 @@ export const appManagedComputerSetupSession = (
 ) => create(ManagedComputerSetupSessionSchema, {
   id: session.id,
   managedComputerId: session.managed_computer_id,
-  organizationId: session.organization_id,
+  workspaceId: session.organization_id,
   projectId: session.project_id,
   status: setupSessionStatus[session.status],
   expiresAt: appFleetTimestamp(session.expires_at),

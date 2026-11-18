@@ -113,9 +113,7 @@ describe("provider structured output contracts", () => {
       },
       agentMessage: null,
       contextRequests: null,
-      memoryRequests: null,
       memoryCitations: null,
-      memorySaveRequest: null,
     } as const;
     const contextOutput = {
       body: null,
@@ -127,9 +125,7 @@ describe("provider structured output contracts", () => {
       skillExecutionProposal: null,
       delegation: null,
       agentMessage: null,
-      memoryRequests: null,
       memoryCitations: null,
-      memorySaveRequest: null,
       contextRequests: [{
         resource: "issues",
         projectId: "project-1",
@@ -167,7 +163,6 @@ describe("provider structured output contracts", () => {
           },
           agentMessage: null,
           memoryCitations: null,
-          memorySaveRequest: null,
         },
         attachmentPaths: ["auth.html"],
       });
@@ -210,14 +205,16 @@ describe("provider structured output contracts", () => {
         case: "context",
         requests: { contextRequests: contextOutput.contextRequests },
       });
-      expect(contract.decode({
+      // The legacy memory lookup and save fields are gone from the contract.
+      expect(() => contract.decode({
         ...contextOutput,
         contextRequests: null,
         memoryRequests: [{ operation: "search", queries: ["metric units"] }],
-      })).toEqual({
-        case: "memory",
-        request: { operation: "search", queries: ["metric units"] },
-      });
+      })).toThrow();
+      expect(() => contract.decode({
+        ...replyOutput,
+        memorySaveRequest: null,
+      })).toThrow();
       expect(() => contract.decode({
         ...contextOutput,
         body: "Mixed reply and context lookup",
@@ -227,11 +224,70 @@ describe("provider structured output contracts", () => {
     }
   });
 
+  it("decodes a repository request as its own turn", () => {
+    const base = {
+      body: null,
+      attachments: [],
+      document: null,
+      issueProposal: null,
+      issueBatchProposal: null,
+      executionProposal: null,
+      skillExecutionProposal: null,
+      delegation: null,
+      agentMessage: null,
+      contextRequests: null,
+      memoryCitations: null,
+    } as const;
+    const request = { reason: "Read src-cli/worktree.ts to answer accurately" };
+
+    for (const provider of providers) {
+      const contract = providerStructuredOutputContract(
+        provider,
+        ChannelAgentReplyProviderOutputSchema,
+      );
+      expect(contract.decode({ ...base, repositoryRequest: request })).toEqual({
+        case: "repository",
+        request,
+      });
+      // Absent and explicitly null both mean "no repository is being asked
+      // for", so a normal reply keeps decoding exactly as it did.
+      expect(
+        contract.decode({ ...base, body: "A plain answer", repositoryRequest: null }),
+      ).toMatchObject({ case: "reply" });
+      expect(contract.decode({ ...base, body: "A plain answer" }))
+        .toMatchObject({ case: "reply" });
+      // A request is never also a completion or memory data.
+      expect(() =>
+        contract.decode({ ...base, body: "Mixed", repositoryRequest: request })
+      ).toThrow();
+      expect(() =>
+        contract.decode({
+          ...base,
+          repositoryRequest: request,
+          memoryCitations: [{ documentId: "bay-area", version: 4 }],
+        })
+      ).toThrow();
+      expect(() =>
+        contract.decode({
+          ...base,
+          repositoryRequest: request,
+          agentMessage: {
+            agentId: "22222222-2222-4222-8222-222222222222",
+            body: "Check the ticker.",
+          },
+        })
+      ).toThrow();
+      expect(() =>
+        contract.decode({ ...base, repositoryRequest: { reason: "" } })
+      ).toThrow();
+    }
+  });
+
   it("encodes a lookup turn with no Agent message", () => {
     /*
       A lookup turn is replayed to the provider through the same codec. An
       Agent message reappearing there would send a message the Agent never
-      chose, so both lookup cases must encode it as null.
+      chose, so every request turn must encode it as null.
     */
     const encode = Schema.encodeSync(ChannelAgentReplyProviderOutputSchema);
 
@@ -248,9 +304,14 @@ describe("provider structured output contracts", () => {
       },
     })).toMatchObject({ agentMessage: null, delegation: null, body: null });
     expect(encode({
-      case: "memory",
-      request: { operation: "search", queries: ["metric units"] },
-    })).toMatchObject({ agentMessage: null, delegation: null, body: null });
+      case: "repository",
+      request: { reason: "Read the router before answering" },
+    })).toMatchObject({
+      agentMessage: null,
+      delegation: null,
+      body: null,
+      repositoryRequest: { reason: "Read the router before answering" },
+    });
   });
 });
 
@@ -270,9 +331,7 @@ describe("Claude Code provider schemas", () => {
     },
     agentMessage: null,
     contextRequests: null,
-    memoryRequests: null,
     memoryCitations: null,
-    memorySaveRequest: null,
   } as const;
 
   it("drops format while the codec keeps enforcing it", () => {

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { loadManagedComputerCredential } from "./managed-computer-credential";
 
 const managedComputerId = "44444444-4444-4444-8444-444444444444";
-const organizationId = "55555555-5555-4555-8555-555555555555";
+const workspaceId = "55555555-5555-4555-8555-555555555555";
 const credential = `briar_worker_${"a".repeat(43)}`;
 const directories: string[] = [];
 
@@ -22,7 +22,7 @@ async function fixture(mode = 0o640) {
   await writeFile(path, JSON.stringify({
     credential,
     deviceId: `managed-${managedComputerId}`,
-    organizationId,
+    organizationId: workspaceId,
     managedComputerId,
     apiOrigin: "https://briar.example",
   }), { mode });
@@ -35,7 +35,7 @@ describe("managed computer credential", () => {
     await expect(loadManagedComputerCredential(await fixture())).resolves.toEqual({
       credential,
       deviceId: `managed-${managedComputerId}`,
-      organizationId,
+      workspaceId,
       managedComputerId,
       apiOrigin: "https://briar.example",
     });

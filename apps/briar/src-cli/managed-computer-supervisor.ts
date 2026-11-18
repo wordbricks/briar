@@ -15,7 +15,7 @@ export function managedWorkerProjectIds(config: Config) {
   return config.teams
     .filter((project) =>
       project.executionWorker?.deviceId === managed.deviceId &&
-      project.executionWorker.organizationId === managed.organizationId
+      project.executionWorker.workspaceId === managed.workspaceId
     )
     .map((project) => project.id)
     .sort();

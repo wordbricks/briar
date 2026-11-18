@@ -6,7 +6,7 @@ import {
 } from "./managed-computer-service";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 
-const organizationId = "11111111-1111-4111-8111-111111111111";
+const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "promotion-owner";
 const observedAt = "2026-08-25T00:00:00.000Z";
 
@@ -44,16 +44,16 @@ describe("managed computer promotion campaigns", () => {
       insert into "user" (id, name, email, emailVerified, createdAt, updatedAt)
       values ('${userId}', 'Promotion Owner', 'promotion@example.com', 1, '${observedAt}', '${observedAt}');
       insert into briar_organizations (id, name, handle, created_at, updated_at)
-      values ('${organizationId}', 'Promotion Org', 'promotion-org', '${observedAt}', '${observedAt}');
+      values ('${workspaceId}', 'Promotion Org', 'promotion-org', '${observedAt}', '${observedAt}');
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
-      ) values ('${organizationId}', '${userId}', 'owner', '${observedAt}', '${observedAt}');
+      ) values ('${workspaceId}', '${userId}', 'owner', '${observedAt}', '${observedAt}');
     `);
   }, 30_000);
 
   it("allows the next campaign after the previous computer is stopped", async () => {
     const first = await applyForPromotionalManagedComputer(db, env(), {
-      organizationId,
+      workspaceId,
       userId,
       code: " test-promo-one ",
       requestId: "22222222-2222-4222-8222-222222222222",
@@ -72,7 +72,7 @@ describe("managed computer promotion campaigns", () => {
     ).bind(first.computer.id).run();
 
     await expect(validateManagedComputerPromotion(db, env(), {
-      organizationId,
+      workspaceId,
       userId,
       code: "TEST-PROMO-ONE",
       observedAt: "2026-08-25T00:01:00.000Z",
@@ -82,7 +82,7 @@ describe("managed computer promotion campaigns", () => {
       limitReason: "user",
     });
     await expect(validateManagedComputerPromotion(db, env(), {
-      organizationId,
+      workspaceId,
       userId,
       code: "TEST-PROMO-TWO",
       observedAt: "2026-08-25T00:02:00.000Z",
@@ -93,7 +93,7 @@ describe("managed computer promotion campaigns", () => {
     });
 
     const second = await applyForPromotionalManagedComputer(db, env(), {
-      organizationId,
+      workspaceId,
       userId,
       code: "TEST-PROMO-TWO",
       requestId: "33333333-3333-4333-8333-333333333333",
@@ -107,7 +107,7 @@ describe("managed computer promotion campaigns", () => {
     const redemptions = await db.prepare(
       `select campaign_id from briar_managed_computer_promotion_redemptions
        where organization_id = ? order by campaign_id`,
-    ).bind(organizationId).all<{ campaign_id: string }>();
+    ).bind(workspaceId).all<{ campaign_id: string }>();
     expect(redemptions.results).toEqual([
       { campaign_id: "getbriar-jay-1" },
       { campaign_id: "getbriar-jay-2" },
@@ -115,7 +115,7 @@ describe("managed computer promotion campaigns", () => {
     const audits = await db.prepare(
       `select detail_json from briar_managed_computer_audit_events
        where organization_id = ?`,
-    ).bind(organizationId).all<{ detail_json: string }>();
+    ).bind(workspaceId).all<{ detail_json: string }>();
     expect(JSON.stringify(audits.results)).not.toContain("TEST-PROMO");
   });
 });

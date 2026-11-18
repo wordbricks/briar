@@ -17,7 +17,7 @@ export function DmMemoryCitations({ scope, references }: {
       aria-label={`${t("memory.citations")} ${index + 1} · v${reference.version}`}>
       {index + 1} · v{reference.version}
     </button>)}
-    {selected && <DmMemoryDialog key={`${scope.token}:${scope.organizationId}:${scope.channelId}`}
+    {selected && <DmMemoryDialog key={`${scope.token}:${scope.workspaceId}:${scope.channelId}`}
       scope={scope} initialReference={selected} onClose={() => setSelected(null)} />}
   </div>;
 }

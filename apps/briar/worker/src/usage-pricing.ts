@@ -9,14 +9,14 @@ import {
   type AgentUsageModelRateTable,
 } from "../../src/lib/agent-usage-pricing";
 import type {
-  OrganizationCostRecordRow,
-  OrganizationUsageRecordRow,
+  WorkspaceCostRecordRow,
+  WorkspaceUsageRecordRow,
 } from "./db";
 
 export const AGENT_USAGE_PRICING_CACHE_TTL_MS = 5 * 60_000;
 const AGENT_USAGE_PRICING_FETCH_TIMEOUT_MS = 10_000;
 
-export type EstimatedOrganizationUsageCostRecord = {
+export type EstimatedWorkspaceUsageCostRecord = {
   executionId: string;
   projectId: string;
   runAttempt: number;
@@ -27,11 +27,11 @@ export type EstimatedOrganizationUsageCostRecord = {
   sessionId: string | null;
   scopeId: string | null;
   turnId: string | null;
-  agentProvider: OrganizationUsageRecordRow["agent_provider"];
+  agentProvider: WorkspaceUsageRecordRow["agent_provider"];
   modelProvider: string | null;
   model: string | null;
   canonicalModel: string | null;
-  modelSource: OrganizationUsageRecordRow["model_source"];
+  modelSource: WorkspaceUsageRecordRow["model_source"];
   usageSource: string;
   pricingKey: string;
   amountUsdTicks: number;
@@ -139,7 +139,7 @@ export function createAgentUsagePricingLoader(
 export const loadAgentUsagePricing = createAgentUsagePricingLoader();
 
 type RunUsagePricingInput = Pick<
-  OrganizationUsageRecordRow,
+  WorkspaceUsageRecordRow,
   | "agent_provider"
   | "model_provider"
   | "model"
@@ -152,7 +152,7 @@ type RunUsagePricingInput = Pick<
 
 /** Reprice one run from its immutable usage ledger whenever detail is read. */
 export function estimateRunExecutionCost(input: {
-  usageRecords: readonly OrganizationUsageRecordRow[];
+  usageRecords: readonly WorkspaceUsageRecordRow[];
   loadedPricing: LoadedAgentUsagePricing;
 }): AgentExecutionCostEstimate {
   const providerReportedModels = [...new Set(
@@ -278,8 +278,8 @@ const modelNames = (record: {
   );
 
 const costCoversUsage = (
-  cost: OrganizationCostRecordRow,
-  usage: OrganizationUsageRecordRow,
+  cost: WorkspaceCostRecordRow,
+  usage: WorkspaceUsageRecordRow,
 ) => {
   if (cost.execution_id !== usage.execution_id) return false;
   if (cost.usage_key !== null) return cost.usage_key === usage.usage_key;
@@ -307,13 +307,13 @@ const costCoversUsage = (
  * unattributed provider aggregate covers its whole scope/session; a per-model
  * provider row covers only the same model when it lacks a direct usage key.
  */
-export function estimateOrganizationUsageCosts(input: {
-  usageRecords: readonly OrganizationUsageRecordRow[];
-  costRecords: readonly OrganizationCostRecordRow[];
+export function estimateWorkspaceUsageCosts(input: {
+  usageRecords: readonly WorkspaceUsageRecordRow[];
+  costRecords: readonly WorkspaceCostRecordRow[];
   table: AgentUsageModelRateTable | null;
-}): EstimatedOrganizationUsageCostRecord[] {
+}): EstimatedWorkspaceUsageCostRecord[] {
   if (!input.table) return [];
-  const costsByExecution = new Map<string, OrganizationCostRecordRow[]>();
+  const costsByExecution = new Map<string, WorkspaceCostRecordRow[]>();
   for (const cost of input.costRecords) {
     costsByExecution.set(cost.execution_id, [
       ...(costsByExecution.get(cost.execution_id) ?? []),
@@ -368,7 +368,7 @@ export function estimateOrganizationUsageCosts(input: {
         amountUsdTicks,
         observedAt: usage.observed_at,
         costSource: "modelPriced",
-      } satisfies EstimatedOrganizationUsageCostRecord,
+      } satisfies EstimatedWorkspaceUsageCostRecord,
     ];
   });
 }

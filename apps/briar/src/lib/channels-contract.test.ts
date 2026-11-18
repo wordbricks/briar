@@ -460,6 +460,7 @@ describe("channel reply completion contract", () => {
       title,
       description: null,
       priority: 2,
+      attachmentIds: [],
     });
     const batch = {
       items: [

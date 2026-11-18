@@ -40,8 +40,8 @@ describe("navigation history", () => {
         section: "account",
       }),
       settingsNavigationLocation({
-        scope: "organization",
-        organizationId: "organization-a",
+        scope: "workspace",
+        workspaceId: "workspace-a",
         section: "members",
       }),
       settingsNavigationLocation({
@@ -166,19 +166,19 @@ describe("navigation history", () => {
       issueNavigationLocation("project-a", "run-a"),
       channelNavigationLocation(
         "channels",
-        "organization-a",
+        "workspace-a",
         "channel-a",
         "project-a",
       ),
       channelNavigationLocation(
         "channels",
-        "organization-a",
+        "workspace-a",
         "channel-b",
         "project-a",
       ),
       channelNavigationLocation(
         "dms",
-        "organization-a",
+        "workspace-a",
         "dm-a",
         "project-a",
       ),
@@ -206,12 +206,12 @@ describe("navigation history", () => {
   it("replaces an unavailable destination without creating a new visit", () => {
     const unavailable = channelNavigationLocation(
       "channels",
-      "organization-a",
+      "workspace-a",
       "deleted",
     );
     const fallback = channelNavigationLocation(
       "channels",
-      "organization-a",
+      "workspace-a",
       "general",
     );
     let history = createNavigationHistory<string>("issues");

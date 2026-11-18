@@ -23,6 +23,8 @@ export interface IssuePropertyFilters {
   assignee: string[];
   agent: string[];
   creator: string[];
+  /** {@link IssueUpdatedBucket} values, matched against `HuntRun.updatedAt`. */
+  updated: string[];
 }
 
 export type IssuePropertyFilterKey = keyof IssuePropertyFilters;
@@ -37,7 +39,44 @@ export function emptyIssuePropertyFilters(): IssuePropertyFilters {
     assignee: [],
     agent: [],
     creator: [],
+    updated: [],
   };
+}
+
+/*
+  The "last updated" property filter. The buckets do not overlap, so they
+  combine with OR like every other multi-select property: whole elapsed days
+  since `updatedAt` decide the bucket, which keeps "1-7 days" and "8-30 days"
+  apart at the day boundary.
+*/
+export const issueUpdatedBuckets = [
+  "last24h",
+  "days1to7",
+  "days8to30",
+  "over30d",
+] as const;
+
+export type IssueUpdatedBucket = (typeof issueUpdatedBuckets)[number];
+
+const dayMs = 24 * 60 * 60 * 1000;
+
+/**
+ * The bucket `updatedAt` falls in as of `now`, or null when the timestamp does
+ * not parse. A timestamp slightly in the future (clock skew) counts as the last
+ * 24 hours.
+ */
+export function issueUpdatedBucketOf(
+  updatedAt: string | null | undefined,
+  now: number,
+): IssueUpdatedBucket | null {
+  if (!updatedAt) return null;
+  const updated = Date.parse(updatedAt);
+  if (Number.isNaN(updated)) return null;
+  const elapsedDays = Math.floor(Math.max(0, now - updated) / dayMs);
+  if (elapsedDays < 1) return "last24h";
+  if (elapsedDays <= 7) return "days1to7";
+  if (elapsedDays <= 30) return "days8to30";
+  return "over30d";
 }
 
 export function propertyFilterMatches(
@@ -53,6 +92,7 @@ export function propertyFilterMatches(
 export function runMatchesIssuePropertyFilters(
   run: HuntRun,
   filters: IssuePropertyFilters,
+  now: number = Date.now(),
 ) {
   return (
     propertyFilterMatches(filters.status, run.status) &&
@@ -63,7 +103,9 @@ export function runMatchesIssuePropertyFilters(
     ) &&
     propertyFilterMatches(filters.assignee, run.assigneeUserId) &&
     propertyFilterMatches(filters.agent, run.agentId) &&
-    propertyFilterMatches(filters.creator, run.createdByUserId)
+    propertyFilterMatches(filters.creator, run.createdByUserId) &&
+    (filters.updated.length === 0 ||
+      filters.updated.includes(issueUpdatedBucketOf(run.updatedAt, now) ?? ""))
   );
 }
 

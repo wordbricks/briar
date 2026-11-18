@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 93b80f08b32bd972ecd8dfb0c1dd7fd08a4e370a1b426cc896a84e86e562a698
--- snapshot-digest: 88c0f8a3d72c38303fc1e8703dd521cb037ff3e61dc47d8f4b28a9839f22670f
+-- migrations-digest: 22025eb924b62e445e56a18328ba595fab9aac41f9302efaed0028b8c556a607
+-- snapshot-digest: 009b17aa1b89d1d1c5a0de2b2ba0a46bca0faa84db6e3c0e595f93da1d8eb724
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1429,93 +1429,6 @@ CREATE TABLE briar_dm_memory_spaces (
   unique (organization_id, channel_id, owner_user_id, agent_id, roster_epoch)
 );
 -- @statement
-CREATE TABLE briar_dm_memory_documents (
-  id text primary key not null,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  kind text not null check (kind in ('observation', 'topic')),
-  title text not null check (length(title) between 1 and 200),
-  current_version integer not null check (current_version > 0),
-  status text not null default 'active'
-    check (status in ('active', 'invalidated', 'superseded', 'deleted')),
-  conflicted integer not null default 0 check (conflicted in (0, 1)),
-  superseded_by text,
-  created_at text not null,
-  updated_at text not null, expired_version integer not null default 0,
-  unique (space_id, id)
-);
--- @statement
-CREATE TABLE briar_dm_memory_revisions (
-  space_id text not null,
-  document_id text not null,
-  version integer not null,
-  body text not null check (length(cast(body as blob)) between 1 and 65536),
-  body_hash text not null,
-  memory_class text not null check (memory_class in ('profile', 'log', 'note')),
-  evidence_type text not null check (evidence_type in ('explicit_user', 'observed')),
-  protected_by_user integer not null check (protected_by_user in (0, 1)),
-  source_language text not null,
-  observed_at text,
-  valid_until text,
-  origin text not null check (origin in ('user_edit', 'explicit_request', 'extract', 'consolidate')),
-  author_agent_id text,
-  policy_version text not null,
-  created_at text not null,
-  primary key (document_id, version),
-  foreign key (space_id, document_id)
-    references briar_dm_memory_documents(space_id, id) on delete cascade
-);
--- @statement
-CREATE TABLE briar_dm_memory_sources (
-  space_id text not null,
-  document_id text not null,
-  document_version integer not null,
-  item_id text not null default '',
-  source_type text not null check (source_type in ('message', 'user_edit_event')),
-  source_id text not null,
-  source_version integer not null,
-  source_hash text not null,
-  primary key (document_id, document_version, item_id, source_type, source_id),
-  foreign key (space_id, document_id)
-    references briar_dm_memory_documents(space_id, id) on delete cascade,
-  foreign key (document_id, document_version)
-    references briar_dm_memory_revisions(document_id, version) on delete cascade
-);
--- @statement
-CREATE TABLE briar_dm_memory_commits (
-  id text primary key not null,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  request_id text not null,
-  document_id text,
-  payload_hash text,
-  result_version integer,
-  applied integer not null default 0 check (applied in (0, 1)),
-  created_at text not null,
-  unique (space_id, request_id)
-);
--- @statement
-CREATE TABLE briar_dm_memory_jobs (
-  id text primary key not null,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  kind text not null check (kind in ('index', 'delete', 'extract', 'consolidate', 'explicit_request')),
-  dedupe_key text not null unique,
-  document_id text,
-  document_version integer,
-  status text not null default 'pending'
-    check (status in ('pending', 'running', 'retry_wait', 'succeeded', 'no_change', 'failed', 'cancelled')),
-  stage text,
-  attempt integer not null default 0,
-  lease_token_hash text,
-  lease_expires_at text,
-  expected_memory_revision integer not null,
-  revocation_epoch integer not null,
-  input_json text,
-  error_code text,
-  mutation_id text,
-  available_at text not null,
-  created_at text not null,
-  updated_at text not null
-, claimed_worker_id text, claimed_device_id text, input_hash text, policy_json text, calls_used integer not null default 0, source_start integer not null default 0, source_end integer not null default 0, request_source_id text, request_targets_json text not null default '[]', result_json text);
--- @statement
 CREATE TABLE briar_dm_memory_exclusions (
   space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
   source_type text not null check (source_type in ('message', 'user_edit_event')),
@@ -1524,200 +1437,6 @@ CREATE TABLE briar_dm_memory_exclusions (
   revocation_epoch integer not null,
   created_at text not null,
   primary key (space_id, source_type, source_id, document_id)
-);
--- @statement
-CREATE TABLE briar_dm_memory_chunks (
-  id text primary key not null,
-  space_id text not null,
-  document_id text not null,
-  document_version integer not null,
-  vector_id text not null unique,
-  splitter_profile text not null,
-  embedding_profile text not null,
-  start_bytes integer not null check (start_bytes >= 0),
-  end_bytes integer not null check (end_bytes > start_bytes),
-  line_start integer not null check (line_start > 0),
-  line_end integer not null check (line_end >= line_start),
-  headings_json text not null,
-  token_count integer not null check (token_count between 1 and 800),
-  ready integer not null default 0 check (ready in (0, 1)),
-  created_at text not null,
-  foreign key (space_id, document_id)
-    references briar_dm_memory_documents(space_id, id) on delete cascade,
-  foreign key (document_id, document_version)
-    references briar_dm_memory_revisions(document_id, version) on delete cascade
-);
--- @statement
-CREATE TABLE briar_dm_memory_vectors (
-  id text primary key not null,
-  organization_id text not null,
-  space_id text not null,
-  document_id text not null,
-  document_version integer not null,
-  chunk_id text not null,
-  embedding_profile text not null,
-  state text not null default 'pending'
-    check (state in ('pending', 'submitted', 'ready', 'purging', 'purged', 'purge_failed')),
-  upsert_mutation_id text,
-  delete_mutation_id text,
-  submitted_at text,
-  write_expires_at text,
-  delete_submitted_at text,
-  confirmed_at text,
-  available_at text not null,
-  lease_token text,
-  lease_expires_at text,
-  attempt integer not null default 0,
-  error_code text,
-  created_at text not null
-);
--- @statement
-CREATE TABLE briar_dm_memory_briefs (
-  space_id text primary key not null references briar_dm_memory_spaces(id) on delete cascade,
-  memory_revision integer not null,
-  revocation_epoch integer not null,
-  policy_version text not null,
-  valid_through text,
-  content_json text not null check (length(cast(content_json as blob)) <= 8192),
-  created_at text not null
-);
--- @statement
-CREATE TABLE briar_dm_memory_source_events (
-  sequence integer primary key autoincrement,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  message_id text not null,
-  created_at text not null,
-  unique (space_id, message_id)
-);
--- @statement
-CREATE TABLE briar_dm_memory_learning_outbox (
-  reply_job_id text not null,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  kind text not null check (kind in ('extract', 'explicit_request')),
-  source_end integer not null,
-  request_source_id text,
-  request_targets_json text not null default '[]',
-  revocation_epoch integer not null,
-  settled integer not null default 0,
-  available_at text not null,
-  created_at text not null,
-  primary key (reply_job_id, kind)
-);
--- @statement
-CREATE TABLE briar_dm_memory_observation_events (
-  sequence integer primary key autoincrement,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  document_id text not null,
-  document_version integer not null,
-  created_at text not null,
-  unique (document_id, document_version)
-);
--- @statement
-CREATE TABLE briar_dm_memory_learning_state (
-  space_id text primary key not null references briar_dm_memory_spaces(id) on delete cascade,
-  source_watermark integer not null default 0,
-  observation_watermark integer not null default 0,
-  last_consolidation_started_at text,
-  last_consolidation_succeeded_at text,
-  last_scheduled_at text,
-  updated_at text not null
-);
--- @statement
-CREATE TABLE briar_dm_memory_learning_retries (
-  request_id text primary key not null,
-  operation_id text not null,
-  job_id text not null references briar_dm_memory_jobs(id) on delete cascade,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  revocation_epoch integer not null,
-  created_at text not null
-);
--- @statement
-CREATE TABLE briar_dm_memory_learning_inputs (
-  job_id text not null references briar_dm_memory_jobs(id) on delete cascade,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  source_type text not null check (source_type in ('message', 'user_edit_event')),
-  source_id text not null,
-  source_version integer not null,
-  source_hash text,
-  primary key (job_id, source_type, source_id)
-);
--- @statement
-CREATE TABLE briar_dm_memory_model_calls (
-  id text primary key not null,
-  job_id text not null references briar_dm_memory_jobs(id) on delete cascade,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  organization_id text not null references briar_organizations(id) on delete cascade,
-  claim_token_hash text not null,
-  stage text not null check (stage in ('proposing', 'verifying')),
-  input_hash text,
-  proposal_hash text,
-  model_json text not null,
-  status text not null default 'reserved' check (status in ('reserved', 'completed', 'failed')),
-  budget_applied integer not null default 0,
-  reserved_micro_usd integer not null,
-  input_tokens integer,
-  output_tokens integer,
-  cost_micro_usd integer,
-  error_code text,
-  created_at text not null,
-  completed_at text
-);
--- @statement
-CREATE TABLE briar_dm_memory_proposals (
-  id text primary key not null references briar_dm_memory_model_calls(id) on delete cascade,
-  job_id text not null references briar_dm_memory_jobs(id) on delete cascade,
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  input_hash text,
-  proposal_hash text,
-  proposal_json text,
-  normalized_json text,
-  status text not null check (status in ('proposed', 'applied', 'rejected', 'stale', 'cancelled')),
-  created_at text not null,
-  terminal_at text
-);
--- @statement
-CREATE TABLE briar_dm_memory_verifications (
-  id text primary key not null references briar_dm_memory_model_calls(id) on delete cascade,
-  job_id text not null references briar_dm_memory_jobs(id) on delete cascade,
-  proposal_id text not null references briar_dm_memory_proposals(id) on delete cascade,
-  input_hash text,
-  proposal_hash text,
-  decisions_json text,
-  approved integer not null,
-  request_authorized integer not null default 0,
-  error_code text,
-  created_at text not null
-);
--- @statement
-CREATE TABLE briar_dm_memory_learning_commits (
-  job_id text primary key not null references briar_dm_memory_jobs(id) on delete cascade,
-  commit_id text not null references briar_dm_memory_commits(id) on delete cascade,
-  proposal_hash text,
-  result_json text not null
-);
--- @statement
-CREATE TABLE briar_dm_memory_document_links (
-  document_id text not null,
-  document_version integer not null,
-  source_document_id text not null references briar_dm_memory_documents(id) on delete cascade,
-  source_document_version integer not null,
-  primary key (document_id, document_version, source_document_id),
-  foreign key (document_id, document_version)
-    references briar_dm_memory_revisions(document_id, version) on delete cascade
-);
--- @statement
-CREATE TABLE briar_dm_memory_learning_payload_purges (
-  space_id text not null,
-  source_type text not null,
-  source_id text not null,
-  primary key (space_id, source_type, source_id)
-);
--- @statement
-CREATE TABLE briar_dm_memory_purge_documents (
-  space_id text not null references briar_dm_memory_spaces(id) on delete cascade,
-  root_document_id text not null,
-  document_id text not null,
-  primary key (root_document_id, document_id)
 );
 -- @statement
 CREATE TABLE briar_reply_completion_receipts (
@@ -2408,7 +2127,7 @@ CREATE TABLE briar_channel_agent_reply_jobs (
   default 0 check (planned_update_resume in (0, 1)), session_id text
   references briar_channel_reply_sessions (id) on delete cascade, approved_skill_execution_proposal_id text, memory_restart_count integer not null default 0, agent_message_hop integer not null default 0
     check (agent_message_hop between 0 and 2), origin_reply_job_id text
-    references briar_channel_agent_reply_jobs (id) on delete cascade, superseded_by_reply_job_id text, steer_revision integer not null default 0, applied_steer_revision integer not null default 0, last_input_at text, steer_restart_count integer not null default 0,
+    references briar_channel_agent_reply_jobs (id) on delete cascade, superseded_by_reply_job_id text, steer_revision integer not null default 0, applied_steer_revision integer not null default 0, last_input_at text, steer_restart_count integer not null default 0, routing_action text, routing_target_job_id text, routing_response text, stop_requested_at text, stop_confirmed_at text, routing_receipt_id text, routing_decision_action text, dm_schedule_id text,
   unique (channel_id, trigger_message_id, agent_id),
   foreign key ("agent_provider") references briar_agent_providers (provider)
 );
@@ -2543,21 +2262,6 @@ CREATE TABLE briar_dm_memory_activity_revocations (
   organization_id text not null, channel_id text not null, agent_id text not null,
   trigger_message_id text not null, parent_message_id text not null,
   attempts integer not null, primary key (id, attempts)
-);
--- @statement
-CREATE TABLE briar_dm_memory_discovered_refs (
-  job_id text not null references briar_channel_agent_reply_jobs(id) on delete cascade,
-  claim_token_hash text not null,
-  document_id text not null references briar_dm_memory_documents(id) on delete cascade,
-  version integer not null,
-  primary key (job_id, claim_token_hash, document_id, version)
-);
--- @statement
-CREATE TABLE briar_dm_memory_reply_citations (
-  message_id text not null references briar_channel_messages(id) on delete cascade,
-  document_id text not null references briar_dm_memory_documents(id) on delete cascade,
-  version integer not null,
-  primary key (message_id, document_id, version)
 );
 -- @statement
 CREATE TABLE briar_dm_memory_reply_fences (
@@ -2716,23 +2420,6 @@ CREATE TABLE briar_issue_agent_reply_jobs (
   unique (project_id, trigger_message_id, agent_id),
   foreign key ("preferred_provider") references briar_agent_providers (provider),
   foreign key ("agent_provider") references briar_agent_providers (provider)
-);
--- @statement
-CREATE TABLE briar_issue_attachments (
-  id text primary key not null,
-  run_id text not null references briar_hunt_runs (id) on delete cascade,
-  project_id text not null references briar_projects (id) on delete cascade,
-  object_key text not null unique check (
-    object_key = trim(object_key)
-    and length(object_key) between 1 and 500
-  ),
-  filename text not null check (length(trim(filename)) between 1 and 255),
-  content_type text not null check (content_type in (
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
-    'image/svg+xml', 'text/html', 'video/mp4', 'video/webm', 'video/quicktime'
-  )),
-  byte_size integer not null check (byte_size between 1 and 20971520),
-  created_at text not null
 );
 -- @statement
 CREATE TABLE briar_issue_create_mutation_receipts (
@@ -3842,6 +3529,190 @@ CREATE TABLE briar_dm_public_message_receipts (
   created_at text not null
 ) strict;
 -- @statement
+CREATE TABLE briar_dm_schedules (
+  id text primary key not null,
+  organization_id text not null references briar_organizations(id) on delete cascade,
+  channel_id text not null references briar_channels(id) on delete cascade,
+  owner_user_id text not null references "user"(id) on delete cascade,
+  agent_id text not null references briar_project_agents(id) on delete cascade,
+  source_message_id text not null references briar_channel_messages(id) on delete cascade,
+  source_version integer not null,
+  roster_epoch integer not null,
+  request_key text not null,
+  payload_hash text not null,
+  instruction text not null check (length(instruction) between 1 and 8000),
+  previous_job_id text,
+  next_run_at text not null,
+  interval_seconds integer check (interval_seconds is null or interval_seconds between 300 and 31536000),
+  time_zone text not null,
+  enabled integer not null default 1 check (enabled in (0, 1)),
+  revision integer not null default 1,
+  current_job_id text,
+  cancelled_at text,
+  created_at text not null,
+  updated_at text not null,
+  unique (channel_id, owner_user_id, agent_id, source_message_id, request_key)
+);
+-- @statement
+CREATE TABLE briar_issue_attachments (
+  id text primary key not null,
+  run_id text not null references briar_hunt_runs (id) on delete cascade,
+  project_id text not null references briar_projects (id) on delete cascade,
+  object_key text not null unique check (
+    object_key = trim(object_key)
+    and length(object_key) between 1 and 500
+  ),
+  filename text not null check (length(trim(filename)) between 1 and 255),
+  content_type text not null check (content_type in (
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/svg+xml', 'text/html', 'video/mp4', 'video/webm', 'video/quicktime',
+    'application/pdf', 'text/markdown', 'text/plain'
+  )),
+  byte_size integer not null check (byte_size between 1 and 20971520),
+  created_at text not null
+);
+-- @statement
+CREATE TABLE briar_memory_vault_scope_kinds (
+  scope_kind text primary key not null
+    check (scope_kind = lower(trim(scope_kind)) and length(scope_kind) between 1 and 32)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_states (
+  state text primary key not null
+    check (state = lower(trim(state)) and length(state) between 1 and 32)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_record_types (
+  record_type text primary key not null
+    check (record_type = lower(trim(record_type)) and length(record_type) between 1 and 32),
+  path_template text not null unique
+    check (length(path_template) between 4 and 100 and path_template glob '*.md')
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vaults (
+  id text primary key not null check (length(id) = 36),
+  organization_id text not null references briar_organizations (id) on delete cascade,
+  agent_id text not null references briar_project_agents (id) on delete cascade,
+  scope_kind text not null references briar_memory_vault_scope_kinds (scope_kind),
+  scope_key text not null check (length(scope_key) between 1 and 200),
+  owner_user_id text check (owner_user_id is null or length(owner_user_id) between 1 and 200),
+  dm_space_id text references briar_dm_memory_spaces (id) on delete cascade,
+  repo_name text not null unique check (length(repo_name) between 1 and 100),
+  generation integer not null default 1 check (generation >= 1),
+  head_commit text check (
+    head_commit is null
+    or (length(head_commit) = 40 and head_commit not glob '*[^0-9a-f]*')
+  ),
+  synced_at text,
+  state text not null default 'active' references briar_memory_vault_states (state),
+  created_at text not null,
+  updated_at text not null,
+  unique (organization_id, agent_id, scope_kind, scope_key),
+  check ((dm_space_id is null) = (owner_user_id is null)),
+  check (dm_space_id is null or scope_key = dm_space_id)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_records (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  record_id text not null check (length(record_id) between 1 and 63),
+  record_type text not null references briar_memory_record_types (record_type),
+  path text not null check (length(path) between 4 and 200 and path glob '*.md'),
+  status text check (status is null or length(status) between 1 and 32),
+  aliases_json text not null default '[]'
+    check (json_valid(aliases_json) and json_type(aliases_json) = 'array'),
+  revision integer not null check (revision >= 1),
+  commit_sha text not null check (length(commit_sha) = 40),
+  protected_by_user integer not null default 0 check (protected_by_user in (0, 1)),
+  created_at text not null,
+  updated_at text not null,
+  deleted_at text,
+  primary key (vault_id, record_id)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_revisions (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  record_id text not null check (length(record_id) between 1 and 63),
+  revision integer not null check (revision >= 1),
+  commit_sha text not null check (length(commit_sha) = 40),
+  path text not null check (length(path) between 4 and 200),
+  actor text not null check (length(actor) between 1 and 200),
+  created_at text not null,
+  primary key (vault_id, record_id, revision)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_requests (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  request_id text not null check (length(request_id) between 1 and 200),
+  payload_hash text not null
+    check (length(payload_hash) = 64 and payload_hash not glob '*[^0-9a-f]*'),
+  commit_sha text check (commit_sha is null or length(commit_sha) = 40),
+  result_json text not null check (json_valid(result_json)),
+  created_at text not null,
+  primary key (vault_id, request_id)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_claim_reads (
+  claim_token_hash text not null
+    check (length(claim_token_hash) = 64 and claim_token_hash not glob '*[^0-9a-f]*'),
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  record_id text not null check (length(record_id) between 1 and 63),
+  revision integer not null check (revision >= 1),
+  work_id text not null check (length(work_id) between 1 and 200),
+  read_at text not null,
+  primary key (claim_token_hash, vault_id, record_id, revision)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_purges (
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  source_generation integer not null check (source_generation >= 1),
+  paths_json text not null
+    check (json_valid(paths_json) and json_type(paths_json) = 'array'),
+  requested_at text not null,
+  started_at text,
+  lease_token text check (lease_token is null or length(lease_token) = 36),
+  lease_expires_at text,
+  attempts integer not null default 0 check (attempts >= 0),
+  last_error text check (last_error is null or length(last_error) <= 2000),
+  switched_at text,
+  completed_at text,
+  updated_at text not null,
+  primary key (vault_id, source_generation)
+) strict;
+-- @statement
+CREATE TABLE briar_memory_vault_reply_citations (
+  message_id text not null references briar_channel_messages (id) on delete cascade,
+  vault_id text not null references briar_memory_vaults (id) on delete cascade,
+  record_id text not null check (length(record_id) between 1 and 63),
+  revision integer not null check (revision >= 1),
+  created_at text not null,
+  primary key (message_id, vault_id, record_id, revision)
+) strict;
+-- @statement
+CREATE TABLE briar_dm_memory_setting_requests (
+  id text primary key not null check (length(id) = 36),
+  space_id text not null references briar_dm_memory_spaces (id) on delete cascade,
+  request_id text not null check (length(request_id) = 36),
+  payload_hash text not null
+    check (length(payload_hash) = 64 and payload_hash not glob '*[^0-9a-f]*'),
+  applied integer not null default 0 check (applied in (0, 1)),
+  created_at text not null,
+  unique (space_id, request_id)
+) strict;
+-- @statement
+CREATE TABLE briar_agent_workspace_tool_requests (
+  organization_id text not null
+    references briar_organizations (id) on delete cascade,
+  work_id text not null check (length(work_id) between 1 and 200),
+  request_key text not null check (length(request_key) between 1 and 128),
+  operation text not null check (length(operation) between 1 and 32),
+  payload_hash text not null
+    check (length(payload_hash) = 64 and payload_hash not glob '*[^0-9a-f]*'),
+  agent_id text references briar_project_agents (id) on delete set null,
+  result_json text not null check (json_valid(result_json)),
+  created_at text not null,
+  primary key (organization_id, work_id, request_key)
+) strict;
+-- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-pilot','getbriar-pilot','GETBRIAR managed computer pilot',1,'2026-08-21T00:00:00.000Z','2026-08-21T00:00:00.000Z');
 -- @statement
 INSERT INTO "briar_managed_computer_campaigns" ("id","code_key","name","active","created_at","updated_at") VALUES('getbriar-jay-1','getbriar-jay-1','Managed computer pilot Jay slot 1',1,'2026-08-25T00:00:00.000Z','2026-08-25T00:00:00.000Z');
@@ -3905,6 +3776,50 @@ INSERT INTO "briar_dm_message_purposes" ("purpose","proto_name") VALUES('convers
 INSERT INTO "briar_dm_message_publication_kinds" ("publication_kind","proto_name") VALUES('intermediate','DM_MESSAGE_PUBLICATION_KIND_INTERMEDIATE');
 -- @statement
 INSERT INTO "briar_dm_message_publication_kinds" ("publication_kind","proto_name") VALUES('final','DM_MESSAGE_PUBLICATION_KIND_FINAL');
+-- @statement
+INSERT INTO "briar_memory_vault_scope_kinds" ("scope_kind") VALUES('dm');
+-- @statement
+INSERT INTO "briar_memory_vault_scope_kinds" ("scope_kind") VALUES('group');
+-- @statement
+INSERT INTO "briar_memory_vault_scope_kinds" ("scope_kind") VALUES('project');
+-- @statement
+INSERT INTO "briar_memory_vault_states" ("state") VALUES('active');
+-- @statement
+INSERT INTO "briar_memory_vault_states" ("state") VALUES('purging');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('person','entities/people/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('org','entities/orgs/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('tool','entities/tools/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('project','entities/projects/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('infrastructure','entities/infrastructure/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('comms','comms/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('workstream','workstreams/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('fact','knowledge/facts/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('procedure','knowledge/procedures/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('preference','knowledge/preferences/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('decision','knowledge/decisions/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('lesson','knowledge/lessons/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('playbook','playbook.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('timeline-weekly','timeline/weekly/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('timeline-monthly','timeline/monthly/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('browser-guidance','browser-guidance/attempts/{id}.md');
+-- @statement
+INSERT INTO "briar_memory_record_types" ("record_type","path_template") VALUES('timeline-daily','timeline/daily/{id}.md');
 -- @statement
 CREATE VIEW briar_run_child_storage_a_project_mismatches as
 select child.project_id as stale_project_id,
@@ -4517,41 +4432,6 @@ CREATE INDEX briar_agent_skill_execution_realtime_outbox_updated_idx
 CREATE INDEX briar_dm_memory_spaces_owner on briar_dm_memory_spaces
   (organization_id, owner_user_id, channel_id, status);
 -- @statement
-CREATE INDEX briar_dm_memory_documents_page on briar_dm_memory_documents
-  (space_id, status, id);
--- @statement
-CREATE INDEX briar_dm_memory_sources_origin on briar_dm_memory_sources
-  (source_type, source_id, space_id);
--- @statement
-CREATE INDEX briar_dm_memory_jobs_claim on briar_dm_memory_jobs
-  (kind, status, available_at, id);
--- @statement
-CREATE INDEX briar_dm_memory_chunks_document on briar_dm_memory_chunks
-  (space_id, document_id, document_version, start_bytes);
--- @statement
-CREATE INDEX briar_dm_memory_vectors_cleanup on briar_dm_memory_vectors (state, available_at, id);
--- @statement
-CREATE INDEX briar_dm_memory_vectors_document on briar_dm_memory_vectors (document_id, document_version);
--- @statement
-CREATE UNIQUE INDEX briar_dm_memory_one_learning_claim on briar_dm_memory_jobs(space_id)
-where kind in ('extract', 'explicit_request', 'consolidate') and status = 'running';
--- @statement
-CREATE INDEX briar_dm_memory_source_events_space on briar_dm_memory_source_events(space_id, sequence);
--- @statement
-CREATE INDEX briar_dm_memory_learning_outbox_pending on briar_dm_memory_learning_outbox(space_id, settled, available_at);
--- @statement
-CREATE INDEX briar_dm_memory_observation_events_space on briar_dm_memory_observation_events(space_id, sequence);
--- @statement
-CREATE INDEX briar_dm_memory_learning_inputs_source on briar_dm_memory_learning_inputs(space_id, source_type, source_id);
--- @statement
-CREATE INDEX briar_dm_memory_calls_organization on briar_dm_memory_model_calls(organization_id, created_at);
--- @statement
-CREATE INDEX briar_dm_memory_calls_space on briar_dm_memory_model_calls(space_id, created_at);
--- @statement
-CREATE INDEX briar_dm_memory_proposals_job on briar_dm_memory_proposals(job_id, created_at);
--- @statement
-CREATE INDEX briar_dm_memory_document_links_source on briar_dm_memory_document_links(source_document_id, source_document_version);
--- @statement
 CREATE INDEX briar_reply_completion_receipts_work_idx
   on briar_reply_completion_receipts (reply_kind, work_id, created_at);
 -- @statement
@@ -4833,11 +4713,6 @@ CREATE INDEX briar_agent_worklog_entries_session_sequence_idx
 CREATE INDEX briar_agent_worklog_entries_session_updated_idx
   on briar_agent_worklog_entries (session_id, updated_sequence, entry_id);
 -- @statement
-CREATE INDEX briar_agent_transcript_segments_session_sequence_idx
-  on briar_agent_transcript_segments (
-    session_id, first_sequence, last_sequence
-  );
--- @statement
 CREATE INDEX briar_hunt_runs_github_reconcile_idx
   on briar_hunt_runs (paused_at, id)
   where status = 'running'
@@ -4976,12 +4851,6 @@ CREATE INDEX briar_agent_skill_execution_origin_idx
 CREATE INDEX briar_project_agents_designated_worker_idx
   on briar_project_agents (designated_worker_id, project_id);
 -- @statement
-CREATE INDEX briar_issue_attachments_run_idx
-  on briar_issue_attachments (run_id, created_at, id);
--- @statement
-CREATE INDEX briar_issue_attachments_project_idx
-  on briar_issue_attachments (project_id, run_id);
--- @statement
 CREATE INDEX briar_issue_subscriptions_user_idx
   on briar_issue_subscriptions (organization_id, user_id, created_at desc);
 -- @statement
@@ -5015,8 +4884,6 @@ CREATE INDEX briar_issue_relations_second_idx
   on briar_issue_relations (project_id, second_run_id, created_at);
 -- @statement
 CREATE INDEX briar_dm_memory_reply_fences_space on briar_dm_memory_reply_fences(space_id);
--- @statement
-CREATE INDEX briar_dm_memory_reply_citations_document on briar_dm_memory_reply_citations(document_id);
 -- @statement
 CREATE INDEX briar_channel_message_mutation_receipts_scope_idx
   on briar_channel_message_mutation_receipts (
@@ -5189,6 +5056,44 @@ CREATE UNIQUE INDEX briar_channel_messages_dm_batch_part_idx
 CREATE UNIQUE INDEX briar_channel_messages_dm_sequence_idx
   on briar_channel_messages (channel_id, dm_sequence)
   where dm_sequence is not null;
+-- @statement
+CREATE INDEX briar_dm_schedules_due on briar_dm_schedules(enabled, next_run_at);
+-- @statement
+CREATE INDEX briar_dm_schedules_scope on briar_dm_schedules(channel_id, owner_user_id, agent_id, created_at);
+-- @statement
+CREATE INDEX briar_issue_attachments_run_idx
+  on briar_issue_attachments (run_id, created_at, id);
+-- @statement
+CREATE INDEX briar_issue_attachments_project_idx
+  on briar_issue_attachments (project_id, run_id);
+-- @statement
+CREATE INDEX briar_memory_vaults_dm_space on briar_memory_vaults (dm_space_id)
+where dm_space_id is not null;
+-- @statement
+CREATE UNIQUE INDEX briar_memory_vault_records_live_path
+on briar_memory_vault_records (vault_id, path)
+where deleted_at is null;
+-- @statement
+CREATE INDEX briar_memory_vault_records_recent
+on briar_memory_vault_records (vault_id, updated_at desc, record_id)
+where deleted_at is null;
+-- @statement
+CREATE INDEX briar_memory_vault_revisions_commit
+on briar_memory_vault_revisions (vault_id, commit_sha);
+-- @statement
+CREATE INDEX briar_memory_vault_claim_reads_age
+on briar_memory_vault_claim_reads (read_at);
+-- @statement
+CREATE INDEX briar_memory_vault_purges_open
+on briar_memory_vault_purges (lease_expires_at)
+where completed_at is null;
+-- @statement
+CREATE INDEX briar_memory_vault_reply_citations_record
+on briar_memory_vault_reply_citations (vault_id, record_id);
+-- @statement
+CREATE INDEX briar_agent_workspace_tool_requests_channel_post_rate
+on briar_agent_workspace_tool_requests (organization_id, created_at)
+where operation = 'channel.post';
 -- @statement
 CREATE TRIGGER briar_dashboard_settings_update_sync
 after update on briar_project_settings BEGIN
@@ -9101,26 +9006,6 @@ begin
   select raise(ignore);
 end;
 -- @statement
-CREATE TRIGGER briar_dashboard_attachments_insert_sync
-after insert on briar_issue_attachments BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (new.project_id, 'run', new.run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (new.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
-CREATE TRIGGER briar_dashboard_attachments_delete_sync
-after delete on briar_issue_attachments BEGIN
-  insert into briar_dashboard_changes (
-    project_id, entity_type, entity_id, operation, created_at
-  ) values (old.project_id, 'run', old.run_id, 'upsert', datetime('now'));
-  insert into briar_dashboard_sync_state (project_id, current_version)
-  values (old.project_id, last_insert_rowid())
-  on conflict (project_id) do update set current_version = excluded.current_version;
-END;
--- @statement
 CREATE TRIGGER briar_dashboard_members_insert_sync
 after insert on briar_organization_members BEGIN
   insert into briar_dashboard_changes (
@@ -10036,47 +9921,6 @@ CREATE TRIGGER briar_dm_memory_project_access_removed before delete on briar_pro
   );
 end;
 -- @statement
-CREATE TRIGGER briar_dm_memory_cancel_revoked after update of revocation_epoch on briar_dm_memory_spaces
-when old.revocation_epoch <> new.revocation_epoch begin
-  update briar_dm_memory_jobs set status = 'cancelled', input_json = null,
-    lease_token_hash = null, lease_expires_at = null, error_code = 'scope_revoked'
-  where space_id = new.id and kind in ('extract', 'consolidate', 'explicit_request')
-    and status in ('pending', 'running', 'retry_wait');
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_chunk_purge after delete on briar_dm_memory_chunks
-begin
-  update briar_dm_memory_vectors set state = 'purging', delete_mutation_id = null,
-    confirmed_at = null, available_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-    lease_token = null, lease_expires_at = null, attempt = 0, error_code = null
-    where id = old.vector_id;
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_document_projection_update
-after update of current_version, status, conflicted, expired_version on briar_dm_memory_documents
-begin
-  delete from briar_dm_memory_chunks where document_id = new.id
-    and (document_version <> new.current_version or new.status <> 'active'
-      or new.expired_version = new.current_version);
-  delete from briar_dm_memory_briefs where space_id = new.space_id;
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_space_projection_update
-after update of memory_revision, revocation_epoch, status on briar_dm_memory_spaces
-begin
-  delete from briar_dm_memory_briefs where space_id = new.id;
-  delete from briar_dm_memory_chunks where space_id = new.id and new.status <> 'active';
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_expiry_epoch
-after update of expired_version on briar_dm_memory_documents
-when new.expired_version = new.current_version and old.expired_version <> new.expired_version
-begin
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1,
-    revocation_epoch = revocation_epoch + 1,
-    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where id = new.space_id;
-end;
--- @statement
 CREATE TRIGGER briar_issue_hierarchy_validate_insert
 before insert on briar_issue_parent_links BEGIN
   select case when not exists (
@@ -10226,164 +10070,10 @@ before delete on briar_issue_relations BEGIN
   on conflict (project_id) do update set current_version = excluded.current_version;
 END;
 -- @statement
-CREATE TRIGGER briar_dm_memory_reply_revoked
-after update of revocation_epoch on briar_dm_memory_spaces
-when old.revocation_epoch <> new.revocation_epoch begin
-  insert or ignore into briar_dm_memory_activity_revocations
-    (id, organization_id, channel_id, agent_id, trigger_message_id, parent_message_id, attempts)
-    select job.id, job.organization_id, job.channel_id, job.agent_id, job.trigger_message_id, job.parent_message_id, job.attempts
-    from briar_channel_agent_reply_jobs job join briar_dm_memory_reply_fences fence on fence.job_id = job.id
-    where job.status = 'running' and fence.space_id = new.id;
-
-  update briar_channel_reply_sessions set conversation_id = null,
-    memory_revocation_epoch = null
-    where memory_space_id = new.id;
-  update briar_channel_agent_reply_jobs set status = 'queued',
-    claim_token_hash = null, claimed_at = null, lease_expires_at = null,
-    planned_update_resume = 0, memory_restart_count = memory_restart_count + 1, error = null
-    where status = 'running' and id in (
-      select job_id from briar_dm_memory_reply_fences where space_id = new.id
-    );
-  delete from briar_channel_reply_lookups where job_id in (
-    select job_id from briar_dm_memory_reply_fences where space_id = new.id
-  );
-  delete from briar_dm_memory_discovered_refs where job_id in (
-    select job_id from briar_dm_memory_reply_fences where space_id = new.id
-  );
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_reply_space_deleted before delete on briar_dm_memory_spaces begin
-  insert or ignore into briar_dm_memory_activity_revocations
-    (id, organization_id, channel_id, agent_id, trigger_message_id, parent_message_id, attempts)
-    select job.id, job.organization_id, job.channel_id, job.agent_id, job.trigger_message_id, job.parent_message_id, job.attempts
-    from briar_channel_agent_reply_jobs job join briar_dm_memory_reply_fences fence on fence.job_id = job.id
-    where job.status = 'running' and fence.space_id = old.id;
-
-  update briar_channel_reply_sessions set conversation_id = null,
-    memory_revocation_epoch = null where memory_space_id = old.id;
-  update briar_channel_agent_reply_jobs set status = 'queued',
-    claim_token_hash = null, claimed_at = null, lease_expires_at = null,
-    planned_update_resume = 0, memory_restart_count = memory_restart_count + 1, error = null
-    where status = 'running' and id in (
-      select job_id from briar_dm_memory_reply_fences where space_id = old.id
-    );
-  delete from briar_channel_reply_lookups where job_id in (
-    select job_id from briar_dm_memory_reply_fences where space_id = old.id
-  );
-  delete from briar_dm_memory_discovered_refs where job_id in (
-    select job_id from briar_dm_memory_reply_fences where space_id = old.id
-  );
-end;
--- @statement
 CREATE TRIGGER briar_dm_memory_lookup_revision_changed after update of memory_revision on briar_dm_memory_spaces
 when old.memory_revision <> new.memory_revision begin
   update briar_channel_reply_lookups set response_json = null
     where job_id in (select job_id from briar_dm_memory_reply_fences where space_id = new.id);
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_citations_forgotten after update of status on briar_dm_memory_documents
-when new.status = 'deleted' begin
-  delete from briar_dm_memory_reply_citations where document_id = new.id;
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_invalidate_derived_versions after update of current_version, expired_version on briar_dm_memory_documents
-when old.current_version <> new.current_version or
-  (old.expired_version <> new.expired_version and new.expired_version = new.current_version) begin
-  update briar_dm_memory_documents set status = 'invalidated' where status = 'active' and id in (
-    with recursive affected(id) as (
-      select link.document_id from briar_dm_memory_document_links link
-      join briar_dm_memory_documents current on current.id = link.document_id and current.current_version = link.document_version
-      where link.source_document_id = new.id and
-        (link.source_document_version <> new.current_version or new.expired_version = new.current_version)
-      union select link.document_id from briar_dm_memory_document_links link join affected on link.source_document_id = affected.id
-        join briar_dm_memory_documents current on current.id = link.document_id and current.current_version = link.document_version
-    ) select id from affected where id <> new.id
-  );
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_capture_observation after insert on briar_dm_memory_revisions begin
-  insert into briar_dm_memory_observation_events(space_id, document_id, document_version, created_at)
-  select new.space_id, new.document_id, new.version, new.created_at
-  from briar_dm_memory_documents doc where doc.id = new.document_id and doc.kind = 'observation' and new.version = 1
-  on conflict (document_id, document_version) do nothing;
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_begin_opt_in after update of auto_enabled on briar_dm_memory_spaces
-when old.auto_enabled = 0 and new.auto_enabled = 1 begin
-  insert into briar_dm_memory_learning_state(space_id, updated_at) values (new.id, new.updated_at)
-  on conflict (space_id) do nothing;
-  update briar_dm_memory_learning_state set
-    source_watermark = coalesce((select max(sequence) from briar_dm_memory_source_events where space_id = new.id), 0),
-    observation_watermark = coalesce((select max(sequence) from briar_dm_memory_observation_events where space_id = new.id), 0),
-    updated_at = new.updated_at where space_id = new.id;
-  update briar_dm_memory_learning_outbox set settled = 1 where space_id = new.id and kind = 'extract';
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_learning_cancel after update of status on briar_dm_memory_jobs
-when new.kind in ('extract', 'explicit_request', 'consolidate') and new.status = 'cancelled' begin
-  update briar_dm_memory_jobs set input_json = null, input_hash = null,
-    lease_token_hash = null, lease_expires_at = null, result_json = null where id = new.id;
-  update briar_dm_memory_proposals set proposal_json = null, normalized_json = null,
-    status = 'cancelled', terminal_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where job_id = new.id;
-  update briar_dm_memory_verifications set decisions_json = null where job_id = new.id;
-  update briar_dm_memory_model_calls set status = 'failed', error_code = 'scope_revoked',
-    completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where job_id = new.id and status = 'reserved';
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_purge_learning_payload after insert on briar_dm_memory_learning_payload_purges begin
-  update briar_dm_memory_jobs set input_json = null, input_hash = null, result_json = null,
-    status = case when status in ('pending', 'running', 'retry_wait') then 'cancelled' else status end,
-    lease_token_hash = null, lease_expires_at = null
-  where id in (select job_id from briar_dm_memory_learning_inputs
-    where space_id = new.space_id and source_type = new.source_type and source_id = new.source_id);
-  update briar_dm_memory_proposals set input_hash = null, proposal_hash = null,
-    proposal_json = null, normalized_json = null where job_id in (
-      select job_id from briar_dm_memory_learning_inputs where space_id = new.space_id
-        and source_type = new.source_type and source_id = new.source_id);
-  update briar_dm_memory_verifications set input_hash = null, proposal_hash = null,
-    decisions_json = null where job_id in (
-      select job_id from briar_dm_memory_learning_inputs where space_id = new.space_id
-        and source_type = new.source_type and source_id = new.source_id);
-  update briar_dm_memory_model_calls set input_hash = null, proposal_hash = null where job_id in (
-    select job_id from briar_dm_memory_learning_inputs where space_id = new.space_id
-      and source_type = new.source_type and source_id = new.source_id);
-  update briar_dm_memory_learning_commits set proposal_hash = null where job_id in (
-    select job_id from briar_dm_memory_learning_inputs where space_id = new.space_id
-      and source_type = new.source_type and source_id = new.source_id);
-  update briar_dm_memory_commits set payload_hash = null where id in (
-    select commit_id from briar_dm_memory_learning_commits where job_id in (
-      select job_id from briar_dm_memory_learning_inputs where space_id = new.space_id
-        and source_type = new.source_type and source_id = new.source_id));
-  update briar_dm_memory_learning_inputs set source_hash = null where space_id = new.space_id
-    and source_type = new.source_type and source_id = new.source_id;
-  delete from briar_dm_memory_learning_payload_purges where space_id = new.space_id
-    and source_type = new.source_type and source_id = new.source_id;
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_forget_learning_payload after insert on briar_dm_memory_exclusions begin
-  insert into briar_dm_memory_purge_documents(space_id, root_document_id, document_id)
-  select new.space_id, new.document_id, source.document_id from briar_dm_memory_sources source
-  where source.space_id = new.space_id and source.source_type = new.source_type and source.source_id = new.source_id
-  on conflict (root_document_id, document_id) do nothing;
-  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
-  values (new.space_id, new.source_type, new.source_id);
-  update briar_dm_memory_jobs set request_targets_json = '[]' where space_id = new.space_id
-    and exists (select 1 from json_each(request_targets_json) target
-      where json_extract(target.value, '$.documentId') in (
-        select document_id from briar_dm_memory_purge_documents where space_id = new.space_id));
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_forget_derived_content after update of revocation_epoch on briar_dm_memory_spaces
-when old.revocation_epoch <> new.revocation_epoch begin
-  update briar_dm_memory_documents set status = 'deleted', title = '[deleted]'
-  where space_id = new.id and id in (select source.document_id from briar_dm_memory_sources source
-    join briar_dm_memory_exclusions excluded on excluded.space_id = source.space_id
-      and excluded.source_type = source.source_type and excluded.source_id = source.source_id
-    where source.space_id = new.id);
-  update briar_dm_memory_commits set payload_hash = null where document_id in (
-    select id from briar_dm_memory_documents where space_id = new.id and status = 'deleted');
-  delete from briar_dm_memory_revisions where document_id in (
-    select id from briar_dm_memory_documents where space_id = new.id and status = 'deleted');
 end;
 -- @statement
 CREATE TRIGGER briar_reply_completion_receipt_immutable_update
@@ -12076,354 +11766,6 @@ BEGIN
   select raise(abort, 'conversation proposal no longer belongs to project');
 END;
 -- @statement
-CREATE TRIGGER briar_hunt_runs_channel_proposal_reservation_required
-before insert on briar_hunt_runs
-when new.source = 'issue'
-  and new.source_key like 'briar-channel-approved:%'
-  and not exists (
-    select 1 from briar_hunt_runs existing
-    where existing.project_id = new.project_id
-      and existing.source = new.source
-      and existing.source_key = new.source_key
-  )
-  and not exists (
-    select 1
-    from briar_channel_action_proposals proposal
-    join briar_channels channel on channel.id = proposal.channel_id
-    join briar_projects project
-      on project.id = proposal.project_id
-     and project.organization_id = channel.organization_id
-    where proposal.status = 'pending'
-      and proposal.action_type = 'request_issue_create'
-      and proposal.project_id = new.project_id
-      and proposal.issue_source_key = new.source_key
-      and proposal.accepted_by_user_id is not null
-      and proposal.accepted_at is not null
-      and (
-        length(new.source_key) = 87
-        and substr(new.source_key, 1, 23) = 'briar-channel-approved:'
-        and substr(new.source_key, 24) not glob '*[^0-9a-f]*'
-      )
-      and (
-        json_type(proposal.payload_json) = 'object'
-        and (select count(*) from json_each(proposal.payload_json)) = 1
-        and json_type(proposal.payload_json, '$.issue') = 'object'
-        and (
-          select count(*)
-          from json_each(proposal.payload_json, '$.issue')
-        ) = 3
-        and json_type(proposal.payload_json, '$.issue.title') = 'text'
-        and json_type(
-          proposal.payload_json, '$.issue.description'
-        ) in ('text', 'null')
-        and json_type(
-          proposal.payload_json, '$.issue.priority'
-        ) in ('integer', 'null')
-      )
-      and (
-        new.title = json_extract(proposal.payload_json, '$.issue.title')
-        and new.issue_description is
-          json_extract(proposal.payload_json, '$.issue.description')
-        and new.priority is
-          json_extract(proposal.payload_json, '$.issue.priority')
-        and new.status = 'backlog'
-        and new.stage = 'queued'
-        and new.workflow_stage is null
-        and new.issue_checkpoints_json = '[]'
-        and new.detail =
-          '채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.'
-        and new.repository = coalesce(
-          (select settings.github_repository
-           from briar_project_settings settings
-           where settings.project_id = proposal.project_id),
-          project.name
-        )
-      )
-      and (
-        new.assignee_user_id is null
-        and new.agent_id is null
-        and new.worker_id is null
-        and new.requested_worker_id is null
-        and new.claim_token_hash is null
-        and new.claimed_by is null
-        and new.claimed_at is null
-        and new.lease_expires_at is null
-        and new.claim_attempts = 0
-        and new.current_attempt = 1
-        and new.current_revision = 1
-        and new.full_auto = 0
-        and new.requires_claim_token = 0
-      )
-      and (
-        new.last_execution_id is null
-        and new.dispatch_mode is null
-        and new.dispatch_request_id is null
-        and new.dispatched_at is null
-        and new.requested_by_user_id is null
-        and new.requested_agent_provider is null
-        and new.requested_agent_model is null
-        and new.requested_agent_effort is null
-        and new.preferred_agent_provider is null
-        and new.preferred_agent_model is null
-        and new.preferred_agent_effort is null
-      )
-      and (
-        new.branch is null
-        and new.commit_sha is null
-        and new.tracker_provider is null
-        and new.tracker_issue_id is null
-        and new.tracker_issue_identifier is null
-        and new.tracker_issue_url is null
-        and new.tracker_issue_state is null
-        and new.result_summary is null
-        and new.structured_result_json is null
-        and new.pull_request_urls = '[]'
-        and new.target_sha is null
-        and new.staging_qa_status is null
-        and new.production_qa_status is null
-        and new.staging_qa_detail is null
-        and new.production_qa_detail is null
-        and new.execution_metrics_json is null
-      )
-      and (
-        new.completed_at is null
-        and new.paused_at is null
-        and new.resume_requested_at is null
-        and new.waiting_checkpoint_key is null
-        and new.waiting_checkpoint_revision is null
-        and new.event_count = 0
-        and new.source_created_at = proposal.created_at
-        and new.started_at = proposal.created_at
-        and new.last_event_at = proposal.created_at
-        and new.created_at = new.updated_at
-      )
-      and (
-        json_type(new.context_json) = 'object'
-        and (select count(*) from json_each(new.context_json)) = 6
-        and json_type(new.context_json, '$.origin') = 'text'
-        and json_extract(new.context_json, '$.origin') = 'briar-channel'
-        and json_type(new.context_json, '$.proposalId') = 'text'
-        and json_extract(new.context_json, '$.proposalId') = proposal.id
-        and json_type(new.context_json, '$.channelId') = 'text'
-        and json_extract(new.context_json, '$.channelId') = proposal.channel_id
-        and json_type(new.context_json, '$.issueId') = 'text'
-        and json_extract(new.context_json, '$.issueId') = proposal.id
-        and json_type(new.context_json, '$.attachmentCount') = 'integer'
-        and json_extract(new.context_json, '$.attachmentCount') = 0
-        and json_type(new.context_json, '$.relatedMessage') = 'object'
-        and (
-          select count(*)
-          from json_each(new.context_json, '$.relatedMessage')
-        ) = 4
-        and json_type(
-          new.context_json, '$.relatedMessage.organizationId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.organizationId'
-        ) = channel.organization_id
-        and json_type(
-          new.context_json, '$.relatedMessage.channelId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.channelId'
-        ) = proposal.channel_id
-        and json_type(
-          new.context_json, '$.relatedMessage.messageId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.messageId'
-        ) = proposal.reply_message_id
-        and json_type(
-          new.context_json, '$.relatedMessage.rootMessageId'
-        ) = 'text'
-      )
-  )
-BEGIN
-  select raise(abort, 'channel proposal approval reservation not found');
-END;
--- @statement
-CREATE TRIGGER briar_hunt_runs_finalize_channel_proposal_approval
-after insert on briar_hunt_runs
-when new.source = 'issue'
-  and new.source_key like 'briar-channel-approved:%'
-  and exists (
-    select 1
-    from briar_channel_action_proposals proposal
-    join briar_channels channel on channel.id = proposal.channel_id
-    join briar_projects project
-      on project.id = proposal.project_id
-     and project.organization_id = channel.organization_id
-    where proposal.status = 'pending'
-      and proposal.action_type = 'request_issue_create'
-      and proposal.project_id = new.project_id
-      and proposal.issue_source_key = new.source_key
-      and proposal.accepted_by_user_id is not null
-      and proposal.accepted_at is not null
-      and (
-        length(new.source_key) = 87
-        and substr(new.source_key, 1, 23) = 'briar-channel-approved:'
-        and substr(new.source_key, 24) not glob '*[^0-9a-f]*'
-      )
-      and (
-        json_type(proposal.payload_json) = 'object'
-        and (select count(*) from json_each(proposal.payload_json)) = 1
-        and json_type(proposal.payload_json, '$.issue') = 'object'
-        and (
-          select count(*)
-          from json_each(proposal.payload_json, '$.issue')
-        ) = 3
-        and json_type(proposal.payload_json, '$.issue.title') = 'text'
-        and json_type(
-          proposal.payload_json, '$.issue.description'
-        ) in ('text', 'null')
-        and json_type(
-          proposal.payload_json, '$.issue.priority'
-        ) in ('integer', 'null')
-      )
-      and (
-        new.title = json_extract(proposal.payload_json, '$.issue.title')
-        and new.issue_description is
-          json_extract(proposal.payload_json, '$.issue.description')
-        and new.priority is
-          json_extract(proposal.payload_json, '$.issue.priority')
-        and new.status = 'backlog'
-        and new.stage = 'queued'
-        and new.workflow_stage is null
-        and new.issue_checkpoints_json = '[]'
-        and new.detail =
-          '채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.'
-        and new.repository = coalesce(
-          (select settings.github_repository
-           from briar_project_settings settings
-           where settings.project_id = proposal.project_id),
-          project.name
-        )
-      )
-      and (
-        new.assignee_user_id is null
-        and new.agent_id is null
-        and new.worker_id is null
-        and new.requested_worker_id is null
-        and new.claim_token_hash is null
-        and new.claimed_by is null
-        and new.claimed_at is null
-        and new.lease_expires_at is null
-        and new.claim_attempts = 0
-        and new.current_attempt = 1
-        and new.current_revision = 1
-        and new.full_auto = 0
-        and new.requires_claim_token = 0
-      )
-      and (
-        new.last_execution_id is null
-        and new.dispatch_mode is null
-        and new.dispatch_request_id is null
-        and new.dispatched_at is null
-        and new.requested_by_user_id is null
-        and new.requested_agent_provider is null
-        and new.requested_agent_model is null
-        and new.requested_agent_effort is null
-        and new.preferred_agent_provider is null
-        and new.preferred_agent_model is null
-        and new.preferred_agent_effort is null
-      )
-      and (
-        new.branch is null
-        and new.commit_sha is null
-        and new.tracker_provider is null
-        and new.tracker_issue_id is null
-        and new.tracker_issue_identifier is null
-        and new.tracker_issue_url is null
-        and new.tracker_issue_state is null
-        and new.result_summary is null
-        and new.structured_result_json is null
-        and new.pull_request_urls = '[]'
-        and new.target_sha is null
-        and new.staging_qa_status is null
-        and new.production_qa_status is null
-        and new.staging_qa_detail is null
-        and new.production_qa_detail is null
-        and new.execution_metrics_json is null
-      )
-      and (
-        new.completed_at is null
-        and new.paused_at is null
-        and new.resume_requested_at is null
-        and new.waiting_checkpoint_key is null
-        and new.waiting_checkpoint_revision is null
-        and new.event_count = 0
-        and new.source_created_at = proposal.created_at
-        and new.started_at = proposal.created_at
-        and new.last_event_at = proposal.created_at
-        and new.created_at = new.updated_at
-      )
-      and (
-        json_type(new.context_json) = 'object'
-        and (select count(*) from json_each(new.context_json)) = 6
-        and json_type(new.context_json, '$.origin') = 'text'
-        and json_extract(new.context_json, '$.origin') = 'briar-channel'
-        and json_type(new.context_json, '$.proposalId') = 'text'
-        and json_extract(new.context_json, '$.proposalId') = proposal.id
-        and json_type(new.context_json, '$.channelId') = 'text'
-        and json_extract(new.context_json, '$.channelId') = proposal.channel_id
-        and json_type(new.context_json, '$.issueId') = 'text'
-        and json_extract(new.context_json, '$.issueId') = proposal.id
-        and json_type(new.context_json, '$.attachmentCount') = 'integer'
-        and json_extract(new.context_json, '$.attachmentCount') = 0
-        and json_type(new.context_json, '$.relatedMessage') = 'object'
-        and (
-          select count(*)
-          from json_each(new.context_json, '$.relatedMessage')
-        ) = 4
-        and json_type(
-          new.context_json, '$.relatedMessage.organizationId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.organizationId'
-        ) = channel.organization_id
-        and json_type(
-          new.context_json, '$.relatedMessage.channelId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.channelId'
-        ) = proposal.channel_id
-        and json_type(
-          new.context_json, '$.relatedMessage.messageId'
-        ) = 'text'
-        and json_extract(
-          new.context_json, '$.relatedMessage.messageId'
-        ) = proposal.reply_message_id
-        and json_type(
-          new.context_json, '$.relatedMessage.rootMessageId'
-        ) = 'text'
-      )
-  )
-BEGIN
-  insert into briar_channel_issue_approval_audit (
-    id, proposal_id, organization_id, channel_id, project_id, run_id,
-    approved_by_user_id, approved_at, issue_source_key, result_verification,
-    payload_json, created_at
-  )
-  select proposal.id || ':approval:' || proposal.issue_source_key,
-         proposal.id, channel.organization_id, proposal.channel_id,
-         proposal.project_id, new.id, proposal.accepted_by_user_id,
-         proposal.accepted_at, proposal.issue_source_key, 'atomic',
-         proposal.payload_json, proposal.accepted_at
-  from briar_channel_action_proposals proposal
-  join briar_channels channel on channel.id = proposal.channel_id
-  where proposal.status = 'pending'
-    and proposal.action_type = 'request_issue_create'
-    and proposal.project_id = new.project_id
-    and proposal.issue_source_key = new.source_key
-    and proposal.accepted_by_user_id is not null
-    and proposal.accepted_at is not null;
-  update briar_channel_action_proposals
-  set status = 'accepted', result_run_id = new.id, updated_at = accepted_at
-  where status = 'pending' and action_type = 'request_issue_create'
-    and project_id = new.project_id and issue_source_key = new.source_key
-    and accepted_by_user_id is not null and accepted_at is not null;
-END;
--- @statement
 CREATE TRIGGER briar_channel_issue_approval_audit_atomic_insert_guard
 before insert on briar_channel_issue_approval_audit
 when new.result_verification <> 'atomic'
@@ -13061,61 +12403,6 @@ BEGIN
     ),
     updated_at = excluded.updated_at;
 END;
--- @statement
-CREATE TRIGGER briar_dm_memory_message_changed
-after update of body, deleted_at on briar_channel_messages
-when old.body <> new.body or old.deleted_at is not new.deleted_at
-begin
-  update briar_channel_messages set memory_source_version = old.memory_source_version + 1
-  where id = new.id;
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1,
-    revocation_epoch = revocation_epoch + 1
-  where id in (select space_id from briar_dm_memory_sources
-    where source_type = 'message' and source_id = new.id);
-  update briar_dm_memory_documents set status = 'invalidated'
-  where status = 'active' and id in (select document_id from briar_dm_memory_sources
-    where source_type = 'message' and source_id = new.id);
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_message_deleted before delete on briar_channel_messages begin
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1,
-    revocation_epoch = revocation_epoch + 1
-  where id in (select space_id from briar_dm_memory_sources
-    where source_type = 'message' and source_id = old.id);
-  update briar_dm_memory_documents set status = 'invalidated'
-  where status = 'active' and id in (select document_id from briar_dm_memory_sources
-    where source_type = 'message' and source_id = old.id);
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_capture_message after insert on briar_channel_messages begin
-  insert into briar_dm_memory_source_events(space_id, message_id, created_at)
-  select space.id, new.id, new.created_at from briar_dm_memory_spaces space
-  join briar_dm_memory_live_rosters live on live.organization_id = space.organization_id
-    and live.channel_id = space.channel_id and live.owner_user_id = space.owner_user_id
-    and live.agent_id = space.agent_id and live.roster_epoch = space.roster_epoch
-  where space.channel_id = new.channel_id and space.status = 'active'
-    and space.use_enabled = 1 and space.auto_enabled = 1 and new.deleted_at is null
-    and julianday(new.created_at) >= julianday(space.auto_enabled_at)
-    and (new.author_user_id = space.owner_user_id or new.author_agent_id = space.agent_id)
-  on conflict (space_id, message_id) do nothing;
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_edit_learning_source after update of body, deleted_at on briar_channel_messages
-when old.body <> new.body or old.deleted_at is not new.deleted_at begin
-  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
-  select distinct space_id, 'message', new.id from briar_dm_memory_learning_inputs
-  where source_type = 'message' and source_id = new.id;
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
-  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = new.id);
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_delete_learning_source before delete on briar_channel_messages begin
-  insert into briar_dm_memory_learning_payload_purges(space_id, source_type, source_id)
-  select distinct space_id, 'message', old.id from briar_dm_memory_learning_inputs
-  where source_type = 'message' and source_id = old.id;
-  update briar_dm_memory_spaces set memory_revision = memory_revision + 1, revocation_epoch = revocation_epoch + 1
-  where id in (select space_id from briar_dm_memory_learning_inputs where source_type = 'message' and source_id = old.id);
-end;
 -- @statement
 CREATE TRIGGER briar_channel_message_blocks_array_insert
 before insert on briar_channel_messages
@@ -13769,40 +13056,6 @@ begin
   delete from briar_worker_update_reservations where work_type = 'mergeBatch' and work_id = new.id;
 end;
 -- @statement
-CREATE TRIGGER briar_dm_memory_jobs_update_claim_fence
-before update of lease_token_hash on briar_dm_memory_jobs
-when new.lease_token_hash is not null and new.lease_token_hash is not old.lease_token_hash
-begin
-  select raise(ignore) where exists (
-    select 1 from briar_execution_worker_update_requests request
-    join briar_execution_workers worker on worker.device_id = request.device_id
-    where worker.id = new.claimed_worker_id and request.status = 'requested'
-      and request.handoff_state <> 'idle'
-  );
-  select raise(ignore) where exists (
-    select 1 from briar_worker_update_reservations reservation
-    where reservation.work_type = 'dmMemory' and reservation.work_id = new.id
-      and reservation.device_id is not (
-        select device_id from briar_execution_workers where id = new.claimed_worker_id
-      )
-  );
-  select raise(ignore) where not exists (
-    select 1 from briar_worker_update_reservations where work_type = 'dmMemory' and work_id = new.id
-  ) and exists (
-    select 1 from briar_worker_update_reservations reservation
-    join briar_execution_workers worker on worker.device_id = reservation.device_id
-    where worker.id = new.claimed_worker_id
-  );
-end;
--- @statement
-CREATE TRIGGER briar_dm_memory_jobs_update_reservation_release
-after update of status, lease_token_hash on briar_dm_memory_jobs
-when (new.lease_token_hash is not null and new.lease_token_hash is not old.lease_token_hash)
-  or new.status in ('succeeded', 'no_change', 'failed', 'cancelled')
-begin
-  delete from briar_worker_update_reservations where work_type = 'dmMemory' and work_id = new.id;
-end;
--- @statement
 CREATE TRIGGER briar_hunt_runs_update_claim_fence
 before update of claim_token_hash on briar_hunt_runs
 when new.claim_token_hash is not null and new.claim_token_hash is not old.claim_token_hash
@@ -13953,4 +13206,449 @@ when old.dm_batch_id is not new.dm_batch_id
   or old.dm_purpose is not new.dm_purpose
 begin
   select raise(abort, 'DM public message metadata is immutable');
+end;
+-- @statement
+CREATE TRIGGER briar_dashboard_attachments_insert_sync
+after insert on briar_issue_attachments BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (new.project_id, 'run', new.run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (new.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_dashboard_attachments_delete_sync
+after delete on briar_issue_attachments BEGIN
+  insert into briar_dashboard_changes (
+    project_id, entity_type, entity_id, operation, created_at
+  ) values (old.project_id, 'run', old.run_id, 'upsert', datetime('now'));
+  insert into briar_dashboard_sync_state (project_id, current_version)
+  values (old.project_id, last_insert_rowid())
+  on conflict (project_id) do update set current_version = excluded.current_version;
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_channel_proposal_reservation_required
+before insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-channel-approved:%'
+  and not exists (
+    select 1 from briar_hunt_runs existing
+    where existing.project_id = new.project_id
+      and existing.source = new.source
+      and existing.source_key = new.source_key
+  )
+  and not exists (
+    select 1
+    from briar_channel_action_proposals proposal
+    join briar_channels channel on channel.id = proposal.channel_id
+    join briar_projects project
+      on project.id = proposal.project_id
+     and project.organization_id = channel.organization_id
+    where proposal.status = 'pending'
+      and proposal.action_type = 'request_issue_create'
+      and proposal.project_id = new.project_id
+      and proposal.issue_source_key = new.source_key
+      and proposal.accepted_by_user_id is not null
+      and proposal.accepted_at is not null
+      and (
+        length(new.source_key) = 87
+        and substr(new.source_key, 1, 23) = 'briar-channel-approved:'
+        and substr(new.source_key, 24) not glob '*[^0-9a-f]*'
+      )
+      and (
+        json_type(proposal.payload_json) = 'object'
+        and (select count(*) from json_each(proposal.payload_json)) = 1
+        and json_type(proposal.payload_json, '$.issue') = 'object'
+        and (
+          select count(*)
+          from json_each(proposal.payload_json, '$.issue')
+        ) in (3, 4)
+        and (
+          (
+            select count(*)
+            from json_each(proposal.payload_json, '$.issue')
+          ) = 3
+          or json_type(
+            proposal.payload_json, '$.issue.attachmentIds'
+          ) = 'array'
+        )
+        and json_type(proposal.payload_json, '$.issue.title') = 'text'
+        and json_type(
+          proposal.payload_json, '$.issue.description'
+        ) in ('text', 'null')
+        and json_type(
+          proposal.payload_json, '$.issue.priority'
+        ) in ('integer', 'null')
+      )
+      and (
+        new.title = json_extract(proposal.payload_json, '$.issue.title')
+        and new.issue_description is
+          json_extract(proposal.payload_json, '$.issue.description')
+        and new.priority is
+          json_extract(proposal.payload_json, '$.issue.priority')
+        and new.status = 'backlog'
+        and new.stage = 'queued'
+        and new.workflow_stage is null
+        and new.issue_checkpoints_json = '[]'
+        and new.detail =
+          '채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.'
+        and new.repository = coalesce(
+          (select settings.github_repository
+           from briar_project_settings settings
+           where settings.project_id = proposal.project_id),
+          project.name
+        )
+      )
+      and (
+        new.assignee_user_id is null
+        and new.agent_id is null
+        and new.worker_id is null
+        and new.requested_worker_id is null
+        and new.claim_token_hash is null
+        and new.claimed_by is null
+        and new.claimed_at is null
+        and new.lease_expires_at is null
+        and new.claim_attempts = 0
+        and new.current_attempt = 1
+        and new.current_revision = 1
+        and new.full_auto = 0
+        and new.requires_claim_token = 0
+      )
+      and (
+        new.last_execution_id is null
+        and new.dispatch_mode is null
+        and new.dispatch_request_id is null
+        and new.dispatched_at is null
+        and new.requested_by_user_id is null
+        and new.requested_agent_provider is null
+        and new.requested_agent_model is null
+        and new.requested_agent_effort is null
+        and new.preferred_agent_provider is null
+        and new.preferred_agent_model is null
+        and new.preferred_agent_effort is null
+      )
+      and (
+        new.branch is null
+        and new.commit_sha is null
+        and new.tracker_provider is null
+        and new.tracker_issue_id is null
+        and new.tracker_issue_identifier is null
+        and new.tracker_issue_url is null
+        and new.tracker_issue_state is null
+        and new.result_summary is null
+        and new.structured_result_json is null
+        and new.pull_request_urls = '[]'
+        and new.target_sha is null
+        and new.staging_qa_status is null
+        and new.production_qa_status is null
+        and new.staging_qa_detail is null
+        and new.production_qa_detail is null
+        and new.execution_metrics_json is null
+      )
+      and (
+        new.completed_at is null
+        and new.paused_at is null
+        and new.resume_requested_at is null
+        and new.waiting_checkpoint_key is null
+        and new.waiting_checkpoint_revision is null
+        and new.event_count = 0
+        and new.source_created_at = proposal.created_at
+        and new.started_at = proposal.created_at
+        and new.last_event_at = proposal.created_at
+        and new.created_at = new.updated_at
+      )
+      and (
+        json_type(new.context_json) = 'object'
+        and (select count(*) from json_each(new.context_json)) = 6
+        and json_type(new.context_json, '$.origin') = 'text'
+        and json_extract(new.context_json, '$.origin') = 'briar-channel'
+        and json_type(new.context_json, '$.proposalId') = 'text'
+        and json_extract(new.context_json, '$.proposalId') = proposal.id
+        and json_type(new.context_json, '$.channelId') = 'text'
+        and json_extract(new.context_json, '$.channelId') = proposal.channel_id
+        and json_type(new.context_json, '$.issueId') = 'text'
+        and json_extract(new.context_json, '$.issueId') = proposal.id
+        and json_type(new.context_json, '$.attachmentCount') = 'integer'
+        and json_extract(new.context_json, '$.attachmentCount')
+          = coalesce(
+            json_array_length(proposal.payload_json, '$.issue.attachmentIds'),
+            0
+          )
+        and json_type(new.context_json, '$.relatedMessage') = 'object'
+        and (
+          select count(*)
+          from json_each(new.context_json, '$.relatedMessage')
+        ) = 4
+        and json_type(
+          new.context_json, '$.relatedMessage.organizationId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.organizationId'
+        ) = channel.organization_id
+        and json_type(
+          new.context_json, '$.relatedMessage.channelId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.channelId'
+        ) = proposal.channel_id
+        and json_type(
+          new.context_json, '$.relatedMessage.messageId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.messageId'
+        ) = proposal.reply_message_id
+        and json_type(
+          new.context_json, '$.relatedMessage.rootMessageId'
+        ) = 'text'
+      )
+  )
+BEGIN
+  select raise(abort, 'channel proposal approval reservation not found');
+END;
+-- @statement
+CREATE TRIGGER briar_hunt_runs_finalize_channel_proposal_approval
+after insert on briar_hunt_runs
+when new.source = 'issue'
+  and new.source_key like 'briar-channel-approved:%'
+  and exists (
+    select 1
+    from briar_channel_action_proposals proposal
+    join briar_channels channel on channel.id = proposal.channel_id
+    join briar_projects project
+      on project.id = proposal.project_id
+     and project.organization_id = channel.organization_id
+    where proposal.status = 'pending'
+      and proposal.action_type = 'request_issue_create'
+      and proposal.project_id = new.project_id
+      and proposal.issue_source_key = new.source_key
+      and proposal.accepted_by_user_id is not null
+      and proposal.accepted_at is not null
+      and (
+        length(new.source_key) = 87
+        and substr(new.source_key, 1, 23) = 'briar-channel-approved:'
+        and substr(new.source_key, 24) not glob '*[^0-9a-f]*'
+      )
+      and (
+        json_type(proposal.payload_json) = 'object'
+        and (select count(*) from json_each(proposal.payload_json)) = 1
+        and json_type(proposal.payload_json, '$.issue') = 'object'
+        and (
+          select count(*)
+          from json_each(proposal.payload_json, '$.issue')
+        ) in (3, 4)
+        and (
+          (
+            select count(*)
+            from json_each(proposal.payload_json, '$.issue')
+          ) = 3
+          or json_type(
+            proposal.payload_json, '$.issue.attachmentIds'
+          ) = 'array'
+        )
+        and json_type(proposal.payload_json, '$.issue.title') = 'text'
+        and json_type(
+          proposal.payload_json, '$.issue.description'
+        ) in ('text', 'null')
+        and json_type(
+          proposal.payload_json, '$.issue.priority'
+        ) in ('integer', 'null')
+      )
+      and (
+        new.title = json_extract(proposal.payload_json, '$.issue.title')
+        and new.issue_description is
+          json_extract(proposal.payload_json, '$.issue.description')
+        and new.priority is
+          json_extract(proposal.payload_json, '$.issue.priority')
+        and new.status = 'backlog'
+        and new.stage = 'queued'
+        and new.workflow_stage is null
+        and new.issue_checkpoints_json = '[]'
+        and new.detail =
+          '채널 대화에서 사용자가 승인한 제안으로 생성된 이슈입니다.'
+        and new.repository = coalesce(
+          (select settings.github_repository
+           from briar_project_settings settings
+           where settings.project_id = proposal.project_id),
+          project.name
+        )
+      )
+      and (
+        new.assignee_user_id is null
+        and new.agent_id is null
+        and new.worker_id is null
+        and new.requested_worker_id is null
+        and new.claim_token_hash is null
+        and new.claimed_by is null
+        and new.claimed_at is null
+        and new.lease_expires_at is null
+        and new.claim_attempts = 0
+        and new.current_attempt = 1
+        and new.current_revision = 1
+        and new.full_auto = 0
+        and new.requires_claim_token = 0
+      )
+      and (
+        new.last_execution_id is null
+        and new.dispatch_mode is null
+        and new.dispatch_request_id is null
+        and new.dispatched_at is null
+        and new.requested_by_user_id is null
+        and new.requested_agent_provider is null
+        and new.requested_agent_model is null
+        and new.requested_agent_effort is null
+        and new.preferred_agent_provider is null
+        and new.preferred_agent_model is null
+        and new.preferred_agent_effort is null
+      )
+      and (
+        new.branch is null
+        and new.commit_sha is null
+        and new.tracker_provider is null
+        and new.tracker_issue_id is null
+        and new.tracker_issue_identifier is null
+        and new.tracker_issue_url is null
+        and new.tracker_issue_state is null
+        and new.result_summary is null
+        and new.structured_result_json is null
+        and new.pull_request_urls = '[]'
+        and new.target_sha is null
+        and new.staging_qa_status is null
+        and new.production_qa_status is null
+        and new.staging_qa_detail is null
+        and new.production_qa_detail is null
+        and new.execution_metrics_json is null
+      )
+      and (
+        new.completed_at is null
+        and new.paused_at is null
+        and new.resume_requested_at is null
+        and new.waiting_checkpoint_key is null
+        and new.waiting_checkpoint_revision is null
+        and new.event_count = 0
+        and new.source_created_at = proposal.created_at
+        and new.started_at = proposal.created_at
+        and new.last_event_at = proposal.created_at
+        and new.created_at = new.updated_at
+      )
+      and (
+        json_type(new.context_json) = 'object'
+        and (select count(*) from json_each(new.context_json)) = 6
+        and json_type(new.context_json, '$.origin') = 'text'
+        and json_extract(new.context_json, '$.origin') = 'briar-channel'
+        and json_type(new.context_json, '$.proposalId') = 'text'
+        and json_extract(new.context_json, '$.proposalId') = proposal.id
+        and json_type(new.context_json, '$.channelId') = 'text'
+        and json_extract(new.context_json, '$.channelId') = proposal.channel_id
+        and json_type(new.context_json, '$.issueId') = 'text'
+        and json_extract(new.context_json, '$.issueId') = proposal.id
+        and json_type(new.context_json, '$.attachmentCount') = 'integer'
+        and json_extract(new.context_json, '$.attachmentCount')
+          = coalesce(
+            json_array_length(proposal.payload_json, '$.issue.attachmentIds'),
+            0
+          )
+        and json_type(new.context_json, '$.relatedMessage') = 'object'
+        and (
+          select count(*)
+          from json_each(new.context_json, '$.relatedMessage')
+        ) = 4
+        and json_type(
+          new.context_json, '$.relatedMessage.organizationId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.organizationId'
+        ) = channel.organization_id
+        and json_type(
+          new.context_json, '$.relatedMessage.channelId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.channelId'
+        ) = proposal.channel_id
+        and json_type(
+          new.context_json, '$.relatedMessage.messageId'
+        ) = 'text'
+        and json_extract(
+          new.context_json, '$.relatedMessage.messageId'
+        ) = proposal.reply_message_id
+        and json_type(
+          new.context_json, '$.relatedMessage.rootMessageId'
+        ) = 'text'
+      )
+  )
+BEGIN
+  insert into briar_channel_issue_approval_audit (
+    id, proposal_id, organization_id, channel_id, project_id, run_id,
+    approved_by_user_id, approved_at, issue_source_key, result_verification,
+    payload_json, created_at
+  )
+  select proposal.id || ':approval:' || proposal.issue_source_key,
+         proposal.id, channel.organization_id, proposal.channel_id,
+         proposal.project_id, new.id, proposal.accepted_by_user_id,
+         proposal.accepted_at, proposal.issue_source_key, 'atomic',
+         proposal.payload_json, proposal.accepted_at
+  from briar_channel_action_proposals proposal
+  join briar_channels channel on channel.id = proposal.channel_id
+  where proposal.status = 'pending'
+    and proposal.action_type = 'request_issue_create'
+    and proposal.project_id = new.project_id
+    and proposal.issue_source_key = new.source_key
+    and proposal.accepted_by_user_id is not null
+    and proposal.accepted_at is not null;
+  update briar_channel_action_proposals
+  set status = 'accepted', result_run_id = new.id, updated_at = accepted_at
+  where status = 'pending' and action_type = 'request_issue_create'
+    and project_id = new.project_id and issue_source_key = new.source_key
+    and accepted_by_user_id is not null and accepted_at is not null;
+END;
+-- @statement
+CREATE TRIGGER briar_dm_memory_message_changed
+after update of body, deleted_at on briar_channel_messages
+when old.body <> new.body or old.deleted_at is not new.deleted_at
+begin
+  update briar_channel_messages set memory_source_version = old.memory_source_version + 1
+  where id = new.id;
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_reply_revoked
+after update of revocation_epoch on briar_dm_memory_spaces
+when old.revocation_epoch <> new.revocation_epoch begin
+  insert or ignore into briar_dm_memory_activity_revocations
+    (id, organization_id, channel_id, agent_id, trigger_message_id, parent_message_id, attempts)
+    select job.id, job.organization_id, job.channel_id, job.agent_id, job.trigger_message_id, job.parent_message_id, job.attempts
+    from briar_channel_agent_reply_jobs job join briar_dm_memory_reply_fences fence on fence.job_id = job.id
+    where job.status = 'running' and fence.space_id = new.id;
+
+  update briar_channel_reply_sessions set conversation_id = null,
+    memory_revocation_epoch = null
+    where memory_space_id = new.id;
+  update briar_channel_agent_reply_jobs set status = 'queued',
+    claim_token_hash = null, claimed_at = null, lease_expires_at = null,
+    planned_update_resume = 0, memory_restart_count = memory_restart_count + 1, error = null
+    where status = 'running' and id in (
+      select job_id from briar_dm_memory_reply_fences where space_id = new.id
+    );
+  delete from briar_channel_reply_lookups where job_id in (
+    select job_id from briar_dm_memory_reply_fences where space_id = new.id
+  );
+end;
+-- @statement
+CREATE TRIGGER briar_dm_memory_reply_space_deleted before delete on briar_dm_memory_spaces begin
+  insert or ignore into briar_dm_memory_activity_revocations
+    (id, organization_id, channel_id, agent_id, trigger_message_id, parent_message_id, attempts)
+    select job.id, job.organization_id, job.channel_id, job.agent_id, job.trigger_message_id, job.parent_message_id, job.attempts
+    from briar_channel_agent_reply_jobs job join briar_dm_memory_reply_fences fence on fence.job_id = job.id
+    where job.status = 'running' and fence.space_id = old.id;
+
+  update briar_channel_reply_sessions set conversation_id = null,
+    memory_revocation_epoch = null where memory_space_id = old.id;
+  update briar_channel_agent_reply_jobs set status = 'queued',
+    claim_token_hash = null, claimed_at = null, lease_expires_at = null,
+    planned_update_resume = 0, memory_restart_count = memory_restart_count + 1, error = null
+    where status = 'running' and id in (
+      select job_id from briar_dm_memory_reply_fences where space_id = old.id
+    );
+  delete from briar_channel_reply_lookups where job_id in (
+    select job_id from briar_dm_memory_reply_fences where space_id = old.id
+  );
 end;

@@ -8,8 +8,7 @@ import { create } from "@bufbuild/protobuf";
 import {
   type Team as TeamMessage,
   TeamService,
-  UpdateTeamSettingsRequestSchema,
-} from "@briar/contracts/gen/briar/app/v1/team_pb";
+  UpdateTeamSettingsRequestSchema} from "@briar/contracts/gen/briar/app/v1/team_pb";
 import {
   isRepositoryWorkflowPending,
   repositoryWorkflowPendingStageId,
@@ -106,8 +105,8 @@ async function listTeamsCommand(
   const teams = response.map((team) => ({
     id: team.id,
     name: team.name,
-    organizationId: team.organizationId,
-    organizationName: team.organizationName,
+    workspaceId: team.workspaceId,
+    workspaceName: team.workspaceName,
     role: teamRoleFromProto(team.role),
   }));
   if (resolved.jsonOutput()) {
@@ -123,7 +122,7 @@ async function listTeamsCommand(
       [
         team.name,
         `  Team ID: ${team.id}`,
-        `  Organization: ${team.organizationName} (${team.organizationId})`,
+        `  Workspace: ${team.workspaceName} (${team.workspaceId})`,
         `  Role: ${team.role}`,
       ].join("\n")
     ).join("\n\n"),

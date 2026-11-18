@@ -98,7 +98,7 @@ async function githubPullRequestLinksForEvent(
     | "mergedAt"
     | "providerUpdatedAt"
     | "linkedIssues"
-    | "organizationId"
+    | "workspaceId"
   >,
 ) {
   const linkedIssuesJson = stableJson(input.linkedIssues);
@@ -146,8 +146,8 @@ async function githubPullRequestLinksForEvent(
     )
     .bind(
       input.providerUpdatedAt,
-      input.organizationId ?? null,
-      input.organizationId ?? null,
+      input.workspaceId ?? null,
+      input.workspaceId ?? null,
       input.repositoryId,
       input.pullRequestNumber,
       input.pullRequestId,

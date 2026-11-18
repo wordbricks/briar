@@ -50,7 +50,7 @@ export async function handleManagedComputerRoute(
       managedComputerSetupAgentMatch[1],
     );
     if (
-      !computer || computer.organization_id !== principal.organizationId ||
+      !computer || computer.organization_id !== principal.workspaceId ||
       computer.briar_device_id !== principal.deviceId ||
       !["needs_setup", "ready"].includes(computer.state)
     ) {
@@ -101,7 +101,7 @@ export async function handleManagedComputerRoute(
       managedComputerRemoteAgentMatch[1],
     );
     if (
-      !computer || computer.organization_id !== principal.organizationId ||
+      !computer || computer.organization_id !== principal.workspaceId ||
       computer.briar_device_id !== principal.deviceId ||
       !["needs_setup", "ready"].includes(computer.state)
     ) {

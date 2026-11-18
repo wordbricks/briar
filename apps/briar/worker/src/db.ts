@@ -33,7 +33,7 @@ export {
   consumeGithubInstallState,
   consumeGithubOAuthState,
   getGithubConnectionByInstallation,
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
   syncGithubConnectionRepositories,
   connectGithubInstallation,
@@ -105,7 +105,7 @@ export {
   listDashboardRuns,
   listDashboardRunsByIds,
   listDashboardRunSummaries,
-  listOrganizationStatusTrayRuns,
+  listWorkspaceStatusTrayRuns,
 } from "./hunt-run-read-repository";
 export {
   decodeDashboardRunListCursor,
@@ -116,7 +116,7 @@ export type {
   DashboardRunListFilters,
   DashboardRunListPage,
   DashboardRunSummaryRow,
-  OrganizationStatusTrayRunRow,
+  WorkspaceStatusTrayRunRow,
 } from "./hunt-run-read-repository";
 
 export { recoverHuntRun } from "./hunt-run-recovery-repository";
@@ -220,7 +220,7 @@ export type { IssueMessageRow } from "./issue-message-repository";
 export {
   listIssueConversationNotifications,
   listIssueSubscriptions,
-  listOrganizationIssueSubscriptionRunIds,
+  listWorkspaceIssueSubscriptionRunIds,
   subscribeIssue,
   unsubscribeIssue,
   listChannelConversationNotifications,
@@ -269,18 +269,18 @@ export {
   updateWorkspaceMemberRole,
   updateWorkspaceMemberProjects,
   removeWorkspaceMember,
-} from "./organization-command-repository";
+} from "./workspace-command-repository";
 export type {
   AcceptWorkspaceInvitationOutcome,
   UpdateWorkspaceMemberProjectsOutcome,
-} from "./organization-command-repository";
+} from "./workspace-command-repository";
 
 export {
-  getOrganizationInboxSyncVersion,
-  listOrganizationInboxRealtimeOutbox,
-  acknowledgeOrganizationInboxRealtimeOutbox,
-} from "./organization-inbox-outbox-repository";
-export type { OrganizationInboxRealtimeOutboxRow } from "./organization-inbox-outbox-repository";
+  getWorkspaceInboxSyncVersion,
+  listWorkspaceInboxRealtimeOutbox,
+  acknowledgeWorkspaceInboxRealtimeOutbox,
+} from "./workspace-inbox-outbox-repository";
+export type { WorkspaceInboxRealtimeOutboxRow } from "./workspace-inbox-outbox-repository";
 
 export type {
   TeamAgentRow,
@@ -402,25 +402,25 @@ export type {
 } from "./slack-repository";
 
 export {
-  listOrganizationUsageRuns,
+  listWorkspaceUsageRuns,
   listProjectUsageRuns,
   getRunExecutionAttempt,
   recordRunUsageRecords,
   recordRunCostRecords,
-  listOrganizationUsageExecutionAttempts,
-  listOrganizationUsageRecords,
+  listWorkspaceUsageExecutionAttempts,
+  listWorkspaceUsageRecords,
   listRunUsageRecords,
   listProjectUsageTotals,
-  listOrganizationUsageCostRecords,
+  listWorkspaceUsageCostRecords,
   listIssueResultReviews,
   updateHuntRunExecutionMetrics,
 } from "./usage-repository";
 export type {
-  OrganizationUsageRunRow,
+  WorkspaceUsageRunRow,
   RunExecutionAttemptRow,
-  OrganizationUsageRecordRow,
+  WorkspaceUsageRecordRow,
   ProjectUsageTotalRow,
-  OrganizationCostRecordRow,
+  WorkspaceCostRecordRow,
 } from "./usage-repository";
 
 export {

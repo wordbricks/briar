@@ -8,7 +8,7 @@ import {
   AgentUsagePricingStatus,
   AgentUsageRunSchema,
   GetProjectUsageSummaryResponseSchema,
-  ListOrganizationUsageRunsResponseSchema,
+  ListWorkspaceUsageRunsResponseSchema,
   ListStatusTrayRunsResponseSchema,
   ProjectUsagePeriod,
   StatusTrayRunSchema,
@@ -27,7 +27,7 @@ const observedAt = timestampFromDate(new Date("2026-08-31T00:00:00.000Z"));
 describe("Reporting protobuf mapping", () => {
   it("keeps provider-reported and model-priced cost ledgers distinct", () => {
     const report = organizationUsageReportFromProto(create(
-      ListOrganizationUsageRunsResponseSchema,
+      ListWorkspaceUsageRunsResponseSchema,
       {
         generatedAt: observedAt,
         pricing: create(AgentUsagePricingSchema, {

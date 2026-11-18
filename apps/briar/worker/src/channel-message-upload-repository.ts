@@ -8,7 +8,7 @@ import {
 } from "./upload-repository";
 
 export type ChannelMessageUploadScope = {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   userId: string;
   messageId: string;
@@ -25,7 +25,7 @@ export type ChannelMessageMutationReceiptRow = {
 
 const uploadScope = (scope: ChannelMessageUploadScope): UploadScope => ({
   purpose: "channel_message",
-  organizationId: scope.organizationId,
+  workspaceId: scope.workspaceId,
   projectId: null,
   channelId: scope.channelId,
   userId: scope.userId,
@@ -116,7 +116,7 @@ export function channelMessageMutationReceiptStatement(
     )
     .bind(
       input.messageId,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.userId,
       input.requestHash,

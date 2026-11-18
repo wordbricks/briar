@@ -115,7 +115,7 @@ describe("project creation preflight", () => {
 
 describe("configured project repository preparation", () => {
   const credential: ProjectGithubCredential = {
-    project: { id: "project-1", organizationId: "organization-1" },
+    project: { id: "project-1", organizationId: "workspace-1" },
     repository: {
       id: 123456789,
       fullName: "wordbricks/briar",

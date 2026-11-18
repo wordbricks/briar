@@ -9,8 +9,9 @@ import { fromBinary, toBinary } from "@bufbuild/protobuf";
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import { AGENT_PROGRESS_HEADLINE_MAX_LENGTH } from "./agent-progress-message";
 
-export const CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH = 240;
+export { AGENT_PROGRESS_HEADLINE_MAX_LENGTH as CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH } from "./agent-progress-message";
 export const CHANNEL_AGENT_ACTIVITY_STALE_MS = 30_000;
 
 const strictSchemaOptions = {
@@ -35,7 +36,7 @@ export const ChannelAgentActivityDescriptor = Schema.Struct({
   id: Schema.Trim.check(Schema.isLengthBetween(1, 200)),
   kind: ChannelAgentActivityKind,
   headline: Schema.Trim.check(
-    Schema.isLengthBetween(1, CHANNEL_AGENT_ACTIVITY_HEADLINE_MAX_LENGTH),
+    Schema.isLengthBetween(1, AGENT_PROGRESS_HEADLINE_MAX_LENGTH),
   ),
 }).annotate({ parseOptions: strictSchemaOptions });
 export type ChannelAgentActivityDescriptor =

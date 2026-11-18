@@ -43,10 +43,10 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await cleanup();
   });
 
-  it("explains when shared organization resources block deletion", async () => {
+  it("explains when shared workspace resources block deletion", async () => {
     const onDelete = vi.fn(async () => {
       throw new Error(
-        "Account deletion is blocked by shared organization resources",
+        "Account deletion is blocked by shared workspace resources",
       );
     });
     const { cleanup, container, root } = createReactTestRoot({
@@ -70,7 +70,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     await act(async () => findButton("Delete permanently")?.click());
 
     expect(document.body.textContent).toContain(
-      "You still own an organization, project, Worker, or Slack connection",
+      "You still own a workspace, project, Worker, or Slack connection",
     );
     await cleanup();
   });

@@ -1,7 +1,14 @@
-import { expireDmMemories } from "./dm-memory-access";
 import { HttpError } from "./http-response";
 
-/** SQL guard runs inside completion's transaction, after any model/attachment I/O. */
+/**
+ * A DM reply claim is fenced to the memory space it was bound to
+ * (`bindDmMemoryReplyClaim`). The fence holds while the space is active, its
+ * roster is live and its revocation epoch is the one the claim saw; a forget,
+ * a settings change or a roster change moves the epoch and ends the claim.
+ * The memory vault resolves a DM claim's scope through the same fence.
+ *
+ * SQL guard; runs inside completion's transaction, after any model/attachment I/O.
+ */
 export const dmMemoryReplyFenceCurrent = (job: string) => `not exists (
   select 1 from briar_dm_memory_reply_fences fence
   where fence.job_id = ${job}.id and fence.claim_token_hash = ${job}.claim_token_hash
@@ -13,24 +20,13 @@ export const dmMemoryReplyFenceCurrent = (job: string) => `not exists (
       where space.id = fence.space_id and space.status = 'active'
         and space.organization_id = ${job}.organization_id and space.channel_id = ${job}.channel_id
         and space.agent_id = ${job}.agent_id and space.revocation_epoch = fence.revocation_epoch
-        and (fence.protocol = 0 or exists (select 1 from briar_execution_workers binding
-          where binding.id = ${job}.claimed_worker_id and binding.device_id = ${job}.claimed_device_id
-            and json_valid(binding.runtime_proto_json)
-            and json_type(binding.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 'integer'
-            and json_extract(binding.runtime_proto_json, '$.capabilities.dmMemoryProtocol') = 1))
-        and not exists (select 1 from briar_dm_memory_documents expired
-          join briar_dm_memory_revisions rev on rev.document_id = expired.id and rev.version = expired.current_version
-          where expired.space_id = space.id and expired.status = 'active'
-            and expired.expired_version <> expired.current_version
-            and julianday(rev.valid_until) <= julianday('now'))
     )
 )`;
 
 export async function requireDmMemoryReplyFence(db: D1Database, jobId: string) {
-  const fence = await db.prepare(`select space_id from briar_dm_memory_reply_fences where job_id = ?`)
-    .bind(jobId).first<{ space_id: string }>();
+  const fence = await db.prepare(`select 1 from briar_dm_memory_reply_fences where job_id = ?`)
+    .bind(jobId).first();
   if (!fence) return;
-  await expireDmMemories(db, new Date().toISOString(), fence.space_id);
   const valid = await db.prepare(`select 1 from briar_channel_agent_reply_jobs job
     where job.id = ? and job.status = 'running' and julianday(job.lease_expires_at) > julianday('now')
       and ${dmMemoryReplyFenceCurrent("job")}`)

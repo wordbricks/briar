@@ -9,7 +9,7 @@ import Connect
 import Foundation
 import SwiftProtobuf
 
-/// FleetService owns authenticated organization-level machine administration.
+/// FleetService owns authenticated workspace-level machine administration.
 /// WebSocket upgrades for remote desktop and guided setup remain ordinary HTTP;
 /// this service owns only their unary control-plane requests and tickets.
 public protocol BriarAPI_FleetServiceClientInterface: Sendable {

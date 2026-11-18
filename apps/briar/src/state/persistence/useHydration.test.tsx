@@ -9,16 +9,13 @@ import { createReactTestRoot, flush, type ReactTestRoot } from "../../test/react
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
-  Organization,
+  Workspace,
   PlanningProject,
   Project,
   SessionUser,
 } from "../../types";
 import { organizationChannelIdsAtom } from "../entities/channels";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import {
   setSessionDataSources,
@@ -66,7 +63,7 @@ const user: SessionUser = {
 
 const otherUser: SessionUser = { ...user, id: "user-2", name: "Someone Else" };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -79,8 +76,8 @@ const teamOf = (id: string): Project => ({
   ...demoDashboard.team,
   id,
   name: id,
-  organizationId: organization.id,
-  organizationName: organization.name,
+  workspaceId: workspace.id,
+  workspaceName: workspace.name,
 });
 
 const teamA = teamOf("team-a");
@@ -88,7 +85,7 @@ const teamB = teamOf("team-b");
 
 const channel: ChannelSummary = {
   id: "channel-1",
-  organizationId: organization.id,
+  workspaceId: workspace.id,
   kind: "channel",
   slug: "general",
   name: "general",
@@ -128,8 +125,8 @@ const storedPayload: DashboardPayload = {
 function storedSnapshot(): ClientSnapshot {
   const source = createTestRegistry([
     [userAtom, user],
-    [organizationsAtom, [organization]],
-    [activeOrganizationIdAtom, organization.id],
+    [workspacesAtom, [workspace]],
+    [activeWorkspaceIdAtom, workspace.id],
     [teamsAtom, [teamA]],
     [activeTeamIdAtom, teamA.id],
   ]);
@@ -140,7 +137,7 @@ function storedSnapshot(): ClientSnapshot {
   });
   applySyncEvent(source, {
     kind: "channel-catalog-snapshot",
-    organizationId: organization.id,
+    workspaceId: workspace.id,
     channels: [channel],
   });
   const snapshot = collectSnapshot(source);
@@ -176,7 +173,7 @@ class BootServer {
       this.deltaRequests.push({ teamId, cursor });
       return Promise.resolve(deltaOf(cursor));
     },
-    loadOrganizations: async () => [organization],
+    loadWorkspaces: async () => [workspace],
     loadSession: () =>
       new Promise<SessionUser>((resolve) => {
         this.pendingSession.push(resolve);
@@ -228,11 +225,11 @@ const mount = async ({
   // Always written under the key a boot on this device looks for, so a record
   // whose own account disagrees with the pointer is still reachable.
   if (record) {
-    await store.write(snapshotKey(user.id, organization.id), record);
+    await store.write(snapshotKey(user.id, workspace.id), record);
   }
   if (pointer) {
     writeSnapshotAccount({
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       userId: user.id,
     });
   }
@@ -268,11 +265,11 @@ describe("useHydration", () => {
     expect(registry.get(userAtom)).toEqual(user);
     expect(registry.get(tokenAtom)).toBeNull();
     expect(readActiveTeamView(registry)).toEqual(storedPayload);
-    expect(registry.get(organizationChannelIdsAtom(organization.id))).toEqual([
+    expect(registry.get(organizationChannelIdsAtom(workspace.id))).toEqual([
       channel.id,
     ]);
     expect(registry.get(hydratedAccountAtom)).toEqual({
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       userId: user.id,
     });
     // Nothing was fetched: a hydrated screen carries no credential.

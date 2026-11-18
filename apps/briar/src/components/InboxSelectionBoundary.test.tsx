@@ -24,7 +24,7 @@ import {
 } from "../state/inbox/atoms";
 import { mergeCurrentInboxMessages } from "../state/inbox/useInboxSync";
 import { activePageAtom } from "../state/navigation/atoms";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import { lockedTeamIdAtom } from "../state/platform";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom, userAtom } from "../state/session/atoms";
@@ -85,7 +85,7 @@ const settled = (): AtomRegistry => {
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
     [activeTeamIdAtom, teamId],
-    [activeOrganizationIdAtom, team.organizationId],
+    [activeWorkspaceIdAtom, team.workspaceId],
     [lockedTeamIdAtom, null],
   ]);
   applySyncEvent(registry, { kind: "team-snapshot", teamId, payload });
@@ -95,7 +95,7 @@ const settled = (): AtomRegistry => {
     userId: demoUser.id,
   });
   registry.set(inboxFeedIdentityAtom, {
-    scope: `${demoUser.id}:${team.organizationId}`,
+    scope: `${demoUser.id}:${team.workspaceId}`,
     token: "token-1",
   });
   registry.subscribe(

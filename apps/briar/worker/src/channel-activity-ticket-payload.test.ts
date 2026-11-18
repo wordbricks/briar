@@ -7,7 +7,7 @@ import {
   decodeIssueActivitySocketTicketPayloadJson,
 } from "./channel-activity-ticket-payload";
 
-const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const workspaceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const channelId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const replyJobId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const agentId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
@@ -18,7 +18,7 @@ const runId = "22222222-2222-4222-8222-222222222222";
 
 const channelPublishPayload = {
   purpose: "publish",
-  organizationId,
+  workspaceId,
   channelId,
   replyJobId,
   agentId,
@@ -34,7 +34,7 @@ const channelPublishPayload = {
 
 const channelSocketPayload = {
   purpose: "subscribe",
-  organizationId,
+  workspaceId,
   channelId,
   userId: "user-a",
   expiresAt: 1,
@@ -44,7 +44,7 @@ const channelSocketPayload = {
 
 const issuePublishPayload = {
   purpose: "publish-issue",
-  organizationId,
+  workspaceId,
   projectId,
   runId,
   replyJobId,
@@ -59,7 +59,7 @@ const issuePublishPayload = {
 
 const issueSocketPayload = {
   purpose: "subscribe-issue",
-  organizationId,
+  workspaceId,
   projectId,
   runId,
   userId: "user-a",
@@ -135,7 +135,7 @@ describe("channel activity ticket payload schemas", () => {
         Option.isSome(
           decodeJson(decodeChannelActivityPublishTokenPayloadJson, {
             ...channelPublishPayload,
-            organizationId: value,
+            workspaceId: value,
           }),
         ),
       ).toBe(true);
@@ -145,7 +145,7 @@ describe("channel activity ticket payload schemas", () => {
         Option.isNone(
           decodeJson(decodeChannelActivityPublishTokenPayloadJson, {
             ...channelPublishPayload,
-            organizationId: value,
+            workspaceId: value,
           }),
         ),
       ).toBe(true);
@@ -154,7 +154,7 @@ describe("channel activity ticket payload schemas", () => {
 
   it("requires every UUID claim to match the existing UUID format", () => {
     for (const field of [
-      "organizationId",
+      "workspaceId",
       "channelId",
       "replyJobId",
       "agentId",
@@ -172,7 +172,7 @@ describe("channel activity ticket payload schemas", () => {
     }
 
     for (const field of [
-      "organizationId",
+      "workspaceId",
       "projectId",
       "runId",
       "replyJobId",

@@ -36,7 +36,7 @@
 		2AF90E1B4483EB04BF943C3C /* ChannelsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951BB81B83C74CEDE2ECEC15 /* ChannelsViews.swift */; };
 		2B87877CD12A67914A351155 /* DmMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A83FBB5F0F68854441186A /* DmMemory.swift */; };
 		2E57FEC834A9552E0E4879A9 /* CompanionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */; };
-		32894C0F51CB69E304BFD7F1 /* organization.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = B821873E9C744C9FE24003FF /* organization.connect.swift */; };
+		32894C0F51CB69E304BFD7F1 /* workspace.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = B821873E9C744C9FE24003FF /* workspace.connect.swift */; };
 		32C49F7F08A6EC8D1D32DD1B /* CompanionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0BE22C1849DA483E8B7BFF /* CompanionViews.swift */; };
 		331B2463AD5AD73630B327FD /* channel.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CA9E603F73AE75A9B380F0 /* channel.mock.swift */; };
 		34475DF5BB3861033A115B71 /* realtime_control.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90DB51DAAB0B2EE21EAD19B /* realtime_control.connect.swift */; };
@@ -61,7 +61,7 @@
 		47E3C4756142CDBC0AA72EC4 /* linear_import.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = F385E189B0AD1D5E2C8E2165 /* linear_import.pb.swift */; };
 		48E29BEE371B44630906E022 /* agent.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DC6A72C8A01128DA3D0DE0 /* agent.connect.swift */; };
 		49A2F5728B179AEB15A3B9FC /* AgentProviderCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EC0E32766ABD454DD2FB5B4 /* AgentProviderCatalogTests.swift */; };
-		4B22A355F40A606DF95392EC /* organization.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C701D207AB6778064BE9D5D /* organization.pb.swift */; };
+		4B22A355F40A606DF95392EC /* workspace.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C701D207AB6778064BE9D5D /* workspace.pb.swift */; };
 		4F27453B849254BD91EF85C4 /* fleet.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43D68DD8E6FB17DCC4609E96 /* fleet.mock.swift */; };
 		505EDE711BE711A9ED023EA2 /* team.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824C2F1FFE2A65DCB5F7C35D /* team.mock.swift */; };
 		524D88C0B6EA96C5C817E29E /* github.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3376DF87320BD38DB0E9A002 /* github.connect.swift */; };
@@ -122,7 +122,7 @@
 		A2FAECA169C615CCCCBC17E7 /* AgentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61217A3C52F459A88E333CD1 /* AgentModels.swift */; };
 		A4142A5A077B1E5302037B68 /* SelectableText.swift in Sources */ = {isa = PBXBuildFile; fileRef = E824C71CF3A757A4B40140EE /* SelectableText.swift */; };
 		A4A64239DC5E0780959F5F5D /* merge_queue.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00079796878B50FF6BFB3124 /* merge_queue.mock.swift */; };
-		A89E6A2F416124E861E26843 /* organization.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1CB434671AE16A1E25AAFC /* organization.mock.swift */; };
+		A89E6A2F416124E861E26843 /* workspace.mock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1CB434671AE16A1E25AAFC /* workspace.mock.swift */; };
 		A9888EC25CD246FB84570B52 /* workflow.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0EF265824691DE79DCEF8B /* workflow.pb.swift */; };
 		ADB31F4D8D99839F32D30052 /* reporting.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B60E1058016F4ECD5CF709E /* reporting.connect.swift */; };
 		ADC382624A47D8BEB3F6A982 /* BriarContractsMocks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 255A359627FF6AC89CD8CA47 /* BriarContractsMocks.framework */; };
@@ -292,7 +292,7 @@
 		1A2217931CB2AAB582D5A116 /* inbox.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = inbox.pb.swift; sourceTree = "<group>"; };
 		1B60E1058016F4ECD5CF709E /* reporting.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = reporting.connect.swift; sourceTree = "<group>"; };
 		1BEDE13FA827C88C7264C715 /* RealtimeConnectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeConnectTests.swift; sourceTree = "<group>"; };
-		1C701D207AB6778064BE9D5D /* organization.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = organization.pb.swift; sourceTree = "<group>"; };
+		1C701D207AB6778064BE9D5D /* workspace.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = workspace.pb.swift; sourceTree = "<group>"; };
 		1F0EF265824691DE79DCEF8B /* workflow.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = workflow.pb.swift; sourceTree = "<group>"; };
 		2034C52B05B2B54DF7F3F3E5 /* BriarCompanionTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BriarCompanionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		233573EB5589EBF9DE724279 /* UITestCompanionFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestCompanionFlow.swift; sourceTree = "<group>"; };
@@ -348,7 +348,7 @@
 		941BF7FDBA64BE20B365D774 /* team.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = team.pb.swift; sourceTree = "<group>"; };
 		951BB81B83C74CEDE2ECEC15 /* ChannelsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsViews.swift; sourceTree = "<group>"; };
 		9A110B2A438D4543375A7231 /* IssueWriteViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueWriteViews.swift; sourceTree = "<group>"; };
-		9A1CB434671AE16A1E25AAFC /* organization.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = organization.mock.swift; sourceTree = "<group>"; };
+		9A1CB434671AE16A1E25AAFC /* workspace.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = workspace.mock.swift; sourceTree = "<group>"; };
 		9C9EE6E17DC9F346B0A712DD /* IssueWriteModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueWriteModels.swift; sourceTree = "<group>"; };
 		9D7EE1F656749591A921C0C7 /* linear_import.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = linear_import.connect.swift; sourceTree = "<group>"; };
 		9EC0E32766ABD454DD2FB5B4 /* AgentProviderCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProviderCatalogTests.swift; sourceTree = "<group>"; };
@@ -362,7 +362,7 @@
 		B1ABEDA18BD63454F0D126BE /* team.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = team.connect.swift; sourceTree = "<group>"; };
 		B2A83FBB5F0F68854441186A /* DmMemory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DmMemory.swift; sourceTree = "<group>"; };
 		B39FE63A0EDED2FBB809F740 /* ChannelsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsStoreTests.swift; sourceTree = "<group>"; };
-		B821873E9C744C9FE24003FF /* organization.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = organization.connect.swift; sourceTree = "<group>"; };
+		B821873E9C744C9FE24003FF /* workspace.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = workspace.connect.swift; sourceTree = "<group>"; };
 		B941ED81ECF5145E9F9BE24C /* AppSystemServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSystemServices.swift; sourceTree = "<group>"; };
 		BB472046B544E8DEA6A7BE6C /* agent.mock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = agent.mock.swift; sourceTree = "<group>"; };
 		BBC0E3E02C956EEB2914E15C /* merge_queue.connect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = merge_queue.connect.swift; sourceTree = "<group>"; };
@@ -523,7 +523,7 @@
 				C11D830C5A0B667170EB01B0 /* issue.mock.swift */,
 				391B6949AF778E7DE1B72695 /* linear_import.mock.swift */,
 				00079796878B50FF6BFB3124 /* merge_queue.mock.swift */,
-				9A1CB434671AE16A1E25AAFC /* organization.mock.swift */,
+				9A1CB434671AE16A1E25AAFC /* workspace.mock.swift */,
 				C81967B93218F15AAEB25F9E /* realtime_control.mock.swift */,
 				DB5D99D9FBE1EA05EBB46E36 /* reporting.mock.swift */,
 				824C2F1FFE2A65DCB5F7C35D /* team.mock.swift */,
@@ -579,8 +579,8 @@
 				F385E189B0AD1D5E2C8E2165 /* linear_import.pb.swift */,
 				BBC0E3E02C956EEB2914E15C /* merge_queue.connect.swift */,
 				EF1460A460D5D46147D888AA /* merge_queue.pb.swift */,
-				B821873E9C744C9FE24003FF /* organization.connect.swift */,
-				1C701D207AB6778064BE9D5D /* organization.pb.swift */,
+				B821873E9C744C9FE24003FF /* workspace.connect.swift */,
+				1C701D207AB6778064BE9D5D /* workspace.pb.swift */,
 				E90DB51DAAB0B2EE21EAD19B /* realtime_control.connect.swift */,
 				CCED8D7A68AB791A6ADE08EE /* realtime_control.pb.swift */,
 				1B60E1058016F4ECD5CF709E /* reporting.connect.swift */,
@@ -986,7 +986,7 @@
 				412BB9D9875DE1970A675DDA /* issue.mock.swift in Sources */,
 				3E93BD8BCED9FB79B64651D1 /* linear_import.mock.swift in Sources */,
 				A4A64239DC5E0780959F5F5D /* merge_queue.mock.swift in Sources */,
-				A89E6A2F416124E861E26843 /* organization.mock.swift in Sources */,
+				A89E6A2F416124E861E26843 /* workspace.mock.swift in Sources */,
 				841B4375903CAF3CBB32238C /* realtime_control.mock.swift in Sources */,
 				63F91CF5B921B22EB43C3C5C /* reporting.mock.swift in Sources */,
 				505EDE711BE711A9ED023EA2 /* team.mock.swift in Sources */,
@@ -1098,8 +1098,8 @@
 				47E3C4756142CDBC0AA72EC4 /* linear_import.pb.swift in Sources */,
 				3849BD636924B5EA17F45941 /* merge_queue.connect.swift in Sources */,
 				62485ECDCB5F58BD514FBE0C /* merge_queue.pb.swift in Sources */,
-				32894C0F51CB69E304BFD7F1 /* organization.connect.swift in Sources */,
-				4B22A355F40A606DF95392EC /* organization.pb.swift in Sources */,
+				32894C0F51CB69E304BFD7F1 /* workspace.connect.swift in Sources */,
+				4B22A355F40A606DF95392EC /* workspace.pb.swift in Sources */,
 				91608382FCBC2C96372120C2 /* provider.pb.swift in Sources */,
 				05B6DA6110227F1E2D9F9082 /* provider_block.pb.swift in Sources */,
 				FBFB85025FD12AED29129A65 /* realtime.pb.swift in Sources */,

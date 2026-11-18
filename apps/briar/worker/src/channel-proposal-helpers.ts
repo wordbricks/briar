@@ -31,16 +31,16 @@ export function resolveChannelProposalTargetProjectId(input: {
 }
 
 export function assertChannelProposalAuthorScope(input: {
-  channelOrganizationId: string;
+  channelWorkspaceId: string;
   proposedProjectId: string | null;
   replyAuthorAgentId: string | null;
-  replyAuthorAgentOrganizationId: string | null;
+  replyAuthorAgentWorkspaceId: string | null;
   replyAuthorAgentProjectId: string | null;
 }) {
   if (
     !input.replyAuthorAgentId ||
-    !input.replyAuthorAgentOrganizationId ||
-    input.replyAuthorAgentOrganizationId !== input.channelOrganizationId
+    !input.replyAuthorAgentWorkspaceId ||
+    input.replyAuthorAgentWorkspaceId !== input.channelWorkspaceId
   ) {
     throw new HttpError(
       409,
@@ -72,14 +72,20 @@ export function approvedIssueCreation<T extends Record<string, unknown>>(
   };
 }
 
+/**
+ * Builds the `relatedMessage` object stored in `briar_hunt_runs.context_json`.
+ * A D1 trigger validates that payload key by key, so the persisted key stays
+ * the pre-rename `organizationId`; `parseRelatedMessageReference` translates it
+ * back to `workspaceId` on the way out.
+ */
 export function channelRelatedMessageReference(input: {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   messageId: string;
   rootMessageId: string | null;
 }) {
   return {
-    organizationId: input.organizationId,
+    organizationId: input.workspaceId,
     channelId: input.channelId,
     messageId: input.messageId,
     // A root message is required by the in-app deep-link handler. A proposal

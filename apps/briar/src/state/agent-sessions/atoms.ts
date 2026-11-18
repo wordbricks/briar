@@ -246,7 +246,7 @@ export const processingIssueIdsAtom = Atom.make(
  * Whether one run has an agent on it.
  *
  * The board threaded the whole set down as a prop, through the card context, so
- * a session starting anywhere in the organization gave every card a new context
+ * a session starting anywhere in the workspace gave every card a new context
  * object and re-rendered the board. Each card subscribes to its own answer
  * instead: a session that starts on one issue notifies that issue's card and
  * leaves the rest of the board asleep.

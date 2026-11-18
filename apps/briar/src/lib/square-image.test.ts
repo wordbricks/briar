@@ -2,9 +2,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  maxOrganizationLogoSourceBytes,
+  maxWorkspaceLogoSourceBytes,
   organizationLogoFromFile,
-} from "./organization-logo";
+} from "./workspace-logo";
 import {
   isTeamAgentAvatarDataUrl,
   maxTeamAgentAvatarDataUrlLength,
@@ -14,10 +14,10 @@ import {
 
 const adapters = [
   {
-    name: "organization logo",
+    name: "workspace logo",
     fromFile: organizationLogoFromFile,
-    maxSourceBytes: maxOrganizationLogoSourceBytes,
-    invalidSourceError: "invalid-organization-logo",
+    maxSourceBytes: maxWorkspaceLogoSourceBytes,
+    invalidSourceError: "invalid-workspace-logo",
   },
   {
     name: "project agent avatar",

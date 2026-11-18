@@ -9,7 +9,7 @@ describe("channel reply workspace scope", () => {
           projectId: "33333333-3333-4333-8333-333333333333",
           scope: {
             kind: "project",
-            organizationId: "11111111-1111-4111-8111-111111111111",
+            workspaceId: "11111111-1111-4111-8111-111111111111",
             projectId: "33333333-3333-4333-8333-333333333333",
           },
         },
@@ -18,14 +18,14 @@ describe("channel reply workspace scope", () => {
     ).toThrow("does not match local worker project");
   });
 
-  it("allows an Organization Agent to run without opening a repository", () => {
+  it("allows a Workspace Agent to run without opening a repository", () => {
     expect(() =>
       assertChannelReplyWorkspaceScope(
         {
           projectId: null,
           scope: {
-            kind: "organization",
-            organizationId: "11111111-1111-4111-8111-111111111111",
+            kind: "workspace",
+            workspaceId: "11111111-1111-4111-8111-111111111111",
           },
         },
         "22222222-2222-4222-8222-222222222222",

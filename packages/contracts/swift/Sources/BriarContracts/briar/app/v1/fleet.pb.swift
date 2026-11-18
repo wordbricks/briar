@@ -253,7 +253,7 @@ public nonisolated enum BriarAPI_ManagedComputerPromotionLimitReason: SwiftProto
   public typealias RawValue = Int
   case unspecified // = 0
   case user // = 1
-  case organization // = 2
+  case workspace // = 2
   case fleet // = 3
   case UNRECOGNIZED(Int)
 
@@ -265,7 +265,7 @@ public nonisolated enum BriarAPI_ManagedComputerPromotionLimitReason: SwiftProto
     switch rawValue {
     case 0: self = .unspecified
     case 1: self = .user
-    case 2: self = .organization
+    case 2: self = .workspace
     case 3: self = .fleet
     default: self = .UNRECOGNIZED(rawValue)
     }
@@ -275,7 +275,7 @@ public nonisolated enum BriarAPI_ManagedComputerPromotionLimitReason: SwiftProto
     switch self {
     case .unspecified: return 0
     case .user: return 1
-    case .organization: return 2
+    case .workspace: return 2
     case .fleet: return 3
     case .UNRECOGNIZED(let i): return i
     }
@@ -285,7 +285,7 @@ public nonisolated enum BriarAPI_ManagedComputerPromotionLimitReason: SwiftProto
   public static let allCases: [BriarAPI_ManagedComputerPromotionLimitReason] = [
     .unspecified,
     .user,
-    .organization,
+    .workspace,
     .fleet,
   ]
 
@@ -433,7 +433,7 @@ public nonisolated struct BriarAPI_RegisterProjectExecutionWorkerResponse: Senda
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var deviceID: String = String()
 
@@ -485,7 +485,7 @@ public nonisolated struct BriarAPI_BindProjectExecutionWorkerResponse: Sendable 
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var deviceID: String = String()
 
@@ -649,7 +649,7 @@ public nonisolated struct BriarAPI_ExecutionWorkerBinding: Sendable {
   fileprivate var _readinessDetail: String? = nil
 }
 
-public nonisolated struct BriarAPI_OrganizationExecutionWorker: @unchecked Sendable {
+public nonisolated struct BriarAPI_WorkspaceExecutionWorker: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -752,7 +752,7 @@ public nonisolated struct BriarAPI_ListExecutionWorkersRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -764,7 +764,7 @@ public nonisolated struct BriarAPI_ListExecutionWorkersResponse: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var workers: [BriarAPI_OrganizationExecutionWorker] = []
+  public var workers: [BriarAPI_WorkspaceExecutionWorker] = []
 
   public var latestVersion: String {
     get {_latestVersion ?? String()}
@@ -799,7 +799,7 @@ public nonisolated struct BriarAPI_RequestExecutionWorkerUpdateRequest: Sendable
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var deviceID: String = String()
 
@@ -876,7 +876,7 @@ public nonisolated struct BriarAPI_UpdateExecutionWorkerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var deviceID: String = String()
 
@@ -960,7 +960,7 @@ public nonisolated struct BriarAPI_DeleteExecutionWorkerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var deviceID: String = String()
 
@@ -1007,9 +1007,9 @@ public nonisolated struct BriarAPI_ManagedComputer: @unchecked Sendable {
     set {_uniqueStorage()._id = newValue}
   }
 
-  public var organizationID: String {
-    get {_storage._organizationID}
-    set {_uniqueStorage()._organizationID = newValue}
+  public var workspaceID: String {
+    get {_storage._workspaceID}
+    set {_uniqueStorage()._workspaceID = newValue}
   }
 
   public var requesterUserID: String {
@@ -1187,7 +1187,7 @@ public nonisolated struct BriarAPI_GetManagedComputerProductRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1216,7 +1216,7 @@ public nonisolated struct BriarAPI_GetManagedComputerProductResponse: Sendable {
 
   public var canApply: Bool = false
 
-  public var organizationLimit: UInt32 = 0
+  public var workspaceLimit: UInt32 = 0
 
   public var fleetLimit: UInt32 = 0
 
@@ -1232,7 +1232,7 @@ public nonisolated struct BriarAPI_ListManagedComputersRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1270,7 +1270,7 @@ public nonisolated struct BriarAPI_RegisterSandboxComputerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var deviceID: String = String()
 
@@ -1307,7 +1307,7 @@ public nonisolated struct BriarAPI_UnregisterSandboxComputerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var deviceID: String = String()
 
@@ -1333,7 +1333,7 @@ public nonisolated struct BriarAPI_GetManagedComputerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var managedComputerID: String = String()
 
@@ -1368,7 +1368,7 @@ public nonisolated struct BriarAPI_ValidateManagedComputerPromotionRequest: Send
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var code: String = String()
 
@@ -1413,7 +1413,7 @@ public nonisolated struct BriarAPI_ApplyForManagedComputerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var code: String = String()
 
@@ -1512,7 +1512,7 @@ public nonisolated struct BriarAPI_RetryManagedComputerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var managedComputerID: String = String()
 
@@ -1551,7 +1551,7 @@ public nonisolated struct BriarAPI_RetireManagedComputerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var managedComputerID: String = String()
 
@@ -1588,7 +1588,7 @@ public nonisolated struct BriarAPI_TerminateManagedComputerRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var managedComputerID: String = String()
 
@@ -1718,7 +1718,7 @@ public nonisolated struct BriarAPI_CreateManagedComputerRemoteSessionRequest: Se
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var managedComputerID: String = String()
 
@@ -1790,7 +1790,7 @@ public nonisolated struct BriarAPI_EndManagedComputerRemoteSessionRequest: Senda
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var managedComputerID: String = String()
 
@@ -1822,7 +1822,7 @@ public nonisolated struct BriarAPI_ManagedComputerSetupSession: Sendable {
 
   public var managedComputerID: String = String()
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var projectID: String = String()
 
@@ -1849,7 +1849,7 @@ public nonisolated struct BriarAPI_CreateManagedComputerSetupSessionRequest: Sen
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var managedComputerID: String = String()
 
@@ -1904,7 +1904,7 @@ public nonisolated struct BriarAPI_GetManagedComputerSetupStatusRequest: Sendabl
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var managedComputerID: String = String()
 
@@ -2006,7 +2006,7 @@ nonisolated extension BriarAPI_ManagedComputerCurrency: SwiftProtobuf._ProtoName
 }
 
 nonisolated extension BriarAPI_ManagedComputerPromotionLimitReason: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_UNSPECIFIED\0\u{1}MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_USER\0\u{1}MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_ORGANIZATION\0\u{1}MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_FLEET\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_UNSPECIFIED\0\u{1}MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_USER\0\u{1}MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_WORKSPACE\0\u{1}MANAGED_COMPUTER_PROMOTION_LIMIT_REASON_FLEET\0")
 }
 
 nonisolated extension BriarAPI_ManagedComputerRemoteSessionState: SwiftProtobuf._ProtoNameProviding {
@@ -2073,7 +2073,7 @@ nonisolated extension BriarAPI_RegisterProjectExecutionWorkerRequest: SwiftProto
 
 nonisolated extension BriarAPI_RegisterProjectExecutionWorkerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RegisterProjectExecutionWorkerResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0\u{1}worker\0\u{3}worker_token\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}device_id\0\u{1}worker\0\u{3}worker_token\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2081,7 +2081,7 @@ nonisolated extension BriarAPI_RegisterProjectExecutionWorkerResponse: SwiftProt
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._worker) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.workerToken) }()
@@ -2095,8 +2095,8 @@ nonisolated extension BriarAPI_RegisterProjectExecutionWorkerResponse: SwiftProt
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
@@ -2111,7 +2111,7 @@ nonisolated extension BriarAPI_RegisterProjectExecutionWorkerResponse: SwiftProt
   }
 
   public static func ==(lhs: BriarAPI_RegisterProjectExecutionWorkerResponse, rhs: BriarAPI_RegisterProjectExecutionWorkerResponse) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs._worker != rhs._worker {return false}
     if lhs.workerToken != rhs.workerToken {return false}
@@ -2166,7 +2166,7 @@ nonisolated extension BriarAPI_BindProjectExecutionWorkerRequest: SwiftProtobuf.
 
 nonisolated extension BriarAPI_BindProjectExecutionWorkerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".BindProjectExecutionWorkerResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0\u{1}worker\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}device_id\0\u{1}worker\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2174,7 +2174,7 @@ nonisolated extension BriarAPI_BindProjectExecutionWorkerResponse: SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._worker) }()
       default: break
@@ -2187,8 +2187,8 @@ nonisolated extension BriarAPI_BindProjectExecutionWorkerResponse: SwiftProtobuf
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
@@ -2200,7 +2200,7 @@ nonisolated extension BriarAPI_BindProjectExecutionWorkerResponse: SwiftProtobuf
   }
 
   public static func ==(lhs: BriarAPI_BindProjectExecutionWorkerResponse, rhs: BriarAPI_BindProjectExecutionWorkerResponse) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs._worker != rhs._worker {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -2420,8 +2420,8 @@ nonisolated extension BriarAPI_ExecutionWorkerBinding: SwiftProtobuf.Message, Sw
   }
 }
 
-nonisolated extension BriarAPI_OrganizationExecutionWorker: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".OrganizationExecutionWorker"
+nonisolated extension BriarAPI_WorkspaceExecutionWorker: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WorkspaceExecutionWorker"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{3}owner_user_id\0\u{3}owner_name\0\u{1}label\0\u{1}icon\0\u{1}state\0\u{3}max_concurrent_sessions\0\u{3}active_sessions\0\u{3}last_heartbeat_at\0\u{3}created_at\0\u{1}versions\0\u{3}remote_update_supported\0\u{3}update_request\0\u{1}bindings\0")
 
   fileprivate class _StorageClass {
@@ -2553,7 +2553,7 @@ nonisolated extension BriarAPI_OrganizationExecutionWorker: SwiftProtobuf.Messag
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_OrganizationExecutionWorker, rhs: BriarAPI_OrganizationExecutionWorker) -> Bool {
+  public static func ==(lhs: BriarAPI_WorkspaceExecutionWorker, rhs: BriarAPI_WorkspaceExecutionWorker) -> Bool {
     if lhs._storage !== rhs._storage {
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
@@ -2583,7 +2583,7 @@ nonisolated extension BriarAPI_OrganizationExecutionWorker: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_ListExecutionWorkersRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListExecutionWorkersRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2591,21 +2591,21 @@ nonisolated extension BriarAPI_ListExecutionWorkersRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_ListExecutionWorkersRequest, rhs: BriarAPI_ListExecutionWorkersRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2662,7 +2662,7 @@ nonisolated extension BriarAPI_ListExecutionWorkersResponse: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_RequestExecutionWorkerUpdateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RequestExecutionWorkerUpdateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}device_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2670,7 +2670,7 @@ nonisolated extension BriarAPI_RequestExecutionWorkerUpdateRequest: SwiftProtobu
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
       default: break
       }
@@ -2678,8 +2678,8 @@ nonisolated extension BriarAPI_RequestExecutionWorkerUpdateRequest: SwiftProtobu
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
@@ -2688,7 +2688,7 @@ nonisolated extension BriarAPI_RequestExecutionWorkerUpdateRequest: SwiftProtobu
   }
 
   public static func ==(lhs: BriarAPI_RequestExecutionWorkerUpdateRequest, rhs: BriarAPI_RequestExecutionWorkerUpdateRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2745,7 +2745,7 @@ nonisolated extension BriarAPI_RequestExecutionWorkerUpdateResponse.Outcome: Swi
 
 nonisolated extension BriarAPI_UpdateExecutionWorkerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateExecutionWorkerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0\u{3}max_concurrent_sessions\0\u{1}icon\0\u{3}clear_icon\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}device_id\0\u{3}max_concurrent_sessions\0\u{1}icon\0\u{3}clear_icon\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2753,7 +2753,7 @@ nonisolated extension BriarAPI_UpdateExecutionWorkerRequest: SwiftProtobuf.Messa
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self._maxConcurrentSessions) }()
       case 4: try {
@@ -2792,8 +2792,8 @@ nonisolated extension BriarAPI_UpdateExecutionWorkerRequest: SwiftProtobuf.Messa
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
@@ -2816,7 +2816,7 @@ nonisolated extension BriarAPI_UpdateExecutionWorkerRequest: SwiftProtobuf.Messa
   }
 
   public static func ==(lhs: BriarAPI_UpdateExecutionWorkerRequest, rhs: BriarAPI_UpdateExecutionWorkerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs._maxConcurrentSessions != rhs._maxConcurrentSessions {return false}
     if lhs.iconUpdate != rhs.iconUpdate {return false}
@@ -2890,7 +2890,7 @@ nonisolated extension BriarAPI_UpdateExecutionWorkerResponse: SwiftProtobuf.Mess
 
 nonisolated extension BriarAPI_DeleteExecutionWorkerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeleteExecutionWorkerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0\u{3}request_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}device_id\0\u{3}request_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2898,7 +2898,7 @@ nonisolated extension BriarAPI_DeleteExecutionWorkerRequest: SwiftProtobuf.Messa
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
@@ -2907,8 +2907,8 @@ nonisolated extension BriarAPI_DeleteExecutionWorkerRequest: SwiftProtobuf.Messa
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
@@ -2920,7 +2920,7 @@ nonisolated extension BriarAPI_DeleteExecutionWorkerRequest: SwiftProtobuf.Messa
   }
 
   public static func ==(lhs: BriarAPI_DeleteExecutionWorkerRequest, rhs: BriarAPI_DeleteExecutionWorkerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -2995,11 +2995,11 @@ nonisolated extension BriarAPI_ManagedComputerError: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ManagedComputer"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{3}requester_user_id\0\u{1}state\0\u{1}region\0\u{3}instance_id\0\u{3}volume_id\0\u{3}device_id\0\u{1}error\0\u{3}retry_count\0\u{3}retry_available\0\u{3}created_at\0\u{3}expires_at\0\u{3}updated_at\0\u{1}provider\0\u{1}label\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}workspace_id\0\u{3}requester_user_id\0\u{1}state\0\u{1}region\0\u{3}instance_id\0\u{3}volume_id\0\u{3}device_id\0\u{1}error\0\u{3}retry_count\0\u{3}retry_available\0\u{3}created_at\0\u{3}expires_at\0\u{3}updated_at\0\u{1}provider\0\u{1}label\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
-    var _organizationID: String = String()
+    var _workspaceID: String = String()
     var _requesterUserID: String = String()
     var _state: BriarAPI_ManagedComputerState = .unspecified
     var _region: String = String()
@@ -3025,7 +3025,7 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
 
     init(copying source: _StorageClass) {
       _id = source._id
-      _organizationID = source._organizationID
+      _workspaceID = source._workspaceID
       _requesterUserID = source._requesterUserID
       _state = source._state
       _region = source._region
@@ -3059,7 +3059,7 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._organizationID) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._workspaceID) }()
         case 3: try { try decoder.decodeSingularStringField(value: &_storage._requesterUserID) }()
         case 4: try { try decoder.decodeSingularEnumField(value: &_storage._state) }()
         case 5: try { try decoder.decodeSingularStringField(value: &_storage._region) }()
@@ -3089,8 +3089,8 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
       if !_storage._id.isEmpty {
         try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
       }
-      if !_storage._organizationID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._organizationID, fieldNumber: 2)
+      if !_storage._workspaceID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._workspaceID, fieldNumber: 2)
       }
       if !_storage._requesterUserID.isEmpty {
         try visitor.visitSingularStringField(value: _storage._requesterUserID, fieldNumber: 3)
@@ -3144,7 +3144,7 @@ nonisolated extension BriarAPI_ManagedComputer: SwiftProtobuf.Message, SwiftProt
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._id != rhs_storage._id {return false}
-        if _storage._organizationID != rhs_storage._organizationID {return false}
+        if _storage._workspaceID != rhs_storage._workspaceID {return false}
         if _storage._requesterUserID != rhs_storage._requesterUserID {return false}
         if _storage._state != rhs_storage._state {return false}
         if _storage._region != rhs_storage._region {return false}
@@ -3283,7 +3283,7 @@ nonisolated extension BriarAPI_ManagedComputerProduct: SwiftProtobuf.Message, Sw
 
 nonisolated extension BriarAPI_GetManagedComputerProductRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetManagedComputerProductRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3291,21 +3291,21 @@ nonisolated extension BriarAPI_GetManagedComputerProductRequest: SwiftProtobuf.M
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_GetManagedComputerProductRequest, rhs: BriarAPI_GetManagedComputerProductRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3313,7 +3313,7 @@ nonisolated extension BriarAPI_GetManagedComputerProductRequest: SwiftProtobuf.M
 
 nonisolated extension BriarAPI_GetManagedComputerProductResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetManagedComputerProductResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}product\0\u{3}applications_enabled\0\u{3}remote_desktop_enabled\0\u{3}configuration_ready\0\u{3}can_apply\0\u{3}organization_limit\0\u{3}fleet_limit\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}product\0\u{3}applications_enabled\0\u{3}remote_desktop_enabled\0\u{3}configuration_ready\0\u{3}can_apply\0\u{3}workspace_limit\0\u{3}fleet_limit\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3326,7 +3326,7 @@ nonisolated extension BriarAPI_GetManagedComputerProductResponse: SwiftProtobuf.
       case 3: try { try decoder.decodeSingularBoolField(value: &self.remoteDesktopEnabled) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.configurationReady) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.canApply) }()
-      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.organizationLimit) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.workspaceLimit) }()
       case 7: try { try decoder.decodeSingularUInt32Field(value: &self.fleetLimit) }()
       default: break
       }
@@ -3353,8 +3353,8 @@ nonisolated extension BriarAPI_GetManagedComputerProductResponse: SwiftProtobuf.
     if self.canApply != false {
       try visitor.visitSingularBoolField(value: self.canApply, fieldNumber: 5)
     }
-    if self.organizationLimit != 0 {
-      try visitor.visitSingularUInt32Field(value: self.organizationLimit, fieldNumber: 6)
+    if self.workspaceLimit != 0 {
+      try visitor.visitSingularUInt32Field(value: self.workspaceLimit, fieldNumber: 6)
     }
     if self.fleetLimit != 0 {
       try visitor.visitSingularUInt32Field(value: self.fleetLimit, fieldNumber: 7)
@@ -3368,7 +3368,7 @@ nonisolated extension BriarAPI_GetManagedComputerProductResponse: SwiftProtobuf.
     if lhs.remoteDesktopEnabled != rhs.remoteDesktopEnabled {return false}
     if lhs.configurationReady != rhs.configurationReady {return false}
     if lhs.canApply != rhs.canApply {return false}
-    if lhs.organizationLimit != rhs.organizationLimit {return false}
+    if lhs.workspaceLimit != rhs.workspaceLimit {return false}
     if lhs.fleetLimit != rhs.fleetLimit {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3377,7 +3377,7 @@ nonisolated extension BriarAPI_GetManagedComputerProductResponse: SwiftProtobuf.
 
 nonisolated extension BriarAPI_ListManagedComputersRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListManagedComputersRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3385,21 +3385,21 @@ nonisolated extension BriarAPI_ListManagedComputersRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_ListManagedComputersRequest, rhs: BriarAPI_ListManagedComputersRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3446,7 +3446,7 @@ nonisolated extension BriarAPI_ListManagedComputersResponse: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_RegisterSandboxComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RegisterSandboxComputerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0\u{1}label\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}device_id\0\u{1}label\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3454,7 +3454,7 @@ nonisolated extension BriarAPI_RegisterSandboxComputerRequest: SwiftProtobuf.Mes
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.label) }()
       default: break
@@ -3463,8 +3463,8 @@ nonisolated extension BriarAPI_RegisterSandboxComputerRequest: SwiftProtobuf.Mes
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
@@ -3476,7 +3476,7 @@ nonisolated extension BriarAPI_RegisterSandboxComputerRequest: SwiftProtobuf.Mes
   }
 
   public static func ==(lhs: BriarAPI_RegisterSandboxComputerRequest, rhs: BriarAPI_RegisterSandboxComputerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.label != rhs.label {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -3520,7 +3520,7 @@ nonisolated extension BriarAPI_RegisterSandboxComputerResponse: SwiftProtobuf.Me
 
 nonisolated extension BriarAPI_UnregisterSandboxComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UnregisterSandboxComputerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}device_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}device_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3528,7 +3528,7 @@ nonisolated extension BriarAPI_UnregisterSandboxComputerRequest: SwiftProtobuf.M
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
       default: break
       }
@@ -3536,8 +3536,8 @@ nonisolated extension BriarAPI_UnregisterSandboxComputerRequest: SwiftProtobuf.M
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 2)
@@ -3546,7 +3546,7 @@ nonisolated extension BriarAPI_UnregisterSandboxComputerRequest: SwiftProtobuf.M
   }
 
   public static func ==(lhs: BriarAPI_UnregisterSandboxComputerRequest, rhs: BriarAPI_UnregisterSandboxComputerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3585,7 +3585,7 @@ nonisolated extension BriarAPI_UnregisterSandboxComputerResponse: SwiftProtobuf.
 
 nonisolated extension BriarAPI_GetManagedComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetManagedComputerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}managed_computer_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3593,7 +3593,7 @@ nonisolated extension BriarAPI_GetManagedComputerRequest: SwiftProtobuf.Message,
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       default: break
       }
@@ -3601,8 +3601,8 @@ nonisolated extension BriarAPI_GetManagedComputerRequest: SwiftProtobuf.Message,
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
@@ -3611,7 +3611,7 @@ nonisolated extension BriarAPI_GetManagedComputerRequest: SwiftProtobuf.Message,
   }
 
   public static func ==(lhs: BriarAPI_GetManagedComputerRequest, rhs: BriarAPI_GetManagedComputerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3654,7 +3654,7 @@ nonisolated extension BriarAPI_GetManagedComputerResponse: SwiftProtobuf.Message
 
 nonisolated extension BriarAPI_ValidateManagedComputerPromotionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ValidateManagedComputerPromotionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}code\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3662,7 +3662,7 @@ nonisolated extension BriarAPI_ValidateManagedComputerPromotionRequest: SwiftPro
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.code) }()
       default: break
       }
@@ -3670,8 +3670,8 @@ nonisolated extension BriarAPI_ValidateManagedComputerPromotionRequest: SwiftPro
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.code.isEmpty {
       try visitor.visitSingularStringField(value: self.code, fieldNumber: 2)
@@ -3680,7 +3680,7 @@ nonisolated extension BriarAPI_ValidateManagedComputerPromotionRequest: SwiftPro
   }
 
   public static func ==(lhs: BriarAPI_ValidateManagedComputerPromotionRequest, rhs: BriarAPI_ValidateManagedComputerPromotionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.code != rhs.code {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3748,7 +3748,7 @@ nonisolated extension BriarAPI_ValidateManagedComputerPromotionResponse: SwiftPr
 
 nonisolated extension BriarAPI_ApplyForManagedComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ApplyForManagedComputerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}code\0\u{3}request_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}code\0\u{3}request_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3756,7 +3756,7 @@ nonisolated extension BriarAPI_ApplyForManagedComputerRequest: SwiftProtobuf.Mes
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.code) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
@@ -3765,8 +3765,8 @@ nonisolated extension BriarAPI_ApplyForManagedComputerRequest: SwiftProtobuf.Mes
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.code.isEmpty {
       try visitor.visitSingularStringField(value: self.code, fieldNumber: 2)
@@ -3778,7 +3778,7 @@ nonisolated extension BriarAPI_ApplyForManagedComputerRequest: SwiftProtobuf.Mes
   }
 
   public static func ==(lhs: BriarAPI_ApplyForManagedComputerRequest, rhs: BriarAPI_ApplyForManagedComputerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.code != rhs.code {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -3876,7 +3876,7 @@ nonisolated extension BriarAPI_ApplyForManagedComputerResponse: SwiftProtobuf.Me
 
 nonisolated extension BriarAPI_RetryManagedComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RetryManagedComputerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0\u{3}request_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}managed_computer_id\0\u{3}request_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3884,7 +3884,7 @@ nonisolated extension BriarAPI_RetryManagedComputerRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       default: break
@@ -3893,8 +3893,8 @@ nonisolated extension BriarAPI_RetryManagedComputerRequest: SwiftProtobuf.Messag
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
@@ -3906,7 +3906,7 @@ nonisolated extension BriarAPI_RetryManagedComputerRequest: SwiftProtobuf.Messag
   }
 
   public static func ==(lhs: BriarAPI_RetryManagedComputerRequest, rhs: BriarAPI_RetryManagedComputerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -3955,7 +3955,7 @@ nonisolated extension BriarAPI_RetryManagedComputerResponse: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_RetireManagedComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RetireManagedComputerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}managed_computer_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3963,7 +3963,7 @@ nonisolated extension BriarAPI_RetireManagedComputerRequest: SwiftProtobuf.Messa
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       default: break
       }
@@ -3971,8 +3971,8 @@ nonisolated extension BriarAPI_RetireManagedComputerRequest: SwiftProtobuf.Messa
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
@@ -3981,7 +3981,7 @@ nonisolated extension BriarAPI_RetireManagedComputerRequest: SwiftProtobuf.Messa
   }
 
   public static func ==(lhs: BriarAPI_RetireManagedComputerRequest, rhs: BriarAPI_RetireManagedComputerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -4029,7 +4029,7 @@ nonisolated extension BriarAPI_RetireManagedComputerResponse: SwiftProtobuf.Mess
 
 nonisolated extension BriarAPI_TerminateManagedComputerRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TerminateManagedComputerRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}managed_computer_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4037,7 +4037,7 @@ nonisolated extension BriarAPI_TerminateManagedComputerRequest: SwiftProtobuf.Me
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       default: break
       }
@@ -4045,8 +4045,8 @@ nonisolated extension BriarAPI_TerminateManagedComputerRequest: SwiftProtobuf.Me
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
@@ -4055,7 +4055,7 @@ nonisolated extension BriarAPI_TerminateManagedComputerRequest: SwiftProtobuf.Me
   }
 
   public static func ==(lhs: BriarAPI_TerminateManagedComputerRequest, rhs: BriarAPI_TerminateManagedComputerRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -4217,7 +4217,7 @@ nonisolated extension BriarAPI_ManagedComputerSocketTicket: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateManagedComputerRemoteSessionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0\u{3}request_id\0\u{3}reconnect_session_id\0\u{3}agent_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}managed_computer_id\0\u{3}request_id\0\u{3}reconnect_session_id\0\u{3}agent_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4225,7 +4225,7 @@ nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionRequest: SwiftP
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._reconnectSessionID) }()
@@ -4240,8 +4240,8 @@ nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionRequest: SwiftP
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
@@ -4259,7 +4259,7 @@ nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionRequest: SwiftP
   }
 
   public static func ==(lhs: BriarAPI_CreateManagedComputerRemoteSessionRequest, rhs: BriarAPI_CreateManagedComputerRemoteSessionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs._reconnectSessionID != rhs._reconnectSessionID {return false}
@@ -4355,7 +4355,7 @@ nonisolated extension BriarAPI_CreateManagedComputerRemoteSessionResponse: Swift
 
 nonisolated extension BriarAPI_EndManagedComputerRemoteSessionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EndManagedComputerRemoteSessionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0\u{3}remote_session_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}managed_computer_id\0\u{3}remote_session_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4363,7 +4363,7 @@ nonisolated extension BriarAPI_EndManagedComputerRemoteSessionRequest: SwiftProt
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.remoteSessionID) }()
       default: break
@@ -4372,8 +4372,8 @@ nonisolated extension BriarAPI_EndManagedComputerRemoteSessionRequest: SwiftProt
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
@@ -4385,7 +4385,7 @@ nonisolated extension BriarAPI_EndManagedComputerRemoteSessionRequest: SwiftProt
   }
 
   public static func ==(lhs: BriarAPI_EndManagedComputerRemoteSessionRequest, rhs: BriarAPI_EndManagedComputerRemoteSessionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.remoteSessionID != rhs.remoteSessionID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -4425,7 +4425,7 @@ nonisolated extension BriarAPI_EndManagedComputerRemoteSessionResponse: SwiftPro
 
 nonisolated extension BriarAPI_ManagedComputerSetupSession: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ManagedComputerSetupSession"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}managed_computer_id\0\u{3}organization_id\0\u{3}project_id\0\u{1}status\0\u{3}expires_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}managed_computer_id\0\u{3}workspace_id\0\u{3}project_id\0\u{1}status\0\u{3}expires_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4435,7 +4435,7 @@ nonisolated extension BriarAPI_ManagedComputerSetupSession: SwiftProtobuf.Messag
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 5: try { try decoder.decodeSingularEnumField(value: &self.status) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._expiresAt) }()
@@ -4455,8 +4455,8 @@ nonisolated extension BriarAPI_ManagedComputerSetupSession: SwiftProtobuf.Messag
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
     }
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 3)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 3)
     }
     if !self.projectID.isEmpty {
       try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 4)
@@ -4473,7 +4473,7 @@ nonisolated extension BriarAPI_ManagedComputerSetupSession: SwiftProtobuf.Messag
   public static func ==(lhs: BriarAPI_ManagedComputerSetupSession, rhs: BriarAPI_ManagedComputerSetupSession) -> Bool {
     if lhs.id != rhs.id {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.projectID != rhs.projectID {return false}
     if lhs.status != rhs.status {return false}
     if lhs._expiresAt != rhs._expiresAt {return false}
@@ -4484,7 +4484,7 @@ nonisolated extension BriarAPI_ManagedComputerSetupSession: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_CreateManagedComputerSetupSessionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateManagedComputerSetupSessionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0\u{3}project_id\0\u{3}request_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}managed_computer_id\0\u{3}project_id\0\u{3}request_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4492,7 +4492,7 @@ nonisolated extension BriarAPI_CreateManagedComputerSetupSessionRequest: SwiftPr
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
@@ -4502,8 +4502,8 @@ nonisolated extension BriarAPI_CreateManagedComputerSetupSessionRequest: SwiftPr
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
@@ -4518,7 +4518,7 @@ nonisolated extension BriarAPI_CreateManagedComputerSetupSessionRequest: SwiftPr
   }
 
   public static func ==(lhs: BriarAPI_CreateManagedComputerSetupSessionRequest, rhs: BriarAPI_CreateManagedComputerSetupSessionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.projectID != rhs.projectID {return false}
     if lhs.requestID != rhs.requestID {return false}
@@ -4583,7 +4583,7 @@ nonisolated extension BriarAPI_CreateManagedComputerSetupSessionResponse: SwiftP
 
 nonisolated extension BriarAPI_GetManagedComputerSetupStatusRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetManagedComputerSetupStatusRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}managed_computer_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}managed_computer_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4591,7 +4591,7 @@ nonisolated extension BriarAPI_GetManagedComputerSetupStatusRequest: SwiftProtob
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.managedComputerID) }()
       default: break
       }
@@ -4599,8 +4599,8 @@ nonisolated extension BriarAPI_GetManagedComputerSetupStatusRequest: SwiftProtob
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.managedComputerID.isEmpty {
       try visitor.visitSingularStringField(value: self.managedComputerID, fieldNumber: 2)
@@ -4609,7 +4609,7 @@ nonisolated extension BriarAPI_GetManagedComputerSetupStatusRequest: SwiftProtob
   }
 
   public static func ==(lhs: BriarAPI_GetManagedComputerSetupStatusRequest, rhs: BriarAPI_GetManagedComputerSetupStatusRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.managedComputerID != rhs.managedComputerID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

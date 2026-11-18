@@ -21,12 +21,13 @@ import { teamWorkersAtom } from "../../state/entities/workers";
 import { useIntegrationActions } from "../../state/integrations/actions";
 import { useWorkflowActions } from "../../state/workflow/actions";
 import { useWorkspaceActions } from "../../state/workspace/actions";
+import { useLocalWorkspaceActions } from "../../state/local-workspace/actions";
 import {
   activeTeamConnectionStateAtom,
   connectedTeamIdsAtom,
   healthAtom,
   teamReadinessAtom,
-} from "../../state/workspace/atoms";
+} from "../../state/local-workspace/atoms";
 import { velenAtom } from "../../state/integrations/atoms";
 
 /*
@@ -142,7 +143,7 @@ export function TeamSettingsWithDashboard(
   const health = useAtomValue(healthAtom);
   const readiness = useAtomValue(teamReadinessAtom(teamId ?? ""));
   const velen = useAtomValue(velenAtom);
-  const { refreshHealth } = useWorkspaceActions();
+  const { refreshHealth } = useLocalWorkspaceActions();
   const {
     analyzeWorkflowRequirements,
     regenerateWorkflow,

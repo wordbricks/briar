@@ -115,8 +115,8 @@ describe("MyIssues", () => {
             isSidebarOpen
             loadProjectDashboard={loadProjectDashboard}
             onOpenIssue={onOpenIssue}
-            organizationId="demo-organization"
-            organizationName="Briar"
+            workspaceId="demo-workspace"
+            workspaceName="Briar"
             projects={projects}
           />
           {extra}

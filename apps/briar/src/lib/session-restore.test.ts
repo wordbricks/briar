@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Code, ConnectError } from "@connectrpc/connect";
-import type { Organization, Project, SessionUser } from "../types";
+import type { Workspace, Project, SessionUser } from "../types";
 import { ApiError } from "./api";
 import {
   restoreStoredSession,
@@ -23,16 +23,16 @@ const projects: Project[] = [
     icon: null,
     iconName: null,
     iconColor: null,
-    organizationId: "organization-1",
-    organizationName: "Briar",
+    workspaceId: "workspace-1",
+    workspaceName: "Briar",
     role: "owner",
     createdAt: "2026-07-25T00:00:00.000Z",
   },
 ];
 
-const organizations: Organization[] = [
+const workspaces: Workspace[] = [
   {
-    id: "organization-1",
+    id: "workspace-1",
     name: "Briar",
     handle: "briar",
     logo: null,
@@ -44,7 +44,7 @@ const organizations: Organization[] = [
 function createDependencies() {
   return {
     clearToken: vi.fn(async () => undefined),
-    loadOrganizations: vi.fn(async () => organizations),
+    loadWorkspaces: vi.fn(async () => workspaces),
     loadTeams: vi.fn(async () => projects),
     loadSession: vi.fn(async () => user),
     readToken: vi.fn(async (): Promise<string | null> => "stored-token"),
@@ -74,7 +74,7 @@ describe("restoreStoredSession", () => {
     });
     expect(dependencies.clearToken).toHaveBeenCalledOnce();
     expect(dependencies.loadTeams).not.toHaveBeenCalled();
-    expect(dependencies.loadOrganizations).not.toHaveBeenCalled();
+    expect(dependencies.loadWorkspaces).not.toHaveBeenCalled();
   });
 
   it("clears the stored token when Connect wraps the 401 error", async () => {
@@ -94,7 +94,7 @@ describe("restoreStoredSession", () => {
     });
     expect(dependencies.clearToken).toHaveBeenCalledOnce();
     expect(dependencies.loadTeams).not.toHaveBeenCalled();
-    expect(dependencies.loadOrganizations).not.toHaveBeenCalled();
+    expect(dependencies.loadWorkspaces).not.toHaveBeenCalled();
   });
 
   it("keeps the token and retries after a transient session error", async () => {
@@ -112,7 +112,7 @@ describe("restoreStoredSession", () => {
   it("keeps the token and retries when account data fails to load", async () => {
     const dependencies = createDependencies();
     const error = new ApiError(503, "Service unavailable");
-    dependencies.loadOrganizations.mockRejectedValue(error);
+    dependencies.loadWorkspaces.mockRejectedValue(error);
 
     await expect(restoreStoredSession(dependencies)).resolves.toEqual({
       status: "retry",
@@ -129,7 +129,7 @@ describe("restoreStoredSession", () => {
       token: "stored-token",
       user,
       projects,
-      organizations,
+      workspaces,
     });
     expect(dependencies.clearToken).not.toHaveBeenCalled();
   });

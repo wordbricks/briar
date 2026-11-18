@@ -20,8 +20,8 @@ describe("worker queue claim validation", () => {
               claimToken: "claim-1",
               scope: {
                 scope: {
-                  case: "organization",
-                  value: { organizationId: "organization-1" },
+                  case: "workspace",
+                  value: { workspaceId: "workspace-1" },
                 },
               },
             },
@@ -32,7 +32,7 @@ describe("worker queue claim validation", () => {
     } as unknown as WorkerQueueClient;
 
     await expect(createWorkerQueueOperations(client).claimWork({
-      organizationId: "organization-1",
+      workspaceId: "workspace-1",
       projectId: "project-1",
       workerId: "worker-1",
       claimedBy: "device-1",
@@ -51,7 +51,7 @@ describe("worker queue claim validation", () => {
         claimToken: "claim-1",
         work: {
           case: "channelReply",
-          value: { organizationId: "organization-1" },
+          value: { workspaceId: "workspace-1" },
         },
       },
       outcome: {

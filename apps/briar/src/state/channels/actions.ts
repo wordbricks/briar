@@ -15,7 +15,7 @@ import type {
   ChannelVisibility,
 } from "../../lib/channels-contract";
 import { organizationChannelsAtom } from "../entities/channels";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
@@ -49,7 +49,7 @@ export interface ChannelNavigationBridge {
   readonly navigateToChannel?: (
     channelId: string,
     page: ChannelNavigationPage,
-    organizationId?: string | null,
+    workspaceId?: string | null,
     projectId?: string | null,
   ) => void;
   readonly navigateToPage?: (page: ActivePage) => void;
@@ -70,19 +70,19 @@ const channelNavigation = (registry: AtomRegistry): ChannelNavigationBridge =>
 
 export interface ChannelActions {
   /** Marks a channel read locally and confirms it with the server. */
-  readonly markOrganizationChannelRead: (channelId: string) => void;
+  readonly markWorkspaceChannelRead: (channelId: string) => void;
   /** Creates a channel, opens it, and arms its invite dialog. */
-  readonly createOrganizationChannel: (
+  readonly createWorkspaceChannel: (
     name: string,
     visibility: ChannelVisibility,
     defaultProjectId?: string | null,
   ) => Promise<void>;
   /** Navigates to a channel, on whichever page its kind belongs to. */
-  readonly openOrganizationChannel: (channelId: string) => void;
+  readonly openWorkspaceChannel: (channelId: string) => void;
   /** Opens a channel with its settings dialog armed. */
-  readonly openOrganizationChannelSettings: (channelId: string) => void;
+  readonly openWorkspaceChannelSettings: (channelId: string) => void;
   /** Deletes a channel and leaves it if it was the one on screen. */
-  readonly deleteOrganizationChannel: (channelId: string) => Promise<void>;
+  readonly deleteWorkspaceChannel: (channelId: string) => Promise<void>;
   /** Records the channel the app considers open. Selecting one ends a compose. */
   readonly selectChannel: (channelId: string | null) => void;
   /**
@@ -95,8 +95,8 @@ export interface ChannelActions {
     channelId: string | null,
     threadRootMessageId?: string | null,
   ) => void;
-  /** Replaces the active organization's catalog, `useState` setter style. */
-  readonly replaceOrganizationChannels: (
+  /** Replaces the active workspace's catalog, `useState` setter style. */
+  readonly replaceWorkspaceChannels: (
     update:
       | readonly ChannelSummary[]
       | ((current: ChannelSummary[]) => readonly ChannelSummary[]),
@@ -147,33 +147,33 @@ export interface ChannelActions {
 }
 
 export function createChannelActions(registry: AtomRegistry): ChannelActions {
-  const catalog = (organizationId: string) =>
-    registry.get(organizationChannelsAtom(organizationId));
-  const channelIn = (organizationId: string, channelId: string) =>
-    catalog(organizationId).find((channel) => channel.id === channelId) ?? null;
+  const catalog = (workspaceId: string) =>
+    registry.get(organizationChannelsAtom(workspaceId));
+  const channelIn = (workspaceId: string, channelId: string) =>
+    catalog(workspaceId).find((channel) => channel.id === channelId) ?? null;
 
-  const replaceOrganizationChannels: ChannelActions["replaceOrganizationChannels"] =
+  const replaceWorkspaceChannels: ChannelActions["replaceWorkspaceChannels"] =
     (update) => {
-      const organizationId = registry.get(activeOrganizationIdAtom);
-      if (!organizationId) return;
-      const current = catalog(organizationId);
+      const workspaceId = registry.get(activeWorkspaceIdAtom);
+      if (!workspaceId) return;
+      const current = catalog(workspaceId);
       const next = typeof update === "function" ? update(current) : update;
       if (next === current) return;
       applySyncEvent(registry, {
         kind: "channel-catalog-snapshot",
-        organizationId,
+        workspaceId,
         channels: next,
       });
     };
 
-  /** The organization and token every server write needs, or a clear failure. */
+  /** The workspace and token every server write needs, or a clear failure. */
   const requireSession = () => {
-    const organizationId = registry.get(activeOrganizationIdAtom);
+    const workspaceId = registry.get(activeWorkspaceIdAtom);
     const token = registry.get(tokenAtom);
-    if (!organizationId || !token) {
-      throw new Error("Organization is not available");
+    if (!workspaceId || !token) {
+      throw new Error("Workspace is not available");
     }
-    return { organizationId, token };
+    return { workspaceId, token };
   };
 
   /*
@@ -185,9 +185,9 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
     channelId: string,
     update: { pinned?: boolean; hidden?: boolean; section?: string | null },
   ) => {
-    const { organizationId, token } = requireSession();
+    const { workspaceId, token } = requireSession();
     const result = await resolveChannelApi(registry)
-      .updateChannelSidebarPreference(token, organizationId, channelId, update);
+      .updateChannelSidebarPreference(token, workspaceId, channelId, update);
     applySyncEvent(registry, {
       kind: "channel-changed",
       channel: result.channel,
@@ -200,17 +200,17 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
    * the next conversation by itself.
    */
   const deleteChannel = async (channelId: string, fallback: ActivePage) => {
-    const { organizationId, token } = requireSession();
+    const { workspaceId, token } = requireSession();
     await resolveChannelApi(registry).deleteChannel(
       token,
-      organizationId,
+      workspaceId,
       channelId,
     );
     const wasOpen = registry.get(activeChannelIdAtom) === channelId;
     Atom.batch(() => {
       applySyncEvent(registry, {
         kind: "channel-removed",
-        organizationId,
+        workspaceId,
         channelId,
       });
       registry.update(requestedChannelMessageAtom, (current) =>
@@ -224,12 +224,12 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
     if (wasOpen) channelNavigation(registry).navigateToPage?.(fallback);
   };
 
-  const openOrganizationChannel: ChannelActions["openOrganizationChannel"] = (
+  const openWorkspaceChannel: ChannelActions["openWorkspaceChannel"] = (
     channelId,
   ) => {
-    const organizationId = registry.get(activeOrganizationIdAtom);
-    if (!organizationId) return;
-    const channel = channelIn(organizationId, channelId);
+    const workspaceId = registry.get(activeWorkspaceIdAtom);
+    if (!workspaceId) return;
+    const channel = channelIn(workspaceId, channelId);
     // A project window only ever shows the channels pinned to its own team.
     const lockedTeamId = registry.get(lockedTeamIdAtom);
     if (lockedTeamId && channel?.defaultProjectId !== lockedTeamId) return;
@@ -240,11 +240,11 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
   };
 
   return {
-    markOrganizationChannelRead(channelId) {
+    markWorkspaceChannelRead(channelId) {
       const token = registry.get(tokenAtom);
-      const organizationId = registry.get(activeOrganizationIdAtom);
-      if (!token || !organizationId) return;
-      const channel = channelIn(organizationId, channelId);
+      const workspaceId = registry.get(activeWorkspaceIdAtom);
+      if (!token || !workspaceId) return;
+      const channel = channelIn(workspaceId, channelId);
       if (!channel?.hasUnread) return;
       const lastReadAt = laterTimestamp(
         channel.lastMessageAt,
@@ -255,25 +255,25 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
         channel: markChannelSummaryRead(channel, lastReadAt),
       });
       void resolveChannelApi(registry)
-        .markChannelRead(token, organizationId, channelId, { lastReadAt })
+        .markChannelRead(token, workspaceId, channelId, { lastReadAt })
         .catch(() => {
           // The next catalog snapshot restores unread if the write failed.
         });
     },
 
-    async createOrganizationChannel(name, visibility, defaultProjectId) {
-      const organizationId = registry.get(activeOrganizationIdAtom);
+    async createWorkspaceChannel(name, visibility, defaultProjectId) {
+      const workspaceId = registry.get(activeWorkspaceIdAtom);
       const token = registry.get(tokenAtom);
-      if (!organizationId || !token) {
-        throw new Error("Organization is not available");
+      if (!workspaceId || !token) {
+        throw new Error("Workspace is not available");
       }
       const result = await resolveChannelApi(registry).createChannel(
         token,
-        organizationId,
+        workspaceId,
         { name, visibility, defaultProjectId },
       );
       Atom.batch(() => {
-        replaceOrganizationChannels((current) =>
+        replaceWorkspaceChannels((current) =>
           [
             ...current.filter((channel) => channel.id !== result.channel.id),
             result.channel,
@@ -284,18 +284,18 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
       channelNavigation(registry).navigateToChannel?.(
         result.channel.id,
         "channels",
-        organizationId,
+        workspaceId,
       );
     },
 
-    openOrganizationChannel,
+    openWorkspaceChannel,
 
-    openOrganizationChannelSettings(channelId) {
+    openWorkspaceChannelSettings(channelId) {
       registry.set(requestedChannelSettingsIdAtom, channelId);
-      openOrganizationChannel(channelId);
+      openWorkspaceChannel(channelId);
     },
 
-    deleteOrganizationChannel: (channelId) => deleteChannel(channelId, "lobby"),
+    deleteWorkspaceChannel: (channelId) => deleteChannel(channelId, "lobby"),
 
     deleteDirectMessage: (channelId) => deleteChannel(channelId, "dms"),
 
@@ -309,10 +309,10 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
       writeSidebarPreference(channelId, { hidden }),
 
     async markDirectMessageUnread(channelId) {
-      const { organizationId, token } = requireSession();
+      const { workspaceId, token } = requireSession();
       const result = await resolveChannelApi(registry).markChannelUnread(
         token,
-        organizationId,
+        workspaceId,
         channelId,
       );
       applySyncEvent(registry, {
@@ -322,24 +322,24 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
     },
 
     async createDirectMessageSection(name) {
-      const { organizationId, token } = requireSession();
+      const { workspaceId, token } = requireSession();
       const result = await resolveChannelApi(registry)
-        .createChannelSidebarSection(token, organizationId, name);
+        .createChannelSidebarSection(token, workspaceId, name);
       registry.set(channelSidebarSectionsAtom, [...result.sections]);
       return result.section;
     },
 
     async renameDirectMessageSection(sectionId, name) {
-      const { organizationId, token } = requireSession();
+      const { workspaceId, token } = requireSession();
       const result = await resolveChannelApi(registry)
-        .renameChannelSidebarSection(token, organizationId, sectionId, name);
+        .renameChannelSidebarSection(token, workspaceId, sectionId, name);
       registry.set(channelSidebarSectionsAtom, [...result.sections]);
     },
 
     async deleteDirectMessageSection(sectionId) {
-      const { organizationId, token } = requireSession();
+      const { workspaceId, token } = requireSession();
       const result = await resolveChannelApi(registry)
-        .deleteChannelSidebarSection(token, organizationId, sectionId);
+        .deleteChannelSidebarSection(token, workspaceId, sectionId);
       Atom.batch(() => {
         registry.set(channelSidebarSectionsAtom, [...result.sections]);
         /*
@@ -347,7 +347,7 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
           Doing the same locally keeps the list right without a refetch; the
           next delta confirms it.
         */
-        for (const channel of catalog(organizationId)) {
+        for (const channel of catalog(workspaceId)) {
           if (channel.sidebarSectionId !== sectionId) continue;
           applySyncEvent(registry, {
             kind: "channel-changed",
@@ -383,7 +383,7 @@ export function createChannelActions(registry: AtomRegistry): ChannelActions {
       });
     },
 
-    replaceOrganizationChannels,
+    replaceWorkspaceChannels,
 
     clearRequestedChannelMessage() {
       registry.set(requestedChannelMessageAtom, null);

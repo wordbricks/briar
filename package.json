@@ -1,6 +1,6 @@
 {
   "name": "briar",
-  "version": "1.2.222",
+  "version": "1.2.237",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,7 @@
       "@dotenvx/dotenvx": "2.19.2",
       "@effect/eslint-plugin": "0.3.2",
       "@effect/tsgo": "0.36.5",
-      "@modelcontextprotocol/sdk": "1.29.0",
+      "@modelcontextprotocol/sdk": "1.32.0",
       "@oxlint/plugins": "1.80.0",
       "@types/bun": "1.4.0",
       "@types/node": "24.10.1",
@@ -31,10 +31,10 @@
       "react-dom": "19.2.8",
       "tailwindcss": "4.3.3",
       "typescript": "7.0.2",
-      "vite": "8.0.16",
-      "vitest": "4.1.0",
+      "vite": "8.1.6",
+      "vitest": "4.1.11",
       "wrangler": "4.127.1",
-      "zod": "4.3.6"
+      "zod": "4.6.6"
     }
   },
   "bin": {
@@ -55,7 +55,7 @@
     "lint:repo:type-aware": "oxlint --type-aware scripts --config .oxlintrc.jsonc",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test:all //#test:repo-tools",
-    "test:repo-tools": "vitest run --exclude '**/.claude/**' --maxWorkers=1 --no-file-parallelism scripts/agent-provider-sql-constraints.test.ts scripts/apply-remote-d1-migrations.test.ts scripts/production-git-target.test.ts scripts/remote-operation-lease.test.ts scripts/release-bump-fast-path.test.ts scripts/ci-local.test.ts scripts/ci-worktree-lock.test.ts scripts/ios-release-config.test.ts scripts/macos-dmg-release.test.ts scripts/verify-encrypted-env.test.ts scripts/verify-signoff-ready.test.ts tools/oxlint/anti-slop/rules/no-raw-tauri-ipc.test.ts",
+    "test:repo-tools": "vitest run --exclude '**/.claude/**' --maxWorkers=1 --no-file-parallelism scripts/agent-provider-sql-constraints.test.ts scripts/apply-remote-d1-migrations.test.ts scripts/production-git-target.test.ts scripts/remote-operation-lease.test.ts scripts/release-bump-fast-path.test.ts scripts/ci-local.test.ts scripts/ci-worktree-lock.test.ts scripts/ios-release-config.test.ts scripts/macos-dmg-release.test.ts scripts/verify-encrypted-env.test.ts scripts/verify-signoff-ready.test.ts scripts/worker-module-rules.test.ts scripts/worker-deploy-order.test.ts tools/oxlint/anti-slop/rules/no-raw-tauri-ipc.test.ts",
     "prepare": "effect-tsgo patch --typescript --no-oxlint",
     "ci:local": "bun run scripts/ci-local.ts",
     "ci:signoff": "bun run scripts/ci-local.ts --signoff",
@@ -127,11 +127,14 @@
   "overrides": {
     "@effect/platform-node-shared": "4.0.0-rc.112",
     "@hono/node-server": "2.0.12",
-    "fast-uri": "3.1.6",
+    "fast-uri": "3.1.7",
     "hono": "4.12.34",
     "ip-address": "10.4.0",
+    "js-yaml": "4.3.2",
     "nanoid": "3.3.18",
     "postcss": "8.5.23",
-    "undici": "7.29.0"
+    "sharp": "0.35.5",
+    "undici": "7.30.1",
+    "zod": "4.6.6"
   }
 }

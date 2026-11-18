@@ -4,7 +4,7 @@ import {
   loadDashboard,
   loadDashboardDelta,
   loadDashboardRuns,
-  loadOrganizations,
+  loadWorkspaces,
   loadSession,
   loadTeamProjects,
   loadTeams,
@@ -12,7 +12,7 @@ import {
 import { loadConnectedTeamIds } from "../../lib/team-connection";
 import { useRegistry, type AtomRegistry } from "../registry";
 import { teamSyncApiAtom } from "../sync/loader";
-import { workspaceApiAtom } from "../workspace/api";
+import { workspaceApiAtom } from "../local-workspace/api";
 
 /*
   The reads the session performs on its own: restoring a stored session, signing
@@ -30,7 +30,7 @@ export interface SessionDataSources {
   readonly loadDashboard: typeof loadDashboard;
   readonly loadDashboardDelta: typeof loadDashboardDelta;
   readonly loadDashboardRuns?: typeof loadDashboardRuns;
-  readonly loadOrganizations: typeof loadOrganizations;
+  readonly loadWorkspaces: typeof loadWorkspaces;
   readonly loadSession: typeof loadSession;
   readonly loadTeamProjects: typeof loadTeamProjects;
   readonly loadTeams: typeof loadTeams;
@@ -41,7 +41,7 @@ export const liveSessionDataSources: SessionDataSources = {
   loadDashboard,
   loadDashboardDelta,
   loadDashboardRuns,
-  loadOrganizations,
+  loadWorkspaces,
   loadSession,
   loadTeamProjects,
   loadTeams,

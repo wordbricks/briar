@@ -2,7 +2,7 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 
 import type {
   ExecutionWorker,
-  OrganizationMember,
+  WorkspaceMember,
   ProjectAgent,
 } from "../../types";
 import { teamAgentSessionsAtom } from "../agent-sessions/atoms";
@@ -151,7 +151,7 @@ export const runAssignedWorkerAtom = Atom.family((key: string) => {
 /** The member a run is assigned to, resolved against the team's member list. */
 export const runAssigneeAtom = Atom.family((key: string) => {
   const [teamId, runId] = splitBoardKey(key);
-  return Atom.make((get): OrganizationMember | null => {
+  return Atom.make((get): WorkspaceMember | null => {
     const run = get(runAtom(runId));
     if (!run?.assigneeUserId) return null;
     return (

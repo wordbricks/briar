@@ -8,6 +8,7 @@ import {
   DEFAULT_MAX_ERROR_DELAY_MS,
   DEFAULT_MAX_HEARTBEAT_ERROR_DELAY_MS,
   DEFAULT_MAX_IDLE_DELAY_MS,
+  DM_REPLY_STEER_POLL_MS,
   createWorkerDeviceIdentity,
   createWorkerLoopHeartbeat,
   defaultWorkerLabel,
@@ -189,9 +190,8 @@ describe("briar worker loop", () => {
   });
 
   /*
-    The server shortens `retryAfterMs` while a DM reply is inside its settle
-    window. Stretching that hint up to the poll interval would strand work the
-    server already knows is about to be claimable.
+    A server delay shorter than the poll interval says work is about to become
+    claimable. Stretching that hint up to the poll interval would strand it.
   */
   it("re-claims on a short server retry hint instead of the idle interval", async () => {
     let polls = 0;
@@ -199,7 +199,7 @@ describe("briar worker loop", () => {
       claim: async () => {
         polls += 1;
         return polls > 2
-          ? { work: issue("issue-settled") }
+          ? { work: issue("issue-soon") }
           : { work: null, retryAfterMs: 2_000 };
       },
     });
@@ -327,6 +327,177 @@ describe("briar worker loop", () => {
     expect(result).toMatchObject({ processed: 1, failures: 0 });
   });
 
+  /*
+    The wake that says "this job just absorbed another message" is sent while
+    the claim RPC is still in flight. Reading the counter inside the execution
+    swallowed it, and the renewal then waited a whole interval before asking
+    again — five minutes for a plain direct message.
+  */
+  it.each([true, false])(
+    "renews before waiting when a wake landed during the claim: %s",
+    async (wakeDuringClaim) => {
+      let notify: ((reason: WorkerWakeReason) => void) | undefined;
+      const events: string[] = [];
+      const test = harness([], {
+        wake: { subscribe: (listener) => { notify = listener; return () => {}; } },
+        claim: async () => {
+          if (wakeDuringClaim) notify?.("channel_reply_enqueued");
+          return issue("wake-during-claim");
+        },
+        sleep: async (milliseconds, signal) => {
+          if (!signal) return;
+          events.push(`wait:${milliseconds}`);
+          if (signal.aborted) return;
+          await new Promise<void>((resolve) =>
+            signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+        },
+        renewLease: async () => { events.push("renew"); },
+        runIssue: async () => {
+          // The renewal loop is scheduled synchronously with the execution, so
+          // one macrotask is enough for it to have asked or waited.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        },
+      });
+      await runWorkerLoop(test.dependencies, {
+        once: true,
+        leaseRenewIntervalMs: 600_000,
+      });
+      expect(events[0]).toBe(wakeDuringClaim ? "renew" : "wait:600000");
+    },
+  );
+
+  it.each([
+    ["a direct message reply", { workType: "channelReply" as const, workId: "dm-work",
+      routing: null, snapshot: { channel: { kind: "dm" } } }, DM_REPLY_STEER_POLL_MS],
+    ["an issue", {}, 5 * 60_000],
+  ])("renews %s on its own interval", async (_label, extra, expected) => {
+    const renewalWaits: number[] = [];
+    const test = harness([{ ...issue("renewal-interval"), ...extra }], {
+      sleep: async (milliseconds, signal) => {
+        if (!signal) return;
+        renewalWaits.push(milliseconds);
+        if (signal.aborted) return;
+        await new Promise<void>((resolve) =>
+          signal.addEventListener("abort", () => resolve(), { once: true }),
+        );
+      },
+      runIssue: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      },
+    });
+    await runWorkerLoop(test.dependencies, {
+      once: true,
+      leaseRenewIntervalMs: 5 * 60_000,
+    });
+    // Jitter is pinned by the harness random, so this is the interval itself.
+    expect(renewalWaits[0]).toBe(expected);
+  });
+
+  /*
+    With the short interval the steer now reaches the renewal while the reply is
+    still being set up. Aborting there would trade the wasted provider turn for
+    a wasted setup; the reply folds the steer into this same claim right before
+    its first turn instead.
+  */
+  it("defers a pre-turn lease conflict on a direct message to the steer fold", async () => {
+    let abortedDuringRun = false;
+    const dmReply = {
+      ...issue("dm-steered"),
+      workType: "channelReply" as const,
+      workId: "dm-work",
+      routing: null,
+      snapshot: { channel: { kind: "dm" } },
+    };
+    const test = harness(
+      [dmReply],
+      {
+        replyTurnStarted: () => false,
+        renewLease: async () => { throw new Error("Reply claim is no longer active"); },
+        runIssue: async (_work, signal) => {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          abortedDuringRun = signal.aborted;
+        },
+      },
+      { renewalTicks: 2 },
+    );
+    const result = await runWorkerLoop(test.dependencies, {
+      once: true,
+      leaseRenewIntervalMs: 5 * 60_000,
+    });
+    expect(abortedDuringRun).toBe(false);
+    expect(result).toMatchObject({ processed: 1, failures: 0 });
+    expect(test.logs.some((line) => line.includes("deferred to the steer fold")))
+      .toBe(true);
+    expect(test.logs.some((line) => line.includes("lease renewal failed")))
+      .toBe(false);
+  });
+
+  it("still aborts a channel reply that is not a direct message before its turn", async () => {
+    let aborted = false;
+    const channelReply = {
+      ...issue("channel-lost"),
+      workType: "channelReply" as const,
+      workId: "channel-work",
+      routing: null,
+      snapshot: { channel: { kind: "channel" } },
+    };
+    const test = harness(
+      [channelReply],
+      {
+        replyTurnStarted: () => false,
+        renewLease: async () => { throw new Error("Reply claim is no longer active"); },
+        runIssue: async (_work, signal) => {
+          await new Promise<void>((resolve) => {
+            if (signal.aborted) { aborted = true; resolve(); return; }
+            signal.addEventListener("abort", () => { aborted = true; resolve(); }, { once: true });
+          });
+        },
+      },
+      { renewalTicks: 1 },
+    );
+    const result = await runWorkerLoop(test.dependencies, {
+      once: true,
+      leaseRenewIntervalMs: 5 * 60_000,
+    });
+    expect(aborted).toBe(true);
+    expect(result.failures).toBe(1);
+    expect(test.logs.some((line) => line.includes("deferred to the steer fold"))).toBe(false);
+  });
+
+  it("still aborts a direct message once its provider turn has started", async () => {
+    let aborted = false;
+    const dmReply = {
+      ...issue("dm-running"),
+      workType: "channelReply" as const,
+      workId: "dm-work",
+      routing: null,
+      snapshot: { channel: { kind: "dm" } },
+    };
+    const test = harness(
+      [dmReply],
+      {
+        replyTurnStarted: () => true,
+        renewLease: async () => { throw new Error("Reply claim is no longer active"); },
+        runIssue: async (_work, signal) => {
+          await new Promise<void>((resolve) => {
+            if (signal.aborted) { aborted = true; resolve(); return; }
+            signal.addEventListener("abort", () => { aborted = true; resolve(); }, { once: true });
+          });
+        },
+      },
+      { renewalTicks: 1 },
+    );
+    const result = await runWorkerLoop(test.dependencies, {
+      once: true,
+      leaseRenewIntervalMs: 5 * 60_000,
+    });
+    expect(aborted).toBe(true);
+    expect(result.failures).toBe(1);
+    expect(test.logs.some((line) => line.includes("lease renewal failed"))).toBe(true);
+  });
+
   it("polls exactly as before when no wake source is attached", async () => {
     let polls = 0;
     const test = harness([], {
@@ -343,6 +514,192 @@ describe("briar worker loop", () => {
 
     expect(result.processed).toBe(1);
     expect(test.sleeps).toEqual([15_000, 30_000]);
+  });
+
+  /*
+    Reconstructing a two-minute DM reply meant guessing where the time before
+    the claim went. These hold the account the loop now writes: the idle wait,
+    what ended it, the claim RPC and the heartbeat that ran right before it.
+  */
+  describe("claim latency", () => {
+    /** One measured claim latency line, decoded. */
+    const claimLatency = (logs: readonly string[]) =>
+      logs.flatMap((line) =>
+        line.startsWith("claim latency: ")
+          ? [JSON.parse(line.slice("claim latency: ".length))]
+          : []
+      );
+
+    /** A loop whose every blocking step costs the fake clock something. */
+    const timedHarness = (input: {
+      claim: (attempt: number) => ClaimedIssue | null;
+      claimRpcMs: number;
+      heartbeatMs: number;
+      wake?: WorkerLoopDependencies["wake"];
+      sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
+      clock: { value: number };
+    }) => {
+      let attempts = 0;
+      return harness([], {
+        now: () => input.clock.value,
+        claim: async () => {
+          attempts += 1;
+          input.clock.value += input.claimRpcMs;
+          return input.claim(attempts);
+        },
+        heartbeat: async () => {
+          input.clock.value += input.heartbeatMs;
+        },
+        sleep: input.sleep ?? (async (milliseconds) => {
+          input.clock.value += milliseconds;
+        }),
+        ...(input.wake ? { wake: input.wake } : {}),
+      });
+    };
+
+    it("reports the poll it waited on and the claim RPC it paid for", async () => {
+      const clock = { value: 0 };
+      const test = timedHarness({
+        clock,
+        claimRpcMs: 40,
+        heartbeatMs: 12,
+        claim: (attempt) => attempt > 1 ? issue("issue-polled") : null,
+      });
+      await runWorkerLoop(test.dependencies, {
+        maxIssues: 1,
+        idleDelayMs: 15_000,
+        heartbeatIntervalMs: 10 * 60_000,
+        leaseRenewIntervalMs: 10 * 60_000,
+      });
+
+      expect(claimLatency(test.logs)).toEqual([
+        {
+          workId: null,
+          rpcMs: 40,
+          waitedMs: 15_000,
+          wake: "poll",
+          heartbeatMs: 0,
+        },
+      ]);
+    });
+
+    /*
+      #1837 moved the heartbeat off the claim's critical path. `heartbeatMs` is
+      what proves it stayed there: a beat that blocks is visible here rather
+      than hidden inside the gap between two lines.
+    */
+    it("names the heartbeat the wait ended for, and what it blocked", async () => {
+      const clock = { value: 0 };
+      const test = timedHarness({
+        clock,
+        claimRpcMs: 40,
+        heartbeatMs: 12,
+        claim: (attempt) => attempt > 1 ? issue("issue-beaten") : null,
+      });
+      await runWorkerLoop(test.dependencies, {
+        maxIssues: 1,
+        idleDelayMs: 15_000,
+        heartbeatIntervalMs: 10_000,
+        leaseRenewIntervalMs: 10 * 60_000,
+      });
+
+      // The first beat costs 12ms and puts the next one 10s out, so the idle
+      // wait is cut to it: 9_960ms rather than the 15s poll.
+      expect(claimLatency(test.logs)).toEqual([
+        {
+          workId: null,
+          rpcMs: 40,
+          waitedMs: 9_960,
+          wake: "heartbeat",
+          heartbeatMs: 12,
+        },
+      ]);
+    });
+
+    it("names the server wake that cut the wait short", async () => {
+      const clock = { value: 0 };
+      const reply: ClaimedIssue = {
+        ...issue("briar-channel:reply"),
+        workType: "channelReply",
+        workId: "reply-work-1",
+      };
+      let notify: ((reason: WorkerWakeReason) => void) | null = null;
+      const idleWaits: number[] = [];
+      const test = timedHarness({
+        clock,
+        claimRpcMs: 40,
+        heartbeatMs: 12,
+        claim: (attempt) => attempt > 1 ? reply : null,
+        wake: {
+          subscribe: (listener) => {
+            notify = listener;
+            return () => {};
+          },
+        },
+        sleep: async (milliseconds, signal) => {
+          // Only the lease renewal waits this long; it blocks until the loop
+          // aborts it, exactly as the real timer does.
+          if (milliseconds >= 100_000) {
+            if (signal?.aborted) return;
+            await new Promise<void>((resolve) => {
+              signal?.addEventListener("abort", () => resolve(), { once: true });
+            });
+            return;
+          }
+          idleWaits.push(milliseconds);
+          // The person's message lands three seconds into the poll wait.
+          clock.value += 3_000;
+          notify?.("channel_reply_enqueued");
+        },
+      });
+      await runWorkerLoop(test.dependencies, {
+        maxIssues: 1,
+        idleDelayMs: 15_000,
+        heartbeatIntervalMs: 10 * 60_000,
+        leaseRenewIntervalMs: 10 * 60_000,
+      });
+
+      expect(idleWaits).toEqual([15_000]);
+      expect(claimLatency(test.logs)).toEqual([
+        {
+          workId: "reply-work-1",
+          rpcMs: 40,
+          waitedMs: 3_000,
+          wake: "channel_reply_enqueued",
+          heartbeatMs: 0,
+        },
+      ]);
+    });
+
+    it("says a claim that followed another one waited on nothing", async () => {
+      const clock = { value: 0 };
+      const first = { ...issue("first"), workType: "channelReply" as const, workId: "a" };
+      const second = { ...issue("second"), workType: "channelReply" as const, workId: "b" };
+      const test = timedHarness({
+        clock,
+        claimRpcMs: 40,
+        heartbeatMs: 12,
+        claim: (attempt) => attempt === 1 ? first : attempt === 2 ? second : null,
+      });
+      await runWorkerLoop(test.dependencies, {
+        maxIssues: 2,
+        maxConcurrentSessions: 2,
+        idleDelayMs: 15_000,
+        heartbeatIntervalMs: 10 * 60_000,
+        leaseRenewIntervalMs: 10 * 60_000,
+      });
+
+      const measured = claimLatency(test.logs);
+      expect(measured).toHaveLength(2);
+      expect(measured[0]).toMatchObject({ workId: "a", waitedMs: 0, wake: "poll" });
+      // The heartbeat after the first claim is the one this claim waited on.
+      expect(measured[1]).toMatchObject({
+        workId: "b",
+        waitedMs: 0,
+        wake: "poll",
+        heartbeatMs: 12,
+      });
+    });
   });
 
   it("holds exactly one issue in flight and renews its lease while it runs", async () => {
@@ -393,14 +750,13 @@ describe("briar worker loop", () => {
     expect(observedMaximum).toBe(2);
   });
 
-  it("runs issue and channel replies without consuming regular session slots", async () => {
+  it("runs three independent DM sessions and an issue reply while regular slots are full", async () => {
     const regularWork = [issue("issue-1")];
     const replyWork: ClaimedIssue[] = [
-      {
-        ...issue("channel-reply"),
-        workType: "channelReply",
-        workId: "channel-reply",
-      },
+      ...["structure", "logs", "docs"].map((id) => ({
+        ...issue(id), workType: "channelReply" as const, runId: "same-dm",
+        workId: id, session: { id: `session-${id}` }, routing: { action: "new" },
+      })),
       {
         ...issue("issue-reply"),
         workType: "issueReply",
@@ -416,7 +772,7 @@ describe("briar worker loop", () => {
     let observedMaximum = 0;
 
     const maybeRelease = () => {
-      if (allReleased || replyReleases.length < 2 || !releaseRegular) return;
+      if (allReleased || replyReleases.length < 4 || !releaseRegular) return;
       allReleased = true;
       releaseRegular();
       for (const release of replyReleases.splice(0)) release();
@@ -449,13 +805,13 @@ describe("briar worker loop", () => {
     });
 
     const result = await runWorkerLoop(test.dependencies, {
-      maxIssues: 3,
+      maxIssues: 5,
       maxConcurrentSessions: 1,
     });
 
-    expect(result).toMatchObject({ processed: 3, failures: 0 });
-    expect(observedMaximum).toBe(3);
-    expect(claimModes.slice(0, 3)).toEqual([false, true, true]);
+    expect(result).toMatchObject({ processed: 5, failures: 0 });
+    expect(observedMaximum).toBe(5);
+    expect(claimModes.slice(0, 5)).toEqual([false, true, true, true, true]);
     expect(readinessStates).toContain("busy");
     expect(readinessStates.at(-1)).toBe("ready");
   });
@@ -728,28 +1084,6 @@ describe("briar worker loop", () => {
       maxConcurrentSessions: 2,
       updateDirective,
     });
-  });
-
-  it("finishes the budgeted memory-learning transaction without replaying it during drain", async () => {
-    let heartbeatCount = 0;
-    let completed = false;
-    const test = harness([{ ...issue("memory-update"), workType: "dmMemory" }], {
-      heartbeat: async () => ++heartbeatCount >= 2 ? {
-        acceptingWork: false, updateDirective: { id: "update-request", targetVersion: "2.0.0",
-          status: "requested", requestedAt: new Date(0).toISOString(), handoffState: "draining" },
-      } : { acceptingWork: true },
-      runIssue: async (_claimed, signal) => {
-        await Promise.resolve();
-        await Promise.resolve();
-        expect(signal.aborted).toBe(false);
-        completed = true;
-      },
-      handoff: async () => { throw new Error("Memory transaction must not be replayed"); },
-    });
-    const result = await runWorkerLoop(test.dependencies, { once: true });
-    expect(completed).toBe(true);
-    expect(result.processed).toBe(1);
-    expect(result.failures).toBe(0);
   });
 
   it("does not wait out the renewal interval after an issue finishes", async () => {

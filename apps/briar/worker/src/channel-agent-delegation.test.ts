@@ -22,7 +22,7 @@ import {
   type HuntEventInput,
 } from "./db";
 import { HttpError } from "./http-response";
-import { createOrganizationAgent } from "./organization-agents";
+import { createWorkspaceAgent } from "./workspace-agents";
 import { rethrowReplyCompletionHttpError } from "./reply-completion-http-error";
 import { workerRuntimeProtoJsonFixture } from "./test-helpers/worker-runtime";
 import {
@@ -33,7 +33,7 @@ import type {
 } from "./worker-reply-completion-mappers";
 import { requireWorkerProjectBinding } from "./worker-route-auth";
 
-const organizationId = "10000000-0000-4000-8000-000000000001";
+const workspaceId = "10000000-0000-4000-8000-000000000001";
 const projectId = "20000000-0000-4000-8000-000000000001";
 const otherProjectId = "20000000-0000-4000-8000-000000000002";
 const deviceId = "30000000-0000-4000-8000-000000000001";
@@ -73,13 +73,13 @@ const backlogEvent = (sourceKey: string): HuntEventInput => ({
   context: null,
 });
 
-describe("Organization Agent channel delegation", () => {
+describe("Workspace Agent channel delegation", () => {
   const db = cloudflareEnv.DB;
   const archives = cloudflareEnv.ARCHIVES;
   let projectAgent: Awaited<ReturnType<typeof createTeamAgent>>;
   let otherProjectAgent: Awaited<ReturnType<typeof createTeamAgent>>;
   let organizationAgent: NonNullable<
-    Awaited<ReturnType<typeof createOrganizationAgent>>
+    Awaited<ReturnType<typeof createWorkspaceAgent>>
   >;
 
   beforeAll(async () => {
@@ -92,13 +92,13 @@ describe("Organization Agent channel delegation", () => {
       db.prepare(
         `insert into briar_organizations (id, name, handle, created_at, updated_at)
          values (?, 'Delegation Org', 'delegation-org', ?, ?)`,
-      ).bind(organizationId, now, now),
+      ).bind(workspaceId, now, now),
     ]);
     await db.prepare(
       `insert into briar_organization_members (
          organization_id, user_id, role, created_at, updated_at
        ) values (?, ?, 'owner', ?, ?)`,
-    ).bind(organizationId, ownerId, now, now).run();
+    ).bind(workspaceId, ownerId, now, now).run();
     for (const [id, name] of [
       [projectId, "Briar"],
       [otherProjectId, "Other"],
@@ -111,7 +111,7 @@ describe("Organization Agent channel delegation", () => {
       ).bind(
         id,
         ownerId,
-        organizationId,
+        workspaceId,
         name,
         id === projectId ? "a".repeat(64) : "c".repeat(64),
         now,
@@ -124,7 +124,7 @@ describe("Organization Agent channel delegation", () => {
            id, organization_id, owner_user_id, label, device_identity_hash,
            state, last_heartbeat_at, created_at, updated_at
          ) values (?, ?, ?, 'Delegation device', ?, 'online', ?, ?, ?)`,
-      ).bind(deviceId, organizationId, ownerId, "b".repeat(64), now, now, now),
+      ).bind(deviceId, workspaceId, ownerId, "b".repeat(64), now, now, now),
       db.prepare(
         `insert into briar_execution_worker_credentials (
            device_id, token_hash, created_at
@@ -158,7 +158,7 @@ describe("Organization Agent channel delegation", () => {
     }
     await createChannel(db, {
       id: channelId,
-      organizationId,
+      workspaceId,
       kind: "channel",
       dmKey: null,
       slug: "delegation",
@@ -169,10 +169,10 @@ describe("Organization Agent channel delegation", () => {
       createdByUserId: ownerId,
       createdAt: now,
     });
-    organizationAgent = (await createOrganizationAgent(db, {
+    organizationAgent = (await createWorkspaceAgent(db, {
       id: organizationAgentId,
-      organizationId,
-      name: "Organization Lead",
+      workspaceId,
+      name: "Workspace Lead",
       provider: "claude",
       model: null,
       responsibility: "Coordinate project questions.",
@@ -239,7 +239,7 @@ describe("Organization Agent channel delegation", () => {
     readonly kind: "channel_completion";
     readonly jobId: string;
     readonly input: {
-      organizationId: string;
+      workspaceId: string;
       workerId: string;
       claimToken: string;
       conversationId?: string | null;
@@ -259,7 +259,7 @@ describe("Organization Agent channel delegation", () => {
   ) => {
     const job = await getChannelAgentReplyJob(
       db,
-      call.input.organizationId,
+      call.input.workspaceId,
       call.jobId,
     );
     const binding = await db.prepare(
@@ -301,7 +301,7 @@ describe("Organization Agent channel delegation", () => {
         env: runtimeEnv,
         worker: {
           principal: {
-            organizationId: binding.organization_id,
+            workspaceId: binding.organization_id,
             deviceId: binding.device_id,
           },
           binding: {
@@ -315,7 +315,7 @@ describe("Organization Agent channel delegation", () => {
           workerId: call.input.workerId,
           claim: {
             replyKind: "channel",
-            organizationId: call.input.organizationId,
+            workspaceId: call.input.workspaceId,
             workId: call.jobId,
             runId: job.channel_id,
             claimToken: call.input.claimToken,
@@ -348,7 +348,7 @@ describe("Organization Agent channel delegation", () => {
     ) => invokeChannelCompletion(input, runtimeEnv),
   };
 
-  const queueOrganizationReply = async (body: string) => {
+  const queueWorkspaceReply = async (body: string) => {
     const now = new Date().toISOString();
     const messageId = crypto.randomUUID();
     await createChannelMessage(db, {
@@ -365,7 +365,7 @@ describe("Organization Agent channel delegation", () => {
       createdAt: now,
     });
     const jobs = await enqueueChannelAgentReplies(db, {
-      organizationId,
+      workspaceId,
       channelId,
       triggerMessageId: messageId,
       parentMessageId: messageId,
@@ -389,7 +389,7 @@ describe("Organization Agent channel delegation", () => {
       workerId,
     );
     const work = await claimNextChannelReplyWork({
-      input: { organizationId, workerId },
+      input: { workspaceId, workerId },
       db,
       env: env(),
       authenticatedWorker,
@@ -398,12 +398,12 @@ describe("Organization Agent channel delegation", () => {
   };
 
   const queueDelegatedChild = async (request: string) => {
-    const parent = await queueOrganizationReply(request);
+    const parent = await queueWorkspaceReply(request);
     const parentClaim = await claim(otherWorkerId);
     expect(parentClaim.work).toMatchObject({ workId: parent.id });
     const response = await completionWorker.execute(
       completionCall(parent.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: String(parentClaim.work?.claimToken),
         result: {
@@ -425,8 +425,8 @@ describe("Organization Agent channel delegation", () => {
   };
 
   it("atomically hands a repository question to the exact rostered Project Agent", async () => {
-    const parent = await queueOrganizationReply(
-      "@organization-lead Which module owns authentication in Briar?",
+    const parent = await queueWorkspaceReply(
+      "@workspace-lead Which module owns authentication in Briar?",
     );
     const parentClaim = await claim(otherWorkerId);
     expect(parentClaim.work).toMatchObject({
@@ -444,7 +444,7 @@ describe("Organization Agent channel delegation", () => {
     const parentToken = String(parentClaim.work?.claimToken);
     const completed = await completionWorker.execute(
       completionCall(parent.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: parentToken,
         result: {
@@ -469,7 +469,7 @@ describe("Organization Agent channel delegation", () => {
     );
     const child = jobs.find((job) => job.agent_id === projectAgent.id)!;
     expect(child).toMatchObject({
-      organization_id: organizationId,
+      organization_id: workspaceId,
       channel_id: channelId,
       project_id: projectId,
       skill_id: null,
@@ -503,7 +503,7 @@ describe("Organization Agent channel delegation", () => {
 
     const recursive = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: childToken,
         result: {
@@ -523,7 +523,7 @@ describe("Organization Agent channel delegation", () => {
 
     const childCompleted = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: childToken,
         result: {
@@ -546,7 +546,7 @@ describe("Organization Agent channel delegation", () => {
 
   it("lets the delegated Project Agent discover from its full Skill roster", async () => {
     const request = "Repository questions: run the saved repository workflow.";
-    const parent = await queueOrganizationReply(request);
+    const parent = await queueWorkspaceReply(request);
     const parentClaim = await claim(otherWorkerId);
     expect(parentClaim.work).toMatchObject({
       workId: parent.id,
@@ -557,7 +557,7 @@ describe("Organization Agent channel delegation", () => {
 
     const organizationAttempt = await completionWorker.execute(
       completionCall(parent.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: parentClaimToken,
         result: {
@@ -585,7 +585,7 @@ describe("Organization Agent channel delegation", () => {
 
     const delegated = await completionWorker.execute(
       completionCall(parent.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: parentClaimToken,
         result: {
@@ -628,7 +628,7 @@ describe("Organization Agent channel delegation", () => {
 
     const childCompleted = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
@@ -651,7 +651,7 @@ describe("Organization Agent channel delegation", () => {
     ).bind(child.id).first()).resolves.toBeNull();
   });
 
-  it("requires Organization delegation and preserves it on a Project Agent execution card", async () => {
+  it("requires Workspace delegation and preserves it on a Project Agent execution card", async () => {
     const workflow = JSON.stringify({
       version: 2,
       requirements: [],
@@ -673,12 +673,12 @@ describe("Organization Agent channel delegation", () => {
       backlogEvent(`delegated-execution-${crypto.randomUUID()}`),
     );
 
-    const direct = await queueOrganizationReply("Execute the Briar issue.");
+    const direct = await queueWorkspaceReply("Execute the Briar issue.");
     const directClaim = await claim(otherWorkerId);
     expect(directClaim.work).toMatchObject({ workId: direct.id, projectId: null });
     const rejected = await completionWorker.execute(
       completionCall(direct.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: String(directClaim.work?.claimToken),
         result: {
@@ -694,7 +694,7 @@ describe("Organization Agent channel delegation", () => {
     expect(rejected.status).toBe(400);
     const directFinished = await completionWorker.execute(
       completionCall(direct.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: String(directClaim.work?.claimToken),
         result: {
@@ -734,7 +734,7 @@ describe("Organization Agent channel delegation", () => {
     });
     const lateCompletion = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
@@ -753,7 +753,7 @@ describe("Organization Agent channel delegation", () => {
     ).resolves.toBeNull();
     const completed = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
@@ -840,7 +840,7 @@ describe("Organization Agent channel delegation", () => {
 
     const rejected = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
@@ -861,7 +861,7 @@ describe("Organization Agent channel delegation", () => {
 
     const completed = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
@@ -942,7 +942,7 @@ describe("Organization Agent channel delegation", () => {
 
     const completed = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
@@ -959,13 +959,13 @@ describe("Organization Agent channel delegation", () => {
   });
 
   it("revalidates the roster atomically and never creates a child after revocation", async () => {
-    const parent = await queueOrganizationReply("Inspect the Briar repository.");
+    const parent = await queueWorkspaceReply("Inspect the Briar repository.");
     const parentClaim = await claim(otherWorkerId);
     expect(parentClaim.work).toMatchObject({ workId: parent.id });
     const parentToken = String(parentClaim.work?.claimToken);
     await removeChannelAgent(db, channelId, projectAgent.id);
 
-    const claimed = await getChannelAgentReplyJob(db, organizationId, parent.id);
+    const claimed = await getChannelAgentReplyJob(db, workspaceId, parent.id);
     const completed = await completeChannelReply(db, claimed!, {
       jobId: parent.id,
       deviceId,
@@ -1057,7 +1057,7 @@ describe("Organization Agent channel delegation", () => {
     });
     const completed = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
@@ -1120,7 +1120,7 @@ describe("Organization Agent channel delegation", () => {
     });
     const completed = await completionWorker.execute(
       completionCall(child.id, {
-        organizationId,
+        workspaceId,
         workerId: projectWorkerId,
         claimToken: String(childClaim.work?.claimToken),
         result: {
@@ -1142,7 +1142,7 @@ describe("Organization Agent channel delegation", () => {
   });
 
   it("rejects non-roster and project-mismatched targets before completion", async () => {
-    const parent = await queueOrganizationReply("Inspect the other project.");
+    const parent = await queueWorkspaceReply("Inspect the other project.");
     const parentClaim = await claim(otherWorkerId);
     const parentToken = String(parentClaim.work?.claimToken);
     for (const delegation of [
@@ -1159,7 +1159,7 @@ describe("Organization Agent channel delegation", () => {
     ]) {
       const response = await completionWorker.execute(
         completionCall(parent.id, {
-          organizationId,
+          workspaceId,
           workerId: otherWorkerId,
           claimToken: parentToken,
           result: {
@@ -1175,7 +1175,7 @@ describe("Organization Agent channel delegation", () => {
     }
     const ordinary = await completionWorker.execute(
       completionCall(parent.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: parentToken,
         result: {
@@ -1190,15 +1190,15 @@ describe("Organization Agent channel delegation", () => {
     expect(ordinary.status).toBe(200);
   });
 
-  it("revokes a claimed Organization Agent before it can create a delegated child", async () => {
-    const parent = await queueOrganizationReply("Inspect Briar after removal.");
+  it("revokes a claimed Workspace Agent before it can create a delegated child", async () => {
+    const parent = await queueWorkspaceReply("Inspect Briar after removal.");
     const parentClaim = await claim(otherWorkerId);
     const parentToken = String(parentClaim.work?.claimToken);
 
     await removeChannelAgent(db, channelId, organizationAgent.id);
     const completion = await completionWorker.execute(
       completionCall(parent.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: parentToken,
         result: {
@@ -1216,7 +1216,7 @@ describe("Organization Agent channel delegation", () => {
     );
     expect(completion.status).toBe(409);
     await expect(
-      getChannelAgentReplyJob(db, organizationId, parent.id),
+      getChannelAgentReplyJob(db, workspaceId, parent.id),
     ).resolves.toMatchObject({
       status: "failed",
       claimed_device_id: null,
@@ -1238,12 +1238,12 @@ describe("Organization Agent channel delegation", () => {
   });
 
   it("fails a delegated child when its roster authorization is removed", async () => {
-    const parent = await queueOrganizationReply("Inspect Briar again.");
+    const parent = await queueWorkspaceReply("Inspect Briar again.");
     const parentClaim = await claim(otherWorkerId);
     const parentToken = String(parentClaim.work?.claimToken);
     const completed = await completionWorker.execute(
       completionCall(parent.id, {
-        organizationId,
+        workspaceId,
         workerId: otherWorkerId,
         claimToken: parentToken,
         result: {
@@ -1270,7 +1270,7 @@ describe("Organization Agent channel delegation", () => {
 
     await removeChannelAgent(db, channelId, projectAgent.id);
     await expect(
-      getChannelAgentReplyJob(db, organizationId, child.id),
+      getChannelAgentReplyJob(db, workspaceId, child.id),
     ).resolves.toMatchObject({
       status: "failed",
       claimed_device_id: null,
@@ -1306,7 +1306,7 @@ describe("Organization Agent channel delegation", () => {
     });
     await expect(
       enqueueChannelAgentReplies(db, {
-        organizationId,
+        workspaceId,
         channelId,
         triggerMessageId: messageId,
         parentMessageId: messageId,

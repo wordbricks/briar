@@ -50,6 +50,6 @@ export type GithubPullRequestSyncInput = {
   linkedIssues: Array<{ projectId: string; runId: string }>;
   actor: string;
   observedAt: string;
-  /** Restricts a connected installation to runs in its Briar organization. */
-  organizationId?: string | null;
+  /** Restricts a connected installation to runs in its Briar workspace. */
+  workspaceId?: string | null;
 };

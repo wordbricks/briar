@@ -180,7 +180,7 @@
     "worker:build": { "cache": false },
     "worker:deploy": {
       "cache": false,
-      "passThroughEnv": ["CLOUDFLARE_*", "DOTENV_*", "WRANGLER_*"]
+      "passThroughEnv": ["BRIAR_WORKER_DEPLOY_ORDER", "CLOUDFLARE_*", "DOTENV_*", "WRANGLER_*"]
     },
     "worker:startup": { "cache": false }
   }

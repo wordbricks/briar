@@ -6,7 +6,7 @@ import {
 } from "./managed-computer-supervisor";
 
 const managedComputerId = "44444444-4444-4444-8444-444444444444";
-const organizationId = "55555555-5555-4555-8555-555555555555";
+const workspaceId = "55555555-5555-4555-8555-555555555555";
 const deviceId = `managed-${managedComputerId}`;
 
 describe("managed computer worker supervisor", () => {
@@ -29,7 +29,7 @@ describe("managed computer worker supervisor", () => {
       },
       managedComputer: {
         managedComputerId,
-        organizationId,
+        organizationId: workspaceId,
         deviceId,
         credentialFile: "/var/lib/briar/worker-credential.json",
       },
@@ -41,7 +41,7 @@ describe("managed computer worker supervisor", () => {
           executionWorker: {
             deviceId,
             workerId: "worker-one",
-            organizationId,
+            organizationId: workspaceId,
             label: "Managed",
             maxConcurrentSessions: 1,
           },
@@ -53,7 +53,7 @@ describe("managed computer worker supervisor", () => {
           executionWorker: {
             deviceId: "33333333-3333-4333-8333-333333333333",
             workerId: "other-worker",
-            organizationId,
+            organizationId: workspaceId,
             token: "briar_worker_other",
             label: "Other",
             maxConcurrentSessions: 1,

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider, useI18n } from "../i18n";
 import { demoDashboard } from "../lib/demo-data";
 import type { StatusTraySnapshot } from "../generated/tauri";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import { lockedTeamIdAtom } from "../state/platform";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
@@ -24,7 +24,7 @@ import { useStatusTray } from "./useStatusTray";
 /*
   The tray is a side effect with no view, so what these cases check is what
   reaches Rust: the runs of the open dashboard merged with the ones the
-  organization poll returns, and nothing at all in a project window.
+  workspace poll returns, and nothing at all in a project window.
 */
 
 const team: Project = { ...demoDashboard.team, id: "team-a", name: "Team A" };
@@ -65,8 +65,8 @@ class TrayBridge {
 
   api(overrides: Partial<StatusTrayApi> = {}): StatusTrayApi {
     return {
-      loadStatusTrayRuns: (async (_token: string, organizationId: string) => {
-        this.pollRequests.push(organizationId);
+      loadStatusTrayRuns: (async (_token: string, workspaceId: string) => {
+        this.pollRequests.push(workspaceId);
         return { runs: this.pollResult };
       }) as StatusTrayApi["loadStatusTrayRuns"],
       syncStatusTray: async (snapshot: StatusTraySnapshot) => {
@@ -115,7 +115,7 @@ const harness = (
 ): AtomRegistry =>
   createTestRegistry([
     [tokenAtom, "token-1"],
-    [activeOrganizationIdAtom, "org-a"],
+    [activeWorkspaceIdAtom, "org-a"],
     [activeTeamIdAtom, team.id],
     [lockedTeamIdAtom, lockedTeamId],
     [statusTrayApiAtom, bridge.api()],

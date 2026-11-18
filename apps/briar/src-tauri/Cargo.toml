@@ -1,6 +1,6 @@
 [package]
 name = "briar"
-version = "1.2.222"
+version = "1.2.237"
 description = "Agent Development Environment"
 authors = ["Wordbricks"]
 license = "Apache-2.0"
@@ -21,7 +21,7 @@ base64 = "0.23"
 briar-contracts = { path = "../../../packages/contracts/rust", features = ["client-tls"] }
 buffa = { version = "=0.9.1", features = ["json"] }
 chrono = "0.4"
-connectrpc = { version = "=0.9.0", default-features = false, features = ["json"] }
+connectrpc = { version = "=0.9.1", default-features = false, features = ["json"] }
 dirs = "6.0.0"
 serde = { version = "1", features = ["derive"] }
 serde_ignored = "0.1.10"
@@ -44,7 +44,7 @@ tauri-plugin-notification = "2.3.3"
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-clipboard-manager = "=2.3.2"
 tauri-plugin-process = "=2.3.1"
-tauri-plugin-updater = "=2.10.1"
+tauri-plugin-updater = "=2.14.0"
 tauri-plugin-window-state = "=2.4.1"
 
 [target.'cfg(any(windows, target_os = "linux"))'.dependencies]

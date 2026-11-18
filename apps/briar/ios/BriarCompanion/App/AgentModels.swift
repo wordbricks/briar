@@ -845,7 +845,7 @@ private extension ProjectAgentSession.Event {
 }
 
 extension ChannelAgentSummary {
-    init(connectMessage message: BriarAPI_OrganizationAgent) throws {
+    init(connectMessage message: BriarAPI_WorkspaceAgent) throws {
         guard
             let agentID = UUID(uuidString: message.agentID),
             message.hasCreatedAt
@@ -861,7 +861,8 @@ extension ChannelAgentSummary {
             projectId: try agentOptionalUUID(message.projectID, isPresent: message.hasProjectID),
             description: message.hasDescription_p ? message.description_p : nil,
             responsibility: message.responsibility,
-            createdAt: try agentDate(message.createdAt)
+            createdAt: try agentDate(message.createdAt),
+            skills: try message.skills.map { try ProjectAgent.Skill(connectMessage: $0) }
         )
     }
 }

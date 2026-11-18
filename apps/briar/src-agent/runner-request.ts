@@ -3,6 +3,7 @@ import {
   AgentRunKind as ProtoAgentRunKind,
   ApprovalPolicy as ProtoApprovalPolicy,
   SandboxMode as ProtoSandboxMode,
+  ToolInheritance as ProtoToolInheritance,
   type RunRequest as ProtoRunRequest,
 } from "@briar/contracts/gen/briar/sidecar/v1/agent_runner_pb";
 import * as Result from "effect/Result";
@@ -13,6 +14,12 @@ export type RunnerSandboxMode =
   | "readOnly"
   | "workspaceWrite"
   | "dangerFullAccess";
+/**
+ * Whose tool catalog the provider may load. `briar` keeps the sandbox, network
+ * setting, skills and web search of an ordinary turn and drops only the host
+ * user's own MCP servers, apps and plugins.
+ */
+export type RunnerToolInheritance = "inherit" | "briar";
 
 /**
  * Provider-facing projection of the generated sidecar request.
@@ -31,12 +38,14 @@ export type RunnerRequest = Omit<
   | "attachments"
   | "protocolFingerprint"
   | "runKind"
+  | "toolInheritance"
 > & {
   approvalPolicy: RunnerApprovalPolicy;
   sandboxMode: RunnerSandboxMode;
   outputSchema?: JsonObject | boolean;
   attachments: AgentAttachment[];
   runKind?: "parent" | "computerUse";
+  toolInheritance: RunnerToolInheritance;
 };
 
 const unsupportedEnum = (name: string, value: number) =>
@@ -72,6 +81,22 @@ function sandboxMode(
   }
 }
 
+function toolInheritance(
+  value: ProtoToolInheritance,
+): Result.Result<RunnerToolInheritance, Error> {
+  switch (value) {
+    // A request written before the field carries UNSPECIFIED and keeps the
+    // behaviour it was written for.
+    case ProtoToolInheritance.UNSPECIFIED:
+    case ProtoToolInheritance.INHERIT:
+      return Result.succeed("inherit");
+    case ProtoToolInheritance.BRIAR:
+      return Result.succeed("briar");
+    default:
+      return Result.fail(unsupportedEnum("tool inheritance", value));
+  }
+}
+
 function runKind(value: ProtoAgentRunKind): "parent" | "computerUse" {
   return value === ProtoAgentRunKind.COMPUTER_USE ? "computerUse" : "parent";
 }
@@ -81,6 +106,9 @@ export const decodeRunnerRequest = (request: ProtoRunRequest) =>
   Result.gen(function*() {
     const decodedApprovalPolicy = yield* approvalPolicy(request.approvalPolicy);
     const decodedSandboxMode = yield* sandboxMode(request.sandboxMode);
+    const decodedToolInheritance = yield* toolInheritance(
+      request.toolInheritance,
+    );
     const {
       $typeName: _,
       $unknown: _unknown,
@@ -90,12 +118,14 @@ export const decodeRunnerRequest = (request: ProtoRunRequest) =>
       attachments,
       protocolFingerprint: _protocolFingerprint,
       runKind: wireRunKind,
+      toolInheritance: _toolInheritance,
       ...shared
     } = request;
     return {
       ...shared,
       approvalPolicy: decodedApprovalPolicy,
       sandboxMode: decodedSandboxMode,
+      toolInheritance: decodedToolInheritance,
       outputSchema: outputSchema?.value.value,
       attachments: attachments.map((attachment) => ({
         type: "image" as const,

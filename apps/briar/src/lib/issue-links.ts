@@ -1,10 +1,28 @@
 import { briarApiUrl } from "./api-config";
 import { formatIssueKey } from "./issue-key";
+import type { ActivePage } from "./app-navigation";
 
 const issueLinkPathPattern =
   /^\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const webAppIssueLinkPathPattern =
   /^\/app\/open\/issues\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
+const webAppIssueKeyPathPattern =
+  /^\/app\/issues\/([A-Za-z0-9]{1,3}-\d{1,9})\/?$/u;
+const webAppPagePathPattern = /^\/app\/([a-z-]{1,32})\/?$/u;
+
+const webAppPages: ReadonlySet<string> = new Set<ActivePage>([
+  "lobby",
+  "projects",
+  "issues",
+  "agents",
+  "channels",
+  "dms",
+  "schedule",
+  "inbox",
+  "my-issues",
+  "workspace-create",
+  "settings",
+]);
 const sessionLinkPathPattern =
   /^\/open\/sessions\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/?$/iu;
 const channelLinkPathPattern =
@@ -22,16 +40,26 @@ export type SessionLinkTarget = {
 };
 
 export type ChannelLinkTarget = {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   messageId: string | null;
   rootMessageId: string | null;
 };
 
+export type IssueKeyLinkTarget = {
+  issueKey: string;
+};
+
+export type WebPageLinkTarget = {
+  page: ActivePage;
+};
+
 export type BriarLinkTarget =
   | ({ kind: "issue" } & IssueLinkTarget)
+  | ({ kind: "issueKey" } & IssueKeyLinkTarget)
   | ({ kind: "session" } & SessionLinkTarget)
-  | ({ kind: "channel" } & ChannelLinkTarget);
+  | ({ kind: "channel" } & ChannelLinkTarget)
+  | ({ kind: "page" } & WebPageLinkTarget);
 
 export type IssueShareResult = "cancelled" | "copied" | "shared";
 
@@ -82,7 +110,7 @@ export function sessionShareUrl(
 
 export function channelShareUrl(
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     messageId?: string | null;
     rootMessageId?: string | null;
@@ -91,7 +119,7 @@ export function channelShareUrl(
 ): string {
   const url = new URL(origin);
   url.pathname =
-    `/open/channels/${encodeURIComponent(input.organizationId)}` +
+    `/open/channels/${encodeURIComponent(input.workspaceId)}` +
     `/${encodeURIComponent(input.channelId)}` +
     (input.messageId?.trim()
       ? `/${encodeURIComponent(input.messageId.trim())}`
@@ -141,6 +169,33 @@ export function parseWebAppIssuePath(pathname: string): IssueLinkTarget | null {
   return match ? { projectId: match[1], runId: match[2] } : null;
 }
 
+export function parseWebAppIssueKeyPath(pathname: string): string | null {
+  const match = pathname.match(webAppIssueKeyPathPattern);
+  return match ? match[1].toUpperCase() : null;
+}
+
+export function parseWebAppPagePath(pathname: string): ActivePage | null {
+  const match = pathname.match(webAppPagePathPattern);
+  if (!match) return null;
+  return webAppPages.has(match[1]) ? (match[1] as ActivePage) : null;
+}
+
+/**
+ * The canonical, human-readable URL of an issue card on the web app, keyed by
+ * the team's issue prefix and the run number ("BR-42") instead of internal
+ * ids. Opening, copying or reloading it lands on the same card.
+ */
+export function webAppIssueKeyUrl(
+  issueKey: string,
+  origin = configuredShareOrigin(),
+): string {
+  const url = new URL(origin);
+  url.pathname = `/app/issues/${encodeURIComponent(issueKey.toUpperCase())}`;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
 export function parseSessionLink(
   value: string,
   trustedOrigin = configuredBriarOrigin(),
@@ -169,7 +224,7 @@ export function parseSessionLink(
 }
 
 function channelLinkFromParts(
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   messageId: string | null | undefined,
   rootMessageId?: string | null,
@@ -177,7 +232,7 @@ function channelLinkFromParts(
   const normalizedMessageId = messageId ?? null;
   const root = rootMessageId?.trim();
   return {
-    organizationId,
+    workspaceId,
     channelId,
     messageId: normalizedMessageId,
     rootMessageId: root || normalizedMessageId,
@@ -265,8 +320,9 @@ export async function copyIssueId(
 export async function copyIssueShareLink(input: {
   projectId: string;
   runId: string;
+  urlOverride?: string;
 }): Promise<void> {
-  await copyText(issueShareUrl(input.projectId, input.runId));
+  await copyText(input.urlOverride ?? issueShareUrl(input.projectId, input.runId));
 }
 
 export async function copySessionShareLink(input: {
@@ -277,7 +333,7 @@ export async function copySessionShareLink(input: {
 }
 
 export async function copyChannelShareLink(input: {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   messageId: string;
   rootMessageId?: string | null;
@@ -293,8 +349,9 @@ export async function shareIssueLink(input: {
   projectId: string;
   runId: string;
   title: string;
+  urlOverride?: string;
 }): Promise<IssueShareResult> {
-  const url = issueShareUrl(input.projectId, input.runId);
+  const url = input.urlOverride ?? issueShareUrl(input.projectId, input.runId);
   if (navigator.share) {
     try {
       await navigator.share({ title: input.title, url });

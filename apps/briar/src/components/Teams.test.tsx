@@ -9,7 +9,7 @@ import { Teams } from "./Teams";
 
 const project = (input: Partial<PlanningProject> = {}): PlanningProject => ({
   id: "planning-1",
-  workspaceId: "organization-1",
+  workspaceId: "workspace-1",
   workspaceName: "Briar",
   teamId: "team-1",
   teamName: "Desktop",

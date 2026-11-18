@@ -69,7 +69,7 @@ const completedChannelIssueTransferExists = async (
 
 /**
  * Move an issue (hunt run) and its project-scoped children to another project
- * in the same organization. Active/leased runs cannot transfer. Source-project
+ * in the same workspace. Active/leased runs cannot transfer. Source-project
  * dashboard clients receive an explicit delete tombstone; the run UPDATE trigger
  * upserts the issue into the target project.
  */

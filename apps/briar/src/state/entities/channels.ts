@@ -5,9 +5,9 @@ import { shallowArrayEqual } from "./upsert";
 
 /*
   Channel summaries normalized by channel id, plus one ordered id index per
-  organization.
+  workspace.
 
-  The index is stored rather than derived from `channel.organizationId` because
+  The index is stored rather than derived from `channel.workspaceId` because
   the order is user visible and the two catalog paths produce it differently: a
   snapshot renders the server's order verbatim, while a delta re-sorts the whole
   list by name. A derived index could only ever offer insertion order, which is
@@ -15,7 +15,7 @@ import { shallowArrayEqual } from "./upsert";
 */
 
 /**
- * The list every organization without a catalog renders. One shared instance so
+ * The list every workspace without a catalog renders. One shared instance so
  * "not loaded yet" and "loaded and empty" both keep a stable array identity.
  */
 const emptyChannels: ChannelSummary[] = [];
@@ -33,37 +33,37 @@ export const channelAtom = Atom.family((channelId: string) =>
 );
 
 /**
- * An organization's channel ids in render order, or `null` when its catalog has
+ * An workspace's channel ids in render order, or `null` when its catalog has
  * never been loaded. List views subscribe to this instead of the summaries, so
  * one channel's unread flag does not re-render the list.
  */
-export const organizationChannelIdsAtom = Atom.family((organizationId: string) =>
+export const organizationChannelIdsAtom = Atom.family((workspaceId: string) =>
   Atom.make<string[] | null>(null).pipe(
     Atom.keepAlive,
     Atom.withEquality<string[] | null>(shallowArrayEqual),
-    Atom.withLabel(`entities/channels/organization/${organizationId}/ids`),
+    Atom.withLabel(`entities/channels/workspace/${workspaceId}/ids`),
   ),
 );
 
 /**
- * The organizations whose catalog is stored. `Atom.family` cannot be
+ * The workspaces whose catalog is stored. `Atom.family` cannot be
  * enumerated, so clearing every catalog on sign-out needs this list to know
  * which entries exist.
  */
-export const channelCatalogOrganizationIdsAtom = Atom.make<string[]>([]).pipe(
+export const channelCatalogWorkspaceIdsAtom = Atom.make<string[]>([]).pipe(
   Atom.keepAlive,
   Atom.withEquality<string[]>(shallowArrayEqual),
-  Atom.withLabel("entities/channels/organizations"),
+  Atom.withLabel("entities/channels/workspaces"),
 );
 
 /**
- * An organization's channels resolved against the store. The array keeps its
+ * An workspace's channels resolved against the store. The array keeps its
  * reference while every summary in it keeps theirs, so a delta that changed
  * nothing produces no new list.
  */
-export const organizationChannelsAtom = Atom.family((organizationId: string) =>
+export const organizationChannelsAtom = Atom.family((workspaceId: string) =>
   Atom.make((get): ChannelSummary[] => {
-    const ids = get(organizationChannelIdsAtom(organizationId));
+    const ids = get(organizationChannelIdsAtom(workspaceId));
     if (!ids) return emptyChannels;
     const channels = get(channelsByIdAtom);
     const resolved: ChannelSummary[] = [];
@@ -74,6 +74,6 @@ export const organizationChannelsAtom = Atom.family((organizationId: string) =>
     return resolved;
   }).pipe(
     Atom.withEquality<ChannelSummary[]>(shallowArrayEqual),
-    Atom.withLabel(`entities/channels/organization/${organizationId}`),
+    Atom.withLabel(`entities/channels/workspace/${workspaceId}`),
   ),
 );

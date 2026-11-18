@@ -5,7 +5,7 @@ import type {
   AutoHuntSession,
   ExecutionWorker,
   HuntRun,
-  OrganizationMember,
+  WorkspaceMember,
   ProjectAgent,
 } from "../../types";
 import { membersByIdAtom, teamMemberIdsAtom } from "../entities/members";
@@ -71,7 +71,7 @@ const workerTemplate: ExecutionWorker = {
   createdAt: "2026-07-29T00:00:00.000Z",
 };
 
-const memberTemplate: OrganizationMember = {
+const memberTemplate: WorkspaceMember = {
   userId: "member-1",
   name: "Member",
   email: "member@briar.local",
@@ -306,7 +306,7 @@ describe("board run facts", () => {
   });
 
   it("resolves the assignee against the team's members", () => {
-    const member: OrganizationMember = { ...memberTemplate, userId: "member-1" };
+    const member: WorkspaceMember = { ...memberTemplate, userId: "member-1" };
     const registry = createTestRegistry([
       [
         runsByIdAtom,

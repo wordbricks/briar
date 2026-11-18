@@ -6,7 +6,7 @@ import { demoMode } from "../platform";
 import { shallowArrayEqual } from "./upsert";
 
 /*
-  The agent providers an organization has enabled, as the team dashboard payload
+  The agent providers a workspace has enabled, as the team dashboard payload
   reports them.
 
   `AgentProvider` is a string union, not an identified record, so there is no
@@ -19,11 +19,11 @@ import { shallowArrayEqual } from "./upsert";
 const demoTeamId = demoMode ? demoDashboard.team.id : null;
 
 /**
- * A team payload's organization providers, or `null` when the payload carried
+ * A team payload's workspace providers, or `null` when the payload carried
  * none. The delta merge replaces the list wholesale, so there is no per-item
  * identity to preserve — only the list's own reference.
  */
-export const teamOrganizationProvidersAtom = Atom.family((teamId: string) =>
+export const teamWorkspaceProvidersAtom = Atom.family((teamId: string) =>
   Atom.make<AgentProvider[] | null>(
     teamId === demoTeamId ? (demoDashboard.organizationProviders ?? null) : null,
   ).pipe(

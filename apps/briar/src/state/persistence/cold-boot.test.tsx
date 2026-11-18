@@ -15,15 +15,12 @@ import { createReactTestRoot, flush, type ReactTestRoot } from "../../test/react
 import type {
   DashboardDeltaPayload,
   DashboardPayload,
-  Organization,
+  Workspace,
   PlanningProject,
   Project,
   SessionUser,
 } from "../../types";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import {
   setSessionDataSources,
@@ -59,7 +56,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -72,8 +69,8 @@ const team: Project = {
   ...demoDashboard.team,
   id: "team-a",
   name: "Team A",
-  organizationId: organization.id,
-  organizationName: organization.name,
+  workspaceId: workspace.id,
+  workspaceName: workspace.name,
 };
 
 const STORED_CURSOR = 12;
@@ -103,8 +100,8 @@ const freshPayload: DashboardPayload = {
 function storedSnapshot(): ClientSnapshot {
   const source = createTestRegistry([
     [userAtom, user],
-    [organizationsAtom, [organization]],
-    [activeOrganizationIdAtom, organization.id],
+    [workspacesAtom, [workspace]],
+    [activeWorkspaceIdAtom, workspace.id],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
   ]);
@@ -153,7 +150,7 @@ class BootServer {
             generatedAt: freshPayload.generatedAt,
           } satisfies DashboardDeltaPayload);
     },
-    loadOrganizations: async () => [organization],
+    loadWorkspaces: async () => [workspace],
     loadSession: () =>
       new Promise<SessionUser>((resolve) => {
         this.pendingSession.push(resolve);
@@ -184,9 +181,9 @@ const gateProps: Omit<AuthGateProps, "children"> = {
   invitationToken: null,
   onAcceptInvitation: async () => undefined,
   onInitialOnboardingComplete: () => undefined,
-  onJoinOrganization: () => undefined,
-  onOrganizationCreated: () => undefined,
-  showsFirstOrganizationSetup: false,
+  onJoinWorkspace: () => undefined,
+  onWorkspaceCreated: () => undefined,
+  showsFirstWorkspaceSetup: false,
   showsInitialOnboarding: false,
 };
 
@@ -222,9 +219,9 @@ const mount = async (
   setSnapshotStore(registry, store);
   setSessionDataSources(registry, server.dataSources);
   if (record) {
-    await store.write(snapshotKey(user.id, organization.id), record);
+    await store.write(snapshotKey(user.id, workspace.id), record);
     writeSnapshotAccount({
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       userId: user.id,
     });
   }
@@ -295,7 +292,7 @@ describe("cold boot", () => {
     });
     await flush(2);
     expect([...store.entries().keys()]).toEqual([
-      snapshotKey(user.id, organization.id),
+      snapshotKey(user.id, workspace.id),
     ]);
   });
 

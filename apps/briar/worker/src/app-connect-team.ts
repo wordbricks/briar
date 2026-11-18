@@ -4,8 +4,7 @@ import {
   PlanningProjectStatus,
   TeamExecutionWorkerPolicy_SelectionMode,
   TeamService,
-  UpdateCheckpointPolicyRequest_Scope,
-} from "@briar/contracts/gen/briar/app/v1/team_pb";
+  UpdateCheckpointPolicyRequest_Scope} from "@briar/contracts/gen/briar/app/v1/team_pb";
 import type { NullableStringUpdate } from "@briar/contracts/gen/briar/app/v1/team_pb";
 import { ProjectRole } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import { create } from "@bufbuild/protobuf";
@@ -13,8 +12,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   WorkflowCheckpoint_Position,
   type AutoHuntWorkflow as AutoHuntWorkflowMessage,
-  type WorkflowCheckpointSpec,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
+  type WorkflowCheckpointSpec} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import {
   Code,
   ConnectError,
@@ -41,7 +39,7 @@ import {
   appProjectSettings,
 } from "./app-connect-mappers";
 import { HttpError } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import {
   createPlanningProject,
   deletePlanningProject,
@@ -221,7 +219,7 @@ const nullableUpdate = (value: NullableStringUpdate | undefined) => {
 };
 
 const requirePlanningWrite = (value: keyof typeof role) => {
-  if (!hasOrganizationCapability(value, "issues:write")) {
+  if (!hasWorkspaceCapability(value, "issues:write")) {
     throw new HttpError(403, "Team project editing permission required");
   }
 };
@@ -479,7 +477,7 @@ export const createAppTeamService = (
         db,
         user: session.user,
         name: input.name,
-        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
         locale: normalizeTeamAgentLocale(
           request.headers.get("accept-language"),
         ),

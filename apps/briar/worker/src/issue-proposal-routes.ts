@@ -20,7 +20,7 @@ import {
   reworkHuntRun,
 } from "./db";
 import { HttpError } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import {
   issueActionProposalJson,
   issueExecutionProposalJson,
@@ -57,7 +57,7 @@ async function requireIssueProposalProject(
 ) {
   const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
-  if (!hasOrganizationCapability(project.member_role, capability)) {
+  if (!hasWorkspaceCapability(project.member_role, capability)) {
     throw new HttpError(403, deniedMessage);
   }
   return project;

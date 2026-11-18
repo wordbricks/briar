@@ -64,14 +64,14 @@ describe("workflow checkpoint policy persistence", () => {
         "2026-08-04T00:00:00.000Z",
       )
       .run();
-    const organization = await createWorkspace(db, {
+    const workspace = await createWorkspace(db, {
       name: "Policy Org",
       handle: "policy-org",
       ownerUserId: "policy-user",
     });
     const project = await createTeam(db, {
       ownerUserId: "policy-user",
-      organizationId: organization.id,
+      workspaceId: workspace.id,
       name: "Policy Project",
       agentTokenHash: "d".repeat(64),
     });

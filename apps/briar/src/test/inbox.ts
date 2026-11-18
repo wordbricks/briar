@@ -8,7 +8,7 @@ import {
   inboxUserIdAtom,
 } from "../state/inbox/atoms";
 import type { InboxMessage } from "../state/inbox/model";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import type { AtomRegistry } from "../state/registry";
 import { tokenAtom } from "../state/session/atoms";
 
@@ -38,7 +38,7 @@ export function seedInboxMessages(
   const storageKey = registry.get(inboxStorageKeyAtom);
   const userId = registry.get(inboxUserIdAtom);
   const token = registry.get(tokenAtom);
-  const organizationId = registry.get(activeOrganizationIdAtom);
+  const workspaceId = registry.get(activeWorkspaceIdAtom);
   const settled = options.initialSyncComplete ?? true;
   Atom.batch(() => {
     registry.set(inboxStateAtom, {
@@ -48,9 +48,9 @@ export function seedInboxMessages(
     });
     if (settled && token && userId) {
       registry.set(inboxReadSyncIdentityAtom, { storageKey, token, userId });
-      if (organizationId) {
+      if (workspaceId) {
         registry.set(inboxFeedIdentityAtom, {
-          scope: `${userId}:${organizationId}`,
+          scope: `${userId}:${workspaceId}`,
           token,
         });
       }

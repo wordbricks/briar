@@ -45,14 +45,14 @@ export async function requireWorkerCredential(
   return principal;
 }
 
-export async function requireWorkerOrganization(
+export async function requireWorkerWorkspace(
   db: D1Database,
   request: Request,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const principal = await requireWorkerCredential(db, request);
-  if (principal.organizationId !== organizationId) {
-    throw new HttpError(403, "Worker is not enabled for this organization");
+  if (principal.workspaceId !== workspaceId) {
+    throw new HttpError(403, "Worker is not enabled for this workspace");
   }
   return principal;
 }

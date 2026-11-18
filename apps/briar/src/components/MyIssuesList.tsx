@@ -28,7 +28,7 @@ import {
   type MyIssuesGroup,
 } from "../state/my-issues/atoms";
 import type { MyIssueScope, MyIssuesGroupKey } from "../state/my-issues/model";
-import type { HuntRun, OrganizationMember } from "../types";
+import type { HuntRun, WorkspaceMember } from "../types";
 
 export type { MyIssueScope } from "../state/my-issues/model";
 
@@ -77,7 +77,7 @@ const MyIssuesRow = memo(function MyIssuesRow({
   onOpen,
   runId,
 }: {
-  members: readonly OrganizationMember[];
+  members: readonly WorkspaceMember[];
   onOpen: (projectId: string, runId: string) => void;
   runId: string;
 }) {
@@ -183,7 +183,7 @@ export function MyIssuesList({
   hasUnfilteredIssues: boolean;
   isLoading: boolean;
   loadingLabel: string;
-  members: readonly OrganizationMember[];
+  members: readonly WorkspaceMember[];
   onOpen: (projectId: string, runId: string) => void;
   onQueryChange: (query: string) => void;
   onRetry: () => void;

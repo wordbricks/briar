@@ -36,12 +36,13 @@ const agent = {
 const channelReply = {
   ...common,
   workType: "channelReply" as const,
-  organizationId: "77777777-7777-4777-8777-777777777777",
+  routing: null,
+  workspaceId: "77777777-7777-4777-8777-777777777777",
   channelId: common.runId,
   projectId: "88888888-8888-4888-8888-888888888888",
   scope: {
     kind: "project" as const,
-    organizationId: "77777777-7777-4777-8777-777777777777",
+    workspaceId: "77777777-7777-4777-8777-777777777777",
     projectId: "88888888-8888-4888-8888-888888888888",
   },
   triggerMessageId: "99999999-9999-4999-8999-999999999999",
@@ -53,6 +54,8 @@ const channelReply = {
   activeSkill: null,
   skillExecutionTarget: null,
   activity: { token: "activity", expiresAt: leaseExpiresAt },
+  acknowledgementReaction: null,
+  directMessage: true,
   organizationContext: null,
   delegation: null,
   delegationTargets: [],
@@ -69,10 +72,8 @@ const channelReply = {
     contentType: "image/png",
     byteSize: 42,
     url:
-      "/organizations/77777777-7777-4777-8777-777777777777/channel-reply-claims/11111111-1111-4111-8111-111111111111/attachments/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "/workspaces/77777777-7777-4777-8777-777777777777/channel-reply-claims/11111111-1111-4111-8111-111111111111/attachments/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
   }],
-      memory: null,
-      memoryLearningEnabled: false,
   agentMessageTargets: [],
   inboundAgentMessage: null,
   agentMessageHop: 0,
@@ -81,6 +82,7 @@ const channelReply = {
   inputRevision: 0,
   publishedMessageBatches: [],
   snapshot: {
+    dmRoutingContext: null, dmScheduleContext: null,
     channel: {
       id: common.runId,
       kind: "channel" as const,
@@ -123,10 +125,11 @@ describe("Worker claim protobuf mapper", () => {
     expect(timestampDate(message.work.value.claimedAt!).toISOString()).toBe(
       claimedAt,
     );
+    expect(message.work.value.directMessage).toBe(true);
 
     const executionClaim = claimedWorkFromProto(message);
     expect(executionClaim).toMatchObject({
-      workType: "channelReply",
+      workType: "channelReply", routing: null,
       projectId: channelReply.projectId,
       scope: channelReply.scope,
       session: {
@@ -134,6 +137,7 @@ describe("Worker claim protobuf mapper", () => {
         retainedUntil: channelReply.session.retainedUntil,
       },
       triggerAttachments: channelReply.triggerAttachments,
+      directMessage: true,
     });
   });
 
@@ -173,7 +177,7 @@ describe("Worker claim protobuf mapper", () => {
       agentMessageTargets: [{
         agentId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
         agentName: "Repository Guide",
-        // An Organization Agent has no repository, so both project fields
+        // An Workspace Agent has no repository, so both project fields
         // must survive as absent rather than as an empty string.
         projectId: null,
         projectName: null,

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 import type { ChannelAgentActivityFrame } from "../../lib/channel-agent-activity";
 import { useChannelAgentActivity } from "../../hooks/use-channel-agent-activity";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { useRegistry } from "../registry";
 import { tokenAtom } from "../session/atoms";
 import {
@@ -49,10 +49,10 @@ export function ChannelActivityPublisher({
 }) {
   const registry = useRegistry();
   const token = useAtomValue(tokenAtom);
-  const organizationId = useAtomValue(activeOrganizationIdAtom);
+  const workspaceId = useAtomValue(activeWorkspaceIdAtom);
   const activity = useChannelAgentActivity(
     token ?? "",
-    organizationId ?? "",
+    workspaceId ?? "",
     enabled && channelId ? channelId : null,
   );
   useEffect(() => {

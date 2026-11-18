@@ -11,8 +11,8 @@ import {
   workspaceApiAtom,
   workspaceModesAtom,
   type WorkspaceApi,
-} from "../workspace/api";
-import { connectedTeamIdsAtom, healthAtom } from "../workspace/atoms";
+} from "../local-workspace/api";
+import { connectedTeamIdsAtom, healthAtom } from "../local-workspace/atoms";
 import { createIntegrationActions } from "./actions";
 import { velenAtom } from "./atoms";
 

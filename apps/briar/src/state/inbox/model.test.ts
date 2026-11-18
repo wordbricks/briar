@@ -4,11 +4,13 @@ import type { AutoHuntSession } from "../../types";
 import {
   buildCurrentInboxMessages,
   classifyInboxMessage,
-  filterInboxMessagesByOrganization,
+  filterInboxMessagesByWorkspace,
   inboxReadVersionsToPush,
   isInboxMessageUnread,
   mergeInboxMessages,
   mergeInboxReadVersions,
+  inboxMessageOrigin,
+  inboxOriginFilterMatches,
 } from "./model";
 
 const project = demoDashboard.team;
@@ -418,12 +420,12 @@ describe("Inbox messages", () => {
     });
   });
 
-  it("keeps only messages from the selected organization", () => {
+  it("keeps only messages from the selected workspace", () => {
     const otherProject = {
       ...project,
       id: "project-other",
       name: "Other project",
-      organizationId: "organization-other",
+      workspaceId: "workspace-other",
     };
     const messages = buildCurrentInboxMessages(
       null,
@@ -439,17 +441,17 @@ describe("Inbox messages", () => {
     );
 
     expect(
-      filterInboxMessagesByOrganization(
+      filterInboxMessagesByWorkspace(
         messages,
         [project, otherProject],
-        project.organizationId,
+        project.workspaceId,
       ).map((message) => message.id),
     ).toEqual(["session:selected-session"]);
     expect(
-      filterInboxMessagesByOrganization(
+      filterInboxMessagesByWorkspace(
         messages,
         [project, otherProject],
-        otherProject.organizationId,
+        otherProject.workspaceId,
       ).map((message) => message.id),
     ).toEqual(["session:other-session"]);
   });
@@ -602,5 +604,25 @@ describe("Inbox messages", () => {
       "important",
       "activity",
     ]);
+  });
+});
+
+describe("inbox message origin", () => {
+  it("labels issue runs and issue conversations as issue, channel replies as channel", () => {
+    expect(inboxMessageOrigin({ kind: "issue" })).toBe("issue");
+    expect(inboxMessageOrigin({ kind: "conversation" })).toBe("issue");
+    expect(inboxMessageOrigin({ kind: "channel" })).toBe("channel");
+    expect(inboxMessageOrigin({ kind: "session" })).toBe("agent");
+  });
+
+  it("keeps every origin for all and only the matching one otherwise", () => {
+    expect(inboxOriginFilterMatches("issue", "all")).toBe(true);
+    expect(inboxOriginFilterMatches("channel", "all")).toBe(true);
+    expect(inboxOriginFilterMatches("agent", "all")).toBe(true);
+    expect(inboxOriginFilterMatches("issue", "issue")).toBe(true);
+    expect(inboxOriginFilterMatches("channel", "issue")).toBe(false);
+    expect(inboxOriginFilterMatches("agent", "issue")).toBe(false);
+    expect(inboxOriginFilterMatches("channel", "channel")).toBe(true);
+    expect(inboxOriginFilterMatches("issue", "channel")).toBe(false);
   });
 });

@@ -1,7 +1,6 @@
 import {
-  type OrganizationNotification,
-  OrganizationNotificationSchema,
-} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+  type WorkspaceNotification,
+  WorkspaceNotificationSchema} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { fromBinary } from "@bufbuild/protobuf";
 import * as Option from "effect/Option";
 
@@ -25,8 +24,8 @@ export type RealtimeNotification =
       readonly version: number;
     };
 
-const decodeOrganizationNotification = Option.liftThrowable(
-  (bytes: Uint8Array) => fromBinary(OrganizationNotificationSchema, bytes),
+const decodeWorkspaceNotification = Option.liftThrowable(
+  (bytes: Uint8Array) => fromBinary(WorkspaceNotificationSchema, bytes),
 );
 
 const safeRevision = (revision: bigint) =>
@@ -39,7 +38,7 @@ const impossibleNotification = (notification: never): never => {
 };
 
 const toRealtimeNotification = (
-  message: OrganizationNotification,
+  message: WorkspaceNotification,
 ): Option.Option<RealtimeNotification> => {
   const notification = message.notification;
   switch (notification.case) {
@@ -76,4 +75,4 @@ const toRealtimeNotification = (
 };
 
 export const decodeRealtimeNotificationBinary = (bytes: Uint8Array) =>
-  Option.flatMap(decodeOrganizationNotification(bytes), toRealtimeNotification);
+  Option.flatMap(decodeWorkspaceNotification(bytes), toRealtimeNotification);

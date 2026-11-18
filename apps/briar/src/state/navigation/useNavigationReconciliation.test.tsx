@@ -13,6 +13,14 @@ import {
   settingsNavigationLocation,
 } from "../../lib/app-navigation";
 import { organizationChannelsAtom } from "../entities/channels";
+import {
+  boardQueryAtom,
+  boardSourceAtom,
+  boardStatusAtom,
+  boardViewAtom,
+  persistBoardScroll,
+  readStoredBoardScroll,
+} from "../board/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { channelApiAtom } from "../channels/api";
 import {
@@ -33,10 +41,7 @@ import {
   navigationTeamIdAtom,
   settingsTargetAtom,
 } from "./atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import {
   loadingAtom,
@@ -47,7 +52,7 @@ import {
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import { createReactTestRoot, flush } from "../../test/react";
 import type { ChannelSummary } from "../../lib/channels-contract";
-import type { Organization, Project, SessionUser } from "../../types";
+import type { Workspace, Project, SessionUser } from "../../types";
 import { createNavigationActions, type NavigationActions } from "./actions";
 import { useNavigationReconciliation } from "./useNavigationReconciliation";
 
@@ -56,7 +61,7 @@ import { useNavigationReconciliation } from "./useNavigationReconciliation";
 
   These cases pin every outcome of the six effects that run in a fixed order —
   user boundary reset, settings target sync, team id backfill, team existence
-  fallback, organization existence fallback, schedule tab gate — plus the
+  fallback, workspace existence fallback, schedule tab gate — plus the
   navigation actions that feed them. They were written against the block while
   it still lived in the app shell and have followed it unchanged since, which is
   what makes them this phase's characterization.
@@ -80,7 +85,7 @@ const scheduleLessTeam = teamOf("team-no-schedule", {
   scheduleTabEnabled: false,
 });
 
-const organizationOf = (id: string): Organization => ({
+const organizationOf = (id: string): Workspace => ({
   id,
   name: id,
   handle: id,
@@ -88,12 +93,12 @@ const organizationOf = (id: string): Organization => ({
   role: "owner",
   createdAt: "2026-09-01T00:00:00.000Z",
 });
-const organization = organizationOf(teamA.organizationId);
-const otherOrganization = organizationOf("organization-b");
+const workspace = organizationOf(teamA.workspaceId);
+const otherWorkspace = organizationOf("workspace-b");
 
 const channelOf = (id: string): ChannelSummary => ({
   id,
-  organizationId: organization.id,
+  workspaceId: workspace.id,
   kind: "channel",
   slug: id,
   name: id,
@@ -120,7 +125,7 @@ const channelOf = (id: string): ChannelSummary => ({
 const seedChannels = (registry: AtomRegistry, channels: ChannelSummary[]) => {
   applySyncEvent(registry, {
     kind: "channel-catalog-snapshot",
-    organizationId: organization.id,
+    workspaceId: workspace.id,
     channels,
   });
 };
@@ -134,7 +139,7 @@ function Harness() {
 
 const harness = (
   teams: Project[] = [teamA, teamB],
-  organizations: Organization[] = [organization],
+  workspaces: Workspace[] = [workspace],
 ): AtomRegistry =>
   createTestRegistry([
     [userAtom, user],
@@ -145,8 +150,8 @@ const harness = (
     [tokenAtom, "token-1"],
     [teamsAtom, teams],
     [activeTeamIdAtom, teams[0]?.id ?? null],
-    [organizationsAtom, organizations],
-    [activeOrganizationIdAtom, organizations[0]?.id ?? null],
+    [workspacesAtom, workspaces],
+    [activeWorkspaceIdAtom, workspaces[0]?.id ?? null],
     // Marking a channel read confirms with the server; nothing here needs the
     // round trip, and the local write is what the assertions look at.
     [channelApiAtom, { markChannelRead: async () => undefined }],
@@ -284,16 +289,16 @@ describe("navigation reconciliation", () => {
     await act(async () => {
       actions.navigateToLocation(
         settingsNavigationLocation({
-          scope: "organization",
-          organizationId: organization.id,
+          scope: "workspace",
+          workspaceId: workspace.id,
           section: "members",
         }),
       );
     });
     await flush();
     expect(registry.get(settingsTargetAtom)).toEqual({
-      scope: "organization",
-      organizationId: organization.id,
+      scope: "workspace",
+      workspaceId: workspace.id,
       section: "members",
     });
     await view.cleanup();
@@ -320,7 +325,7 @@ describe("navigation reconciliation", () => {
     await view.cleanup();
   });
 
-  it("keeps a channel location on a team the account lost, on the same organization", async () => {
+  it("keeps a channel location on a team the account lost, on the same workspace", async () => {
     const registry = harness();
     seedChannels(registry, [
       channelOf("channel-a"),
@@ -331,7 +336,7 @@ describe("navigation reconciliation", () => {
       actions.navigateToChannel(
         "channel-a",
         "channels",
-        organization.id,
+        workspace.id,
         teamB.id,
       );
     });
@@ -347,7 +352,7 @@ describe("navigation reconciliation", () => {
     expect(registry.get(navigationLocationAtom)).toBe(
       channelNavigationLocation(
         "channels",
-        organization.id,
+        workspace.id,
         "channel-a",
         teamA.id,
       ),
@@ -404,45 +409,45 @@ describe("navigation reconciliation", () => {
     await view.cleanup();
   });
 
-  it("falls back when the location names an organization the account lost", async () => {
-    const registry = harness([teamA, teamB], [organization, otherOrganization]);
+  it("falls back when the location names a workspace the account lost", async () => {
+    const registry = harness([teamA, teamB], [workspace, otherWorkspace]);
     const view = await mount(registry);
 
     await act(async () => {
       actions.navigateToLocation(
-        organizationNavigationLocation(otherOrganization.id, "inbox"),
+        organizationNavigationLocation(otherWorkspace.id, "inbox"),
       );
     });
     await flush();
     expect(registry.get(activePageAtom)).toBe("inbox");
 
     await act(async () => {
-      registry.set(organizationsAtom, [organization]);
+      registry.set(workspacesAtom, [workspace]);
     });
     await flush();
     expect(registry.get(navigationLocationAtom)).toBe(
-      organizationNavigationLocation(organization.id, "inbox"),
+      organizationNavigationLocation(workspace.id, "inbox"),
     );
     await view.cleanup();
   });
 
-  it("keeps a channel page on the fallback organization when the named one is gone", async () => {
-    const registry = harness([teamA, teamB], [organization, otherOrganization]);
+  it("keeps a channel page on the fallback workspace when the named one is gone", async () => {
+    const registry = harness([teamA, teamB], [workspace, otherWorkspace]);
     const view = await mount(registry);
 
     await act(async () => {
       actions.navigateToLocation(
-        channelPageNavigationLocation("channels", otherOrganization.id),
+        channelPageNavigationLocation("channels", otherWorkspace.id),
       );
     });
     await flush();
 
     await act(async () => {
-      registry.set(organizationsAtom, [organization]);
+      registry.set(workspacesAtom, [workspace]);
     });
     await flush();
     expect(registry.get(navigationLocationAtom)).toBe(
-      channelPageNavigationLocation("channels", organization.id, teamA.id),
+      channelPageNavigationLocation("channels", workspace.id, teamA.id),
     );
     await view.cleanup();
   });
@@ -517,7 +522,7 @@ describe("navigation reconciliation", () => {
     expect(registry.get(activeChannelIdAtom)).toBe("channel-a");
     expect(
       registry
-        .get(organizationChannelsAtom(organization.id))
+        .get(organizationChannelsAtom(workspace.id))
         .find((channel) => channel.id === "channel-a")?.hasUnread,
     ).toBe(false);
     await view.cleanup();
@@ -565,7 +570,7 @@ describe("navigation reconciliation", () => {
     await flush();
     expect(registry.get(activeChannelIdAtom)).toBeNull();
     expect(registry.get(navigationLocationAtom)).toBe(
-      channelPageNavigationLocation("channels", organization.id, teamA.id),
+      channelPageNavigationLocation("channels", workspace.id, teamA.id),
     );
     await view.cleanup();
   });
@@ -651,7 +656,7 @@ describe("the DM page's latest conversation", () => {
     const view = await mount(registry);
 
     expect(registry.get(navigationLocationAtom)).toBe(
-      channelNavigationLocation("dms", organization.id, latest.id, teamA.id),
+      channelNavigationLocation("dms", workspace.id, latest.id, teamA.id),
     );
     expect(registry.get(activeChannelIdAtom)).toBe(latest.id);
     // Swapped in, not visited: Back has nowhere to go.
@@ -741,6 +746,95 @@ describe("the DM page's latest conversation", () => {
 
     expect(registry.get(activePageAtom)).toBe("issues");
     expect(registry.get(activeChannelIdAtom)).toBeNull();
+    await view.cleanup();
+  });
+});
+
+describe("inbound events while an issue is open", () => {
+  /*
+    Option 1's other half: a card stays open, with its search, view and
+    scroll, when life happens around it. A new DM and a board refresh are
+    data events, not navigation events — they must never move the user or
+    reset the board they are looking at. These two cases pin that contract
+    so the reload persistence work cannot be undone by a future sync path.
+  */
+
+  const seedOpenIssue = async (registry: AtomRegistry) => {
+    await act(async () => {
+      actions.navigateToIssue("run-1", teamA.id);
+    });
+    await flush();
+    await act(async () => {
+      registry.set(boardQueryAtom, "로그");
+      registry.set(boardSourceAtom, "issue");
+      registry.set(boardStatusAtom, "active");
+      registry.set(boardViewAtom, "list");
+      persistBoardScroll(teamA.id, 120);
+    });
+    await flush();
+    expect(registry.get(activePageAtom)).toBe("issues");
+    expect(registry.get(activeRunIdAtom)).toBe("run-1");
+    expect(registry.get(navigationTeamIdAtom)).toBe(teamA.id);
+  };
+
+  const expectContextIntact = (registry: AtomRegistry, before: unknown) => {
+    expect(registry.get(navigationLocationAtom)).toEqual(before);
+    expect(registry.get(activePageAtom)).toBe("issues");
+    expect(registry.get(activeRunIdAtom)).toBe("run-1");
+    expect(registry.get(activeChannelIdAtom)).toBeNull();
+    expect(registry.get(desktopActiveChannelIdAtom)).toBeNull();
+    expect(registry.get(boardQueryAtom)).toBe("로그");
+    expect(registry.get(boardSourceAtom)).toBe("issue");
+    expect(registry.get(boardStatusAtom)).toBe("active");
+    expect(registry.get(boardViewAtom)).toBe("list");
+    expect(readStoredBoardScroll(teamA.id)).toBe(120);
+  };
+
+  it("keeps the open issue, board state and scroll when a direct message arrives", async () => {
+    window.localStorage.removeItem(`briar:board-scroll:${teamA.id}`);
+    const registry = harness();
+    const view = await mount(registry);
+    await seedOpenIssue(registry);
+    const before = registry.get(navigationLocationAtom);
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "channel-catalog-delta",
+        workspaceId: workspace.id,
+        channels: [
+          {
+            ...channelOf("dm-new"),
+            kind: "dm",
+            hasUnread: true,
+            lastMessageAt: "2026-10-23T09:00:00.000Z",
+            lastMessagePreview: "새 메시지",
+          },
+        ],
+        removedChannelIds: [],
+        reset: false,
+      });
+    });
+    await flush();
+    expectContextIntact(registry, before);
+    await view.cleanup();
+  });
+
+  it("keeps the open issue, board state and scroll when the board refreshes", async () => {
+    window.localStorage.removeItem(`briar:board-scroll:${teamA.id}`);
+    const registry = harness();
+    const view = await mount(registry);
+    await seedOpenIssue(registry);
+    const before = registry.get(navigationLocationAtom);
+
+    await act(async () => {
+      applySyncEvent(registry, {
+        kind: "run-changed",
+        run: demoDashboard.runs[0],
+        teamId: teamA.id,
+      });
+    });
+    await flush();
+    expectContextIntact(registry, before);
     await view.cleanup();
   });
 });

@@ -3,10 +3,7 @@ import * as Atom from "effect/unstable/reactivity/Atom";
 
 import { agentSessionAtom } from "../agent-sessions/atoms";
 import { shallowArrayEqual } from "../entities/upsert";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { companionMode, demoMode, lockedTeamIdAtom } from "../platform";
 import { tokenAtom, userAtom } from "../session/atoms";
 import { activeTeamAtom, activeTeamIdAtom } from "../team/atoms";
@@ -36,14 +33,14 @@ import {
 
   The policy is atoms and pure functions on purpose. "Three previously visited
   pages, evicted oldest first, dropped entirely when the account or the
-  organization changes" is a rule about the app, not about React, and it is
+  workspace changes" is a rule about the app, not about React, and it is
   asserted here without rendering anything.
 */
 
 /**
- * A page whose DOM is worth keeping. The board and the organization level lists
+ * A page whose DOM is worth keeping. The board and the workspace level lists
  * are the heavy ones: each builds a long list, and each is somewhere the user
- * walks back to within seconds. Settings, the organization create flow and the
+ * walks back to within seconds. Settings, the workspace create flow and the
  * per team pages beside the board are not here — they are cheap, and a settings
  * screen that keeps its scroll across a visit is not worth a kept DOM tree.
  */
@@ -58,8 +55,8 @@ export type KeepAlivePageKind =
  * A kept page and the scope it was built for.
  *
  * The scope is what stops a kept page from showing another team's rows. The
- * board is per team; the other four are per organization, including channels —
- * the channel views are one component per organization that switches channels
+ * board is per team; the other four are per workspace, including channels —
+ * the channel views are one component per workspace that switches channels
  * through a prop, so keying them by channel would build one kept DOM tree per
  * channel ever opened and none of them would be the one on screen.
  */
@@ -126,11 +123,11 @@ export const activeShellAtom = Atom.make<"companion" | "desktop">(
 function resolveDesktopKeptPage(get: Atom.AtomContext): KeptPage | null {
   const page = get(activePageAtom);
   const settingsTarget = get(settingsTargetAtom);
-  const organizationId = get(activeOrganizationIdAtom);
+  const workspaceId = get(activeWorkspaceIdAtom);
   const token = get(tokenAtom);
   const lockedTeamId = get(lockedTeamIdAtom);
 
-  if (page === "organization-create") return null;
+  if (page === "workspace-create") return null;
   if (
     page === "settings" &&
     settingsTarget.scope === "application" &&
@@ -138,21 +135,21 @@ function resolveDesktopKeptPage(get: Atom.AtomContext): KeptPage | null {
   ) {
     return null;
   }
-  if (page === "settings" && settingsTarget.scope === "organization") {
-    const target = settingsTarget.organizationId;
-    const known = get(organizationsAtom).some(
-      (organization) => organization.id === target,
+  if (page === "settings" && settingsTarget.scope === "workspace") {
+    const target = settingsTarget.workspaceId;
+    const known = get(workspacesAtom).some(
+      (workspace) => workspace.id === target,
     );
     if (known) return null;
   }
-  if (page === "dms" && !lockedTeamId && organizationId) {
-    return token ? { kind: "dms", scopeId: organizationId } : null;
+  if (page === "dms" && !lockedTeamId && workspaceId) {
+    return token ? { kind: "dms", scopeId: workspaceId } : null;
   }
   if (page === "projects" && get(activeTeamForTabsAtom)) return null;
-  if (page === "my-issues" && organizationId) {
-    return { kind: "my-issues", scopeId: organizationId };
+  if (page === "my-issues" && workspaceId) {
+    return { kind: "my-issues", scopeId: workspaceId };
   }
-  if (page === "inbox") return { kind: "inbox", scopeId: organizationId ?? "" };
+  if (page === "inbox") return { kind: "inbox", scopeId: workspaceId ?? "" };
   const activeTeam = get(activeTeamAtom);
   if (page === "settings" && settingsTarget.scope === "project" && activeTeam) {
     return null;
@@ -160,8 +157,8 @@ function resolveDesktopKeptPage(get: Atom.AtomContext): KeptPage | null {
   if (page === "lobby" && activeTeam) return null;
   if (page === "agents" && activeTeam) return null;
   if (page === "schedule" && activeTeam) return null;
-  if (page === "channels" && organizationId && token) {
-    return { kind: "channels", scopeId: organizationId };
+  if (page === "channels" && workspaceId && token) {
+    return { kind: "channels", scopeId: workspaceId };
   }
   return { kind: "board", scopeId: get(activeTeamIdAtom) ?? "" };
 }
@@ -178,15 +175,15 @@ function resolveCompanionKeptPage(get: Atom.AtomContext): KeptPage | null {
   }
   const page = get(companionPageAtom);
   if (page === "settings") return null;
-  const organizationId = get(activeOrganizationIdAtom);
+  const workspaceId = get(activeWorkspaceIdAtom);
   const token = get(tokenAtom);
-  if (page === "home" && organizationId && (token || demoMode)) {
-    return { kind: "channels", scopeId: organizationId };
+  if (page === "home" && workspaceId && (token || demoMode)) {
+    return { kind: "channels", scopeId: workspaceId };
   }
   if (page === "lobby" && get(activeTeamAtom)) return null;
-  if (page === "inbox") return { kind: "inbox", scopeId: organizationId ?? "" };
-  if (page === "dms" && organizationId && token) {
-    return { kind: "dms", scopeId: organizationId };
+  if (page === "inbox") return { kind: "inbox", scopeId: workspaceId ?? "" };
+  if (page === "dms" && workspaceId && token) {
+    return { kind: "dms", scopeId: workspaceId };
   }
   return { kind: "board", scopeId: get(activeTeamIdAtom) ?? "" };
 }
@@ -194,17 +191,17 @@ function resolveCompanionKeptPage(get: Atom.AtomContext): KeptPage | null {
 /**
  * What makes every kept page stale at once.
  *
- * A kept page holds the rows of one account inside one organization, so a
- * different account or a different organization invalidates all of them —
+ * A kept page holds the rows of one account inside one workspace, so a
+ * different account or a different workspace invalidates all of them —
  * including the ones whose key happens to survive, such as an inbox opened
- * before an organization resolved. The pinned window's team is here for the
+ * before a workspace resolved. The pinned window's team is here for the
  * same reason: a project window is scoped to one team for its whole life, and a
  * change to that scope means this is not the same window's content any more.
  */
 function keptPageScope(get: Atom.AtomContext): string {
   return [
     get(userAtom)?.id ?? "",
-    get(activeOrganizationIdAtom) ?? "",
+    get(activeWorkspaceIdAtom) ?? "",
     get(lockedTeamIdAtom) ?? "",
   ].join("|");
 }
@@ -222,10 +219,10 @@ const sameKeptPageContext = (
 /*
   The page on screen and the scope it belongs to, resolved together.
 
-  Together is the point. Both answers come from the organization and the signed
+  Together is the point. Both answers come from the workspace and the signed
   in account, so computing them in two atoms gives the history below two
   arrivals for one write — and it recorded the page it saw in between, which is
-  the old organization's page filed under the new organization's scope. One atom
+  the old workspace's page filed under the new workspace's scope. One atom
   over the same roots is one arrival and one consistent pair.
 */
 const desktopKeptPageContextAtom = Atom.make(
@@ -309,7 +306,7 @@ interface KeptPagesState {
   is this atom's own previous value, which is what makes an LRU out of a
   derivation, and `Atom.keepAlive` is what keeps that previous value around
   between visits. A scope change is read here rather than reset by a caller for
-  the same reason — sign-out and an organization switch are already writes to
+  the same reason — sign-out and a workspace switch are already writes to
   atoms this one depends on.
 */
 const keptPagesStateAtom = Atom.make((get): KeptPagesState => {

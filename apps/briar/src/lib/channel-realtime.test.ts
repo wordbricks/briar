@@ -14,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("organization realtime transport", () => {
+describe("workspace realtime transport", () => {
   it("shares one physical socket across channel, project, and Inbox consumers", async () => {
     const sockets: FakeWebSocket[] = [];
     vi.stubGlobal("WebSocket", class extends FakeWebSocket {
@@ -29,17 +29,17 @@ describe("organization realtime transport", () => {
 
     const channel = createChannelRealtimeTransport(
       "token",
-      "organization-1",
+      "workspace-1",
       createTicket,
     );
     const project = createProjectRealtimeTransport(
       "token",
-      "organization-1",
+      "workspace-1",
       createTicket,
     );
     const inbox = createInboxRealtimeTransport(
       "token",
-      "organization-1",
+      "workspace-1",
       createTicket,
     );
     channel.start();
@@ -50,7 +50,7 @@ describe("organization realtime transport", () => {
     expect(createTicket).toHaveBeenCalledOnce();
     expect(createTicket).toHaveBeenCalledWith(
       "token",
-      "organization-1",
+      "workspace-1",
       expect.any(AbortSignal),
     );
     expect(sockets).toHaveLength(1);

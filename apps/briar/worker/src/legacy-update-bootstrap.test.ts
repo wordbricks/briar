@@ -7,7 +7,7 @@ describe("Briar 1.2.174 update bootstrap", () => {
   const db = env.DB;
   const userId = "legacy-update-user";
   const token = "legacy-update-token";
-  const organizationId = "11111111-1111-4111-8111-111111111111";
+  const workspaceId = "11111111-1111-4111-8111-111111111111";
   const projectId = "22222222-2222-4222-8222-222222222222";
   const observedAt = "2026-09-01T00:00:00.000Z";
 
@@ -28,20 +28,20 @@ describe("Briar 1.2.174 update bootstrap", () => {
       insert into briar_organizations (
         id, name, handle, created_at, updated_at
       ) values (
-        '${organizationId}', 'Legacy Organization', 'legacy-organization',
+        '${workspaceId}', 'Legacy Workspace', 'legacy-workspace',
         '${observedAt}', '${observedAt}'
       );
       insert into briar_organization_members (
         organization_id, user_id, role, created_at, updated_at
       ) values (
-        '${organizationId}', '${userId}', 'owner',
+        '${workspaceId}', '${userId}', 'owner',
         '${observedAt}', '${observedAt}'
       );
       insert into briar_teams (
         id, owner_user_id, organization_id, name, agent_token_hash,
         created_at, updated_at
       ) values (
-        '${projectId}', '${userId}', '${organizationId}', 'Legacy Project',
+        '${projectId}', '${userId}', '${workspaceId}', 'Legacy Project',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         '${observedAt}', '${observedAt}'
       );
@@ -65,13 +65,13 @@ describe("Briar 1.2.174 update bootstrap", () => {
     );
 
   it("restores the session far enough to render the signed-update UI", async () => {
-    const [me, organizations, projects] = await Promise.all([
+    const [me, workspaces, projects] = await Promise.all([
       fetch("/me"),
-      fetch("/organizations"),
+      fetch("/workspaces"),
       fetch("/projects"),
     ]);
 
-    expect([me.status, organizations.status, projects.status]).toEqual([
+    expect([me.status, workspaces.status, projects.status]).toEqual([
       200,
       200,
       200,
@@ -85,11 +85,11 @@ describe("Briar 1.2.174 update bootstrap", () => {
         image: null,
       },
     });
-    await expect(organizations.json()).resolves.toEqual({
-      organizations: [{
-        id: organizationId,
-        name: "Legacy Organization",
-        handle: "legacy-organization",
+    await expect(workspaces.json()).resolves.toEqual({
+      workspaces: [{
+        id: workspaceId,
+        name: "Legacy Workspace",
+        handle: "legacy-workspace",
         logo: null,
         role: "owner",
         createdAt: observedAt,
@@ -98,7 +98,7 @@ describe("Briar 1.2.174 update bootstrap", () => {
     await expect(projects.json()).resolves.toEqual({
       projects: [{
         id: projectId,
-        workspaceId: organizationId,
+        workspaceId: workspaceId,
         teamId: projectId,
         name: "Legacy Project",
         issueKeyPrefix: "AH",
@@ -106,8 +106,8 @@ describe("Briar 1.2.174 update bootstrap", () => {
         icon: null,
         iconName: null,
         iconColor: null,
-        organizationId,
-        organizationName: "Legacy Organization",
+        organizationId: workspaceId,
+        organizationName: "Legacy Workspace",
         role: "owner",
         createdAt: observedAt,
       }],

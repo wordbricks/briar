@@ -333,6 +333,35 @@ describe("read-only Agent environment", () => {
     }
   });
 
+  it("preserves configured OpenCode model transports without user hooks or project tools", async () => {
+    const sourceHome = await mkdtemp(join(tmpdir(), "briar-opencode-custom-source-"));
+    const sourceConfig = join(sourceHome, ".config", "opencode");
+    await mkdir(sourceConfig, { recursive: true });
+    await writeFile(join(sourceConfig, "opencode.json"), JSON.stringify({
+      model: "local/custom", instructions: ["private.md"], plugin: ["unsafe"], mcp: { unsafe: {} },
+      provider: { local: { npm: "@ai-sdk/openai-compatible", options: { baseURL: "http://127.0.0.1:9999/v1" },
+        models: { custom: { name: "Custom" } }, plugin: ["nested-unsafe"] } },
+    }));
+    const prepared = await prepareReadOnlyAgentEnvironment("opencode", {
+      workspaceRoot: join(sourceHome, "repo"), environment: { HOME: sourceHome },
+    });
+    try {
+      expect(JSON.parse(prepared.environment.OPENCODE_CONFIG_CONTENT!)).toEqual({ provider: {
+        local: { npm: "@ai-sdk/openai-compatible", options: { baseURL: "http://127.0.0.1:9999/v1" },
+          models: { custom: { name: "Custom" } } },
+      } });
+      expect(prepared.environment.OPENCODE_DISABLE_PROJECT_CONFIG).toBe("1");
+      expect(prepared.environment.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBe("1");
+      const upstream = await prepareReadOnlyAgentEnvironment("openrouter", {
+        workspaceRoot: join(sourceHome, "repo"), environment: { HOME: sourceHome,
+          OPENROUTER_API_KEY: "upstream-only", OPENCODE_CONFIG_CONTENT: '{"provider":{"openrouter":{}}}' },
+      });
+      try { expect(JSON.parse(upstream.environment.OPENCODE_CONFIG_CONTENT!))
+        .toEqual({ provider: { openrouter: {} } }); }
+      finally { await upstream.cleanup(); }
+    } finally { await prepared.cleanup(); await rm(sourceHome, { recursive: true, force: true }); }
+  });
+
   it("keeps only the OpenRouter key and generated OpenCode config", async () => {
     const prepared = await prepareReadOnlyAgentEnvironment("openrouter", {
       workspaceRoot: "/repo",
@@ -524,6 +553,10 @@ describe("read-only Agent environment", () => {
       '{"unsafeHook":true}',
     );
 
+    await writeFile(
+      join(sourceHome, ".gemini", "antigravity-cli", "antigravity-oauth-token"),
+      "synthetic-antigravity-oauth",
+    );
     const prepared = await prepareReadOnlyAgentEnvironment("agy", {
       workspaceRoot: join(sourceHome, "repo"),
       environment: {
@@ -542,6 +575,8 @@ describe("read-only Agent environment", () => {
       expect(
         await readFile(join(isolatedRoot, ".gemini", "oauth_creds.json"), "utf8"),
       ).toBe('{"access_token":"subscription-oauth"}');
+      expect(await readFile(join(isolatedRoot, ".gemini", "antigravity-cli", "antigravity-oauth-token"), "utf8"))
+        .toBe("synthetic-antigravity-oauth");
       await expect(
         access(join(isolatedRoot, ".gemini", "settings.json")),
       ).rejects.toMatchObject({ code: "ENOENT" });

@@ -33,12 +33,13 @@ const parseRelatedMessageReference = (value: unknown) => {
     return null;
   }
   const reference = value as Record<string, unknown>;
-  const organizationId = reference.organizationId;
+  // Stored under the pre-rename key; see `channelRelatedMessageReference`.
+  const workspaceId = reference.organizationId;
   const channelId = reference.channelId;
   const messageId = reference.messageId;
   const rootMessageId = reference.rootMessageId;
   if (
-    typeof organizationId !== "string" || !organizationId.trim() ||
+    typeof workspaceId !== "string" || !workspaceId.trim() ||
     typeof channelId !== "string" || !channelId.trim() ||
     typeof messageId !== "string" || !messageId.trim() ||
     typeof rootMessageId !== "string" || !rootMessageId.trim()
@@ -46,11 +47,31 @@ const parseRelatedMessageReference = (value: unknown) => {
     return null;
   }
   return {
-    organizationId: organizationId.trim(),
+    workspaceId: workspaceId.trim(),
     channelId: channelId.trim(),
     messageId: messageId.trim(),
     rootMessageId: rootMessageId.trim(),
   };
+};
+
+/**
+ * The agent that created the issue with `tools issue create`
+ * (agent-workspace-tools/issues.ts writes `origin`, `createdByAgent` and
+ * `createdByProvider` into the run context). Null for every other origin.
+ */
+export const parseIssueCreatorAgent = (context: Readonly<Record<string, unknown>> | null) => {
+  if (context?.origin !== "briar-agent-tool") return null;
+  const agent = context.createdByAgent;
+  if (typeof agent === "object" && agent !== null && !Array.isArray(agent)) {
+    const { id, name } = agent as Record<string, unknown>;
+    if (typeof id === "string" && typeof name === "string" && name.trim()) {
+      return { agentId: id, name: name.trim() };
+    }
+  }
+  const provider = context.createdByProvider;
+  return typeof provider === "string" && provider.trim()
+    ? { agentId: null, name: `${provider.trim()} agent` }
+    : null;
 };
 
 export const dashboardEventJson = (
@@ -165,6 +186,7 @@ export function dashboardRunJson(
     difficulty: run.issue_difficulty,
     assigneeUserId: run.assignee_user_id,
     createdByUserId: run.created_by_user_id ?? null,
+    createdByAgent: parseIssueCreatorAgent(context as Readonly<Record<string, unknown>> | null),
     subscribers: issueSubscribers(run),
     repository: run.repository,
     branch: run.branch,

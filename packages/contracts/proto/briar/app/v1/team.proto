@@ -37,7 +37,7 @@ message ListTeamsResponse {
 
 message CreateTeamRequest {
   string name = 1;
-  optional string organization_id = 2;
+  optional string workspace_id = 2;
 }
 
 message CreateTeamResponse {
@@ -182,8 +182,8 @@ message Team {
   string issue_key_prefix = 3;
   bool schedule_tab_enabled = 4;
   optional string icon = 5;
-  string organization_id = 6;
-  string organization_name = 7;
+  string workspace_id = 6;
+  string workspace_name = 7;
   ProjectRole role = 8;
   google.protobuf.Timestamp created_at = 9;
   optional string icon_name = 10;

@@ -17,13 +17,13 @@ import {
   issueReplyExecutionConfig,
 } from "./agent-execution-config";
 import { assertRunEventIdentityNotOverridden } from "./run-event-identity";
-import { loadOrganizationInboxConditionalSnapshot } from "./organization-inbox-sync";
+import { loadWorkspaceInboxConditionalSnapshot } from "./workspace-inbox-sync";
 import { responseWithPostCommitCleanup } from "./post-commit-cleanup";
 import {
   decodeAccountDeletionInput,
   decodeAccountProfileInput,
   decodeWorkspaceMemberRoleInput,
-} from "./account-organization-request-contract";
+} from "./account-workspace-request-contract";
 import {
   decodeExecutionPreferences,
   decodeIssueInput,
@@ -49,7 +49,9 @@ const createScheduledTaskDependencies = (): ScheduledTaskDependencies => ({
     deadLettered: 0,
     deferred: 0,
   })),
-  runDmMemoryMaintenance: vi.fn(async () => ({ expired: 0, indexing: null, cleanup: null })),
+  runDueDmSchedules: vi.fn(async () => ({ scanned: 0, enqueued: 0 })),
+  runDmReplyCleanup: vi.fn(async () => null),
+  runMemoryVaultMaintenance: vi.fn(async () => ({ skipped: "no_artifacts_binding" as const })),
   cleanupExpiredChannelReplySessions: vi.fn(async () => []),
   maintainUploadCleanup: vi.fn(async () => ({
     enqueuedUploads: 0,
@@ -116,18 +118,18 @@ const scheduledContext = () => {
 const scheduledEnv = cloudflareEnv;
 
 describe("Worker HTTP contract", () => {
-  it("skips the organization Inbox snapshot when its ETag is unchanged", async () => {
+  it("skips the workspace Inbox snapshot when its ETag is unchanged", async () => {
     const loadSnapshot = vi.fn(async () => ({ messages: ["expensive"] }));
-    const result = await loadOrganizationInboxConditionalSnapshot({
-      organizationId: "22222222-2222-4222-8222-222222222222",
+    const result = await loadWorkspaceInboxConditionalSnapshot({
+      workspaceId: "22222222-2222-4222-8222-222222222222",
       ifNoneMatch:
-        'W/"organization-inbox:22222222-2222-4222-8222-222222222222:7"',
+        'W/"workspace-inbox:22222222-2222-4222-8222-222222222222:7"',
       readVersion: async () => 7,
       loadSnapshot,
     });
 
     expect(result).toEqual({
-      etag: 'W/"organization-inbox:22222222-2222-4222-8222-222222222222:7"',
+      etag: 'W/"workspace-inbox:22222222-2222-4222-8222-222222222222:7"',
       snapshot: null,
     });
     expect(loadSnapshot).not.toHaveBeenCalled();
@@ -275,10 +277,10 @@ describe("Worker HTTP contract", () => {
 
   it("rejects proposals whose original Agent scope cannot be verified", () => {
     const organizationProposal = {
-      channelOrganizationId: "organization-a",
+      channelWorkspaceId: "workspace-a",
       proposedProjectId: "project-a",
       replyAuthorAgentId: "agent-a",
-      replyAuthorAgentOrganizationId: "organization-a",
+      replyAuthorAgentWorkspaceId: "workspace-a",
       replyAuthorAgentProjectId: null,
     };
     expect(() => assertChannelProposalAuthorScope(organizationProposal))
@@ -292,7 +294,7 @@ describe("Worker HTTP contract", () => {
     expect(() =>
       assertChannelProposalAuthorScope({
         ...organizationProposal,
-        replyAuthorAgentOrganizationId: "organization-b",
+        replyAuthorAgentWorkspaceId: "workspace-b",
       })
     ).toThrow("can no longer be verified");
   });
@@ -308,7 +310,8 @@ describe("Worker HTTP contract", () => {
     );
     await Promise.all(minute.pending);
     expect(minuteDependencies.reconcileGithubMergedRuns).toHaveBeenCalledOnce();
-    expect(minuteDependencies.runDmMemoryMaintenance).toHaveBeenCalledOnce();
+    expect(minuteDependencies.runDmReplyCleanup).toHaveBeenCalledOnce();
+    expect(minuteDependencies.runMemoryVaultMaintenance).toHaveBeenCalledWith(scheduledEnv, "minute");
     expect(minuteDependencies.flushWhatsAppOutbox).toHaveBeenCalledOnce();
     expect(
       minuteDependencies.reconcileEnabledMergeQueueRuns,
@@ -700,7 +703,7 @@ describe("Worker HTTP contract", () => {
     ).toBe("skipped");
   });
 
-  it("accepts only assignable organization member roles", () => {
+  it("accepts only assignable workspace member roles", () => {
     for (const role of ["co-owner", "developer", "editor", "viewer"]) {
       expect(decodeWorkspaceMemberRoleInput({ role })).toEqual({ role });
     }

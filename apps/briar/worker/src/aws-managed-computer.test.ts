@@ -11,7 +11,7 @@ const config: ManagedComputerConfig = {
   remoteDesktopAllowedOrigins: [],
   remoteDesktopTokenTtlSeconds: 60,
   remoteDesktopMaxSessionMinutes: 60,
-  remoteDesktopOrganizationSessionLimit: 2,
+  remoteDesktopWorkspaceSessionLimit: 2,
   remoteDesktopFleetSessionLimit: 20,
   remoteDesktopRateLimit: 10,
   campaignId: "getbriar-pilot",
@@ -52,7 +52,7 @@ const instanceXml = (
   <groupSet><item><groupId>sg-0123456789abcdef0</groupId></item></groupSet>
   <tagSet>
     <item><key>briar-managed</key><value>true</value></item>
-    <item><key>briar-organization</key><value>11111111-1111-4111-8111-111111111111</value></item>
+    <item><key>briar-workspace</key><value>11111111-1111-4111-8111-111111111111</value></item>
     <item><key>briar-managed-computer</key><value>22222222-2222-4222-8222-222222222222</value></item>
     <item><key>briar-campaign</key><value>getbriar-pilot</value></item>
     ${launchTemplateTags}
@@ -76,7 +76,7 @@ describe("AWS managed computer adapter", () => {
     });
     await expect(runManagedInstance(config, {
       managedComputerId: "22222222-2222-4222-8222-222222222222",
-      organizationId: "11111111-1111-4111-8111-111111111111",
+      workspaceId: "11111111-1111-4111-8111-111111111111",
       campaignId: "getbriar-pilot",
       nonce: "n".repeat(43),
     }, fetcher as typeof fetch)).resolves.toBe("i-0123456789abcdef0");
@@ -109,7 +109,7 @@ describe("AWS managed computer adapter", () => {
       ));
     await expect(verifyManagedInstance(config, {
       managedComputerId: "22222222-2222-4222-8222-222222222222",
-      organizationId: "11111111-1111-4111-8111-111111111111",
+      workspaceId: "11111111-1111-4111-8111-111111111111",
       campaignId: "getbriar-pilot",
       instanceId: "i-0123456789abcdef0",
       region: "us-east-1",
@@ -138,7 +138,7 @@ describe("AWS managed computer adapter", () => {
       ));
     await expect(verifyManagedInstance(config, {
       managedComputerId: "22222222-2222-4222-8222-222222222222",
-      organizationId: "11111111-1111-4111-8111-111111111111",
+      workspaceId: "11111111-1111-4111-8111-111111111111",
       campaignId: "getbriar-pilot",
       instanceId: "i-0123456789abcdef0",
       region: "us-east-1",
@@ -157,7 +157,7 @@ describe("AWS managed computer adapter", () => {
       .mockResolvedValueOnce(new Response(volumeXml));
     await expect(verifyManagedInstance(config, {
       managedComputerId: "22222222-2222-4222-8222-222222222222",
-      organizationId: "11111111-1111-4111-8111-111111111111",
+      workspaceId: "11111111-1111-4111-8111-111111111111",
       campaignId: "getbriar-pilot",
       instanceId: "i-0123456789abcdef0",
       region: "us-east-1",

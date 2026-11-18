@@ -1,6 +1,6 @@
 export type ChannelReplyScope =
-  | { kind: "organization"; organizationId: string }
-  | { kind: "project"; organizationId: string; projectId: string };
+  | { kind: "workspace"; workspaceId: string }
+  | { kind: "project"; workspaceId: string; projectId: string };
 
 /**
  * Reject a mismatched Project Agent claim before allocating a worktree. One

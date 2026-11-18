@@ -402,7 +402,7 @@ export function createWorkerExecutionService(
       try {
         const result = await services.listClaimedChannelMessages({
           db: input.db,
-          organizationId: principal.organizationId,
+          workspaceId: principal.workspaceId,
           deviceId: principal.deviceId,
           jobId: canonicalUuid(request.workId).toLowerCase(),
           parentMessageId: query.parentMessageId?.toLowerCase() ?? null,

@@ -1,12 +1,12 @@
-import { readActiveOrganizationId } from "../../lib/active-organization";
+import { readActiveWorkspaceId } from "../../lib/active-workspace";
 
 /*
   Which record a cold start should read.
 
   Hydration has to name a key before anything asynchronous has happened: the
-  store is keyed by account and organization, and both of those are answers the
-  network has not given yet. The organization half already exists —
-  `useActiveOrganizationPersistence` writes it per user — but reading it needs
+  store is keyed by account and workspace, and both of those are answers the
+  network has not given yet. The workspace half already exists —
+  `useActiveWorkspacePersistence` writes it per user — but reading it needs
   the user id, so the last written account is remembered here alongside it.
 
   localStorage rather than IndexedDB because it is synchronous: the decision
@@ -18,20 +18,20 @@ const storageKey = "briar.snapshot-account.v1";
 
 export interface SnapshotAccount {
   readonly userId: string;
-  readonly organizationId: string;
+  readonly workspaceId: string;
 }
 
-/** The account and organization the last snapshot was written for. */
+/** The account and workspace the last snapshot was written for. */
 export function readSnapshotAccount(): SnapshotAccount | null {
   try {
     const stored = window.localStorage.getItem(storageKey);
     if (!stored) return null;
     const parsed: unknown = JSON.parse(stored);
     if (typeof parsed !== "object" || parsed === null) return null;
-    const { organizationId, userId } = parsed as Record<string, unknown>;
+    const { workspaceId, userId } = parsed as Record<string, unknown>;
     if (typeof userId !== "string" || userId === "") return null;
-    if (typeof organizationId !== "string" || organizationId === "") return null;
-    return { organizationId, userId };
+    if (typeof workspaceId !== "string" || workspaceId === "") return null;
+    return { workspaceId, userId };
   } catch {
     return null;
   }
@@ -58,10 +58,10 @@ export function clearSnapshotAccount(): void {
  * The record a cold start should look for, or `null` when this device has never
  * written one.
  *
- * The organization comes from the per-user key the session bootstrap resolves
- * its own selection from, so a window that switched organizations last hands
- * back the same organization the bootstrap is about to choose; the pointer's
- * own organization is the fallback for a device that has the record but never
+ * The workspace comes from the per-user key the session bootstrap resolves
+ * its own selection from, so a window that switched workspaces last hands
+ * back the same workspace the bootstrap is about to choose; the pointer's
+ * own workspace is the fallback for a device that has the record but never
  * wrote that key.
  */
 export function resolveBootSnapshotAccount(): SnapshotAccount | null {
@@ -69,7 +69,7 @@ export function resolveBootSnapshotAccount(): SnapshotAccount | null {
   if (!account) return null;
   return {
     userId: account.userId,
-    organizationId:
-      readActiveOrganizationId(account.userId) ?? account.organizationId,
+    workspaceId:
+      readActiveWorkspaceId(account.userId) ?? account.workspaceId,
   };
 }

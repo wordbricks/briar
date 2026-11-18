@@ -6,11 +6,11 @@ import {
   decodeStoredMergeQueueValidationCommands,
 } from "../../src/lib/merge-queue-validation-contract";
 import {
-  getGithubConnectionForOrganization,
+  getGithubConnectionForWorkspace,
   listGithubConnectionRepositories,
 } from "./github-connection-repository";
 import { getMergeQueueProfile } from "./merge-queue-profile";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import { getTeam } from "./team-command-repository";
 import {
   getTeamSettings,
@@ -58,8 +58,8 @@ export class TeamConfigurationApplicationError extends Error {
 export type TeamConfigurationApplicationServices = {
   readonly assertStoredCheckpointPoliciesCompatible:
     typeof assertStoredCheckpointPoliciesCompatible;
-  readonly getGithubConnectionForOrganization:
-    typeof getGithubConnectionForOrganization;
+  readonly getGithubConnectionForWorkspace:
+    typeof getGithubConnectionForWorkspace;
   readonly getMergeQueueProfile: typeof getMergeQueueProfile;
   readonly getTeam: typeof getTeam;
   readonly getProjectExecutionWorkerPolicy:
@@ -80,7 +80,7 @@ export type TeamConfigurationApplicationServices = {
 const teamConfigurationApplicationServices:
   TeamConfigurationApplicationServices = {
     assertStoredCheckpointPoliciesCompatible,
-    getGithubConnectionForOrganization,
+    getGithubConnectionForWorkspace,
     getMergeQueueProfile,
     getTeam,
     getProjectExecutionWorkerPolicy,
@@ -112,7 +112,7 @@ const requireTeam = async (
 const requireDevelopmentManagement = (
   project: Awaited<ReturnType<typeof getTeam>> & {},
 ) => {
-  if (!hasOrganizationCapability(project.member_role, "development:manage")) {
+  if (!hasWorkspaceCapability(project.member_role, "development:manage")) {
     throw new TeamConfigurationApplicationError(
       "development_management_required",
       "Development management permission required",
@@ -202,7 +202,7 @@ export async function updateTeamSettingsApplication(
 
   const githubRepository = input.settings.githubRepository
     ? await (async () => {
-        const connection = await services.getGithubConnectionForOrganization(
+        const connection = await services.getGithubConnectionForWorkspace(
           input.db,
           project.organization_id,
         );

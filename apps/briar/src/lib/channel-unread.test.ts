@@ -9,7 +9,7 @@ const channel = (
   overrides: Partial<ChannelSummary> = {},
 ): ChannelSummary => ({
   id: "channel-1",
-  organizationId: "org-1",
+  workspaceId: "org-1",
   slug: "general",
   name: "General",
   topic: null,

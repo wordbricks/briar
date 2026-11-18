@@ -169,7 +169,7 @@ export function createAgentSessionActions(
     const normalizedTargets = [...new Map(
       targets.map((target) => [target.id, {
         id: target.id,
-        organizationId: target.organizationId ?? null,
+        workspaceId: target.workspaceId ?? null,
       }]),
     ).values()].sort((left, right) => left.id.localeCompare(right.id));
     const current = registry.get(agentSessionSyncContextAtom);
@@ -183,7 +183,7 @@ export function createAgentSessionActions(
       current.targets.every(
         (target, index) =>
           target.id === normalizedTargets[index]?.id &&
-          target.organizationId === normalizedTargets[index]?.organizationId,
+          target.workspaceId === normalizedTargets[index]?.workspaceId,
       )
     ) {
       return;

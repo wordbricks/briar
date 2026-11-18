@@ -1,515 +1,319 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  PreparedProjectRepository,
-  RepositoryReadiness,
-} from "../../generated/tauri";
-import { demoDashboard, demoRepositoryReadiness } from "../../lib/demo-data";
-import type {
-  DashboardPayload,
-  Project,
-  TeamSettings,
-} from "../../types";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { demoDashboard } from "../../lib/demo-data";
+import type { Workspace, Project } from "../../types";
 import { createTestRegistry, type AtomRegistry } from "../registry";
-import { loadingAtom, sessionErrorAtom, tokenAtom } from "../session/atoms";
+import { reconnectRequestGeneration } from "../local-workspace/api";
+import { healthAtom } from "../local-workspace/atoms";
+import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
-import { readActiveTeamView } from "../../test/team-view";
+import { readTeamView } from "../../test/team-view";
+import { activeTeamIdAtom, staleTeamIdAtom, teamsAtom } from "../team/atoms";
+import { lockedTeamIdAtom } from "../platform";
 import {
-  activeTeamIdAtom,
-  deletingTeamIdAtom,
-  teamConnectionAtom,
-  teamSettingsAtom,
-  teamsAtom,
-} from "../team/atoms";
-import { createWorkspaceActions } from "./actions";
-import {
-  workspaceApiAtom,
-  workspaceModesAtom,
-  type WorkspaceApi,
-} from "./api";
-import {
-  connectedTeamIdsAtom,
-  healthAtom,
-  teamReadinessAtom,
-} from "./atoms";
+  createWorkspaceActions,
+  type WorkspaceActionApi,
+} from "./actions";
+import { activeWorkspaceIdAtom, workspacesAtom } from "./atoms";
 
-const teamOf = (id: string): Project => ({
+const organizationA: Workspace = {
+  id: "org-a",
+  name: "Org A",
+  handle: "org-a",
+  logo: null,
+  role: "owner",
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+const organizationB: Workspace = {
+  ...organizationA,
+  id: "org-b",
+  name: "Org B",
+  handle: "org-b",
+};
+
+const teamOf = (id: string, workspace: Workspace): Project => ({
   ...demoDashboard.team,
   id,
   name: id,
-  icon: null,
-  iconName: null,
-});
-const teamA = teamOf("team-a");
-const teamB = teamOf("team-b");
-
-const settingsOf = (overrides: Partial<TeamSettings> = {}): TeamSettings => ({
-  ...demoDashboard.settings,
-  githubRepositoryId: 42,
-  githubRepository: "wordbricks/briar",
-  ...overrides,
+  workspaceId: workspace.id,
+  workspaceName: workspace.name,
 });
 
-const dashboardOf = (team: Project, settings = settingsOf()): DashboardPayload => ({
-  ...demoDashboard,
-  team,
-  settings,
-  runs: [],
-  cursor: 1,
-  generatedAt: "2026-09-01T00:00:00.000Z",
-});
-
-const readinessOf = (path: string): RepositoryReadiness => ({
-  ...demoRepositoryReadiness,
-  repositoryPath: path,
-});
-
-const preparedOf = (path: string): PreparedProjectRepository => ({
-  repositoryPath: path,
-  repositoryId: 42,
-  repository: "wordbricks/briar",
-  reused: false,
-  completedSteps: [],
-});
+const teamA = teamOf("team-a", organizationA);
+const teamB = teamOf("team-b", organizationB);
 
 /**
- * In-memory stand-ins for the Tauri commands and team endpoints the workspace
- * flows call. Every one of them records what it was asked to do, so a test can
- * assert the order the flows keep between this device and the server.
+ * In-memory stand-in for the workspace RPCs. It records what was asked so a
+ * test can assert an action reached the server exactly once, and echoes the
+ * requested change back the way the Worker does.
  */
 class WorkspaceServer {
-  connectedTeamIds: string[] = [];
-  readonly connected: string[] = [];
-  readonly connectedProviders: (string | null)[] = [];
-  readonly disconnected: string[] = [];
-  readonly workersConfigured: string[] = [];
-  readonly settingsWrites: { teamId: string; settings: TeamSettings }[] = [];
-  readonly localWorkflowWrites: string[] = [];
-  readonly deletedTeams: string[] = [];
-  readonly readiness = new Map<string, RepositoryReadiness>();
-  inventoryError: Error | null = null;
-  connectError: Error | null = null;
-  disconnectError: Error | null = null;
-  repairError: Error | null = null;
-  healthy = true;
+  readonly created: { name: string; handle: string }[] = [];
+  readonly renamed: [string, string][] = [];
+  readonly logos: [string, string | null][] = [];
+  readonly handleChecks: string[] = [];
+  takenHandles = new Set<string>();
 
-  api: Partial<WorkspaceApi> = {
-    loadConnectedTeamIds: async () => {
-      if (this.inventoryError) throw this.inventoryError;
-      return [...this.connectedTeamIds];
+  private workspaces: Workspace[];
+
+  constructor(workspaces: Workspace[]) {
+    this.workspaces = [...workspaces];
+  }
+
+  private require(workspaceId: string) {
+    const workspace = this.workspaces.find(
+      (candidate) => candidate.id === workspaceId,
+    );
+    if (!workspace) throw new Error(`unknown workspace ${workspaceId}`);
+    return workspace;
+  }
+
+  readonly api: WorkspaceActionApi = {
+    createWorkspace: async (_token, input) => {
+      this.created.push({ ...input });
+      const workspace: Workspace = {
+        id: `remote-${input.handle}`,
+        name: input.name,
+        handle: input.handle,
+        logo: null,
+        role: "owner",
+        createdAt: "2026-09-01T00:00:00.000Z",
+      };
+      this.workspaces.push(workspace);
+      return { workspace };
     },
-    loadTeamRepositoryReadiness: async (teamId) =>
-      this.readiness.get(teamId) ?? null,
-    loadAutoHuntHealth: async (teamId) => ({
-      ...(demoDashboard as unknown as { health?: never }),
-      projectId: teamId,
-      healthy: this.healthy,
-    }) as never,
-    repairAutoHunt: async (teamId) => {
-      if (this.repairError) throw this.repairError;
-      return { projectId: teamId, healthy: true } as never;
+    isWorkspaceHandleAvailable: async (_token, handle) => {
+      this.handleChecks.push(handle);
+      return !this.takenHandles.has(handle);
     },
-    updateLocalTeamWorkflow: async (teamId, workflow) => {
-      this.localWorkflowWrites.push(teamId);
-      return workflow;
+    updateWorkspace: async (_token, workspaceId, name) => {
+      this.renamed.push([workspaceId, name]);
+      return { workspace: { ...this.require(workspaceId), name } };
     },
-    connectLocalTeam: async (input) => {
-      if (this.connectError) throw this.connectError;
-      this.connected.push(input.projectId);
-      this.connectedProviders.push(input.provider ?? null);
-      this.connectedTeamIds = [...this.connectedTeamIds, input.projectId];
-      return {
-        repositoryPath: input.repositoryPath,
-        workflow: input.autoHunt.workflow,
-      } as never;
+    updateWorkspaceLogo: async (_token, workspaceId, logo) => {
+      this.logos.push([workspaceId, logo]);
+      return { workspace: { ...this.require(workspaceId), logo } };
     },
-    disconnectLocalTeam: async (teamId) => {
-      if (this.disconnectError) throw this.disconnectError;
-      this.disconnected.push(teamId);
-    },
-    configureLocalExecutionWorker: async (teamId) => {
-      this.workersConfigured.push(teamId);
-      return true as never;
-    },
-    createAgentToken: async () => ({ agentToken: "agent-token" }) as never,
-    createProjectGithubCredential: async () =>
-      ({
-        project: { id: teamA.id, organizationId: teamA.organizationId },
-        repository: {
-          id: 42,
-          fullName: "wordbricks/briar",
-          cloneUrl: "https://example.invalid/briar.git",
-        },
-        username: "x-access-token",
-        password: "secret",
-        expiresAt: "2026-09-02T00:00:00.000Z",
-      }) as never,
-    prepareTeamRepository: async (teamId) => preparedOf(`/repos/${teamId}`),
-    discoverRepositoryIcon: async () => null,
-    updateTeamSettings: async (_token, teamId, settings) => {
-      this.settingsWrites.push({ teamId, settings });
-      return { settings } as never;
-    },
-    deleteTeam: async (_token, teamId) => {
-      this.deletedTeams.push(teamId);
-      this.connectedTeamIds = this.connectedTeamIds.filter(
-        (candidate) => candidate !== teamId,
-      );
-      return undefined as never;
-    },
-    loadDashboard: async (_token, teamId) => dashboardOf(teamOf(teamId)),
-    generateTeamWorkflow: async () => demoDashboard.settings.workflow,
-    loadGithubIntegration: async () =>
-      ({
-        connected: true,
-        repositories: [{ fullName: "wordbricks/briar" }],
-      }) as never,
   };
 }
 
 interface Harness {
-  readonly actions: ReturnType<typeof createWorkspaceActions>;
   readonly registry: AtomRegistry;
   readonly server: WorkspaceServer;
+  readonly reconnectBumps: () => number;
+  /** Puts a probed value back on the health atom. */
+  readonly armHealth: () => void;
+  /** The health probe is blanked exactly when the switch changes the board. */
+  readonly healthResets: () => number;
+  readonly actions: ReturnType<typeof createWorkspaceActions>;
 }
 
 const harness = (
-  options: { readonly demoMode?: boolean; readonly teams?: Project[] } = {},
+  overrides: { lockedTeamId?: string | null } = {},
+  workspaces: Workspace[] = [organizationA, organizationB],
+  teams: Project[] = [teamA, teamB],
 ): Harness => {
-  const server = new WorkspaceServer();
   const registry = createTestRegistry([
+    [workspacesAtom, workspaces],
+    [teamsAtom, teams],
     [tokenAtom, "token-1"],
-    [teamsAtom, options.teams ?? [teamA, teamB]],
-    [activeTeamIdAtom, teamA.id],
-    [organizationsAtom, [{ ...demoDashboard.team, id: teamA.organizationId }]],
-    [activeOrganizationIdAtom, teamA.organizationId],
-    [workspaceApiAtom, server.api],
-    [
-      workspaceModesAtom,
-      { demoMode: options.demoMode ?? false, remoteMode: false },
-    ],
+    [lockedTeamIdAtom, overrides.lockedTeamId ?? null],
   ]);
-  return { actions: createWorkspaceActions(registry), registry, server };
-};
-
-/** Puts a team's payload in the store, as a snapshot load does. */
-const loadTeam = (
-  registry: AtomRegistry,
-  team: Project,
-  settings = settingsOf(),
-) =>
-  applySyncEvent(registry, {
-    kind: "team-snapshot",
-    teamId: team.id,
-    payload: dashboardOf(team, settings),
-  });
-
-describe("createWorkspaceActions", () => {
-  it("probes the selected team's health only once it is connected here", async () => {
-    const { actions, registry, server } = harness();
-
-    // Nothing is connected to this device yet, so there is nothing to probe.
-    expect(await actions.refreshHealth()).toBeNull();
-    expect(registry.get(healthAtom).status).toBe("idle");
-
-    registry.set(connectedTeamIdsAtom, [teamA.id]);
-    const health = await actions.refreshHealth();
-
-    expect(health?.projectId).toBe(teamA.id);
-    expect(registry.get(healthAtom)).toEqual({
-      status: "ready",
-      value: health,
-      error: null,
-    });
-    expect(server.settingsWrites).toEqual([]);
-  });
-
-  it("keeps the last health on screen when a repair fails", async () => {
-    const { actions, registry, server } = harness();
-    registry.set(connectedTeamIdsAtom, [teamA.id]);
-    const probed = await actions.refreshHealth();
-
-    server.repairError = new Error("설치 실패");
-    expect(await actions.repairHealth()).toBeNull();
-
-    expect(registry.get(healthAtom)).toEqual({
-      status: "error",
-      value: probed,
-      error: "설치 실패",
-    });
-  });
-
-  it("drops a health probe that outlived its team", async () => {
-    const { actions, registry } = harness();
-    registry.set(connectedTeamIdsAtom, [teamA.id, teamB.id]);
-
-    const probe = actions.refreshHealth();
-    registry.set(activeTeamIdAtom, teamB.id);
-
-    expect(await probe).toBeNull();
-    // The superseded probe wrote nothing, so the loading marker the newer one
-    // owns is still up.
-    expect(registry.get(healthAtom).value).toBeNull();
-  });
-
-  it("blanks a team's readiness before re-probing it", async () => {
-    const { actions, registry, server } = harness();
-    server.connectedTeamIds = [teamA.id];
-    server.readiness.set(teamA.id, readinessOf("/repos/team-a"));
-
-    const readiness = await actions.refreshProjectReadiness(teamA.id);
-
-    expect(readiness?.repositoryPath).toBe("/repos/team-a");
-    expect(registry.get(teamReadinessAtom(teamA.id))).toEqual({
-      readiness,
-      error: null,
-      loading: false,
-    });
-    // The probe carried the inventory it read, so nothing else has to fetch it.
-    expect(registry.get(connectedTeamIdsAtom)).toEqual([teamA.id]);
-  });
-
-  it("reports a readiness probe failure against the team that failed", async () => {
-    const { actions, registry, server } = harness();
-    server.connectedTeamIds = [teamA.id];
-
-    await actions.refreshProjectReadiness(teamA.id);
-
-    expect(registry.get(teamReadinessAtom(teamA.id)).error).toBe(
-      "로컬 저장소 준비 상태를 확인할 수 없습니다.",
-    );
-    expect(registry.get(teamReadinessAtom(teamB.id)).error).toBeNull();
-  });
-
-  it("connects a repository and mirrors the settings the server accepted", async () => {
-    const { actions, registry, server } = harness();
-    loadTeam(registry, teamA);
-    registry.set(teamConnectionAtom, {
-      kind: "new",
-      project: teamA,
-      agentToken: null,
-      workflow: undefined,
-    });
-    server.readiness.set(teamA.id, readinessOf("/repos/team-a"));
-
-    const connected = await actions.connectProject(
-      {
-        velenOrg: "wordbricks",
-        dataSource: null,
-        linearEnabled: false,
-        workflow: demoDashboard.settings.workflow,
-      },
-      "/repos/team-a",
-      undefined,
-      "claude",
-    );
-
-    expect(connected.repositoryPath).toBe("/repos/team-a");
-    // The agent backend chosen on the connection screen reaches the native
-    // command instead of being resolved again from install order.
-    expect(server.connectedProviders).toEqual(["claude"]);
-    // Local config first, then the server settings that share the workflow.
-    expect(server.connected).toEqual([teamA.id]);
-    expect(server.localWorkflowWrites).toEqual([teamA.id]);
-    expect(server.workersConfigured).toEqual([teamA.id]);
-    expect(registry.get(connectedTeamIdsAtom)).toEqual([teamA.id]);
-    // The generated draft is canonicalized on its way through, so the flow is
-    // asserted on rather than the literal it started from.
-    expect(registry.get(teamConnectionAtom)?.workflow?.version).toBe(
-      demoDashboard.settings.workflow.version,
-    );
-    expect(registry.get(loadingAtom)).toBe(false);
-  });
-
-  it("refuses a connection the local inventory does not confirm", async () => {
-    const { actions, registry, server } = harness();
-    loadTeam(registry, teamA);
-    registry.set(teamConnectionAtom, {
-      kind: "new",
-      project: teamA,
-      agentToken: null,
-      workflow: undefined,
-    });
-    // The command reports success but the inventory does not list the team.
-    server.api = {
-      ...server.api,
-      connectLocalTeam: async (input) =>
-        ({ repositoryPath: input.repositoryPath }) as never,
-    };
-    registry.set(workspaceApiAtom, server.api);
-
-    await expect(
-      actions.connectProject(
-        {
-          velenOrg: null,
-          linearEnabled: false,
-          workflow: demoDashboard.settings.workflow,
-        },
-        "/repos/team-a",
-      ),
-    ).rejects.toThrow("저장된 로컬 프로젝트 연결을 다시 확인하지 못했습니다.");
-    expect(registry.get(sessionErrorAtom)).toContain(
-      "저장된 로컬 프로젝트 연결",
-    );
-  });
-
-  it("prepares a configured repository and commits its settings", async () => {
-    const { actions, registry, server } = harness();
-    loadTeam(registry, teamA);
-
-    const prepared = await actions.prepareGithubProjectRepository(
-      teamA.id,
-      "wordbricks/briar",
-    );
-
-    expect(prepared.repository).toBe("wordbricks/briar");
-    expect(registry.get(teamSettingsAtom(teamA.id))?.githubRepository).toBe(
-      "wordbricks/briar",
-    );
-    expect(server.settingsWrites).toHaveLength(1);
-  });
-
-  it("rejects a repository outside the organization's GitHub App scope", async () => {
-    const { actions } = harness();
-
-    await expect(
-      actions.resolveGithubProjectRepository("someone/else"),
-    ).rejects.toThrow("저장소 접근 범위에 없습니다");
-    await expect(
-      actions.resolveGithubProjectRepository("WordBricks/Briar"),
-    ).resolves.toBe("wordbricks/briar");
-  });
-
-  it("connects a second machine to a team that is already configured", async () => {
-    const { actions, registry, server } = harness();
-    loadTeam(registry, teamA);
-    server.readiness.set(teamA.id, readinessOf("/repos/team-a"));
-
-    const result = await actions.startWorkingOnProject(teamA.id);
-
-    expect(result?.readiness.repositoryPath).toBe("/repos/team-a");
-    expect(server.connected).toEqual([teamA.id]);
-    expect(server.workersConfigured).toEqual([teamA.id]);
-    expect(registry.get(teamReadinessAtom(teamA.id))).toEqual({
-      readiness: result?.readiness,
-      error: null,
-      loading: false,
-    });
-  });
-
-  it("deletes a team, its local connection and everything it owned", async () => {
-    const { actions, registry, server } = harness();
-    loadTeam(registry, teamA);
-    registry.set(connectedTeamIdsAtom, [teamA.id, teamB.id]);
-    registry.set(teamReadinessAtom(teamA.id), {
-      readiness: readinessOf("/repos/team-a"),
-      error: null,
-      loading: false,
-    });
+  const server = new WorkspaceServer(workspaces);
+  const baseReconnectGeneration = reconnectRequestGeneration(registry);
+  const actions = createWorkspaceActions(registry, { api: server.api });
+  /*
+    The health probe is workspace state now, so "was it blanked" is read off the
+    atom rather than counted through an injected callback. Each assertion arms
+    it with a probed value first, and a reset takes it back to idle.
+  */
+  const armHealth = () =>
     registry.set(healthAtom, {
       status: "ready",
       value: null,
-      error: null,
+      error: "이전 오류",
+    });
+  armHealth();
+  return {
+    actions,
+    armHealth,
+    healthResets: () =>
+      registry.get(healthAtom).status === "idle" ? 1 : 0,
+    reconnectBumps: () =>
+      reconnectRequestGeneration(registry) - baseReconnectGeneration,
+    registry,
+    server,
+  };
+};
+
+/** Puts a team's payload in the store and selects it, as a snapshot load does. */
+const loadTeam = (registry: AtomRegistry, team: Project) => {
+  registry.set(activeTeamIdAtom, team.id);
+  applySyncEvent(registry, {
+    kind: "team-snapshot",
+    teamId: team.id,
+    payload: {
+      ...demoDashboard,
+      team,
+      runs: [],
+      generatedAt: "2026-09-01T00:00:00.000Z",
+    },
+  });
+};
+
+describe("createWorkspaceActions", () => {
+  it("appends a created workspace and selects it with no team", async () => {
+    const { actions, registry, healthResets, server, reconnectBumps } =
+      harness();
+
+    const workspace = await actions.addWorkspace({
+      name: "Org C",
+      handle: "org-c",
     });
 
-    await actions.removeProject(teamA.id);
+    expect(server.created).toEqual([{ name: "Org C", handle: "org-c" }]);
+    expect(registry.get(workspacesAtom)).toEqual([
+      organizationA,
+      organizationB,
+      workspace,
+    ]);
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(workspace.id);
+    expect(registry.get(activeTeamIdAtom)).toBeNull();
+    expect(healthResets()).toBe(1);
+    expect(reconnectBumps()).toBe(1);
+  });
 
-    expect(server.deletedTeams).toEqual([teamA.id]);
-    expect(server.disconnected).toEqual([teamA.id]);
-    expect(registry.get(teamsAtom)).toEqual([teamB]);
+  it("refuses to create a workspace without a session", async () => {
+    const { actions, registry, server } = harness();
+    registry.set(tokenAtom, null);
+
+    await expect(
+      actions.addWorkspace({ name: "Org C", handle: "org-c" }),
+    ).rejects.toThrow("로그인이 필요합니다.");
+    expect(server.created).toEqual([]);
+  });
+
+  it("mirrors a rename into the team list and the dashboard", async () => {
+    const { actions, registry, server } = harness();
+    loadTeam(registry, teamA);
+
+    const workspace = await actions.renameWorkspace(
+      organizationA.id,
+      "Org A renamed",
+    );
+
+    expect(server.renamed).toEqual([[organizationA.id, "Org A renamed"]]);
+    expect(workspace.name).toBe("Org A renamed");
+    expect(registry.get(workspacesAtom)).toEqual([
+      workspace,
+      organizationB,
+    ]);
+    // The team list carries a denormalised workspace name of its own.
+    expect(
+      registry.get(teamsAtom).map((team) => team.workspaceName),
+    ).toEqual(["Org A renamed", "Org B"]);
+    // …and so does the team entity the dashboard renders.
+    expect(readTeamView(registry, teamA.id)?.team.workspaceName)
+      .toBe("Org A renamed");
+  });
+
+  it("rejects renaming a workspace the account does not have", async () => {
+    const { actions, server } = harness();
+
+    await expect(actions.renameWorkspace("org-missing", "x")).rejects.toThrow(
+      "변경할 워크스페이스를 찾을 수 없습니다.",
+    );
+    expect(server.renamed).toEqual([]);
+  });
+
+  it("replaces only the edited workspace when changing a logo", async () => {
+    const { actions, registry, server } = harness();
+
+    const workspace = await actions.changeWorkspaceLogo(
+      organizationB.id,
+      "data:image/png;base64,",
+    );
+
+    expect(server.logos).toEqual([[organizationB.id, "data:image/png;base64,"]]);
+    expect(registry.get(workspacesAtom)).toEqual([
+      organizationA,
+      workspace,
+    ]);
+  });
+
+  it("reports handle availability from the server", async () => {
+    const { actions, server } = harness();
+    server.takenHandles.add("taken");
+
+    expect(await actions.checkWorkspaceHandle("free")).toBe(true);
+    expect(await actions.checkWorkspaceHandle("taken")).toBe(false);
+    expect(server.handleChecks).toEqual(["free", "taken"]);
+  });
+
+  it("selects a workspace together with its first team", () => {
+    const { actions, registry, healthResets, reconnectBumps } = harness();
+
+    actions.selectWorkspace(organizationB.id);
+
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(organizationB.id);
     expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
-    expect(registry.get(connectedTeamIdsAtom)).toEqual([teamB.id]);
-    expect(registry.get(teamReadinessAtom(teamA.id)).readiness).toBeNull();
-    expect(registry.get(healthAtom).status).toBe("idle");
+    // Nothing is stored for that team, so the board shows the loading state.
+    expect(registry.get(staleTeamIdAtom)).toBeNull();
+    expect(healthResets()).toBe(1);
+    expect(reconnectBumps()).toBe(1);
   });
 
-  it("names the team while the deletion runs and forgets it when it settles", async () => {
+  it("renders a stored team immediately and marks it for a fresh snapshot", () => {
     const { actions, registry } = harness();
-    const seen: (string | null)[] = [];
-    const unsubscribe = registry.subscribe(
-      deletingTeamIdAtom,
-      (value) => seen.push(value),
-      { immediate: true },
-    );
+    loadTeam(registry, teamB);
+    registry.set(activeTeamIdAtom, teamA.id);
 
-    await actions.removeProject(teamA.id);
+    actions.selectWorkspace(organizationB.id);
 
-    expect(seen).toEqual([null, teamA.id, null]);
-    unsubscribe();
+    expect(readTeamView(registry, teamB.id)?.team.id).toBe(teamB.id);
+    expect(registry.get(staleTeamIdAtom)).toBe(teamB.id);
   });
 
-  it("keeps the team deleted when only the local cleanup failed", async () => {
-    const { actions, registry, server } = harness();
-    server.disconnectError = new Error("파일이 잠겼습니다");
+  it("ignores a workspace the account is not a member of", () => {
+    const { actions, registry, healthResets, reconnectBumps } = harness();
 
-    await actions.removeProject(teamA.id);
+    actions.selectWorkspace("org-missing");
 
-    expect(server.deletedTeams).toEqual([teamA.id]);
-    expect(registry.get(teamsAtom)).toEqual([teamB]);
-    expect(registry.get(sessionErrorAtom)).toContain(
-      "로컬 연결 정리에 실패했습니다",
-    );
+    expect(registry.get(activeWorkspaceIdAtom)).toBeNull();
+    expect(healthResets()).toBe(0);
+    expect(reconnectBumps()).toBe(0);
   });
 
-  it("opens reconnect with the workflow the team already has", async () => {
-    const { actions, registry } = harness();
-    loadTeam(registry, teamA);
+  it("treats reselecting the settled workspace as a no-op", () => {
+    const { actions, registry, healthResets, reconnectBumps } = harness();
+    // The board on screen already belongs to the team this workspace
+    // resolves to, so nothing has to be reloaded.
+    loadTeam(registry, teamB);
+    registry.set(activeWorkspaceIdAtom, organizationB.id);
+    registry.set(sessionErrorAtom, "이전 오류");
 
-    expect(await actions.reconnectProject(teamA.id)).toBe("opened");
+    actions.selectWorkspace(organizationB.id);
 
-    expect(registry.get(teamConnectionAtom)).toEqual({
-      kind: "reconnect",
-      project: teamA,
-      agentToken: null,
-      workflow: settingsOf().workflow,
+    expect(registry.get(sessionErrorAtom)).toBeNull();
+    expect(registry.get(staleTeamIdAtom)).toBeNull();
+    expect(healthResets()).toBe(0);
+    expect(reconnectBumps()).toBe(0);
+  });
+
+  it("keeps a project window pinned to its own team's workspace", () => {
+    const { actions, registry, healthResets } = harness({
+      lockedTeamId: teamB.id,
     });
-    expect(registry.get(activeTeamIdAtom)).toBe(teamA.id);
-  });
 
-  it("reports a reconnect for a team the account does not have", async () => {
-    const { actions, registry } = harness();
+    actions.selectWorkspace(organizationA.id);
+    expect(registry.get(activeWorkspaceIdAtom)).toBeNull();
+    expect(registry.get(activeTeamIdAtom)).toBeNull();
 
-    expect(await actions.reconnectProject("team-missing")).toBe("failed");
-    expect(registry.get(teamConnectionAtom)).toBeNull();
-  });
-
-  it("drops a reconnect a newer one replaced", async () => {
-    const { actions, registry, server } = harness();
-    // The selected team's payload is on screen, so its own reconnect resolves
-    // without waiting for the fetch the other team's is stuck on.
-    loadTeam(registry, teamA);
-    let releaseDashboard: (payload: DashboardPayload) => void = () => undefined;
-    server.api = {
-      ...server.api,
-      loadDashboard: () =>
-        new Promise<DashboardPayload>((resolve) => {
-          releaseDashboard = resolve;
-        }),
-    };
-    registry.set(workspaceApiAtom, server.api);
-
-    const first = actions.reconnectProject(teamB.id);
-    // A second attempt bumps the shared generation the first one holds.
-    await actions.reconnectProject(teamA.id).catch(() => undefined);
-    releaseDashboard(dashboardOf(teamB));
-
-    expect(await first).toBe("superseded");
-    expect(registry.get(teamConnectionAtom)?.project.id).toBe(teamA.id);
-  });
-
-  it("creates a demo team locally and opens its connection flow", async () => {
-    const { actions, registry } = harness({ demoMode: true, teams: [] });
-
-    const { project, agentToken } = await actions.addProject({ name: " Demo " });
-
-    expect(agentToken).toBeNull();
-    expect(project.name).toBe("Demo");
-    expect(registry.get(teamsAtom)).toEqual([project]);
-    expect(registry.get(activeTeamIdAtom)).toBe(project.id);
-    expect(readActiveTeamView(registry)?.team.id).toBe(project.id);
+    actions.selectWorkspace(organizationB.id);
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(organizationB.id);
+    expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
+    // A locked window never reloads the board: it only ever shows one team.
+    expect(healthResets()).toBe(0);
   });
 });

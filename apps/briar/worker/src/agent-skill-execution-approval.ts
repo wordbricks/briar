@@ -294,7 +294,7 @@ export async function approveAgentSkillExecutionProposal(
   for (const workerId of candidateWorkerIds) {
     try {
       worker = await availableExecutionWorkerForAgentSkill(db, {
-        organizationId: proposal.organization_id,
+        workspaceId: proposal.organization_id,
         projectId: proposal.project_id,
         workerId,
         provider: runtimeProvider,
@@ -345,7 +345,7 @@ export async function approveAgentSkillExecutionProposal(
       : await acceptAgentSkillExecutionProposal(db, {
         proposalId: proposal.id,
         sourceKind: input.sourceKind,
-        organizationId: proposal.organization_id,
+        workspaceId: proposal.organization_id,
         projectId: proposal.project_id,
         channelId: proposal.channel_id,
         conversationRunId: proposal.conversation_run_id,

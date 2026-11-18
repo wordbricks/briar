@@ -1,3 +1,4 @@
+import { runDueDmSchedules } from "./dm-schedules";
 import {
   archiveCompletedLogs,
   expireArchives,
@@ -14,13 +15,44 @@ import {
 } from "./managed-computer-reconciliation";
 import {
   flushAgentSkillExecutionRealtimeOutbox,
-  flushOrganizationInboxRealtimeOutbox,
+  flushWorkspaceInboxRealtimeOutbox,
 } from "./realtime-scheduling";
 import { processSlackRevocationQueue } from "./slack-revocations";
 import { cleanupExpiredChannelReplySessions } from "./channels";
 import { maintainUploadCleanup } from "./upload-repository";
-import { runDmMemoryMaintenance } from "./dm-memory-indexing";
+import { cleanupAbandonedReplyLookups } from "./channel-reply-lookup-budget";
+import { flushDmMemoryActivityRevocations } from "./dm-memory-activity-revocations";
 import { flushWhatsAppOutbox } from "./whatsapp-outbox";
+import { memoryVaultStoreFromEnv } from "./memory-vault/artifacts-git-store";
+import { runMemoryVaultMaintenance as runMemoryVaultMaintenanceWithStore } from "./memory-vault/forget";
+
+/**
+ * Memory vault purges (every minute) and the orphan repository sweep (every six
+ * hours). A failure is logged and reported, never allowed to fail the other
+ * scheduled work.
+ */
+async function runMemoryVaultMaintenance(env: Env, cadence: "minute" | "six_hourly") {
+  const store = memoryVaultStoreFromEnv(env);
+  let maintenance: Awaited<ReturnType<typeof runMemoryVaultMaintenanceWithStore>> | { error: string };
+  try {
+    maintenance = await runMemoryVaultMaintenanceWithStore({ db: env.DB, store }, cadence);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ message: "Memory vault maintenance failed", cadence, error: message }));
+    maintenance = { error: message };
+  }
+  return maintenance;
+}
+
+/**
+ * Reply-claim housekeeping that used to ride on DM memory maintenance: drop
+ * lookup caches of reply claims that ended, and clear the activity of replies
+ * a DM memory revocation sent back to the queue.
+ */
+async function runDmReplyCleanup(env: Env, observedAt: string) {
+  await cleanupAbandonedReplyLookups(env.DB, observedAt);
+  return env.CHANNEL_ACTIVITY_REALTIME ? await flushDmMemoryActivityRevocations(env.DB, env) : null;
+}
 
 export type ScheduledTaskDependencies = {
   archiveCompletedLogs: typeof archiveCompletedLogs;
@@ -34,8 +66,10 @@ export type ScheduledTaskDependencies = {
   reconcileManagedComputers: typeof reconcileManagedComputers;
   cleanupExpiredChannelReplySessions: typeof cleanupExpiredChannelReplySessions;
   maintainUploadCleanup: typeof maintainUploadCleanup;
-  runDmMemoryMaintenance: typeof runDmMemoryMaintenance;
+  runDmReplyCleanup: typeof runDmReplyCleanup;
+  runDueDmSchedules: typeof runDueDmSchedules;
   flushWhatsAppOutbox: typeof flushWhatsAppOutbox;
+  runMemoryVaultMaintenance: typeof runMemoryVaultMaintenance;
 };
 
 interface DashboardChangePruneFailure {
@@ -54,8 +88,10 @@ const scheduledTaskDependencies: ScheduledTaskDependencies = {
   reconcileManagedComputers,
   cleanupExpiredChannelReplySessions,
   maintainUploadCleanup,
-  runDmMemoryMaintenance,
+  runDmReplyCleanup,
+  runDueDmSchedules,
   flushWhatsAppOutbox,
+  runMemoryVaultMaintenance,
 };
 const GITHUB_RECONCILIATION_CRON = "* * * * *";
 const LOG_MAINTENANCE_CRON = "17 */6 * * *";
@@ -70,7 +106,7 @@ export async function handleScheduledTask(
   if (controller.cron === GITHUB_RECONCILIATION_CRON) {
     ctx.waitUntil((async () => {
       try {
-        const [github, mergeQueue, managedComputerRetirements, dmMemory, whatsapp] =
+        const [github, mergeQueue, managedComputerRetirements, dmReplyCleanup, whatsapp, dmSchedules, memoryVault] =
           await Promise.all([
           dependencies.reconcileGithubMergedRuns(env.DB),
           dependencies.reconcileEnabledMergeQueueRuns(env.DB, observedAt),
@@ -79,11 +115,13 @@ export async function handleScheduledTask(
             env,
             observedAt,
           ),
-          dependencies.runDmMemoryMaintenance(env, observedAt),
+          dependencies.runDmReplyCleanup(env, observedAt),
           dependencies.flushWhatsAppOutbox(env, env.DB, observedAt),
+          dependencies.runDueDmSchedules(env.DB, new Date().toISOString()),
+          dependencies.runMemoryVaultMaintenance(env, "minute"),
         ]);
         await Promise.all([
-          flushOrganizationInboxRealtimeOutbox(env, env.DB),
+          flushWorkspaceInboxRealtimeOutbox(env, env.DB),
           flushAgentSkillExecutionRealtimeOutbox(env, env.DB),
         ]);
         console.log(JSON.stringify({
@@ -92,8 +130,10 @@ export async function handleScheduledTask(
           github,
           mergeQueue,
           managedComputerRetirements,
-          dmMemory,
+          dmReplyCleanup,
           whatsapp,
+          dmSchedules,
+          memoryVault,
         }));
       } catch (error) {
         console.error(JSON.stringify({
@@ -136,7 +176,7 @@ export async function handleScheduledTask(
         }));
       }
       const [archive, expired, cleanup, slackRevocations, github, managedComputers,
-        channelReplySessions, uploads] =
+        channelReplySessions, uploads, memoryVault] =
         await Promise.all([
         dependencies.archiveCompletedLogs(env.DB, env.ARCHIVES, observedAt),
         dependencies.expireArchives(
@@ -160,9 +200,10 @@ export async function handleScheduledTask(
           env.ATTACHMENTS,
           observedAt,
         ),
+        dependencies.runMemoryVaultMaintenance(env, "six_hourly"),
       ]);
       await Promise.all([
-        flushOrganizationInboxRealtimeOutbox(env, env.DB),
+        flushWorkspaceInboxRealtimeOutbox(env, env.DB),
         flushAgentSkillExecutionRealtimeOutbox(env, env.DB),
       ]);
       if (dashboardChangePruneFailure !== null) {
@@ -183,6 +224,7 @@ export async function handleScheduledTask(
           reason: "ttl_expired",
         })),
         uploads,
+        memoryVault,
       }));
     } catch (error) {
       console.error(JSON.stringify({

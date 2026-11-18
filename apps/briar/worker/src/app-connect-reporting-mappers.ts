@@ -14,17 +14,15 @@ import {
   AgentUsageRunSchema,
   GetProjectUsageSummaryResponseSchema,
   GetRunCostEstimateResponseSchema,
-  ListOrganizationUsageRunsResponseSchema,
+  ListWorkspaceUsageRunsResponseSchema,
   ListStatusTrayRunsResponseSchema,
   ProjectUsageBreakdownItemSchema,
   ProjectUsagePeriod,
   ProjectUsageTimelinePointSchema,
-  StatusTrayRunSchema,
-} from "@briar/contracts/gen/briar/app/v1/reporting_pb";
+  StatusTrayRunSchema} from "@briar/contracts/gen/briar/app/v1/reporting_pb";
 import {
   AgentExecutionMetricsSchema,
-  AgentExecutionModelSource,
-} from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
+  AgentExecutionModelSource} from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import type { AutoHuntRunStatus } from "../../src/lib/auto-hunt-contract";
 import type { AgentExecutionMetrics } from "../../src/lib/agent-execution-metrics";
 import type {
@@ -34,13 +32,13 @@ import type {
 import type { TeamUsageSummary } from "../../src/lib/team-usage-summary";
 import { appAgentProvider } from "./app-connect-mappers";
 import type {
-  listOrganizationUsageRunsApplication,
+  listWorkspaceUsageRunsApplication,
   listStatusTrayRunsApplication,
   organizationUsageRunReport,
 } from "./reporting-application";
 
-type OrganizationUsageRunReport = ReturnType<typeof organizationUsageRunReport>;
-type OrganizationUsageRunsReport = Awaited<ReturnType<typeof listOrganizationUsageRunsApplication>>;
+type WorkspaceUsageRunReport = ReturnType<typeof organizationUsageRunReport>;
+type WorkspaceUsageRunsReport = Awaited<ReturnType<typeof listWorkspaceUsageRunsApplication>>;
 type StatusTrayRunsReport = Awaited<ReturnType<typeof listStatusTrayRunsApplication>>;
 
 export const appReportingTimestamp = (value: string) => {
@@ -85,7 +83,7 @@ const modelSource = {
   configuredFallback: AgentExecutionModelSource.CONFIGURED_FALLBACK,
   unknown: AgentExecutionModelSource.UNKNOWN,
 } as const satisfies Record<
-  OrganizationUsageRunReport["usageRecords"][number]["modelSource"],
+  WorkspaceUsageRunReport["usageRecords"][number]["modelSource"],
   AgentExecutionModelSource
 >;
 
@@ -118,7 +116,7 @@ const appExecutionMetrics = (metrics: AgentExecutionMetrics) =>
   });
 
 const appUsageExecutionAttempt = (
-  attempt: OrganizationUsageRunReport["executionAttempts"][number],
+  attempt: WorkspaceUsageRunReport["executionAttempts"][number],
 ) =>
   create(AgentUsageExecutionAttemptSchema, {
     executionId: attempt.executionId,
@@ -131,7 +129,7 @@ const appUsageExecutionAttempt = (
     recordedAt: appReportingTimestamp(attempt.recordedAt),
   });
 
-const appUsageRecord = (record: OrganizationUsageRunReport["usageRecords"][number]) =>
+const appUsageRecord = (record: WorkspaceUsageRunReport["usageRecords"][number]) =>
   create(AgentUsageRecordSchema, {
     executionId: record.executionId,
     projectId: record.projectId,
@@ -162,7 +160,7 @@ const appUsageRecord = (record: OrganizationUsageRunReport["usageRecords"][numbe
     recordedAt: appReportingTimestamp(record.recordedAt),
   });
 
-const appUsageCostRecord = (record: OrganizationUsageRunReport["costRecords"][number]) =>
+const appUsageCostRecord = (record: WorkspaceUsageRunReport["costRecords"][number]) =>
   create(AgentUsageCostRecordSchema, {
     executionId: record.executionId,
     projectId: record.projectId,
@@ -187,7 +185,7 @@ const appUsageCostRecord = (record: OrganizationUsageRunReport["costRecords"][nu
   });
 
 const appUsageEstimatedCostRecord = (
-  record: OrganizationUsageRunReport["estimatedCostRecords"][number],
+  record: WorkspaceUsageRunReport["estimatedCostRecords"][number],
 ) =>
   create(AgentUsageEstimatedCostRecordSchema, {
     executionId: record.executionId,
@@ -211,7 +209,7 @@ const appUsageEstimatedCostRecord = (
     amountUsdTicks: appUint64(record.amountUsdTicks, "estimatedCost.amountUsdTicks"),
   });
 
-const appOrganizationUsageRun = (run: OrganizationUsageRunReport) =>
+const appWorkspaceUsageRun = (run: WorkspaceUsageRunReport) =>
   create(AgentUsageRunSchema, {
     id: run.id,
     projectId: run.projectId,
@@ -236,9 +234,9 @@ const appOrganizationUsageRun = (run: OrganizationUsageRunReport) =>
     estimatedCostRecords: run.estimatedCostRecords.map(appUsageEstimatedCostRecord),
   });
 
-export const appOrganizationUsageRuns = (report: OrganizationUsageRunsReport) =>
-  create(ListOrganizationUsageRunsResponseSchema, {
-    runs: report.runs.map(appOrganizationUsageRun),
+export const appWorkspaceUsageRuns = (report: WorkspaceUsageRunsReport) =>
+  create(ListWorkspaceUsageRunsResponseSchema, {
+    runs: report.runs.map(appWorkspaceUsageRun),
     generatedAt: appReportingTimestamp(report.generatedAt),
     pricing: appAgentUsagePricing(report.pricing),
   });

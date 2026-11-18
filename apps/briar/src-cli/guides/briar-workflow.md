@@ -450,6 +450,27 @@ ignored. The desktop host and registered Worker then sweep recorded completions 
 Uncommitted or untracked source changes keep the checkout in place; maintenance failure does
 not change the run outcome.
 
+## Issues and channels from inside a run
+
+A Worker-dispatched run (issue, issue conversation reply, channel or DM reply, Agent task)
+has a `tools` command on its PATH. `tools issue …` and `tools channel …` act as the run's
+Agent, authorized by the run's claim; they need no token. Run `tools issue --help` and
+`tools channel --help` for the options.
+
+- Create an issue for follow-up work you find but will not do in this run
+  (`tools issue create --title … --description-file -`); search first with
+  `tools issue list --text …`.
+- Note important findings, decisions and blockers on the relevant issue with
+  `tools issue note <issue> "…"`.
+- Move other issues as their work progresses with `tools issue status <issue> <status>`.
+  An agent sets backlog, blocked, completed or cancelled; `queued` only asks a person to
+  approve execution. The issue this run is executing is never moved this way: use
+  `briar run …` for it.
+- Share progress and results other people or agents need in a channel you belong to with
+  `tools channel post <channel> "…"`. DMs are not reachable, posts never start other
+  agents, and agent posts are limited to 30 per hour per organization.
+- Pass `--request-key K` on every write and reuse it when retrying after a timeout.
+
 ## Handoff
 
 Report the run ID, source key, repository-derived workflow, execution pause stage and complete required stages, workspace and branch,

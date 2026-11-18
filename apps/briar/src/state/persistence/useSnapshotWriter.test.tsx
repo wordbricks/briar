@@ -7,15 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoDashboard } from "../../lib/demo-data";
 import type {
   DashboardPayload,
-  Organization,
+  Workspace,
   Project,
   SessionUser,
 } from "../../types";
 import { createReactTestRoot, type ReactTestRoot } from "../../test/react";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { createSessionActions } from "../session/actions";
 import { tokenAtom, userAtom } from "../session/atoms";
@@ -37,7 +34,7 @@ import { SNAPSHOT_WRITE_DELAY_MS, useSnapshotWriter } from "./useSnapshotWriter"
   The writer is the only thing in the app that touches storage on a schedule, so
   these fix its schedule: a burst of changes costs one write, leaving the tab
   costs one more, and the two events that must remove a record — leaving an
-  organization and signing out — actually remove it.
+  workspace and signing out — actually remove it.
 */
 
 const user: SessionUser = {
@@ -46,7 +43,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organizationA: Organization = {
+const organizationA: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -55,13 +52,13 @@ const organizationA: Organization = {
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
-const organizationB: Organization = { ...organizationA, id: "org-b", handle: "org-b" };
+const organizationB: Workspace = { ...organizationA, id: "org-b", handle: "org-b" };
 
-const teamOf = (id: string, organizationId: string): Project => ({
+const teamOf = (id: string, workspaceId: string): Project => ({
   ...demoDashboard.team,
   id,
   name: id,
-  organizationId,
+  workspaceId,
 });
 
 const teamA = teamOf("team-a", organizationA.id);
@@ -122,8 +119,8 @@ const signedIn = () => {
   registry = createTestRegistry([
     [userAtom, user],
     [tokenAtom, "token-1"],
-    [organizationsAtom, [organizationA, organizationB]],
-    [activeOrganizationIdAtom, organizationA.id],
+    [workspacesAtom, [organizationA, organizationB]],
+    [activeWorkspaceIdAtom, organizationA.id],
     [teamsAtom, [teamA, teamB]],
     [activeTeamIdAtom, teamA.id],
   ]);
@@ -206,7 +203,7 @@ describe("useSnapshotWriter", () => {
     expect(stored?.teamState[0]?.cursor).toBe(4);
     // …and the pointer the next cold start reads its key from.
     expect(readSnapshotAccount()).toEqual({
-      organizationId: organizationA.id,
+      workspaceId: organizationA.id,
       userId: user.id,
     });
   });
@@ -238,7 +235,7 @@ describe("useSnapshotWriter", () => {
     expect(store.writes).toHaveLength(3);
   });
 
-  it("removes the record of the organization the account left", async () => {
+  it("removes the record of the workspace the account left", async () => {
     signedIn();
     await mount();
     await advance(SNAPSHOT_WRITE_DELAY_MS);
@@ -246,21 +243,21 @@ describe("useSnapshotWriter", () => {
     expect([...store.records().keys()]).toEqual([keyA]);
 
     await act(async () => {
-      registry.set(activeOrganizationIdAtom, organizationB.id);
+      registry.set(activeWorkspaceIdAtom, organizationB.id);
       registry.set(activeTeamIdAtom, teamB.id);
     });
     await settle();
     expect(store.deletes).toEqual([keyA]);
     expect([...store.records().keys()]).toEqual([]);
 
-    // The new organization gets its own record on the next window.
+    // The new workspace gets its own record on the next window.
     await advance(SNAPSHOT_WRITE_DELAY_MS);
     expect([...store.records().keys()]).toEqual([
       snapshotKey(user.id, organizationB.id),
     ]);
   });
 
-  it("drops a scheduled write when the organization changed under it", async () => {
+  it("drops a scheduled write when the workspace changed under it", async () => {
     signedIn();
     await mount();
     await advance(SNAPSHOT_WRITE_DELAY_MS);
@@ -272,12 +269,12 @@ describe("useSnapshotWriter", () => {
         teamId: teamA.id,
         payload: payloadOf(teamA, 9),
       });
-      registry.set(activeOrganizationIdAtom, organizationB.id);
+      registry.set(activeWorkspaceIdAtom, organizationB.id);
       registry.set(activeTeamIdAtom, teamB.id);
     });
     await advance(SNAPSHOT_WRITE_DELAY_MS);
 
-    // Nothing was written under organization A's key after the account left it.
+    // Nothing was written under workspace A's key after the account left it.
     expect(store.writes).toEqual([snapshotKey(user.id, organizationB.id)]);
   });
 

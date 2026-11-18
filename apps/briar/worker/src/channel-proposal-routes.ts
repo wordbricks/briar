@@ -19,7 +19,7 @@ import {
   declineChannelActionProposal,
   getChannelAgentSkillExecutionProposal,
   getChannelExecutionProposal,
-  getOrganizationProject,
+  getWorkspaceProject,
   reserveChannelActionProposalApproval,
   reserveChannelExecutionProposalApproval,
   type ChannelRow,
@@ -28,6 +28,10 @@ import {
   listChannelIssueBatchItems,
   materializeChannelIssueBatch,
 } from "./channel-issue-batch-approval";
+import {
+  channelIssueAttachmentStatements,
+  resolveChannelIssueAttachmentSources,
+} from "./channel-issue-attachment-sources";
 import { recordHuntEvent } from "./hunt-event-repository";
 import { getHuntRunForProject } from "./hunt-run-repository";
 import { HttpError } from "./http-response";
@@ -43,6 +47,7 @@ import {
   newChannelBatchProposalIssueSourceKey,
   newChannelProposalIssueSourceKey,
 } from "./proposal-issue-source";
+import { digestRunId } from "./run-identity";
 import {
   assertExecutionSelectionAvailable,
   dispatchHuntRun,
@@ -80,7 +85,7 @@ const liveIssueExecutionProposalJson = (
 async function createApprovedChannelProposalIssue(input: {
   db: D1Database;
   project: Pick<TeamRow, "id" | "name">;
-  organizationId: string;
+  workspaceId: string;
   proposalId: string;
   channelId: string;
   messageId: string;
@@ -89,15 +94,35 @@ async function createApprovedChannelProposalIssue(input: {
   title: string;
   description: string | null;
   priority: number | null;
+  attachmentIds: readonly string[];
   createdByUserId: string;
   occurredAt: string;
 }) {
   const settings = await getTeamSettings(input.db, input.project.id);
   const relatedMessage = channelRelatedMessageReference({
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     messageId: input.messageId,
     rootMessageId: input.rootMessageId,
+  });
+  // Reject an unresolvable id before the run exists, so a proposal that names
+  // a deleted file fails cleanly instead of creating an issue without it.
+  await resolveChannelIssueAttachmentSources(input.db, {
+    workspaceId: input.workspaceId,
+    channelId: input.channelId,
+    attachmentIds: input.attachmentIds,
+  });
+  // The run id is derived here rather than read back from the callback so the
+  // attachment rows can be built for it up front: deriving their ids needs a
+  // digest, and the callback that carries them into the batch is synchronous.
+  const runId = await digestRunId(input.project.id, "issue", input.sourceKey);
+  const attachmentStatements = await channelIssueAttachmentStatements(input.db, {
+    projectId: input.project.id,
+    runId,
+    workspaceId: input.workspaceId,
+    channelId: input.channelId,
+    attachmentIds: input.attachmentIds,
+    createdAt: input.occurredAt,
   });
   // Keep the source message structured so the issue description remains the
   // exact proposal payload while the dashboard can offer an in-app jump back.
@@ -136,12 +161,15 @@ async function createApprovedChannelProposalIssue(input: {
       channelId: input.channelId,
       issueId: input.proposalId,
       relatedMessage,
-      attachmentCount: 0,
+      attachmentCount: input.attachmentIds.length,
     },
     createdByUserId: input.createdByUserId,
     preferredAgentProvider: null,
     preferredAgentModel: null,
     preferredAgentEffort: null,
+  }, {
+    newRunId: runId,
+    additionalStatements: () => attachmentStatements,
   });
 }
 
@@ -222,7 +250,7 @@ async function approveChannelExecutionProposalRequest(input: {
   }
   const acceptedAt = new Date().toISOString();
   const reservation = await reserveChannelExecutionProposalApproval(input.db, {
-    organizationId: input.channel.organization_id,
+    workspaceId: input.channel.organization_id,
     channelId: input.channel.id,
     proposalId: input.proposal.id,
     userId: input.userId,
@@ -264,7 +292,7 @@ async function approveChannelExecutionProposalRequest(input: {
     );
     if (!dispatched) throw new HttpError(404, "Run not found");
     const accepted = await getChannelExecutionProposal(input.db, {
-      organizationId: reservation.organization_id,
+      workspaceId: reservation.organization_id,
       channelId: reservation.channel_id!,
       proposalId: reservation.id,
       userId: reservation.approval_reserved_by_user_id,
@@ -305,18 +333,18 @@ async function approveChannelExecutionProposalRequest(input: {
 type ChannelProposalApplicationInput = {
   db: D1Database;
   env: Env;
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   proposalId: string;
   userId: string;
 };
 
-export async function declineOrganizationChannelProposal(
+export async function declineWorkspaceChannelProposal(
   input: ChannelProposalApplicationInput,
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -352,17 +380,17 @@ export async function declineOrganizationChannelProposal(
   return { outcome: "declined" as const };
 }
 
-export async function acceptOrganizationChannelExecutionProposal(
+export async function acceptWorkspaceChannelExecutionProposal(
   input: ChannelProposalApplicationInput & { request: unknown },
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
   const proposal = await getChannelExecutionProposal(input.db, {
-    organizationId: channel.organization_id,
+    workspaceId: channel.organization_id,
     channelId: channel.id,
     proposalId: input.proposalId,
     userId: input.userId,
@@ -388,17 +416,17 @@ export async function acceptOrganizationChannelExecutionProposal(
   });
 }
 
-export async function acceptOrganizationChannelSkillExecutionProposal(
+export async function acceptWorkspaceChannelSkillExecutionProposal(
   input: ChannelProposalApplicationInput & { request: unknown },
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
   const loadProposal = () => getChannelAgentSkillExecutionProposal(input.db, {
-    organizationId: channel.organization_id,
+    workspaceId: channel.organization_id,
     channelId: channel.id,
     proposalId: input.proposalId,
     userId: input.userId,
@@ -434,12 +462,12 @@ export async function acceptOrganizationChannelSkillExecutionProposal(
   );
 }
 
-export async function acceptOrganizationChannelProposal(
+export async function acceptWorkspaceChannelProposal(
   input: ChannelProposalApplicationInput & { request: unknown },
 ) {
   const channel = await requireChannelAccess(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -453,10 +481,10 @@ export async function acceptOrganizationChannelProposal(
     throw new HttpError(409, "Declined proposals cannot create an issue");
   }
   assertChannelProposalAuthorScope({
-    channelOrganizationId: channel.organization_id,
+    channelWorkspaceId: channel.organization_id,
     proposedProjectId: proposal.project_id,
     replyAuthorAgentId: proposal.reply_author_agent_id,
-    replyAuthorAgentOrganizationId: proposal.reply_author_agent_organization_id,
+    replyAuthorAgentWorkspaceId: proposal.reply_author_agent_organization_id,
     replyAuthorAgentProjectId: proposal.reply_author_agent_project_id,
   });
   const request = decodeChannelProposalAcceptInput(input.request);
@@ -480,7 +508,7 @@ export async function acceptOrganizationChannelProposal(
   if (!targetProjectId) {
     throw new HttpError(400, "A target project is required");
   }
-  const organizationProject = await getOrganizationProject(
+  const organizationProject = await getWorkspaceProject(
     input.db,
     channel.organization_id,
     targetProjectId,
@@ -524,7 +552,7 @@ export async function acceptOrganizationChannelProposal(
     }
     const approvedAt = new Date().toISOString();
     const reservation = await reserveChannelActionProposalApproval(input.db, {
-      organizationId: channel.organization_id,
+      workspaceId: channel.organization_id,
       channelId: channel.id,
       proposalId: proposal.id,
       projectId: project.id,
@@ -556,7 +584,7 @@ export async function acceptOrganizationChannelProposal(
       await materializeChannelIssueBatch({
         db: input.db,
         project,
-        organizationId: channel.organization_id,
+        workspaceId: channel.organization_id,
         channelId: channel.id,
         proposalId: proposal.id,
         messageId: proposal.reply_message_id,
@@ -599,7 +627,7 @@ export async function acceptOrganizationChannelProposal(
     }
     const executionProposal = proposal.execution_proposal_id
       ? await getChannelExecutionProposal(input.db, {
-          organizationId: channel.organization_id,
+          workspaceId: channel.organization_id,
           channelId: channel.id,
           proposalId: proposal.execution_proposal_id,
           userId: input.userId,
@@ -666,7 +694,7 @@ export async function acceptOrganizationChannelProposal(
     }
   }
   const reservation = await reserveChannelActionProposalApproval(input.db, {
-    organizationId: channel.organization_id,
+    workspaceId: channel.organization_id,
     channelId: channel.id,
     proposalId: proposal.id,
     projectId: project.id,
@@ -687,7 +715,7 @@ export async function acceptOrganizationChannelProposal(
     ) {
       const executionProposal = current.execution_proposal_id
         ? await getChannelExecutionProposal(input.db, {
-            organizationId: channel.organization_id,
+            workspaceId: channel.organization_id,
             channelId: channel.id,
             proposalId: current.execution_proposal_id,
             userId: input.userId,
@@ -739,7 +767,7 @@ export async function acceptOrganizationChannelProposal(
   const resultRunId = await createApprovedChannelProposalIssue({
     db: input.db,
     project,
-    organizationId: channel.organization_id,
+    workspaceId: channel.organization_id,
     sourceKey: reservation.issue_source_key,
     proposalId: proposal.id,
     channelId: channel.id,
@@ -748,6 +776,7 @@ export async function acceptOrganizationChannelProposal(
     title: approvedIssue.title,
     description: approvedIssue.description,
     priority: approvedIssue.priority,
+    attachmentIds: approvedIssue.attachmentIds,
     createdByUserId: reservation.accepted_by_user_id,
     occurredAt: proposal.created_at,
   });
@@ -766,7 +795,7 @@ export async function acceptOrganizationChannelProposal(
   }
   const executionProposal = finalized.execution_proposal_id
     ? await getChannelExecutionProposal(input.db, {
-        organizationId: channel.organization_id,
+        workspaceId: channel.organization_id,
         channelId: channel.id,
         proposalId: finalized.execution_proposal_id,
         userId: input.userId,

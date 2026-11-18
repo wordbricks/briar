@@ -11,14 +11,11 @@ import { TooltipProvider } from "../ui/tooltip";
 import { demoDashboard } from "../../lib/demo-data";
 import { createCachedTeamUsageSummaryLoader } from "../../lib/team-usage-summary";
 import { settingsNavigationLocation } from "../../lib/app-navigation";
-import { demoOrganization, demoUser } from "../../state/demo-fixtures";
-import { requestedTeamAgentSettingsIdAtom } from "../../state/dialogs/atoms";
+import { demoWorkspace, demoUser } from "../../state/demo-fixtures";
+import { isSidebarOpenAtom, requestedTeamAgentSettingsIdAtom } from "../../state/dialogs/atoms";
 import { createNavigationActions } from "../../state/navigation/actions";
 import { activePageAtom } from "../../state/navigation/atoms";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../../state/organization/atoms";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../../state/workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../../state/registry";
 import { tokenAtom, userAtom } from "../../state/session/atoms";
 import { applySyncEvent } from "../../state/sync/apply";
@@ -60,7 +57,7 @@ const props: DesktopShellProps = {
     all: [],
     rememberAgent: () => undefined,
   },
-  loadOrganizationProjectDashboard: async () => null,
+  loadWorkspaceProjectDashboard: async () => null,
   loadProjectHomeMerges: async () => ({
     repository: "wordbricks/briar",
     generatedAt: "2026-09-01T00:00:00.000Z",
@@ -77,7 +74,7 @@ const props: DesktopShellProps = {
       knownModels: 0,
     },
   }),
-  openOrganizationIssue: () => undefined,
+  openWorkspaceIssue: () => undefined,
   openProjectInNewWindow: async () => undefined,
   repositorySetup: {
     beginTeamReconnect: () => undefined,
@@ -114,7 +111,7 @@ const agent: ProjectAgent = {
 
 const agentDirectMessage: ChannelSummary = {
   id: "dm-1",
-  organizationId: demoOrganization.id,
+  workspaceId: demoWorkspace.id,
   kind: "dm",
   slug: "atlas",
   name: "Atlas",
@@ -150,8 +147,8 @@ const harness = (): AtomRegistry => {
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
     [activeTeamIdAtom, team.id],
-    [organizationsAtom, [demoOrganization]],
-    [activeOrganizationIdAtom, demoOrganization.id],
+    [workspacesAtom, [demoWorkspace]],
+    [activeWorkspaceIdAtom, demoWorkspace.id],
   ]);
   applySyncEvent(registry, {
     kind: "team-snapshot",
@@ -216,6 +213,40 @@ describe("DesktopShell", () => {
     await view.cleanup();
   });
 
+  it("closes the mobile drawer after navigation and keeps the page in place", async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: (query: string) => ({ matches: query === "(max-width: 760px)" }),
+    });
+    const registry = harness();
+    try {
+      const { view } = await mount(registry);
+      await act(async () => registry.set(isSidebarOpenAtom, true));
+      expect(view.container.querySelector(".mobile-sidebar-backdrop")).not.toBeNull();
+      await act(async () => {
+        view.container.querySelector<HTMLElement>("#app-sidebar")?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+      });
+      await flush();
+      expect(registry.get(isSidebarOpenAtom)).toBe(false);
+      await act(async () => registry.set(isSidebarOpenAtom, true));
+      expect(view.container.querySelector(".mobile-sidebar-backdrop")).not.toBeNull();
+      await act(async () => createNavigationActions(registry).navigateToPage("inbox"));
+      await flush();
+      expect(registry.get(isSidebarOpenAtom)).toBe(false);
+      expect(registry.get(activePageAtom)).toBe("inbox");
+      expect(view.container.querySelector(".mobile-sidebar-backdrop")).toBeNull();
+      await view.cleanup();
+    } finally {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
+  });
+
   it("hides the sidebar on the settings page", async () => {
     const registry = harness();
     const { view } = await mount(registry);
@@ -265,7 +296,7 @@ describe("DesktopShell", () => {
     const registry = harness();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId: demoOrganization.id,
+      workspaceId: demoWorkspace.id,
       channels: [agentDirectMessage],
     });
     createNavigationActions(registry).navigateToPage("dms");
@@ -277,11 +308,11 @@ describe("DesktopShell", () => {
       },
     });
     await settle(
-      () => view.container.querySelector(".sidebar-dm-row") !== null,
+      () => view.container.querySelector("[data-briar-sidebar-dm-row]") !== null,
       { description: "the DM row" },
     );
 
-    const row = view.container.querySelector<HTMLElement>(".sidebar-dm-row")!;
+    const row = view.container.querySelector<HTMLElement>("[data-briar-sidebar-dm-row]")!;
     await act(async () => {
       row.dispatchEvent(
         new MouseEvent("contextmenu", {
@@ -295,7 +326,7 @@ describe("DesktopShell", () => {
     });
     const editProfile = [
       ...document.body.querySelectorAll<HTMLElement>(
-        ".sidebar-channel-context-menu [role=menuitem]",
+        '[role="menu"] [role=menuitem]',
       ),
     ].find((item) => item.textContent?.includes("Edit Profile"));
     expect(editProfile).toBeTruthy();

@@ -5,10 +5,6 @@ import {
 } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
-  DmMemoryBriefState,
-  DmMemoryDescriptorSchema,
-} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
-import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
   AgentSkillKind,
@@ -22,7 +18,6 @@ import {
   ClaimedIssueReply_SnapshotSchema,
   ClaimedIssuePayloadSchema,
   ClaimedIssueSchema,
-  ClaimedDmMemoryLearningSchema,
   ClaimedMergeBatchSchema,
   ClaimedProjectAgentTaskSchema,
   ClaimedWorkSchema,
@@ -32,7 +27,7 @@ import {
   ChannelDelegationTarget_SkillSchema,
   ClaimedInboundAgentMessageSchema,
   ChannelReplyScopeSchema,
-  ChannelReplyScope_OrganizationSchema,
+  ChannelReplyScope_WorkspaceSchema,
   ChannelReplyScope_ProjectSchema,
   ChannelReplySessionSchema,
   DetachedAgentClaimSchema,
@@ -54,8 +49,7 @@ import {
   MergeBatchValidationFailureCode,
   DmMessagePublicationKind,
   type ClaimedIssue,
-  type ClaimedWork,
-} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+  type ClaimedWork} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import {
@@ -65,15 +59,12 @@ import {
   WorkflowCompletionSchema,
   WorkflowExecutionSchema,
   WorkflowRequirementSchema,
-  WorkflowStageSchema,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
+  WorkflowStageSchema} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import type { claimNextChannelReplyWork } from "./channel-reply-claim-routes";
 import type { claimNextIssueReplyWork } from "./issue-reply-worker-routes";
 import type { claimNextMergeBatchWork } from "./merge-batch-worker";
 import type { claimNextTeamAgentTaskWork } from "./team-agent-task-worker";
 import type { claimNextQueueWork } from "./queue-claim-routes";
-import type { claimDmLearningJob } from "./dm-memory-learning-claims";
-import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
 
 type AwaitedClaim<Fn extends (...args: never[]) => unknown> = NonNullable<
   Awaited<ReturnType<Fn>>
@@ -84,8 +75,7 @@ export type WorkerQueueClaim =
   | AwaitedClaim<typeof claimNextIssueReplyWork>
   | AwaitedClaim<typeof claimNextChannelReplyWork>
   | AwaitedClaim<typeof claimNextTeamAgentTaskWork>
-  | AwaitedClaim<typeof claimNextMergeBatchWork>
-  | AwaitedClaim<typeof claimDmLearningJob>;
+  | AwaitedClaim<typeof claimNextMergeBatchWork>;
 
 const requiredTimestamp = (value: string | null, field: string) => {
   if (value === null) throw new Error(`Worker claim omitted ${field}`);
@@ -533,17 +523,17 @@ const channelReply = (
       workId: value.workId,
       channelId: value.channelId,
       scope: create(ChannelReplyScopeSchema, {
-        scope: value.scope.kind === "organization"
+        scope: value.scope.kind === "workspace"
           ? {
-              case: "organization",
-              value: create(ChannelReplyScope_OrganizationSchema, {
-                organizationId: value.scope.organizationId,
+              case: "workspace",
+              value: create(ChannelReplyScope_WorkspaceSchema, {
+                workspaceId: value.scope.workspaceId,
               }),
             }
           : {
               case: "project",
               value: create(ChannelReplyScope_ProjectSchema, {
-                organizationId: value.scope.organizationId,
+                workspaceId: value.scope.workspaceId,
                 projectId: value.scope.projectId,
               }),
             },
@@ -566,6 +556,7 @@ const channelReply = (
         createdAt: requiredTimestamp(batch.createdAt, "published batch creation"),
       })),
       dmPublicMessageProtocol: value.dmPublicMessageProtocol ?? 0,
+      routing: value.routing ? { action: value.routing.action, proposedAction: value.routing.proposedAction ?? undefined, targetJobId: value.routing.targetJobId ?? undefined, response: value.routing.response ?? undefined } : undefined,
       provider: provider(value.provider),
       model: value.model ?? undefined,
       effort: value.effort ?? undefined,
@@ -578,7 +569,9 @@ const channelReply = (
       claimedAt: requiredTimestamp(value.claimedAt, "claimedAt"),
       leaseExpiresAt: requiredTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
       activity: activity(value.activity),
-      organizationContextSnapshotAt: value.organizationContext
+      acknowledgementReaction: value.acknowledgementReaction ?? undefined,
+      directMessage: value.directMessage,
+      workspaceContextSnapshotAt: value.organizationContext
         ? requiredTimestamp(
             value.organizationContext.snapshotAt,
             "organizationContext.snapshotAt",
@@ -616,24 +609,11 @@ const channelReply = (
       handoffContext: handoff(value.handoffContext),
       snapshot: jsonObject(value.snapshot, "channelReply.snapshot"),
       triggerAttachments: value.triggerAttachments.map(attachment),
-      memory: value.memory
-        ? create(DmMemoryDescriptorSchema, {
-            protocol: value.memory.protocol,
-            memorySpaceId: value.memory.memorySpaceId,
-            memoryRevision: BigInt(value.memory.memoryRevision),
-            revocationEpoch: BigInt(value.memory.revocationEpoch),
-            searchEnabled: value.memory.searchEnabled,
-            briefState: value.memory.briefState === "available"
-              ? DmMemoryBriefState.AVAILABLE
-              : DmMemoryBriefState.DISABLED,
-          })
-        : undefined,
-      memoryLearningEnabled: value.memoryLearningEnabled,
       agentMessageTargets: value.agentMessageTargets.map((target) =>
         create(ChannelAgentMessageTargetSchema, {
           agentId: target.agentId,
           agentName: target.agentName,
-          // Organization Agents have no repository, so both project fields
+          // Workspace Agents have no repository, so both project fields
           // stay absent rather than being filled with a placeholder.
           projectId: target.projectId ?? undefined,
           projectName: target.projectName ?? undefined,
@@ -774,29 +754,6 @@ const mergeBatch = (
   },
 });
 
-const dmMemoryLearning = (
-  value: AwaitedClaim<typeof claimDmLearningJob>,
-): ClaimedWork => create(ClaimedWorkSchema, {
-  work: {
-    case: "dmMemory",
-    value: create(ClaimedDmMemoryLearningSchema, {
-      workId: value.workId,
-      runId: value.runId,
-      organizationId: value.organizationId,
-      workerId: value.workerId,
-      sourceKey: value.sourceKey,
-      title: value.title,
-      claimToken: value.claimToken,
-      claimedAt: requiredTimestamp(value.claimedAt, "claimedAt"),
-      leaseExpiresAt: requiredTimestamp(value.leaseExpiresAt, "leaseExpiresAt"),
-      inputHash: value.inputHash,
-      snapshotJson: new TextEncoder().encode(
-        dmMemoryCanonicalJson(value.snapshot),
-      ),
-    }),
-  },
-});
-
 /** The sole application-model to generated protobuf mapping for Worker claims. */
 export function workerClaimMessage(value: WorkerQueueClaim): ClaimedWork {
   switch (value.workType) {
@@ -805,6 +762,5 @@ export function workerClaimMessage(value: WorkerQueueClaim): ClaimedWork {
     case "channelReply": return channelReply(value);
     case "projectAgentTask": return projectAgentTask(value);
     case "mergeBatch": return mergeBatch(value);
-    case "dmMemory": return dmMemoryLearning(value);
   }
 }

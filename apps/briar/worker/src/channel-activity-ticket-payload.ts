@@ -18,7 +18,7 @@ const Nonce = ShortText(100);
 export const ChannelActivityPublishTokenPayload = Schema.Struct({
   purpose: Schema.Literal("publish"),
   claimTokenHash: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/u)),
-  organizationId: ActivityUuid,
+  workspaceId: ActivityUuid,
   channelId: ActivityUuid,
   replyJobId: ActivityUuid,
   agentId: ActivityUuid,
@@ -36,7 +36,7 @@ export type ChannelActivityPublishTokenPayload =
 
 export const ChannelActivitySocketTicketPayload = Schema.Struct({
   purpose: Schema.Literal("subscribe"),
-  organizationId: ActivityUuid,
+  workspaceId: ActivityUuid,
   channelId: ActivityUuid,
   userId: UserId,
   expiresAt: Schema.Int,
@@ -49,7 +49,7 @@ export type ChannelActivitySocketTicketPayload =
 
 export const IssueActivityPublishTokenPayload = Schema.Struct({
   purpose: Schema.Literal("publish-issue"),
-  organizationId: ActivityUuid,
+  workspaceId: ActivityUuid,
   projectId: ActivityUuid,
   runId: ActivityUuid,
   replyJobId: ActivityUuid,
@@ -67,7 +67,7 @@ export type IssueActivityPublishTokenPayload =
 
 export const IssueActivitySocketTicketPayload = Schema.Struct({
   purpose: Schema.Literal("subscribe-issue"),
-  organizationId: ActivityUuid,
+  workspaceId: ActivityUuid,
   projectId: ActivityUuid,
   runId: ActivityUuid,
   userId: UserId,

@@ -1039,7 +1039,7 @@ export async function archiveCompletedLogs(
               sha256: serialized.objectSha256,
             },
             sha256: serialized.objectSha256,
-            storageClass: "InfrequentAccess",
+            storageClass: "Standard",
           });
         }
         await verifyObject(

@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { demoDashboard } from "../../lib/demo-data";
-import { demoOrganization, demoUser } from "../demo-fixtures";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import { demoWorkspace, demoUser } from "../demo-fixtures";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom, userAtom } from "../session/atoms";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
@@ -34,7 +31,7 @@ import {
 
 const team = demoDashboard.team;
 const otherTeam = { ...team, id: "team-2", name: "Team two" };
-const otherOrganization = { ...demoOrganization, id: "org-2" };
+const otherWorkspace = { ...demoWorkspace, id: "org-2" };
 
 const harness = (): AtomRegistry => {
   const registry = createTestRegistry([
@@ -42,8 +39,8 @@ const harness = (): AtomRegistry => {
     [tokenAtom, "token-1"],
     [teamsAtom, [team, otherTeam]],
     [activeTeamIdAtom, team.id],
-    [organizationsAtom, [demoOrganization, otherOrganization]],
-    [activeOrganizationIdAtom, demoOrganization.id],
+    [workspacesAtom, [demoWorkspace, otherWorkspace]],
+    [activeWorkspaceIdAtom, demoWorkspace.id],
   ]);
   // A derived LRU only sees the visits it is subscribed for, which is the
   // arrangement it lives in: the page slot is always reading it.
@@ -84,25 +81,25 @@ describe("desktopKeptPageAtom", () => {
     navigation.navigateToPage("inbox");
     expect(registry.get(desktopKeptPageAtom)).toEqual({
       kind: "inbox",
-      scopeId: demoOrganization.id,
+      scopeId: demoWorkspace.id,
     });
 
     navigation.navigateToPage("my-issues");
     expect(registry.get(desktopKeptPageAtom)).toEqual({
       kind: "my-issues",
-      scopeId: demoOrganization.id,
+      scopeId: demoWorkspace.id,
     });
 
     navigation.navigateToPage("channels");
     expect(registry.get(desktopKeptPageAtom)).toEqual({
       kind: "channels",
-      scopeId: demoOrganization.id,
+      scopeId: demoWorkspace.id,
     });
 
     navigation.navigateToPage("dms");
     expect(registry.get(desktopKeptPageAtom)).toEqual({
       kind: "dms",
-      scopeId: demoOrganization.id,
+      scopeId: demoWorkspace.id,
     });
   });
 
@@ -115,7 +112,7 @@ describe("desktopKeptPageAtom", () => {
       expect(registry.get(desktopKeptPageAtom)).toBeNull();
     }
 
-    navigation.navigateToPage("organization-create");
+    navigation.navigateToPage("workspace-create");
     expect(registry.get(desktopKeptPageAtom)).toBeNull();
 
     registry.set(settingsTargetAtom, {
@@ -167,13 +164,13 @@ describe("companionKeptPageAtom", () => {
     registry.set(companionPageAtom, "home");
     expect(registry.get(companionKeptPageAtom)).toEqual({
       kind: "channels",
-      scopeId: demoOrganization.id,
+      scopeId: demoWorkspace.id,
     });
 
     registry.set(companionPageAtom, "inbox");
     expect(registry.get(companionKeptPageAtom)).toEqual({
       kind: "inbox",
-      scopeId: demoOrganization.id,
+      scopeId: demoWorkspace.id,
     });
 
     registry.set(companionPageAtom, "settings");
@@ -192,18 +189,18 @@ describe("keptPageKeysAtom", () => {
     navigation.navigateToPage("dms");
     expect(registry.get(keptPageKeysAtom)).toEqual([
       `board:${team.id}`,
-      `inbox:${demoOrganization.id}`,
-      `channels:${demoOrganization.id}`,
-      `dms:${demoOrganization.id}`,
+      `inbox:${demoWorkspace.id}`,
+      `channels:${demoWorkspace.id}`,
+      `dms:${demoWorkspace.id}`,
     ]);
 
     // The fifth heavy page pushes the oldest one out.
     navigation.navigateToPage("my-issues");
     expect(registry.get(keptPageKeysAtom)).toEqual([
-      `inbox:${demoOrganization.id}`,
-      `channels:${demoOrganization.id}`,
-      `dms:${demoOrganization.id}`,
-      `my-issues:${demoOrganization.id}`,
+      `inbox:${demoWorkspace.id}`,
+      `channels:${demoWorkspace.id}`,
+      `dms:${demoWorkspace.id}`,
+      `my-issues:${demoWorkspace.id}`,
     ]);
   });
 
@@ -220,7 +217,7 @@ describe("keptPageKeysAtom", () => {
     expect(registry.get(keptPageKeysAtom)).toEqual(kept);
   });
 
-  it("drops every kept page when the organization changes", () => {
+  it("drops every kept page when the workspace changes", () => {
     const registry = harness();
     const navigation = createNavigationActions(registry);
 
@@ -229,9 +226,9 @@ describe("keptPageKeysAtom", () => {
     // The DM page the window opened on, the board and the inbox.
     expect(registry.get(keptPageKeysAtom)).toHaveLength(3);
 
-    registry.set(activeOrganizationIdAtom, otherOrganization.id);
+    registry.set(activeWorkspaceIdAtom, otherWorkspace.id);
     expect(registry.get(keptPageKeysAtom)).toEqual([
-      `inbox:${otherOrganization.id}`,
+      `inbox:${otherWorkspace.id}`,
     ]);
   });
 
@@ -246,7 +243,7 @@ describe("keptPageKeysAtom", () => {
 
     registry.set(userAtom, null);
     registry.set(tokenAtom, null);
-    registry.set(activeOrganizationIdAtom, null);
+    registry.set(activeWorkspaceIdAtom, null);
     // Nothing an unauthenticated window drew belongs to the next account.
     expect(registry.get(keptPageKeysAtom)).toEqual([`board:${team.id}`]);
   });
@@ -261,7 +258,7 @@ describe("pageVisibleAtom", () => {
     const boardKey = keptPageKey({ kind: "board", scopeId: team.id });
     const inboxKey = keptPageKey({
       kind: "inbox",
-      scopeId: demoOrganization.id,
+      scopeId: demoWorkspace.id,
     });
     expect(registry.get(pageVisibleAtom(boardKey))).toBe(true);
     expect(registry.get(pageVisibleAtom(inboxKey))).toBe(false);

@@ -1,9 +1,9 @@
 import * as Schema from "effect/Schema";
-import { IsoDateTimeWithOffset } from "./date-time-schema";
-import { dmLearningFailureCodes } from "./dm-memory-learning-contract";
 
 export const dmMemoryDocumentMaxBytes = 65_536;
 export const dmMemoryPageSize = 50;
+/** Records in one whole-vault (folder tree) list response; `nextCursor` continues past it. */
+export const dmMemoryTreeMaxDocuments = 1000;
 export const dmMemoryClasses = ["profile", "log", "note"] as const;
 export type DmMemoryClass = (typeof dmMemoryClasses)[number];
 
@@ -22,10 +22,6 @@ const fields = {
   title: Schema.Trim.check(Schema.isLengthBetween(1, 200)),
   body,
   memoryClass: Schema.Literals(dmMemoryClasses),
-  sourceLanguage: Schema.String.check(Schema.isPattern(/^[a-z]{2,8}(?:-[a-z0-9]{1,8})*$/iu)),
-  observedAt: Schema.NullOr(IsoDateTimeWithOffset),
-  validUntil: Schema.NullOr(IsoDateTimeWithOffset),
-  sourceMessage: Schema.optional(strict(Schema.Struct({ id, version }))),
 };
 
 export const dmMemoryCreateInput = strict(Schema.Struct(fields));
@@ -40,10 +36,6 @@ export const dmMemorySettingsInput = strict(Schema.Struct({
 export type DmMemoryCreateInput = typeof dmMemoryCreateInput.Type;
 export type DmMemoryEditInput = typeof dmMemoryEditInput.Type;
 export type DmMemorySettingsInput = typeof dmMemorySettingsInput.Type;
-export const dmMemoryLearningRetryInput = strict(Schema.Struct({
-  requestId: id, revocationEpoch: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-}));
-export type DmMemoryLearningRetryInput = typeof dmMemoryLearningRetryInput.Type;
 
 export const DmMemorySpace = Schema.Struct({
   id, channelId: id, agentId: id, rosterEpoch: Schema.Int,
@@ -53,6 +45,12 @@ export const DmMemorySpace = Schema.Struct({
 });
 export type DmMemorySpace = typeof DmMemorySpace.Type;
 
+/**
+ * A vault record in the legacy document shape. `kind`, `status`, `conflicted`,
+ * `evidenceType`, `sourceLanguage`, `observedAt`, `validUntil` and `indexState`
+ * are not stored by the vault; the server fills fixed values because shipped
+ * clients reject the proto's UNSPECIFIED (`dm_memory.proto`).
+ */
 const documentFields = {
   id, memorySpaceId: id, kind: Schema.Literals(["observation", "topic"]),
   title: Schema.String, version, status: Schema.Literals(["active", "invalidated", "superseded"]),
@@ -61,6 +59,15 @@ const documentFields = {
   sourceLanguage: Schema.String, observedAt: Schema.NullOr(Schema.String),
   validUntil: Schema.NullOr(Schema.String), createdAt: Schema.String, updatedAt: Schema.String,
   indexState: Schema.Literals(["pending", "ready", "failed"]),
+  /**
+   * Where the record lives in the vault, its real type and a workstream's
+   * status. Null from servers before the folder tree (the dialog then lists
+   * the record at the root).
+   */
+  path: Schema.NullOr(Schema.String), recordType: Schema.NullOr(Schema.String),
+  recordStatus: Schema.NullOr(Schema.String),
+  /** The app-owned README.md: readable, never edited or deleted. */
+  readOnly: Schema.Boolean,
 };
 export const DmMemoryDocument = Schema.Struct(documentFields);
 export type DmMemoryDocument = typeof DmMemoryDocument.Type;
@@ -82,30 +89,13 @@ export const DmMemoryRevisionPage = Schema.Struct({
   nextCursor: Schema.NullOr(version),
 });
 export type DmMemoryRevisionPage = typeof DmMemoryRevisionPage.Type;
-export const DmMemoryLearningStatus = Schema.Struct({
-  configuration: Schema.NullOr(Schema.Struct({
-    proposer: Schema.Struct({ transport: Schema.Literals(["agent", "openrouter"]), model: Schema.String, provider: Schema.String }),
-    verifier: Schema.Struct({ transport: Schema.Literals(["agent", "openrouter"]), model: Schema.String, provider: Schema.String }),
-    costTracked: Schema.Boolean,
-    spaceDailyCalls: Schema.Int, spaceDailyMicroUsd: Schema.Int,
-    agentProvider: Schema.String, agentProviderVerified: Schema.Boolean, workerAvailable: Schema.Boolean,
-  })),
-  callsToday: Schema.Int, reservedMicroUsdToday: Schema.Int, pendingJobs: Schema.Int, failedJobs: Schema.Int,
-  retryableJob: Schema.optional(Schema.NullOr(Schema.Struct({ id, callsUsed: Schema.Int }))),
-  lastJob: Schema.NullOr(Schema.Struct({
-    id, kind: Schema.Literals(["extract", "explicit_request", "consolidate"]),
-    status: Schema.Literals(["pending", "running", "retry_wait", "failed", "cancelled", "succeeded", "no_change"]),
-    stage: Schema.NullOr(Schema.Literals(["proposing", "verifying", "committing"])),
-    errorCode: Schema.NullOr(Schema.Literals(dmLearningFailureCodes)), updatedAt: Schema.String,
-  })),
-});
-export type DmMemoryLearningStatus = typeof DmMemoryLearningStatus.Type;
 export const DmMemoryPage = Schema.Struct({
   eligible: Schema.Boolean,
   capabilities: Schema.Struct({ recall: Schema.Boolean, automaticLearning: Schema.Boolean }),
   spaces: Schema.Array(DmMemorySpace), selectedSpaceId: Schema.NullOr(id),
-  documents: Schema.Array(DmMemoryDocument), nextCursor: Schema.NullOr(id),
-  learning: Schema.optional(Schema.NullOr(DmMemoryLearningStatus)),
+  documents: Schema.Array(DmMemoryDocument), nextCursor: Schema.NullOr(Schema.String),
+  /** The vault's canonical folders for the tree; empty from servers before it. */
+  folders: Schema.Array(Schema.String),
 });
 export type DmMemoryPage = typeof DmMemoryPage.Type;
 

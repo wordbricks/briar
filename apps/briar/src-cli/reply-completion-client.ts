@@ -9,7 +9,6 @@ import {
   ChannelReplySuccessSchema,
   CompleteChannelReplyRequestSchema,
   CompleteIssueReplyRequestSchema,
-  DmMemorySaveRequestSchema,
   IssueReplySuccessSchema,
   PrepareReplyAttachmentUploadsRequestSchema,
   ReplyCompletionDisposition,
@@ -211,14 +210,6 @@ const channelSuccess = (
       documentId: reference.documentId,
       version: reference.version,
     })),
-    memorySaveRequest: result.memorySaveRequest
-      ? create(DmMemorySaveRequestSchema, {
-          documents: result.memorySaveRequest.documents.map((reference) => ({
-            documentId: reference.documentId,
-            version: reference.version,
-          })),
-        })
-      : undefined,
     publishedFinalBatchId,
   };
   const artifactProposalCount = [
@@ -283,6 +274,7 @@ const channelSuccess = (
               title: result.issueProposal.issue.title,
               description: result.issueProposal.issue.description ?? undefined,
               priority: result.issueProposal.issue.priority ?? undefined,
+              attachmentIds: result.issueProposal.issue.attachmentIds,
             },
             executeAfterCreate: result.issueProposal.executeAfterCreate,
           },
@@ -298,6 +290,7 @@ const channelSuccess = (
                   title: item.issue.title,
                   description: item.issue.description ?? undefined,
                   priority: item.issue.priority ?? undefined,
+                  attachmentIds: item.issue.attachmentIds,
                 },
               })),
               dependencies: result.issueBatchProposal.batch.dependencies,

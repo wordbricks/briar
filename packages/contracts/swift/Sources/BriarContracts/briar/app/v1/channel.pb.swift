@@ -193,7 +193,7 @@ public nonisolated struct BriarAPI_ListChannelsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -223,7 +223,7 @@ public nonisolated struct BriarAPI_SyncChannelsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var cursor: UInt64 = 0
 
@@ -263,7 +263,7 @@ public nonisolated struct BriarAPI_ListDirectMessageRecipientsRequest: Sendable 
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -275,9 +275,9 @@ public nonisolated struct BriarAPI_ListDirectMessageRecipientsResponse: Sendable
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var members: [BriarAPI_OrganizationMember] = []
+  public var members: [BriarAPI_WorkspaceMember] = []
 
-  public var agents: [BriarAPI_OrganizationAgent] = []
+  public var agents: [BriarAPI_WorkspaceAgent] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -289,7 +289,7 @@ public nonisolated struct BriarAPI_CreateDirectMessageRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var memberIds: [String] = []
 
@@ -328,7 +328,7 @@ public nonisolated struct BriarAPI_ListAgentDirectMessagesRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var agentID: String = String()
 
@@ -354,7 +354,7 @@ public nonisolated struct BriarAPI_CreateChannelRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var name: String = String()
 
@@ -401,7 +401,7 @@ public nonisolated struct BriarAPI_UpdateChannelRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -556,7 +556,7 @@ public nonisolated struct BriarAPI_DeleteChannelRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -582,7 +582,7 @@ public nonisolated struct BriarAPI_SetChannelAgentRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -642,7 +642,7 @@ public nonisolated struct BriarAPI_SetChannelAgentResponse: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var agents: [BriarAPI_OrganizationAgent] = []
+  public var agents: [BriarAPI_WorkspaceAgent] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -654,7 +654,7 @@ public nonisolated struct BriarAPI_SetChannelMemberRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -726,7 +726,7 @@ public nonisolated struct BriarAPI_ListChannelWebhooksRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -752,7 +752,7 @@ public nonisolated struct BriarAPI_CreateChannelWebhookRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -768,7 +768,7 @@ public nonisolated struct BriarAPI_UpdateChannelWebhookRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -786,7 +786,7 @@ public nonisolated struct BriarAPI_RotateChannelWebhookRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -802,7 +802,7 @@ public nonisolated struct BriarAPI_RevokeChannelWebhookRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -906,7 +906,7 @@ public nonisolated struct BriarAPI_GetChannelRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -942,7 +942,7 @@ public nonisolated struct BriarAPI_GetChannelResponse: Sendable {
 
   public var members: [BriarAPI_ChannelMember] = []
 
-  public var agents: [BriarAPI_OrganizationAgent] = []
+  public var agents: [BriarAPI_WorkspaceAgent] = []
 
   public var messages: [BriarAPI_ChannelMessage] = []
 
@@ -970,7 +970,7 @@ public nonisolated struct BriarAPI_MarkChannelReadRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1016,7 +1016,7 @@ public nonisolated struct BriarAPI_MarkChannelUnreadRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1053,7 +1053,7 @@ public nonisolated struct BriarAPI_UpdateChannelSidebarPreferenceRequest: Sendab
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1135,7 +1135,7 @@ public nonisolated struct BriarAPI_ChannelSidebarSection: Sendable {
 
   public var id: String = String()
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var name: String = String()
 
@@ -1172,7 +1172,7 @@ public nonisolated struct BriarAPI_ListChannelSidebarSectionsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1196,7 +1196,7 @@ public nonisolated struct BriarAPI_CreateChannelSidebarSectionRequest: Sendable 
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var name: String = String()
 
@@ -1235,7 +1235,7 @@ public nonisolated struct BriarAPI_RenameChannelSidebarSectionRequest: Sendable 
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var sectionID: String = String()
 
@@ -1274,7 +1274,7 @@ public nonisolated struct BriarAPI_DeleteChannelSidebarSectionRequest: Sendable 
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var sectionID: String = String()
 
@@ -1300,7 +1300,7 @@ public nonisolated struct BriarAPI_ListChannelMessagesRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1372,7 +1372,7 @@ public nonisolated struct BriarAPI_PrepareChannelMessageAttachmentsRequest: Send
   /// different scope or metadata fails rather than changing the reservation.
   public var requestID: String = String()
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1406,7 +1406,7 @@ public nonisolated struct BriarAPI_CreateChannelMessageRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1446,7 +1446,7 @@ public nonisolated struct BriarAPI_CreateChannelMessageRequest: Sendable {
   public mutating func clearPreferredDeviceID() {self._preferredDeviceID = nil}
 
   /// Uploaded bytes must have been prepared by
-  /// PrepareChannelMessageAttachments for this exact organization, channel,
+  /// PrepareChannelMessageAttachments for this exact workspace, channel,
   /// and authenticated user. The upload ID is also the durable attachment ID.
   public var attachments: [BriarTypes_UploadReference] = []
 
@@ -1487,7 +1487,7 @@ public nonisolated struct BriarAPI_DeleteChannelMessageRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1536,7 +1536,7 @@ public nonisolated struct BriarAPI_ToggleChannelMessageReactionRequest: Sendable
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1575,7 +1575,7 @@ public nonisolated struct BriarAPI_SetChannelThreadSubscriptionRequest: Sendable
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1607,7 +1607,7 @@ public nonisolated struct BriarAPI_AcceptChannelProposalRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1694,7 +1694,7 @@ public nonisolated struct BriarAPI_AcceptChannelExecutionProposalRequest: Sendab
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1766,7 +1766,7 @@ public nonisolated struct BriarAPI_DeclineChannelProposalRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1832,7 +1832,7 @@ public nonisolated struct BriarAPI_AcceptChannelSkillExecutionProposalRequest: S
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -1964,9 +1964,9 @@ public nonisolated struct BriarAPI_ChannelSummary: @unchecked Sendable {
     set {_uniqueStorage()._id = newValue}
   }
 
-  public var organizationID: String {
-    get {_storage._organizationID}
-    set {_uniqueStorage()._organizationID = newValue}
+  public var workspaceID: String {
+    get {_storage._workspaceID}
+    set {_uniqueStorage()._workspaceID = newValue}
   }
 
   public var slug: String {
@@ -2441,7 +2441,7 @@ public nonisolated struct BriarAPI_GetChannelMessageDocumentRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -2505,7 +2505,7 @@ public nonisolated struct BriarAPI_GetChannelLinkPreviewRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var channelID: String = String()
 
@@ -2954,6 +2954,11 @@ public nonisolated struct BriarAPI_ChannelIssueProposal: Sendable {
   /// Clears the value of `priority`. Subsequent reads from it will return its default value.
   public mutating func clearPriority() {self._priority = nil}
 
+  /// Conversation attachments the approved issue carries into the project. The
+  /// approver sees them on the card, so the copy is part of what was approved
+  /// rather than a server-side guess about which files belong to the issue.
+  public var attachmentIds: [String] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -3190,7 +3195,7 @@ nonisolated extension BriarAPI_DmMessagePurpose: SwiftProtobuf._ProtoNameProvidi
 
 nonisolated extension BriarAPI_ListChannelsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListChannelsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3198,21 +3203,21 @@ nonisolated extension BriarAPI_ListChannelsRequest: SwiftProtobuf.Message, Swift
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_ListChannelsRequest, rhs: BriarAPI_ListChannelsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3260,7 +3265,7 @@ nonisolated extension BriarAPI_ListChannelsResponse: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_SyncChannelsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SyncChannelsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}cursor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}cursor\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3268,7 +3273,7 @@ nonisolated extension BriarAPI_SyncChannelsRequest: SwiftProtobuf.Message, Swift
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularUInt64Field(value: &self.cursor) }()
       default: break
       }
@@ -3276,8 +3281,8 @@ nonisolated extension BriarAPI_SyncChannelsRequest: SwiftProtobuf.Message, Swift
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if self.cursor != 0 {
       try visitor.visitSingularUInt64Field(value: self.cursor, fieldNumber: 2)
@@ -3286,7 +3291,7 @@ nonisolated extension BriarAPI_SyncChannelsRequest: SwiftProtobuf.Message, Swift
   }
 
   public static func ==(lhs: BriarAPI_SyncChannelsRequest, rhs: BriarAPI_SyncChannelsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.cursor != rhs.cursor {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3360,7 +3365,7 @@ nonisolated extension BriarAPI_SyncChannelsResponse: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_ListDirectMessageRecipientsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListDirectMessageRecipientsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3368,21 +3373,21 @@ nonisolated extension BriarAPI_ListDirectMessageRecipientsRequest: SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_ListDirectMessageRecipientsRequest, rhs: BriarAPI_ListDirectMessageRecipientsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3425,7 +3430,7 @@ nonisolated extension BriarAPI_ListDirectMessageRecipientsResponse: SwiftProtobu
 
 nonisolated extension BriarAPI_CreateDirectMessageRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateDirectMessageRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{4}\u{2}member_ids\0\u{3}agent_ids\0\u{c}\u{2}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{4}\u{2}member_ids\0\u{3}agent_ids\0\u{c}\u{2}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3433,7 +3438,7 @@ nonisolated extension BriarAPI_CreateDirectMessageRequest: SwiftProtobuf.Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 3: try { try decoder.decodeRepeatedStringField(value: &self.memberIds) }()
       case 4: try { try decoder.decodeRepeatedStringField(value: &self.agentIds) }()
       default: break
@@ -3442,8 +3447,8 @@ nonisolated extension BriarAPI_CreateDirectMessageRequest: SwiftProtobuf.Message
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.memberIds.isEmpty {
       try visitor.visitRepeatedStringField(value: self.memberIds, fieldNumber: 3)
@@ -3455,7 +3460,7 @@ nonisolated extension BriarAPI_CreateDirectMessageRequest: SwiftProtobuf.Message
   }
 
   public static func ==(lhs: BriarAPI_CreateDirectMessageRequest, rhs: BriarAPI_CreateDirectMessageRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.memberIds != rhs.memberIds {return false}
     if lhs.agentIds != rhs.agentIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -3499,7 +3504,7 @@ nonisolated extension BriarAPI_CreateDirectMessageResponse: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_ListAgentDirectMessagesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListAgentDirectMessagesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}agent_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}agent_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3507,7 +3512,7 @@ nonisolated extension BriarAPI_ListAgentDirectMessagesRequest: SwiftProtobuf.Mes
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
       default: break
       }
@@ -3515,8 +3520,8 @@ nonisolated extension BriarAPI_ListAgentDirectMessagesRequest: SwiftProtobuf.Mes
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.agentID.isEmpty {
       try visitor.visitSingularStringField(value: self.agentID, fieldNumber: 2)
@@ -3525,7 +3530,7 @@ nonisolated extension BriarAPI_ListAgentDirectMessagesRequest: SwiftProtobuf.Mes
   }
 
   public static func ==(lhs: BriarAPI_ListAgentDirectMessagesRequest, rhs: BriarAPI_ListAgentDirectMessagesRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.agentID != rhs.agentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3564,7 +3569,7 @@ nonisolated extension BriarAPI_ListAgentDirectMessagesResponse: SwiftProtobuf.Me
 
 nonisolated extension BriarAPI_CreateChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateChannelRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}name\0\u{1}slug\0\u{1}topic\0\u{1}visibility\0\u{3}default_project_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}name\0\u{1}slug\0\u{1}topic\0\u{1}visibility\0\u{3}default_project_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3572,7 +3577,7 @@ nonisolated extension BriarAPI_CreateChannelRequest: SwiftProtobuf.Message, Swif
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._slug) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._topic) }()
@@ -3588,8 +3593,8 @@ nonisolated extension BriarAPI_CreateChannelRequest: SwiftProtobuf.Message, Swif
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.name.isEmpty {
       try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
@@ -3610,7 +3615,7 @@ nonisolated extension BriarAPI_CreateChannelRequest: SwiftProtobuf.Message, Swif
   }
 
   public static func ==(lhs: BriarAPI_CreateChannelRequest, rhs: BriarAPI_CreateChannelRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.name != rhs.name {return false}
     if lhs._slug != rhs._slug {return false}
     if lhs._topic != rhs._topic {return false}
@@ -3623,7 +3628,7 @@ nonisolated extension BriarAPI_CreateChannelRequest: SwiftProtobuf.Message, Swif
 
 nonisolated extension BriarAPI_UpdateChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateChannelRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{1}name\0\u{1}topic\0\u{3}clear_topic\0\u{1}visibility\0\u{3}default_project_id\0\u{3}clear_default_project\0\u{1}archived\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{1}name\0\u{1}topic\0\u{3}clear_topic\0\u{1}visibility\0\u{3}default_project_id\0\u{3}clear_default_project\0\u{1}archived\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3631,7 +3636,7 @@ nonisolated extension BriarAPI_UpdateChannelRequest: SwiftProtobuf.Message, Swif
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._name) }()
       case 4: try {
@@ -3688,8 +3693,8 @@ nonisolated extension BriarAPI_UpdateChannelRequest: SwiftProtobuf.Message, Swif
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -3729,7 +3734,7 @@ nonisolated extension BriarAPI_UpdateChannelRequest: SwiftProtobuf.Message, Swif
   }
 
   public static func ==(lhs: BriarAPI_UpdateChannelRequest, rhs: BriarAPI_UpdateChannelRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs._name != rhs._name {return false}
     if lhs.topicUpdate != rhs.topicUpdate {return false}
@@ -3849,7 +3854,7 @@ nonisolated extension BriarAPI_UpdateChannelResponse: SwiftProtobuf.Message, Swi
 
 nonisolated extension BriarAPI_DeleteChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeleteChannelRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3857,7 +3862,7 @@ nonisolated extension BriarAPI_DeleteChannelRequest: SwiftProtobuf.Message, Swif
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       default: break
       }
@@ -3865,8 +3870,8 @@ nonisolated extension BriarAPI_DeleteChannelRequest: SwiftProtobuf.Message, Swif
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -3875,7 +3880,7 @@ nonisolated extension BriarAPI_DeleteChannelRequest: SwiftProtobuf.Message, Swif
   }
 
   public static func ==(lhs: BriarAPI_DeleteChannelRequest, rhs: BriarAPI_DeleteChannelRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3914,7 +3919,7 @@ nonisolated extension BriarAPI_DeleteChannelResponse: SwiftProtobuf.Message, Swi
 
 nonisolated extension BriarAPI_SetChannelAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SetChannelAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}agent_id\0\u{1}add\0\u{1}remove\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}agent_id\0\u{1}add\0\u{1}remove\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3922,7 +3927,7 @@ nonisolated extension BriarAPI_SetChannelAgentRequest: SwiftProtobuf.Message, Sw
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.agentID) }()
       case 4: try {
@@ -3961,8 +3966,8 @@ nonisolated extension BriarAPI_SetChannelAgentRequest: SwiftProtobuf.Message, Sw
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -3985,7 +3990,7 @@ nonisolated extension BriarAPI_SetChannelAgentRequest: SwiftProtobuf.Message, Sw
   }
 
   public static func ==(lhs: BriarAPI_SetChannelAgentRequest, rhs: BriarAPI_SetChannelAgentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.agentID != rhs.agentID {return false}
     if lhs.membership != rhs.membership {return false}
@@ -4064,7 +4069,7 @@ nonisolated extension BriarAPI_SetChannelAgentResponse: SwiftProtobuf.Message, S
 
 nonisolated extension BriarAPI_SetChannelMemberRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SetChannelMemberRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}user_id\0\u{1}add\0\u{1}remove\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}user_id\0\u{1}add\0\u{1}remove\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4072,7 +4077,7 @@ nonisolated extension BriarAPI_SetChannelMemberRequest: SwiftProtobuf.Message, S
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.userID) }()
       case 4: try {
@@ -4111,8 +4116,8 @@ nonisolated extension BriarAPI_SetChannelMemberRequest: SwiftProtobuf.Message, S
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4135,7 +4140,7 @@ nonisolated extension BriarAPI_SetChannelMemberRequest: SwiftProtobuf.Message, S
   }
 
   public static func ==(lhs: BriarAPI_SetChannelMemberRequest, rhs: BriarAPI_SetChannelMemberRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.userID != rhs.userID {return false}
     if lhs.membership != rhs.membership {return false}
@@ -4214,7 +4219,7 @@ nonisolated extension BriarAPI_SetChannelMemberResponse: SwiftProtobuf.Message, 
 
 nonisolated extension BriarAPI_ListChannelWebhooksRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListChannelWebhooksRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4222,7 +4227,7 @@ nonisolated extension BriarAPI_ListChannelWebhooksRequest: SwiftProtobuf.Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       default: break
       }
@@ -4230,8 +4235,8 @@ nonisolated extension BriarAPI_ListChannelWebhooksRequest: SwiftProtobuf.Message
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4240,7 +4245,7 @@ nonisolated extension BriarAPI_ListChannelWebhooksRequest: SwiftProtobuf.Message
   }
 
   public static func ==(lhs: BriarAPI_ListChannelWebhooksRequest, rhs: BriarAPI_ListChannelWebhooksRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -4279,7 +4284,7 @@ nonisolated extension BriarAPI_ListChannelWebhooksResponse: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_CreateChannelWebhookRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateChannelWebhookRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{1}name\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{1}name\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4287,7 +4292,7 @@ nonisolated extension BriarAPI_CreateChannelWebhookRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
       default: break
@@ -4296,8 +4301,8 @@ nonisolated extension BriarAPI_CreateChannelWebhookRequest: SwiftProtobuf.Messag
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4309,7 +4314,7 @@ nonisolated extension BriarAPI_CreateChannelWebhookRequest: SwiftProtobuf.Messag
   }
 
   public static func ==(lhs: BriarAPI_CreateChannelWebhookRequest, rhs: BriarAPI_CreateChannelWebhookRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.name != rhs.name {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -4319,7 +4324,7 @@ nonisolated extension BriarAPI_CreateChannelWebhookRequest: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_UpdateChannelWebhookRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateChannelWebhookRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}webhook_id\0\u{1}name\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}webhook_id\0\u{1}name\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4327,7 +4332,7 @@ nonisolated extension BriarAPI_UpdateChannelWebhookRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.webhookID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.name) }()
@@ -4337,8 +4342,8 @@ nonisolated extension BriarAPI_UpdateChannelWebhookRequest: SwiftProtobuf.Messag
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4353,7 +4358,7 @@ nonisolated extension BriarAPI_UpdateChannelWebhookRequest: SwiftProtobuf.Messag
   }
 
   public static func ==(lhs: BriarAPI_UpdateChannelWebhookRequest, rhs: BriarAPI_UpdateChannelWebhookRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.webhookID != rhs.webhookID {return false}
     if lhs.name != rhs.name {return false}
@@ -4364,7 +4369,7 @@ nonisolated extension BriarAPI_UpdateChannelWebhookRequest: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_RotateChannelWebhookRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RotateChannelWebhookRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}webhook_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}webhook_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4372,7 +4377,7 @@ nonisolated extension BriarAPI_RotateChannelWebhookRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.webhookID) }()
       default: break
@@ -4381,8 +4386,8 @@ nonisolated extension BriarAPI_RotateChannelWebhookRequest: SwiftProtobuf.Messag
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4394,7 +4399,7 @@ nonisolated extension BriarAPI_RotateChannelWebhookRequest: SwiftProtobuf.Messag
   }
 
   public static func ==(lhs: BriarAPI_RotateChannelWebhookRequest, rhs: BriarAPI_RotateChannelWebhookRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.webhookID != rhs.webhookID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -4404,7 +4409,7 @@ nonisolated extension BriarAPI_RotateChannelWebhookRequest: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_RevokeChannelWebhookRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RevokeChannelWebhookRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}webhook_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}webhook_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4412,7 +4417,7 @@ nonisolated extension BriarAPI_RevokeChannelWebhookRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.webhookID) }()
       default: break
@@ -4421,8 +4426,8 @@ nonisolated extension BriarAPI_RevokeChannelWebhookRequest: SwiftProtobuf.Messag
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4434,7 +4439,7 @@ nonisolated extension BriarAPI_RevokeChannelWebhookRequest: SwiftProtobuf.Messag
   }
 
   public static func ==(lhs: BriarAPI_RevokeChannelWebhookRequest, rhs: BriarAPI_RevokeChannelWebhookRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.webhookID != rhs.webhookID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -4590,7 +4595,7 @@ nonisolated extension BriarAPI_RevokeChannelWebhookResponse: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_GetChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetChannelRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}message_limit\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}message_limit\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4598,7 +4603,7 @@ nonisolated extension BriarAPI_GetChannelRequest: SwiftProtobuf.Message, SwiftPr
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self._messageLimit) }()
       default: break
@@ -4611,8 +4616,8 @@ nonisolated extension BriarAPI_GetChannelRequest: SwiftProtobuf.Message, SwiftPr
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4624,7 +4629,7 @@ nonisolated extension BriarAPI_GetChannelRequest: SwiftProtobuf.Message, SwiftPr
   }
 
   public static func ==(lhs: BriarAPI_GetChannelRequest, rhs: BriarAPI_GetChannelRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs._messageLimit != rhs._messageLimit {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -4693,7 +4698,7 @@ nonisolated extension BriarAPI_GetChannelResponse: SwiftProtobuf.Message, SwiftP
 
 nonisolated extension BriarAPI_MarkChannelReadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".MarkChannelReadRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{4}\u{2}last_read_at\0\u{c}\u{3}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{4}\u{2}last_read_at\0\u{c}\u{3}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4701,7 +4706,7 @@ nonisolated extension BriarAPI_MarkChannelReadRequest: SwiftProtobuf.Message, Sw
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._lastReadAt) }()
       default: break
@@ -4714,8 +4719,8 @@ nonisolated extension BriarAPI_MarkChannelReadRequest: SwiftProtobuf.Message, Sw
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4727,7 +4732,7 @@ nonisolated extension BriarAPI_MarkChannelReadRequest: SwiftProtobuf.Message, Sw
   }
 
   public static func ==(lhs: BriarAPI_MarkChannelReadRequest, rhs: BriarAPI_MarkChannelReadRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs._lastReadAt != rhs._lastReadAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -4771,7 +4776,7 @@ nonisolated extension BriarAPI_MarkChannelReadResponse: SwiftProtobuf.Message, S
 
 nonisolated extension BriarAPI_MarkChannelUnreadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".MarkChannelUnreadRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4779,7 +4784,7 @@ nonisolated extension BriarAPI_MarkChannelUnreadRequest: SwiftProtobuf.Message, 
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       default: break
       }
@@ -4787,8 +4792,8 @@ nonisolated extension BriarAPI_MarkChannelUnreadRequest: SwiftProtobuf.Message, 
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4797,7 +4802,7 @@ nonisolated extension BriarAPI_MarkChannelUnreadRequest: SwiftProtobuf.Message, 
   }
 
   public static func ==(lhs: BriarAPI_MarkChannelUnreadRequest, rhs: BriarAPI_MarkChannelUnreadRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -4840,7 +4845,7 @@ nonisolated extension BriarAPI_MarkChannelUnreadResponse: SwiftProtobuf.Message,
 
 nonisolated extension BriarAPI_UpdateChannelSidebarPreferenceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateChannelSidebarPreferenceRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{1}pinned\0\u{1}hidden\0\u{3}clear_section\0\u{3}section_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{1}pinned\0\u{1}hidden\0\u{3}clear_section\0\u{3}section_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4848,7 +4853,7 @@ nonisolated extension BriarAPI_UpdateChannelSidebarPreferenceRequest: SwiftProto
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self._pinned) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self._hidden) }()
@@ -4883,8 +4888,8 @@ nonisolated extension BriarAPI_UpdateChannelSidebarPreferenceRequest: SwiftProto
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -4910,7 +4915,7 @@ nonisolated extension BriarAPI_UpdateChannelSidebarPreferenceRequest: SwiftProto
   }
 
   public static func ==(lhs: BriarAPI_UpdateChannelSidebarPreferenceRequest, rhs: BriarAPI_UpdateChannelSidebarPreferenceRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs._pinned != rhs._pinned {return false}
     if lhs._hidden != rhs._hidden {return false}
@@ -4956,7 +4961,7 @@ nonisolated extension BriarAPI_UpdateChannelSidebarPreferenceResponse: SwiftProt
 
 nonisolated extension BriarAPI_ChannelSidebarSection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelSidebarSection"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{1}name\0\u{1}position\0\u{3}created_at\0\u{3}updated_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}workspace_id\0\u{1}name\0\u{1}position\0\u{3}created_at\0\u{3}updated_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4965,7 +4970,7 @@ nonisolated extension BriarAPI_ChannelSidebarSection: SwiftProtobuf.Message, Swi
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self.position) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
@@ -4983,8 +4988,8 @@ nonisolated extension BriarAPI_ChannelSidebarSection: SwiftProtobuf.Message, Swi
     if !self.id.isEmpty {
       try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
     }
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 2)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 2)
     }
     if !self.name.isEmpty {
       try visitor.visitSingularStringField(value: self.name, fieldNumber: 3)
@@ -5003,7 +5008,7 @@ nonisolated extension BriarAPI_ChannelSidebarSection: SwiftProtobuf.Message, Swi
 
   public static func ==(lhs: BriarAPI_ChannelSidebarSection, rhs: BriarAPI_ChannelSidebarSection) -> Bool {
     if lhs.id != rhs.id {return false}
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.name != rhs.name {return false}
     if lhs.position != rhs.position {return false}
     if lhs._createdAt != rhs._createdAt {return false}
@@ -5015,7 +5020,7 @@ nonisolated extension BriarAPI_ChannelSidebarSection: SwiftProtobuf.Message, Swi
 
 nonisolated extension BriarAPI_ListChannelSidebarSectionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListChannelSidebarSectionsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5023,21 +5028,21 @@ nonisolated extension BriarAPI_ListChannelSidebarSectionsRequest: SwiftProtobuf.
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_ListChannelSidebarSectionsRequest, rhs: BriarAPI_ListChannelSidebarSectionsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5075,7 +5080,7 @@ nonisolated extension BriarAPI_ListChannelSidebarSectionsResponse: SwiftProtobuf
 
 nonisolated extension BriarAPI_CreateChannelSidebarSectionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateChannelSidebarSectionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}name\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}name\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5083,7 +5088,7 @@ nonisolated extension BriarAPI_CreateChannelSidebarSectionRequest: SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       default: break
       }
@@ -5091,8 +5096,8 @@ nonisolated extension BriarAPI_CreateChannelSidebarSectionRequest: SwiftProtobuf
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.name.isEmpty {
       try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
@@ -5101,7 +5106,7 @@ nonisolated extension BriarAPI_CreateChannelSidebarSectionRequest: SwiftProtobuf
   }
 
   public static func ==(lhs: BriarAPI_CreateChannelSidebarSectionRequest, rhs: BriarAPI_CreateChannelSidebarSectionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.name != rhs.name {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -5149,7 +5154,7 @@ nonisolated extension BriarAPI_CreateChannelSidebarSectionResponse: SwiftProtobu
 
 nonisolated extension BriarAPI_RenameChannelSidebarSectionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RenameChannelSidebarSectionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}section_id\0\u{1}name\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}section_id\0\u{1}name\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5157,7 +5162,7 @@ nonisolated extension BriarAPI_RenameChannelSidebarSectionRequest: SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.sectionID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.name) }()
       default: break
@@ -5166,8 +5171,8 @@ nonisolated extension BriarAPI_RenameChannelSidebarSectionRequest: SwiftProtobuf
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.sectionID.isEmpty {
       try visitor.visitSingularStringField(value: self.sectionID, fieldNumber: 2)
@@ -5179,7 +5184,7 @@ nonisolated extension BriarAPI_RenameChannelSidebarSectionRequest: SwiftProtobuf
   }
 
   public static func ==(lhs: BriarAPI_RenameChannelSidebarSectionRequest, rhs: BriarAPI_RenameChannelSidebarSectionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.sectionID != rhs.sectionID {return false}
     if lhs.name != rhs.name {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -5228,7 +5233,7 @@ nonisolated extension BriarAPI_RenameChannelSidebarSectionResponse: SwiftProtobu
 
 nonisolated extension BriarAPI_DeleteChannelSidebarSectionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeleteChannelSidebarSectionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}section_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}section_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5236,7 +5241,7 @@ nonisolated extension BriarAPI_DeleteChannelSidebarSectionRequest: SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.sectionID) }()
       default: break
       }
@@ -5244,8 +5249,8 @@ nonisolated extension BriarAPI_DeleteChannelSidebarSectionRequest: SwiftProtobuf
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.sectionID.isEmpty {
       try visitor.visitSingularStringField(value: self.sectionID, fieldNumber: 2)
@@ -5254,7 +5259,7 @@ nonisolated extension BriarAPI_DeleteChannelSidebarSectionRequest: SwiftProtobuf
   }
 
   public static func ==(lhs: BriarAPI_DeleteChannelSidebarSectionRequest, rhs: BriarAPI_DeleteChannelSidebarSectionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.sectionID != rhs.sectionID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -5293,7 +5298,7 @@ nonisolated extension BriarAPI_DeleteChannelSidebarSectionResponse: SwiftProtobu
 
 nonisolated extension BriarAPI_ListChannelMessagesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListChannelMessagesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}cursor\0\u{1}limit\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}parent_message_id\0\u{1}cursor\0\u{1}limit\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5301,7 +5306,7 @@ nonisolated extension BriarAPI_ListChannelMessagesRequest: SwiftProtobuf.Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._parentMessageID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._cursor) }()
@@ -5316,8 +5321,8 @@ nonisolated extension BriarAPI_ListChannelMessagesRequest: SwiftProtobuf.Message
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -5335,7 +5340,7 @@ nonisolated extension BriarAPI_ListChannelMessagesRequest: SwiftProtobuf.Message
   }
 
   public static func ==(lhs: BriarAPI_ListChannelMessagesRequest, rhs: BriarAPI_ListChannelMessagesRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs._parentMessageID != rhs._parentMessageID {return false}
     if lhs._cursor != rhs._cursor {return false}
@@ -5386,7 +5391,7 @@ nonisolated extension BriarAPI_ListChannelMessagesResponse: SwiftProtobuf.Messag
 
 nonisolated extension BriarAPI_PrepareChannelMessageAttachmentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PrepareChannelMessageAttachmentsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}organization_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}attachments\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}attachments\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5395,7 +5400,7 @@ nonisolated extension BriarAPI_PrepareChannelMessageAttachmentsRequest: SwiftPro
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.clientMessageID) }()
       case 5: try { try decoder.decodeRepeatedMessageField(value: &self.attachments) }()
@@ -5408,8 +5413,8 @@ nonisolated extension BriarAPI_PrepareChannelMessageAttachmentsRequest: SwiftPro
     if !self.requestID.isEmpty {
       try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
     }
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 2)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 2)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 3)
@@ -5425,7 +5430,7 @@ nonisolated extension BriarAPI_PrepareChannelMessageAttachmentsRequest: SwiftPro
 
   public static func ==(lhs: BriarAPI_PrepareChannelMessageAttachmentsRequest, rhs: BriarAPI_PrepareChannelMessageAttachmentsRequest) -> Bool {
     if lhs.requestID != rhs.requestID {return false}
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.clientMessageID != rhs.clientMessageID {return false}
     if lhs.attachments != rhs.attachments {return false}
@@ -5471,7 +5476,7 @@ nonisolated extension BriarAPI_PrepareChannelMessageAttachmentsResponse: SwiftPr
 
 nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreateChannelMessageRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}body\0\u{4}\u{2}parent_message_id\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{4}\u{2}skill_id\0\u{3}preferred_device_id\0\u{1}attachments\0\u{c}\u{5}\u{1}\u{c}\u{9}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}client_message_id\0\u{1}body\0\u{4}\u{2}parent_message_id\0\u{3}mentioned_user_ids\0\u{3}mentioned_agent_ids\0\u{4}\u{2}skill_id\0\u{3}preferred_device_id\0\u{1}attachments\0\u{c}\u{5}\u{1}\u{c}\u{9}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5479,7 +5484,7 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.clientMessageID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.body) }()
@@ -5499,8 +5504,8 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -5533,7 +5538,7 @@ nonisolated extension BriarAPI_CreateChannelMessageRequest: SwiftProtobuf.Messag
   }
 
   public static func ==(lhs: BriarAPI_CreateChannelMessageRequest, rhs: BriarAPI_CreateChannelMessageRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.clientMessageID != rhs.clientMessageID {return false}
     if lhs.body != rhs.body {return false}
@@ -5589,7 +5594,7 @@ nonisolated extension BriarAPI_CreateChannelMessageResponse: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_DeleteChannelMessageRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeleteChannelMessageRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}message_id\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}message_id\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5597,7 +5602,7 @@ nonisolated extension BriarAPI_DeleteChannelMessageRequest: SwiftProtobuf.Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.messageID) }()
       default: break
@@ -5606,8 +5611,8 @@ nonisolated extension BriarAPI_DeleteChannelMessageRequest: SwiftProtobuf.Messag
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -5619,7 +5624,7 @@ nonisolated extension BriarAPI_DeleteChannelMessageRequest: SwiftProtobuf.Messag
   }
 
   public static func ==(lhs: BriarAPI_DeleteChannelMessageRequest, rhs: BriarAPI_DeleteChannelMessageRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.messageID != rhs.messageID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -5673,7 +5678,7 @@ nonisolated extension BriarAPI_DeleteChannelMessageResponse: SwiftProtobuf.Messa
 
 nonisolated extension BriarAPI_ToggleChannelMessageReactionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToggleChannelMessageReactionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}message_id\0\u{1}emoji\0\u{c}\u{5}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}message_id\0\u{1}emoji\0\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5681,7 +5686,7 @@ nonisolated extension BriarAPI_ToggleChannelMessageReactionRequest: SwiftProtobu
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.messageID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.emoji) }()
@@ -5691,8 +5696,8 @@ nonisolated extension BriarAPI_ToggleChannelMessageReactionRequest: SwiftProtobu
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -5707,7 +5712,7 @@ nonisolated extension BriarAPI_ToggleChannelMessageReactionRequest: SwiftProtobu
   }
 
   public static func ==(lhs: BriarAPI_ToggleChannelMessageReactionRequest, rhs: BriarAPI_ToggleChannelMessageReactionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.messageID != rhs.messageID {return false}
     if lhs.emoji != rhs.emoji {return false}
@@ -5752,7 +5757,7 @@ nonisolated extension BriarAPI_ToggleChannelMessageReactionResponse: SwiftProtob
 
 nonisolated extension BriarAPI_SetChannelThreadSubscriptionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SetChannelThreadSubscriptionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}root_message_id\0\u{1}subscribed\0\u{c}\u{5}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}root_message_id\0\u{1}subscribed\0\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5760,7 +5765,7 @@ nonisolated extension BriarAPI_SetChannelThreadSubscriptionRequest: SwiftProtobu
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.rootMessageID) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.subscribed) }()
@@ -5770,8 +5775,8 @@ nonisolated extension BriarAPI_SetChannelThreadSubscriptionRequest: SwiftProtobu
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -5786,7 +5791,7 @@ nonisolated extension BriarAPI_SetChannelThreadSubscriptionRequest: SwiftProtobu
   }
 
   public static func ==(lhs: BriarAPI_SetChannelThreadSubscriptionRequest, rhs: BriarAPI_SetChannelThreadSubscriptionRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.rootMessageID != rhs.rootMessageID {return false}
     if lhs.subscribed != rhs.subscribed {return false}
@@ -5832,7 +5837,7 @@ nonisolated extension BriarAPI_SetChannelThreadSubscriptionResponse: SwiftProtob
 
 nonisolated extension BriarAPI_AcceptChannelProposalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AcceptChannelProposalRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}proposal_id\0\u{4}\u{2}project_id\0\u{1}execution\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}proposal_id\0\u{4}\u{2}project_id\0\u{1}execution\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5840,7 +5845,7 @@ nonisolated extension BriarAPI_AcceptChannelProposalRequest: SwiftProtobuf.Messa
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.proposalID) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._projectID) }()
@@ -5855,8 +5860,8 @@ nonisolated extension BriarAPI_AcceptChannelProposalRequest: SwiftProtobuf.Messa
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -5874,7 +5879,7 @@ nonisolated extension BriarAPI_AcceptChannelProposalRequest: SwiftProtobuf.Messa
   }
 
   public static func ==(lhs: BriarAPI_AcceptChannelProposalRequest, rhs: BriarAPI_AcceptChannelProposalRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.proposalID != rhs.proposalID {return false}
     if lhs._projectID != rhs._projectID {return false}
@@ -5991,7 +5996,7 @@ nonisolated extension BriarAPI_AcceptChannelProposalResponse: SwiftProtobuf.Mess
 
 nonisolated extension BriarAPI_AcceptChannelExecutionProposalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AcceptChannelExecutionProposalRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}proposal_id\0\u{2}\u{2}approval\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}proposal_id\0\u{2}\u{2}approval\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5999,7 +6004,7 @@ nonisolated extension BriarAPI_AcceptChannelExecutionProposalRequest: SwiftProto
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.proposalID) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._approval) }()
@@ -6013,8 +6018,8 @@ nonisolated extension BriarAPI_AcceptChannelExecutionProposalRequest: SwiftProto
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -6029,7 +6034,7 @@ nonisolated extension BriarAPI_AcceptChannelExecutionProposalRequest: SwiftProto
   }
 
   public static func ==(lhs: BriarAPI_AcceptChannelExecutionProposalRequest, rhs: BriarAPI_AcceptChannelExecutionProposalRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.proposalID != rhs.proposalID {return false}
     if lhs._approval != rhs._approval {return false}
@@ -6138,7 +6143,7 @@ nonisolated extension BriarAPI_AcceptChannelExecutionProposalResponse: SwiftProt
 
 nonisolated extension BriarAPI_DeclineChannelProposalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeclineChannelProposalRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}proposal_id\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}proposal_id\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6146,7 +6151,7 @@ nonisolated extension BriarAPI_DeclineChannelProposalRequest: SwiftProtobuf.Mess
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.proposalID) }()
       default: break
@@ -6155,8 +6160,8 @@ nonisolated extension BriarAPI_DeclineChannelProposalRequest: SwiftProtobuf.Mess
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -6168,7 +6173,7 @@ nonisolated extension BriarAPI_DeclineChannelProposalRequest: SwiftProtobuf.Mess
   }
 
   public static func ==(lhs: BriarAPI_DeclineChannelProposalRequest, rhs: BriarAPI_DeclineChannelProposalRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.proposalID != rhs.proposalID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -6212,7 +6217,7 @@ nonisolated extension BriarAPI_DeclineChannelProposalResponse.Outcome: SwiftProt
 
 nonisolated extension BriarAPI_AcceptChannelSkillExecutionProposalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AcceptChannelSkillExecutionProposalRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}proposal_id\0\u{4}\u{2}worker_id\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}proposal_id\0\u{4}\u{2}worker_id\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6220,7 +6225,7 @@ nonisolated extension BriarAPI_AcceptChannelSkillExecutionProposalRequest: Swift
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.proposalID) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._workerID) }()
@@ -6234,8 +6239,8 @@ nonisolated extension BriarAPI_AcceptChannelSkillExecutionProposalRequest: Swift
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -6250,7 +6255,7 @@ nonisolated extension BriarAPI_AcceptChannelSkillExecutionProposalRequest: Swift
   }
 
   public static func ==(lhs: BriarAPI_AcceptChannelSkillExecutionProposalRequest, rhs: BriarAPI_AcceptChannelSkillExecutionProposalRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.proposalID != rhs.proposalID {return false}
     if lhs._workerID != rhs._workerID {return false}
@@ -6363,11 +6368,11 @@ nonisolated extension BriarAPI_DirectMessageParticipant.Kind: SwiftProtobuf._Pro
 
 nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelSummary"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}organization_id\0\u{1}slug\0\u{1}name\0\u{1}topic\0\u{1}visibility\0\u{3}default_project_id\0\u{3}archived_at\0\u{3}member_count\0\u{3}agent_count\0\u{3}created_at\0\u{3}updated_at\0\u{1}kind\0\u{3}last_message_at\0\u{3}last_message_preview\0\u{3}last_read_at\0\u{3}has_unread\0\u{3}direct_message_participants\0\u{3}created_by_user_id\0\u{3}pinned_at\0\u{3}sidebar_section_id\0\u{3}hidden_at\0\u{3}read_only\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}workspace_id\0\u{1}slug\0\u{1}name\0\u{1}topic\0\u{1}visibility\0\u{3}default_project_id\0\u{3}archived_at\0\u{3}member_count\0\u{3}agent_count\0\u{3}created_at\0\u{3}updated_at\0\u{1}kind\0\u{3}last_message_at\0\u{3}last_message_preview\0\u{3}last_read_at\0\u{3}has_unread\0\u{3}direct_message_participants\0\u{3}created_by_user_id\0\u{3}pinned_at\0\u{3}sidebar_section_id\0\u{3}hidden_at\0\u{3}read_only\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
-    var _organizationID: String = String()
+    var _workspaceID: String = String()
     var _slug: String = String()
     var _name: String = String()
     var _topic: String? = nil
@@ -6400,7 +6405,7 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
 
     init(copying source: _StorageClass) {
       _id = source._id
-      _organizationID = source._organizationID
+      _workspaceID = source._workspaceID
       _slug = source._slug
       _name = source._name
       _topic = source._topic
@@ -6441,7 +6446,7 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._organizationID) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._workspaceID) }()
         case 3: try { try decoder.decodeSingularStringField(value: &_storage._slug) }()
         case 4: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
         case 5: try { try decoder.decodeSingularStringField(value: &_storage._topic) }()
@@ -6478,8 +6483,8 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
       if !_storage._id.isEmpty {
         try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
       }
-      if !_storage._organizationID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._organizationID, fieldNumber: 2)
+      if !_storage._workspaceID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._workspaceID, fieldNumber: 2)
       }
       if !_storage._slug.isEmpty {
         try visitor.visitSingularStringField(value: _storage._slug, fieldNumber: 3)
@@ -6554,7 +6559,7 @@ nonisolated extension BriarAPI_ChannelSummary: SwiftProtobuf.Message, SwiftProto
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._id != rhs_storage._id {return false}
-        if _storage._organizationID != rhs_storage._organizationID {return false}
+        if _storage._workspaceID != rhs_storage._workspaceID {return false}
         if _storage._slug != rhs_storage._slug {return false}
         if _storage._name != rhs_storage._name {return false}
         if _storage._topic != rhs_storage._topic {return false}
@@ -7074,7 +7079,7 @@ nonisolated extension BriarAPI_ChannelDocument: SwiftProtobuf.Message, SwiftProt
 
 nonisolated extension BriarAPI_GetChannelMessageDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetChannelMessageDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{3}message_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{3}message_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -7082,7 +7087,7 @@ nonisolated extension BriarAPI_GetChannelMessageDocumentRequest: SwiftProtobuf.M
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.messageID) }()
       default: break
@@ -7091,8 +7096,8 @@ nonisolated extension BriarAPI_GetChannelMessageDocumentRequest: SwiftProtobuf.M
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -7104,7 +7109,7 @@ nonisolated extension BriarAPI_GetChannelMessageDocumentRequest: SwiftProtobuf.M
   }
 
   public static func ==(lhs: BriarAPI_GetChannelMessageDocumentRequest, rhs: BriarAPI_GetChannelMessageDocumentRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.messageID != rhs.messageID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -7197,7 +7202,7 @@ nonisolated extension BriarAPI_GetChannelMessageDocumentResponse: SwiftProtobuf.
 
 nonisolated extension BriarAPI_GetChannelLinkPreviewRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetChannelLinkPreviewRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{3}channel_id\0\u{1}url\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{3}channel_id\0\u{1}url\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -7205,7 +7210,7 @@ nonisolated extension BriarAPI_GetChannelLinkPreviewRequest: SwiftProtobuf.Messa
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.url) }()
       default: break
@@ -7214,8 +7219,8 @@ nonisolated extension BriarAPI_GetChannelLinkPreviewRequest: SwiftProtobuf.Messa
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if !self.channelID.isEmpty {
       try visitor.visitSingularStringField(value: self.channelID, fieldNumber: 2)
@@ -7227,7 +7232,7 @@ nonisolated extension BriarAPI_GetChannelLinkPreviewRequest: SwiftProtobuf.Messa
   }
 
   public static func ==(lhs: BriarAPI_GetChannelLinkPreviewRequest, rhs: BriarAPI_GetChannelLinkPreviewRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.channelID != rhs.channelID {return false}
     if lhs.url != rhs.url {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -7681,7 +7686,7 @@ nonisolated extension BriarAPI_ChannelMessage: SwiftProtobuf.Message, SwiftProto
 
 nonisolated extension BriarAPI_ChannelIssueProposal: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelIssueProposal"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}title\0\u{1}description\0\u{1}priority\0\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}title\0\u{1}description\0\u{1}priority\0\u{4}\u{2}attachment_ids\0\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -7692,6 +7697,7 @@ nonisolated extension BriarAPI_ChannelIssueProposal: SwiftProtobuf.Message, Swif
       case 1: try { try decoder.decodeSingularStringField(value: &self.title) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self._priority) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.attachmentIds) }()
       default: break
       }
     }
@@ -7711,6 +7717,9 @@ nonisolated extension BriarAPI_ChannelIssueProposal: SwiftProtobuf.Message, Swif
     try { if let v = self._priority {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
     } }()
+    if !self.attachmentIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.attachmentIds, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7718,6 +7727,7 @@ nonisolated extension BriarAPI_ChannelIssueProposal: SwiftProtobuf.Message, Swif
     if lhs.title != rhs.title {return false}
     if lhs._description_p != rhs._description_p {return false}
     if lhs._priority != rhs._priority {return false}
+    if lhs.attachmentIds != rhs.attachmentIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

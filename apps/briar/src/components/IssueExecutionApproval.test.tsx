@@ -585,7 +585,7 @@ describe("IssueExecutionApproval", () => {
         surfaceKey="channel:accepted"
       />,
     );
-    expect(container.textContent).toContain("Organization Agent Bumble의 위임");
+    expect(container.textContent).toContain("Workspace Agent Bumble의 위임");
     expect(container.textContent).toContain("codex · gpt-5.6-sol · high");
     expect(container.textContent).toContain("Build Mac");
     await act(async () => {

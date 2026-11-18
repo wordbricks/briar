@@ -20,12 +20,12 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-public nonisolated enum BriarAPI_OrganizationUsageRange: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum BriarAPI_WorkspaceUsageRange: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
-  case organizationUsageRange7Days // = 1
-  case organizationUsageRange30Days // = 2
-  case organizationUsageRange90Days // = 3
+  case workspaceUsageRange7Days // = 1
+  case workspaceUsageRange30Days // = 2
+  case workspaceUsageRange90Days // = 3
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -35,9 +35,9 @@ public nonisolated enum BriarAPI_OrganizationUsageRange: SwiftProtobuf.Enum, Swi
   public init?(rawValue: Int) {
     switch rawValue {
     case 0: self = .unspecified
-    case 1: self = .organizationUsageRange7Days
-    case 2: self = .organizationUsageRange30Days
-    case 3: self = .organizationUsageRange90Days
+    case 1: self = .workspaceUsageRange7Days
+    case 2: self = .workspaceUsageRange30Days
+    case 3: self = .workspaceUsageRange90Days
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -45,19 +45,19 @@ public nonisolated enum BriarAPI_OrganizationUsageRange: SwiftProtobuf.Enum, Swi
   public var rawValue: Int {
     switch self {
     case .unspecified: return 0
-    case .organizationUsageRange7Days: return 1
-    case .organizationUsageRange30Days: return 2
-    case .organizationUsageRange90Days: return 3
+    case .workspaceUsageRange7Days: return 1
+    case .workspaceUsageRange30Days: return 2
+    case .workspaceUsageRange90Days: return 3
     case .UNRECOGNIZED(let i): return i
     }
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [BriarAPI_OrganizationUsageRange] = [
+  public static let allCases: [BriarAPI_WorkspaceUsageRange] = [
     .unspecified,
-    .organizationUsageRange7Days,
-    .organizationUsageRange30Days,
-    .organizationUsageRange90Days,
+    .workspaceUsageRange7Days,
+    .workspaceUsageRange30Days,
+    .workspaceUsageRange90Days,
   ]
 
 }
@@ -984,21 +984,21 @@ public nonisolated struct BriarAPI_AgentUsageRun: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct BriarAPI_ListOrganizationUsageRunsRequest: Sendable {
+public nonisolated struct BriarAPI_ListWorkspaceUsageRunsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
-  public var range: BriarAPI_OrganizationUsageRange = .unspecified
+  public var range: BriarAPI_WorkspaceUsageRange = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct BriarAPI_ListOrganizationUsageRunsResponse: Sendable {
+public nonisolated struct BriarAPI_ListWorkspaceUsageRunsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1261,7 +1261,7 @@ public nonisolated struct BriarAPI_ListStatusTrayRunsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var organizationID: String = String()
+  public var workspaceID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1397,8 +1397,8 @@ public nonisolated struct BriarAPI_GetRunCostEstimateResponse: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "briar.app.v1"
 
-nonisolated extension BriarAPI_OrganizationUsageRange: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ORGANIZATION_USAGE_RANGE_UNSPECIFIED\0\u{1}ORGANIZATION_USAGE_RANGE_7_DAYS\0\u{1}ORGANIZATION_USAGE_RANGE_30_DAYS\0\u{1}ORGANIZATION_USAGE_RANGE_90_DAYS\0")
+nonisolated extension BriarAPI_WorkspaceUsageRange: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0WORKSPACE_USAGE_RANGE_UNSPECIFIED\0\u{1}WORKSPACE_USAGE_RANGE_7_DAYS\0\u{1}WORKSPACE_USAGE_RANGE_30_DAYS\0\u{1}WORKSPACE_USAGE_RANGE_90_DAYS\0")
 }
 
 nonisolated extension BriarAPI_ProjectUsagePeriod: SwiftProtobuf._ProtoNameProviding {
@@ -2375,9 +2375,9 @@ nonisolated extension BriarAPI_AgentUsageRun: SwiftProtobuf.Message, SwiftProtob
   }
 }
 
-nonisolated extension BriarAPI_ListOrganizationUsageRunsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListOrganizationUsageRunsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0\u{1}range\0")
+nonisolated extension BriarAPI_ListWorkspaceUsageRunsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListWorkspaceUsageRunsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0\u{1}range\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2385,7 +2385,7 @@ nonisolated extension BriarAPI_ListOrganizationUsageRunsRequest: SwiftProtobuf.M
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       case 2: try { try decoder.decodeSingularEnumField(value: &self.range) }()
       default: break
       }
@@ -2393,8 +2393,8 @@ nonisolated extension BriarAPI_ListOrganizationUsageRunsRequest: SwiftProtobuf.M
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     if self.range != .unspecified {
       try visitor.visitSingularEnumField(value: self.range, fieldNumber: 2)
@@ -2402,16 +2402,16 @@ nonisolated extension BriarAPI_ListOrganizationUsageRunsRequest: SwiftProtobuf.M
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_ListOrganizationUsageRunsRequest, rhs: BriarAPI_ListOrganizationUsageRunsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+  public static func ==(lhs: BriarAPI_ListWorkspaceUsageRunsRequest, rhs: BriarAPI_ListWorkspaceUsageRunsRequest) -> Bool {
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.range != rhs.range {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension BriarAPI_ListOrganizationUsageRunsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListOrganizationUsageRunsResponse"
+nonisolated extension BriarAPI_ListWorkspaceUsageRunsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListWorkspaceUsageRunsResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}runs\0\u{3}generated_at\0\u{1}pricing\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2445,7 +2445,7 @@ nonisolated extension BriarAPI_ListOrganizationUsageRunsResponse: SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: BriarAPI_ListOrganizationUsageRunsResponse, rhs: BriarAPI_ListOrganizationUsageRunsResponse) -> Bool {
+  public static func ==(lhs: BriarAPI_ListWorkspaceUsageRunsResponse, rhs: BriarAPI_ListWorkspaceUsageRunsResponse) -> Bool {
     if lhs.runs != rhs.runs {return false}
     if lhs._generatedAt != rhs._generatedAt {return false}
     if lhs._pricing != rhs._pricing {return false}
@@ -2761,7 +2761,7 @@ nonisolated extension BriarAPI_StatusTrayRun: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension BriarAPI_ListStatusTrayRunsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ListStatusTrayRunsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}organization_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}workspace_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2769,21 +2769,21 @@ nonisolated extension BriarAPI_ListStatusTrayRunsRequest: SwiftProtobuf.Message,
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.organizationID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.workspaceID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.organizationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.organizationID, fieldNumber: 1)
+    if !self.workspaceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.workspaceID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: BriarAPI_ListStatusTrayRunsRequest, rhs: BriarAPI_ListStatusTrayRunsRequest) -> Bool {
-    if lhs.organizationID != rhs.organizationID {return false}
+    if lhs.workspaceID != rhs.workspaceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

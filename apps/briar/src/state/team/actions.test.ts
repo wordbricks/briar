@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { demoDashboard } from "../../lib/demo-data";
 import type { Project } from "../../types";
 import { teamEntityAtom } from "../entities/teams";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { lockedTeamIdAtom } from "../platform";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { setSessionDataSources } from "../session/api";
-import { reconnectRequestGeneration } from "../workspace/api";
+import { reconnectRequestGeneration } from "../local-workspace/api";
 import { sessionErrorAtom, tokenAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { readTeamView } from "../../test/team-view";
@@ -227,7 +227,7 @@ describe("selectTeam", () => {
     actions.selectTeam(teamB.id);
 
     expect(registry.get(activeTeamIdAtom)).toBe(teamB.id);
-    expect(registry.get(activeOrganizationIdAtom)).toBe(teamB.organizationId);
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(teamB.workspaceId);
     expect(registry.get(sessionErrorAtom)).toBeNull();
     expect(reconnectBumps()).toBe(1);
     // Team B was never loaded, so there is no stored board to mark stale: the

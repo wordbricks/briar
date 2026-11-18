@@ -4,13 +4,11 @@ import {
   ChannelService,
   ChannelVisibility as ProtoChannelVisibility,
   DeclineChannelProposalResponse_Outcome,
-  DeclineChannelProposalResponseSchema,
-} from "@briar/contracts/gen/briar/app/v1/channel_pb";
+  DeclineChannelProposalResponseSchema} from "@briar/contracts/gen/briar/app/v1/channel_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   PreparedUploadSchema,
-  UploadReferenceSchema,
-} from "@briar/contracts/gen/briar/types/v1/upload_pb";
+  UploadReferenceSchema} from "@briar/contracts/gen/briar/types/v1/upload_pb";
 import {
   Code,
   ConnectError,
@@ -42,30 +40,30 @@ import type {
   ChannelSidebarPreferenceUpdate,
 } from "./channel-sidebar-repository";
 import {
-  createOrganizationChannelMessage,
-  deleteOrganizationChannelMessage,
-  listOrganizationChannelMessages,
-  setOrganizationChannelThreadSubscription,
-  toggleOrganizationChannelMessageReaction,
+  createWorkspaceChannelMessage,
+  deleteWorkspaceChannelMessage,
+  listWorkspaceChannelMessages,
+  setWorkspaceChannelThreadSubscription,
+  toggleWorkspaceChannelMessageReaction,
 } from "./channel-message-routes";
 import {
   createChannelMessageApplicationRequest,
   requiredAppAgentProviderFromProto,
 } from "./app-mutation-request-mappers";
 import {
-  acceptOrganizationChannelExecutionProposal,
-  acceptOrganizationChannelProposal,
-  acceptOrganizationChannelSkillExecutionProposal,
-  declineOrganizationChannelProposal,
+  acceptWorkspaceChannelExecutionProposal,
+  acceptWorkspaceChannelProposal,
+  acceptWorkspaceChannelSkillExecutionProposal,
+  declineWorkspaceChannelProposal,
 } from "./channel-proposal-routes";
 import {
-  createOrganizationDirectMessage,
-  getOrganizationChannelDetail,
-  listOrganizationAgentDirectMessages,
-  listOrganizationChannels,
-  markOrganizationChannelRead,
-  syncOrganizationChannels,
-} from "./organization-channel-routes";
+  createWorkspaceDirectMessage,
+  getWorkspaceChannelDetail,
+  listWorkspaceAgentDirectMessages,
+  listWorkspaceChannels,
+  markWorkspaceChannelRead,
+  syncWorkspaceChannels,
+} from "./workspace-channel-routes";
 import {
   createChannelWebhookApplication,
   listChannelWebhooksApplication,
@@ -81,14 +79,14 @@ import {
   channelWebhookNameSchema,
   type ChannelVisibility,
 } from "../../src/lib/channels-contract";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import {
-  getOrganizationRole,
-  listOrganizationMembers,
-} from "./organization-repository";
+  getWorkspaceRole,
+  listWorkspaceMembers,
+} from "./workspace-repository";
 import {
-  listOrganizationAgents,
-} from "./organization-agents";
+  listWorkspaceAgents,
+} from "./workspace-agents";
 import {
   scheduleChannelRealtimePublish,
   scheduleChannelActivityDisconnect,
@@ -98,8 +96,8 @@ import {
 import { decodeRequestSync } from "./request-schema";
 import { UuidString } from "./schema-codecs";
 import { requireSession } from "./session-auth";
-import { appOrganizationMember } from "./app-connect-mappers";
-import { appOrganizationAgent } from "./app-connect-agent-mappers";
+import { appWorkspaceMember } from "./app-connect-mappers";
+import { appWorkspaceAgent } from "./app-connect-agent-mappers";
 import {
   appChannelDocumentContent,
   appChannelLinkPreview,
@@ -135,12 +133,12 @@ export type AppConnectChannelInput = {
 
 export type AppConnectChannelServices = {
   readonly acceptExecutionProposal:
-    typeof acceptOrganizationChannelExecutionProposal;
-  readonly acceptProposal: typeof acceptOrganizationChannelProposal;
+    typeof acceptWorkspaceChannelExecutionProposal;
+  readonly acceptProposal: typeof acceptWorkspaceChannelProposal;
   readonly acceptSkillExecutionProposal:
-    typeof acceptOrganizationChannelSkillExecutionProposal;
-  readonly createDirectMessage: typeof createOrganizationDirectMessage;
-  readonly listAgentDirectMessages: typeof listOrganizationAgentDirectMessages;
+    typeof acceptWorkspaceChannelSkillExecutionProposal;
+  readonly createDirectMessage: typeof createWorkspaceDirectMessage;
+  readonly listAgentDirectMessages: typeof listWorkspaceAgentDirectMessages;
   readonly createChannel: typeof createChannelApplication;
   readonly updateChannel: typeof updateChannelApplication;
   readonly deleteChannel: typeof deleteChannelApplication;
@@ -151,17 +149,17 @@ export type AppConnectChannelServices = {
   readonly updateChannelWebhook: typeof updateChannelWebhookApplication;
   readonly rotateChannelWebhook: typeof rotateChannelWebhookApplication;
   readonly revokeChannelWebhook: typeof revokeChannelWebhookApplication;
-  readonly createMessage: typeof createOrganizationChannelMessage;
+  readonly createMessage: typeof createWorkspaceChannelMessage;
   readonly prepareMessageAttachments:
     typeof prepareChannelMessageAttachmentsApplication;
-  readonly declineProposal: typeof declineOrganizationChannelProposal;
-  readonly deleteMessage: typeof deleteOrganizationChannelMessage;
-  readonly getChannel: typeof getOrganizationChannelDetail;
+  readonly declineProposal: typeof declineWorkspaceChannelProposal;
+  readonly deleteMessage: typeof deleteWorkspaceChannelMessage;
+  readonly getChannel: typeof getWorkspaceChannelDetail;
   readonly getLinkPreview: typeof getChannelLinkPreviewApplication;
   readonly getMessageDocument: typeof getChannelMessageDocumentApplication;
-  readonly listChannels: typeof listOrganizationChannels;
-  readonly listMessages: typeof listOrganizationChannelMessages;
-  readonly markRead: typeof markOrganizationChannelRead;
+  readonly listChannels: typeof listWorkspaceChannels;
+  readonly listMessages: typeof listWorkspaceChannelMessages;
+  readonly markRead: typeof markWorkspaceChannelRead;
   readonly markUnread: typeof markChannelUnreadApplication;
   readonly updateSidebarPreference:
     typeof updateChannelSidebarPreferenceApplication;
@@ -171,17 +169,17 @@ export type AppConnectChannelServices = {
   readonly deleteSidebarSection: typeof deleteChannelSidebarSectionApplication;
   readonly requireSession: typeof requireSession;
   readonly setThreadSubscription:
-    typeof setOrganizationChannelThreadSubscription;
-  readonly syncChannels: typeof syncOrganizationChannels;
-  readonly toggleReaction: typeof toggleOrganizationChannelMessageReaction;
+    typeof setWorkspaceChannelThreadSubscription;
+  readonly syncChannels: typeof syncWorkspaceChannels;
+  readonly toggleReaction: typeof toggleWorkspaceChannelMessageReaction;
 };
 
 export const appConnectChannelServices: AppConnectChannelServices = {
-  acceptExecutionProposal: acceptOrganizationChannelExecutionProposal,
-  acceptProposal: acceptOrganizationChannelProposal,
-  acceptSkillExecutionProposal: acceptOrganizationChannelSkillExecutionProposal,
-  createDirectMessage: createOrganizationDirectMessage,
-  listAgentDirectMessages: listOrganizationAgentDirectMessages,
+  acceptExecutionProposal: acceptWorkspaceChannelExecutionProposal,
+  acceptProposal: acceptWorkspaceChannelProposal,
+  acceptSkillExecutionProposal: acceptWorkspaceChannelSkillExecutionProposal,
+  createDirectMessage: createWorkspaceDirectMessage,
+  listAgentDirectMessages: listWorkspaceAgentDirectMessages,
   createChannel: createChannelApplication,
   updateChannel: updateChannelApplication,
   deleteChannel: deleteChannelApplication,
@@ -192,16 +190,16 @@ export const appConnectChannelServices: AppConnectChannelServices = {
   updateChannelWebhook: updateChannelWebhookApplication,
   rotateChannelWebhook: rotateChannelWebhookApplication,
   revokeChannelWebhook: revokeChannelWebhookApplication,
-  createMessage: createOrganizationChannelMessage,
+  createMessage: createWorkspaceChannelMessage,
   prepareMessageAttachments: prepareChannelMessageAttachmentsApplication,
-  declineProposal: declineOrganizationChannelProposal,
-  deleteMessage: deleteOrganizationChannelMessage,
-  getChannel: getOrganizationChannelDetail,
+  declineProposal: declineWorkspaceChannelProposal,
+  deleteMessage: deleteWorkspaceChannelMessage,
+  getChannel: getWorkspaceChannelDetail,
   getLinkPreview: getChannelLinkPreviewApplication,
   getMessageDocument: getChannelMessageDocumentApplication,
-  listChannels: listOrganizationChannels,
-  listMessages: listOrganizationChannelMessages,
-  markRead: markOrganizationChannelRead,
+  listChannels: listWorkspaceChannels,
+  listMessages: listWorkspaceChannelMessages,
+  markRead: markWorkspaceChannelRead,
   markUnread: markChannelUnreadApplication,
   updateSidebarPreference: updateChannelSidebarPreferenceApplication,
   listSidebarSections: listChannelSidebarSectionsApplication,
@@ -209,9 +207,9 @@ export const appConnectChannelServices: AppConnectChannelServices = {
   renameSidebarSection: renameChannelSidebarSectionApplication,
   deleteSidebarSection: deleteChannelSidebarSectionApplication,
   requireSession,
-  setThreadSubscription: setOrganizationChannelThreadSubscription,
-  syncChannels: syncOrganizationChannels,
-  toggleReaction: toggleOrganizationChannelMessageReaction,
+  setThreadSubscription: setWorkspaceChannelThreadSubscription,
+  syncChannels: syncWorkspaceChannels,
+  toggleReaction: toggleWorkspaceChannelMessageReaction,
 };
 
 const decodeUuid = decodeRequestSync(UuidString);
@@ -291,7 +289,7 @@ const approvalJson = (approval: {
 });
 
 const declineProposalMessage = (
-  value: Awaited<ReturnType<typeof declineOrganizationChannelProposal>>,
+  value: Awaited<ReturnType<typeof declineWorkspaceChannelProposal>>,
 ) => create(DeclineChannelProposalResponseSchema, {
   outcome: value.outcome === "declined"
     ? DeclineChannelProposalResponse_Outcome.DECLINED
@@ -300,11 +298,11 @@ const declineProposalMessage = (
 
 const scheduleChannelMutation = (
   input: AppConnectChannelInput,
-  organizationId: string,
+  workspaceId: string,
 ) => scheduleChannelRealtimePublish(
   input.env,
   input.db,
-  canonicalUuid(organizationId),
+  canonicalUuid(workspaceId),
   input.context,
 );
 
@@ -316,7 +314,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.listChannels({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       userId: session.user.id,
     });
     return create(ChannelService.method.listChannels.output, {
@@ -333,7 +331,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.syncChannels({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       userId: session.user.id,
       since: Number(request.cursor),
     });
@@ -350,23 +348,23 @@ const createAppChannelService = (
   },
 
   listDirectMessageRecipients: async (request) => {
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const session = await services.requireSession(input.auth, input.request);
-    const role = await getOrganizationRole(
+    const role = await getWorkspaceRole(
       input.db,
-      organizationId,
+      workspaceId,
       session.user.id,
     );
-    if (!hasOrganizationCapability(role, "organization:read")) {
-      throw new ConnectError("Organization not found", Code.NotFound);
+    if (!hasWorkspaceCapability(role, "workspace:read")) {
+      throw new ConnectError("Workspace not found", Code.NotFound);
     }
     const [members, agents] = await Promise.all([
-      listOrganizationMembers(input.db, organizationId),
-      listOrganizationAgents(input.db, organizationId),
+      listWorkspaceMembers(input.db, workspaceId),
+      listWorkspaceAgents(input.db, workspaceId),
     ]);
     return create(ChannelService.method.listDirectMessageRecipients.output, {
-      members: members.map((member) => appOrganizationMember(member)),
-      agents: agents.map(appOrganizationAgent),
+      members: members.map((member) => appWorkspaceMember(member)),
+      agents: agents.map(appWorkspaceAgent),
     });
   },
 
@@ -374,11 +372,11 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.createDirectMessage({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       userId: session.user.id,
       request: { memberIds: request.memberIds, agentIds: request.agentIds },
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     return create(ChannelService.method.createDirectMessage.output, {
       channel: appChannelSummaryJson(result.channel),
     });
@@ -388,7 +386,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.listAgentDirectMessages({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       userId: session.user.id,
       agentId: canonicalUuid(request.agentId),
     });
@@ -399,10 +397,10 @@ const createAppChannelService = (
 
   createChannel: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const channel = await services.createChannel({
       db: input.db,
-      organizationId,
+      workspaceId,
       userId: session.user.id,
       command: {
         name: decodeChannelName(request.name),
@@ -418,7 +416,7 @@ const createAppChannelService = (
           : canonicalUuid(request.defaultProjectId),
       },
     });
-    scheduleChannelMutation(input, organizationId);
+    scheduleChannelMutation(input, workspaceId);
     return create(ChannelService.method.createChannel.output, {
       channel: appChannelSummary(channel),
     });
@@ -426,7 +424,7 @@ const createAppChannelService = (
 
   updateChannel: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const channelId = canonicalUuid(request.channelId);
     const topic = request.topicUpdate.case === "topic"
       ? decodeChannelTopic(request.topicUpdate.value)
@@ -441,7 +439,7 @@ const createAppChannelService = (
       : undefined;
     const channel = await services.updateChannel({
       db: input.db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: session.user.id,
       command: {
@@ -454,10 +452,10 @@ const createAppChannelService = (
         archived: request.archived,
       },
     });
-    scheduleChannelMutation(input, organizationId);
+    scheduleChannelMutation(input, workspaceId);
     scheduleChannelActivityDisconnect(
       input.env,
-      organizationId,
+      workspaceId,
       channelId,
       input.context,
     );
@@ -468,11 +466,11 @@ const createAppChannelService = (
 
   deleteChannel: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const channelId = canonicalUuid(request.channelId);
     const result = await services.deleteChannel({
       db: input.db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: session.user.id,
     });
@@ -492,10 +490,10 @@ const createAppChannelService = (
           ),
       }],
     });
-    scheduleChannelMutation(input, organizationId);
+    scheduleChannelMutation(input, workspaceId);
     scheduleChannelActivityDisconnect(
       input.env,
-      organizationId,
+      workspaceId,
       channelId,
       input.context,
     );
@@ -504,49 +502,49 @@ const createAppChannelService = (
 
   setChannelAgent: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const channelId = canonicalUuid(request.channelId);
     const change = domainMembershipChange(request.membership);
     const agents = await services.setChannelAgent({
       db: input.db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: session.user.id,
       agentId: canonicalUuid(request.agentId),
       change,
     });
-    scheduleChannelMutation(input, organizationId);
+    scheduleChannelMutation(input, workspaceId);
     if (change.case === "remove") {
       scheduleChannelActivityDisconnect(
         input.env,
-        organizationId,
+        workspaceId,
         channelId,
         input.context,
       );
     }
     return create(ChannelService.method.setChannelAgent.output, {
-      agents: agents.map(appOrganizationAgent),
+      agents: agents.map(appWorkspaceAgent),
     });
   },
 
   setChannelMember: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const channelId = canonicalUuid(request.channelId);
     const change = domainMembershipChange(request.membership);
     const members = await services.setChannelMember({
       db: input.db,
-      organizationId,
+      workspaceId,
       channelId,
       userId: session.user.id,
       targetUserId: decodeChannelUserId(request.userId),
       change,
     });
-    scheduleChannelMutation(input, organizationId);
+    scheduleChannelMutation(input, workspaceId);
     if (change.case === "remove") {
       scheduleChannelActivityDisconnect(
         input.env,
-        organizationId,
+        workspaceId,
         channelId,
         input.context,
       );
@@ -560,7 +558,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const webhooks = await services.listChannelWebhooks({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
     });
@@ -573,7 +571,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.createChannelWebhook({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
       name: decodeChannelWebhookName(request.name),
@@ -591,7 +589,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const webhook = await services.updateChannelWebhook({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       webhookId: canonicalUuid(request.webhookId),
       userId: session.user.id,
@@ -606,7 +604,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.rotateChannelWebhook({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       webhookId: canonicalUuid(request.webhookId),
       userId: session.user.id,
@@ -624,7 +622,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const webhook = await services.revokeChannelWebhook({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       webhookId: canonicalUuid(request.webhookId),
       userId: session.user.id,
@@ -638,7 +636,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.getChannel({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
       messageLimit: request.messageLimit ?? null,
@@ -657,7 +655,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.markRead({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
       request: {
@@ -666,7 +664,7 @@ const createAppChannelService = (
           : undefined,
       },
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     return create(ChannelService.method.markChannelRead.output, {
       channel: appChannelSummaryJson(result.channel),
     });
@@ -674,14 +672,14 @@ const createAppChannelService = (
 
   markChannelUnread: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const result = await services.markUnread({
       db: input.db,
-      organizationId,
+      workspaceId,
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
     });
-    scheduleChannelMutation(input, organizationId);
+    scheduleChannelMutation(input, workspaceId);
     return create(ChannelService.method.markChannelUnread.output, {
       channel: appChannelSummaryJson(result.channel),
     });
@@ -689,15 +687,15 @@ const createAppChannelService = (
 
   updateChannelSidebarPreference: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const result = await services.updateSidebarPreference({
       db: input.db,
-      organizationId,
+      workspaceId,
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
       update: domainSidebarPreferenceUpdate(request),
     });
-    scheduleChannelMutation(input, organizationId);
+    scheduleChannelMutation(input, workspaceId);
     return create(ChannelService.method.updateChannelSidebarPreference.output, {
       channel: appChannelSummaryJson(result.channel),
     });
@@ -707,7 +705,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.listSidebarSections({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       userId: session.user.id,
     });
     return create(ChannelService.method.listChannelSidebarSections.output, {
@@ -719,7 +717,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.createSidebarSection({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       userId: session.user.id,
       name: request.name,
     });
@@ -733,7 +731,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.renameSidebarSection({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       userId: session.user.id,
       sectionId: canonicalUuid(request.sectionId),
       name: request.name,
@@ -746,14 +744,14 @@ const createAppChannelService = (
 
   deleteChannelSidebarSection: async (request) => {
     const session = await services.requireSession(input.auth, input.request);
-    const organizationId = canonicalUuid(request.organizationId);
+    const workspaceId = canonicalUuid(request.workspaceId);
     const result = await services.deleteSidebarSection({
       db: input.db,
-      organizationId,
+      workspaceId,
       userId: session.user.id,
       sectionId: canonicalUuid(request.sectionId),
     });
-    scheduleChannelMutation(input, organizationId);
+    scheduleChannelMutation(input, workspaceId);
     return create(ChannelService.method.deleteChannelSidebarSection.output, {
       sections: result.sections.map(appChannelSidebarSection),
     });
@@ -763,7 +761,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.listMessages({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
       parentMessageId: request.parentMessageId,
@@ -782,7 +780,7 @@ const createAppChannelService = (
     const result = await services.prepareMessageAttachments({
       db: input.db,
       signingSecret: input.env.BETTER_AUTH_SECRET,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
       messageId: canonicalUuid(request.clientMessageId),
@@ -817,7 +815,7 @@ const createAppChannelService = (
       db: input.db,
       env: input.env,
       context: input.context,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
       attachmentIds: request.attachments.map((attachment) =>
@@ -825,7 +823,7 @@ const createAppChannelService = (
       ),
       request: createChannelMessageApplicationRequest(request),
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     return appCreateChannelMessageResponse(result);
   },
 
@@ -833,7 +831,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.deleteMessage({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       messageId: canonicalUuid(request.messageId),
       userId: session.user.id,
@@ -841,7 +839,7 @@ const createAppChannelService = (
       env: input.env,
       context: input.context,
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     return create(ChannelService.method.deleteChannelMessage.output, {
       deleted: result.deleted,
       message: result.message ? appChannelMessage(result.message) : undefined,
@@ -855,7 +853,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const document = await services.getMessageDocument({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       messageId: canonicalUuid(request.messageId),
       userId: session.user.id,
@@ -869,7 +867,7 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const preview = await services.getLinkPreview({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       userId: session.user.id,
       url: request.url,
@@ -883,13 +881,13 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.toggleReaction({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       messageId: canonicalUuid(request.messageId),
       userId: session.user.id,
       request: { emoji: request.emoji },
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     return create(ChannelService.method.toggleChannelMessageReaction.output, {
       message: appChannelMessage(result.message),
     });
@@ -899,13 +897,13 @@ const createAppChannelService = (
     const session = await services.requireSession(input.auth, input.request);
     const result = await services.setThreadSubscription({
       db: input.db,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       rootMessageId: canonicalUuid(request.rootMessageId),
       userId: session.user.id,
       subscribed: request.subscribed,
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     return create(ChannelService.method.setChannelThreadSubscription.output, {
       rootMessageId: result.rootMessageId,
       subscribers: result.subscribers.map(appChannelSubscriber),
@@ -917,7 +915,7 @@ const createAppChannelService = (
     const result = await services.acceptProposal({
       db: input.db,
       env: input.env,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       proposalId: canonicalUuid(request.proposalId),
       userId: session.user.id,
@@ -926,7 +924,7 @@ const createAppChannelService = (
         execution: request.execution ? approvalJson(request.execution) : null,
       },
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     if (result.projectId) {
       scheduleProjectRealtimePublish(
         input.env,
@@ -946,13 +944,13 @@ const createAppChannelService = (
     const result = await services.acceptExecutionProposal({
       db: input.db,
       env: input.env,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       proposalId: canonicalUuid(request.proposalId),
       userId: session.user.id,
       request: approvalJson(request.approval),
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     if (result.projectId) {
       scheduleProjectRealtimePublish(
         input.env,
@@ -969,12 +967,12 @@ const createAppChannelService = (
     const result = await services.declineProposal({
       db: input.db,
       env: input.env,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       proposalId: canonicalUuid(request.proposalId),
       userId: session.user.id,
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     return declineProposalMessage(result);
   },
 
@@ -983,13 +981,13 @@ const createAppChannelService = (
     const result = await services.acceptSkillExecutionProposal({
       db: input.db,
       env: input.env,
-      organizationId: canonicalUuid(request.organizationId),
+      workspaceId: canonicalUuid(request.workspaceId),
       channelId: canonicalUuid(request.channelId),
       proposalId: canonicalUuid(request.proposalId),
       userId: session.user.id,
       request: { workerId: request.workerId ?? null },
     });
-    scheduleChannelMutation(input, request.organizationId);
+    scheduleChannelMutation(input, request.workspaceId);
     if (result.projectId) {
       const projectId = canonicalUuid(result.projectId);
       scheduleProjectRealtimePublish(input.env, input.db, projectId, input.context);

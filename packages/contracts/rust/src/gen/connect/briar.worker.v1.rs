@@ -8,6 +8,30 @@ pub type OwnedClaimWorkRequestView = ::buffa::view::OwnedView<
 pub type OwnedClaimWorkResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::ClaimWorkResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ExecuteDmScheduleToolRequestView<'static>>`.
+pub type OwnedExecuteDmScheduleToolRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ExecuteDmScheduleToolResponseView<'static>>`.
+pub type OwnedExecuteDmScheduleToolResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ResolveDmReplyRoutingRequestView<'static>>`.
+pub type OwnedResolveDmReplyRoutingRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ResolveDmReplyRoutingResponseView<'static>>`.
+pub type OwnedResolveDmReplyRoutingResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<AcknowledgeChannelReplySteerRequestView<'static>>`.
 pub type OwnedAcknowledgeChannelReplySteerRequestView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerRequestView<
@@ -17,6 +41,18 @@ pub type OwnedAcknowledgeChannelReplySteerRequestView = ::buffa::view::OwnedView
 ///Shorthand for `OwnedView<AcknowledgeChannelReplySteerResponseView<'static>>`.
 pub type OwnedAcknowledgeChannelReplySteerResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RefreshChannelReplyClaimRequestView<'static>>`.
+pub type OwnedRefreshChannelReplyClaimRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RefreshChannelReplyClaimRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RefreshChannelReplyClaimResponseView<'static>>`.
+pub type OwnedRefreshChannelReplyClaimResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RefreshChannelReplyClaimResponseView<
         'static,
     >,
 >;
@@ -164,81 +200,139 @@ pub type OwnedBlockMergeBatchRequestView = ::buffa::view::OwnedView<
 pub type OwnedBlockMergeBatchResponseView = ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::BlockMergeBatchResponseView<'static>,
 >;
-///Shorthand for `OwnedView<CheckDmMemoryClaimRequestView<'static>>`.
-pub type OwnedCheckDmMemoryClaimRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimRequestView<
+///Shorthand for `OwnedView<MemoryVaultListRequestView<'static>>`.
+pub type OwnedMemoryVaultListRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultListRequestView<'static>,
+>;
+///Shorthand for `OwnedView<MemoryVaultListResponseView<'static>>`.
+pub type OwnedMemoryVaultListResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultListResponseView<'static>,
+>;
+///Shorthand for `OwnedView<MemoryVaultReadRequestView<'static>>`.
+pub type OwnedMemoryVaultReadRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultReadRequestView<'static>,
+>;
+///Shorthand for `OwnedView<MemoryVaultReadResponseView<'static>>`.
+pub type OwnedMemoryVaultReadResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultReadResponseView<'static>,
+>;
+///Shorthand for `OwnedView<MemoryVaultSearchRequestView<'static>>`.
+pub type OwnedMemoryVaultSearchRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSearchRequestView<'static>,
+>;
+///Shorthand for `OwnedView<MemoryVaultSearchResponseView<'static>>`.
+pub type OwnedMemoryVaultSearchResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSearchResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<CheckDmMemoryClaimResponseView<'static>>`.
-pub type OwnedCheckDmMemoryClaimResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<
+///Shorthand for `OwnedView<MemoryVaultJournalRequestView<'static>>`.
+pub type OwnedMemoryVaultJournalRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultJournalRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<GetDmMemoryBriefRequestView<'static>>`.
-pub type OwnedGetDmMemoryBriefRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefRequestView<'static>,
->;
-///Shorthand for `OwnedView<GetDmMemoryBriefResponseView<'static>>`.
-pub type OwnedGetDmMemoryBriefResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<'static>,
->;
-///Shorthand for `OwnedView<LookupDmMemoryRequestView<'static>>`.
-pub type OwnedLookupDmMemoryRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryRequestView<'static>,
->;
-///Shorthand for `OwnedView<LookupDmMemoryResponseView<'static>>`.
-pub type OwnedLookupDmMemoryResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<'static>,
->;
-///Shorthand for `OwnedView<ReserveDmMemoryLearningCallRequestView<'static>>`.
-pub type OwnedReserveDmMemoryLearningCallRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallRequestView<
+///Shorthand for `OwnedView<MemoryVaultJournalResponseView<'static>>`.
+pub type OwnedMemoryVaultJournalResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultJournalResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<ReserveDmMemoryLearningCallResponseView<'static>>`.
-pub type OwnedReserveDmMemoryLearningCallResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+///Shorthand for `OwnedView<MemoryVaultSaveRequestView<'static>>`.
+pub type OwnedMemoryVaultSaveRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSaveRequestView<'static>,
+>;
+///Shorthand for `OwnedView<MemoryVaultSaveResponseView<'static>>`.
+pub type OwnedMemoryVaultSaveResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSaveResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetMemoryVaultContextRequestView<'static>>`.
+pub type OwnedGetMemoryVaultContextRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::GetMemoryVaultContextRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<SubmitDmMemoryLearningProposalRequestView<'static>>`.
-pub type OwnedSubmitDmMemoryLearningProposalRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalRequestView<
+///Shorthand for `OwnedView<GetMemoryVaultContextResponseView<'static>>`.
+pub type OwnedGetMemoryVaultContextResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::GetMemoryVaultContextResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<SubmitDmMemoryLearningProposalResponseView<'static>>`.
-pub type OwnedSubmitDmMemoryLearningProposalResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+///Shorthand for `OwnedView<AgentIssueListRequestView<'static>>`.
+pub type OwnedAgentIssueListRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueListRequestView<'static>,
+>;
+///Shorthand for `OwnedView<AgentIssueListResponseView<'static>>`.
+pub type OwnedAgentIssueListResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueListResponseView<'static>,
+>;
+///Shorthand for `OwnedView<AgentIssueShowRequestView<'static>>`.
+pub type OwnedAgentIssueShowRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueShowRequestView<'static>,
+>;
+///Shorthand for `OwnedView<AgentIssueShowResponseView<'static>>`.
+pub type OwnedAgentIssueShowResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueShowResponseView<'static>,
+>;
+///Shorthand for `OwnedView<AgentIssueCreateRequestView<'static>>`.
+pub type OwnedAgentIssueCreateRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueCreateRequestView<'static>,
+>;
+///Shorthand for `OwnedView<AgentIssueCreateResponseView<'static>>`.
+pub type OwnedAgentIssueCreateResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueCreateResponseView<'static>,
+>;
+///Shorthand for `OwnedView<AgentIssueNoteRequestView<'static>>`.
+pub type OwnedAgentIssueNoteRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueNoteRequestView<'static>,
+>;
+///Shorthand for `OwnedView<AgentIssueNoteResponseView<'static>>`.
+pub type OwnedAgentIssueNoteResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueNoteResponseView<'static>,
+>;
+///Shorthand for `OwnedView<AgentIssueSetStatusRequestView<'static>>`.
+pub type OwnedAgentIssueSetStatusRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueSetStatusRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<SubmitDmMemoryLearningVerificationRequestView<'static>>`.
-pub type OwnedSubmitDmMemoryLearningVerificationRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationRequestView<
+///Shorthand for `OwnedView<AgentIssueSetStatusResponseView<'static>>`.
+pub type OwnedAgentIssueSetStatusResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueSetStatusResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<SubmitDmMemoryLearningVerificationResponseView<'static>>`.
-pub type OwnedSubmitDmMemoryLearningVerificationResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
-        'static,
-    >,
+///Shorthand for `OwnedView<AgentIssueUpdateRequestView<'static>>`.
+pub type OwnedAgentIssueUpdateRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueUpdateRequestView<'static>,
 >;
-///Shorthand for `OwnedView<FailDmMemoryLearningRequestView<'static>>`.
-pub type OwnedFailDmMemoryLearningRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningRequestView<
-        'static,
-    >,
+///Shorthand for `OwnedView<AgentIssueUpdateResponseView<'static>>`.
+pub type OwnedAgentIssueUpdateResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueUpdateResponseView<'static>,
 >;
-///Shorthand for `OwnedView<FailDmMemoryLearningResponseView<'static>>`.
-pub type OwnedFailDmMemoryLearningResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
-        'static,
-    >,
+///Shorthand for `OwnedView<AgentChannelListRequestView<'static>>`.
+pub type OwnedAgentChannelListRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelListRequestView<'static>,
+>;
+///Shorthand for `OwnedView<AgentChannelListResponseView<'static>>`.
+pub type OwnedAgentChannelListResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelListResponseView<'static>,
+>;
+///Shorthand for `OwnedView<AgentChannelReadRequestView<'static>>`.
+pub type OwnedAgentChannelReadRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelReadRequestView<'static>,
+>;
+///Shorthand for `OwnedView<AgentChannelReadResponseView<'static>>`.
+pub type OwnedAgentChannelReadResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelReadResponseView<'static>,
+>;
+///Shorthand for `OwnedView<AgentChannelPostRequestView<'static>>`.
+pub type OwnedAgentChannelPostRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelPostRequestView<'static>,
+>;
+///Shorthand for `OwnedView<AgentChannelPostResponseView<'static>>`.
+pub type OwnedAgentChannelPostResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelPostResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<PublishReplyActivityRequestView<'static>>`.
 pub type OwnedPublishReplyActivityRequestView = ::buffa::view::OwnedView<
@@ -491,6 +585,90 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ResolveDmReplyRoutingResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::ResolveDmReplyRoutingResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
     crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerResponse,
 >
 for crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerResponseView<
@@ -508,6 +686,48 @@ impl ::connectrpc::Encodable<
 >
 for ::buffa::view::OwnedView<
     crate::proto::briar::worker::v1::__buffa::view::AcknowledgeChannelReplySteerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::RefreshChannelReplyClaimResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::RefreshChannelReplyClaimResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::RefreshChannelReplyClaimResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::RefreshChannelReplyClaimResponseView<
         'static,
     >,
 > {
@@ -1048,8 +1268,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse>
-for crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultListResponse>
+for crate::proto::briar::worker::v1::__buffa::view::MemoryVaultListResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1057,9 +1277,77 @@ for crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseVi
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultListResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultListResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultReadResponse>
+for crate::proto::briar::worker::v1::__buffa::view::MemoryVaultReadResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultReadResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultReadResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultSearchResponse>
+for crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSearchResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultSearchResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSearchResponseView<
         'static,
     >,
 > {
@@ -1084,8 +1372,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::GetDmMemoryBriefResponse>
-for crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultJournalResponse>
+for crate::proto::briar::worker::v1::__buffa::view::MemoryVaultJournalResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1093,9 +1381,11 @@ for crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::GetDmMemoryBriefResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultJournalResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<'static>,
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultJournalResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -1118,8 +1408,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::LookupDmMemoryResponse>
-for crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultSaveResponse>
+for crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSaveResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1127,9 +1417,9 @@ for crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<'
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::LookupDmMemoryResponse>
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::MemoryVaultSaveResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<'static>,
+    crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSaveResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -1153,9 +1443,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+    crate::proto::briar::worker::v1::GetMemoryVaultContextResponse,
 >
-for crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+for crate::proto::briar::worker::v1::__buffa::view::GetMemoryVaultContextResponseView<
     '_,
 > {
     fn encode(
@@ -1166,10 +1456,10 @@ for crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallR
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+    crate::proto::briar::worker::v1::GetMemoryVaultContextResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+    crate::proto::briar::worker::v1::__buffa::view::GetMemoryVaultContextResponseView<
         'static,
     >,
 > {
@@ -1194,12 +1484,146 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
->
-for crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
-    '_,
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueListResponse>
+for crate::proto::briar::worker::v1::__buffa::view::AgentIssueListResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueListResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueListResponseView<'static>,
 > {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueShowResponse>
+for crate::proto::briar::worker::v1::__buffa::view::AgentIssueShowResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueShowResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueShowResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueCreateResponse>
+for crate::proto::briar::worker::v1::__buffa::view::AgentIssueCreateResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueCreateResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueCreateResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueNoteResponse>
+for crate::proto::briar::worker::v1::__buffa::view::AgentIssueNoteResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueNoteResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueNoteResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::briar::worker::v1::AgentIssueSetStatusResponse,
+>
+for crate::proto::briar::worker::v1::__buffa::view::AgentIssueSetStatusResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1208,10 +1632,10 @@ for crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningPropos
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+    crate::proto::briar::worker::v1::AgentIssueSetStatusResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueSetStatusResponseView<
         'static,
     >,
 > {
@@ -1236,12 +1660,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
->
-for crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
-    '_,
-> {
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueUpdateResponse>
+for crate::proto::briar::worker::v1::__buffa::view::AgentIssueUpdateResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1249,13 +1669,9 @@ for crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerifi
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
->
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentIssueUpdateResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
-        'static,
-    >,
+    crate::proto::briar::worker::v1::__buffa::view::AgentIssueUpdateResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -1278,12 +1694,8 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
->
-for crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
-    '_,
-> {
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentChannelListResponse>
+for crate::proto::briar::worker::v1::__buffa::view::AgentChannelListResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -1291,13 +1703,77 @@ for crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponse
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
->
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentChannelListResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
-        'static,
-    >,
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelListResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentChannelReadResponse>
+for crate::proto::briar::worker::v1::__buffa::view::AgentChannelReadResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentChannelReadResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelReadResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentChannelPostResponse>
+for crate::proto::briar::worker::v1::__buffa::view::AgentChannelPostResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::briar::worker::v1::AgentChannelPostResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::AgentChannelPostResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -1958,9 +2434,27 @@ pub const WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC: ::connectrpc::Spec = ::connectrp
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ExecuteDmScheduleTool` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_EXECUTE_DM_SCHEDULE_TOOL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/ExecuteDmScheduleTool",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ResolveDmReplyRouting` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_RESOLVE_DM_REPLY_ROUTING_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/ResolveDmReplyRouting",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `AcknowledgeChannelReplySteer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const WORKER_QUEUE_SERVICE_ACKNOWLEDGE_CHANNEL_REPLY_STEER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/briar.worker.v1.WorkerQueueService/AcknowledgeChannelReplySteer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RefreshChannelReplyClaim` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_REFRESH_CHANNEL_REPLY_CLAIM_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/RefreshChannelReplyClaim",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -2042,45 +2536,93 @@ pub const WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC: ::connectrpc::Spec = ::co
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `CheckDmMemoryClaim` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const WORKER_QUEUE_SERVICE_CHECK_DM_MEMORY_CLAIM_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.WorkerQueueService/CheckDmMemoryClaim",
+/// Static [`Spec`](::connectrpc::Spec) for the `MemoryVaultList` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_MEMORY_VAULT_LIST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/MemoryVaultList",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `GetDmMemoryBrief` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const WORKER_QUEUE_SERVICE_GET_DM_MEMORY_BRIEF_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.WorkerQueueService/GetDmMemoryBrief",
+/// Static [`Spec`](::connectrpc::Spec) for the `MemoryVaultRead` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_MEMORY_VAULT_READ_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/MemoryVaultRead",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `LookupDmMemory` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.WorkerQueueService/LookupDmMemory",
+/// Static [`Spec`](::connectrpc::Spec) for the `MemoryVaultSearch` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_MEMORY_VAULT_SEARCH_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/MemoryVaultSearch",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `ReserveDmMemoryLearningCall` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const WORKER_QUEUE_SERVICE_RESERVE_DM_MEMORY_LEARNING_CALL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.WorkerQueueService/ReserveDmMemoryLearningCall",
+/// Static [`Spec`](::connectrpc::Spec) for the `MemoryVaultJournal` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_MEMORY_VAULT_JOURNAL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/MemoryVaultJournal",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `SubmitDmMemoryLearningProposal` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_PROPOSAL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.WorkerQueueService/SubmitDmMemoryLearningProposal",
+/// Static [`Spec`](::connectrpc::Spec) for the `MemoryVaultSave` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_MEMORY_VAULT_SAVE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/MemoryVaultSave",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `SubmitDmMemoryLearningVerification` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_VERIFICATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.WorkerQueueService/SubmitDmMemoryLearningVerification",
+/// Static [`Spec`](::connectrpc::Spec) for the `GetMemoryVaultContext` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_GET_MEMORY_VAULT_CONTEXT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/GetMemoryVaultContext",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `FailDmMemoryLearning` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const WORKER_QUEUE_SERVICE_FAIL_DM_MEMORY_LEARNING_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.WorkerQueueService/FailDmMemoryLearning",
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentIssueList` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_ISSUE_LIST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentIssueList",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentIssueShow` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_ISSUE_SHOW_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentIssueShow",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentIssueCreate` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_ISSUE_CREATE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentIssueCreate",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentIssueNote` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_ISSUE_NOTE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentIssueNote",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentIssueSetStatus` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_ISSUE_SET_STATUS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentIssueSetStatus",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentIssueUpdate` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_ISSUE_UPDATE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentIssueUpdate",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentChannelList` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_CHANNEL_LIST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentChannelList",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentChannelRead` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_CHANNEL_READ_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentChannelRead",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `AgentChannelPost` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const WORKER_QUEUE_SERVICE_AGENT_CHANNEL_POST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkerQueueService/AgentChannelPost",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -2160,6 +2702,52 @@ pub trait WorkerQueueService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Handle the ExecuteDmScheduleTool RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn execute_dm_schedule_tool<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ResolveDmReplyRouting RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn resolve_dm_reply_routing<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::ResolveDmReplyRoutingRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::ResolveDmReplyRoutingResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the AcknowledgeChannelReplySteer RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -2180,6 +2768,29 @@ pub trait WorkerQueueService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RefreshChannelReplyClaim RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn refresh_channel_reply_claim<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::RefreshChannelReplyClaimRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::RefreshChannelReplyClaimResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2482,7 +3093,7 @@ pub trait WorkerQueueService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the CheckDmMemoryClaim RPC.
+    /// Memory vault tools (docs/plans/memory-vault-spec.md §6, §7).
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2491,21 +3102,21 @@ pub trait WorkerQueueService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn check_dm_memory_claim<'a>(
+    fn memory_vault_list<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+            crate::proto::briar::worker::v1::MemoryVaultListRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse,
+                crate::proto::briar::worker::v1::MemoryVaultListResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the GetDmMemoryBrief RPC.
+    /// Handle the MemoryVaultRead RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2514,21 +3125,21 @@ pub trait WorkerQueueService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn get_dm_memory_brief<'a>(
+    fn memory_vault_read<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+            crate::proto::briar::worker::v1::MemoryVaultReadRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::GetDmMemoryBriefResponse,
+                crate::proto::briar::worker::v1::MemoryVaultReadResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the LookupDmMemory RPC.
+    /// Handle the MemoryVaultSearch RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2537,21 +3148,21 @@ pub trait WorkerQueueService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn lookup_dm_memory<'a>(
+    fn memory_vault_search<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+            crate::proto::briar::worker::v1::MemoryVaultSearchRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::LookupDmMemoryResponse,
+                crate::proto::briar::worker::v1::MemoryVaultSearchResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the ReserveDmMemoryLearningCall RPC.
+    /// Handle the MemoryVaultJournal RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2560,21 +3171,21 @@ pub trait WorkerQueueService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn reserve_dm_memory_learning_call<'a>(
+    fn memory_vault_journal<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+            crate::proto::briar::worker::v1::MemoryVaultJournalRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+                crate::proto::briar::worker::v1::MemoryVaultJournalResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the SubmitDmMemoryLearningProposal RPC.
+    /// Handle the MemoryVaultSave RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2583,21 +3194,21 @@ pub trait WorkerQueueService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn submit_dm_memory_learning_proposal<'a>(
+    fn memory_vault_save<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+            crate::proto::briar::worker::v1::MemoryVaultSaveRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+                crate::proto::briar::worker::v1::MemoryVaultSaveResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the SubmitDmMemoryLearningVerification RPC.
+    /// Handle the GetMemoryVaultContext RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2606,21 +3217,22 @@ pub trait WorkerQueueService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn submit_dm_memory_learning_verification<'a>(
+    fn get_memory_vault_context<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+            crate::proto::briar::worker::v1::GetMemoryVaultContextRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
+                crate::proto::briar::worker::v1::GetMemoryVaultContextResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the FailDmMemoryLearning RPC.
+    /// Agent workspace tools: `tools issue …` and `tools channel …`
+    /// (docs/plans/agent-workspace-tools.md).
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2629,17 +3241,201 @@ pub trait WorkerQueueService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn fail_dm_memory_learning<'a>(
+    fn agent_issue_list<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+            crate::proto::briar::worker::v1::AgentIssueListRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
+                crate::proto::briar::worker::v1::AgentIssueListResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AgentIssueShow RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn agent_issue_show<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AgentIssueShowRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AgentIssueShowResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AgentIssueCreate RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn agent_issue_create<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AgentIssueCreateRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AgentIssueCreateResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AgentIssueNote RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn agent_issue_note<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AgentIssueNoteRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AgentIssueNoteResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AgentIssueSetStatus RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn agent_issue_set_status<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AgentIssueSetStatusRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AgentIssueSetStatusResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AgentIssueUpdate RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn agent_issue_update<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AgentIssueUpdateRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AgentIssueUpdateResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AgentChannelList RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn agent_channel_list<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AgentChannelListRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AgentChannelListResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AgentChannelRead RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn agent_channel_read<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AgentChannelReadRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AgentChannelReadResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the AgentChannelPost RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn agent_channel_post<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::briar::worker::v1::AgentChannelPostRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::briar::worker::v1::AgentChannelPostResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2706,6 +3502,64 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
             .with_spec(WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "ExecuteDmScheduleTool",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.execute_dm_schedule_tool(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_EXECUTE_DM_SCHEDULE_TOOL_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "ResolveDmReplyRouting",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::ResolveDmReplyRoutingRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.resolve_dm_reply_routing(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::ResolveDmReplyRoutingResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_RESOLVE_DM_REPLY_ROUTING_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
                 "AcknowledgeChannelReplySteer",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -2733,6 +3587,35 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                 },
             )
             .with_spec(WORKER_QUEUE_SERVICE_ACKNOWLEDGE_CHANNEL_REPLY_STEER_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "RefreshChannelReplyClaim",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::RefreshChannelReplyClaimRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::RefreshChannelReplyClaimRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.refresh_channel_reply_claim(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::RefreshChannelReplyClaimResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_REFRESH_CHANNEL_REPLY_CLAIM_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
                 "RenewWorkLease",
@@ -3112,13 +3995,13 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
             .with_spec(WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
-                "CheckDmMemoryClaim",
+                "MemoryVaultList",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::MemoryVaultListRequestView<
                                 'static,
                             >,
                         >,
@@ -3127,27 +4010,27 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+                                crate::proto::briar::worker::v1::MemoryVaultListRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.check_dm_memory_claim(ctx, sreq)
+                            svc.memory_vault_list(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse,
+                                    crate::proto::briar::worker::v1::MemoryVaultListResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(WORKER_QUEUE_SERVICE_CHECK_DM_MEMORY_CLAIM_SPEC)
+            .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_LIST_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
-                "GetDmMemoryBrief",
+                "MemoryVaultRead",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::MemoryVaultReadRequestView<
                                 'static,
                             >,
                         >,
@@ -3156,27 +4039,27 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+                                crate::proto::briar::worker::v1::MemoryVaultReadRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_dm_memory_brief(ctx, sreq)
+                            svc.memory_vault_read(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::GetDmMemoryBriefResponse,
+                                    crate::proto::briar::worker::v1::MemoryVaultReadResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(WORKER_QUEUE_SERVICE_GET_DM_MEMORY_BRIEF_SPEC)
+            .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_READ_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
-                "LookupDmMemory",
+                "MemoryVaultSearch",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSearchRequestView<
                                 'static,
                             >,
                         >,
@@ -3185,27 +4068,27 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+                                crate::proto::briar::worker::v1::MemoryVaultSearchRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.lookup_dm_memory(ctx, sreq)
+                            svc.memory_vault_search(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::LookupDmMemoryResponse,
+                                    crate::proto::briar::worker::v1::MemoryVaultSearchResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC)
+            .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_SEARCH_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
-                "ReserveDmMemoryLearningCall",
+                "MemoryVaultJournal",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::MemoryVaultJournalRequestView<
                                 'static,
                             >,
                         >,
@@ -3214,27 +4097,27 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+                                crate::proto::briar::worker::v1::MemoryVaultJournalRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.reserve_dm_memory_learning_call(ctx, sreq)
+                            svc.memory_vault_journal(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+                                    crate::proto::briar::worker::v1::MemoryVaultJournalResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(WORKER_QUEUE_SERVICE_RESERVE_DM_MEMORY_LEARNING_CALL_SPEC)
+            .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_JOURNAL_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
-                "SubmitDmMemoryLearningProposal",
+                "MemoryVaultSave",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSaveRequestView<
                                 'static,
                             >,
                         >,
@@ -3243,27 +4126,27 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+                                crate::proto::briar::worker::v1::MemoryVaultSaveRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.submit_dm_memory_learning_proposal(ctx, sreq)
+                            svc.memory_vault_save(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+                                    crate::proto::briar::worker::v1::MemoryVaultSaveResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_PROPOSAL_SPEC)
+            .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_SAVE_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
-                "SubmitDmMemoryLearningVerification",
+                "GetMemoryVaultContext",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::GetMemoryVaultContextRequestView<
                                 'static,
                             >,
                         >,
@@ -3272,27 +4155,27 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+                                crate::proto::briar::worker::v1::GetMemoryVaultContextRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.submit_dm_memory_learning_verification(ctx, sreq)
+                            svc.get_memory_vault_context(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
+                                    crate::proto::briar::worker::v1::GetMemoryVaultContextResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_VERIFICATION_SPEC)
+            .with_spec(WORKER_QUEUE_SERVICE_GET_MEMORY_VAULT_CONTEXT_SPEC)
             .route_view(
                 WORKER_QUEUE_SERVICE_SERVICE_NAME,
-                "FailDmMemoryLearning",
+                "AgentIssueList",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentIssueListRequestView<
                                 'static,
                             >,
                         >,
@@ -3301,18 +4184,250 @@ impl<S: WorkerQueueService> WorkerQueueServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+                                crate::proto::briar::worker::v1::AgentIssueListRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.fail_dm_memory_learning(ctx, sreq)
+                            svc.agent_issue_list(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
+                                    crate::proto::briar::worker::v1::AgentIssueListResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(WORKER_QUEUE_SERVICE_FAIL_DM_MEMORY_LEARNING_SPEC)
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_LIST_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AgentIssueShow",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentIssueShowRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AgentIssueShowRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.agent_issue_show(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AgentIssueShowResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_SHOW_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AgentIssueCreate",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentIssueCreateRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AgentIssueCreateRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.agent_issue_create(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AgentIssueCreateResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_CREATE_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AgentIssueNote",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentIssueNoteRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AgentIssueNoteRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.agent_issue_note(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AgentIssueNoteResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_NOTE_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AgentIssueSetStatus",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentIssueSetStatusRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AgentIssueSetStatusRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.agent_issue_set_status(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AgentIssueSetStatusResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_SET_STATUS_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AgentIssueUpdate",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentIssueUpdateRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AgentIssueUpdateRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.agent_issue_update(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AgentIssueUpdateResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_UPDATE_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AgentChannelList",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentChannelListRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AgentChannelListRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.agent_channel_list(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AgentChannelListResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_CHANNEL_LIST_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AgentChannelRead",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentChannelReadRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AgentChannelReadRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.agent_channel_read(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AgentChannelReadResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_CHANNEL_READ_SPEC)
+            .route_view(
+                WORKER_QUEUE_SERVICE_SERVICE_NAME,
+                "AgentChannelPost",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::briar::worker::v1::__buffa::view::AgentChannelPostRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::briar::worker::v1::AgentChannelPostRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.agent_channel_post(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::briar::worker::v1::AgentChannelPostResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WORKER_QUEUE_SERVICE_AGENT_CHANNEL_POST_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -3375,12 +4490,30 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .with_spec(WORKER_QUEUE_SERVICE_CLAIM_WORK_SPEC),
                 )
             }
+            "ExecuteDmScheduleTool" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_EXECUTE_DM_SCHEDULE_TOOL_SPEC),
+                )
+            }
+            "ResolveDmReplyRouting" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_RESOLVE_DM_REPLY_ROUTING_SPEC),
+                )
+            }
             "AcknowledgeChannelReplySteer" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(
                             WORKER_QUEUE_SERVICE_ACKNOWLEDGE_CHANNEL_REPLY_STEER_SPEC,
                         ),
+                )
+            }
+            "RefreshChannelReplyClaim" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_REFRESH_CHANNEL_REPLY_CLAIM_SPEC),
                 )
             }
             "RenewWorkLease" => {
@@ -3473,52 +4606,94 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .with_spec(WORKER_QUEUE_SERVICE_BLOCK_MERGE_BATCH_SPEC),
                 )
             }
-            "CheckDmMemoryClaim" => {
+            "MemoryVaultList" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(WORKER_QUEUE_SERVICE_CHECK_DM_MEMORY_CLAIM_SPEC),
+                        .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_LIST_SPEC),
                 )
             }
-            "GetDmMemoryBrief" => {
+            "MemoryVaultRead" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(WORKER_QUEUE_SERVICE_GET_DM_MEMORY_BRIEF_SPEC),
+                        .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_READ_SPEC),
                 )
             }
-            "LookupDmMemory" => {
+            "MemoryVaultSearch" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC),
+                        .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_SEARCH_SPEC),
                 )
             }
-            "ReserveDmMemoryLearningCall" => {
+            "MemoryVaultJournal" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(
-                            WORKER_QUEUE_SERVICE_RESERVE_DM_MEMORY_LEARNING_CALL_SPEC,
-                        ),
+                        .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_JOURNAL_SPEC),
                 )
             }
-            "SubmitDmMemoryLearningProposal" => {
+            "MemoryVaultSave" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(
-                            WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_PROPOSAL_SPEC,
-                        ),
+                        .with_spec(WORKER_QUEUE_SERVICE_MEMORY_VAULT_SAVE_SPEC),
                 )
             }
-            "SubmitDmMemoryLearningVerification" => {
+            "GetMemoryVaultContext" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(
-                            WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_VERIFICATION_SPEC,
-                        ),
+                        .with_spec(WORKER_QUEUE_SERVICE_GET_MEMORY_VAULT_CONTEXT_SPEC),
                 )
             }
-            "FailDmMemoryLearning" => {
+            "AgentIssueList" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(WORKER_QUEUE_SERVICE_FAIL_DM_MEMORY_LEARNING_SPEC),
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_LIST_SPEC),
+                )
+            }
+            "AgentIssueShow" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_SHOW_SPEC),
+                )
+            }
+            "AgentIssueCreate" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_CREATE_SPEC),
+                )
+            }
+            "AgentIssueNote" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_NOTE_SPEC),
+                )
+            }
+            "AgentIssueSetStatus" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_SET_STATUS_SPEC),
+                )
+            }
+            "AgentIssueUpdate" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_ISSUE_UPDATE_SPEC),
+                )
+            }
+            "AgentChannelList" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_CHANNEL_LIST_SPEC),
+                )
+            }
+            "AgentChannelRead" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_CHANNEL_READ_SPEC),
+                )
+            }
+            "AgentChannelPost" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WORKER_QUEUE_SERVICE_AGENT_CHANNEL_POST_SPEC),
                 )
             }
             _ => None,
@@ -3558,6 +4733,50 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         >(format)
                 })
             }
+            "ExecuteDmScheduleTool" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+                    >::from_parts(&req, &body);
+                    svc.execute_dm_schedule_tool(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::ExecuteDmScheduleToolResponse,
+                        >(format)
+                })
+            }
+            "ResolveDmReplyRouting" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::ResolveDmReplyRoutingRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::ResolveDmReplyRoutingRequest,
+                    >::from_parts(&req, &body);
+                    svc.resolve_dm_reply_routing(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::ResolveDmReplyRoutingResponse,
+                        >(format)
+                })
+            }
             "AcknowledgeChannelReplySteer" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -3577,6 +4796,28 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         .await?
                         .encode::<
                             crate::proto::briar::worker::v1::AcknowledgeChannelReplySteerResponse,
+                        >(format)
+                })
+            }
+            "RefreshChannelReplyClaim" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::RefreshChannelReplyClaimRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::RefreshChannelReplyClaimRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::RefreshChannelReplyClaimRequest,
+                    >::from_parts(&req, &body);
+                    svc.refresh_channel_reply_claim(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::RefreshChannelReplyClaimResponse,
                         >(format)
                 })
             }
@@ -3866,157 +5107,333 @@ impl<T: WorkerQueueService> ::connectrpc::Dispatcher for WorkerQueueServiceServe
                         >(format)
                 })
             }
-            "CheckDmMemoryClaim" => {
+            "MemoryVaultList" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultListRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::MemoryVaultListRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultListRequest,
                     >::from_parts(&req, &body);
-                    svc.check_dm_memory_claim(ctx, req)
+                    svc.memory_vault_list(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::CheckDmMemoryClaimResponse,
+                            crate::proto::briar::worker::v1::MemoryVaultListResponse,
                         >(format)
                 })
             }
-            "GetDmMemoryBrief" => {
+            "MemoryVaultRead" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultReadRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::MemoryVaultReadRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultReadRequest,
                     >::from_parts(&req, &body);
-                    svc.get_dm_memory_brief(ctx, req)
+                    svc.memory_vault_read(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::GetDmMemoryBriefResponse,
+                            crate::proto::briar::worker::v1::MemoryVaultReadResponse,
                         >(format)
                 })
             }
-            "LookupDmMemory" => {
+            "MemoryVaultSearch" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultSearchRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSearchRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultSearchRequest,
                     >::from_parts(&req, &body);
-                    svc.lookup_dm_memory(ctx, req)
+                    svc.memory_vault_search(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::LookupDmMemoryResponse,
+                            crate::proto::briar::worker::v1::MemoryVaultSearchResponse,
                         >(format)
                 })
             }
-            "ReserveDmMemoryLearningCall" => {
+            "MemoryVaultJournal" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultJournalRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::MemoryVaultJournalRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultJournalRequest,
                     >::from_parts(&req, &body);
-                    svc.reserve_dm_memory_learning_call(ctx, req)
+                    svc.memory_vault_journal(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallResponse,
+                            crate::proto::briar::worker::v1::MemoryVaultJournalResponse,
                         >(format)
                 })
             }
-            "SubmitDmMemoryLearningProposal" => {
+            "MemoryVaultSave" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultSaveRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSaveRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+                        crate::proto::briar::worker::v1::MemoryVaultSaveRequest,
                     >::from_parts(&req, &body);
-                    svc.submit_dm_memory_learning_proposal(ctx, req)
+                    svc.memory_vault_save(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalResponse,
+                            crate::proto::briar::worker::v1::MemoryVaultSaveResponse,
                         >(format)
                 })
             }
-            "SubmitDmMemoryLearningVerification" => {
+            "GetMemoryVaultContext" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+                        crate::proto::briar::worker::v1::GetMemoryVaultContextRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::GetMemoryVaultContextRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+                        crate::proto::briar::worker::v1::GetMemoryVaultContextRequest,
                     >::from_parts(&req, &body);
-                    svc.submit_dm_memory_learning_verification(ctx, req)
+                    svc.get_memory_vault_context(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationResponse,
+                            crate::proto::briar::worker::v1::GetMemoryVaultContextResponse,
                         >(format)
                 })
             }
-            "FailDmMemoryLearning" => {
+            "AgentIssueList" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+                        crate::proto::briar::worker::v1::AgentIssueListRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentIssueListRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+                        crate::proto::briar::worker::v1::AgentIssueListRequest,
                     >::from_parts(&req, &body);
-                    svc.fail_dm_memory_learning(ctx, req)
+                    svc.agent_issue_list(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::FailDmMemoryLearningResponse,
+                            crate::proto::briar::worker::v1::AgentIssueListResponse,
+                        >(format)
+                })
+            }
+            "AgentIssueShow" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AgentIssueShowRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentIssueShowRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AgentIssueShowRequest,
+                    >::from_parts(&req, &body);
+                    svc.agent_issue_show(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AgentIssueShowResponse,
+                        >(format)
+                })
+            }
+            "AgentIssueCreate" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AgentIssueCreateRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentIssueCreateRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AgentIssueCreateRequest,
+                    >::from_parts(&req, &body);
+                    svc.agent_issue_create(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AgentIssueCreateResponse,
+                        >(format)
+                })
+            }
+            "AgentIssueNote" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AgentIssueNoteRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentIssueNoteRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AgentIssueNoteRequest,
+                    >::from_parts(&req, &body);
+                    svc.agent_issue_note(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AgentIssueNoteResponse,
+                        >(format)
+                })
+            }
+            "AgentIssueSetStatus" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AgentIssueSetStatusRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentIssueSetStatusRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AgentIssueSetStatusRequest,
+                    >::from_parts(&req, &body);
+                    svc.agent_issue_set_status(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AgentIssueSetStatusResponse,
+                        >(format)
+                })
+            }
+            "AgentIssueUpdate" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AgentIssueUpdateRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentIssueUpdateRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AgentIssueUpdateRequest,
+                    >::from_parts(&req, &body);
+                    svc.agent_issue_update(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AgentIssueUpdateResponse,
+                        >(format)
+                })
+            }
+            "AgentChannelList" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AgentChannelListRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentChannelListRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AgentChannelListRequest,
+                    >::from_parts(&req, &body);
+                    svc.agent_channel_list(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AgentChannelListResponse,
+                        >(format)
+                })
+            }
+            "AgentChannelRead" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AgentChannelReadRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentChannelReadRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AgentChannelReadRequest,
+                    >::from_parts(&req, &body);
+                    svc.agent_channel_read(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AgentChannelReadResponse,
+                        >(format)
+                })
+            }
+            "AgentChannelPost" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::briar::worker::v1::AgentChannelPostRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::briar::worker::v1::__buffa::view::AgentChannelPostRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::briar::worker::v1::AgentChannelPostRequest,
+                    >::from_parts(&req, &body);
+                    svc.agent_channel_post(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::briar::worker::v1::AgentChannelPostResponse,
                         >(format)
                 })
             }
@@ -4195,6 +5612,96 @@ where
             )
             .await
     }
+    /// Call the ExecuteDmScheduleTool RPC. Sends a request to /briar.worker.v1.WorkerQueueService/ExecuteDmScheduleTool.
+    pub async fn execute_dm_schedule_tool(
+        &self,
+        request: crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.execute_dm_schedule_tool_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ExecuteDmScheduleTool RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn execute_dm_schedule_tool_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::ExecuteDmScheduleToolRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ExecuteDmScheduleToolResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_EXECUTE_DM_SCHEDULE_TOOL_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ResolveDmReplyRouting RPC. Sends a request to /briar.worker.v1.WorkerQueueService/ResolveDmReplyRouting.
+    pub async fn resolve_dm_reply_routing(
+        &self,
+        request: crate::proto::briar::worker::v1::ResolveDmReplyRoutingRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.resolve_dm_reply_routing_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ResolveDmReplyRouting RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn resolve_dm_reply_routing_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::ResolveDmReplyRoutingRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::ResolveDmReplyRoutingResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_RESOLVE_DM_REPLY_ROUTING_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the AcknowledgeChannelReplySteer RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AcknowledgeChannelReplySteer.
     pub async fn acknowledge_channel_reply_steer(
         &self,
@@ -4234,6 +5741,51 @@ where
                 &self.transport,
                 &self.config,
                 WORKER_QUEUE_SERVICE_ACKNOWLEDGE_CHANNEL_REPLY_STEER_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RefreshChannelReplyClaim RPC. Sends a request to /briar.worker.v1.WorkerQueueService/RefreshChannelReplyClaim.
+    pub async fn refresh_channel_reply_claim(
+        &self,
+        request: crate::proto::briar::worker::v1::RefreshChannelReplyClaimRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RefreshChannelReplyClaimResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.refresh_channel_reply_claim_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RefreshChannelReplyClaim RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn refresh_channel_reply_claim_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::RefreshChannelReplyClaimRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::RefreshChannelReplyClaimResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_REFRESH_CHANNEL_REPLY_CLAIM_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
@@ -4825,35 +6377,35 @@ where
             )
             .await
     }
-    /// Call the CheckDmMemoryClaim RPC. Sends a request to /briar.worker.v1.WorkerQueueService/CheckDmMemoryClaim.
-    pub async fn check_dm_memory_claim(
+    /// Call the MemoryVaultList RPC. Sends a request to /briar.worker.v1.WorkerQueueService/MemoryVaultList.
+    pub async fn memory_vault_list(
         &self,
-        request: crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultListRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultListResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.check_dm_memory_claim_with_options(
+        self.memory_vault_list_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the CheckDmMemoryClaim RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn check_dm_memory_claim_with_options(
+    /// Call the MemoryVaultList RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn memory_vault_list_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::CheckDmMemoryClaimRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultListRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::CheckDmMemoryClaimResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultListResponseView<
                     'static,
                 >,
             >,
@@ -4863,42 +6415,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                WORKER_QUEUE_SERVICE_CHECK_DM_MEMORY_CLAIM_SPEC
+                WORKER_QUEUE_SERVICE_MEMORY_VAULT_LIST_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the GetDmMemoryBrief RPC. Sends a request to /briar.worker.v1.WorkerQueueService/GetDmMemoryBrief.
-    pub async fn get_dm_memory_brief(
+    /// Call the MemoryVaultRead RPC. Sends a request to /briar.worker.v1.WorkerQueueService/MemoryVaultRead.
+    pub async fn memory_vault_read(
         &self,
-        request: crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultReadRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultReadResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.get_dm_memory_brief_with_options(
+        self.memory_vault_read_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the GetDmMemoryBrief RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_dm_memory_brief_with_options(
+    /// Call the MemoryVaultRead RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn memory_vault_read_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::GetDmMemoryBriefRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultReadRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::GetDmMemoryBriefResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultReadResponseView<
                     'static,
                 >,
             >,
@@ -4908,42 +6460,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                WORKER_QUEUE_SERVICE_GET_DM_MEMORY_BRIEF_SPEC
+                WORKER_QUEUE_SERVICE_MEMORY_VAULT_READ_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the LookupDmMemory RPC. Sends a request to /briar.worker.v1.WorkerQueueService/LookupDmMemory.
-    pub async fn lookup_dm_memory(
+    /// Call the MemoryVaultSearch RPC. Sends a request to /briar.worker.v1.WorkerQueueService/MemoryVaultSearch.
+    pub async fn memory_vault_search(
         &self,
-        request: crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultSearchRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSearchResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.lookup_dm_memory_with_options(
+        self.memory_vault_search_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the LookupDmMemory RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn lookup_dm_memory_with_options(
+    /// Call the MemoryVaultSearch RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn memory_vault_search_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::LookupDmMemoryRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultSearchRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::LookupDmMemoryResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSearchResponseView<
                     'static,
                 >,
             >,
@@ -4953,42 +6505,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                WORKER_QUEUE_SERVICE_LOOKUP_DM_MEMORY_SPEC
+                WORKER_QUEUE_SERVICE_MEMORY_VAULT_SEARCH_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the ReserveDmMemoryLearningCall RPC. Sends a request to /briar.worker.v1.WorkerQueueService/ReserveDmMemoryLearningCall.
-    pub async fn reserve_dm_memory_learning_call(
+    /// Call the MemoryVaultJournal RPC. Sends a request to /briar.worker.v1.WorkerQueueService/MemoryVaultJournal.
+    pub async fn memory_vault_journal(
         &self,
-        request: crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultJournalRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultJournalResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.reserve_dm_memory_learning_call_with_options(
+        self.memory_vault_journal_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the ReserveDmMemoryLearningCall RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn reserve_dm_memory_learning_call_with_options(
+    /// Call the MemoryVaultJournal RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn memory_vault_journal_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::ReserveDmMemoryLearningCallRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultJournalRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::ReserveDmMemoryLearningCallResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultJournalResponseView<
                     'static,
                 >,
             >,
@@ -4998,42 +6550,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                WORKER_QUEUE_SERVICE_RESERVE_DM_MEMORY_LEARNING_CALL_SPEC
+                WORKER_QUEUE_SERVICE_MEMORY_VAULT_JOURNAL_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the SubmitDmMemoryLearningProposal RPC. Sends a request to /briar.worker.v1.WorkerQueueService/SubmitDmMemoryLearningProposal.
-    pub async fn submit_dm_memory_learning_proposal(
+    /// Call the MemoryVaultSave RPC. Sends a request to /briar.worker.v1.WorkerQueueService/MemoryVaultSave.
+    pub async fn memory_vault_save(
         &self,
-        request: crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultSaveRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSaveResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.submit_dm_memory_learning_proposal_with_options(
+        self.memory_vault_save_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the SubmitDmMemoryLearningProposal RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn submit_dm_memory_learning_proposal_with_options(
+    /// Call the MemoryVaultSave RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn memory_vault_save_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::SubmitDmMemoryLearningProposalRequest,
+        request: crate::proto::briar::worker::v1::MemoryVaultSaveRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningProposalResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::MemoryVaultSaveResponseView<
                     'static,
                 >,
             >,
@@ -5043,42 +6595,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_PROPOSAL_SPEC
+                WORKER_QUEUE_SERVICE_MEMORY_VAULT_SAVE_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the SubmitDmMemoryLearningVerification RPC. Sends a request to /briar.worker.v1.WorkerQueueService/SubmitDmMemoryLearningVerification.
-    pub async fn submit_dm_memory_learning_verification(
+    /// Call the GetMemoryVaultContext RPC. Sends a request to /briar.worker.v1.WorkerQueueService/GetMemoryVaultContext.
+    pub async fn get_memory_vault_context(
         &self,
-        request: crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+        request: crate::proto::briar::worker::v1::GetMemoryVaultContextRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::GetMemoryVaultContextResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.submit_dm_memory_learning_verification_with_options(
+        self.get_memory_vault_context_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the SubmitDmMemoryLearningVerification RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn submit_dm_memory_learning_verification_with_options(
+    /// Call the GetMemoryVaultContext RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_memory_vault_context_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::SubmitDmMemoryLearningVerificationRequest,
+        request: crate::proto::briar::worker::v1::GetMemoryVaultContextRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::SubmitDmMemoryLearningVerificationResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::GetMemoryVaultContextResponseView<
                     'static,
                 >,
             >,
@@ -5088,42 +6640,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                WORKER_QUEUE_SERVICE_SUBMIT_DM_MEMORY_LEARNING_VERIFICATION_SPEC
+                WORKER_QUEUE_SERVICE_GET_MEMORY_VAULT_CONTEXT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the FailDmMemoryLearning RPC. Sends a request to /briar.worker.v1.WorkerQueueService/FailDmMemoryLearning.
-    pub async fn fail_dm_memory_learning(
+    /// Call the AgentIssueList RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentIssueList.
+    pub async fn agent_issue_list(
         &self,
-        request: crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+        request: crate::proto::briar::worker::v1::AgentIssueListRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueListResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.fail_dm_memory_learning_with_options(
+        self.agent_issue_list_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the FailDmMemoryLearning RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn fail_dm_memory_learning_with_options(
+    /// Call the AgentIssueList RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_issue_list_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::FailDmMemoryLearningRequest,
+        request: crate::proto::briar::worker::v1::AgentIssueListRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::FailDmMemoryLearningResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueListResponseView<
                     'static,
                 >,
             >,
@@ -5133,7 +6685,367 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                WORKER_QUEUE_SERVICE_FAIL_DM_MEMORY_LEARNING_SPEC
+                WORKER_QUEUE_SERVICE_AGENT_ISSUE_LIST_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AgentIssueShow RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentIssueShow.
+    pub async fn agent_issue_show(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueShowRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueShowResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.agent_issue_show_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AgentIssueShow RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_issue_show_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueShowRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueShowResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_AGENT_ISSUE_SHOW_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AgentIssueCreate RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentIssueCreate.
+    pub async fn agent_issue_create(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueCreateRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueCreateResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.agent_issue_create_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AgentIssueCreate RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_issue_create_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueCreateRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueCreateResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_AGENT_ISSUE_CREATE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AgentIssueNote RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentIssueNote.
+    pub async fn agent_issue_note(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueNoteRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueNoteResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.agent_issue_note_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AgentIssueNote RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_issue_note_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueNoteRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueNoteResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_AGENT_ISSUE_NOTE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AgentIssueSetStatus RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentIssueSetStatus.
+    pub async fn agent_issue_set_status(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueSetStatusRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueSetStatusResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.agent_issue_set_status_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AgentIssueSetStatus RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_issue_set_status_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueSetStatusRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueSetStatusResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_AGENT_ISSUE_SET_STATUS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AgentIssueUpdate RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentIssueUpdate.
+    pub async fn agent_issue_update(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueUpdateRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueUpdateResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.agent_issue_update_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AgentIssueUpdate RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_issue_update_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentIssueUpdateRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentIssueUpdateResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_AGENT_ISSUE_UPDATE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AgentChannelList RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentChannelList.
+    pub async fn agent_channel_list(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentChannelListRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentChannelListResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.agent_channel_list_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AgentChannelList RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_channel_list_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentChannelListRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentChannelListResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_AGENT_CHANNEL_LIST_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AgentChannelRead RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentChannelRead.
+    pub async fn agent_channel_read(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentChannelReadRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentChannelReadResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.agent_channel_read_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AgentChannelRead RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_channel_read_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentChannelReadRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentChannelReadResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_AGENT_CHANNEL_READ_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AgentChannelPost RPC. Sends a request to /briar.worker.v1.WorkerQueueService/AgentChannelPost.
+    pub async fn agent_channel_post(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentChannelPostRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentChannelPostResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.agent_channel_post_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AgentChannelPost RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn agent_channel_post_with_options(
+        &self,
+        request: crate::proto::briar::worker::v1::AgentChannelPostRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::briar::worker::v1::__buffa::view::AgentChannelPostResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WORKER_QUEUE_SERVICE_AGENT_CHANNEL_POST_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
@@ -9943,34 +11855,34 @@ where
     }
 }
 
-///Shorthand for `OwnedView<OrganizationAgentContextServiceGetManifestRequestView<'static>>`.
-pub type OwnedOrganizationAgentContextServiceGetManifestRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestRequestView<
+///Shorthand for `OwnedView<WorkspaceAgentContextServiceGetManifestRequestView<'static>>`.
+pub type OwnedWorkspaceAgentContextServiceGetManifestRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<OrganizationAgentContextServiceGetManifestResponseView<'static>>`.
-pub type OwnedOrganizationAgentContextServiceGetManifestResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+///Shorthand for `OwnedView<WorkspaceAgentContextServiceGetManifestResponseView<'static>>`.
+pub type OwnedWorkspaceAgentContextServiceGetManifestResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<OrganizationAgentContextServiceLookupRequestView<'static>>`.
-pub type OwnedOrganizationAgentContextServiceLookupRequestView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupRequestView<
+///Shorthand for `OwnedView<WorkspaceAgentContextServiceLookupRequestView<'static>>`.
+pub type OwnedWorkspaceAgentContextServiceLookupRequestView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<OrganizationAgentContextServiceLookupResponseView<'static>>`.
-pub type OwnedOrganizationAgentContextServiceLookupResponseView = ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+///Shorthand for `OwnedView<WorkspaceAgentContextServiceLookupResponseView<'static>>`.
+pub type OwnedWorkspaceAgentContextServiceLookupResponseView = ::buffa::view::OwnedView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
         'static,
     >,
 >;
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
 >
-for crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+for crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
     '_,
 > {
     fn encode(
@@ -9981,10 +11893,10 @@ for crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServ
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
         'static,
     >,
 > {
@@ -10010,9 +11922,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
 >
-for crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+for crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
     '_,
 > {
     fn encode(
@@ -10023,10 +11935,10 @@ for crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServ
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+    crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
         'static,
     >,
 > {
@@ -10052,20 +11964,20 @@ for ::buffa::view::OwnedView<
     }
 }
 /// Full service name for this service.
-pub const ORGANIZATION_AGENT_CONTEXT_SERVICE_SERVICE_NAME: &str = "briar.worker.v1.OrganizationAgentContextService";
+pub const WORKSPACE_AGENT_CONTEXT_SERVICE_SERVICE_NAME: &str = "briar.worker.v1.WorkspaceAgentContextService";
 /// Static [`Spec`](::connectrpc::Spec) for the `GetManifest` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const ORGANIZATION_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.OrganizationAgentContextService/GetManifest",
+pub const WORKSPACE_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkspaceAgentContextService/GetManifest",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `Lookup` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/briar.worker.v1.OrganizationAgentContextService/Lookup",
+pub const WORKSPACE_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/briar.worker.v1.WorkspaceAgentContextService/Lookup",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Claim-scoped, lazily hydrated context for Organization Agents. The Worker
+/// Claim-scoped, lazily hydrated context for Workspace Agents. The Worker
 /// credential authenticates the machine; the claim capability in each request
 /// authorizes one active channel reply.
 ///
@@ -10117,7 +12029,7 @@ pub const ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC: ::connectrpc::Spec = :
 /// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
 /// example` doc.
 #[allow(clippy::type_complexity)]
-pub trait OrganizationAgentContextService: Send + Sync + 'static {
+pub trait WorkspaceAgentContextService: Send + Sync + 'static {
     /// Handle the GetManifest RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -10132,12 +12044,12 @@ pub trait OrganizationAgentContextService: Send + Sync + 'static {
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+            crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+                crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -10155,12 +12067,12 @@ pub trait OrganizationAgentContextService: Send + Sync + 'static {
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+            crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+                crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -10180,7 +12092,7 @@ pub trait OrganizationAgentContextService: Send + Sync + 'static {
 /// let service = Arc::new(MyServiceImpl);
 /// let router = service.register(Router::new());
 /// ```
-pub trait OrganizationAgentContextServiceExt: OrganizationAgentContextService {
+pub trait WorkspaceAgentContextServiceExt: WorkspaceAgentContextService {
     /// Register this service implementation with a Router.
     ///
     /// Takes ownership of the `Arc<Self>` and returns a new Router with
@@ -10190,21 +12102,21 @@ pub trait OrganizationAgentContextServiceExt: OrganizationAgentContextService {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router;
 }
-impl<S: OrganizationAgentContextService> OrganizationAgentContextServiceExt for S {
+impl<S: WorkspaceAgentContextService> WorkspaceAgentContextServiceExt for S {
     fn register(
         self: ::std::sync::Arc<Self>,
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
             .route_view(
-                ORGANIZATION_AGENT_CONTEXT_SERVICE_SERVICE_NAME,
+                WORKSPACE_AGENT_CONTEXT_SERVICE_SERVICE_NAME,
                 "GetManifest",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestRequestView<
                                 'static,
                             >,
                         >,
@@ -10213,27 +12125,27 @@ impl<S: OrganizationAgentContextService> OrganizationAgentContextServiceExt for 
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+                                crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
                             >::from_parts(req.reborrow(), req.bytes());
                             svc.get_manifest(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+                                    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(ORGANIZATION_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC)
+            .with_spec(WORKSPACE_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC)
             .route_view(
-                ORGANIZATION_AGENT_CONTEXT_SERVICE_SERVICE_NAME,
+                WORKSPACE_AGENT_CONTEXT_SERVICE_SERVICE_NAME,
                 "Lookup",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupRequestView<
+                            crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupRequestView<
                                 'static,
                             >,
                         >,
@@ -10242,32 +12154,32 @@ impl<S: OrganizationAgentContextService> OrganizationAgentContextServiceExt for 
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+                                crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
                             >::from_parts(req.reborrow(), req.bytes());
                             svc.lookup(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+                                    crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC)
+            .with_spec(WORKSPACE_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
 #[doc(hidden)]
-pub struct OrganizationAgentContextServiceRegisterMarker;
+pub struct WorkspaceAgentContextServiceRegisterMarker;
 impl<
-    S: OrganizationAgentContextService,
-> ::connectrpc::ServiceRegister<OrganizationAgentContextServiceRegisterMarker>
+    S: WorkspaceAgentContextService,
+> ::connectrpc::ServiceRegister<WorkspaceAgentContextServiceRegisterMarker>
 for ::std::sync::Arc<S> {
     fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
-        <S as OrganizationAgentContextServiceExt>::register(self, router)
+        <S as WorkspaceAgentContextServiceExt>::register(self, router)
     }
 }
-/// Monomorphic dispatcher for `OrganizationAgentContextService`.
+/// Monomorphic dispatcher for `WorkspaceAgentContextService`.
 ///
 /// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
 ///
@@ -10276,14 +12188,14 @@ for ::std::sync::Arc<S> {
 /// ```rust,ignore
 /// use connectrpc::ConnectRpcService;
 ///
-/// let server = OrganizationAgentContextServiceServer::new(MyImpl);
+/// let server = WorkspaceAgentContextServiceServer::new(MyImpl);
 /// let service = ConnectRpcService::new(server);
 /// // hand `service` to axum/hyper as a fallback_service
 /// ```
-pub struct OrganizationAgentContextServiceServer<T> {
+pub struct WorkspaceAgentContextServiceServer<T> {
     inner: ::std::sync::Arc<T>,
 }
-impl<T: OrganizationAgentContextService> OrganizationAgentContextServiceServer<T> {
+impl<T: WorkspaceAgentContextService> WorkspaceAgentContextServiceServer<T> {
     /// Wrap a service implementation in a monomorphic dispatcher.
     pub fn new(service: T) -> Self {
         Self {
@@ -10295,33 +12207,32 @@ impl<T: OrganizationAgentContextService> OrganizationAgentContextServiceServer<T
         Self { inner }
     }
 }
-impl<T> Clone for OrganizationAgentContextServiceServer<T> {
+impl<T> Clone for WorkspaceAgentContextServiceServer<T> {
     fn clone(&self) -> Self {
         Self {
             inner: ::std::sync::Arc::clone(&self.inner),
         }
     }
 }
-impl<T: OrganizationAgentContextService> ::connectrpc::Dispatcher
-for OrganizationAgentContextServiceServer<T> {
+impl<T: WorkspaceAgentContextService> ::connectrpc::Dispatcher
+for WorkspaceAgentContextServiceServer<T> {
     #[inline]
     fn lookup(
         &self,
         path: &str,
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
-        let method = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/")?;
+        let method = path.strip_prefix("briar.worker.v1.WorkspaceAgentContextService/")?;
         match method {
             "GetManifest" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(ORGANIZATION_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC),
+                        .with_spec(WORKSPACE_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC),
                 )
             }
             "Lookup" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC),
+                        .with_spec(WORKSPACE_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC),
                 )
             }
             _ => None,
@@ -10335,7 +12246,7 @@ for OrganizationAgentContextServiceServer<T> {
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
         let Some(method) = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/") else {
+            .strip_prefix("briar.worker.v1.WorkspaceAgentContextService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
         };
         let _ = (&ctx, &request, &format);
@@ -10344,21 +12255,21 @@ for OrganizationAgentContextServiceServer<T> {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+                        crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+                        crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
                     >::from_parts(&req, &body);
                     svc.get_manifest(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestResponse,
+                            crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestResponse,
                         >(format)
                 })
             }
@@ -10366,21 +12277,21 @@ for OrganizationAgentContextServiceServer<T> {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+                        crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupRequestView<
+                    let req: crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+                        crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
                     >::from_parts(&req, &body);
                     svc.lookup(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupResponse,
+                            crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupResponse,
                         >(format)
                 })
             }
@@ -10395,7 +12306,7 @@ for OrganizationAgentContextServiceServer<T> {
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
         let Some(method) = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/") else {
+            .strip_prefix("briar.worker.v1.WorkspaceAgentContextService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
         };
         let _ = (&ctx, &request, &format);
@@ -10411,7 +12322,7 @@ for OrganizationAgentContextServiceServer<T> {
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
         let Some(method) = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/") else {
+            .strip_prefix("briar.worker.v1.WorkspaceAgentContextService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
         };
         let _ = (&ctx, &requests, &format);
@@ -10427,7 +12338,7 @@ for OrganizationAgentContextServiceServer<T> {
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
         let Some(method) = path
-            .strip_prefix("briar.worker.v1.OrganizationAgentContextService/") else {
+            .strip_prefix("briar.worker.v1.WorkspaceAgentContextService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
         };
         let _ = (&ctx, &requests, &format);
@@ -10453,7 +12364,7 @@ for OrganizationAgentContextServiceServer<T> {
 /// let conn = Http2Connection::connect_plaintext(uri.clone()).await?.shared(1024);
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
-/// let client = OrganizationAgentContextServiceClient::new(conn, config);
+/// let client = WorkspaceAgentContextServiceClient::new(conn, config);
 /// let response = client.get_manifest(request).await?;
 /// ```
 ///
@@ -10465,7 +12376,7 @@ for OrganizationAgentContextServiceServer<T> {
 /// let http = HttpClient::plaintext();  // cleartext http:// only
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
-/// let client = OrganizationAgentContextServiceClient::new(http, config);
+/// let client = WorkspaceAgentContextServiceClient::new(http, config);
 /// let response = client.get_manifest(request).await?;
 /// ```
 ///
@@ -10495,12 +12406,12 @@ for OrganizationAgentContextServiceServer<T> {
 /// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
 #[cfg(feature = "client")]
 #[derive(Clone)]
-pub struct OrganizationAgentContextServiceClient<T> {
+pub struct WorkspaceAgentContextServiceClient<T> {
     transport: T,
     config: ::connectrpc::client::ClientConfig,
 }
 #[cfg(feature = "client")]
-impl<T> OrganizationAgentContextServiceClient<T>
+impl<T> WorkspaceAgentContextServiceClient<T>
 where
     T: ::connectrpc::client::ClientTransport,
     <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
@@ -10517,14 +12428,14 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the GetManifest RPC. Sends a request to /briar.worker.v1.OrganizationAgentContextService/GetManifest.
+    /// Call the GetManifest RPC. Sends a request to /briar.worker.v1.WorkspaceAgentContextService/GetManifest.
     pub async fn get_manifest(
         &self,
-        request: crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+        request: crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
                     'static,
                 >,
             >,
@@ -10540,12 +12451,12 @@ where
     /// Call the GetManifest RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
     pub async fn get_manifest_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::OrganizationAgentContextServiceGetManifestRequest,
+        request: crate::proto::briar::worker::v1::WorkspaceAgentContextServiceGetManifestRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceGetManifestResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceGetManifestResponseView<
                     'static,
                 >,
             >,
@@ -10555,21 +12466,21 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                ORGANIZATION_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC
+                WORKSPACE_AGENT_CONTEXT_SERVICE_GET_MANIFEST_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the Lookup RPC. Sends a request to /briar.worker.v1.OrganizationAgentContextService/Lookup.
+    /// Call the Lookup RPC. Sends a request to /briar.worker.v1.WorkspaceAgentContextService/Lookup.
     pub async fn lookup(
         &self,
-        request: crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+        request: crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
                     'static,
                 >,
             >,
@@ -10582,12 +12493,12 @@ where
     /// Call the Lookup RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
     pub async fn lookup_with_options(
         &self,
-        request: crate::proto::briar::worker::v1::OrganizationAgentContextServiceLookupRequest,
+        request: crate::proto::briar::worker::v1::WorkspaceAgentContextServiceLookupRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::briar::worker::v1::__buffa::view::OrganizationAgentContextServiceLookupResponseView<
+                crate::proto::briar::worker::v1::__buffa::view::WorkspaceAgentContextServiceLookupResponseView<
                     'static,
                 >,
             >,
@@ -10597,7 +12508,7 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                ORGANIZATION_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC
+                WORKSPACE_AGENT_CONTEXT_SERVICE_LOOKUP_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

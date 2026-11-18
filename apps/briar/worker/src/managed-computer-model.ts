@@ -169,7 +169,7 @@ export type ManagedComputerConfig = {
   remoteDesktopAllowedOrigins: readonly string[];
   remoteDesktopTokenTtlSeconds: number;
   remoteDesktopMaxSessionMinutes: number;
-  remoteDesktopOrganizationSessionLimit: number;
+  remoteDesktopWorkspaceSessionLimit: number;
   remoteDesktopFleetSessionLimit: number;
   remoteDesktopRateLimit: number;
   campaignId: string;
@@ -223,6 +223,7 @@ export function managedComputerConfig(env: Env): ManagedComputerConfig {
     remoteDesktopAllowedOrigins: [
       ...configuredRemoteOrigins,
       ...(apiOriginValue ? [apiOriginValue] : []),
+      "https://briar.onequery.dev",
       "https://briar.wordbricks.ai",
       "tauri://localhost",
       "http://tauri.localhost",
@@ -238,7 +239,7 @@ export function managedComputerConfig(env: Env): ManagedComputerConfig {
       60,
       8 * 60,
     ),
-    remoteDesktopOrganizationSessionLimit: boundedPositiveInteger(
+    remoteDesktopWorkspaceSessionLimit: boundedPositiveInteger(
       env.MANAGED_COMPUTER_REMOTE_DESKTOP_ORGANIZATION_SESSION_LIMIT,
       2,
       50,
@@ -361,7 +362,7 @@ export function managedComputerProduct(config: ManagedComputerConfig) {
 export function managedComputerJson(row: ManagedComputerRow) {
   return {
     id: row.id,
-    organizationId: row.organization_id,
+    workspaceId: row.organization_id,
     requesterUserId: row.requester_user_id,
     state: row.state,
     provider: row.provider,

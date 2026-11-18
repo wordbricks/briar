@@ -1,18 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { demoDashboard } from "../../lib/demo-data";
-import type { Organization, Project, SessionUser } from "../../types";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import type { Workspace, Project, SessionUser } from "../../types";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { runsByIdAtom } from "../entities/runs";
 import { createTestRegistry, type AtomRegistry } from "../registry";
-import { reconnectRequestGeneration } from "../workspace/api";
-import {
-  connectedTeamIdsAtom,
-  localInventoryErrorAtom,
-} from "../workspace/atoms";
+import { reconnectRequestGeneration } from "../local-workspace/api";
+import { connectedTeamIdsAtom, localInventoryErrorAtom } from "../local-workspace/atoms";
 import { applySyncEvent } from "../sync/apply";
 import { readTeamView } from "../../test/team-view";
 import {
@@ -34,7 +28,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -92,8 +86,8 @@ const harness = (): Harness => {
     [userAtom, user],
     [tokenAtom, "token-1"],
     [teamsAtom, [teamA, teamB]],
-    [organizationsAtom, [organization]],
-    [activeOrganizationIdAtom, organization.id],
+    [workspacesAtom, [workspace]],
+    [activeWorkspaceIdAtom, workspace.id],
     [activeTeamIdAtom, teamA.id],
     [isCreatingTeamAtom, true],
     // Signing out has to drop the device's workspace inventory with the session.
@@ -131,8 +125,8 @@ const expectSignedOut = (registry: AtomRegistry) => {
   expect(registry.get(userAtom)).toBeNull();
   expect(registry.get(tokenAtom)).toBeNull();
   expect(registry.get(teamsAtom)).toEqual([]);
-  expect(registry.get(organizationsAtom)).toEqual([]);
-  expect(registry.get(activeOrganizationIdAtom)).toBeNull();
+  expect(registry.get(workspacesAtom)).toEqual([]);
+  expect(registry.get(activeWorkspaceIdAtom)).toBeNull();
   expect(registry.get(activeTeamIdAtom)).toBeNull();
   expect(registry.get(teamConnectionAtom)).toBeNull();
   expect(registry.get(isCreatingTeamAtom)).toBe(false);

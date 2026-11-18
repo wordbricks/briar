@@ -910,7 +910,7 @@ private struct HostStatusSheet: View {
         guard let fleet else { return }
         do {
             var request = BriarAPI_ListExecutionWorkersRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             let response = try await fleet.listExecutionWorkers(request: request, headers: [:]).briarValue()
             canManage = response.canManage
             pendingDevices = Set(response.workers.filter {
@@ -928,7 +928,7 @@ private struct HostStatusSheet: View {
         updateError = nil
         do {
             var request = BriarAPI_RequestExecutionWorkerUpdateRequest()
-            request.organizationID = coreUUIDString(organizationID)
+            request.workspaceID = coreUUIDString(organizationID)
             request.deviceID = deviceID
             _ = try await fleet.requestExecutionWorkerUpdate(request: request, headers: [:]).briarValue()
             await refreshUpdates()
@@ -3478,12 +3478,18 @@ struct RunDetailView: View {
                 )
                 LabeledContent(
                     L10n.text("등록자", locale: locale),
-                    value: members.first { $0.userId == run.createdByUserId }?.name
-                        ?? L10n.text("알 수 없음", locale: locale)
+                    value: creatorName
                 )
                 LabeledContent(L10n.text("실행 Worker", locale: locale), value: assignedWorkerLabel)
             }
         }
+    }
+
+    /// An agent-created issue has no creating person; the two never coexist.
+    private var creatorName: String {
+        if let agent = run.createdByAgent { return agent.name }
+        return members.first { $0.userId == run.createdByUserId }?.name
+            ?? L10n.text("알 수 없음", locale: locale)
     }
 
     private var assignedWorkerLabel: String {

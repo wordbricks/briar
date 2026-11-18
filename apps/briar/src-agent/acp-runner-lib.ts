@@ -26,6 +26,7 @@ import {
 import { readAgentImage } from "./runner-attachments";
 import { extractSingleJsonObject } from "../src/lib/single-json-object";
 import type { RunnerRequest } from "./runner-request";
+import { agentProgressMessage } from "../src/lib/agent-progress-message";
 
 /**
  * Provider-neutral Agent Client Protocol helpers.
@@ -438,7 +439,14 @@ function completeActiveMessage(
 ): NormalizedAgentEvent | undefined {
   if (!state.activeMessageId) return;
   const text = state.activeAssistantText;
-  state.lastAssistantText = text;
+  /*
+    A progress update still belongs in the work log, but it is never the
+    turn's answer: `resolveAcpFinalMessage` reads `lastAssistantText`, so
+    adopting one here would send the update itself as the reply. The strict
+    reply contract would reject it, but only after structured-output-repair
+    spends a repair turn on it.
+  */
+  if (!agentProgressMessage(text)) state.lastAssistantText = text;
   const event = normalizedMessageCompleted({
     id: state.activeMessageId,
     phase,

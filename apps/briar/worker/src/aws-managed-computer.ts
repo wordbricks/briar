@@ -23,7 +23,7 @@ type AwsCredentials = {
 
 type ManagedInstanceExpectation = {
   managedComputerId: string;
-  organizationId: string;
+  workspaceId: string;
   campaignId: string;
   instanceId: string;
   region: string;
@@ -298,7 +298,7 @@ export async function runManagedInstance(
   config: ManagedComputerConfig,
   input: {
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     campaignId: string;
     nonce: string;
     clientToken?: string;
@@ -319,7 +319,7 @@ export async function runManagedInstance(
   }
   const tags = [
     ["briar-managed", "true"],
-    ["briar-organization", input.organizationId],
+    ["briar-workspace", input.workspaceId],
     ["briar-managed-computer", input.managedComputerId],
     ["briar-campaign", input.campaignId],
   ] as const;
@@ -492,7 +492,7 @@ export async function verifyManagedInstance(
     instance.httpTokens === "required" ? null : "imds_v2",
     instance.encrypted ? null : "ebs_encryption",
     instance.tags["briar-managed"] === "true" ? null : "managed_tag",
-    instance.tags["briar-organization"] === expected.organizationId
+    instance.tags["briar-workspace"] === expected.workspaceId
       ? null
       : "organization_tag",
     instance.tags["briar-managed-computer"] === expected.managedComputerId

@@ -1,21 +1,20 @@
 import {
   ChannelsChangedSchema,
   InboxChangedSchema,
-  type OrganizationNotification,
-  OrganizationNotificationSchema,
+  type WorkspaceNotification as WorkspaceNotification,
+  WorkspaceNotificationSchema as WorkspaceNotificationSchema,
   ProjectAgentSessionsChangedSchema,
-  ProjectChangedSchema,
-} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
+  ProjectChangedSchema} from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { evictDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-const notifyRequest = (notification: OrganizationNotification) =>
+const notifyRequest = (notification: WorkspaceNotification) =>
   new Request("https://realtime.test/notify", {
     method: "POST",
     headers: { "Content-Type": "application/protobuf" },
-    body: toBinary(OrganizationNotificationSchema, notification),
+    body: toBinary(WorkspaceNotificationSchema, notification),
   });
 
 const decodeFrame = async (value: unknown) => {
@@ -29,7 +28,7 @@ const decodeFrame = async (value: unknown) => {
   } else {
     throw new TypeError("Expected a binary WebSocket message");
   }
-  return fromBinary(OrganizationNotificationSchema, bytes);
+  return fromBinary(WorkspaceNotificationSchema, bytes);
 };
 
 function openWebSocket(response: Response) {
@@ -76,7 +75,7 @@ describe("ChannelRealtimeHub", () => {
   it("fans out only newer protobuf cursor frames", async () => {
     const realtime = await subscribe(9);
     const channelsChanged = (cursor: bigint) =>
-      create(OrganizationNotificationSchema, {
+      create(WorkspaceNotificationSchema, {
         notification: {
           case: "channelsChanged",
           value: create(ChannelsChangedSchema, { cursor }),
@@ -96,7 +95,7 @@ describe("ChannelRealtimeHub", () => {
     await evictDurableObject(realtime.stub);
     await realtime.stub.fetch(notifyRequest(channelsChanged(11n)));
     await realtime.stub.fetch(notifyRequest(create(
-      OrganizationNotificationSchema,
+      WorkspaceNotificationSchema,
       {
         notification: {
           case: "inboxChanged",
@@ -113,14 +112,14 @@ describe("ChannelRealtimeHub", () => {
     const realtime = await subscribe(42);
     const projectId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
     const projectChanged = (cursor: bigint) =>
-      create(OrganizationNotificationSchema, {
+      create(WorkspaceNotificationSchema, {
         notification: {
           case: "projectChanged",
           value: create(ProjectChangedSchema, { projectId, cursor }),
         },
       });
     const sessionsChanged = (version: bigint) =>
-      create(OrganizationNotificationSchema, {
+      create(WorkspaceNotificationSchema, {
         notification: {
           case: "projectAgentSessionsChanged",
           value: create(ProjectAgentSessionsChangedSchema, {
@@ -141,7 +140,7 @@ describe("ChannelRealtimeHub", () => {
     await realtime.stub.fetch(notifyRequest(projectChanged(2n)));
     await realtime.stub.fetch(notifyRequest(sessionsChanged(7n)));
     await realtime.stub.fetch(notifyRequest(create(
-      OrganizationNotificationSchema,
+      WorkspaceNotificationSchema,
       {
         notification: {
           case: "channelsChanged",
@@ -157,7 +156,7 @@ describe("ChannelRealtimeHub", () => {
   it("rejects a frame without a notification oneof", async () => {
     const stub = env.CHANNEL_REALTIME.getByName(crypto.randomUUID());
     const response = await stub.fetch(notifyRequest(
-      create(OrganizationNotificationSchema),
+      create(WorkspaceNotificationSchema),
     ));
     expect(response.status).toBe(400);
   });

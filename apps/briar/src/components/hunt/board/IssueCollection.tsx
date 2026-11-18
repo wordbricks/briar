@@ -41,7 +41,7 @@ import type {
   HuntRun,
   HuntRunPlacement,
   IssueExecutionPreferences,
-  OrganizationMember,
+  WorkspaceMember,
   PlanningProject,
   Project,
   ProjectAgent,
@@ -204,7 +204,7 @@ export function IssueCollection({
   isSidebarOpen: boolean;
   issueKeyPrefixForRun?: (run: HuntRun) => string | undefined;
   loadingLabel?: string;
-  members: OrganizationMember[];
+  members: WorkspaceMember[];
   onCheckpointsChange?: (run: HuntRun, checkpoints: AutoHuntWorkflowCheckpoint[]) => void;
   onCreateInColumn?: (placement: HuntRunPlacement) => void;
   onDelete?: (run: HuntRun) => void;

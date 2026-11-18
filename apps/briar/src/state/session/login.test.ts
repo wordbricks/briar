@@ -3,11 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { demoDashboard } from "../../lib/demo-data";
-import type { Organization, Project, SessionUser } from "../../types";
-import {
-  activeOrganizationIdAtom,
-  organizationsAtom,
-} from "../organization/atoms";
+import type { Workspace, Project, SessionUser } from "../../types";
+import { activeWorkspaceIdAtom, workspacesAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { activeTeamIdAtom, teamsAtom } from "../team/atoms";
 import {
@@ -34,7 +31,7 @@ const user: SessionUser = {
   email: "tester@briar.local",
 };
 
-const organization: Organization = {
+const workspace: Workspace = {
   id: "org-a",
   name: "Org A",
   handle: "org-a",
@@ -47,8 +44,8 @@ const team: Project = {
   ...demoDashboard.team,
   id: "team-a",
   name: "team-a",
-  organizationId: organization.id,
-  organizationName: organization.name,
+  workspaceId: workspace.id,
+  workspaceName: workspace.name,
 };
 
 /** In-memory device-authorization endpoint and browser hand-off. */
@@ -117,7 +114,7 @@ const harness = (): Harness => {
   setSessionDataSources(registry, {
     loadSession: async () => user,
     loadTeams: async () => [team],
-    loadOrganizations: async () => [organization],
+    loadWorkspaces: async () => [workspace],
     loadConnectedTeamIds: async () => [],
   });
   const actions = createSessionActions(registry, { api: server.api });
@@ -155,8 +152,8 @@ describe("device authorization sign-in", () => {
     expect(registry.get(tokenAtom)).toBe("token-1");
     expect(registry.get(userAtom)).toEqual(user);
     expect(registry.get(teamsAtom)).toEqual([team]);
-    expect(registry.get(organizationsAtom)).toEqual([organization]);
-    expect(registry.get(activeOrganizationIdAtom)).toBe(organization.id);
+    expect(registry.get(workspacesAtom)).toEqual([workspace]);
+    expect(registry.get(activeWorkspaceIdAtom)).toBe(workspace.id);
     expect(registry.get(activeTeamIdAtom)).toBe(team.id);
     expect(server.writtenTokens).toEqual(["token-1"]);
     expect(registry.get(loginCodeAtom)).toBeNull();

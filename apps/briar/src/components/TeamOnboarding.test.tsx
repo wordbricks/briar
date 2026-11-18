@@ -79,8 +79,8 @@ describe("TeamOnboarding", () => {
             project: {
               id: "project-1",
               name: "Briar",
-              organizationId: "organization-1",
-              organizationName: "Wordbricks",
+              workspaceId: "workspace-1",
+              workspaceName: "Wordbricks",
               role: "developer",
               issueKeyPrefix: "BRIAR",
               scheduleTabEnabled: false,
@@ -257,8 +257,8 @@ describe("TeamOnboarding", () => {
             project: {
               id: "project-1",
               name: "Briar",
-              organizationId: "organization-1",
-              organizationName: "Wordbricks",
+              workspaceId: "workspace-1",
+              workspaceName: "Wordbricks",
               role: "developer",
               issueKeyPrefix: "BRIAR",
               scheduleTabEnabled: false,

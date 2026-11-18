@@ -7,7 +7,7 @@ import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarAPI_";
 
-// GitHubIntegrationService owns organization installation discovery and the
+// GitHubIntegrationService owns workspace installation discovery and the
 // start of the browser installation flow. OAuth/install callbacks and signed
 // webhooks intentionally remain ordinary HTTP endpoints.
 service GitHubIntegrationService {
@@ -54,7 +54,7 @@ message GitHubInstallationRepository {
 }
 
 message GetGitHubIntegrationRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message GetGitHubIntegrationResponse {
@@ -69,7 +69,7 @@ message GetGitHubIntegrationResponse {
 }
 
 message BeginGitHubInstallationRequest {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message BeginGitHubInstallationResponse {
@@ -78,7 +78,7 @@ message BeginGitHubInstallationResponse {
 
 message ProjectGitHubCredential {
   string project_id = 1;
-  string organization_id = 2;
+  string workspace_id = 2;
   uint64 repository_id = 3;
   string repository = 4;
   string clone_url = 5;

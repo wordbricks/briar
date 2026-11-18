@@ -100,14 +100,14 @@ export async function createTeamAgent(
     created_at: createdAt,
     updated_at: createdAt,
   };
-  // Organization identity follows the project and is required before the
+  // Workspace identity follows the project and is required before the
   // Agent can appear in a channel roster.
-  const organization = await db
+  const workspace = await db
     .prepare(`select organization_id from briar_teams where id = ?`)
     .bind(projectId)
     .first<{ organization_id: string }>();
-  if (!organization) throw new Error("Project not found");
-  agent.organization_id = organization.organization_id;
+  if (!workspace) throw new Error("Project not found");
+  agent.organization_id = workspace.organization_id;
   const skillRows = normalizedAgentSkillRows(
     agent.id,
     input.skills ?? [],
@@ -125,7 +125,7 @@ export async function createTeamAgent(
         )
         .bind(
           agent.id,
-          organization.organization_id,
+          workspace.organization_id,
           agent.project_id,
           agent.name,
           agent.avatar,

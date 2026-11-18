@@ -25,10 +25,10 @@ import {
   requestedRunIdAtom,
   requestedSessionIdAtom,
 } from "../state/navigation/atoms";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import { companionMode, lockedTeamIdAtom } from "../state/platform";
 import {
-  activeOrganizationTeamsAtom,
+  activeWorkspaceTeamsAtom,
   activeTeamAtom,
 } from "../state/team/atoms";
 import { useAppKeyboardCommandScope } from "./appKeyboardCommands";
@@ -77,8 +77,8 @@ export function useAppShortcuts({
     openAppSettings,
   } = useNavigationActions();
   const activeTeam = useAtomValue(activeTeamAtom);
-  const activeOrganizationId = useAtomValue(activeOrganizationIdAtom);
-  const activeOrganizationTeams = useAtomValue(activeOrganizationTeamsAtom);
+  const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
+  const activeWorkspaceTeams = useAtomValue(activeWorkspaceTeamsAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const sequenceShortcutsEnabled = useAtomValue(sequenceShortcutsEnabledAtom);
   const setSequenceShortcutsEnabled = useAtomSet(sequenceShortcutsEnabledAtom);
@@ -163,18 +163,18 @@ export function useAppShortcuts({
   const keyboardShortcutDisabled = {
     createIssue: !activeTeam,
     goAgents: !activeTeam,
-    goChannels: !activeOrganizationId,
-    goDms: !activeOrganizationId || Boolean(lockedTeamId),
-    goInbox: !activeOrganizationId,
+    goChannels: !activeWorkspaceId,
+    goDms: !activeWorkspaceId || Boolean(lockedTeamId),
+    goInbox: !activeWorkspaceId,
     goIssues: !activeTeam,
     goProjectHome: !activeTeam,
     goSchedule: !activeTeam || !isTeamScheduleTabEnabled(activeTeam),
     goSettings: false,
-    openChannel: !activeOrganizationId,
+    openChannel: !activeWorkspaceId,
     openCommandPalette: false,
-    openDm: !activeOrganizationId || Boolean(lockedTeamId),
+    openDm: !activeWorkspaceId || Boolean(lockedTeamId),
     openIssue: !activeTeam,
-    openProject: activeOrganizationTeams.length === 0,
+    openProject: activeWorkspaceTeams.length === 0,
     openSession: !activeTeam,
     showKeyboardShortcuts: false,
     toggleSidebar: false,

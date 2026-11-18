@@ -20,11 +20,20 @@ import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, Cre
 import { sortAgentProviders, type AgentProvider } from "@/lib/team-llm";
 import {
   boardLoadedAtom,
+  boardPropertyFiltersAtom,
+  boardQueryAtom,
   boardRunAtom,
   boardRunKey,
   boardScopedRunIdsAtom,
+  boardSourceAtom,
+  boardStatusAtom,
+  boardViewAtom,
+  persistBoardScroll,
+  persistBoardViewState,
+  readStoredBoardScroll,
   resetBoardPropertyFilters,
   resetBoardViewState,
+  restoreBoardViewState,
 } from "@/state/board/atoms";
 import {
   runAgentAssociationAtom,
@@ -32,7 +41,7 @@ import {
 } from "@/state/board/run-facts";
 import { useBoardSources } from "@/state/board/useBoardSources";
 import { teamMembersAtom } from "@/state/entities/members";
-import { teamOrganizationProvidersAtom } from "@/state/entities/providers";
+import { teamWorkspaceProvidersAtom } from "@/state/entities/providers";
 import { teamRunsAtom } from "@/state/entities/runs";
 import { teamEntityAtom } from "@/state/entities/teams";
 import { teamWorkersAtom } from "@/state/entities/workers";
@@ -248,7 +257,7 @@ function HuntDashboardContent({
   const settings = useAtomValue(teamSettingsAtom(teamId));
   const members = useAtomValue(teamMembersAtom(teamId));
   const workers = useAtomValue(teamWorkersAtom(teamId));
-  const organizationProviders = useAtomValue(teamOrganizationProvidersAtom(teamId));
+  const organizationProviders = useAtomValue(teamWorkspaceProvidersAtom(teamId));
   const executionPolicy = useAtomValue(teamExecutionPolicyAtom(teamId));
   const notifications = useAtomValue(teamNotificationsAtom(teamId));
   const dashboardLoaded = useAtomValue(boardLoadedAtom(teamId));
@@ -365,13 +374,94 @@ function HuntDashboardContent({
     exactly as the effect keyed on the team id used to.
   */
   useEffect(() => {
-    resetBoardViewState(registry);
+    const teamId = registry.get(activeTeamIdAtom);
+    if (!teamId || !restoreBoardViewState(registry, teamId)) {
+      resetBoardViewState(registry);
+    }
+    // Mount only: restores what a reload wiped. Team switches are handled by
+    // the property-filter effect below and must not re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry]);
+  const boardQuery = useAtomValue(boardQueryAtom);
+  const boardSource = useAtomValue(boardSourceAtom);
+  const boardStatus = useAtomValue(boardStatusAtom);
+  const boardView = useAtomValue(boardViewAtom);
+  const boardPropertyFilters = useAtomValue(boardPropertyFiltersAtom);
   useEffect(() => {
-    resetBoardPropertyFilters(registry);
+    if (!activeTeamId) return;
+    persistBoardViewState(registry, activeTeamId);
+  }, [
+    registry,
+    activeTeamId,
+    boardQuery,
+    boardSource,
+    boardStatus,
+    boardView,
+    boardPropertyFilters,
+  ]);
+  const previousTeamIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Mount is a restore, not a switch: clearing here would wipe the property
+    // filters the restore just brought back. Real team switches still clear.
+    if (previousTeamIdRef.current === null) {
+      previousTeamIdRef.current = activeTeamId;
+      return;
+    }
+    if (previousTeamIdRef.current !== activeTeamId) {
+      previousTeamIdRef.current = activeTeamId;
+      resetBoardPropertyFilters(registry);
+    }
   }, [activeTeamId, registry]);
 
   const issuesLoading = !dashboardLoaded && !noProject && !error && !recoveryError;
+  /*
+    Scroll is remembered per team alongside the view state: the board listens
+    for scrolls of its kanban/list container in the capture phase (scroll does
+    not bubble), persists the offset, and the next mount puts it back once the
+    first loaded page has rendered.
+  */
+  const restoredBoardScrollRef = useRef(false);
+  useEffect(() => {
+    if (!activeTeamId) return;
+    let persistTimer: number | null = null;
+    const onScroll = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (
+        !target.classList.contains("kanban-board") &&
+        !target.classList.contains("issue-list")
+      ) {
+        return;
+      }
+      if (persistTimer !== null) window.clearTimeout(persistTimer);
+      const scrollTop = target.scrollTop;
+      persistTimer = window.setTimeout(() => {
+        persistTimer = null;
+        persistBoardScroll(activeTeamId, scrollTop);
+      }, 150);
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("scroll", onScroll, true);
+      if (persistTimer !== null) window.clearTimeout(persistTimer);
+    };
+  }, [activeTeamId]);
+  useEffect(() => {
+    if (restoredBoardScrollRef.current || !activeTeamId || issuesLoading) {
+      return;
+    }
+    restoredBoardScrollRef.current = true;
+    const stored = readStoredBoardScroll(activeTeamId);
+    if (stored === null) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const scroller = document.querySelector<HTMLElement>(
+          "#issues .kanban-board, #issues .issue-list",
+        );
+        if (scroller) scroller.scrollTop = stored;
+      });
+    });
+  }, [activeTeamId, issuesLoading]);
   const displayedError = error ?? recoveryError;
   const lastDisplayedErrorRef = useRef<string | null>(null);
   useEffect(() => {
@@ -390,7 +480,7 @@ function HuntDashboardContent({
   const selectedInboxVersion = selected ? [inboxIssueMessageVersion(selected), ...(notifications.conversation ?? []).filter(notification => notification.runId === selected.id).map(notification => notification.id).sort()].join(":") : null;
   const transferDestinationProjects = useMemo(() => {
     if (!team) return [];
-    return projects.filter(project => project.id !== team.id && (!team.organizationId || project.organizationId === team.organizationId));
+    return projects.filter(project => project.id !== team.id && (!team.workspaceId || project.workspaceId === team.workspaceId));
   }, [projects, team]);
   const transferDestinationOptions = useMemo(() => {
     const sourcePlanningProjectId = transferringRunFromMenu?.projectId;
@@ -568,7 +658,7 @@ function HuntDashboardContent({
       }} onTransfer={onTransferIssue ? async targetProjectId => {
         await onTransferIssue(selected.id, targetProjectId);
         openRun(null);
-      } : undefined} transferProjects={transferDestinationProjects} teams={projects} currentTeam={team} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAddRelated={onAddRelatedIssue ? relatedRunId => onAddRelatedIssue(selected.id, relatedRunId) : undefined} onCreateSubIssue={() => openCreateSubIssueDialog(selected.id)} onLinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, selected.id) : undefined} onSetParent={onSetIssueParent ? parentRunId => onSetIssueParent(selected.id, parentRunId) : undefined} onUnlinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, null) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRemoveRelated={onRemoveRelatedIssue ? relatedRunId => onRemoveRelatedIssue(selected.id, relatedRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => openRun(runId)} onLoadAttachment={onLoadAttachment} onLoadIssueMessages={() => onLoadIssueMessages(selected.id)} onLoadRunEvents={() => onLoadRunEvents(selected.id)} onLoadRunEvidence={() => onLoadRunEvidence(selected.id)} onLoadRunEvidenceImage={onLoadRunEvidenceImage} onViewingIssueConversationChange={onViewingIssueConversationChange} onCompleteResultReview={onCompleteResultReview ? () => onCompleteResultReview(selected.id) : undefined} mentionMembers={members ?? []} mentionAgents={agents.filter(agent => agent.teamId === team?.id)} onMove={placement => onMoveRun(selected.id, placement)} onMoveIssueProject={onMoveIssueProject && selected.projectId ? targetProjectId => onMoveIssueProject(selected.id, selected.projectId!, targetProjectId) : undefined} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined} onRetry={() => onRetryRun(selected.id)} onRework={onReworkRun ? input => onReworkRun(selected.id, input) : undefined} onResume={() => onResumeRun(selected.id)} onSendIssueMessage={input => onSendIssueMessage(selected.id, input)} onEditIssueMessage={(messageId, input) => onEditIssueMessage(selected.id, messageId, input)} onDeleteIssueMessage={messageId => onDeleteIssueMessage(selected.id, messageId)} onUpdateIssue={input => onUpdateIssue(selected.id, input)} onUpdateIssueCheckpoints={checkpoints => onUpdateIssueCheckpoints(selected.id, checkpoints)} onUpdateIssuePreferences={input => onUpdateIssuePreferences(selected.id, input)} onUpdateIssueSubscription={onUpdateIssueSubscription ? subscribed => onUpdateIssueSubscription(selected.id, subscribed) : undefined} availableProviders={availableProviders} executionPolicy={executionPolicy ?? undefined} executionWorkers={workers ?? []} performedAgentName={selectedAgents.performed?.name ?? null} performedAgentProvider={selectedAgents.performed?.provider ?? null} performedAgentModel={selectedAgents.performed?.model ?? null} organizationId={team?.organizationId ?? ""} projectId={team?.id ?? ""} run={selected} isProcessing={selectedIsProcessing} availableRuns={availableRuns ?? []} token={token} />
+      } : undefined} transferProjects={transferDestinationProjects} teams={projects} currentTeam={team} onAddDependency={onAddIssueDependency ? prerequisiteRunId => onAddIssueDependency(selected.id, prerequisiteRunId) : undefined} onAddRelated={onAddRelatedIssue ? relatedRunId => onAddRelatedIssue(selected.id, relatedRunId) : undefined} onCreateSubIssue={() => openCreateSubIssueDialog(selected.id)} onLinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, selected.id) : undefined} onSetParent={onSetIssueParent ? parentRunId => onSetIssueParent(selected.id, parentRunId) : undefined} onUnlinkSubIssue={onSetIssueParent ? childRunId => onSetIssueParent(childRunId, null) : undefined} onAcceptIssueAction={onAcceptIssueAction ? proposal => onAcceptIssueAction(selected.id, proposal) : undefined} onAcceptIssueExecution={onAcceptIssueExecution ? (proposal, input) => onAcceptIssueExecution(selected.id, proposal, input) : undefined} onAcceptSkillExecution={onAcceptSkillExecution ? (proposal, input) => onAcceptSkillExecution(selected.id, proposal, input) : undefined} onRemoveDependency={onRemoveIssueDependency ? prerequisiteRunId => onRemoveIssueDependency(selected.id, prerequisiteRunId) : undefined} onRemoveRelated={onRemoveRelatedIssue ? relatedRunId => onRemoveRelatedIssue(selected.id, relatedRunId) : undefined} onRelatedMessageOpen={onRelatedMessageOpen} onDependencyOpen={runId => openRun(runId)} onLoadAttachment={onLoadAttachment} onLoadIssueMessages={() => onLoadIssueMessages(selected.id)} onLoadRunEvents={() => onLoadRunEvents(selected.id)} onLoadRunEvidence={() => onLoadRunEvidence(selected.id)} onLoadRunEvidenceImage={onLoadRunEvidenceImage} onViewingIssueConversationChange={onViewingIssueConversationChange} onCompleteResultReview={onCompleteResultReview ? () => onCompleteResultReview(selected.id) : undefined} mentionMembers={members ?? []} mentionAgents={agents.filter(agent => agent.teamId === team?.id)} onMove={placement => onMoveRun(selected.id, placement)} onMoveIssueProject={onMoveIssueProject && selected.projectId ? targetProjectId => onMoveIssueProject(selected.id, selected.projectId!, targetProjectId) : undefined} onProcessNow={onProcessIssueNow ? () => onProcessIssueNow(selected) : undefined} onRetry={() => onRetryRun(selected.id)} onRework={onReworkRun ? input => onReworkRun(selected.id, input) : undefined} onResume={() => onResumeRun(selected.id)} onSendIssueMessage={input => onSendIssueMessage(selected.id, input)} onEditIssueMessage={(messageId, input) => onEditIssueMessage(selected.id, messageId, input)} onDeleteIssueMessage={messageId => onDeleteIssueMessage(selected.id, messageId)} onUpdateIssue={input => onUpdateIssue(selected.id, input)} onUpdateIssueCheckpoints={checkpoints => onUpdateIssueCheckpoints(selected.id, checkpoints)} onUpdateIssuePreferences={input => onUpdateIssuePreferences(selected.id, input)} onUpdateIssueSubscription={onUpdateIssueSubscription ? subscribed => onUpdateIssueSubscription(selected.id, subscribed) : undefined} availableProviders={availableProviders} executionPolicy={executionPolicy ?? undefined} executionWorkers={workers ?? []} performedAgentName={selectedAgents.performed?.name ?? null} performedAgentProvider={selectedAgents.performed?.provider ?? null} performedAgentModel={selectedAgents.performed?.model ?? null} workspaceId={team?.workspaceId ?? ""} projectId={team?.id ?? ""} run={selected} isProcessing={selectedIsProcessing} availableRuns={availableRuns ?? []} token={token} />
         {createIssueDialog}
       </Suspense>;
   }

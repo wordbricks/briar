@@ -29,6 +29,7 @@ const agentBundles = [
   "pi-runner.js",
   "computer-use-mcp-server.js",
   "dm-message-mcp-server.js",
+  "memory-tools.js",
 ];
 
 afterEach(async () => {

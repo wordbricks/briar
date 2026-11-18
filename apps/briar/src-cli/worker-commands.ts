@@ -1,3 +1,4 @@
+import { supportsOwnedProcessSupervisor } from "./owned-process-supervisor";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { platform } from "node:os";
@@ -13,7 +14,7 @@ import { buildComputerUseArgs } from "@briar/agent-exec";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { autoHuntRequirementKinds } from "../src/lib/auto-hunt-contract";
 import { runProjectAgentTaskCompletionFlow } from "./agent-runner";
-import { detachedProviderBlockOf } from "./detached-provider-turn";
+import { detachedProviderBlockOf, DetachedProviderStopUnconfirmedError } from "./detached-provider-turn";
 import {
   inspectWorkflowRequirements,
   workflowRequirementReadinessDetail,
@@ -26,6 +27,10 @@ import {
   runWorkerLoop,
   type WorkerLoopUpdateDirective,
 } from "./worker";
+import {
+  createBackgroundSweep,
+  createWorkerRuntimeProbes,
+} from "./worker-runtime-probes";
 import { executeClaimedMergeBatch } from "./merge-queue";
 import {
   supportsRemoteWorkerUpdates,
@@ -38,9 +43,9 @@ import {
   projectWorktreeRoot,
 } from "./worktree";
 import {
-  cleanupOrphanedOrganizationAgentWorkspaces,
-  prepareOrganizationAgentWorkspace,
-} from "./organization-agent-context";
+  cleanupOrphanedWorkspaceAgentWorkspaces,
+  prepareWorkspaceAgentWorkspace,
+} from "./workspace-agent-context";
 import {
   healthyWorkerProviders,
   inspectWorkerProviderHealth,
@@ -76,7 +81,6 @@ import {
   worktreesEnabled,
   currentProject,
   openCodeUpstreamConfigured,
-  providerExecutionEnvironment,
 } from "./command-support";
 import {
   type Config,
@@ -93,19 +97,24 @@ import {
   runClaimedIssue,
 } from "./issue-execution";
 import {
+  channelReplyTurnStarted,
   runClaimedProjectAgentTask,
   runClaimedIssueReply,
   failClaimedIssueReply,
   runClaimedChannelReply,
   failClaimedChannelReply,
 } from "./reply-execution";
+import {
+  deferChannelReplyTimelineOutcome,
+  settleChannelReplyTimelineOutcome,
+  type ChannelReplyTimelineOutcome,
+} from "./channel-reply-timeline";
+import { installWorkerLogTimestamps } from "./worker-log-timestamps";
 import { loadManagedComputerCredential } from "./managed-computer-credential";
-import { runClaimedDmMemory } from "./dm-memory-learning";
-import { runDetachedProviderTurn } from "./detached-provider-turn";
-import { prepareReadOnlyAgentEnvironment } from "./read-only-agent-environment";
 import { ComputerUseBoxClient } from "./computer-use-box-client";
 import { COMPUTER_USE_CANARY_AGENT_ID } from "./computer-use-desktop-manager";
 import { agentBundleCandidates } from "./agent-bundle-path";
+import { memoryToolsBundleName } from "./memory-vault-invocation";
 import { defaultComputerUseScreenshotDirectory } from "./computer-use-native-executor";
 import { supportsComputerUseProvider } from
   "../src/lib/computer-use-contract";
@@ -132,7 +141,7 @@ const isRetryableWorkerCompletionError = (error: unknown) =>
 const isMissingWorkerError = (error: unknown) =>
   error instanceof ConnectError && error.code === Code.NotFound;
 
-const workerRuntime = ({
+const workerRuntime = async ({
   providerVersions,
   ...input
 }: {
@@ -143,25 +152,37 @@ const workerRuntime = ({
   providerVersions?: Readonly<Record<string, string>>;
   worktrees: boolean;
   workflowRequirements?: WorkerRuntimeInput["workflowRequirements"];
-  dmMemoryLearning: WorkerRuntimeInput["dmMemoryLearning"];
   computerUse?: WorkerRuntimeInput["computerUse"];
-}): WorkerRuntimeInput => ({
+}): Promise<WorkerRuntimeInput> => ({
   ...input,
+  dmReplyRouting: { protocol: 1, providers: Object.entries(input.providerHealth)
+    .filter(([, health]) => health.installed && supportsOwnedProcessSupervisor())
+    .map(([provider]) => provider as WorkerRuntimeInput["agentProvider"]) },
   dmPublicMessages: (() => {
     const bundle = agentBundleCandidates(
       import.meta.dir,
       "dm-message-mcp-server.js",
     ).find((path) => Bun.file(path).size > 0);
+    // Only a healthy provider may be advertised: the server refuses the whole
+    // heartbeat when a listed provider is not (an installed but signed-out
+    // claude, say), and that refusal took every Worker on the machine offline.
     const providers = Object.entries(input.providerHealth).flatMap(
-      ([provider, health]) => health.healthy &&
+      ([provider, health]) =>
+        health.healthy &&
           supportsDmMessagePublicationProvider(provider as WorkerRuntimeInput["agentProvider"])
-        ? [provider as "codex" | "claude"]
-        : [],
+          ? [provider as WorkerRuntimeInput["agentProvider"]]
+          : [],
     );
     return bundle && providers.length > 0
       ? { protocol: 1 as const, providers }
       : undefined;
   })(),
+  // Advertised only with the `tools` bundle in place: the vault is the only
+  // memory a reply has, so the tools must exist before the server offers it.
+  memoryVault: agentBundleCandidates(import.meta.dir, memoryToolsBundleName)
+      .some((path) => Bun.file(path).size > 0)
+    ? { protocol: 1 as const }
+    : undefined,
   updateRequestId: sandboxWorkerRuntimeMetadata().updateRequestId,
   versions: workerRuntimeVersions({
     briar: cliVersion,
@@ -173,14 +194,44 @@ const workerRuntime = ({
   },
 });
 
-const dmMemoryLearningCapability = (
-  providers: ReturnType<typeof healthyWorkerProviders>,
-  hasOpenRouterKey: boolean,
-): NonNullable<WorkerRuntimeInput["dmMemoryLearning"]> => ({
-  protocol: 2,
-  transports: ["agent", ...(hasOpenRouterKey ? ["openrouter" as const] : [])],
-  providers,
-});
+type WorkerRuntimeProbeResult = {
+  providerHealth: Awaited<ReturnType<typeof inspectWorkerProviderHealth>>;
+  providerCapabilities: Awaited<
+    ReturnType<typeof discoverWorkerProviderCapabilities>
+  >;
+  providerVersions: Awaited<ReturnType<typeof discoverWorkerProviderVersions>>;
+  providers: ReturnType<typeof healthyWorkerProviders>;
+  computerUse: WorkerRuntimeInput["computerUse"];
+};
+
+/**
+ * Everything the runtime snapshot has to learn from this machine. Each call
+ * spawns the provider CLIs, so the worker loop refreshes it in the background
+ * instead of on the heartbeat - and therefore the claim - path.
+ */
+const probeWorkerRuntime = async (
+  config: Config,
+): Promise<WorkerRuntimeProbeResult> => {
+  const providerHealth = await inspectWorkerProviderHealth(
+    enabledAgentProviders(config),
+    {
+      upstreamConfigured: (provider) =>
+        openCodeUpstreamConfigured(config, provider),
+    },
+  );
+  const providerCapabilities = await discoverWorkerProviderCapabilities(
+    enabledAgentProviders(config),
+  );
+  const providerVersions = await discoverWorkerProviderVersions();
+  const providers = healthyWorkerProviders(providerHealth);
+  return {
+    providerHealth,
+    providerCapabilities,
+    providerVersions,
+    providers,
+    computerUse: await inspectComputerUseCapability(config, providers),
+  };
+};
 
 const runComputerUseCanary = async (): Promise<boolean> => {
   const client = await ComputerUseBoxClient.connect();
@@ -288,7 +339,7 @@ const inspectComputerUseCapability = async (
 
 export type ProjectWorkerRegistration = {
   projectId: string;
-  organizationId: string;
+  workspaceId: string;
   deviceId: string;
   workerId: string;
   label: string;
@@ -332,16 +383,12 @@ export async function registerProjectExecutionWorker(input: {
   const provider = providers.includes(configuredProvider)
     ? configuredProvider
     : (providers[0] ?? configuredProvider);
-  const runtime = workerRuntime({
+  const runtime = await workerRuntime({
     agentProvider: provider,
     providerHealth,
     providerCapabilities,
     providerVersions,
     worktrees: true,
-    dmMemoryLearning: dmMemoryLearningCapability(
-      providers,
-      openCodeUpstreamConfigured(config, "openrouter"),
-    ),
     computerUse,
   });
   const enrollment = createWorkerEnrollmentClient(config.apiUrl, input.userToken);
@@ -366,8 +413,8 @@ export async function registerProjectExecutionWorker(input: {
       if (!(error instanceof ConnectError) || error.code !== Code.FailedPrecondition) {
         throw error;
       }
-      // The device is not enrolled in this organization yet. Registration
-      // below creates it and issues the first organization credential.
+      // The device is not enrolled in this workspace yet. Registration
+      // below creates it and issues the first workspace credential.
     }
   }
   registration ??= await enrollment.register({
@@ -397,7 +444,7 @@ export async function registerProjectExecutionWorker(input: {
           candidate.id === project.id
             ? resolved.worker.id
             : candidate.executionWorker!.workerId,
-        organizationId: resolved.organizationId,
+        workspaceId: resolved.workspaceId,
         token: resolved.workerToken,
         label,
         maxConcurrentSessions: resolved.worker.maxConcurrentSessions,
@@ -407,7 +454,7 @@ export async function registerProjectExecutionWorker(input: {
   await saveConfig(config);
   return {
     projectId: project.id,
-    organizationId: resolved.organizationId,
+    workspaceId: resolved.workspaceId,
     deviceId: resolved.deviceId,
     workerId: resolved.worker.id,
     label,
@@ -615,8 +662,15 @@ async function workerSyncLabelCommand() {
 }
 
 async function workerCommand() {
+  /*
+    The service's stdout and stderr are the Worker's only log, and until now
+    nothing in it said when anything happened. Installed here rather than at the
+    call sites, so every line this long-running process writes carries the
+    stamp and no one-shot command does.
+  */
+  installWorkerLogTimestamps();
   const config = await loadConfig();
-  await cleanupOrphanedOrganizationAgentWorkspaces({
+  await cleanupOrphanedWorkspaceAgentWorkspaces({
     workerSessionsDirectory: join(configDirectory, "worker-sessions"),
   });
   const projectId = value("--team");
@@ -641,7 +695,7 @@ async function workerCommand() {
   if (
     managedCredential &&
     (managedCredential.deviceId !== registered.deviceId ||
-      managedCredential.organizationId !== registered.organizationId)
+      managedCredential.workspaceId !== registered.workspaceId)
   ) {
     throw new Error("Managed computer credential does not match this worker");
   }
@@ -673,23 +727,18 @@ async function workerCommand() {
   console.log(`worker ${label} starting as ${workerId}`);
 
   if (readinessProblem) {
-    const providerHealth = await inspectWorkerProviderHealth(
-      enabledAgentProviders(config),
-      {
-        upstreamConfigured: (provider) =>
-          openCodeUpstreamConfigured(config, provider),
-      },
-    );
-    const providerCapabilities = await discoverWorkerProviderCapabilities(
-      enabledAgentProviders(config),
-    );
-    const providerVersions = await discoverWorkerProviderVersions();
-    const providers = healthyWorkerProviders(providerHealth);
-    const computerUse = await inspectComputerUseCapability(config, providers);
+    // This branch reports once and exits, so it still probes synchronously.
+    const {
+      providerHealth,
+      providerCapabilities,
+      providerVersions,
+      providers,
+      computerUse,
+    } = await probeWorkerRuntime(config);
     const configuredProvider = project.llm?.provider ?? "codex";
     const heartbeat = await workerControl.heartbeat({
       workerId,
-      runtime: workerRuntime({
+      runtime: await workerRuntime({
         agentProvider: providers.includes(configuredProvider)
           ? configuredProvider
           : (providers[0] ?? configuredProvider),
@@ -697,10 +746,6 @@ async function workerCommand() {
         providerCapabilities,
         providerVersions,
         worktrees: true,
-        dmMemoryLearning: dmMemoryLearningCapability(
-          providers,
-          openCodeUpstreamConfigured(config, "openrouter"),
-        ),
         computerUse,
       }),
       acceptingWork: false,
@@ -724,25 +769,82 @@ async function workerCommand() {
   const wakeClient = new WorkerWakeClient(
     {
       apiUrl: config.apiUrl,
-      organizationId: registered.organizationId,
+      workspaceId: registered.workspaceId,
       credential: workerToken,
     },
     (line) => console.log(line),
   );
   wakeClient.start();
-  let lastWorktreeSweepAt = Number.NEGATIVE_INFINITY;
-  let lastAnalysisWorktreeSweepAt = Number.NEGATIVE_INFINITY;
   let lastServerMaintenanceAt = Number.NEGATIVE_INFINITY;
   let lastTriggeredUpdateId: string | null = null;
+  // Provider probes cost seconds; the heartbeat reports the last reading and
+  // this scheduler refreshes it in the background for the next one.
+  const runtimeProbes = createWorkerRuntimeProbes({
+    probe: () => probeWorkerRuntime(config),
+    log: (line) => console.log(line),
+  });
+  const analysisWorktreeSweep = createBackgroundSweep({
+    intervalMs: 5 * 60_000,
+    run: async () => {
+      try {
+        await cleanupOrphanedWorkspaceAgentWorkspaces({
+          workerSessionsDirectory: join(configDirectory, "worker-sessions"),
+        });
+        const maintenance = await maintainIdleAnalysisWorktrees(
+          runGit,
+          project.repositoryPath,
+          projectWorktreeRoot(worktreeSettings(project).root, project.id),
+          { activePaths: [...activeCachedAnalysisWorktreePaths.keys()] },
+        );
+        const reportable = maintenance.filter(
+          (item) => item.status === "removed" || item.reason !== "active",
+        );
+        if (reportable.length > 0) {
+          console.log(
+            `analysis worktree maintenance: ${JSON.stringify(reportable)}`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `analysis worktree maintenance failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    },
+  });
+  const completedWorktreeSweep = createBackgroundSweep({
+    intervalMs: 60 * 60 * 1_000,
+    run: async () => {
+      try {
+        await syncCompletedWorktreeRecordsFromDashboard(config, project);
+        const maintenance = await maintainRecordedCompletedWorktrees(project);
+        if (maintenance.length > 0) {
+          console.log(
+            `completed worktree maintenance: ${JSON.stringify(maintenance)}`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `completed worktree maintenance failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    },
+  });
   const result = await runWorkerLoop<ClaimedWork>(
     {
       claim: async (_options) => workerQueue.claimWork({
-          organizationId: registered.organizationId,
+          workspaceId: registered.workspaceId,
           projectId: project.id,
           workerId,
           claimedBy: label,
           repliesOnly: _options?.repliesOnly === true,
         }),
+      replyTurnStarted: (issue) =>
+        issue.workType === "channelReply" &&
+        channelReplyTurnStarted(issue.workId),
       renewLease: async (issue) => {
         const renewed = await workerQueue.renewWorkLease({
           projectId: project.id,
@@ -771,7 +873,7 @@ async function workerCommand() {
                 });
               }
             } else {
-              await prepareOrganizationAgentWorkspace(
+              await prepareWorkspaceAgentWorkspace(
                 join(
                   configDirectory,
                   "worker-sessions",
@@ -792,66 +894,22 @@ async function workerCommand() {
         }
       },
       heartbeat: async (readinessState = "ready") => {
-        if (Date.now() - lastAnalysisWorktreeSweepAt >= 5 * 60_000) {
-          lastAnalysisWorktreeSweepAt = Date.now();
-          try {
-            await cleanupOrphanedOrganizationAgentWorkspaces({
-              workerSessionsDirectory: join(configDirectory, "worker-sessions"),
-            });
-            const maintenance = await maintainIdleAnalysisWorktrees(
-              runGit,
-              project.repositoryPath,
-              projectWorktreeRoot(worktreeSettings(project).root, project.id),
-              { activePaths: [...activeCachedAnalysisWorktreePaths.keys()] },
-            );
-            const reportable = maintenance.filter(
-              (item) => item.status === "removed" || item.reason !== "active",
-            );
-            if (reportable.length > 0) {
-              console.log(
-                `analysis worktree maintenance: ${JSON.stringify(reportable)}`,
-              );
-            }
-          } catch (error) {
-            console.error(
-              `analysis worktree maintenance failed: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
-          }
-        }
-        if (Date.now() - lastWorktreeSweepAt >= 60 * 60 * 1_000) {
-          lastWorktreeSweepAt = Date.now();
-          try {
-            await syncCompletedWorktreeRecordsFromDashboard(config, project);
-            const maintenance = await maintainRecordedCompletedWorktrees(project);
-            if (maintenance.length > 0) {
-              console.log(`completed worktree maintenance: ${JSON.stringify(maintenance)}`);
-            }
-          } catch (error) {
-            console.error(
-              `completed worktree maintenance failed: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
-          }
-        }
-        const providerHealth = await inspectWorkerProviderHealth(
-          enabledAgentProviders(config),
-          {
-            upstreamConfigured: (provider) =>
-              openCodeUpstreamConfigured(config, provider),
-          },
-        );
-        const providerCapabilities = await discoverWorkerProviderCapabilities(
-          enabledAgentProviders(config),
-        );
-        const providerVersions = await discoverWorkerProviderVersions();
-        const providers = healthyWorkerProviders(providerHealth);
-        const computerUse = await inspectComputerUseCapability(
-          config,
+        // Maintenance and provider probes are not liveness data. Kick them and
+        // move on: the loop awaits this heartbeat before every claim.
+        analysisWorktreeSweep.kick();
+        completedWorktreeSweep.kick();
+        const cached = runtimeProbes.snapshot();
+        // Only the very first heartbeat has nothing to report yet, and it runs
+        // before the loop's first claim.
+        const {
+          providerHealth,
+          providerCapabilities,
+          providerVersions,
           providers,
-        );
+          computerUse,
+        } = cached === null
+          ? (await runtimeProbes.refreshNow()).value
+          : cached.value;
         const hasHealthyProvider = providers.length > 0;
         // Shared project workflow tools must be ready on this worker machine.
         // Prefer the requirements returned by the previous heartbeat (server is
@@ -880,7 +938,7 @@ async function workerCommand() {
         const configuredProvider = project.llm?.provider ?? "codex";
         const heartbeat = await workerControl.heartbeat({
           workerId,
-          runtime: workerRuntime({
+          runtime: await workerRuntime({
             agentProvider: providers.includes(configuredProvider)
               ? configuredProvider
               : (providers[0] ?? configuredProvider),
@@ -893,10 +951,6 @@ async function workerCommand() {
               healthy: item.healthy,
               detail: item.detail,
             })),
-            dmMemoryLearning: dmMemoryLearningCapability(
-              providers,
-              openCodeUpstreamConfigured(config, "openrouter"),
-            ),
             computerUse,
           }),
           refreshMaintenance,
@@ -946,7 +1000,7 @@ async function workerCommand() {
               effectiveAcceptingWork = false;
               await workerControl.heartbeat({
                 workerId,
-                runtime: workerRuntime({
+                runtime: await workerRuntime({
                   agentProvider: providers.includes(configuredProvider)
                     ? configuredProvider
                     : (providers[0] ?? configuredProvider),
@@ -959,10 +1013,6 @@ async function workerCommand() {
                     healthy: item.healthy,
                     detail: item.detail,
                   })),
-                  dmMemoryLearning: dmMemoryLearningCapability(
-                    providers,
-                    openCodeUpstreamConfigured(config, "openrouter"),
-                  ),
                   computerUse,
                 }),
                 acceptingWork: false,
@@ -995,20 +1045,6 @@ async function workerCommand() {
         });
       },
       runIssue: async (issue, signal, reportCheckpoint) => {
-        if (issue.workType === "dmMemory") {
-          await runClaimedDmMemory({
-            rpc: workerQueueClient,
-            projectId: project.id,
-            claim: issue,
-            apiKey: config.openrouterApiKey ?? null,
-            signal,
-            agentEnvironment: (provider) =>
-              providerExecutionEnvironment(config, provider, process.env),
-            runAgentTurn: runDetachedProviderTurn,
-            prepareAgentEnvironment: prepareReadOnlyAgentEnvironment,
-          });
-          return;
-        }
         if (issue.workType === "mergeBatch") {
           const claim = issue;
           await executeClaimedMergeBatch({
@@ -1082,29 +1118,50 @@ async function workerCommand() {
         }
         if (issue.workType === "channelReply") {
           const reply = issue;
+          /*
+            Whether a failed reply was steered is this branch's answer, not the
+            reply's: it is what the server says once the provider has stopped
+            and the cleanup has finished. The timeline line waits for it here
+            and the `finally` prints it on every path, steered or not.
+          */
+          deferChannelReplyTimelineOutcome(reply.workId);
+          let timelineOutcome: ChannelReplyTimelineOutcome | null = null;
           try {
-            await runClaimedChannelReply(
-              config,
-              project,
-              reply,
-              workerToken,
-              signal,
-              reportCheckpoint,
-            );
-          } catch (error) {
-            // runClaimedChannelReply has stopped its provider and finished cleanup.
-            // Only now may the server make the response claimable again.
-            if (await workerQueue.acknowledgeChannelReplySteer({
-              projectId: project.id, workerId, work: reply,
-            })) return { steered: true };
-            if (signal.aborted) throw error;
-            await failClaimedChannelReply(
-              config,
-              project,
-              reply,
-              workerToken,
-              error,
-            );
+            try {
+              await runClaimedChannelReply(
+                config,
+                project,
+                reply,
+                workerToken,
+                signal,
+                reportCheckpoint,
+              );
+            } catch (error) {
+              if (error instanceof DetachedProviderStopUnconfirmedError) {
+                await workerQueue.acknowledgeChannelReplySteer({
+                  projectId: project.id, workerId, work: reply, stopUnconfirmed: true,
+                });
+                throw error;
+              }
+              // runClaimedChannelReply has stopped its provider and finished cleanup.
+              // Only now may the server make the response claimable again.
+              if (await workerQueue.acknowledgeChannelReplySteer({
+                projectId: project.id, workerId, work: reply,
+              })) {
+                timelineOutcome = "steered";
+                return { steered: true };
+              }
+              if (signal.aborted) throw error;
+              await failClaimedChannelReply(
+                config,
+                project,
+                reply,
+                workerToken,
+                error,
+              );
+            }
+          } finally {
+            settleChannelReplyTimelineOutcome(reply.workId, timelineOutcome);
           }
           return;
         }
@@ -1150,7 +1207,12 @@ async function workerCommand() {
       maxConcurrentSessions: registered.maxConcurrentSessions,
       ...(Number.isInteger(maxIssues) && maxIssues > 0 ? { maxIssues } : {}),
     },
-  ).finally(() => wakeClient.stop());
+  ).finally(() => {
+    wakeClient.stop();
+    runtimeProbes.stop();
+    analysisWorktreeSweep.stop();
+    completedWorktreeSweep.stop();
+  });
   console.log(JSON.stringify(result));
 }
 

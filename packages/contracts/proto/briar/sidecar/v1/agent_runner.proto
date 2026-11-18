@@ -3,6 +3,7 @@ syntax = "proto3";
 package briar.sidecar.v1;
 
 import "briar/app/v1/channel.proto";
+import "briar/worker/v1/worker_queue.proto";
 import "briar/types/v1/agent_event.proto";
 import "briar/types/v1/provider.proto";
 import "briar/types/v1/provider_block.proto";
@@ -40,6 +41,21 @@ enum RunErrorCode {
   RUN_ERROR_CODE_INTERNAL = 5;
 }
 
+// Whether a turn may load the tools the host user configured for the provider
+// CLI, independently of `external_tools`. `external_tools=false` is a full
+// lockdown (read-only permissions, no web search, no skills); this axis only
+// decides whose tool catalog the provider loads.
+enum ToolInheritance {
+  // Treated as INHERIT so a request written before this field keeps its
+  // behaviour.
+  TOOL_INHERITANCE_UNSPECIFIED = 0;
+  // The provider loads the host user's MCP servers, apps and plugins.
+  TOOL_INHERITANCE_INHERIT = 1;
+  // The provider loads only the MCP servers Briar passes for this turn. The
+  // sandbox mode, network setting, skills and web search stay as requested.
+  TOOL_INHERITANCE_BRIAR = 2;
+}
+
 enum AgentRunKind {
   AGENT_RUN_KIND_UNSPECIFIED = 0;
   AGENT_RUN_KIND_PARENT = 1;
@@ -65,6 +81,7 @@ message DmMessagePublicationBinding {
   bytes capability = 3;
   google.protobuf.Timestamp expires_at = 4;
   uint32 protocol = 5;
+  bool schedule_tools = 6;
 }
 
 message DmMessagePublicationPart {
@@ -79,6 +96,7 @@ message DmMessagePublicationRequest {
   bytes capability = 2;
   string operation_key = 3;
   repeated DmMessagePublicationPart parts = 4;
+  optional briar.worker.v1.DmScheduleToolOperation schedule = 5;
 }
 
 message DmMessagePublicationReceipt {
@@ -108,6 +126,7 @@ message DmMessagePublicationResponse {
   oneof result {
     DmMessagePublicationReceipt receipt = 1;
     DmMessagePublicationError error = 2;
+    briar.worker.v1.ExecuteDmScheduleToolResponse schedule = 3;
   }
 }
 
@@ -115,6 +134,13 @@ message ParentToRunner {
   oneof payload {
     RunRequest run = 1;
     ApprovalResponse approval_response = 2;
+    // Optional first frame. A runner that accepts it starts the provider
+    // process and everything the request below already decides, answers
+    // `RunnerPrepared`, and then waits for the `run` frame that carries the
+    // prompt. Only the fields a provider needs before the prompt exists are
+    // read from it; `message`, `instructions`, `attachments` and
+    // `output_schema` are empty here and arrive with `run`.
+    RunRequest prepare = 3;
   }
 }
 
@@ -126,8 +152,14 @@ message RunnerToParent {
     RunResult result = 4;
     RunBlocked blocked = 5;
     RunError error = 6;
+    RunnerPrepared prepared = 7;
   }
 }
+
+// Emitted once, and only for a two-phase turn: the provider process is up and
+// everything the `prepare` frame decided is done. The parent may now send the
+// `run` frame, or kill the process.
+message RunnerPrepared {}
 
 message RunRequest {
   string message = 1;
@@ -159,6 +191,11 @@ message RunRequest {
   optional string computer_use_mcp_server_path = 18;
   optional DmMessagePublicationBinding dm_message_publication_binding = 19;
   optional string dm_message_mcp_server_path = 20;
+
+  // Independent of `external_tools`: a normal channel reply keeps its sandbox,
+  // network access, skills and web search while refusing the host user's own
+  // MCP servers, apps and plugins, whose startup cost lands on every turn.
+  ToolInheritance tool_inheritance = 21;
 }
 
 message JsonSchema {

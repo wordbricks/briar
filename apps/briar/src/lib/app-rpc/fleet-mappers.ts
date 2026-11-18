@@ -4,8 +4,7 @@ import {
   DashboardWorker_State,
   WorkerIcon_Kind,
   WorkerIconSchema,
-  type DashboardWorker as DashboardWorkerMessage,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  type DashboardWorker as DashboardWorkerMessage} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import {
   ExecutionWorkerHandoffState,
   ExecutionWorkerUpdateStatus,
@@ -30,16 +29,15 @@ import {
   type ManagedComputerRemoteSession as ManagedComputerRemoteSessionMessage,
   type ManagedComputerSetupSession as ManagedComputerSetupSessionMessage,
   type ManagedComputerSetupStatusSession,
-  type OrganizationExecutionWorker as OrganizationExecutionWorkerMessage,
+  type WorkspaceExecutionWorker as WorkspaceExecutionWorkerMessage,
   type RequestExecutionWorkerUpdateResponse,
   type RetryManagedComputerResponse,
   type RetireManagedComputerResponse,
   type TerminateManagedComputerResponse,
   type UpdateExecutionWorkerResponse,
   type UpdateExecutionWorkerRequest,
-  type ValidateManagedComputerPromotionResponse,
-} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
-import type { WorkerCapabilities as WorkerCapabilitiesMessage } from "@briar/contracts/gen/briar/types/v1/worker_pb";
+  type ValidateManagedComputerPromotionResponse} from "@briar/contracts/gen/briar/app/v1/fleet_pb";
+import type { WorkerCapabilities as WorkerCapabilitiesMessage} from "@briar/contracts/gen/briar/types/v1/worker_pb";
 import {
   emptyAgentProviderCapabilityCatalog,
   type AgentEffortCapability,
@@ -53,7 +51,7 @@ import type {
   ManagedComputerRemoteSessionTicket,
   ManagedComputerSetupSessionTicket,
   ManagedComputerState,
-  OrganizationExecutionWorker,
+  WorkspaceExecutionWorker,
   WorkerIcon,
 } from "../../types";
 import {
@@ -228,7 +226,7 @@ export const dashboardWorkerFromProto = (
 
 const workerUpdateStatusFromProto = (
   value: ExecutionWorkerUpdateStatus,
-): NonNullable<OrganizationExecutionWorker["updateRequest"]>["status"] => {
+): NonNullable<WorkspaceExecutionWorker["updateRequest"]>["status"] => {
   switch (value) {
     case ExecutionWorkerUpdateStatus.REQUESTED:
       return "requested";
@@ -246,7 +244,7 @@ const workerUpdateStatusFromProto = (
 const workerHandoffStateFromProto = (
   value: ExecutionWorkerHandoffState,
 ): NonNullable<
-  OrganizationExecutionWorker["updateRequest"]
+  WorkspaceExecutionWorker["updateRequest"]
 >["handoffState"] => {
   switch (value) {
     case ExecutionWorkerHandoffState.IDLE:
@@ -265,8 +263,8 @@ const workerHandoffStateFromProto = (
 };
 
 export const organizationExecutionWorkerFromProto = (
-  worker: OrganizationExecutionWorkerMessage,
-): OrganizationExecutionWorker => ({
+  worker: WorkspaceExecutionWorkerMessage,
+): WorkspaceExecutionWorker => ({
   deviceId: worker.deviceId,
   ownerUserId: worker.ownerUserId,
   ownerName: worker.ownerName,
@@ -277,11 +275,11 @@ export const organizationExecutionWorkerFromProto = (
   activeSessions: worker.activeSessions,
   lastHeartbeatAt: requiredTimestamp(
     worker.lastHeartbeatAt,
-    "organizationExecutionWorker.lastHeartbeatAt",
+    "workspaceExecutionWorker.lastHeartbeatAt",
   ),
   createdAt: requiredTimestamp(
     worker.createdAt,
-    "organizationExecutionWorker.createdAt",
+    "workspaceExecutionWorker.createdAt",
   ),
   versions: { ...worker.versions },
   remoteUpdateSupported: worker.remoteUpdateSupported,
@@ -294,7 +292,7 @@ export const organizationExecutionWorkerFromProto = (
           status: workerUpdateStatusFromProto(worker.updateRequest.status),
           requestedAt: requiredTimestamp(
             worker.updateRequest.requestedAt,
-            "organizationExecutionWorker.updateRequest.requestedAt",
+            "workspaceExecutionWorker.updateRequest.requestedAt",
           ),
           handoffState: workerHandoffStateFromProto(
             worker.updateRequest.handoffState,
@@ -359,7 +357,7 @@ export const managedComputerFromProto = (
   computer: ManagedComputerMessage,
 ): ManagedComputer => ({
   id: computer.id,
-  organizationId: computer.organizationId,
+  workspaceId: computer.workspaceId,
   requesterUserId: computer.requesterUserId,
   state: managedComputerStateFromProto(computer.state),
   provider: computer.provider === ProtoManagedComputerProvider.SANDBOX ? "sandbox" : "aws",
@@ -458,21 +456,21 @@ export const managedComputerProductFromProto = (
     remoteDesktopEnabled: response.remoteDesktopEnabled,
     configurationReady: response.configurationReady,
     canApply: response.canApply,
-    organizationLimit: response.organizationLimit,
+    organizationLimit: response.workspaceLimit,
     fleetLimit: response.fleetLimit,
   };
 };
 
 export const promotionLimitReasonFromProto = (
   value: ManagedComputerPromotionLimitReason | undefined,
-): "user" | "organization" | "fleet" | null => {
+): "user" | "workspace" | "fleet" | null => {
   switch (value) {
     case undefined:
       return null;
     case ManagedComputerPromotionLimitReason.USER:
       return "user";
-    case ManagedComputerPromotionLimitReason.ORGANIZATION:
-      return "organization";
+    case ManagedComputerPromotionLimitReason.WORKSPACE:
+      return "workspace";
     case ManagedComputerPromotionLimitReason.FLEET:
       return "fleet";
     case ManagedComputerPromotionLimitReason.UNSPECIFIED:
@@ -602,7 +600,7 @@ const managedComputerSetupSessionFromProto = (
   return {
     id: session.id,
     managedComputerId: session.managedComputerId,
-    organizationId: session.organizationId,
+    workspaceId: session.workspaceId,
     teamId: session.projectId,
     status,
     expiresAt: requiredTimestamp(

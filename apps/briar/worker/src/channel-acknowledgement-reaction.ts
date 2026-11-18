@@ -1,3 +1,11 @@
+/**
+ * What a Worker publishes when it claims a reply the server has not reacted to
+ * yet, and what a completed reply falls back to. It says only "this was read",
+ * so it may open the Agent's slot but must never take it from a reaction that
+ * says more.
+ */
+export const CHANNEL_ACKNOWLEDGEMENT_PLACEHOLDER = "👀";
+
 /** If the body outruns selection, finish with a fallback without delaying the body. */
 export function channelAcknowledgementFallbackStatement(
   db: D1Database,

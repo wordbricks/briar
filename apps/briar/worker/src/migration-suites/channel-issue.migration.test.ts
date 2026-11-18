@@ -1,4 +1,5 @@
 import "../channel-text-attachments.migration.test";
+import "../issue-attachment-sources.migration.test";
 import "../agent-message-relays.migration.test";
 import "../agent-message-reactions.migration.test";
 import "../dm-public-message.migration.test";

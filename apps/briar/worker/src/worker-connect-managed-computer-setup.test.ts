@@ -16,7 +16,7 @@ import { workerRuntimeFixture } from "./test-helpers/worker-runtime";
 const managedComputerId = "11111111-1111-4111-8111-111111111111";
 const setupToken = `briar_setup_${"a".repeat(43)}`;
 const principal = {
-  organizationId: "22222222-2222-4222-8222-222222222222",
+  workspaceId: "22222222-2222-4222-8222-222222222222",
   deviceId: `managed-${managedComputerId}`,
 } as Awaited<ReturnType<typeof requireWorkerCredential>>;
 

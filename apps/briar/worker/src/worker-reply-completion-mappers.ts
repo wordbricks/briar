@@ -98,7 +98,7 @@ const projectId = (value: string) =>
 
 export type ReplyWireClaim = {
   replyKind: ReplyKind;
-  organizationId: string | null;
+  workspaceId: string | null;
   workId: string;
   runId: string;
   claimToken: string;
@@ -132,7 +132,7 @@ export function replyWireClaim(
     }
     return {
       replyKind: "issue",
-      organizationId: null,
+      workspaceId: null,
       workId,
       runId,
       claimToken: value.claimToken,
@@ -148,13 +148,13 @@ export function replyWireClaim(
     ) {
       throw new ReplyCompletionMappingError("Channel reply claim token is invalid");
     }
-    const organizationId = mapping(
-      () => canonicalUuid(variant.value.organizationId).toLowerCase(),
-      "Reply organization ID is invalid",
+    const workspaceId = mapping(
+      () => canonicalUuid(variant.value.workspaceId).toLowerCase(),
+      "Reply workspace ID is invalid",
     );
     return {
       replyKind: "channel",
-      organizationId,
+      workspaceId,
       workId,
       runId,
       claimToken: value.claimToken,
@@ -244,12 +244,30 @@ export function prepareReplyAttachmentUploadsInputFromProto(
   };
 }
 
+/*
+  An issue-conversation proposal is raised inside the issue that already owns
+  its files, so `attachmentIds` is dropped here rather than carried: only a
+  channel reply names files that have to move between two places.
+*/
 const proposalIssueDraft = (draft: ReplyIssueDraft | undefined) => {
   if (!draft) throw new ReplyCompletionMappingError("Issue draft is required");
   return {
     title: draft.title,
     description: draft.description ?? null,
     priority: draft.priority ?? null,
+  };
+};
+
+const channelProposalIssueDraft = (draft: ReplyIssueDraft | undefined) => {
+  if (!draft) throw new ReplyCompletionMappingError("Issue draft is required");
+  return {
+    ...proposalIssueDraft(draft),
+    attachmentIds: draft.attachmentIds.map((attachmentId) =>
+      mapping(
+        () => canonicalUuid(attachmentId).toLowerCase(),
+        "Issue attachment reference is invalid",
+      )
+    ),
   };
 };
 
@@ -384,7 +402,7 @@ export type ChannelReplyCompletionInput = {
   requestId: string;
   projectId: string;
   workerId: string;
-  claim: ReplyWireClaim & { replyKind: "channel"; organizationId: string };
+  claim: ReplyWireClaim & { replyKind: "channel"; workspaceId: string };
   attachmentIds: string[];
   conversationId: string | null;
   publishedFinalBatchId?: string | null;
@@ -447,7 +465,7 @@ export function completeChannelReplyInputFromProto(
         case "issue":
           issueProposal = {
             projectId: artifacts.proposal.value.projectId ?? null,
-            issue: proposalIssueDraft(artifacts.proposal.value.issue),
+            issue: channelProposalIssueDraft(artifacts.proposal.value.issue),
             executeAfterCreate: artifacts.proposal.value.executeAfterCreate,
           };
           break;
@@ -457,7 +475,7 @@ export function completeChannelReplyInputFromProto(
             batch: {
               items: artifacts.proposal.value.items.map((item) => ({
                 key: item.key,
-                issue: proposalIssueDraft(item.issue),
+                issue: channelProposalIssueDraft(item.issue),
               })),
               dependencies: artifacts.proposal.value.dependencies.map(
                 (dependency) => ({
@@ -505,9 +523,6 @@ export function completeChannelReplyInputFromProto(
       ? { acknowledgementReaction: success.acknowledgementReaction }
       : {}),
     memoryCitations: success.memoryCitations.map(memoryReference),
-    memorySaveRequest: success.memorySaveRequest
-      ? { documents: success.memorySaveRequest.documents.map(memoryReference) }
-      : null,
     body: success.body,
     document,
     issueProposal,

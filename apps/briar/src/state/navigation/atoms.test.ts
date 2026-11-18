@@ -11,7 +11,7 @@ import {
 } from "../../lib/app-navigation";
 import { activeChannelIdAtom } from "../channels/atoms";
 import type { ChannelSummary } from "../../lib/channels-contract";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { userAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
@@ -32,7 +32,7 @@ import {
   navigationHistoryRunLabelsAtom,
   navigationHistoryUserIdAtom,
   navigationLocationAtom,
-  navigationOrganizationIdAtom,
+  navigationWorkspaceIdAtom,
   navigationSettingsTargetAtom,
   navigationTeamIdAtom,
   navigationUserBoundaryChangedAtom,
@@ -125,7 +125,7 @@ describe("navigation location atoms", () => {
     expect(registry.get(activePageAtom)).toBe("issues");
     expect(registry.get(activeRunIdAtom)).toBe("run-1");
     expect(registry.get(navigationTeamIdAtom)).toBe(teamA.id);
-    expect(registry.get(navigationOrganizationIdAtom)).toBeNull();
+    expect(registry.get(navigationWorkspaceIdAtom)).toBeNull();
 
     navigate(
       registry,
@@ -134,7 +134,7 @@ describe("navigation location atoms", () => {
     expect(registry.get(activePageAtom)).toBe("dms");
     expect(registry.get(activeRunIdAtom)).toBeNull();
     expect(registry.get(navigationChannelIdAtom)).toBe("dm-1");
-    expect(registry.get(navigationOrganizationIdAtom)).toBe("org-a");
+    expect(registry.get(navigationWorkspaceIdAtom)).toBe("org-a");
     expect(registry.get(navigationTeamIdAtom)).toBe(teamB.id);
 
     navigate(registry, organizationNavigationLocation("org-a", "inbox"));
@@ -144,22 +144,22 @@ describe("navigation location atoms", () => {
     navigate(
       registry,
       settingsNavigationLocation({
-        scope: "organization",
-        organizationId: "org-a",
+        scope: "workspace",
+        workspaceId: "org-a",
         section: "members",
       }),
     );
     expect(registry.get(activePageAtom)).toBe("settings");
     expect(registry.get(navigationSettingsTargetAtom)).toEqual({
-      scope: "organization",
-      organizationId: "org-a",
+      scope: "workspace",
+      workspaceId: "org-a",
       section: "members",
     });
   });
 
   it("prefers the location's channel over the selected one, and only there", () => {
     const registry = createTestRegistry([
-      [activeOrganizationIdAtom, "org-a"],
+      [activeWorkspaceIdAtom, "org-a"],
     ]);
     registry.set(activeChannelIdAtom, "selected-channel");
 
@@ -358,12 +358,12 @@ describe("navigationHistoryRunLabelsAtom", () => {
 });
 
 describe("sidebar halves", () => {
-  const organizationId = teamA.organizationId;
-  const otherOrganizationId = "organization-other";
-  const otherTeam = teamOf("team-other", { organizationId: otherOrganizationId });
+  const workspaceId = teamA.workspaceId;
+  const otherWorkspaceId = "workspace-other";
+  const otherTeam = teamOf("team-other", { workspaceId: otherWorkspaceId });
   const directMessageOf = (id: string): ChannelSummary => ({
     id,
-    organizationId,
+    workspaceId,
     kind: "dm",
     slug: id,
     name: id,
@@ -389,21 +389,21 @@ describe("sidebar halves", () => {
     hiddenAt: null,
     readOnly: false,
   });
-  const withOrganization = () =>
+  const withWorkspace = () =>
     createTestRegistry([
       [teamsAtom, [teamA, teamB, otherTeam]],
       [activeTeamIdAtom, teamA.id],
-      [activeOrganizationIdAtom, organizationId],
+      [activeWorkspaceIdAtom, workspaceId],
     ]);
 
   it("is the DMs half on the DM page and the Work half everywhere else", () => {
-    const registry = withOrganization();
+    const registry = withWorkspace();
     expect(registry.get(sidebarModeAtom)).toBe("dms");
 
     navigate(registry, projectNavigationLocation("issues", teamA.id));
     expect(registry.get(sidebarModeAtom)).toBe("work");
 
-    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    navigate(registry, channelNavigationLocation("dms", workspaceId, "dm-1"));
     expect(registry.get(sidebarModeAtom)).toBe("dms");
 
     navigate(registry, settingsNavigationLocation({
@@ -414,22 +414,22 @@ describe("sidebar halves", () => {
   });
 
   it("has no work location to return to before a work page was visited", () => {
-    const registry = withOrganization();
+    const registry = withWorkspace();
     expect(registry.get(lastWorkLocationAtom)).toBeNull();
 
-    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    navigate(registry, channelNavigationLocation("dms", workspaceId, "dm-1"));
     expect(registry.get(lastWorkLocationAtom)).toBeNull();
   });
 
   it("returns to the most recent work page, skipping DM visits", () => {
-    const registry = withOrganization();
+    const registry = withWorkspace();
     navigate(registry, projectNavigationLocation("issues", teamA.id));
-    navigate(registry, organizationNavigationLocation(organizationId, "inbox"));
-    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
-    navigate(registry, channelPageNavigationLocation("dms", organizationId));
+    navigate(registry, organizationNavigationLocation(workspaceId, "inbox"));
+    navigate(registry, channelNavigationLocation("dms", workspaceId, "dm-1"));
+    navigate(registry, channelPageNavigationLocation("dms", workspaceId));
 
     expect(registry.get(lastWorkLocationAtom)).toBe(
-      organizationNavigationLocation(organizationId, "inbox"),
+      organizationNavigationLocation(workspaceId, "inbox"),
     );
 
     // Going back past the inbox makes the board the most recent work page.
@@ -439,54 +439,54 @@ describe("sidebar halves", () => {
     );
   });
 
-  it("skips work pages that belong to another organization", () => {
-    const registry = withOrganization();
+  it("skips work pages that belong to another workspace", () => {
+    const registry = withWorkspace();
     navigate(registry, projectNavigationLocation("issues", teamA.id));
-    navigate(registry, organizationNavigationLocation(otherOrganizationId, "inbox"));
+    navigate(registry, organizationNavigationLocation(otherWorkspaceId, "inbox"));
     navigate(registry, projectNavigationLocation("agents", otherTeam.id));
-    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    navigate(registry, channelNavigationLocation("dms", workspaceId, "dm-1"));
 
-    // Neither the other organization's inbox nor its team's page qualifies;
-    // following them would switch the organization back.
+    // Neither the other workspace's inbox nor its team's page qualifies;
+    // following them would switch the workspace back.
     expect(registry.get(lastWorkLocationAtom)).toBe(
       projectNavigationLocation("issues", teamA.id),
     );
 
-    // A location naming no organization or team belongs to every one.
+    // A location naming no workspace or team belongs to every one.
     navigate(registry, settingsNavigationLocation({
       scope: "application",
       section: "account",
     }));
-    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
+    navigate(registry, channelNavigationLocation("dms", workspaceId, "dm-1"));
     expect(registry.get(lastWorkLocationAtom)).toBe(
       settingsNavigationLocation({ scope: "application", section: "account" }),
     );
   });
 
   it("returns to the most recent conversation still in the catalog", () => {
-    const registry = withOrganization();
+    const registry = withWorkspace();
     applySyncEvent(registry, {
       kind: "channel-catalog-snapshot",
-      organizationId,
+      workspaceId,
       channels: [directMessageOf("dm-1"), directMessageOf("dm-2")],
     });
     expect(registry.get(lastDirectMessageChannelIdAtom)).toBeNull();
 
-    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-1"));
-    navigate(registry, channelNavigationLocation("dms", organizationId, "dm-2"));
+    navigate(registry, channelNavigationLocation("dms", workspaceId, "dm-1"));
+    navigate(registry, channelNavigationLocation("dms", workspaceId, "dm-2"));
     navigate(registry, projectNavigationLocation("issues", teamA.id));
     expect(registry.get(lastDirectMessageChannelIdAtom)).toBe("dm-2");
 
     // A conversation that left the catalog is not somewhere to return to.
     applySyncEvent(registry, {
       kind: "channel-removed",
-      organizationId,
+      workspaceId,
       channelId: "dm-2",
     });
     expect(registry.get(lastDirectMessageChannelIdAtom)).toBe("dm-1");
 
-    // Nor is a conversation visited under another organization.
-    navigate(registry, channelNavigationLocation("dms", otherOrganizationId, "dm-9"));
+    // Nor is a conversation visited under another workspace.
+    navigate(registry, channelNavigationLocation("dms", otherWorkspaceId, "dm-9"));
     navigate(registry, projectNavigationLocation("issues", teamA.id));
     expect(registry.get(lastDirectMessageChannelIdAtom)).toBe("dm-1");
   });

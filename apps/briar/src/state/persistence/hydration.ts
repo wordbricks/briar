@@ -45,16 +45,16 @@ export function adoptsHydratedSession(registry: AtomRegistry): boolean {
   return hydrated !== null && user !== null && hydrated.userId === user.id;
 }
 
-/** The hydrated channel catalog is this organization's own. */
+/** The hydrated channel catalog is this workspace's own. */
 export function adoptsHydratedCatalog(
   registry: AtomRegistry,
-  organizationId: string | null,
+  workspaceId: string | null,
 ): boolean {
   const hydrated = registry.get(hydratedAccountAtom);
   return (
-    organizationId !== null &&
+    workspaceId !== null &&
     hydrated !== null &&
-    hydrated.organizationId === organizationId
+    hydrated.workspaceId === workspaceId
   );
 }
 

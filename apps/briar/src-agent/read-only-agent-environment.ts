@@ -6,6 +6,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readFile,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -510,10 +511,56 @@ async function preparePiEnvironment(
   };
 }
 
+/** Keep model transports from user configuration without loading hooks, tools or instructions. */
+async function openCodeProviderConfiguration(environment: NodeJS.ProcessEnv) {
+  const sourceHome = environment.HOME?.trim() || homedir();
+  const sourceConfig = environment.OPENCODE_CONFIG_DIR?.trim() ||
+    join(environment.XDG_CONFIG_HOME?.trim() || join(sourceHome, ".config"), "opencode");
+  const provider: Record<string, unknown> = {};
+  const merge = (text: string) => {
+    let config: unknown;
+    try { config = JSON.parse(text); }
+    catch { config = Bun.JSONC.parse(text); }
+    if (!config || typeof config !== "object" || Array.isArray(config)) return;
+    const entries = (config as Record<string, unknown>).provider;
+    if (!entries || typeof entries !== "object" || Array.isArray(entries)) return;
+    for (const [id, value] of Object.entries(entries)) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      // Only the provider transport declaration is carried into the isolated CLI.
+      const entry = value as Record<string, unknown>;
+      const permitted = Object.fromEntries(["npm", "name", "options", "models", "whitelist", "blacklist"]
+        .filter((key) => Object.hasOwn(entry, key)).map((key) => [key, entry[key]]));
+      Object.defineProperty(provider, id, { value: { ...(provider[id] as object | undefined), ...permitted },
+        enumerable: true, configurable: true, writable: true });
+    }
+  };
+  for (const path of [join(sourceConfig, "opencode.json"), join(sourceConfig, "opencode.jsonc"),
+    ...(environment.OPENCODE_CONFIG?.trim() ? [environment.OPENCODE_CONFIG.trim()] : [])]) {
+    const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (!info) continue;
+    if (!info.isFile() || info.isSymbolicLink() || info.size > 1024 * 1024) {
+      throw new Error("OpenCode provider configuration must be a regular file under 1 MiB");
+    }
+    try { merge(await readFile(path, "utf8")); }
+    catch { throw new Error("OpenCode provider configuration could not be parsed"); }
+  }
+  if (environment.OPENCODE_CONFIG_CONTENT?.trim()) {
+    try { merge(environment.OPENCODE_CONFIG_CONTENT); }
+    catch { throw new Error("OpenCode provider configuration could not be parsed"); }
+  }
+  return Object.keys(provider).length ? JSON.stringify({ provider }) : undefined;
+}
+
 async function prepareOpenCodeEnvironment(
   allowed: NodeJS.ProcessEnv,
   environment: NodeJS.ProcessEnv,
+  includeUserProviderConfiguration: boolean,
 ) {
+  const providerConfiguration = includeUserProviderConfiguration
+    ? await openCodeProviderConfiguration(environment) : undefined;
   const isolatedRoot = await mkdtemp(
     join(tmpdir(), "briar-opencode-read-only-"),
   );
@@ -553,6 +600,7 @@ async function prepareOpenCodeEnvironment(
       XDG_CACHE_HOME: cacheRoot,
       XDG_STATE_HOME: stateRoot,
       OPENCODE_CONFIG_DIR: targetConfigDirectory,
+      ...(providerConfiguration ? { OPENCODE_CONFIG_CONTENT: providerConfiguration } : {}),
       OPENCODE_DISABLE_PROJECT_CONFIG: "1",
       OPENCODE_DISABLE_CLAUDE_CODE: "1",
       OPENCODE_DISABLE_EXTERNAL_SKILLS: "1",
@@ -582,6 +630,7 @@ async function prepareAgyEnvironment(
       "oauth_creds.json",
       "installation_id",
       "antigravity-cli/installation_id",
+      "antigravity-cli/antigravity-oauth-token",
       "antigravity-cli/cache/default_project_id.txt",
       "config/config.json",
     ]) {
@@ -707,7 +756,7 @@ function preparedProviderEnvironment(
   if (provider === "agy") {
     return prepareAgyEnvironment(allowed, environment);
   }
-  return prepareOpenCodeEnvironment(allowed, environment);
+  return prepareOpenCodeEnvironment(allowed, environment, provider === "opencode");
 }
 
 const noReadOnlyIsolation = (environment: NodeJS.ProcessEnv) => ({

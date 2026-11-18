@@ -2,7 +2,7 @@
 
 import { act } from "react";
 import { BoardHarness } from "../../../test/board-harness";
-import { createReactTestRoot, renderReactTestRoot } from "../../../test/react";
+import { createReactTestRoot, renderReactTestRoot, settle } from "../../../test/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AutoHuntSession } from "@/types";
@@ -535,6 +535,9 @@ describe("RunPage", () => {
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".run-page-titlebar-back")?.click();
     });
+    await settle(() => container.querySelector(".kanban-board") !== null, {
+      description: "the kanban board to return after closing issue details",
+    });
     expect(container.querySelector(".run-page")).toBeNull();
     expect(container.querySelector(".kanban-board")).not.toBeNull();
     await cleanup();
@@ -989,7 +992,7 @@ describe("RunPage", () => {
             }],
             dependents: [],
             relatedMessage: {
-              organizationId: "11111111-1111-4111-8111-111111111111",
+              workspaceId: "11111111-1111-4111-8111-111111111111",
               channelId: "22222222-2222-4222-8222-222222222222",
               messageId: "33333333-3333-4333-8333-333333333333",
               rootMessageId: "44444444-4444-4444-8444-444444444444",
@@ -1020,7 +1023,7 @@ describe("RunPage", () => {
     expect(relatedMessageButton?.textContent).toContain("관련 메시지로 돌아가기");
     await act(async () => relatedMessageButton?.click());
     expect(openRelatedMessage).toHaveBeenCalledWith({
-      organizationId: "11111111-1111-4111-8111-111111111111",
+      workspaceId: "11111111-1111-4111-8111-111111111111",
       channelId: "22222222-2222-4222-8222-222222222222",
       messageId: "33333333-3333-4333-8333-333333333333",
       rootMessageId: "44444444-4444-4444-8444-444444444444",

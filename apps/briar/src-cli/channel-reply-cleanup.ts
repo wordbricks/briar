@@ -4,7 +4,7 @@ export type ChannelReplyCleanupOperation = {
 };
 
 /**
- * Channel context can contain private images and organization data. Retry each
+ * Channel context can contain private images and workspace data. Retry each
  * independent cleanup and fail the claim if any residue still cannot be
  * removed; callers must not turn that condition into a successful completion.
  */

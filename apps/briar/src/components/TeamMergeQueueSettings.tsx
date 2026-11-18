@@ -21,7 +21,7 @@ import type {
   MergeQueueStatus,
   Project,
 } from "../types";
-import { hasOrganizationCapability } from "../lib/organization-role";
+import { hasWorkspaceCapability } from "../lib/workspace-role";
 import { SelectMenu } from "./SelectMenu";
 import { Spinner } from "./ui/spinner";
 
@@ -66,7 +66,7 @@ export function TeamMergeQueueSettings({
   token: string | null;
 }) {
   const { localeTag, t } = useI18n();
-  const canManage = hasOrganizationCapability(
+  const canManage = hasWorkspaceCapability(
     project.role,
     "development:manage",
   );

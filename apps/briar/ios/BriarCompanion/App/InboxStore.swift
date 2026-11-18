@@ -235,7 +235,7 @@ final class InboxStore: ObservableObject {
             guard let self else { return }
             do {
                 var request = BriarAPI_GetInboxFeedRequest()
-                request.organizationID = coreUUIDString(organizationID)
+                request.workspaceID = coreUUIDString(organizationID)
                 if let feedVersion = self.feedVersion {
                     request.knownVersion = feedVersion
                 }

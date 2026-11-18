@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { demoDashboard } from "../../lib/demo-data";
 import type { DashboardPayload, HuntRun } from "../../types";
 import { demoUser } from "../demo-fixtures";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../registry";
 import { tokenAtom, userAtom } from "../session/atoms";
 import { applySyncEvent } from "../sync/apply";
@@ -157,7 +157,7 @@ describe("inboxSourceAtom", () => {
   What the derived list guarantees.
 
   The messages are no longer published by a bridge: they are the stored record,
-  scoped to the open organization, marked read and collapsed. The two rules that
+  scoped to the open workspace, marked read and collapsed. The two rules that
   matter to a render count are here — a message that would render identically
   keeps its object, and a row atom therefore hears only about itself.
 */
@@ -176,7 +176,7 @@ const settled = (): AtomRegistry => {
     [userAtom, demoUser],
     [tokenAtom, "token-1"],
     [teamsAtom, [team]],
-    [activeOrganizationIdAtom, team.organizationId],
+    [activeWorkspaceIdAtom, team.workspaceId],
   ]);
   applySyncEvent(registry, {
     kind: "team-snapshot",
@@ -189,7 +189,7 @@ const settled = (): AtomRegistry => {
     userId: demoUser.id,
   });
   registry.set(inboxFeedIdentityAtom, {
-    scope: `${demoUser.id}:${team.organizationId}`,
+    scope: `${demoUser.id}:${team.workspaceId}`,
     token: "token-1",
   });
   // The merge is a subscription in `useInboxSync`; mounting it here is what
@@ -224,7 +224,7 @@ describe("inbox messages", () => {
       [userAtom, demoUser],
       [tokenAtom, "token-1"],
       [teamsAtom, [team]],
-      [activeOrganizationIdAtom, team.organizationId],
+      [activeWorkspaceIdAtom, team.workspaceId],
     ]);
     applySyncEvent(registry, {
       kind: "team-snapshot",

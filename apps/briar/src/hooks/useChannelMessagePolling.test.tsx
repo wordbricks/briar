@@ -32,7 +32,7 @@ function Poller({
     channelId,
     enabled,
     intervalMs: 1_000,
-    organizationId: "org-1",
+    workspaceId: "org-1",
     token: "token",
   });
   return null;

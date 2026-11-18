@@ -4,6 +4,10 @@ import type {
   ChannelIssueBatchProposalPayload,
 } from "../../src/lib/channels-contract";
 import { channelRelatedMessageReference } from "./channel-proposal-helpers";
+import {
+  channelIssueAttachmentStatements,
+  resolveChannelIssueAttachmentSources,
+} from "./channel-issue-attachment-sources";
 import { stableJson } from "./hunt-run-codec";
 import type { TeamRow } from "./team-repository";
 import { getTeamSettings } from "./team-settings-repository";
@@ -66,7 +70,7 @@ export async function listChannelIssueBatchItems(
 export async function materializeChannelIssueBatch(input: {
   db: D1Database;
   project: Pick<TeamRow, "id" | "name">;
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   proposalId: string;
   messageId: string;
@@ -100,7 +104,7 @@ export async function materializeChannelIssueBatch(input: {
   const repository = settings?.github_repository ?? input.project.name;
   const recordedAt = new Date().toISOString();
   const relatedMessage = channelRelatedMessageReference({
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     channelId: input.channelId,
     messageId: input.messageId,
     rootMessageId: input.rootMessageId,
@@ -109,6 +113,14 @@ export async function materializeChannelIssueBatch(input: {
   const statements: D1PreparedStatement[] = [];
 
   for (const item of items) {
+    // Reject an unresolvable id before anything is written: the batch is one
+    // D1 transaction, so a bad item must stop the whole approval rather than
+    // leave the other issues holding files this one could not find.
+    await resolveChannelIssueAttachmentSources(input.db, {
+      workspaceId: input.workspaceId,
+      channelId: input.channelId,
+      attachmentIds: item.issue.attachmentIds,
+    });
     statements.push(
       input.db.prepare(
         `insert into briar_hunt_runs (
@@ -145,7 +157,7 @@ export async function materializeChannelIssueBatch(input: {
           issueId: input.proposalId,
           batchKey: item.localKey,
           relatedMessage,
-          attachmentCount: 0,
+          attachmentCount: item.issue.attachmentIds.length,
         }),
         input.proposalCreatedAt,
         input.proposalCreatedAt,
@@ -179,7 +191,7 @@ export async function materializeChannelIssueBatch(input: {
            local_key, position, source_key, run_id, created_at
          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
-        input.organizationId,
+        input.workspaceId,
         input.channelId,
         input.proposalId,
         input.project.id,
@@ -198,7 +210,7 @@ export async function materializeChannelIssueBatch(input: {
       ).bind(
         `${input.proposalId}:batch-approval:${item.localKey}`,
         input.proposalId,
-        input.organizationId,
+        input.workspaceId,
         input.channelId,
         input.project.id,
         item.runId,
@@ -208,6 +220,14 @@ export async function materializeChannelIssueBatch(input: {
         input.proposalPayloadJson,
         input.approvedAt,
       ),
+      ...await channelIssueAttachmentStatements(input.db, {
+        projectId: input.project.id,
+        runId: item.runId,
+        workspaceId: input.workspaceId,
+        channelId: input.channelId,
+        attachmentIds: item.issue.attachmentIds,
+        createdAt: input.proposalCreatedAt,
+      }),
     );
   }
 

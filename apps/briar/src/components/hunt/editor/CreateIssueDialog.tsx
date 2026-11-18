@@ -12,7 +12,7 @@ import { issueTitleInputMaxLength, issueTitleLength, isIssueTitleWithinLimit } f
 import { clearCreateIssueDraft, loadCreateIssueDraft, saveCreateIssueDraft } from "@/lib/create-issue-draft";
 import { removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { type IssueDifficulty } from "@/lib/issue-difficulty";
-import type { CreateIssueInput, OrganizationMember } from "@/types";
+import type { CreateIssueInput, WorkspaceMember } from "@/types";
 import { agentEffortOptions, agentProviders, type AgentProvider, type ModelEffort } from "@/lib/team-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
 import { useAgentProviderModelPreferences } from "@/hooks/useAgentProviderModelPreferences";
@@ -46,7 +46,7 @@ export function CreateIssueDialog({
   isSubmitting: boolean;
   onClose: () => void;
   onCreate: (projectId: string, input: CreateIssueInput) => Promise<void>;
-  members?: OrganizationMember[];
+  members?: WorkspaceMember[];
   projects: Array<{ id: string; name: string; teamId?: string }>;
   workflow?: AutoHuntWorkflow;
   workflowProjectId?: string;

@@ -1,8 +1,12 @@
+import { useAtomValue } from "@effect/atom-react";
+import { Paperclip } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import {
   type ChannelMessageProposal,
 } from "../lib/channels-contract";
+import { formatAttachmentBytes } from "../lib/issue-attachments";
+import { channelAttachmentsByIdAtom } from "../state/channel-conversation/atoms";
 
 export function channelIssueProposalDetails(
   proposal: ChannelMessageProposal | null | undefined,
@@ -28,10 +32,54 @@ export function channelIssueProposalRequestsExecution(
     : false;
 }
 
+/**
+ * The conversation files this issue will carry into the project. Approving is
+ * also what shares them, so the card names them rather than leaving the member
+ * to infer it from the description.
+ */
+function ChannelProposalAttachments({
+  attachmentIds,
+  channelId,
+}: {
+  attachmentIds: readonly string[];
+  channelId: string;
+}) {
+  const { t } = useI18n();
+  const attachmentsById = useAtomValue(channelAttachmentsByIdAtom(channelId));
+  if (attachmentIds.length === 0) return null;
+  return (
+    <div className="channel-proposal-attachments">
+      <strong>
+        {t("channel.issueProposalAttachments", { count: attachmentIds.length })}
+      </strong>
+      <ul>
+        {attachmentIds.map((attachmentId) => {
+          const attachment = attachmentsById.get(attachmentId);
+          return (
+            <li key={attachmentId}>
+              <Paperclip aria-hidden="true" size={12} />
+              <span>
+                {attachment
+                  ? attachment.filename
+                  : t("channel.issueProposalAttachmentUnavailable")}
+              </span>
+              {attachment
+                ? <small>{formatAttachmentBytes(attachment.byteSize)}</small>
+                : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export function ChannelIssueProposalDetails({
+  channelId,
   projectName,
   proposal,
 }: {
+  channelId: string;
   projectName: string | null;
   proposal: ChannelMessageProposal;
 }) {
@@ -74,6 +122,10 @@ export function ChannelIssueProposalDetails({
                   })}
                 </small>
               ) : null}
+              <ChannelProposalAttachments
+                attachmentIds={item.issue.attachmentIds}
+                channelId={channelId}
+              />
             </li>
           ))}
         </ol>
@@ -135,6 +187,10 @@ export function ChannelIssueProposalDetails({
           ) : null}
         </>
       ) : null}
+      <ChannelProposalAttachments
+        attachmentIds={issue!.attachmentIds}
+        channelId={channelId}
+      />
       <div className="channel-proposal-metadata">
         <span>
           {issue!.priority === null

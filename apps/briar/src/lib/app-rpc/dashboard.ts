@@ -38,7 +38,7 @@ import {
   notificationReasonFromProto,
   optionalAgentProviderFromProto,
   optionalTimestamp,
-  organizationMemberFromProto,
+  workspaceMemberFromProto,
   relatedMessageFromProto,
   requiredMessage,
   requiredTimestamp,
@@ -172,6 +172,9 @@ export const dashboardRunFromProto = (run: DashboardRunMessage): HuntRun => ({
   difficulty: issueDifficultyFromProto(run.difficulty),
   assigneeUserId: run.assigneeUserId ?? null,
   createdByUserId: run.createdByUserId ?? null,
+  createdByAgent: run.createdByAgent
+    ? { agentId: run.createdByAgent.agentId ?? null, name: run.createdByAgent.name }
+    : null,
   subscribers: run.subscribers.map((subscriber) => ({
     userId: subscriber.userId,
     subscribedAt: requiredTimestamp(
@@ -412,11 +415,11 @@ export async function getDashboard(
     ),
     runs: response.runs.map(dashboardRunFromProto),
     workers: response.workers.map(dashboardWorkerFromProto),
-    organizationProviders: response.organizationProviders.map(
+    organizationProviders: response.workspaceProviders.map(
       agentProviderFromProto,
     ),
     executionPolicy: executionPolicyFromProto(response.executionPolicy),
-    members: response.members.map(organizationMemberFromProto),
+    members: response.members.map(workspaceMemberFromProto),
     conversationNotifications: response.conversationNotifications.map(
       conversationNotificationFromProto,
     ),
@@ -516,11 +519,11 @@ export async function syncDashboard(
       ? undefined
       : teamSettingsFromProto(response.settings),
     workers: response.workers.map(dashboardWorkerFromProto),
-    organizationProviders: response.organizationProviders.map(
+    organizationProviders: response.workspaceProviders.map(
       agentProviderFromProto,
     ),
     executionPolicy: executionPolicyFromProto(response.executionPolicy),
-    members: response.members?.values.map(organizationMemberFromProto),
+    members: response.members?.values.map(workspaceMemberFromProto),
     conversationNotifications: response.conversationNotifications?.values.map(
       conversationNotificationFromProto,
     ),

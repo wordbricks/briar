@@ -12,7 +12,7 @@ const socketOpen = 1;
 const readyFrame = () => encodeWorkerWakeFrame({ type: "ready" });
 
 /**
- * Organization-scoped fan-out that tells connected execution Workers to claim
+ * Workspace-scoped fan-out that tells connected execution Workers to claim
  * immediately instead of finishing their idle sleep.
  *
  * D1 stays authoritative for every queue: this object owns only hibernatable
@@ -101,10 +101,10 @@ export class WorkerWakeHub {
 
 export async function subscribeToWorkerWake(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   protocol: string,
 ) {
-  const hub = env.WORKER_WAKE.getByName(organizationId);
+  const hub = env.WORKER_WAKE.getByName(workspaceId);
   return hub.fetch("https://worker-wake.internal/subscribe", {
     headers: {
       Upgrade: "websocket",
@@ -115,10 +115,10 @@ export async function subscribeToWorkerWake(
 
 export async function publishWorkerWake(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   reason: WorkerWakeReason,
 ) {
-  const hub = env.WORKER_WAKE.getByName(organizationId);
+  const hub = env.WORKER_WAKE.getByName(workspaceId);
   const response = await hub.fetch("https://worker-wake.internal/wake", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -134,17 +134,17 @@ export async function publishWorkerWake(
  * Object failure must never fail the request that enqueued the work; the
  * Worker's own polling still picks the job up.
  */
-export function wakeOrganizationWorkers(
+export function wakeWorkspaceWorkers(
   env: Env,
-  organizationId: string,
+  workspaceId: string,
   reason: WorkerWakeReason,
   context?: ExecutionContext,
 ) {
   if (!env.WORKER_WAKE) return;
-  const wake = publishWorkerWake(env, organizationId, reason).catch((error) => {
+  const wake = publishWorkerWake(env, workspaceId, reason).catch((error) => {
     console.error(JSON.stringify({
       message: "Worker wake publish failed",
-      organizationId,
+      workspaceId,
       reason,
       error: error instanceof Error ? error.message : String(error),
     }));

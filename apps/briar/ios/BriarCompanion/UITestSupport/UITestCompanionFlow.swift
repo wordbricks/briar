@@ -436,6 +436,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             return UITestAPIClient.createIssueMessageResponse(request)
         }
 
+        /// A vault record as the server sends it: kind, status, evidence, language
+        /// and index state are fixed legacy values, and a record has no sources.
         private func memoryDocument(detail: Bool, version: UInt32? = nil) -> BriarAPI_DmMemoryDocument {
             var document = BriarAPI_DmMemoryDocument()
             document.id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
@@ -447,20 +449,34 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             document.memoryClass = .profile
             document.evidenceType = .explicitUser
             document.protectedByUser = true
-            document.sourceLanguage = "ko"
+            document.sourceLanguage = "und"
             document.createdAt = Google_Protobuf_Timestamp(
                 date: Date(timeIntervalSince1970: 1_788_220_800)
             )
             document.updatedAt = document.createdAt
-            document.indexState = .pending
+            document.indexState = .ready
+            document.path = "entities/people/synthetic-memory.md"
+            document.recordType = "person"
             if detail {
                 document.body = "합성 데이터: 설명은 결론부터 제시한다."
-                var source = BriarAPI_DmMemorySource()
-                source.type = .userEditEvent
-                source.id = "fixture-edit"
-                source.version = 1
-                document.sources = [source]
             }
+            return document
+        }
+
+        static let readmeDocumentID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+
+        /// The app-owned README.md the folder tree lists first, read only.
+        private func readmeDocument(detail: Bool) -> BriarAPI_DmMemoryDocument {
+            var document = memoryDocument(detail: false, version: 1)
+            document.id = Self.readmeDocumentID
+            document.title = "README.md"
+            document.memoryClass = .note
+            document.evidenceType = .observed
+            document.protectedByUser = false
+            document.path = "README.md"
+            document.recordType = "readme"
+            document.readOnly = true
+            if detail { document.body = "# Memory vault\n\n합성 안내 파일." }
             return document
         }
 
@@ -468,8 +484,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             var response = BriarAPI_ListDmMemoriesResponse()
             response.eligible = true
             var capabilities = BriarAPI_DmMemoryCapabilities()
-            capabilities.recall = false
-            capabilities.automaticLearning = false
+            capabilities.recall = true
+            capabilities.automaticLearning = true
             response.capabilities = capabilities
             var space = BriarAPI_DmMemorySpace()
             space.id = "99999999-9999-4999-8999-999999999999"
@@ -485,13 +501,22 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             space.updatedAt = space.createdAt
             response.spaces = [space]
             response.selectedSpaceID = space.id
-            response.documents = memoryDeleted ? [] : [memoryDocument(detail: false)]
+            response.documents = [readmeDocument(detail: false)]
+                + (memoryDeleted ? [] : [memoryDocument(detail: false)])
+            response.folders = [
+                "browser-guidance/attempts", "comms", "entities/infrastructure", "entities/orgs",
+                "entities/people", "entities/projects", "entities/tools", "knowledge/decisions",
+                "knowledge/facts", "knowledge/lessons", "knowledge/preferences", "knowledge/procedures",
+                "timeline/daily", "timeline/monthly", "timeline/weekly", "workstreams",
+            ]
             return response
         }
 
-        func getDmMemoryDocument() -> BriarAPI_GetDmMemoryDocumentResponse {
+        func getDmMemoryDocument(id: String) -> BriarAPI_GetDmMemoryDocumentResponse {
             var response = BriarAPI_GetDmMemoryDocumentResponse()
-            response.document = memoryDocument(detail: true)
+            response.document = id == Self.readmeDocumentID
+                ? readmeDocument(detail: true)
+                : memoryDocument(detail: true)
             return response
         }
 
@@ -552,7 +577,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
             request: BriarAPI_GetDmMemoryDocumentRequest,
             headers _: Connect.Headers = [:]
         ) async -> ResponseMessage<BriarAPI_GetDmMemoryDocumentResponse> {
-            var response = await scenario.getDmMemoryDocument()
+            var response = await scenario.getDmMemoryDocument(id: request.documentID)
             if request.hasVersion {
                 response.document.version = request.version
             }
@@ -588,11 +613,11 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     private final class AgentServiceMock: BriarAPI_AgentServiceClientMock,
         @unchecked Sendable
     {
-        override func listOrganizationAgents(
-            request _: BriarAPI_ListOrganizationAgentsRequest,
+        override func listWorkspaceAgents(
+            request _: BriarAPI_ListWorkspaceAgentsRequest,
             headers _: Connect.Headers = [:]
-        ) async -> ResponseMessage<BriarAPI_ListOrganizationAgentsResponse> {
-            .success(UITestAPIClient.organizationAgentsResponse())
+        ) async -> ResponseMessage<BriarAPI_ListWorkspaceAgentsResponse> {
+            .success(UITestAPIClient.workspaceAgentsResponse())
         }
 
         override func listProjectAgents(
@@ -793,8 +818,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         }
     }
 
-    private static func organizationAgentsResponse() -> BriarAPI_ListOrganizationAgentsResponse {
-        var agent = BriarAPI_OrganizationAgent()
+    private static func workspaceAgentsResponse() -> BriarAPI_ListWorkspaceAgentsResponse {
+        var agent = BriarAPI_WorkspaceAgent()
         agent.agentID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         agent.name = "Honey"
         agent.provider = .codex
@@ -802,7 +827,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         agent.description_p = "제품 작업을 돕는 Organization Agent"
         agent.responsibility = "제품 작업 지원"
         agent.createdAt = .init(date: Date(timeIntervalSince1970: 1_775_260_800))
-        var response = BriarAPI_ListOrganizationAgentsResponse()
+        var response = BriarAPI_ListWorkspaceAgentsResponse()
         response.agents = [agent]
         return response
     }
@@ -1145,7 +1170,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     ) -> BriarAPI_ListDirectMessageRecipientsResponse {
         var response = BriarAPI_ListDirectMessageRecipientsResponse()
         response.members = directMessageMembers.map(organizationMemberMessage)
-        response.agents = organizationAgentsResponse().agents
+        response.agents = workspaceAgentsResponse().agents
         return response
     }
 
@@ -1214,7 +1239,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     ) -> BriarAPI_GetChannelResponse {
         var response = BriarAPI_GetChannelResponse()
         response.channel = channelSummaryMessage(channel)
-        response.agents = agents.map(organizationAgentMessage)
+        response.agents = agents.map(workspaceAgentMessage)
         response.messages = messages.map(channelMessageMessage)
         if let nextCursor {
             response.nextCursor = nextCursor.uuidString.lowercased()
@@ -1269,7 +1294,7 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
     ) -> BriarAPI_ChannelSummary {
         var message = BriarAPI_ChannelSummary()
         message.id = value.id.uuidString.lowercased()
-        message.organizationID = value.organizationId.uuidString.lowercased()
+        message.workspaceID = value.organizationId.uuidString.lowercased()
         message.slug = value.slug
         message.name = value.name
         if let topic = value.topic { message.topic = topic }
@@ -1302,8 +1327,8 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
 
     private static func organizationMemberMessage(
         _ value: OrganizationMember
-    ) -> BriarAPI_OrganizationMember {
-        var message = BriarAPI_OrganizationMember()
+    ) -> BriarAPI_WorkspaceMember {
+        var message = BriarAPI_WorkspaceMember()
         message.userID = value.userId
         message.name = value.name
         message.email = value.email
@@ -1328,10 +1353,10 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         return message
     }
 
-    private static func organizationAgentMessage(
+    private static func workspaceAgentMessage(
         _ value: ChannelAgentSummary
-    ) -> BriarAPI_OrganizationAgent {
-        var message = BriarAPI_OrganizationAgent()
+    ) -> BriarAPI_WorkspaceAgent {
+        var message = BriarAPI_WorkspaceAgent()
         message.agentID = value.agentId.uuidString.lowercased()
         message.name = value.name
         if let avatar = value.avatar { message.avatar = avatar }
@@ -1343,6 +1368,19 @@ private final class UITestAPIClient: AuthenticatedDownloadClientProtocol,
         if let description = value.description { message.description_p = description }
         message.responsibility = value.responsibility
         message.createdAt = .init(date: value.createdAt)
+        var skill = BriarAPI_ProjectAgentSkill()
+        skill.id = "51515151-5151-4151-8151-515151515151"
+        skill.agentID = message.agentID
+        skill.name = "Review code"
+        skill.body = "Review mobile changes"
+        skill.description_p = "Check mobile changes"
+        skill.provider = .codex
+        skill.kind = .custom
+        skill.executionMode = .task
+        skill.approvalPolicy = .explicit
+        skill.createdAt = message.createdAt
+        skill.updatedAt = message.createdAt
+        message.skills = [skill]
         return message
     }
 

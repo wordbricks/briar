@@ -54,7 +54,7 @@ const claim = (): ClaimedChannelReply => ({
   workId: `reply-${crypto.randomUUID()}`,
   runId: "run-1",
   claimToken: "claim-token",
-  organizationId: "organization-1",
+  workspaceId: "workspace-1",
   inputRevision: 0,
   publishedMessageBatches: [],
 } as unknown as ClaimedChannelReply);

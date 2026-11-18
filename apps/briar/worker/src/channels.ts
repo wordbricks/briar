@@ -1,17 +1,23 @@
-import { channelAcknowledgementFallbackStatement } from "./channel-acknowledgement-reaction";
+import { dmScheduleReplyFenceCurrent } from "./dm-schedule-fence";
+import { dmReplyRoutingAvailable } from "./dm-reply-routing-admission";
 import { dmReplySteerStatements } from "./dm-reply-steer";
+import { workerAgentProviderFromProto } from "./worker-runtime-mappers";
+import {
+  CHANNEL_ACKNOWLEDGEMENT_PLACEHOLDER,
+  channelAcknowledgementFallbackStatement,
+} from "./channel-acknowledgement-reaction";
+
 import { dmReplyStopStatements, type DmReplyStop } from "./dm-reply-stop";
 import * as Schema from "effect/Schema";
-import {
-  dmMemoryCitationsCurrent,
-  dmMemoryCitationStatement,
-  readDmMemoryCitations,
-} from "./dm-memory-citations";
 import {
   dmMemoryReplyFenceCurrent,
   requireDmMemoryReplyFence,
 } from "./dm-memory-reply-fence";
-import { dmLearningReplyOutboxStatements } from "./dm-memory-learning-queue";
+import {
+  memoryVaultCitationStatement,
+  readMemoryVaultCitations,
+  type AcceptedMemoryVaultCitation,
+} from "./memory-vault/citations";
 import {
   channelReplyAssignedWorkerUnavailableError,
   channelReplyNoAvailableWorkerError,
@@ -50,6 +56,7 @@ import type {
 import {
   channelReplyWorkerAvailability,
   hasAvailableChannelReplyWorker,
+  isDeviceInPlannedUpdateWindow,
 } from "./workers";
 import type { WorkerRuntimeMetadata } from "./worker-runtime-mappers";
 import { encodeApprovedTeamAgentTaskSession } from "./team-agent-session-materialization";
@@ -283,7 +290,7 @@ export type ChannelMessageMutationCommit = ChannelMessageUploadScope & {
 };
 
 export type ChannelAgentReplyEnqueueInput = {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   /** The originating channel kind controls DM-only acknowledgement reactions. */
   channelKind?: ChannelKind;
@@ -297,13 +304,7 @@ export type ChannelAgentReplyEnqueueInput = {
     skillId?: string | null;
     provider: AgentProvider;
     unavailableReason?: ChannelReplyUnavailableReason | null;
-    /**
-     * The message the Agent's reply session is anchored to. A channel thread
-     * always anchors on its root, so this is `parentMessageId` there. A direct
-     * message anchors on the Agent's live session instead, which is how a burst
-     * of short messages stays one conversation with one provider session rather
-     * than one isolated session per message.
-     */
+    /** Channel/legacy DM root. Routed plain DMs use their own trigger instead. */
     sessionRootMessageId?: string | null;
   }>;
   preferredDeviceId?: string | null;
@@ -365,6 +366,13 @@ export type ChannelReplyJobRow = {
   origin_reply_job_id: string | null;
   execution_target_ids_json?: string;
   session_id: string | null;
+  dm_schedule_id?: string | null;
+  routing_action?: string | null;
+  routing_decision_action?: string | null;
+  routing_target_job_id?: string | null;
+  routing_response?: string | null;
+  stop_requested_at?: string | null;
+  stop_confirmed_at?: string | null;
   approved_skill_execution_proposal_id?: string | null;
 };
 
@@ -387,6 +395,19 @@ export type ChannelReplySessionRow = {
   created_at: string;
   updated_at: string;
 };
+
+/*
+  A round trip used to copy the other Agent's answer into the person's own
+  conversation, which put B's words in A's mouth; the relaying turn now reads
+  that answer where it was written and speaks for itself, so no copy is made.
+  The copies already sitting in people's conversations stay in the database —
+  a relaying turn queued before this change is still triggered by one — and
+  every person-facing read leaves them out.
+*/
+export const agentAnswerCopySql = (message: string) => `exists (
+  select 1 from briar_channel_message_relays copy
+  where copy.message_id = ${message}.id and copy.direction = 'inbound'
+)`;
 
 const MAX_REPLY_ATTEMPTS = 3;
 export const CHANNEL_REPLY_FAILURE_MESSAGE =
@@ -447,7 +468,7 @@ export const liveChannelReplyRuntime = (job: string) => `coalesce((
         )
       )
   )
-), 0) = 1`;
+), 0) = 1 and ${dmScheduleReplyFenceCurrent(job)}`;
 
 const channelSelectColumns = `
   select channel.id, channel.organization_id, channel.kind, channel.dm_key,
@@ -461,9 +482,11 @@ const channelSelectColumns = `
          channel.created_by_user_id,
          channel.created_at, channel.updated_at,
          (select max(message.created_at) from briar_channel_messages message
-          where message.channel_id = channel.id) as last_message_at,
+          where message.channel_id = channel.id
+            and not ${agentAnswerCopySql("message")}) as last_message_at,
          (select message.body from briar_channel_messages message
           where message.channel_id = channel.id
+            and not ${agentAnswerCopySql("message")}
           order by message.created_at desc, message.id desc limit 1)
            as last_message_preview,
          case when channel.kind = 'dm' then (
@@ -510,7 +533,8 @@ const channelSelectForUser = `${channelSelectColumns},
            as last_read_at,
          (select max(message.created_at) from briar_channel_messages message
           where message.channel_id = channel.id
-            and ifnull(message.author_user_id, '') != ?)
+            and ifnull(message.author_user_id, '') != ?
+            and not ${agentAnswerCopySql("message")})
            as last_unread_message_at,
          sidebar.pinned_at as sidebar_pinned_at,
          sidebar.section_id as sidebar_section_id,
@@ -539,8 +563,8 @@ const dmKeyAfterParticipantChangeSql = `case
 end`;
 
 /**
- * Public channels are readable by every organization member; private channels
- * require an explicit membership row. Organization membership itself is checked
+ * Public channels are readable by every workspace member; private channels
+ * require an explicit membership row. Workspace membership itself is checked
  * by the caller before any of these queries run.
  */
 const visibleToUser = `(
@@ -565,10 +589,10 @@ const notAgentDirectMessage =
 /**
  * An Agent-to-Agent DM carries no `briar_channel_members` rows, so membership
  * cannot grant it. Plan §3.5 asks instead whether the reader can reach every
- * participating Agent: organization owners and co-owners always can, everybody
+ * participating Agent: workspace owners and co-owners always can, everybody
  * else needs a `briar_project_members` row for each project-scoped
- * participant. A conversation between Organization Agents alone is therefore
- * readable by the whole organization. Binds the reader's user ID once.
+ * participant. A conversation between Workspace Agents alone is therefore
+ * readable by the whole workspace. Binds the reader's user ID once.
  */
 const agentDirectMessageVisibleToUser = `(
   channel.kind = 'dm'
@@ -814,7 +838,7 @@ export const isAgentDirectMessage = (
 
 export const channelJson = (row: ChannelRow): ChannelSummary => ({
   id: row.id,
-  organizationId: row.organization_id,
+  workspaceId: row.organization_id,
   kind: row.kind,
   slug: row.slug,
   name: row.name,
@@ -1103,7 +1127,7 @@ function aggregateReactions(
 
 export async function listChannels(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
 ) {
   const rows = await db
@@ -1113,7 +1137,7 @@ export async function listChannels(
          and ${notAgentDirectMessage}
        order by channel.archived_at is not null, channel.name, channel.id`,
     )
-    .bind(userId, userId, userId, organizationId, userId)
+    .bind(userId, userId, userId, workspaceId, userId)
     .all<ChannelRow>();
   return rows.results;
 }
@@ -1125,7 +1149,7 @@ export async function listChannels(
  */
 export async function listAgentDirectMessages(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   agentId: string,
   userId: string,
 ) {
@@ -1141,16 +1165,17 @@ export async function listAgentDirectMessages(
        order by coalesce((
          select max(message.created_at) from briar_channel_messages message
          where message.channel_id = channel.id
+           and not ${agentAnswerCopySql("message")}
        ), channel.created_at) desc, channel.id`,
     )
-    .bind(userId, userId, userId, organizationId, agentId, userId)
+    .bind(userId, userId, userId, workspaceId, agentId, userId)
     .all<ChannelRow>();
   return rows.results;
 }
 
 export async function getChannel(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
 ) {
@@ -1159,7 +1184,7 @@ export async function getChannel(
       `${channelSelectForUser}
        where channel.organization_id = ? and channel.id = ? and ${readableByUser}`,
     )
-    .bind(userId, userId, userId, organizationId, channelId, userId, userId)
+    .bind(userId, userId, userId, workspaceId, channelId, userId, userId)
     .first<ChannelRow>();
 }
 
@@ -1191,14 +1216,14 @@ export async function markChannelRead(
 /** Worker-plane lookup: a claimed job already proves the channel is reachable. */
 export async function getChannelById(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
 ) {
   return db
     .prepare(
       `${channelSelect} where channel.organization_id = ? and channel.id = ?`,
     )
-    .bind(organizationId, channelId)
+    .bind(workspaceId, channelId)
     .first<ChannelRow>();
 }
 
@@ -1232,8 +1257,8 @@ export async function getProjectAgentChannel(
     .first<ChannelRow>();
 }
 
-/** Used to distinguish an inaccessible same-organization channel from 404. */
-export async function getProjectOrganizationChannel(
+/** Used to distinguish an inaccessible same-workspace channel from 404. */
+export async function getProjectWorkspaceChannel(
   db: D1Database,
   projectId: string,
   channelId: string,
@@ -1249,10 +1274,10 @@ export async function getProjectOrganizationChannel(
     .first<ChannelRow>();
 }
 
-/** Resolves a project only when it belongs to the given organization. */
-export async function getOrganizationProject(
+/** Resolves a project only when it belongs to the given workspace. */
+export async function getWorkspaceProject(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   projectId: string,
 ) {
   return db
@@ -1260,7 +1285,7 @@ export async function getOrganizationProject(
       `select id, name, organization_id from briar_teams
        where id = ? and organization_id = ?`,
     )
-    .bind(projectId, organizationId)
+    .bind(projectId, workspaceId)
     .first<{ id: string; name: string; organization_id: string }>();
 }
 
@@ -1268,7 +1293,7 @@ export async function createChannel(
   db: D1Database,
   input: {
     id: string;
-    organizationId: string;
+    workspaceId: string;
     slug: string;
     name: string;
     topic: string | null;
@@ -1297,7 +1322,7 @@ export async function createChannel(
       )
       .bind(
         input.id,
-        input.organizationId,
+        input.workspaceId,
         input.kind,
         input.dmKey,
         input.slug,
@@ -1331,12 +1356,12 @@ export async function createChannel(
       ).bind(input.id, agentId, input.createdByUserId, input.createdAt)
     ),
   ]);
-  return getChannel(db, input.organizationId, input.id, input.createdByUserId);
+  return getChannel(db, input.workspaceId, input.id, input.createdByUserId);
 }
 
 export async function getDirectMessageByKey(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   dmKey: string,
   userId: string,
 ) {
@@ -1346,14 +1371,14 @@ export async function getDirectMessageByKey(
        where channel.organization_id = ? and channel.kind = 'dm'
          and channel.dm_key = ? and ${visibleToUser}`,
     )
-    .bind(userId, userId, userId, organizationId, dmKey, userId)
+    .bind(userId, userId, userId, workspaceId, dmKey, userId)
     .first<ChannelRow>();
 }
 
 export async function updateChannel(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     userId: string;
     name?: string;
@@ -1366,7 +1391,7 @@ export async function updateChannel(
 ) {
   const current = await getChannel(
     db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -1392,15 +1417,15 @@ export async function updateChannel(
           : null,
       input.updatedAt,
       input.channelId,
-      input.organizationId,
+      input.workspaceId,
     )
     .run();
-  return getChannel(db, input.organizationId, input.channelId, input.userId);
+  return getChannel(db, input.workspaceId, input.channelId, input.userId);
 }
 
 export async function deleteChannel(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   userId: string,
   observedAt: string,
@@ -1446,7 +1471,7 @@ export async function deleteChannel(
            alert_state = 'none',
            alert_detail_json = null`,
       )
-      .bind(observedAt, organizationId, channelId, userId, userId),
+      .bind(observedAt, workspaceId, channelId, userId, userId),
     db
       .prepare(
         `delete from briar_channels
@@ -1462,7 +1487,7 @@ export async function deleteChannel(
            )
          returning id`,
       )
-      .bind(channelId, organizationId, userId, userId),
+      .bind(channelId, workspaceId, userId, userId),
   ]);
   return (results[1]?.results?.length ?? 0) > 0;
 }
@@ -1808,7 +1833,7 @@ const channelMessageAttachmentJson = (
   filename: row.filename,
   contentType: row.content_type,
   byteSize: row.byte_size,
-  url: `/organizations/${row.organization_id}/channels/${row.channel_id}/messages/${row.message_id}/attachments/${row.id}`,
+  url: `/workspaces/${row.organization_id}/channels/${row.channel_id}/messages/${row.message_id}/attachments/${row.id}`,
   imageWidth: row.image_width ?? null,
   imageHeight: row.image_height ?? null,
 });
@@ -1834,7 +1859,7 @@ async function attachMessageRelations(
     subscribers,
     relays,
   ] = await Promise.all([
-    readDmMemoryCitations(db, ids),
+    readMemoryVaultCitations(db, ids),
     db
       .prepare(
         `select message_id, user_id from briar_channel_message_mentions
@@ -2131,14 +2156,19 @@ export async function listChannelRootMessages(
     limit?: number;
     createdAfter?: string;
     createdBefore?: string;
+    includeAgentAnswerCopies?: boolean;
   } = {},
 ) {
   const limit = options.limit ?? 200;
   const select = messageSelect;
+  const visible = options.includeAgentAnswerCopies
+    ? ""
+    : `and not ${agentAnswerCopySql("message")}`;
   const rows = await db
     .prepare(
       `${select}
        where message.channel_id = ? and message.parent_message_id is null
+         ${visible}
          ${options.createdAfter ? "and message.created_at > ?" : ""}
          ${options.createdBefore ? "and message.created_at <= ?" : ""}
        order by message.created_at desc,
@@ -2159,13 +2189,18 @@ export async function listChannelThreadMessages(
   db: D1Database,
   channelId: string,
   parentMessageId: string,
+  options: { includeAgentAnswerCopies?: boolean } = {},
 ) {
   const select = messageSelect;
+  const visible = options.includeAgentAnswerCopies
+    ? ""
+    : `and not ${agentAnswerCopySql("message")}`;
   const rows = await db
     .prepare(
       `${select}
        where message.channel_id = ?
          and (message.id = ? or message.parent_message_id = ?)
+         ${visible}
        order by message.created_at,
                 coalesce(message.dm_sequence, 0), message.id`,
     )
@@ -2194,6 +2229,7 @@ export async function listChannelMessagePage(
     cursor: string | null;
     limit: number;
     includeRepliesInTimeline?: boolean;
+    includeAgentAnswerCopies?: boolean;
   },
 ): Promise<ChannelMessagePage | null> {
   const includesReplies =
@@ -2229,6 +2265,9 @@ export async function listChannelMessagePage(
     : includesReplies
       ? "1 = 1"
       : "message.parent_message_id is null";
+  const visible = input.includeAgentAnswerCopies
+    ? ""
+    : `and not ${agentAnswerCopySql("message")}`;
   const before = cursor
     ? `and (message.created_at < ?
             or (message.created_at = ? and (
@@ -2240,6 +2279,7 @@ export async function listChannelMessagePage(
     .prepare(
       `${select}
        where message.channel_id = ? and ${scope}
+         ${visible}
          ${before}
        order by message.created_at desc,
                 coalesce(message.dm_sequence, 0) desc, message.id desc
@@ -2392,7 +2432,7 @@ type ChannelMessageDeletionTarget = {
 async function getChannelMessageDeletionTarget(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     messageId: string;
     userId: string;
@@ -2419,7 +2459,7 @@ async function getChannelMessageDeletionTarget(
     input.userId,
     input.userId,
     input.userId,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.messageId,
   ).first<ChannelMessageDeletionTarget>();
@@ -2441,7 +2481,7 @@ export type DeleteChannelMessageOutcome = {
 export async function deleteChannelMessage(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     messageId: string;
     userId: string;
@@ -2486,7 +2526,7 @@ export async function deleteChannelMessage(
   const authorizationBindings = () => [
     input.messageId,
     input.channelId,
-    input.organizationId,
+    input.workspaceId,
     input.userId,
     input.userId,
     input.userId,
@@ -2515,7 +2555,7 @@ export async function deleteChannelMessage(
          alert_detail_json = null`,
     ).bind(
       input.deletedAt,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.messageId,
       ...authorizationBindings(),
@@ -2861,7 +2901,7 @@ export async function createIncomingChannelWebhookMessage(
 
 export async function getChannelMessageAttachment(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   channelId: string,
   messageId: string,
   attachmentId: string,
@@ -2873,7 +2913,7 @@ export async function getChannelMessageAttachment(
        from briar_channel_message_attachments
        where organization_id = ? and channel_id = ? and message_id = ? and id = ?`,
     )
-    .bind(organizationId, channelId, messageId, attachmentId)
+    .bind(workspaceId, channelId, messageId, attachmentId)
     .first<ChannelMessageAttachmentRow>();
 }
 
@@ -2903,7 +2943,7 @@ export async function getChannelMessageDocument(
 export async function getClaimedChannelReplyChannel(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     jobId: string;
     deviceId: string;
     observedAt: string;
@@ -2936,7 +2976,7 @@ export async function getClaimedChannelReplyChannel(
     )
     .bind(
       input.jobId,
-      input.organizationId,
+      input.workspaceId,
       input.deviceId,
       input.observedAt,
     )
@@ -2952,7 +2992,7 @@ export async function getClaimedChannelReplyChannel(
 export async function getClaimedChannelReplyAttachment(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     jobId: string;
     deviceId: string;
     claimTokenHash: string;
@@ -2975,6 +3015,15 @@ export async function getClaimedChannelReplyAttachment(
           where absorbed.superseded_by_reply_job_id = job.id
             and absorbed.channel_id = job.channel_id and absorbed.agent_id = job.agent_id
             and absorbed.trigger_message_id = attachment.message_id
+        ) or exists (
+          select 1 from briar_dm_schedules schedule
+          join briar_channel_agent_reply_jobs previous on previous.id = schedule.previous_job_id
+            and previous.organization_id = job.organization_id and previous.channel_id = job.channel_id
+            and previous.agent_id = job.agent_id
+          join briar_channel_messages previous_message on previous_message.id = previous.reply_message_id
+            and previous_message.deleted_at is null
+          where schedule.id = job.dm_schedule_id and schedule.current_job_id = job.id
+            and previous.reply_message_id = attachment.message_id
         ))
        where job.id = ? and job.organization_id = ?
          and job.claimed_device_id = ? and job.claim_token_hash = ?
@@ -3001,7 +3050,7 @@ export async function getClaimedChannelReplyAttachment(
     )
     .bind(
       input.jobId,
-      input.organizationId,
+      input.workspaceId,
       input.deviceId,
       input.claimTokenHash,
       input.observedAt,
@@ -3010,25 +3059,11 @@ export async function getClaimedChannelReplyAttachment(
     .first<ChannelMessageAttachmentRow>();
 }
 
-/**
- * An ordinary conversation turn: the Agent simply answers what the person
- * wrote. A Skill command, a delegated turn, an Agent-to-Agent hop and an
- * approved Skill execution each carry their own contract with the runner, so
- * none of them may be absorbed into a later message or held back by the DM
- * settle window.
- */
-const channelReplyPlainConversationTurn = (job: string) =>
-  `${job}.skill_id is null
-     and ${job}.delegated_by_reply_job_id is null
-     and ${job}.agent_message_hop = 0
-     and ${job}.approved_skill_execution_proposal_id is null`;
-
-
 
 /**
  * One job per mentioned agent, so a message that names two agents gets two
- * independent replies. Organization agents leave project_id null, which is what
- * makes them claimable by any device in the organization.
+ * independent replies. Workspace agents leave project_id null, which is what
+ * makes them claimable by any device in the workspace.
  */
 async function channelAgentReplyEnqueueStatements(
   db: D1Database,
@@ -3051,11 +3086,16 @@ async function channelAgentReplyEnqueueStatements(
        current_skill.provider,
        current_skill.model, current_skill.effort,
        case when current_skill.id is null then null else trigger_message.body end`;
+  const routingAgents = new Set((await Promise.all(input.agents.map(async (agent) =>
+    input.channelKind === "dm" && !agent.skillId && await dmReplyRoutingAvailable(db, {
+      workspaceId: input.workspaceId, channelId: input.channelId, provider: agent.provider, preferredDeviceId: input.preferredDeviceId,
+    }) ? agent.id : null))).filter((id) => id !== null));
   return input.agents.flatMap((agent) => {
+      const routed = routingAgents.has(agent.id);
       const sessionId = crypto.randomUUID();
       const jobId = crypto.randomUUID();
-      const sessionRootMessageId = agent.sessionRootMessageId ??
-        input.parentMessageId;
+      const sessionRootMessageId = routed
+        ? input.triggerMessageId : agent.sessionRootMessageId ?? input.parentMessageId;
       return [
         db.prepare(
           `insert into briar_channel_reply_sessions (
@@ -3149,7 +3189,7 @@ async function channelAgentReplyEnqueueStatements(
              updated_at = excluded.updated_at`,
         ).bind(
           sessionId,
-          input.organizationId,
+          input.workspaceId,
           input.channelId,
           sessionRootMessageId,
           agent.projectId,
@@ -3166,7 +3206,7 @@ async function channelAgentReplyEnqueueStatements(
           sessionRootMessageId,
           input.channelId,
           agent.id,
-          input.organizationId,
+          input.workspaceId,
           agent.projectId,
           agent.skillId ?? null,
           agent.provider,
@@ -3218,7 +3258,7 @@ async function channelAgentReplyEnqueueStatements(
            on conflict (channel_id, trigger_message_id, agent_id) do nothing`,
         ).bind(
           jobId,
-          input.organizationId,
+          input.workspaceId,
           input.channelId,
           agent.projectId,
           agent.id,
@@ -3228,9 +3268,9 @@ async function channelAgentReplyEnqueueStatements(
           input.parentMessageId,
           crypto.randomUUID(),
           input.preferredDeviceId ?? null,
-          agent.unavailableReason ? "failed" : "queued",
-          agent.unavailableReason ?? null,
-          agent.unavailableReason ? input.createdAt : null,
+          !routed && agent.unavailableReason ? "failed" : "queued",
+          routed ? null : agent.unavailableReason ?? null,
+          !routed && agent.unavailableReason ? input.createdAt : null,
           input.createdAt,
           input.createdAt,
           agent.skillId ?? null,
@@ -3238,14 +3278,24 @@ async function channelAgentReplyEnqueueStatements(
           sessionRootMessageId,
           input.channelId,
           agent.id,
-          input.organizationId,
+          input.workspaceId,
           agent.projectId,
           agent.skillId ?? null,
           agent.provider,
           agent.skillId ?? null,
           agent.provider,
         ),
-        ...dmReplySteerStatements(db, jobId),
+        ...(routed ? [db.prepare(`update briar_channel_agent_reply_jobs
+          set routing_action = 'pending'
+          where id = ? and skill_id is null and agent_message_hop = 0
+            and delegated_by_reply_job_id is null
+            and exists (select 1 from briar_channels channel
+              join briar_channel_messages message on message.channel_id = channel.id
+              where channel.id = briar_channel_agent_reply_jobs.channel_id
+                and channel.kind = 'dm' and message.id = trigger_message_id
+                and message.author_user_id is not null)
+            and (select count(*) from briar_channel_agents roster
+              where roster.channel_id = briar_channel_agent_reply_jobs.channel_id) = 1`).bind(jobId)] : dmReplySteerStatements(db, jobId)),
         db.prepare(
           `insert into briar_channel_reply_session_events (
              id, session_id, reply_job_id, event_type, reason,
@@ -3313,7 +3363,7 @@ export async function listActiveChannelAgentReplies(
 
 export async function getChannelAgentReplyJob(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   jobId: string,
 ) {
   return db
@@ -3321,7 +3371,7 @@ export async function getChannelAgentReplyJob(
       `select * from briar_channel_agent_reply_jobs
        where id = ? and organization_id = ?`,
     )
-    .bind(jobId, organizationId)
+    .bind(jobId, workspaceId)
     .first<ChannelReplyJobRow>();
 }
 
@@ -3507,106 +3557,13 @@ export async function cleanupExpiredChannelReplySessions(
 }
 
 /**
- * How long a queued direct-message conversation turn waits before a Worker may
- * claim it. Someone typing "hi", "quick question", "about the deploy" wants one
- * answer, and the supersede path can only fold those together while they are
- * all still queued — which means the first one must not be claimed the instant
- * it lands.
- */
-export const DM_REPLY_SETTLE_MS = 2_000;
-
-/** The largest and smallest wait a settle-blocked claim asks the Worker for. */
-export const DM_REPLY_SETTLE_MIN_RETRY_MS = 250;
-export const DM_REPLY_SETTLE_MAX_RETRY_MS = 2_000;
-
-/** The configured window, or the default whenever it is absent or nonsense. */
-export const dmReplySettleMs = (configured: unknown) => {
-  const raw = typeof configured === "string" ? configured.trim() : configured;
-  if (raw === "" || raw === null || raw === undefined) {
-    return DM_REPLY_SETTLE_MS;
-  }
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 60_000
-    ? parsed
-    : DM_REPLY_SETTLE_MS;
-};
-
-const dmReplySettleThreshold = (claimedAt: string, settleMs?: number) =>
-  new Date(Date.parse(claimedAt) - (settleMs ?? DM_REPLY_SETTLE_MS))
-    .toISOString();
-
-/**
- * A direct-message conversation turn is claimable only once the settle window
- * has passed. Everything else — Skill commands, delegated turns, Agent-to-Agent
- * hops, approved Skill executions and every channel thread — is claimable the
- * moment it is queued, exactly as before.
- */
-const channelReplySettled = (job: string) => `(
-       ${job}.created_at <= ?
-       or not exists (
-         select 1 from briar_channels settle_channel
-         where settle_channel.id = ${job}.channel_id
-           and settle_channel.kind = 'dm'
-           and ${channelReplyPlainConversationTurn(job)}
-       )
-     )`;
-
-/**
- * How long the caller should wait before asking again, when the only work it
- * could have taken is a direct-message turn still inside its settle window.
- * Null means nothing is waiting and the caller keeps its ordinary idle delay.
- */
-export async function nextChannelReplySettleWaitMs(
-  db: D1Database,
-  organizationId: string,
-  input: { observedAt: string; settleMs?: number },
-) {
-  const settleMs = input.settleMs ?? DM_REPLY_SETTLE_MS;
-  if (settleMs <= 0) return null;
-  const settleThreshold = dmReplySettleThreshold(input.observedAt, settleMs);
-  const next = await db.prepare(
-    `select min(job.created_at) as earliest
-     from briar_channel_agent_reply_jobs job
-     join briar_channels channel on channel.id = job.channel_id
-     where job.organization_id = ? and job.status = 'queued'
-       and channel.kind = 'dm'
-       and ${channelReplyPlainConversationTurn("job")}
-       and job.created_at > ?
-       and (job.attempts < (? + job.memory_restart_count + job.steer_restart_count) or job.steer_revision > job.applied_steer_revision)
-       and exists (
-         select 1 from briar_channel_agents current_roster
-         where current_roster.channel_id = job.channel_id
-           and current_roster.agent_id = job.agent_id
-       )
-       and not exists (
-         select 1 from briar_channel_agent_reply_jobs active_job
-         where active_job.session_id = job.session_id
-           and active_job.id <> job.id and active_job.status = 'running'
-           and active_job.lease_expires_at > ?
-       )`,
-  ).bind(
-    organizationId,
-    settleThreshold,
-    MAX_REPLY_ATTEMPTS,
-    input.observedAt,
-  ).first<{ earliest: string | null }>();
-  if (!next?.earliest) return null;
-  const remaining = Date.parse(next.earliest) + settleMs -
-    Date.parse(input.observedAt);
-  return Math.min(
-    DM_REPLY_SETTLE_MAX_RETRY_MS,
-    Math.max(DM_REPLY_SETTLE_MIN_RETRY_MS, Math.ceil(remaining)),
-  );
-}
-
-/**
- * Any enabled binding may host an organization job. A Project Agent job may
+ * Any enabled binding may host a workspace job. A Project Agent job may
  * only be claimed by the exact binding for that project; device identity alone
  * is insufficient because one device can run several project loops.
  */
 export async function claimNextChannelAgentReply(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   input: {
     deviceId: string;
     workerId: string;
@@ -3614,13 +3571,8 @@ export async function claimNextChannelAgentReply(
     claimTokenHash: string;
     claimedAt: string;
     leaseExpiresAt: string;
-    settleMs?: number;
   },
 ) {
-  const settleThreshold = dmReplySettleThreshold(
-    input.claimedAt,
-    input.settleMs,
-  );
   // Migration 0092 is a deployment prerequisite, so every claim enforces the
   // saved-Skill snapshot without a runtime compatibility branch.
   const liveSkillSnapshot = (job: string) => `(
@@ -3712,7 +3664,7 @@ export async function claimNextChannelAgentReply(
            and ${liveSkillSnapshot("briar_channel_agent_reply_jobs")}
          )`,
     )
-    .bind(input.claimedAt, input.claimedAt, organizationId)
+    .bind(input.claimedAt, input.claimedAt, workspaceId)
     .run();
   await db
     .prepare(
@@ -3725,7 +3677,7 @@ export async function claimNextChannelAgentReply(
          and steer_revision = applied_steer_revision
          and lease_expires_at <= ?`,
     )
-    .bind(input.claimedAt, organizationId, MAX_REPLY_ATTEMPTS, input.claimedAt)
+    .bind(input.claimedAt, workspaceId, MAX_REPLY_ATTEMPTS, input.claimedAt)
     .run();
   const assignedJobs = await db.prepare(
     `select job.id, job.project_id, agent.computer_use_policy,
@@ -3739,6 +3691,7 @@ export async function claimNextChannelAgentReply(
               then agent.effort
               when current_skill.execution_mode = 'conversation'
               then session.effort else job.selected_skill_effort_snapshot end as runtime_effort,
+            job.planned_update_resume,
             session.owner_device_id, session.owner_worker_id,
             session.owner_worker_label
      from briar_channel_agent_reply_jobs job
@@ -3747,15 +3700,17 @@ export async function claimNextChannelAgentReply(
      left join briar_agent_skills current_skill
        on current_skill.id = job.skill_id and current_skill.agent_id = job.agent_id
      where job.organization_id = ? and session.owner_worker_id is not null
+       and coalesce(job.routing_action, 'new') <> 'pending'
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))`,
-  ).bind(organizationId, input.claimedAt).all<{
+  ).bind(workspaceId, input.claimedAt).all<{
     id: string;
     project_id: string | null;
     agent_provider: AgentProvider | null;
     runtime_model: string | null;
     runtime_effort: AgentSkillEffort | null;
     computer_use_policy: "disabled" | "unattended";
+    planned_update_resume: number;
     owner_device_id: string | null;
     owner_worker_id: string;
     owner_worker_label: string | null;
@@ -3763,7 +3718,7 @@ export async function claimNextChannelAgentReply(
   for (const assigned of assignedJobs.results) {
     if (!assigned.agent_provider) continue;
     const availability = await channelReplyWorkerAvailability(db, {
-      organizationId,
+      workspaceId,
       projectId: assigned.project_id,
       preferredDeviceId: assigned.owner_device_id,
       preferredWorkerId: assigned.owner_worker_id,
@@ -3773,6 +3728,19 @@ export async function claimNextChannelAgentReply(
       observedAt: input.claimedAt,
     });
     if (availability === "available") continue;
+    // A reply the owner handed off for a planned update stays queued while
+    // that device restarts: completing the update marks the request done
+    // before the drained Worker rows come back, so failing here would kill
+    // the very reply the update parked.
+    if (
+      assigned.planned_update_resume === 1 &&
+      assigned.owner_device_id &&
+      await isDeviceInPlannedUpdateWindow(
+        db,
+        assigned.owner_device_id,
+        input.claimedAt,
+      )
+    ) continue;
     const error = channelReplyAssignedWorkerUnavailableError(
       assigned.owner_worker_label ?? assigned.owner_worker_id,
     );
@@ -3794,7 +3762,7 @@ export async function claimNextChannelAgentReply(
       input.claimedAt,
       input.claimedAt,
       assigned.id,
-      organizationId,
+      workspaceId,
       input.claimedAt,
       assigned.owner_worker_id,
     ).run();
@@ -3834,7 +3802,7 @@ export async function claimNextChannelAgentReply(
      where job.organization_id = ? and (job.attempts < (? + job.memory_restart_count + job.steer_restart_count) or job.steer_revision > job.applied_steer_revision)
        and (job.status = 'queued'
          or (job.status = 'running' and job.lease_expires_at <= ?))
-       and ${channelReplySettled("job")}
+       and coalesce(job.error, '') <> 'dm_reply_stop_unconfirmed'
        and not exists (
          select 1 from briar_channel_agent_reply_jobs active_job
          where active_job.session_id = job.session_id
@@ -3878,10 +3846,9 @@ export async function claimNextChannelAgentReply(
        )
      order by job.planned_update_resume desc, job.created_at, job.id`,
   ).bind(
-    organizationId,
+    workspaceId,
     MAX_REPLY_ATTEMPTS,
     input.claimedAt,
-    settleThreshold,
     input.claimedAt,
     input.workerId,
     input.workerId,
@@ -3910,6 +3877,10 @@ export async function claimNextChannelAgentReply(
       candidate.runtime_effort,
     );
     if (!supportsSelection) continue;
+    if (candidate.routing_action != null &&
+      !(input.runtime.dmPublicMessages?.providers.includes(candidate.agent_provider) &&
+        input.runtime.proto.capabilities?.dmReplyRouting?.protocol === 1 &&
+        input.runtime.proto.capabilities.dmReplyRouting.providers.map(workerAgentProviderFromProto).includes(candidate.agent_provider))) continue;
 
     const sessionExpired = candidate.session_retained_until <= input.claimedAt;
     if (
@@ -3937,7 +3908,7 @@ export async function claimNextChannelAgentReply(
       let available = preferredAvailability.get(preferenceKey);
       if (available === undefined) {
         available = await hasAvailableChannelReplyWorker(db, {
-          organizationId,
+          workspaceId,
           projectId: candidate.project_id,
           preferredDeviceId: candidate.preferred_device_id,
           provider: candidate.agent_provider,
@@ -3976,7 +3947,7 @@ export async function claimNextChannelAgentReply(
          and session_id = ?
          and (status = 'queued'
            or (status = 'running' and lease_expires_at <= ?))
-         and ${channelReplySettled("briar_channel_agent_reply_jobs")}
+         and coalesce(error, '') <> 'dm_reply_stop_unconfirmed'
          and not exists (
            select 1 from briar_channel_agent_reply_jobs active_job
            where active_job.session_id = briar_channel_agent_reply_jobs.session_id
@@ -4033,11 +4004,10 @@ export async function claimNextChannelAgentReply(
         input.leaseExpiresAt,
         input.claimedAt,
         candidate.id,
-        organizationId,
+        workspaceId,
         MAX_REPLY_ATTEMPTS,
         candidate.session_id,
         input.claimedAt,
-        settleThreshold,
         input.claimedAt,
         candidate.session_updated_at,
         candidate.session_owner_worker_id,
@@ -4227,14 +4197,14 @@ export async function snapshotChannelReplyExecutionTargets(
 }
 
 /**
- * Revalidates the complete authority chain for one Organization Agent context
+ * Revalidates the complete authority chain for one Workspace Agent context
  * request. A valid token alone is insufficient: the claim, Worker binding,
- * device, organization scope, Agent scope, and live lease must still agree.
+ * device, workspace scope, Agent scope, and live lease must still agree.
  */
-export async function getActiveOrganizationChannelReplyContextClaim(
+export async function getActiveWorkspaceChannelReplyContextClaim(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     jobId: string;
     deviceId: string;
     workerId: string;
@@ -4274,7 +4244,7 @@ export async function getActiveOrganizationChannelReplyContextClaim(
        and binding_project.organization_id = job.organization_id`,
   ).bind(
     input.jobId,
-    input.organizationId,
+    input.workspaceId,
     input.deviceId,
     input.workerId,
     input.claimTokenHash,
@@ -4329,7 +4299,33 @@ export async function getClaimedChannelReply(
   return claimed;
 }
 
-/** First automatic reaction wins, including across claim retries. No reaction is removed. */
+/*
+  The live authorization every acknowledgement statement repeats inside its own
+  query, so revocation cannot race a preflight read. The bind order it expects
+  is jobId, deviceId, workerId, claimTokenHash, observedAt.
+*/
+const liveAcknowledgementClaim = `
+  job.id = ? and job.claimed_device_id = ? and job.claimed_worker_id = ?
+    and job.claim_token_hash = ? and job.status = 'running' and job.lease_expires_at > ?
+    and channel.organization_id = job.organization_id and channel.kind = 'dm'
+    and message.author_user_id is not null and message.deleted_at is null
+    and exists (select 1 from briar_channel_agents roster
+      where roster.channel_id = job.channel_id and roster.agent_id = job.agent_id)
+    and ${liveChannelReplyRuntime("job")}
+    and ${dmMemoryReplyFenceCurrent("job")}
+    and exists (select 1 from briar_execution_workers binding
+      where binding.id = job.claimed_worker_id and binding.device_id = job.claimed_device_id
+        and binding.state <> 'disabled'
+        and (job.project_id is null or binding.project_id = job.project_id))`;
+
+/**
+ * The Agent's acknowledgement is one slot on the trigger message, not a first
+ * write: the placeholder published the moment the reply is claimed is replaced
+ * by the contextual emoji the model picks a few seconds later. Setting the slot
+ * only ever touches this Agent's own reaction — a person's reaction is never
+ * removed, and an Agent somehow holding several reactions on the message is
+ * left exactly as it is rather than being reduced to one.
+ */
 export async function publishChannelAcknowledgementReaction(
   db: D1Database,
   input: {
@@ -4344,33 +4340,119 @@ export async function publishChannelAcknowledgementReaction(
   if (input.emoji.length > 32 || input.emoji !== input.emoji.trim() ||
       !isChannelReactionEmoji(input.emoji)) throw new Error("Invalid acknowledgement emoji");
   await requireDmMemoryReplyFence(db, input.jobId);
-  // Repeat live authorization inside the INSERT so revocation cannot race a preflight read.
-  await db.prepare(`
-    insert into briar_channel_message_reactions (message_id, user_id, agent_id, emoji, created_at)
-    select job.trigger_message_id, null, job.agent_id, ?, ?
-    from briar_channel_agent_reply_jobs job
-    join briar_channels channel on channel.id = job.channel_id
-    join briar_project_agents agent
-      on agent.id = job.agent_id and agent.organization_id = job.organization_id
-    join briar_channel_messages message
-      on message.id = job.trigger_message_id and message.channel_id = channel.id
-    where job.id = ? and job.claimed_device_id = ? and job.claimed_worker_id = ?
-      and job.claim_token_hash = ? and job.status = 'running' and job.lease_expires_at > ?
-      and channel.organization_id = job.organization_id and channel.kind = 'dm'
-      and message.author_user_id is not null and message.deleted_at is null
-      and exists (select 1 from briar_channel_agents roster
-        where roster.channel_id = job.channel_id and roster.agent_id = job.agent_id)
-      and ${liveChannelReplyRuntime("job")}
-      and ${dmMemoryReplyFenceCurrent("job")}
-      and exists (select 1 from briar_execution_workers binding
-        where binding.id = job.claimed_worker_id and binding.device_id = job.claimed_device_id
-          and binding.state <> 'disabled'
-          and (job.project_id is null or binding.project_id = job.project_id))
-      and not exists (select 1 from briar_channel_message_reactions existing
-        where existing.message_id = job.trigger_message_id and existing.agent_id = job.agent_id)
-    on conflict do nothing
-  `).bind(input.emoji, input.observedAt, input.jobId, input.deviceId,
-    input.workerId, input.claimTokenHash, input.observedAt).run();
+  const claim = [input.jobId, input.deviceId, input.workerId,
+    input.claimTokenHash, input.observedAt];
+  // One batch, so the INSERT reads the row the DELETE removed and both the
+  // reaction triggers and the realtime publish see a single settled state.
+  await db.batch([
+    // The placeholder only ever opens the slot. A Worker that claims a reply
+    // before the server's own emoji reached it publishes 👀 anyway, and that
+    // publication must not take the message back to "read" from whatever the
+    // server, or an earlier attempt, already said.
+    ...(input.emoji === CHANNEL_ACKNOWLEDGEMENT_PLACEHOLDER ? [] : [db.prepare(`
+      delete from briar_channel_message_reactions
+      where rowid in (
+        select current.rowid
+        from briar_channel_message_reactions current
+        join briar_channel_agent_reply_jobs job
+          on job.trigger_message_id = current.message_id
+         and job.agent_id = current.agent_id
+        join briar_channels channel on channel.id = job.channel_id
+        join briar_project_agents agent
+          on agent.id = job.agent_id and agent.organization_id = job.organization_id
+        join briar_channel_messages message
+          on message.id = job.trigger_message_id and message.channel_id = channel.id
+        where current.user_id is null and current.emoji <> ?
+          and ${liveAcknowledgementClaim}
+          and (select count(*) from briar_channel_message_reactions held
+            where held.message_id = job.trigger_message_id
+              and held.agent_id = job.agent_id) = 1
+      )
+    `).bind(input.emoji, ...claim)]),
+    // Requesting the emoji the Agent already holds leaves the row untouched,
+    // and so does a message this Agent has several reactions on.
+    db.prepare(`
+      insert into briar_channel_message_reactions (message_id, user_id, agent_id, emoji, created_at)
+      select job.trigger_message_id, null, job.agent_id, ?, ?
+      from briar_channel_agent_reply_jobs job
+      join briar_channels channel on channel.id = job.channel_id
+      join briar_project_agents agent
+        on agent.id = job.agent_id and agent.organization_id = job.organization_id
+      join briar_channel_messages message
+        on message.id = job.trigger_message_id and message.channel_id = channel.id
+      where ${liveAcknowledgementClaim}
+        and not exists (select 1 from briar_channel_message_reactions existing
+          where existing.message_id = job.trigger_message_id and existing.agent_id = job.agent_id)
+      on conflict do nothing
+    `).bind(input.emoji, input.observedAt, ...claim),
+  ]);
+}
+
+/*
+  The server's own act, so there is no claim to authorize it: the reply job has
+  only just been enqueued and no Worker holds it yet. What it still repeats is
+  everything about the target — the job belongs to this Agent, the trigger is a
+  live person's message, and the DM's roster still carries the Agent.
+*/
+const serverAcknowledgementTarget = `
+  job.id = ? and job.agent_id = ?
+    and channel.organization_id = job.organization_id and channel.kind = 'dm'
+    and message.author_user_id is not null and message.deleted_at is null
+    and exists (select 1 from briar_channel_agents roster
+      where roster.channel_id = job.channel_id and roster.agent_id = job.agent_id)`;
+
+/**
+ * Sets the Agent's acknowledgement slot from the server, at message receipt.
+ * It inserts when the Agent has no reaction on the trigger, and replaces the
+ * Worker's 👀 when the Worker got there first. Any other reaction the Agent
+ * holds is deliberate and is left alone, and a person's reaction is never
+ * touched.
+ */
+export async function setChannelAgentAcknowledgementReaction(
+  db: D1Database,
+  input: { jobId: string; agentId: string; emoji: string; observedAt: string },
+) {
+  if (input.emoji.length > 32 || input.emoji !== input.emoji.trim() ||
+      !isChannelReactionEmoji(input.emoji)) throw new Error("Invalid acknowledgement emoji");
+  const target = [input.jobId, input.agentId];
+  // One batch, so the INSERT reads the row the DELETE removed and both the
+  // reaction triggers and the realtime publish see a single settled state.
+  await db.batch([
+    db.prepare(`
+      delete from briar_channel_message_reactions
+      where rowid in (
+        select current.rowid
+        from briar_channel_message_reactions current
+        join briar_channel_agent_reply_jobs job
+          on job.trigger_message_id = current.message_id
+         and job.agent_id = current.agent_id
+        join briar_channels channel on channel.id = job.channel_id
+        join briar_project_agents agent
+          on agent.id = job.agent_id and agent.organization_id = job.organization_id
+        join briar_channel_messages message
+          on message.id = job.trigger_message_id and message.channel_id = channel.id
+        where current.user_id is null and current.emoji = ? and current.emoji <> ?
+          and ${serverAcknowledgementTarget}
+          and (select count(*) from briar_channel_message_reactions held
+            where held.message_id = job.trigger_message_id
+              and held.agent_id = job.agent_id) = 1
+      )
+    `).bind(CHANNEL_ACKNOWLEDGEMENT_PLACEHOLDER, input.emoji, ...target),
+    db.prepare(`
+      insert into briar_channel_message_reactions (message_id, user_id, agent_id, emoji, created_at)
+      select job.trigger_message_id, null, job.agent_id, ?, ?
+      from briar_channel_agent_reply_jobs job
+      join briar_channels channel on channel.id = job.channel_id
+      join briar_project_agents agent
+        on agent.id = job.agent_id and agent.organization_id = job.organization_id
+      join briar_channel_messages message
+        on message.id = job.trigger_message_id and message.channel_id = channel.id
+      where ${serverAcknowledgementTarget}
+        and not exists (select 1 from briar_channel_message_reactions existing
+          where existing.message_id = job.trigger_message_id and existing.agent_id = job.agent_id)
+      on conflict do nothing
+    `).bind(input.emoji, input.observedAt, ...target),
+  ]);
 }
 
 export async function renewChannelReplyLease(
@@ -4469,6 +4551,87 @@ export async function renewChannelReplyLease(
     ),
   ]);
   return (renewed.results[0] as ChannelReplyJobRow | undefined) ?? null;
+}
+
+/**
+ * Folds a steer that landed after the claim into the same claim.
+ *
+ * The restart path is the expensive one: it bumps `attempts` and
+ * `steer_restart_count`, mints a new claim token and makes the Worker set the
+ * whole reply up again. None of that is owed while the provider turn has not
+ * started yet — the only thing out of date is the input the turn is about to
+ * read. So this marks the steer applied in place and leaves everything else
+ * about the claim exactly as it is, and the caller rebuilds the claim payload
+ * against the folded input.
+ *
+ * The authorization is the lease renewal's, verbatim except for the revision
+ * comparison it exists to change: same job, device, Worker and claim token,
+ * still running behind a live lease, still on the roster, still a live runtime
+ * behind a current memory fence and an enabled Worker binding.
+ */
+export async function applyChannelReplySteerInPlace(
+  db: D1Database,
+  input: {
+    jobId: string;
+    deviceId: string;
+    workerId: string;
+    claimTokenHash: string;
+    observedAt: string;
+  },
+) {
+  await requireDmMemoryReplyFence(db, input.jobId);
+  const folded = await db.prepare(
+    `update briar_channel_agent_reply_jobs
+       set applied_steer_revision = steer_revision, updated_at = ?
+     where id = ? and claimed_device_id = ? and claimed_worker_id = ?
+       and claim_token_hash = ? and status = 'running'
+       and steer_revision > applied_steer_revision
+       and lease_expires_at > ?
+       and coalesce(error, '') <> 'dm_reply_stop_unconfirmed'
+       and exists (
+         select 1 from briar_channel_agents current_roster
+         where current_roster.channel_id = briar_channel_agent_reply_jobs.channel_id
+           and current_roster.agent_id = briar_channel_agent_reply_jobs.agent_id
+       )
+       and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
+       and ${dmMemoryReplyFenceCurrent("briar_channel_agent_reply_jobs")}
+       and exists (
+         select 1 from briar_execution_workers binding
+         where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
+           and binding.device_id = briar_channel_agent_reply_jobs.claimed_device_id
+           and binding.state <> 'disabled'
+           and (
+             briar_channel_agent_reply_jobs.project_id is null
+             or binding.project_id = briar_channel_agent_reply_jobs.project_id
+           )
+       )
+     returning *`,
+  ).bind(
+    input.observedAt,
+    input.jobId,
+    input.deviceId,
+    input.workerId,
+    input.claimTokenHash,
+    input.observedAt,
+  ).first<ChannelReplyJobRow>();
+  if (!folded || !folded.session_id) return null;
+  const session = await getChannelReplySession(db, folded.session_id);
+  if (!session) return null;
+  /*
+    The claim's own reason, read back rather than invented: the fold does not
+    re-claim the session, so the payload keeps saying why this Worker holds it.
+  */
+  const claimEvent = await db.prepare(
+    `select reason from briar_channel_reply_session_events
+     where reply_job_id = ? and session_id = ? and event_type = 'claimed'
+     order by occurred_at desc, id desc limit 1`,
+  ).bind(folded.id, session.id).first<{ reason: string }>();
+  if (!claimEvent) return null;
+  return {
+    ...folded,
+    channel_reply_session: session,
+    session_claim_reason: claimEvent.reason,
+  };
 }
 
 export async function failChannelReply(
@@ -4648,10 +4811,8 @@ export async function failChannelReply(
 
 export type ChannelReplyCompletionInput = {
   acknowledgementReaction?: string | null;
-  memoryCitations?: readonly { documentId: string; version: number }[] | null;
-  memorySaveRequest?: {
-    readonly documents: readonly { documentId: string; version: number }[];
-  } | null;
+  /** Vault citations completion already accepted (memory-vault spec §8). */
+  memoryVaultCitations?: readonly AcceptedMemoryVaultCitation[];
   jobId: string;
   deviceId: string;
   workerId: string;
@@ -4731,10 +4892,14 @@ export async function completeChannelReply(
     input.document || input.issueProposal || input.issueBatchProposal ||
       input.executionProposal || input.skillExecutionProposal,
   );
+  if ((job.routing_action === "answer" || job.routing_action === "clarify") &&
+    (artifactRequested || delegation || agentMessage || input.attachments?.length)) {
+    throw new Error("A conversational DM routing decision cannot perform work");
+  }
   if (
     input.publishedFinalBatchId &&
     (artifactRequested || delegation || agentMessage ||
-      input.memoryCitations?.length || input.memorySaveRequest ||
+      input.memoryVaultCitations?.length ||
       input.attachments?.length)
   ) {
     throw new Error(
@@ -4764,7 +4929,7 @@ export async function completeChannelReply(
   */
   if (
     job.agent_message_hop === 1 &&
-    (delegation || artifactRequested || input.memorySaveRequest)
+    (delegation || artifactRequested)
   ) {
     throw new Error(
       "An Agent-to-Agent answer can only carry a body and attachments",
@@ -4802,7 +4967,7 @@ export async function completeChannelReply(
     throw new Error("Project Agent output must target its claimed project");
   }
   if (delegation && (job.project_id !== null || job.delegated_by_reply_job_id)) {
-    throw new Error("Only a top-level Organization Agent reply can delegate");
+    throw new Error("Only a top-level Workspace Agent reply can delegate");
   }
   if (delegation && (
     input.document || input.issueProposal || input.issueBatchProposal ||
@@ -4824,7 +4989,7 @@ export async function completeChannelReply(
   }
   if (input.issueProposal?.executeAfterCreate && job.project_id === null) {
     throw new Error(
-      "An Organization Agent must delegate create-and-execute requests",
+      "An Workspace Agent must delegate create-and-execute requests",
     );
   }
   if (input.issueProposal && input.executionProposal) {
@@ -4862,7 +5027,7 @@ export async function completeChannelReply(
   /*
     Second line of defence behind the completion application: a send only
     applies from an untouched hop-0 turn in a conversation with a person, and
-    only towards another Agent of the same organization.
+    only towards another Agent of the same workspace.
   */
   const agentMessageGuardSql = `and (
          ? = 0
@@ -5050,6 +5215,7 @@ export async function completeChannelReply(
          set status = 'completed', completed_at = ?, updated_at = ?
          where id = ? and claimed_device_id = ? and claimed_worker_id = ?
            and claim_token_hash = ? and status = 'running'
+           and coalesce(routing_action, 'new') <> 'pending'
            and steer_revision = applied_steer_revision
            and lease_expires_at > ?
            and exists (
@@ -5059,7 +5225,6 @@ export async function completeChannelReply(
            )
            and ${liveChannelReplyRuntime("briar_channel_agent_reply_jobs")}
            and ${dmMemoryReplyFenceCurrent("briar_channel_agent_reply_jobs")}
-           and ${dmMemoryCitationsCurrent("briar_channel_agent_reply_jobs")}
            and exists (
              select 1 from briar_execution_workers binding
              where binding.id = briar_channel_agent_reply_jobs.claimed_worker_id
@@ -5171,10 +5336,6 @@ export async function completeChannelReply(
         input.workerId,
         input.claimTokenHash,
         input.completedAt,
-        JSON.stringify([
-          ...(input.memoryCitations ?? []),
-          ...(input.memorySaveRequest?.documents ?? []),
-        ]),
         input.publishedFinalBatchId ?? null,
         input.body,
         input.publishedFinalBatchId ?? null,
@@ -5230,22 +5391,15 @@ export async function completeChannelReply(
         input.publishedFinalBatchId ?? null,
       ),
   );
-  if (input.memoryCitations?.length) {
-    statements.push(dmMemoryCitationStatement(db, {
+  if (input.memoryVaultCitations?.length) {
+    statements.push(memoryVaultCitationStatement(db, {
       jobId: input.jobId,
       claimTokenHash: input.claimTokenHash,
       messageId: job.reply_message_id,
       completedAt: input.completedAt,
-      references: input.memoryCitations,
+      citations: input.memoryVaultCitations,
     }));
   }
-  statements.push(...dmLearningReplyOutboxStatements(db, {
-    jobId: input.jobId,
-    claimTokenHash: input.claimTokenHash,
-    completedAt: input.completedAt,
-    explicitRequested: input.memorySaveRequest != null,
-    requestTargets: input.memorySaveRequest?.documents,
-  }));
   for (const attachment of input.attachments ?? []) {
     statements.push(
       db
@@ -6053,55 +6207,8 @@ export async function completeChannelReply(
     );
   }
   if (job.agent_message_hop === 1 && originJob) {
-    const inboundMessageId = crypto.randomUUID();
     const relayJobId = crypto.randomUUID();
     statements.push(
-      /*
-        Copied under the answering Agent's name so the person's timeline can
-        say who spoke, with the relay row carrying the link back to the
-        original message.
-      */
-      db.prepare(
-        `insert into briar_channel_messages (
-           id, channel_id, parent_message_id, author_user_id, author_agent_id,
-           author_agent_name, author_agent_provider, body, created_at,
-           updated_at
-         )
-         select ?, origin.channel_id,
-                case when origin_channel.kind = 'dm' then null
-                  else coalesce(origin.parent_message_id,
-                                origin.trigger_message_id) end,
-                null, claim.agent_id, ?, ?, ?, ?, ?
-         from briar_channel_agent_reply_jobs claim
-         join briar_channel_agent_reply_jobs origin
-           on origin.id = claim.origin_reply_job_id
-          and origin.organization_id = claim.organization_id
-          and origin.agent_message_hop = 0
-         join briar_channels origin_channel on origin_channel.id = origin.channel_id
-         where ${claimedCompletion} and claim.agent_message_hop = 1`,
-      ).bind(
-        inboundMessageId,
-        input.agentName,
-        input.agentProvider,
-        input.body,
-        input.completedAt,
-        input.completedAt,
-        ...claimedCompletionBindings(),
-      ),
-      db.prepare(
-        `insert into briar_channel_message_relays (
-           message_id, direction, peer_channel_id, peer_message_id,
-           origin_reply_job_id, created_at
-         )
-         select ?, 'inbound', claim.channel_id, claim.reply_message_id,
-                claim.origin_reply_job_id, ?
-         from briar_channel_agent_reply_jobs claim
-         where ${claimedCompletion} and claim.agent_message_hop = 1`,
-      ).bind(
-        inboundMessageId,
-        input.completedAt,
-        ...claimedCompletionBindings(),
-      ),
       /*
         The sending Agent picks its own thread back up: the relay turn joins the
         origin job's own session, and with it the provider conversation, so the
@@ -6126,6 +6233,12 @@ export async function completeChannelReply(
         input.completedAt,
         ...claimedCompletionBindings(),
       ),
+      /*
+        The turn is triggered by the notice the sending Agent already left in
+        the person's conversation ("메시지 보냄 → B"), so the answer needs no
+        copy of its own: it stays the one message it always was, in the
+        Agent-to-Agent conversation, and the claim reads it from there.
+      */
       db.prepare(
         `insert into briar_channel_agent_reply_jobs (
            id, organization_id, channel_id, project_id, agent_id, skill_id,
@@ -6134,12 +6247,16 @@ export async function completeChannelReply(
            origin_reply_job_id, created_at, updated_at
          )
          select ?, origin.organization_id, origin.channel_id,
-                origin.project_id, origin.agent_id, null, session.id, ?,
+                origin.project_id, origin.agent_id, null, session.id,
+                notice.message_id,
                 origin.parent_message_id, ?, session.provider, 'queued', 2,
                 origin.id, ?, ?
          from briar_channel_agent_reply_jobs claim
          join briar_channel_agent_reply_jobs origin
            on origin.id = claim.origin_reply_job_id
+         join briar_channel_message_relays notice
+           on notice.origin_reply_job_id = origin.id
+          and notice.direction = 'outbound'
          join briar_channel_reply_sessions session
            on session.id = origin.session_id
           and session.channel_id = origin.channel_id
@@ -6148,7 +6265,6 @@ export async function completeChannelReply(
          on conflict (channel_id, trigger_message_id, agent_id) do nothing`,
       ).bind(
         relayJobId,
-        inboundMessageId,
         crypto.randomUUID(),
         input.completedAt,
         input.completedAt,
@@ -6187,12 +6303,12 @@ export async function completeChannelReply(
     workerId: input.workerId,
     claimTokenHash: input.claimTokenHash,
     completedAt: input.completedAt,
-    organizationId: job.organization_id,
+    workspaceId: job.organization_id,
     channelId: job.channel_id,
     channelMessageId: job.reply_message_id,
     body: input.body,
     approvalSummary: whatsappApprovalSummary,
-    appOrigin: input.whatsappAppOrigin ?? "https://briar.wordbricks.ai",
+    appOrigin: input.whatsappAppOrigin ?? "https://briar.onequery.dev",
   }));
   statements.push(
     db.prepare(
@@ -6378,7 +6494,7 @@ export async function declineChannelActionProposal(
 
 /**
  * Records the member's approval target before creating the issue. The guarded
- * update is the serialization point for organization Agent proposals whose
+ * update is the serialization point for workspace Agent proposals whose
  * project is chosen at approval time: two members may retry the same target,
  * but they can never create the proposal in two different projects.
  *
@@ -6393,7 +6509,7 @@ export async function declineChannelActionProposal(
 export async function reserveChannelActionProposalApproval(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     proposalId: string;
     projectId: string;
@@ -6467,7 +6583,7 @@ export async function reserveChannelActionProposalApproval(
       input.projectId,
       input.userId,
       input.projectId,
-      input.organizationId,
+      input.workspaceId,
       input.userId,
       input.projectId,
     )
@@ -6532,7 +6648,7 @@ export async function acceptChannelActionProposal(
 export async function getChannelExecutionProposal(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     proposalId: string;
     userId: string;
@@ -6556,7 +6672,7 @@ export async function getChannelExecutionProposal(
     )
     .bind(
       input.proposalId,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.userId,
     )
@@ -6566,7 +6682,7 @@ export async function getChannelExecutionProposal(
 export async function getChannelAgentSkillExecutionProposal(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     proposalId: string;
     userId: string;
@@ -6612,7 +6728,7 @@ export async function getChannelAgentSkillExecutionProposal(
     )
     .bind(
       input.proposalId,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.userId,
     )
@@ -6622,7 +6738,7 @@ export async function getChannelAgentSkillExecutionProposal(
 export async function reserveChannelExecutionProposalApproval(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     channelId: string;
     proposalId: string;
     userId: string;
@@ -6718,7 +6834,7 @@ export async function reserveChannelExecutionProposalApproval(
       input.dispatchRequestId,
       input.reservedAt,
       input.proposalId,
-      input.organizationId,
+      input.workspaceId,
       input.channelId,
       input.userId,
       input.provider,
@@ -6733,31 +6849,31 @@ export async function reserveChannelExecutionProposalApproval(
 
 export async function getChannelSyncCursor(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
 ) {
   const row = await db
     .prepare(
       `select current_version from briar_channel_sync_state
        where organization_id = ?`,
     )
-    .bind(organizationId)
+    .bind(workspaceId)
     .first<{ current_version: number }>();
   return row?.current_version ?? 0;
 }
 
 /**
  * Channel deltas answer "what changed for this member" rather than "what
- * changed in the organization": changes in channels the caller cannot see are
+ * changed in the workspace": changes in channels the caller cannot see are
  * consumed by the cursor but never returned.
  */
 export async function loadChannelDelta(
   db: D1Database,
-  organizationId: string,
+  workspaceId: string,
   userId: string,
   since: number,
   limit = 200,
 ) {
-  const currentCursor = await getChannelSyncCursor(db, organizationId);
+  const currentCursor = await getChannelSyncCursor(db, workspaceId);
   if (currentCursor <= since) {
     return {
       cursor: since,
@@ -6776,7 +6892,7 @@ export async function loadChannelDelta(
        where organization_id = ? and version > ?
        order by version limit ?`,
     )
-    .bind(organizationId, since, limit + 1)
+    .bind(workspaceId, since, limit + 1)
     .all<{
       version: number;
       channel_id: string;
@@ -6807,7 +6923,7 @@ export async function loadChannelDelta(
           `select channel.id from briar_channels channel
            where channel.organization_id = ? and ${readableByUser}`,
         )
-        .bind(organizationId, userId, userId)
+        .bind(workspaceId, userId, userId)
         .all<{ id: string }>()
     ).results.map((row) => row.id),
   );
@@ -6857,7 +6973,7 @@ export async function loadChannelDelta(
             `${channelSelectForUser} where channel.organization_id = ?
              and channel.id in (${[...channelIds].map(() => "?").join(", ")})`,
           )
-          .bind(userId, userId, userId, organizationId, ...channelIds)
+          .bind(userId, userId, userId, workspaceId, ...channelIds)
           .all<ChannelRow>()
       ).results
     : [];
@@ -6880,7 +6996,7 @@ export async function loadChannelDelta(
           .prepare(
             `${messageSelect} where message.id in (${[...messageIds]
               .map(() => "?")
-              .join(", ")})`,
+              .join(", ")}) and not ${agentAnswerCopySql("message")}`,
           )
           .bind(...messageIds)
           .all<ChannelMessageRow>()

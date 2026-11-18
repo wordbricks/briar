@@ -57,7 +57,7 @@ const teamAgentApplicationServices: TeamAgentApplicationServices = {
 async function resolveDesignatedWorker(
   db: D1Database,
   input: {
-    readonly organizationId: string;
+    readonly workspaceId: string;
     readonly projectId: string;
     readonly workerId: string | null;
     readonly provider: TeamAgentRow["provider"];
@@ -68,7 +68,7 @@ async function resolveDesignatedWorker(
 ) {
   if (!input.workerId) return null;
   const worker = await services.getDesignatedWorker(db, {
-    organizationId: input.organizationId,
+    workspaceId: input.workspaceId,
     projectId: input.projectId,
     workerId: input.workerId,
     provider: input.provider,
@@ -79,7 +79,7 @@ async function resolveDesignatedWorker(
   if (!worker) {
     throw new TeamAgentApplicationError(
       "designated_worker_invalid",
-      "Designated Worker must belong to the same organization and project",
+      "Designated Worker must belong to the same workspace and project",
     );
   }
   if (worker.availability !== "available") {
@@ -103,7 +103,7 @@ export async function createTeamAgentApplication(
   const designatedWorker = await resolveDesignatedWorker(
     db,
     {
-      organizationId: project.organization_id,
+      workspaceId: project.organization_id,
       projectId: project.id,
       workerId: write.designatedWorkerId ?? null,
       provider: write.provider,
@@ -147,7 +147,7 @@ export async function updateTeamAgentApplication(
   const designatedWorker = await resolveDesignatedWorker(
     db,
     {
-      organizationId: project.organization_id,
+      workspaceId: project.organization_id,
       projectId: project.id,
       workerId:
         write.designatedWorkerId === undefined

@@ -27,7 +27,10 @@ import "google/protobuf/timestamp.proto";
 // and provider-specific streams intentionally use their dedicated transports.
 service WorkerQueueService {
   rpc ClaimWork(ClaimWorkRequest) returns (ClaimWorkResponse);
+  rpc ExecuteDmScheduleTool(ExecuteDmScheduleToolRequest) returns (ExecuteDmScheduleToolResponse);
+  rpc ResolveDmReplyRouting(ResolveDmReplyRoutingRequest) returns (ResolveDmReplyRoutingResponse);
   rpc AcknowledgeChannelReplySteer(AcknowledgeChannelReplySteerRequest) returns (AcknowledgeChannelReplySteerResponse);
+  rpc RefreshChannelReplyClaim(RefreshChannelReplyClaimRequest) returns (RefreshChannelReplyClaimResponse);
   rpc RenewWorkLease(RenewWorkLeaseRequest) returns (RenewWorkLeaseResponse);
   rpc CheckpointChannelReplySession(CheckpointChannelReplySessionRequest) returns (CheckpointChannelReplySessionResponse);
   rpc PrepareReplyAttachmentUploads(PrepareReplyAttachmentUploadsRequest) returns (PrepareReplyAttachmentUploadsResponse);
@@ -41,13 +44,24 @@ service WorkerQueueService {
   rpc RecordMergeBatchValidation(RecordMergeBatchValidationRequest) returns (RecordMergeBatchValidationResponse);
   rpc CompleteMergeBatchPublication(CompleteMergeBatchPublicationRequest) returns (CompleteMergeBatchPublicationResponse);
   rpc BlockMergeBatch(BlockMergeBatchRequest) returns (BlockMergeBatchResponse);
-  rpc CheckDmMemoryClaim(CheckDmMemoryClaimRequest) returns (CheckDmMemoryClaimResponse);
-  rpc GetDmMemoryBrief(GetDmMemoryBriefRequest) returns (GetDmMemoryBriefResponse);
-  rpc LookupDmMemory(LookupDmMemoryRequest) returns (LookupDmMemoryResponse);
-  rpc ReserveDmMemoryLearningCall(ReserveDmMemoryLearningCallRequest) returns (ReserveDmMemoryLearningCallResponse);
-  rpc SubmitDmMemoryLearningProposal(SubmitDmMemoryLearningProposalRequest) returns (SubmitDmMemoryLearningProposalResponse);
-  rpc SubmitDmMemoryLearningVerification(SubmitDmMemoryLearningVerificationRequest) returns (SubmitDmMemoryLearningVerificationResponse);
-  rpc FailDmMemoryLearning(FailDmMemoryLearningRequest) returns (FailDmMemoryLearningResponse);
+  // Memory vault tools (docs/plans/memory-vault-spec.md §6, §7).
+  rpc MemoryVaultList(MemoryVaultListRequest) returns (MemoryVaultListResponse);
+  rpc MemoryVaultRead(MemoryVaultReadRequest) returns (MemoryVaultReadResponse);
+  rpc MemoryVaultSearch(MemoryVaultSearchRequest) returns (MemoryVaultSearchResponse);
+  rpc MemoryVaultJournal(MemoryVaultJournalRequest) returns (MemoryVaultJournalResponse);
+  rpc MemoryVaultSave(MemoryVaultSaveRequest) returns (MemoryVaultSaveResponse);
+  rpc GetMemoryVaultContext(GetMemoryVaultContextRequest) returns (GetMemoryVaultContextResponse);
+  // Agent workspace tools: `tools issue …` and `tools channel …`
+  // (docs/plans/agent-workspace-tools.md).
+  rpc AgentIssueList(AgentIssueListRequest) returns (AgentIssueListResponse);
+  rpc AgentIssueShow(AgentIssueShowRequest) returns (AgentIssueShowResponse);
+  rpc AgentIssueCreate(AgentIssueCreateRequest) returns (AgentIssueCreateResponse);
+  rpc AgentIssueNote(AgentIssueNoteRequest) returns (AgentIssueNoteResponse);
+  rpc AgentIssueSetStatus(AgentIssueSetStatusRequest) returns (AgentIssueSetStatusResponse);
+  rpc AgentIssueUpdate(AgentIssueUpdateRequest) returns (AgentIssueUpdateResponse);
+  rpc AgentChannelList(AgentChannelListRequest) returns (AgentChannelListResponse);
+  rpc AgentChannelRead(AgentChannelReadRequest) returns (AgentChannelReadResponse);
+  rpc AgentChannelPost(AgentChannelPostRequest) returns (AgentChannelPostResponse);
 }
 
 // Ephemeral reply activity uses the short-lived capability returned with a
@@ -329,8 +343,10 @@ message ClaimedWork {
     ClaimedChannelReply channel_reply = 3;
     ClaimedProjectAgentTask project_agent_task = 4;
     ClaimedMergeBatch merge_batch = 5;
-    ClaimedDmMemoryLearning dm_memory = 6;
   }
+  // Legacy DM memory learning jobs (removed with the D1 memory system).
+  reserved 6;
+  reserved "dm_memory";
 }
 
 message RenewWorkLeaseRequest {
@@ -350,21 +366,19 @@ message WorkClaimIdentity {
     ChannelReplyClaimIdentity channel_reply = 12;
     ProjectAgentTaskClaimIdentity project_agent_task = 13;
     MergeBatchClaimIdentity merge_batch = 14;
-    DmMemoryLearningClaimIdentity dm_memory = 15;
   }
+  // Legacy DM memory learning jobs (removed with the D1 memory system).
+  reserved 15;
+  reserved "dm_memory";
 }
 
 message IssueClaimIdentity {}
 message IssueReplyClaimIdentity {}
 message ProjectAgentTaskClaimIdentity {}
 message MergeBatchClaimIdentity {}
-message DmMemoryLearningClaimIdentity {
-  string organization_id = 1;
-  string input_hash = 2;
-}
 
 message ChannelReplyClaimIdentity {
-  string organization_id = 1;
+  string workspace_id = 1;
 }
 
 message RenewWorkLeaseResponse {
@@ -375,8 +389,10 @@ message RenewWorkLeaseResponse {
     ChannelReplyLeaseRenewal channel_reply = 12;
     ProjectAgentTaskLeaseRenewal project_agent_task = 13;
     MergeBatchLeaseRenewal merge_batch = 14;
-    DmMemoryLearningLeaseRenewal dm_memory = 15;
   }
+  // Legacy DM memory learning jobs (removed with the D1 memory system).
+  reserved 15;
+  reserved "dm_memory";
 }
 
 message CheckpointChannelReplySessionRequest {
@@ -421,6 +437,10 @@ message ReplyIssueDraft {
   string title = 1;
   optional string description = 2;
   optional uint32 priority = 3;
+  // Conversation attachments the created issue must carry. Only a channel
+  // reply fills this; an issue-conversation proposal is already inside the
+  // issue that owns its files, so the server ignores it there.
+  repeated string attachment_ids = 5;
 }
 
 message IssueReplyReworkAction {
@@ -556,8 +576,12 @@ message ChannelReplySuccess {
   string body = 1;
   optional string conversation_id = 2;
   repeated briar.types.v1.UploadReference attachments = 3;
+  // Vault records this claim read, as `{document_id: <record id>, version:
+  // <revision>}` (docs/plans/memory-vault-spec.md §8).
   repeated briar.app.v1.DmMemoryReference memory_citations = 4;
-  optional DmMemorySaveRequest memory_save_request = 5;
+  // Legacy D1 memory save request; older Workers may still send it.
+  reserved 5;
+  reserved "memory_save_request";
   // Optional DM reaction selected with the reply; invalid values retain the acknowledgement.
   optional string acknowledgement_reaction = 6;
   // The FINAL batch already published for this reply. Completion verifies the
@@ -576,10 +600,6 @@ message ChannelReplySuccess {
     ChannelReplyDelegationAction delegation = 12;
     ChannelReplyAgentMessageAction agent_message = 13;
   }
-}
-
-message DmMemorySaveRequest {
-  repeated briar.app.v1.DmMemoryReference documents = 1;
 }
 
 message CompleteChannelReplyRequest {
@@ -634,40 +654,6 @@ message PublishDmMessageBatchResponse {
   bool replayed = 5;
 }
 
-message DmMemoryClaimIdentity {
-  string project_id = 1;
-  string worker_id = 2;
-  WorkClaimIdentity work = 3;
-  uint64 revocation_epoch = 4;
-}
-
-message CheckDmMemoryClaimRequest {
-  DmMemoryClaimIdentity claim = 1;
-}
-
-message CheckDmMemoryClaimResponse {
-  briar.app.v1.DmMemoryDescriptor memory = 1;
-}
-
-message GetDmMemoryBriefRequest {
-  DmMemoryClaimIdentity claim = 1;
-}
-
-message GetDmMemoryBriefResponse {
-  briar.app.v1.DmMemoryDescriptor memory = 1;
-  google.protobuf.Value brief = 2;
-}
-
-message LookupDmMemoryRequest {
-  DmMemoryClaimIdentity claim = 1;
-  string request_id = 2;
-  google.protobuf.Value request = 3;
-}
-
-message LookupDmMemoryResponse {
-  google.protobuf.Value response = 1;
-}
-
 message PublishReplyActivityRequest {
   string reply_job_id = 1;
   uint64 sequence = 2;
@@ -694,99 +680,6 @@ message ChannelReplyLeaseRenewal {
 
 message MergeBatchLeaseRenewal {
   string batch_id = 1;
-}
-
-message DmMemoryLearningLeaseRenewal {}
-
-message ClaimedDmMemoryLearning {
-  string work_id = 1;
-  string run_id = 2;
-  string organization_id = 3;
-  string worker_id = 4;
-  string source_key = 5;
-  string title = 6;
-  string claim_token = 7;
-  google.protobuf.Timestamp claimed_at = 8;
-  google.protobuf.Timestamp lease_expires_at = 9;
-  string input_hash = 10;
-  bytes snapshot_json = 11;
-}
-
-enum DmMemoryLearningStage {
-  DM_MEMORY_LEARNING_STAGE_UNSPECIFIED = 0;
-  DM_MEMORY_LEARNING_STAGE_PROPOSING = 1;
-  DM_MEMORY_LEARNING_STAGE_VERIFYING = 2;
-}
-
-enum DmMemoryLearningFailure {
-  DM_MEMORY_LEARNING_FAILURE_UNSPECIFIED = 0;
-  DM_MEMORY_LEARNING_FAILURE_INVALID_PROPOSAL = 1;
-  DM_MEMORY_LEARNING_FAILURE_VERIFICATION_REJECTED = 2;
-  DM_MEMORY_LEARNING_FAILURE_STALE = 3;
-  DM_MEMORY_LEARNING_FAILURE_SCOPE_REVOKED = 4;
-  DM_MEMORY_LEARNING_FAILURE_BUDGET_EXHAUSTED = 5;
-  DM_MEMORY_LEARNING_FAILURE_MODEL_UNAVAILABLE = 6;
-  DM_MEMORY_LEARNING_FAILURE_MODEL_TIMEOUT = 7;
-  DM_MEMORY_LEARNING_FAILURE_MODEL_CREDENTIALS = 8;
-  DM_MEMORY_LEARNING_FAILURE_MODEL_CONFIGURATION = 9;
-  DM_MEMORY_LEARNING_FAILURE_INPUT_CAPACITY = 10;
-}
-
-message DmMemoryLearningUsage {
-  uint64 input_tokens = 1;
-  uint64 output_tokens = 2;
-  optional uint64 cost_micro_usd = 3;
-}
-
-message DmMemoryLearningRequestIdentity {
-  string project_id = 1;
-  string worker_id = 2;
-  WorkClaimIdentity work = 3;
-}
-
-message ReserveDmMemoryLearningCallRequest {
-  DmMemoryLearningRequestIdentity claim = 1;
-  string call_id = 2;
-  DmMemoryLearningStage stage = 3;
-}
-
-message SubmitDmMemoryLearningProposalRequest {
-  DmMemoryLearningRequestIdentity claim = 1;
-  string call_id = 2;
-  bytes proposal_json = 3;
-  DmMemoryLearningUsage usage = 4;
-}
-
-message SubmitDmMemoryLearningVerificationRequest {
-  DmMemoryLearningRequestIdentity claim = 1;
-  string call_id = 2;
-  string proposal_id = 3;
-  string proposal_hash = 4;
-  bytes verification_json = 5;
-  DmMemoryLearningUsage usage = 6;
-}
-
-message FailDmMemoryLearningRequest {
-  DmMemoryLearningRequestIdentity claim = 1;
-  DmMemoryLearningFailure code = 2;
-  optional string call_id = 3;
-  optional DmMemoryLearningUsage usage = 4;
-}
-
-message ReserveDmMemoryLearningCallResponse {
-  bytes json = 1;
-}
-
-message SubmitDmMemoryLearningProposalResponse {
-  bytes json = 1;
-}
-
-message SubmitDmMemoryLearningVerificationResponse {
-  bytes json = 1;
-}
-
-message FailDmMemoryLearningResponse {
-  bool released = 1;
 }
 
 message HandoffWorkRequest {
@@ -1213,17 +1106,17 @@ message ClaimedIssueReply {
 }
 
 message ChannelReplyScope {
-  message Organization {
-    string organization_id = 1;
+  message Workspace {
+    string workspace_id = 1;
   }
 
   message Project {
-    string organization_id = 1;
+    string workspace_id = 1;
     string project_id = 2;
   }
 
   oneof scope {
-    Organization organization = 1;
+    Workspace workspace = 1;
     Project project = 2;
   }
 }
@@ -1250,7 +1143,7 @@ message ChannelDelegationTarget {
 }
 
 // An Agent the claiming Agent may message directly. Unlike a delegation target
-// this one is not restricted to the channel roster, and an Organization Agent
+// this one is not restricted to the channel roster, and an Workspace Agent
 // has no project, so both project fields are optional.
 message ChannelAgentMessageTarget {
   string agent_id = 1;
@@ -1308,7 +1201,7 @@ message ClaimedChannelReply {
   google.protobuf.Timestamp claimed_at = 16;
   google.protobuf.Timestamp lease_expires_at = 17;
   optional ChannelActivityCredential activity = 18;
-  optional google.protobuf.Timestamp organization_context_snapshot_at = 19;
+  optional google.protobuf.Timestamp workspace_context_snapshot_at = 19;
   optional ClaimedChannelDelegation delegation = 20;
   repeated ChannelDelegationTarget delegation_targets = 21;
   optional ChannelReplySession session = 22;
@@ -1317,8 +1210,10 @@ message ClaimedChannelReply {
   google.protobuf.Struct snapshot = 24;
   // Trigger-message files with claim-scoped raw download URLs.
   repeated QueuedAttachment trigger_attachments = 25;
-  optional briar.app.v1.DmMemoryDescriptor memory = 26;
-  bool memory_learning_enabled = 27;
+  // Legacy D1 memory descriptor and learning flag. DM memory is the vault,
+  // reached through `tools memory` and GetMemoryVaultContext.
+  reserved 26, 27;
+  reserved "memory", "memory_learning_enabled";
   // Agents this claim may message directly. Empty whenever the reply is not
   // eligible to start an Agent-to-Agent conversation.
   repeated ChannelAgentMessageTarget agent_message_targets = 28;
@@ -1338,6 +1233,17 @@ message ClaimedChannelReply {
   // Explicit claim-scoped negotiation. Input revision zero is valid and cannot
   // distinguish an eligible initial DM from an ineligible channel reply.
   uint32 dm_public_message_protocol = 34;
+  optional DmReplyRouting routing = 35;
+  // The acknowledgement reaction this Agent already holds on the trigger
+  // message. Present only when an earlier attempt of this same job published
+  // one, so a steer restart or a lease-expiry retry neither re-publishes the
+  // placeholder nor spends a provider turn choosing the emoji again.
+  optional string acknowledgement_reaction = 36;
+  // The reply answers a person in a 1:1 DM with this Agent. Its failure text
+  // and provider block messages can echo the DM, recalled memory or the prompt,
+  // so the Worker reports only a fixed failure code and the block headline.
+  // Absent means an older server: the Worker redacts as if true.
+  optional bool direct_message = 37;
 }
 
 message PublishedDmMessageBatch {
@@ -1466,8 +1372,460 @@ message AcknowledgeChannelReplySteerRequest {
   string project_id = 1;
   string worker_id = 2;
   WorkClaimIdentity work = 3;
+  // Report uncertainty without acknowledging shutdown or permitting a restart.
+  bool stop_unconfirmed = 4;
 }
 
 message AcknowledgeChannelReplySteerResponse {
   bool released = 1;
+}
+
+// Folds a steer that landed after the claim into the same claim, before the
+// provider turn starts. There is no restart: the attempt and the steer restart
+// count stay exactly as they are, and the caller keeps its claim token.
+message RefreshChannelReplyClaimRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  // Must contain the exact active channel_reply claim. Other work variants and
+  // unknown oneof cases are rejected rather than inferred from scalar fields.
+  WorkClaimIdentity work = 3;
+}
+
+message RefreshChannelReplyClaimResponse {
+  // False when nothing was pending: `reply` is then absent and the caller keeps
+  // the claim payload it already holds.
+  bool steered = 1;
+  // The same claim, rebuilt against the folded input: updated snapshot, pending
+  // trigger messages, input revision and published batches.
+  optional ClaimedChannelReply reply = 2;
+}
+
+// A pending route can only run a separate, tool-free classification turn.
+message DmReplyRouting {
+  string action = 1;
+  optional string target_job_id = 2;
+  optional string response = 3;
+  // Persisted classification while an earlier control input is still pending.
+  optional string proposed_action = 4;
+}
+
+message ResolveDmReplyRoutingRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  DmReplyRouting decision = 4;
+}
+
+message ResolveDmReplyRoutingResponse {
+  DmReplyRouting decision = 1;
+}
+
+// This operation inherits its workspace, DM, owner and Agent from the live claim.
+message DmScheduleToolOperation {
+  string action = 1;
+  string request_key = 2;
+  string schedule_id = 3;
+  string instruction = 4;
+  optional uint32 delay_seconds = 5;
+  optional string run_at = 6;
+  optional uint32 interval_seconds = 7;
+  string time_zone = 8;
+  bool time_zone_confirmed = 9;
+  optional string previous_job_id = 10;
+}
+
+message ExecuteDmScheduleToolRequest {
+  string project_id = 1;
+  string worker_id = 2;
+  WorkClaimIdentity work = 3;
+  DmScheduleToolOperation operation = 4;
+}
+
+message DmScheduleSummary {
+  string id = 1;
+  string instruction = 2;
+  string next_run_at = 3;
+  optional uint32 interval_seconds = 4;
+  string time_zone = 5;
+  bool enabled = 6;
+  uint32 revision = 7;
+  optional string current_job_id = 8;
+  string next_run_display = 9;
+  optional string stop_state = 10;
+}
+
+message ExecuteDmScheduleToolResponse {
+  repeated DmScheduleSummary schedules = 1;
+  bool replayed = 2;
+  string notice = 3;
+  bool truncated = 4;
+}
+
+// Memory vault (docs/plans/memory-vault-spec.md). The server derives the one
+// vault a run may touch from the claim alone: no request names an
+// organization, owner, Agent, channel, project or vault. Tool failures are
+// Connect errors carrying briar.types.v1.ApplicationErrorDetail with the stable
+// code (revision_conflict, expected_revision_required, protected_record,
+// type_mismatch, memory_disabled, write_not_allowed, secret_detected,
+// invalid_record, frontmatter_not_allowed, readme_read_only, not_found, busy,
+// memory_unavailable, idempotency_conflict, claim_inactive, invalid_request).
+// revision_conflict and expected_revision_required also carry
+// briar.types.v1.RevisionConflictDetail with the record's current revision.
+// busy and memory_unavailable are retryable.
+message MemoryVaultClaim {
+  string project_id = 1;
+  string worker_id = 2;
+  // An active issue, issue_reply, channel_reply or project_agent_task claim.
+  // Other or unknown variants fail closed.
+  WorkClaimIdentity work = 3;
+}
+
+message MemoryVaultRecordSummary {
+  string id = 1;
+  // A record type from the vault layout, or "readme" for the README.
+  string type = 2;
+  string path = 3;
+  optional string status = 4;
+  repeated string aliases = 5;
+  uint32 revision = 6;
+  optional string updated_at = 7;
+  bool protected_by_user = 8;
+}
+
+message MemoryVaultListRequest {
+  MemoryVaultClaim claim = 1;
+  optional string type = 2;
+  optional string prefix = 3;
+  optional string status = 4;
+  optional string cursor = 5;
+  optional uint32 limit = 6;
+}
+
+message MemoryVaultListResponse {
+  // Newest update first; the README leads the first page.
+  repeated MemoryVaultRecordSummary records = 1;
+  optional string next_cursor = 2;
+}
+
+message MemoryVaultReadRequest {
+  MemoryVaultClaim claim = 1;
+  // A record id, a repository path, a daily date id, or README.md.
+  string target = 2;
+  optional uint32 revision = 3;
+}
+
+message MemoryVaultReadResponse {
+  MemoryVaultRecordSummary record = 1;
+  optional string created_at = 2;
+  // The body without frontmatter; for README.md the application template.
+  string body = 3;
+  bool latest = 4;
+  optional string commit = 5;
+}
+
+message MemoryVaultSearchRequest {
+  MemoryVaultClaim claim = 1;
+  string text = 2;
+  optional string type = 3;
+  optional string prefix = 4;
+  // Opaque; pins the commit the search started from.
+  optional string cursor = 5;
+  optional uint32 limit = 6;
+}
+
+message MemoryVaultSearchHit {
+  string id = 1;
+  string type = 2;
+  string path = 3;
+  uint32 revision = 4;
+  uint32 line = 5;
+  string snippet = 6;
+}
+
+message MemoryVaultSearchResponse {
+  repeated MemoryVaultSearchHit hits = 1;
+  // Absent on the last page.
+  optional string next_cursor = 2;
+  optional string commit = 3;
+}
+
+message MemoryVaultJournalRequest {
+  MemoryVaultClaim claim = 1;
+  // Generated by the CLI per invocation and reused on its transport retries.
+  string request_id = 2;
+  string text = 3;
+  // ISO 8601 with offset; absent means server now.
+  optional string occurred_at = 4;
+  repeated string references = 5;
+  bool user_requested = 6;
+}
+
+message MemoryVaultJournalResponse {
+  string id = 1;
+  string path = 2;
+  string line = 3;
+  uint32 revision = 4;
+  string commit = 5;
+  bool deduplicated = 6;
+  bool replayed = 7;
+}
+
+message MemoryVaultSaveRequest {
+  MemoryVaultClaim claim = 1;
+  string request_id = 2;
+  string id = 3;
+  string type = 4;
+  optional string status = 5;
+  repeated string aliases = 6;
+  // Required when the record exists; omitted only to create it.
+  optional uint32 expected_revision = 7;
+  bool user_requested = 8;
+  // Markdown body only; the server generates the frontmatter.
+  string content = 9;
+}
+
+message MemoryVaultSaveResponse {
+  string id = 1;
+  string type = 2;
+  string path = 3;
+  uint32 revision = 4;
+  string commit = 5;
+  // Playbook and voice lines dropped to stay within their size limit.
+  repeated string dropped_lines = 6;
+  bool replayed = 7;
+}
+
+message GetMemoryVaultContextRequest {
+  MemoryVaultClaim claim = 1;
+  // The context_key of the last context this CLI injected.
+  optional string known_context_key = 2;
+}
+
+message GetMemoryVaultContextResponse {
+  oneof state {
+    // This run has no vault (no Agent): inject nothing.
+    MemoryVaultContextNone none = 1;
+    // Head and permissions are unchanged since known_context_key.
+    MemoryVaultContextUnchanged unchanged = 2;
+    MemoryVaultContext context = 3;
+  }
+}
+
+message MemoryVaultContextNone {}
+
+message MemoryVaultContextUnchanged {
+  string context_key = 1;
+}
+
+message MemoryVaultContext {
+  // Covers the vault head and the current permissions.
+  string context_key = 1;
+  optional string head = 2;
+  // "dm", "group" or "project".
+  string scope_kind = 3;
+  // The application-owned README, for the trusted run instructions.
+  string readme = 4;
+  // One line saying what is allowed now; follows the README.
+  string status = 5;
+  // Record bodies for <voice-memory>, <voice-guide> and <playbook-memory>.
+  // Empty when the record is missing or recall is off.
+  string voice = 6;
+  string voice_guide = 7;
+  string playbook = 8;
+  bool readable = 9;
+  bool writable = 10;
+  bool user_requested_writable = 11;
+}
+
+// Agent workspace tools (docs/plans/agent-workspace-tools.md). The caller never
+// names an organization, team or acting Agent: the server derives all three
+// from the claim. Issue tools act on the team the Worker binding authenticated
+// for; channel tools act on the non-DM organization channels whose roster
+// holds the claim's Agent. Tool failures are Connect errors carrying
+// briar.types.v1.ApplicationErrorDetail with a stable code (claim_inactive,
+// not_found, invalid_request, not_allowed, no_agent, issue_in_execution,
+// own_run, rate_limited, idempotency_conflict, conflict, unavailable).
+// Writes carry a request key; a repeated (claim work, request key) with the
+// same payload returns the stored result with replayed = true, and with a
+// different payload fails with idempotency_conflict.
+message AgentWorkspaceClaim {
+  string project_id = 1;
+  string worker_id = 2;
+  // An active issue, issue_reply, channel_reply or project_agent_task claim.
+  // Other or unknown variants fail closed.
+  WorkClaimIdentity work = 3;
+  // The provider running this turn; recorded as the author provider of
+  // agent-written notes and posts.
+  briar.types.v1.AgentProvider agent_provider = 4;
+}
+
+message AgentIssueSummary {
+  string id = 1;
+  // The team issue key, e.g. "AH-123".
+  string key = 2;
+  string title = 3;
+  // backlog, queued, running, blocked, failed, completed or cancelled.
+  string status = 4;
+  bool paused = 5;
+  optional uint32 priority = 6;
+  string updated_at = 7;
+}
+
+message AgentIssueListRequest {
+  AgentWorkspaceClaim claim = 1;
+  repeated string statuses = 2;
+  optional string text = 3;
+  optional string cursor = 4;
+  optional uint32 limit = 5;
+}
+
+message AgentIssueListResponse {
+  repeated AgentIssueSummary issues = 1;
+  optional string next_cursor = 2;
+}
+
+message AgentIssueShowRequest {
+  AgentWorkspaceClaim claim = 1;
+  // An issue id or issue key.
+  string issue = 2;
+}
+
+message AgentIssueNoteView {
+  string id = 1;
+  optional string parent_message_id = 2;
+  string author_name = 3;
+  bool author_is_agent = 4;
+  string body = 5;
+  string created_at = 6;
+}
+
+message AgentIssueShowResponse {
+  AgentIssueSummary issue = 1;
+  optional string description = 2;
+  optional string workflow_stage = 3;
+  optional string result_summary = 4;
+  optional string parent_key = 5;
+  // The most recent conversation messages, oldest first.
+  repeated AgentIssueNoteView notes = 6;
+  bool notes_truncated = 7;
+  optional string pending_execution_approval_id = 8;
+}
+
+message AgentIssueCreateRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string title = 3;
+  optional string description = 4;
+  optional uint32 priority = 5;
+  // An issue id or issue key in the same team.
+  optional string parent = 6;
+  // Asks a person to approve execution. The issue is still created in backlog.
+  bool request_execution = 7;
+}
+
+message AgentIssueCreateResponse {
+  AgentIssueSummary issue = 1;
+  // Set when request_execution asked for approval.
+  optional string execution_approval_id = 2;
+  bool replayed = 3;
+}
+
+message AgentIssueNoteRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string issue = 3;
+  string body = 4;
+}
+
+message AgentIssueNoteResponse {
+  string message_id = 1;
+  AgentIssueSummary issue = 2;
+  bool replayed = 3;
+}
+
+message AgentIssueSetStatusRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string issue = 3;
+  // backlog, blocked, completed or cancelled; queued asks for execution approval.
+  string status = 4;
+  optional string reason = 5;
+}
+
+message AgentIssueSetStatusResponse {
+  AgentIssueSummary issue = 1;
+  // "moved", "unchanged", or "approval_requested" for queued.
+  string outcome = 2;
+  optional string execution_approval_id = 3;
+  bool replayed = 4;
+}
+
+message AgentIssueUpdateRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string issue = 3;
+  optional string title = 4;
+  optional string description = 5;
+  optional uint32 priority = 6;
+}
+
+message AgentIssueUpdateResponse {
+  AgentIssueSummary issue = 1;
+  bool replayed = 2;
+}
+
+message AgentChannelSummary {
+  string id = 1;
+  string name = 2;
+  optional string topic = 3;
+  // The channel this channel-reply claim is answering in.
+  bool current = 4;
+}
+
+message AgentChannelListRequest {
+  AgentWorkspaceClaim claim = 1;
+}
+
+message AgentChannelListResponse {
+  repeated AgentChannelSummary channels = 1;
+}
+
+message AgentChannelMessageView {
+  string id = 1;
+  optional string parent_message_id = 2;
+  string author_name = 3;
+  bool author_is_agent = 4;
+  string body = 5;
+  string created_at = 6;
+}
+
+message AgentChannelReadRequest {
+  AgentWorkspaceClaim claim = 1;
+  // A channel id or channel name.
+  string channel = 2;
+  // A root message id: read that thread instead of the timeline.
+  optional string thread = 3;
+  optional string cursor = 4;
+  optional uint32 limit = 5;
+}
+
+message AgentChannelReadResponse {
+  AgentChannelSummary channel = 1;
+  // Oldest first within the page; next_cursor pages further back.
+  repeated AgentChannelMessageView messages = 2;
+  optional string next_cursor = 3;
+}
+
+message AgentChannelPostRequest {
+  AgentWorkspaceClaim claim = 1;
+  string request_key = 2;
+  string channel = 3;
+  optional string thread = 4;
+  string body = 5;
+}
+
+message AgentChannelPostResponse {
+  string message_id = 1;
+  AgentChannelSummary channel = 2;
+  bool replayed = 3;
 }

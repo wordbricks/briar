@@ -1,11 +1,12 @@
 import {
+  getHuntRunForProject,
   getTeam,
   HuntTransitionError,
   moveHuntRun,
   transferIssue,
 } from "./db";
 import { HttpError } from "./http-response";
-import { hasOrganizationCapability } from "./organization-access";
+import { hasWorkspaceCapability } from "./workspace-access";
 import { decodeTeamTransferInput } from "./team-request-contract";
 import {
   decodeMoveRunInput,
@@ -40,7 +41,7 @@ async function requireIssueExecutionProject(
 ) {
   const project = await getTeam(input.db, input.projectId, input.userId);
   if (!project) throw new HttpError(404, "Project not found");
-  if (!hasOrganizationCapability(project.member_role, capability)) {
+  if (!hasWorkspaceCapability(project.member_role, capability)) {
     throw new HttpError(403, deniedMessage);
   }
   return project;
@@ -67,7 +68,7 @@ export async function transferProjectIssue(
   if (targetProject.organization_id !== sourceProject.organization_id) {
     throw new HttpError(
       403,
-      "Issues can only be transferred within the same organization",
+      "Issues can only be transferred within the same workspace",
     );
   }
   const outcome = await transferIssue(input.db, {
@@ -142,7 +143,7 @@ export async function recoverProjectIssueRun(
     (result.outcome === "cancelled" || result.outcome === "already_cancelled")
   ) {
     await auditExecutionEvent(input.db, {
-      organizationId: project.organization_id,
+      workspaceId: project.organization_id,
       projectId: project.id,
       runId: input.runId,
       actorUserId: input.userId,
@@ -181,10 +182,28 @@ export async function moveProjectIssueRun(
 ) {
   const project = await requireIssueExecutionProject(
     input,
-    "issues:execute",
-    "Issue execution permission required",
+    "issues:write",
+    "Issue editing permission required",
   );
   const request = decodeMoveRunInput(input.request);
+  const editorCorrection = !hasWorkspaceCapability(
+    project.member_role, "issues:execute",
+  );
+  if (editorCorrection) {
+    // Editors can correct an unclaimed queue entry, but cannot start, redirect,
+    // or override execution (including a queued run already dispatched).
+    const run = await getHuntRunForProject(input.db, project.id, input.runId);
+    if (!run) throw new HttpError(404, "Run not found");
+    if (
+      request.status !== "backlog" ||
+      !["backlog", "queued"].includes(run.status) ||
+      run.dispatch_request_id !== null ||
+      run.claimed_by !== null ||
+      run.lease_expires_at !== null
+    ) {
+      throw new HttpError(403, "Issue execution permission required");
+    }
+  }
   try {
     const result = await moveHuntRun(input.db, project.id, {
       runId: input.runId,
@@ -193,6 +212,7 @@ export async function moveProjectIssueRun(
       requestId: request.requestId,
       actor: `briar-app:${input.userId}`,
       occurredAt: new Date().toISOString(),
+      requireUnclaimedQueueCorrection: editorCorrection,
     });
     if (result.outcome === "not_found") {
       throw new HttpError(404, "Run not found");

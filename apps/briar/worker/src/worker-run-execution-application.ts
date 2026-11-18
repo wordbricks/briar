@@ -174,13 +174,13 @@ export type WorkerRunExecutionApplicationServices = {
   readonly attemptGithubAutoResume: typeof attemptGithubMergeAutoResume;
   readonly getMergeQueueProfile: typeof getMergeQueueProfile;
   readonly registerReadyMergeCandidates: typeof registerReadyMergeCandidates;
-  readonly projectOrganizationId: (
+  readonly projectWorkspaceId: (
     db: D1Database,
     projectId: string,
   ) => Promise<string | null>;
 };
 
-const projectOrganizationId = async (
+const projectWorkspaceId = async (
   db: D1Database,
   projectId: string,
 ) => (await db
@@ -199,7 +199,7 @@ const workerRunExecutionApplicationServices: WorkerRunExecutionApplicationServic
   attemptGithubAutoResume: attemptGithubMergeAutoResume,
   getMergeQueueProfile,
   registerReadyMergeCandidates,
-  projectOrganizationId,
+  projectWorkspaceId,
 };
 
 const terminalStatuses = new Set<AutoHuntPersistedRunStatus>([
@@ -335,13 +335,13 @@ export async function recordWorkerRunEventApplication(
     );
     const runId = await services.recordEvent(input.db, input.projectId, event);
     if (event.status === "completed" && run?.worker_id) {
-      const organizationId = await services.projectOrganizationId(
+      const workspaceId = await services.projectWorkspaceId(
         input.db,
         input.projectId,
       );
-      if (organizationId) {
+      if (workspaceId) {
         await services.auditEvent(input.db, {
-          organizationId,
+          workspaceId,
           projectId: input.projectId,
           runId,
           workerId: run.worker_id,

@@ -93,13 +93,13 @@ export async function publishReplyActivityApplication(
         observedAt: new Date().toISOString(),
         emoji: input.acknowledgementReaction,
       });
-      await services.publishChannelRealtime(input.env, channel.organizationId,
-        await services.getChannelSyncCursor(input.db, channel.organizationId));
+      await services.publishChannelRealtime(input.env, channel.workspaceId,
+        await services.getChannelSyncCursor(input.db, channel.workspaceId));
       return;
     }
     const frame = services.channelActivityFrame({
       id: channel.replyJobId,
-      organization_id: channel.organizationId,
+      organization_id: channel.workspaceId,
       channel_id: channel.channelId,
       agent_id: channel.agentId,
       trigger_message_id: channel.triggerMessageId,
@@ -108,7 +108,7 @@ export async function publishReplyActivityApplication(
     }, input.activity);
     await services.publishChannelActivity(
       input.env,
-      channel.organizationId,
+      channel.workspaceId,
       frame,
     );
     return;
@@ -130,7 +130,7 @@ export async function publishReplyActivityApplication(
     }, input.activity);
     await services.publishIssueActivity(
       input.env,
-      issue.organizationId,
+      issue.workspaceId,
       frame,
     );
     return;

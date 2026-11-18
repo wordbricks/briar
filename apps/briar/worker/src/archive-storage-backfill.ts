@@ -182,7 +182,7 @@ async function portArchive(
         sha256: objectSha256,
       },
       sha256: objectSha256,
-      storageClass: "InfrequentAccess",
+      storageClass: "Standard",
     });
   }
   await verifyObject(

@@ -91,7 +91,7 @@ describe("team settings sync", () => {
       executionWorker: {
         deviceId: "managed-22222222-2222-4222-8222-222222222222",
         workerId: "worker-1",
-        organizationId: "33333333-3333-4333-8333-333333333333",
+        workspaceId: "33333333-3333-4333-8333-333333333333",
         label: "Managed computer",
         maxConcurrentSessions: 1,
       },

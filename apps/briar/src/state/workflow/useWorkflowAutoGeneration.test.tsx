@@ -16,7 +16,7 @@ import type {
   SessionUser,
   TeamSettings,
 } from "../../types";
-import { activeOrganizationIdAtom } from "../organization/atoms";
+import { activeWorkspaceIdAtom } from "../workspace/atoms";
 import { hydratedAccountAtom } from "../persistence/hydration";
 import { applySnapshot, collectSnapshot } from "../persistence/snapshot";
 import { createTestRegistry, type AtomRegistry } from "../registry";
@@ -32,8 +32,8 @@ import {
   workspaceApiAtom,
   workspaceModesAtom,
   type WorkspaceApi,
-} from "../workspace/api";
-import { connectedTeamIdsAtom } from "../workspace/atoms";
+} from "../local-workspace/api";
+import { connectedTeamIdsAtom } from "../local-workspace/atoms";
 import { useWorkflowAutoGeneration } from "./useWorkflowAutoGeneration";
 
 const teamOf = (id: string): Project => ({ ...demoDashboard.team, id, name: id });
@@ -111,7 +111,7 @@ const seedRegistry = () => {
   return createTestRegistry([
     [tokenAtom, "token-1"],
     [userAtom, user],
-    [activeOrganizationIdAtom, teamA.organizationId],
+    [activeWorkspaceIdAtom, teamA.workspaceId],
     [teamsAtom, [teamA]],
     [activeTeamIdAtom, teamA.id],
     [connectedTeamIdsAtom, [teamA.id]],
@@ -143,7 +143,7 @@ const hydratedRegistry = () => {
   Atom.batch(() => {
     applySnapshot(registry, stored);
     registry.set(hydratedAccountAtom, {
-      organizationId: stored.organizationId,
+      workspaceId: stored.workspaceId,
       userId: stored.userId,
     });
   });

@@ -256,14 +256,16 @@ describe("CLI config loading", () => {
 
   it("keeps the enrolled API origin authoritative over environment overrides", async () => {
     const managedComputerId = "44444444-4444-4444-8444-444444444444";
-    const organizationId = "55555555-5555-4555-8555-555555555555";
+    const workspaceId = "55555555-5555-4555-8555-555555555555";
     const directory = await configDirectory({
       apiUrl: "https://stored.example",
       ...localSettings,
       managedComputer: {
         managedComputerId,
         deviceId: `managed-${managedComputerId}`,
-        organizationId,
+        // Written straight to `config.json`, so this is the persisted
+        // ProtoJSON shape, which keeps the pre-rename `organizationId`.
+        organizationId: workspaceId,
         credentialFile: "/tmp/briar-managed-credential-placeholder.json",
       },
       teams: [],
@@ -276,7 +278,7 @@ describe("CLI config loading", () => {
     await writeFile(credentialFile, JSON.stringify({
       credential: `briar_worker_${"a".repeat(43)}`,
       deviceId: `managed-${managedComputerId}`,
-      organizationId,
+      organizationId: workspaceId,
       managedComputerId,
       apiOrigin: "https://enrolled.example",
     }), { mode: 0o600 });

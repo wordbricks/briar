@@ -2,7 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
   IssueAttachmentSchema,
-  OrganizationMemberSchema,
+  WorkspaceMemberSchema as WorkspaceMemberSchema,
   ProjectRole,
   RelatedMessageReferenceSchema,
   ResultReviewSchema,
@@ -16,8 +16,7 @@ import {
   StructuredRunResult_Outcome,
   StructuredRunResultSchema,
   StructuredRunResult_Urgency,
-  UserSchema,
-} from "@briar/contracts/gen/briar/app/v1/common_pb";
+  UserSchema} from "@briar/contracts/gen/briar/app/v1/common_pb";
 import {
   InboxChannelMessageSchema,
   InboxConversationMessageSchema,
@@ -25,8 +24,7 @@ import {
   InboxIssueMessageSchema,
   InboxMessageIdentitySchema,
   InboxSessionMessage_Status,
-  InboxSessionMessageSchema,
-} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
+  InboxSessionMessageSchema} from "@briar/contracts/gen/briar/app/v1/inbox_pb";
 import {
   ChannelNotificationSchema,
   ConversationNotificationSchema,
@@ -44,22 +42,19 @@ import {
   TrackerReferenceSchema,
   WaitingCheckpointSchema,
   WorkerIcon_Kind,
-  WorkerIconSchema,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  WorkerIconSchema} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { AgentExecutionMetricsSchema } from "@briar/contracts/gen/briar/types/v1/agent_execution_pb";
 import {
   LinearSettingsSchema,
   TeamExecutionWorkerPolicy_SelectionMode,
   TeamExecutionWorkerPolicySchema,
   TeamSchema,
-  TeamSettingsSchema,
-} from "@briar/contracts/gen/briar/app/v1/team_pb";
+  TeamSettingsSchema} from "@briar/contracts/gen/briar/app/v1/team_pb";
 import {
-  OrganizationInvitationPreviewSchema,
-  OrganizationInvitationSchema,
-  OrganizationInvitationStatus,
-  OrganizationSchema,
-} from "@briar/contracts/gen/briar/app/v1/organization_pb";
+  WorkspaceInvitationPreviewSchema as WorkspaceInvitationPreviewSchema,
+  WorkspaceInvitationSchema as WorkspaceInvitationSchema,
+  WorkspaceInvitationStatus as WorkspaceInvitationStatus,
+  WorkspaceSchema as WorkspaceSchema} from "@briar/contracts/gen/briar/app/v1/workspace_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import {
   AutoHuntWorkflowSchema,
@@ -71,8 +66,7 @@ import {
   WorkflowCompletionSchema,
   WorkflowExecutionSchema,
   WorkflowRequirementSchema,
-  WorkflowStageSchema,
-} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
+  WorkflowStageSchema} from "@briar/contracts/gen/briar/types/v1/workflow_pb";
 import type {
   AutoHuntWorkflow,
   AutoHuntWorkflowCheckpoint,
@@ -90,11 +84,11 @@ import type {
   issueConversationNotificationJson,
 } from "./issue-conversation-json";
 import type {
-  OrganizationInvitationRow,
-  OrganizationMemberRow,
-  OrganizationRole,
-  OrganizationRow,
-} from "./organization-repository";
+  WorkspaceInvitationRow,
+  WorkspaceMemberRow,
+  WorkspaceRole,
+  WorkspaceRow,
+} from "./workspace-repository";
 import type { TeamRow } from "./team-repository";
 import type { settingsJson } from "./team-settings-json";
 import type { checkpointPolicyJson } from "./workflow-policy";
@@ -106,7 +100,7 @@ const projectRole = {
   developer: ProjectRole.DEVELOPER,
   editor: ProjectRole.EDITOR,
   viewer: ProjectRole.VIEWER,
-} as const satisfies Record<OrganizationRole, ProjectRole>;
+} as const satisfies Record<WorkspaceRole, ProjectRole>;
 
 const runStatus = {
   backlog: RunStatus.BACKLOG,
@@ -141,7 +135,7 @@ const structuredUrgency = {
 const structuredImpact = {
   issue: StructuredRunResult_Impact.ISSUE,
   project: StructuredRunResult_Impact.PROJECT,
-  organization: StructuredRunResult_Impact.ORGANIZATION,
+  organization: StructuredRunResult_Impact.WORKSPACE,
 } as const;
 
 const sessionStatus = {
@@ -177,11 +171,11 @@ export const appUser = (user: {
   image: user.image ?? undefined,
 });
 
-export const appOrganizationMember = (
-  member: OrganizationMemberRow,
+export const appWorkspaceMember = (
+  member: WorkspaceMemberRow,
   projectIds: readonly string[] = [],
 ) =>
-  create(OrganizationMemberSchema, {
+  create(WorkspaceMemberSchema, {
     userId: member.user_id,
     name: member.name,
     email: member.email,
@@ -191,41 +185,41 @@ export const appOrganizationMember = (
     projectIds: [...projectIds],
   });
 
-export const appOrganization = (organization: OrganizationRow) =>
-  create(OrganizationSchema, {
-    id: organization.id,
-    name: organization.name,
-    handle: organization.handle,
-    logo: organization.logo ?? undefined,
-    role: projectRole[organization.role],
-    createdAt: timestamp(organization.created_at),
+export const appWorkspace = (workspace: WorkspaceRow) =>
+  create(WorkspaceSchema, {
+    id: workspace.id,
+    name: workspace.name,
+    handle: workspace.handle,
+    logo: workspace.logo ?? undefined,
+    role: projectRole[workspace.role],
+    createdAt: timestamp(workspace.created_at),
   });
 
 const organizationInvitationStatus = (
-  invitation: OrganizationInvitationRow,
+  invitation: WorkspaceInvitationRow,
   observedAt: string,
 ) =>
   invitation.revoked_at
-    ? OrganizationInvitationStatus.REVOKED
+    ? WorkspaceInvitationStatus.REVOKED
     : invitation.accepted_at
-      ? OrganizationInvitationStatus.ACCEPTED
+      ? WorkspaceInvitationStatus.ACCEPTED
       : invitation.expires_at <= observedAt
-        ? OrganizationInvitationStatus.EXPIRED
-        : OrganizationInvitationStatus.PENDING;
+        ? WorkspaceInvitationStatus.EXPIRED
+        : WorkspaceInvitationStatus.PENDING;
 
 const maskInvitationEmail = (email: string) => {
   const [local = "", domain = ""] = email.split("@");
   return `${local.slice(0, 1) || "*"}***@${domain}`;
 };
 
-export const appOrganizationInvitation = (
-  invitation: OrganizationInvitationRow,
+export const appWorkspaceInvitation = (
+  invitation: WorkspaceInvitationRow,
   observedAt: string,
 ) =>
-  create(OrganizationInvitationSchema, {
+  create(WorkspaceInvitationSchema, {
     id: invitation.id,
-    organizationId: invitation.organization_id,
-    organizationName: invitation.organization_name,
+    workspaceId: invitation.organization_id,
+    workspaceName: invitation.organization_name,
     initialProjectId: invitation.initial_project_id,
     initialProjectName: invitation.initial_project_name,
     email: invitation.email_normalized,
@@ -239,14 +233,14 @@ export const appOrganizationInvitation = (
     createdAt: timestamp(invitation.created_at),
   });
 
-export const appOrganizationInvitationPreview = (
-  invitation: OrganizationInvitationRow,
+export const appWorkspaceInvitationPreview = (
+  invitation: WorkspaceInvitationRow,
   observedAt: string,
 ) =>
-  create(OrganizationInvitationPreviewSchema, {
+  create(WorkspaceInvitationPreviewSchema, {
     id: invitation.id,
-    organizationId: invitation.organization_id,
-    organizationName: invitation.organization_name,
+    workspaceId: invitation.organization_id,
+    workspaceName: invitation.organization_name,
     initialProjectId: invitation.initial_project_id,
     initialProjectName: invitation.initial_project_name,
     emailHint: maskInvitationEmail(invitation.email_normalized),
@@ -498,8 +492,8 @@ export const appProject = (project: TeamRow) => create(TeamSchema, {
   icon: project.icon ?? undefined,
   iconName: project.icon_name ?? undefined,
   iconColor: project.icon_color ?? undefined,
-  organizationId: project.organization_id,
-  organizationName: project.organization_name,
+  workspaceId: project.organization_id,
+  workspaceName: project.organization_name,
   role: projectRole[project.member_role],
   createdAt: timestamp(project.created_at),
 });
@@ -599,6 +593,9 @@ export const appDashboardRun = (run: DashboardRunJson) =>
       : undefined,
     assigneeUserId: run.assigneeUserId ?? undefined,
     createdByUserId: run.createdByUserId ?? undefined,
+    createdByAgent: run.createdByAgent
+      ? { agentId: run.createdByAgent.agentId ?? undefined, name: run.createdByAgent.name }
+      : undefined,
     subscribers: run.subscribers.map((subscriber) =>
       create(IssueSubscriberSchema, {
         userId: subscriber.userId,
@@ -607,7 +604,12 @@ export const appDashboardRun = (run: DashboardRunJson) =>
     ),
     issueDescription: run.issueDescription ?? undefined,
     relatedMessage: run.relatedMessage
-      ? create(RelatedMessageReferenceSchema, run.relatedMessage)
+      ? create(RelatedMessageReferenceSchema, {
+        workspaceId: run.relatedMessage.workspaceId,
+        channelId: run.relatedMessage.channelId,
+        messageId: run.relatedMessage.messageId,
+        rootMessageId: run.relatedMessage.rootMessageId,
+      })
       : undefined,
     attachments: run.attachments.map((attachment) =>
       create(IssueAttachmentSchema, {

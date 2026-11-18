@@ -71,7 +71,7 @@ import type {
   ExecutionWorker,
   HuntRun,
   IssueExecutionApprovalInput,
-  OrganizationMember,
+  WorkspaceMember,
   Project,
   ProjectExecutionWorkerPolicy,
 } from "../types";
@@ -124,10 +124,7 @@ import {
   saveChannelThreadWidth,
 } from "../lib/channel-thread-width";
 import { ChannelMessageText } from "./ChannelMessageText";
-import {
-  ChannelRelayFromLabel,
-  ChannelRelayOutboundNotice,
-} from "./ChannelRelayRow";
+import { ChannelRelayOutboundNotice } from "./ChannelRelayRow";
 import { ChannelMessageReactions } from "./ChannelMessageReactions";
 import { ChannelDocumentPreview } from "./ChannelDocumentPreview";
 import { ChannelThreadSubscribeControls } from "./ChannelThreadSubscribeControls";
@@ -203,12 +200,12 @@ import {
 import { useChannelConversationView } from "../state/channel-conversation/useChannelConversationView";
 
 type ChannelsProps = {
-  organizationId: string;
-  organizationName?: string;
+  workspaceId: string;
+  workspaceName?: string;
   token: string;
   currentUserId: string | null;
   channels: ChannelSummary[];
-  projects?: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  projects?: readonly Pick<Project, "id" | "name" | "workspaceId">[];
   activeChannelId: string | null;
   /** The catalog cursor, or `null` while the catalog has not landed yet. */
   channelCatalogCursor: number | null;
@@ -262,7 +259,7 @@ const preferOpenComputerPanel = () =>
     : true;
 
 type ChannelInviteCandidate =
-  | { type: "user"; id: string; member: OrganizationMember }
+  | { type: "user"; id: string; member: WorkspaceMember }
   | { type: "agent"; id: string; agent: ChannelAgentSummary };
 
 type ChannelInviteMode = "all" | "specific";
@@ -347,8 +344,8 @@ const channelReplyParticipants = (
     }));
 
 export function Channels({
-  organizationId,
-  organizationName = "",
+  workspaceId,
+  workspaceName = "",
   token,
   currentUserId,
   channels,
@@ -383,7 +380,7 @@ export function Channels({
   const [computerPanelAvailable, setComputerPanelAvailable] = useState(false);
   const computerPanelId = useId();
   const { t, localeTag } = useI18n();
-  const imageCache = useChannelMessageImageCache(`${organizationId}\0${token}`);
+  const imageCache = useChannelMessageImageCache(`${workspaceId}\0${token}`);
   useEffect(() => {
     if (!activeChannelId) return;
     const channel = channels.find((item) => item.id === activeChannelId);
@@ -397,7 +394,7 @@ export function Channels({
     onChannelsChange((current) =>
       markChannelCatalogRead(current, activeChannelId, lastReadAt),
     );
-    void markChannelRead(token, organizationId, activeChannelId, { lastReadAt })
+    void markChannelRead(token, workspaceId, activeChannelId, { lastReadAt })
       .catch(() => {
         // The next catalog snapshot restores unread if the write failed.
       });
@@ -405,7 +402,7 @@ export function Channels({
     activeChannelId,
     channels,
     onChannelsChange,
-    organizationId,
+    workspaceId,
     token,
   ]);
   const [headerProfile, setHeaderProfile] = useState<ProfileTarget | null>(null);
@@ -440,7 +437,7 @@ export function Channels({
   }, [activeChannelId, onViewingChannelChange, threadParentId]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteIsInitial, setInviteIsInitial] = useState(false);
-  const [inviteMembers, setInviteMembers] = useState<OrganizationMember[]>([]);
+  const [inviteMembers, setInviteMembers] = useState<WorkspaceMember[]>([]);
   const [inviteAgents, setInviteAgents] = useState<ChannelAgentSummary[]>([]);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteSaving, setInviteSaving] = useState(false);
@@ -605,7 +602,7 @@ export function Channels({
   useChannelMessagePolling({
     channelId: activeChannelId,
     enabled: readOnly,
-    organizationId,
+    workspaceId,
     token,
   });
 
@@ -644,7 +641,7 @@ export function Channels({
     setInviteError(null);
     setInviteMembers([]);
     setInviteAgents([]);
-    void listDirectMessageRecipients(token, organizationId)
+    void listDirectMessageRecipients(token, workspaceId)
       .then(({ members, agents }) => {
         if (activeChannelIdRef.current !== channelId) return;
         setInviteMembers(members);
@@ -660,7 +657,7 @@ export function Channels({
           setInviteLoading(false);
         }
       });
-  }, [activeChannelId, organizationId, token]);
+  }, [activeChannelId, workspaceId, token]);
 
   useEffect(() => {
     if (
@@ -721,7 +718,7 @@ export function Channels({
     setWebhooksError(null);
     setWebhooks([]);
     setRevealedWebhookUrl(null);
-    void listChannelWebhooks(token, organizationId, channelId)
+    void listChannelWebhooks(token, workspaceId, channelId)
       .then((result) => {
         if (activeChannelIdRef.current === channelId) {
           setWebhooks(result.webhooks);
@@ -737,7 +734,7 @@ export function Channels({
           setWebhooksLoading(false);
         }
       });
-  }, [activeChannelId, organizationId, token]);
+  }, [activeChannelId, workspaceId, token]);
 
   const openSettings = useCallback(() => {
     if (!activeChannelId) return;
@@ -753,7 +750,7 @@ export function Channels({
       try {
         const result = await updateChannel(
           token,
-          organizationId,
+          workspaceId,
           activeChannelId,
           input,
         );
@@ -768,7 +765,7 @@ export function Channels({
         setSettingsSaving(false);
       }
     },
-    [activeChannelId, onChannelsChange, organizationId, token],
+    [activeChannelId, onChannelsChange, workspaceId, token],
   );
 
   const createWebhook = useCallback(async (name: string) => {
@@ -777,7 +774,7 @@ export function Channels({
     setWebhooksError(null);
     try {
       const result = await createChannelWebhook(
-        token, organizationId, activeChannelId, name,
+        token, workspaceId, activeChannelId, name,
       );
       setWebhooks((current) => [...current, result.webhook]);
       setRevealedWebhookUrl(result.url);
@@ -787,7 +784,7 @@ export function Channels({
     } finally {
       setWebhooksSaving(false);
     }
-  }, [activeChannelId, organizationId, token]);
+  }, [activeChannelId, workspaceId, token]);
 
   const renameWebhook = useCallback(async (webhookId: string, name: string) => {
     if (!activeChannelId) return;
@@ -795,7 +792,7 @@ export function Channels({
     setWebhooksError(null);
     try {
       const result = await updateChannelWebhook(
-        token, organizationId, activeChannelId, webhookId, name,
+        token, workspaceId, activeChannelId, webhookId, name,
       );
       setWebhooks((current) => current.map((item) =>
         item.id === result.webhook.id ? result.webhook : item));
@@ -804,7 +801,7 @@ export function Channels({
     } finally {
       setWebhooksSaving(false);
     }
-  }, [activeChannelId, organizationId, token]);
+  }, [activeChannelId, workspaceId, token]);
 
   const rotateWebhook = useCallback(async (webhookId: string) => {
     if (!activeChannelId) return;
@@ -812,7 +809,7 @@ export function Channels({
     setWebhooksError(null);
     try {
       const result = await rotateChannelWebhook(
-        token, organizationId, activeChannelId, webhookId,
+        token, workspaceId, activeChannelId, webhookId,
       );
       setWebhooks((current) => current.map((item) =>
         item.id === result.webhook.id ? result.webhook : item));
@@ -822,7 +819,7 @@ export function Channels({
     } finally {
       setWebhooksSaving(false);
     }
-  }, [activeChannelId, organizationId, token]);
+  }, [activeChannelId, workspaceId, token]);
 
   const revokeWebhook = useCallback(async (webhookId: string) => {
     if (!activeChannelId) return;
@@ -830,7 +827,7 @@ export function Channels({
     setWebhooksError(null);
     try {
       const result = await revokeChannelWebhook(
-        token, organizationId, activeChannelId, webhookId,
+        token, workspaceId, activeChannelId, webhookId,
       );
       setWebhooks((current) => current.map((item) =>
         item.id === result.webhook.id ? result.webhook : item));
@@ -839,7 +836,7 @@ export function Channels({
     } finally {
       setWebhooksSaving(false);
     }
-  }, [activeChannelId, organizationId, token]);
+  }, [activeChannelId, workspaceId, token]);
 
   const addInvitees = useCallback(
     async (selected: ChannelInviteCandidate[]) => {
@@ -854,7 +851,7 @@ export function Channels({
       const refreshRoster = async () => {
         const refreshed = await loadChannel(
           token,
-          organizationId,
+          workspaceId,
           activeChannelId,
           { messageLimit: 1 },
         );
@@ -874,14 +871,14 @@ export function Channels({
             candidate.type === "user"
               ? setChannelMember(
                   token,
-                  organizationId,
+                  workspaceId,
                   activeChannelId,
                   candidate.id,
                   true,
                 )
               : setChannelAgent(
                   token,
-                  organizationId,
+                  workspaceId,
                   activeChannelId,
                   candidate.id,
                   true,
@@ -912,13 +909,13 @@ export function Channels({
         setInviteSaving(false);
       }
     },
-    [activeChannelId, onChannelsChange, organizationId, token],
+    [activeChannelId, onChannelsChange, workspaceId, token],
   );
 
 
   useEffect(() => {
     preparedChannelId.current = null;
-  }, [organizationId, token]);
+  }, [workspaceId, token]);
 
   /*
     Opening a channel no longer copies a cache into component state: the store
@@ -1481,7 +1478,7 @@ export function Channels({
                     </div>
                   ) : null}
                   <VirtualizedChannelMessageList
-                    key={`${organizationId}:${activeChannelId}`}
+                    key={`${workspaceId}:${activeChannelId}`}
                     localeTag={localeTag}
                     messages={messageSummaries}
                     onRowsResize={reportChannelRowsResize}
@@ -1515,7 +1512,7 @@ export function Channels({
                 members={members}
                 currentUserId={currentUserId}
                 channelName={activeChannelName}
-                key={`channel:${organizationId}:${activeChannelId}`}
+                key={`channel:${workspaceId}:${activeChannelId}`}
                 onInvite={() => openInvite()}
                 placeholder={
                   surface === "dm"
@@ -1546,7 +1543,7 @@ export function Channels({
             onAvailabilityChange={setComputerPanelAvailable}
             onClose={() => setComputerPanelOpen(false)}
             open={computerPanelOpen}
-            organizationId={organizationId}
+            workspaceId={workspaceId}
             services={computerPanelServices}
             token={token}
           />
@@ -1657,6 +1654,7 @@ export function Channels({
           <ChannelThreadTypingStrip
             channelId={activeChannelId ?? ""}
             className="channel-thread-typing"
+            showPendingReplyNames={activeChannel.kind !== "dm"}
           />
           <Composer
             agents={agents}
@@ -1665,7 +1663,7 @@ export function Channels({
             members={members}
             currentUserId={currentUserId}
             channelName={activeChannelName}
-            key={`thread:${organizationId}:${activeChannelId}:${threadParentId}`}
+            key={`thread:${workspaceId}:${activeChannelId}:${threadParentId}`}
             onInvite={() => openInvite()}
             placeholder={t("channel.threadPlaceholder")}
             onSend={(body, mentions, attachments, references, selectedSkill) =>
@@ -1717,7 +1715,7 @@ export function Channels({
           loading={inviteLoading}
           members={inviteMembers}
           initialInvite={inviteIsInitial}
-          organizationName={organizationName}
+          workspaceName={workspaceName}
           saving={inviteSaving}
           error={inviteError}
           onAdd={(selected) => void addInvitees(selected)}
@@ -1737,8 +1735,8 @@ export function Channels({
       />
       {memoryOpen && surface === "dm" && activeChannel && <Suspense fallback={null}>
         <DmMemoryDialog
-          key={`${organizationId}:${activeChannel.id}:${currentUserId}`}
-          scope={{ token, organizationId, channelId: activeChannel.id }} onClose={() => setMemoryOpen(false)}
+          key={`${workspaceId}:${activeChannel.id}:${currentUserId}`}
+          scope={{ token, workspaceId, channelId: activeChannel.id }} onClose={() => setMemoryOpen(false)}
         />
       </Suspense>}
       {surface === "channel" && webhooksOpen && activeChannel ? (
@@ -2157,7 +2155,7 @@ function ChannelSettingsDialog({
   currentUserId: string | null;
   error: string | null;
   members: ChannelMember[];
-  projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  projects: readonly Pick<Project, "id" | "name" | "workspaceId">[];
   saving: boolean;
   onAddPeople: () => void;
   onClose: () => void;
@@ -2198,9 +2196,9 @@ function ChannelSettingsDialog({
   const organizationProjects = useMemo(
     () =>
       projects.filter(
-        (project) => project.organizationId === channel.organizationId,
+        (project) => project.workspaceId === channel.workspaceId,
       ),
-    [channel.organizationId, projects],
+    [channel.workspaceId, projects],
   );
 
   const submitName = async () => {
@@ -2642,7 +2640,7 @@ function ChannelInviteDialog({
   initialInvite,
   loading,
   members,
-  organizationName,
+  workspaceName,
   saving,
   onAdd,
   onClose,
@@ -2654,8 +2652,8 @@ function ChannelInviteDialog({
   error: string | null;
   initialInvite: boolean;
   loading: boolean;
-  members: OrganizationMember[];
-  organizationName: string;
+  members: WorkspaceMember[];
+  workspaceName: string;
   saving: boolean;
   onAdd: (selected: ChannelInviteCandidate[]) => void;
   onClose: () => void;
@@ -2739,7 +2737,7 @@ function ChannelInviteDialog({
   );
   const selectedForAdd =
     initialInvite && inviteMode === "all" ? allMemberCandidates : selected;
-  const organizationLabel = organizationName || t("channel.inviteOrganizationFallback");
+  const organizationLabel = workspaceName || t("channel.inviteWorkspaceFallback");
   const canAdd =
     initialInvite && inviteMode === "all"
       ? !loading && !saving
@@ -2804,7 +2802,7 @@ function ChannelInviteDialog({
                 <strong>
                   {t("channel.inviteAllMembers", {
                     count: loading ? "…" : members.length,
-                    organization: organizationLabel,
+                    workspace: organizationLabel,
                   })}
                 </strong>
               </label>
@@ -2994,7 +2992,7 @@ export interface ChannelMessageRowContext {
     projectId: string,
     runId: string,
   ) => void | Promise<void>;
-  readonly projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  readonly projects: readonly Pick<Project, "id" | "name" | "workspaceId">[];
   readonly proposalProjects: Readonly<Record<string, string>>;
   readonly threadParentId: string | null;
   readonly token: string;
@@ -3112,7 +3110,7 @@ export const MessageRow = memo(function MessageRow({
   onIssueOpen?: (projectId: string, runId: string) => void | Promise<void>;
   busy: boolean;
   batchPosition?: ChannelMessageBatchPosition;
-  projects: readonly Pick<Project, "id" | "name" | "organizationId">[];
+  projects: readonly Pick<Project, "id" | "name" | "workspaceId">[];
   selectedProjectId: string | null;
   token: string;
   showTypingState?: boolean;
@@ -3209,7 +3207,7 @@ export const MessageRow = memo(function MessageRow({
   const issueProposal = message.proposal;
   const availableProjects = projects.filter(
     (project) =>
-      !project.organizationId || project.organizationId === channel.organizationId,
+      !project.workspaceId || project.workspaceId === channel.workspaceId,
   );
   const proposalProjectId =
     issueProposal?.projectId ?? channel.defaultProjectId ?? selectedProjectId;
@@ -3290,9 +3288,6 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
       </div>
       <div className="channel-message-body">
-        {relay?.direction === "inbound" ? (
-          <ChannelRelayFromLabel onOpen={onOpenRelay} relay={relay} />
-        ) : null}
         <header>
           <strong>{displayName}</strong>
           {message.author.type === "webhook" ? (
@@ -3306,12 +3301,12 @@ export const MessageRow = memo(function MessageRow({
         </header>
         <ChannelMessageText agents={agents} members={members} message={message} />
         {channel.kind === "dm" && <DmMemoryCitations
-          scope={{ token, organizationId: channel.organizationId, channelId: message.channelId }}
+          scope={{ token, workspaceId: channel.workspaceId, channelId: message.channelId }}
           references={message.memoryCitations ?? []} />}
         <ChannelLinkPreview
           channelId={message.channelId}
           message={message}
-          organizationId={channel.organizationId}
+          workspaceId={channel.workspaceId}
           token={token}
         />
         <ChannelMessageImages attachments={message.attachments} token={token} />
@@ -3319,7 +3314,7 @@ export const MessageRow = memo(function MessageRow({
           <ChannelDocumentPreview
             channelId={message.channelId}
             document={message.document}
-            organizationId={channel.organizationId}
+            workspaceId={channel.workspaceId}
             token={token}
           />
         ) : null}
@@ -3336,6 +3331,7 @@ export const MessageRow = memo(function MessageRow({
                     : t("channel.issueProposalPending")}
               </span>
               <ChannelIssueProposalDetails
+                channelId={message.channelId}
                 projectName={proposalProjectName}
                 proposal={issueProposal}
               />
@@ -3495,7 +3491,7 @@ export const MessageRow = memo(function MessageRow({
           onOpenThread={message.optimistic ? undefined : onOpenThread}
           onReactingChange={setReacting}
           onToggle={onToggleReaction}
-          organizationId={channel.organizationId}
+          workspaceId={channel.workspaceId}
           showHoverActions
         />
 

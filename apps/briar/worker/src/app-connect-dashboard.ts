@@ -2,8 +2,7 @@ import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import type { ConnectRouter, ServiceImpl } from "@connectrpc/connect";
 import {
   DashboardRun_Source,
-  DashboardService,
-} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
+  DashboardService} from "@briar/contracts/gen/briar/app/v1/dashboard_pb";
 import { RunStatus } from "@briar/contracts/gen/briar/app/v1/common_pb";
 import * as Schema from "effect/Schema";
 import { asPlanningProjectId } from "../../src/lib/entity-ids";
@@ -53,7 +52,7 @@ import {
   channelConversationNotificationJson,
   issueConversationNotificationJson,
 } from "./issue-conversation-json";
-import { listProjectMembers } from "./organization-repository";
+import { listProjectMembers } from "./workspace-repository";
 
 import {
   appAgentProvider,
@@ -63,7 +62,7 @@ import {
   appDashboardRunSummary,
   appDashboardWorker,
   appExecutionPolicy,
-  appOrganizationMember,
+  appWorkspaceMember,
   appProject,
   appProjectSettings,
   appRunEvent,
@@ -77,7 +76,7 @@ import { workerJson } from "./worker-json";
 import {
   getProjectExecutionWorkerPolicy,
   listExecutionWorkers,
-  listOrganizationExecutionProviders,
+  listWorkspaceExecutionProviders,
 } from "./workers";
 
 export type AppConnectDashboardInput = {
@@ -275,7 +274,7 @@ export const createAppDashboardService = (
       listIssueRelations(db, project.id),
       listIssueResultReviews(db, project.id),
       listExecutionWorkers(db, project.id, observedAt),
-      listOrganizationExecutionProviders(db, project.organization_id),
+      listWorkspaceExecutionProviders(db, project.organization_id),
       getProjectExecutionWorkerPolicy(db, project.id),
       listProjectMembers(db, project.id),
       listIssueConversationNotifications(db, project.id, session.user.id),
@@ -308,7 +307,7 @@ export const createAppDashboardService = (
         (provider) => appAgentProvider[provider],
       ),
       executionPolicy: appExecutionPolicy(executionPolicy),
-      members: members.map((member) => appOrganizationMember(member)),
+      members: members.map((member) => appWorkspaceMember(member)),
       conversationNotifications: conversationNotifications.map(
         (notification) => appConversationNotification(
           issueConversationNotificationJson(notification),
@@ -429,7 +428,7 @@ export const createAppDashboardService = (
       listIssueRelationsByRunIds(db, project.id, changedRunIdList),
       listIssueResultReviewsByRunIds(db, project.id, changedRunIdList),
       listExecutionWorkers(db, project.id, observedAt),
-      listOrganizationExecutionProviders(db, project.organization_id),
+      listWorkspaceExecutionProviders(db, project.organization_id),
     ]);
     const relations = indexRunRelations(
       attachments,
@@ -489,7 +488,7 @@ export const createAppDashboardService = (
         : undefined,
       members: dashboardListPatch(
         metadata?.[3] ?? null,
-        appOrganizationMember,
+        appWorkspaceMember,
       ),
       conversationNotifications: dashboardListPatch(
         conversationNotifications,

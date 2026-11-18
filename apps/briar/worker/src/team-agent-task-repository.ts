@@ -1,4 +1,3 @@
-import { dmLearningCapacityTable } from "./dm-memory-capacity";
 import {
   hydrateAgentSkills,
   type AgentSkillEffort,
@@ -266,10 +265,6 @@ export async function claimNextTeamAgentTask(
                       'enqueueing', 'waiting_tail', 'validating',
                       'publishing', 'draining'
                     ))
-                + (select count(*) from ${await dmLearningCapacityTable(db)} learning
-                    where learning.claimed_device_id = selected_device.id and learning.status = 'running'
-                      and learning.kind in ('extract', 'explicit_request', 'consolidate')
-                      and learning.lease_expires_at > ?)
                ) < selected_device.max_concurrent_sessions
            )
            and job.attempts < 3
@@ -292,7 +287,6 @@ export async function claimNextTeamAgentTask(
       input.workerId,
       input.workerId,
       input.workerId,
-      input.claimedAt,
       input.claimedAt,
       input.claimedAt,
       input.claimedAt,

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import {
-  OrganizationNotificationSchema,
+  WorkspaceNotificationSchema,
   ProjectChangedSchema,
 } from "@briar/contracts/gen/briar/realtime/v1/realtime_pb";
 import { create, toBinary } from "@bufbuild/protobuf";
@@ -48,7 +48,7 @@ describe("WebSocketRealtimeTransport", () => {
     transport.start();
     await new Promise((resolve) => setTimeout(resolve, 0));
     socket.emit("open", new Event("open"));
-    const frame = create(OrganizationNotificationSchema, {
+    const frame = create(WorkspaceNotificationSchema, {
       notification: {
         case: "projectChanged",
         value: create(ProjectChangedSchema, {
@@ -57,7 +57,7 @@ describe("WebSocketRealtimeTransport", () => {
         }),
       },
     });
-    const encoded = toBinary(OrganizationNotificationSchema, frame);
+    const encoded = toBinary(WorkspaceNotificationSchema, frame);
     socket.emit("message", {
       data: encoded.buffer.slice(
         encoded.byteOffset,

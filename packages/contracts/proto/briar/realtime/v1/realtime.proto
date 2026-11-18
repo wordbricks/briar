@@ -7,9 +7,9 @@ import "google/protobuf/timestamp.proto";
 
 option swift_prefix = "BriarRealtime_";
 
-// Small invalidation frames pushed over the organization WebSocket. Durable
+// Small invalidation frames pushed over the workspace WebSocket. Durable
 // snapshots and cursors remain authoritative in the app Connect services.
-message OrganizationNotification {
+message WorkspaceNotification {
   oneof notification {
     Ready ready = 1;
     ChannelsChanged channels_changed = 2;

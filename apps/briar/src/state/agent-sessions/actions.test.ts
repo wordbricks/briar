@@ -61,7 +61,7 @@ const harness = (api: Partial<AgentSessionApi> = {}) => {
 const configured = (registry: AtomRegistry) =>
   registry.set(agentSessionSyncContextAtom, {
     token: "token-1",
-    targets: [{ id: "project-1", organizationId: null }],
+    targets: [{ id: "project-1", workspaceId: null }],
   });
 
 const run = (id: string, overrides: Partial<HuntRun> = {}) =>
@@ -434,14 +434,14 @@ describe("configureSync", () => {
   it("keeps the context object identical for the same account and teams", () => {
     const { actions, registry } = harness();
     actions.configureSync("token-1", [
-      { id: "project-2", organizationId: "org-1" },
+      { id: "project-2", workspaceId: "org-1" },
       { id: "project-1" },
     ]);
     const first = registry.get(agentSessionSyncContextAtom);
     actions.configureSync("token-1", [
-      { id: "project-1", organizationId: null },
-      { id: "project-2", organizationId: "org-1" },
-      { id: "project-2", organizationId: "org-1" },
+      { id: "project-1", workspaceId: null },
+      { id: "project-2", workspaceId: "org-1" },
+      { id: "project-2", workspaceId: "org-1" },
     ]);
 
     expect(registry.get(agentSessionSyncContextAtom)).toBe(first);

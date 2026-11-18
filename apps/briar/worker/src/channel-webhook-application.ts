@@ -12,7 +12,7 @@ import { randomUrlSafeToken } from "./slack";
 
 type ChannelWebhookApplicationInput = {
   readonly db: D1Database;
-  readonly organizationId: string;
+  readonly workspaceId: string;
   readonly channelId: string;
   readonly userId: string;
 };
@@ -22,7 +22,7 @@ export async function listChannelWebhooksApplication(
 ) {
   const channel = await requireChannelWebhookManagement(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -34,7 +34,7 @@ export async function createChannelWebhookApplication(
 ) {
   const channel = await requireChannelWebhookManagement(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -61,7 +61,7 @@ export async function updateChannelWebhookApplication(
 ) {
   const channel = await requireChannelWebhookManagement(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -80,7 +80,7 @@ export async function rotateChannelWebhookApplication(
 ) {
   const channel = await requireChannelWebhookManagement(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );
@@ -101,7 +101,7 @@ export async function revokeChannelWebhookApplication(
 ) {
   const channel = await requireChannelWebhookManagement(
     input.db,
-    input.organizationId,
+    input.workspaceId,
     input.channelId,
     input.userId,
   );

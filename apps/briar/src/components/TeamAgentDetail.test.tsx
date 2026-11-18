@@ -15,7 +15,7 @@ import {
   companionPageAtom,
   navigationChannelIdAtom,
 } from "../state/navigation/atoms";
-import { activeOrganizationIdAtom } from "../state/organization/atoms";
+import { activeWorkspaceIdAtom } from "../state/workspace/atoms";
 import { createTestRegistry, type AtomRegistry } from "../state/registry";
 import { createReactTestRoot, flush } from "../test/react";
 import type { TeamAgentBoard } from "../types";
@@ -41,7 +41,7 @@ const agent = demoTeamAgents(board.team.id, "en")[0]!;
 
 const conversation: ChannelSummary = {
   id: "agent-dm-1",
-  organizationId: board.team.organizationId,
+  workspaceId: board.team.workspaceId,
   slug: "agent-dm-1",
   name: "Ava, Bay",
   topic: null,
@@ -130,7 +130,7 @@ afterEach(() => {
 describe("TeamAgentDetail conversations", () => {
   it("opens the conversation on the phone's direct message page", async () => {
     const registry = createTestRegistry([
-      [activeOrganizationIdAtom, board.team.organizationId],
+      [activeWorkspaceIdAtom, board.team.workspaceId],
     ]);
     const view = await renderDetail(registry, { companionMode: true });
 
@@ -147,7 +147,7 @@ describe("TeamAgentDetail conversations", () => {
 
   it("still records a visit on the desktop", async () => {
     const registry = createTestRegistry([
-      [activeOrganizationIdAtom, board.team.organizationId],
+      [activeWorkspaceIdAtom, board.team.workspaceId],
     ]);
     const view = await renderDetail(registry, { companionMode: false });
 

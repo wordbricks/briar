@@ -80,12 +80,12 @@ struct RealtimeConnectClient: Sendable {
     func organizationEvents(
         organizationID: UUID
     ) -> AsyncThrowingStream<ChannelRealtimeNotification, Error> {
-        var scope = BriarAPI_CreateRealtimeTicketRequest.OrganizationNotifications()
-        scope.organizationID = coreUUIDString(organizationID)
+        var scope = BriarAPI_CreateRealtimeTicketRequest.WorkspaceNotifications()
+        scope.workspaceID = coreUUIDString(organizationID)
         var request = BriarAPI_CreateRealtimeTicketRequest()
-        request.organizationNotifications = scope
+        request.workspaceNotifications = scope
         return webSocketEvents(request: request) { data in
-            let message = try BriarRealtime_OrganizationNotification(
+            let message = try BriarRealtime_WorkspaceNotification(
                 serializedBytes: data
             )
             return try ChannelRealtimeNotification(protobuf: message)
@@ -97,7 +97,7 @@ struct RealtimeConnectClient: Sendable {
         channelID: UUID
     ) -> AsyncThrowingStream<ChannelAgentActivityFrame, Error> {
         var scope = BriarAPI_CreateRealtimeTicketRequest.ChannelActivity()
-        scope.organizationID = coreUUIDString(organizationID)
+        scope.workspaceID = coreUUIDString(organizationID)
         scope.channelID = coreUUIDString(channelID)
         var request = BriarAPI_CreateRealtimeTicketRequest()
         request.channelActivity = scope

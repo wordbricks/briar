@@ -4,7 +4,7 @@ import type { VelenInspection } from "../../generated/tauri";
 
 /**
  * What the Velen CLI on this device reports: whether it is authenticated, which
- * organization it points at and which data sources that organization exposes.
+ * workspace it points at and which data sources that workspace exposes.
  *
  * It is device state like the workspace atoms, not account state — a second
  * machine signed into the same account can have a different answer — which is

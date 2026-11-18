@@ -4,14 +4,13 @@ import {
   AgentSkillApprovalPolicy,
   AgentSkillExecutionMode,
   AgentSkillKind,
-  OrganizationAgentSchema,
-  ProjectAgentSkillSchema,
-} from "@briar/contracts/gen/briar/app/v1/agent_pb";
+  WorkspaceAgentSchema,
+  ProjectAgentSkillSchema} from "@briar/contracts/gen/briar/app/v1/agent_pb";
 import { ComputerUsePolicy } from "@briar/contracts/gen/briar/types/v1/computer_use_pb";
 import { AgentProvider } from "@briar/contracts/gen/briar/types/v1/provider_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { AgentSkillRow } from "./agent-skills";
-import type { OrganizationAgentRow } from "./organization-agents";
+import type { WorkspaceAgentRow } from "./workspace-agents";
 
 const requiredTimestamp = (value: string, field: string) => {
   const date = new Date(value);
@@ -31,13 +30,13 @@ const provider = {
   openrouter: AgentProvider.OPENROUTER,
   vertex: AgentProvider.VERTEX,
   pi: AgentProvider.PI,
-} as const satisfies Record<OrganizationAgentRow["provider"], AgentProvider>;
+} as const satisfies Record<WorkspaceAgentRow["provider"], AgentProvider>;
 
 const computerUsePolicy = {
   disabled: ComputerUsePolicy.DISABLED,
   unattended: ComputerUsePolicy.UNATTENDED,
 } as const satisfies Record<
-  OrganizationAgentRow["computer_use_policy"],
+  WorkspaceAgentRow["computer_use_policy"],
   ComputerUsePolicy
 >;
 
@@ -56,7 +55,7 @@ const approvalPolicy = {
   explicit: AgentSkillApprovalPolicy.EXPLICIT,
 } as const satisfies Record<AgentSkillRow["approval_policy"], AgentSkillApprovalPolicy>;
 
-const appOrganizationAgentSkill = (skill: AgentSkillRow) =>
+const appWorkspaceAgentSkill = (skill: AgentSkillRow) =>
   create(ProjectAgentSkillSchema, {
     id: skill.id,
     agentId: skill.agent_id,
@@ -74,9 +73,9 @@ const appOrganizationAgentSkill = (skill: AgentSkillRow) =>
     updatedAt: requiredTimestamp(skill.updated_at, "Agent Skill update"),
   });
 
-/** Maps the organization-agent domain row directly to its generated API DTO. */
-export const appOrganizationAgent = (row: OrganizationAgentRow) =>
-  create(OrganizationAgentSchema, {
+/** Maps the workspace-agent domain row directly to its generated API DTO. */
+export const appWorkspaceAgent = (row: WorkspaceAgentRow) =>
+  create(WorkspaceAgentSchema, {
     agentId: row.id,
     name: row.name,
     avatar: row.avatar ?? undefined,
@@ -88,6 +87,6 @@ export const appOrganizationAgent = (row: OrganizationAgentRow) =>
     projectName: row.project_name ?? undefined,
     description: row.description || undefined,
     responsibility: row.responsibility,
-    skills: (row.skills ?? []).map(appOrganizationAgentSkill),
-    createdAt: requiredTimestamp(row.created_at, "Organization Agent creation"),
+    skills: (row.skills ?? []).map(appWorkspaceAgentSkill),
+    createdAt: requiredTimestamp(row.created_at, "Workspace Agent creation"),
   });

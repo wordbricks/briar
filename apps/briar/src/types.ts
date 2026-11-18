@@ -312,6 +312,12 @@ export type RunEvidence = {
   canonical: boolean;
 };
 
+/** The agent behind an agent-created issue; agentId is null for a run without an assigned Agent. */
+export type IssueCreatorAgent = {
+  agentId: string | null;
+  name: string;
+};
+
 export type HuntRun = {
   id: string;
   workspaceId?: string | null;
@@ -350,6 +356,8 @@ export type HuntRun = {
   difficulty: IssueDifficulty | null;
   assigneeUserId?: string | null;
   createdByUserId?: string | null;
+  /** Set instead of createdByUserId when an agent created the issue with `tools issue create`. */
+  createdByAgent?: IssueCreatorAgent | null;
   subscribers: IssueSubscriber[];
   repository: string;
   branch: string | null;
@@ -403,7 +411,7 @@ export type HuntRun = {
 };
 
 export type RelatedMessageReference = {
-  organizationId: string;
+  workspaceId: string;
   channelId: string;
   messageId: string;
   rootMessageId: string;
@@ -427,7 +435,7 @@ export type StatusTrayRunsPayload = {
   generatedAt: string;
 };
 
-/** Lightweight execution projection used by the organization Usage page. */
+/** Lightweight execution projection used by the workspace Usage page. */
 export type AgentUsageExecutionAttempt = {
   executionId: string;
   /** Team that owned the run when this claim was created. */
@@ -582,7 +590,7 @@ export type TeamExecutionWorkerPolicy = {
 /** @deprecated Use {@link TeamExecutionWorkerPolicy} instead. */
 export type ProjectExecutionWorkerPolicy = TeamExecutionWorkerPolicy;
 
-export type OrganizationExecutionWorker = {
+export type WorkspaceExecutionWorker = {
   deviceId: string;
   ownerUserId: string;
   ownerName: string;
@@ -632,7 +640,7 @@ export type ManagedComputerProvider = "aws" | "sandbox";
 
 export type ManagedComputer = {
   id: string;
-  organizationId: string;
+  workspaceId: string;
   requesterUserId: string;
   state: ManagedComputerState;
   provider: ManagedComputerProvider;
@@ -699,20 +707,20 @@ export type ManagedComputerRemoteSessionTicket = {
   reconnected: boolean;
 };
 
-export type OrganizationRole =
+export type WorkspaceRole =
   | "owner"
   | "co-owner"
   | "developer"
   | "editor"
   | "viewer";
 
-export type OrganizationAssignableRole = Exclude<OrganizationRole, "owner">;
+export type WorkspaceAssignableRole = Exclude<WorkspaceRole, "owner">;
 
 export type ManagedComputerSetupSessionTicket = {
   session: {
     id: string;
     managedComputerId: string;
-    organizationId: string;
+    workspaceId: string;
     teamId: string;
     status: "pending" | "consumed";
     expiresAt: string;
@@ -738,9 +746,9 @@ export type Team = {
   icon: string | null;
   iconName: string | null;
   iconColor: string | null;
-  organizationId: string;
-  organizationName: string;
-  role: OrganizationRole;
+  workspaceId: string;
+  workspaceName: string;
+  role: WorkspaceRole;
   createdAt: string;
 };
 
@@ -781,7 +789,7 @@ export type PlanningProject = {
   color: string | null;
   sortOrder: number;
   isDefault: boolean;
-  role: OrganizationRole;
+  role: WorkspaceRole;
   createdAt: string;
   updatedAt: string;
 };
@@ -974,45 +982,45 @@ export type UpdateTeamAgentInput = Omit<
 /** @deprecated Use {@link UpdateTeamAgentInput} instead. */
 export type UpdateProjectAgentInput = UpdateTeamAgentInput;
 
-export type Organization = {
+export type Workspace = {
   id: string;
   name: string;
   handle: string;
   logo: string | null;
-  role: OrganizationRole;
+  role: WorkspaceRole;
   createdAt: string;
 };
 
-export type OrganizationMember = {
+export type WorkspaceMember = {
   userId: string;
   name: string;
   email: string;
   image: string | null;
-  role: OrganizationRole;
+  role: WorkspaceRole;
   projectIds?: string[];
   createdAt: string;
 };
 
-export type OrganizationInvitationStatus =
+export type WorkspaceInvitationStatus =
   "pending" | "accepted" | "expired" | "revoked";
 
-export type OrganizationInvitation = {
+export type WorkspaceInvitation = {
   id: string;
-  organizationId: string;
-  organizationName: string;
+  workspaceId: string;
+  workspaceName: string;
   initialProjectId: string;
   initialProjectName: string;
   email: string;
   emailHint: string;
-  role: OrganizationAssignableRole;
-  status: OrganizationInvitationStatus;
+  role: WorkspaceAssignableRole;
+  status: WorkspaceInvitationStatus;
   expiresAt: string;
   acceptedAt: string | null;
   createdAt: string;
 };
 
-export type OrganizationInvitationPreview = Omit<
-  OrganizationInvitation,
+export type WorkspaceInvitationPreview = Omit<
+  WorkspaceInvitation,
   "email"
 >;
 
@@ -1112,7 +1120,7 @@ export type DashboardPayload = {
   workers?: ExecutionWorker[];
   organizationProviders?: AgentProvider[];
   executionPolicy?: TeamExecutionWorkerPolicy;
-  members?: OrganizationMember[];
+  members?: WorkspaceMember[];
   conversationNotifications?: IssueConversationNotification[];
   channelNotifications?: ChannelConversationNotification[];
   cursor?: number;
@@ -1144,7 +1152,7 @@ export type DashboardDeltaPayload = {
   team?: Team;
   settings?: TeamSettings;
   executionPolicy?: TeamExecutionWorkerPolicy;
-  members?: OrganizationMember[];
+  members?: WorkspaceMember[];
   conversationNotifications?: IssueConversationNotification[];
   channelNotifications?: ChannelConversationNotification[];
   generatedAt: string;

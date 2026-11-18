@@ -9,34 +9,34 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { useI18n } from "../i18n";
-import type { Organization, Project, SessionUser } from "../types";
+import type { Workspace, Project, SessionUser } from "../types";
 import { SelectMenu } from "./SelectMenu";
 
 export function CompanionHeader({
-  activeOrganizationId,
+  activeWorkspaceId,
   activeProjectId,
   loading,
   onLogout,
   onMarkAllRead,
-  onOrganizationChange,
+  onWorkspaceChange,
   onProjectChange,
   onRefresh,
   onSettings,
-  organizations,
+  workspaces,
   pageTitle,
   projects,
   user,
 }: {
-  activeOrganizationId: string | null;
+  activeWorkspaceId: string | null;
   activeProjectId: string | null;
   loading: boolean;
   onLogout: () => void;
   onMarkAllRead?: () => void;
-  onOrganizationChange: (organizationId: string) => void;
+  onWorkspaceChange: (workspaceId: string) => void;
   onProjectChange: (projectId: string) => void;
   onRefresh: () => void;
   onSettings: () => void;
-  organizations: Organization[];
+  workspaces: Workspace[];
   pageTitle?: string | null;
   projects: Project[];
   user: SessionUser;
@@ -71,8 +71,8 @@ export function CompanionHeader({
     };
   }, [isAccountMenuOpen]);
 
-  const selectOrganization = (organizationId: string) => {
-    onOrganizationChange(organizationId);
+  const selectWorkspace = (workspaceId: string) => {
+    onWorkspaceChange(workspaceId);
     setIsAccountMenuOpen(false);
   };
 
@@ -160,22 +160,22 @@ export function CompanionHeader({
                 </button>
                 <div className="companion-account-separator" role="separator" />
                 <div
-                  aria-label={t("sidebar.organizationList")}
-                  className="companion-organization-options"
+                  aria-label={t("sidebar.workspaceList")}
+                  className="companion-workspace-options"
                   role="group"
                 >
-                  <span>{t("sidebar.switchOrganization")}</span>
-                  {organizations.map((organization) => (
+                  <span>{t("sidebar.switchWorkspace")}</span>
+                  {workspaces.map((workspace) => (
                     <button
-                      aria-checked={organization.id === activeOrganizationId}
-                      key={organization.id}
-                      onClick={() => selectOrganization(organization.id)}
+                      aria-checked={workspace.id === activeWorkspaceId}
+                      key={workspace.id}
+                      onClick={() => selectWorkspace(workspace.id)}
                       role="menuitemradio"
                       type="button"
                     >
                       <Building2 aria-hidden="true" size={17} strokeWidth={1.8} />
-                      <span>{organization.name}</span>
-                      {organization.id === activeOrganizationId ? (
+                      <span>{workspace.name}</span>
+                      {workspace.id === activeWorkspaceId ? (
                         <Check aria-hidden="true" size={17} strokeWidth={2} />
                       ) : null}
                     </button>

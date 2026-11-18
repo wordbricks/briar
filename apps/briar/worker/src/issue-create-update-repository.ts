@@ -106,7 +106,7 @@ export function issueCreateMutationReceiptStatement(
   db: D1Database,
   input: {
     clientIssueId: string;
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     userId: string;
     requestHash: string;
@@ -122,7 +122,7 @@ export function issueCreateMutationReceiptStatement(
   );
   decodeIssueCreateMutationReceiptRow({
     client_issue_id: input.clientIssueId,
-    organization_id: input.organizationId,
+    organization_id: input.workspaceId,
     project_id: input.projectId,
     user_id: input.userId,
     request_hash: input.requestHash,
@@ -139,7 +139,7 @@ export function issueCreateMutationReceiptStatement(
     )
     .bind(
       input.clientIssueId,
-      input.organizationId,
+      input.workspaceId,
       input.projectId,
       input.userId,
       input.requestHash,
@@ -152,7 +152,7 @@ export function issueCreateMutationReceiptStatement(
 export function updateIssueMutationStatements(
   db: D1Database,
   input: {
-    organizationId: string;
+    workspaceId: string;
     projectId: string;
     runId: string;
     userId: string;
@@ -186,7 +186,7 @@ export function updateIssueMutationStatements(
   );
   decodeIssueUpdateMutationReceiptRow({
     request_id: input.requestId,
-    organization_id: input.organizationId,
+    organization_id: input.workspaceId,
     project_id: input.projectId,
     run_id: input.runId,
     user_id: input.userId,
