@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { constants, watch, type FSWatcher } from "node:fs";
-import { chmod, lstat, mkdtemp, open, opendir, rename, rm, unlink } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, open, opendir, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { connect, type Socket } from "node:net";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 const MAX_BYTES = 128 * 1024;
+/** The largest request or response frame a file relay carries. */
+export const FILE_RELAY_MAX_BYTES = MAX_BYTES;
 const MAX_CONCURRENT = 8;
 const MAX_FILES = 64;
 const DEADLINE_MS = 20_000;
@@ -47,7 +49,21 @@ async function atomicWrite(directory: string, name: string, bytes: Uint8Array) {
   }
 }
 
-function exchangeSocket(socketPath: string, request: Uint8Array, sockets: Set<Socket>) {
+/** Options a relay other than the DM command's opts into; the defaults are the DM relay's. */
+export type FileRelayOptions = {
+  /** mkdtemp prefix of the relay directory inside the workspace. */
+  readonly prefix?: string;
+  /** How long one request may take end to end. */
+  readonly deadlineMs?: number;
+  /**
+   * Writes a `.gitignore` of `*` into the relay directory, so the transient
+   * request/response files never show up in `git status` or a `git add -A`
+   * of the workspace. It leaves with the directory.
+   */
+  readonly gitIgnore?: boolean;
+};
+
+function exchangeSocket(socketPath: string, request: Uint8Array, sockets: Set<Socket>, deadlineMs = DEADLINE_MS) {
   return new Promise<Uint8Array>((resolve, reject) => {
     const socket = connect(socketPath);
     sockets.add(socket);
@@ -63,7 +79,7 @@ function exchangeSocket(socketPath: string, request: Uint8Array, sockets: Set<So
       if (error) reject(error);
       else resolve(Buffer.concat(chunks, bytes));
     };
-    const timeout = setTimeout(() => finish(new Error("dm_file_relay_socket_timeout")), DEADLINE_MS);
+    const timeout = setTimeout(() => finish(new Error("dm_file_relay_socket_timeout")), deadlineMs);
     socket.once("connect", () => socket.end(request));
     socket.on("data", (chunk: Buffer) => {
       bytes += chunk.length;
@@ -77,11 +93,20 @@ function exchangeSocket(socketPath: string, request: Uint8Array, sockets: Set<So
 }
 
 /** Relays opaque authenticated protobuf frames to one invocation's fixed socket. */
-export async function startDmFileRelay(workspacePath: string, socketPath: string): Promise<{
+export async function startDmFileRelay(workspacePath: string, socketPath: string, options: FileRelayOptions = {}): Promise<{
   directory: string; cleanup(): Promise<void>;
 }> {
-  const directory = await mkdtemp(join(workspacePath, ".briar-dm-relay-"));
+  const deadlineMs = options.deadlineMs ?? DEADLINE_MS;
+  const directory = await mkdtemp(join(workspacePath, options.prefix ?? ".briar-dm-relay-"));
   await chmod(directory, 0o700);
+  if (options.gitIgnore) {
+    try {
+      await writeFile(join(directory, ".gitignore"), "*\n", { mode: 0o600, flag: "wx" });
+    } catch (error) {
+      await rm(directory, { recursive: true, force: true });
+      throw error;
+    }
+  }
   const sockets = new Set<Socket>();
   const tasks = new Set<Promise<void>>();
   const retained = new Map<string, number>();
@@ -97,7 +122,7 @@ export async function startDmFileRelay(workspacePath: string, socketPath: string
       if (overloaded) throw new Error("dm_file_relay_busy");
       const request = await readPrivateFile(join(directory, name));
       if (closed) return;
-      const response = await exchangeSocket(socketPath, request, sockets);
+      const response = await exchangeSocket(socketPath, request, sockets, deadlineMs);
       if (!closed) await atomicWrite(directory, `${id}.response`, response);
     } catch (error) {
       if (!closed) {
@@ -118,7 +143,7 @@ export async function startDmFileRelay(workspacePath: string, socketPath: string
         const present = await Promise.all(["response", "error"].map((suffix) =>
           lstat(join(directory, `${id}.${suffix}`)).then(() => true, () => false)));
         if (!present.some(Boolean)) { retained.delete(id); continue; }
-        if (Date.now() - started < DEADLINE_MS * 2) continue;
+        if (Date.now() - started < deadlineMs * 2) continue;
         await Promise.all(["request", "response", "error"].map((suffix) => unlink(join(directory, `${id}.${suffix}`)).catch(() => undefined)));
         retained.delete(id);
       }
@@ -160,12 +185,12 @@ export async function startDmFileRelay(workspacePath: string, socketPath: string
   }
 }
 
-export async function exchangeDmFileRelay(directory: string, request: Uint8Array): Promise<Uint8Array> {
+export async function exchangeDmFileRelay(directory: string, request: Uint8Array, options: Pick<FileRelayOptions, "deadlineMs"> = {}): Promise<Uint8Array> {
   if (request.byteLength < 1 || request.byteLength > MAX_BYTES) throw new Error("dm_file_relay_payload_invalid");
   await assertDirectory(directory);
   const id = randomUUID();
   const paths = ["request", "response", "error"].map((suffix) => join(directory, `${id}.${suffix}`));
-  const deadline = Date.now() + DEADLINE_MS;
+  const deadline = Date.now() + (options.deadlineMs ?? DEADLINE_MS);
   try {
     await atomicWrite(directory, `${id}.request`, request);
     while (Date.now() < deadline) {

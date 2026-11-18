@@ -28,7 +28,6 @@ export type ChannelReplyTimelineOutcome =
 /** What ended one provider round. `failed` is a round that threw. */
 export type ChannelReplyTurnResult =
   | "reply"
-  | "memory"
   | "repository"
   | "context"
   | "repair"
@@ -41,7 +40,6 @@ export type ChannelReplySetupAccount = {
   /** `turn.started` → the provider accepted this turn's thread. */
   bootMs: number | null;
   steerFolded: boolean;
-  memoryBrief: "loaded" | "unavailable" | null;
   prewarm: string;
 };
 
@@ -267,7 +265,6 @@ export class ChannelReplyTimeline {
       ...(setup === null ? {} : {
         steerFolded: setup.steerFolded,
         prewarm: setup.prewarm,
-        ...(setup.memoryBrief === null ? {} : { memoryBrief: setup.memoryBrief }),
       }),
       ...(this.workspace === null ? {} : { workspace: this.workspace }),
       acknowledgement: this.acknowledgement,

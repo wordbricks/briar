@@ -11,10 +11,6 @@ import {
 } from "./channel-reply-timeline";
 import { normalizeChannelAcknowledgementReaction } from "../src/lib/channel-acknowledgement-reaction";
 import {
-  providerBlockHeadline,
-  type ProviderBlock,
-} from "../src/lib/provider-block";
-import {
   chmod,
   mkdtemp,
   mkdir,
@@ -24,16 +20,19 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  DmMemoryInvocation,
-  dmMemoryErrorDiagnostic,
-  dmMemoryExecutionError,
-} from "./dm-memory-invocation";
+import { replyErrorDiagnostic } from "./reply-error-diagnostic";
+import { dmReplyRedacted, dmReplyRedactedError, dmSafeProviderBlock } from "./dm-reply-redaction";
 import {
   DmMessageInvocation,
   supportsDmMessagePublicationProvider,
 } from "./dm-message-invocation";
 import { findAgentBundle } from "./agent-bundle-path";
+import {
+  closeMemoryVault,
+  openMemoryVaultInvocation,
+  runWithMemoryVault,
+  type MemoryVaultInvocation,
+} from "./memory-vault-invocation";
 import {
   ChannelAgentReplyProviderOutputSchema,
   type ChannelAgentReplyTurn,
@@ -172,7 +171,6 @@ export const canPublishPlainDmFinal = (
 ) => attachments.length === 0 &&
   result.body.trim().length > 0 &&
   (result.memoryCitations?.length ?? 0) === 0 &&
-  result.memorySaveRequest === null &&
   result.document === null &&
   result.issueProposal === null &&
   result.issueBatchProposal === null &&
@@ -205,11 +203,14 @@ async function runClaimedProjectAgentTask(
     git: typeof runGit;
     // Tests observe the resume-scoped transcript range through this factory.
     createTranscriptSequencer?: typeof createDetachedTranscriptSequencer;
+    /** See `ChannelReplyRuntime.memoryToolsPath`. */
+    memoryToolsPath?: string | null;
   } = {
     allocateWorktree: allocateAnalysisWorktree,
     removeWorktree: removeAnalysisWorktree,
     runProviderTurn: runDetachedProviderTurn,
     git: runGit,
+    memoryToolsPath: undefined,
   },
 ) {
   const workspaceId = project.executionWorker?.workspaceId;
@@ -222,9 +223,20 @@ async function runClaimedProjectAgentTask(
     git: runtime.git,
   });
   let taskError: unknown;
+  let memoryVault: MemoryVaultInvocation | null = null;
   try {
     const workspacePath = worktree.path;
     reportCheckpoint?.({ workspacePath });
+    memoryVault = await openMemoryVaultInvocation({
+      queue: createWorkerQueueClient(config.apiUrl, workerToken),
+      projectId: project.id,
+      workerId,
+      work: task,
+      personFacing: false,
+      workspaceTools: true,
+      signal,
+      scriptPath: memoryToolsScriptPath(runtime),
+    });
     const agent: DetachedAgent = {
       ...detachedAgentWithActiveSkill(task.agent, task.activeSkill),
       scope: { kind: "project", workspaceId, projectId: project.id },
@@ -271,7 +283,7 @@ async function runClaimedProjectAgentTask(
     if (conversationId) reportCheckpoint?.({ conversationId });
     const turn = await (async () => {
       try {
-        return await runtime.runProviderTurn({
+        return await runWithMemoryVault(memoryVault, {
           agent,
           prompt,
           workspacePath,
@@ -296,7 +308,7 @@ async function runClaimedProjectAgentTask(
               transcriptEventFromSidecar(payload, sequence),
             );
           },
-        });
+        }, (turnInput) => runtime.runProviderTurn(turnInput));
       } finally {
         // Transcript telemetry remains optional, but buffered progress deserves
         // one final upload attempt before the durable task result is settled.
@@ -316,6 +328,7 @@ async function runClaimedProjectAgentTask(
     taskError = error;
     throw error;
   } finally {
+    await closeMemoryVault(memoryVault);
     try {
       await runtime.removeWorktree({
         repositoryPath: project.repositoryPath,
@@ -433,8 +446,17 @@ async function runClaimedIssueReply(
     },
   });
   activeReplyActivityPublishers.set(issue.workId, activityPublisher);
+  let memoryVault: MemoryVaultInvocation | null = null;
   const cleanupContext = () =>
     cleanupChannelReplyResources([
+      {
+        label: "issue reply memory vault",
+        run: async () => {
+          const vault = memoryVault;
+          memoryVault = null;
+          await closeMemoryVault(vault);
+        },
+      },
       {
         label: "issue reply attachments",
         run: async () => {
@@ -462,6 +484,15 @@ async function runClaimedIssueReply(
         })),
     );
     const attachments = agentImageAttachments(downloadedImages);
+    memoryVault = await openMemoryVaultInvocation({
+      queue: createWorkerQueueClient(config.apiUrl, workerToken),
+      projectId: project.id,
+      workerId: registered.workerId,
+      work: issue,
+      personFacing: true,
+      workspaceTools: true,
+      signal,
+    });
     const agent = detachedReplyAgent({
       workId: issue.workId,
       provider,
@@ -531,7 +562,7 @@ async function runClaimedIssueReply(
       turnAttachments: typeof attachments | undefined,
     ) => {
       try {
-        return await runDetachedProviderTurn({
+        return await runWithMemoryVault(memoryVault, {
           agent,
           prompt: turnPrompt,
           workspacePath,
@@ -567,7 +598,7 @@ async function runClaimedIssueReply(
               );
             }
           },
-        });
+        }, (turnInput) => runDetachedProviderTurn(turnInput));
       } finally {
         // The durable reply result remains more important than optional
         // transcript data, but buffered events must get one final send chance.
@@ -684,6 +715,13 @@ type ChannelReplyRuntime = {
   prepareProviderTurn: typeof prepareDetachedProviderTurn;
   workspaceRoot: string;
   dmMessageMcpServerPath?: string;
+  /**
+   * The `tools memory` bundle. Present and undefined (the production default)
+   * finds the one this Worker shipped; null, or a runtime without the key,
+   * runs without a memory vault, so a hand-built test runtime never reaches
+   * a real server for vault context.
+   */
+  memoryToolsPath?: string | null;
   /** Tests observe worktree allocation through this runner. */
   git?: typeof runGit;
 };
@@ -702,7 +740,12 @@ const defaultChannelReplyRuntime = (): ChannelReplyRuntime => ({
   runProviderTurn: runDetachedProviderTurn,
   prepareProviderTurn: prepareDetachedProviderTurn,
   workspaceRoot: configDirectory,
+  memoryToolsPath: undefined,
 });
+
+/** `undefined` asks `openMemoryVaultInvocation` to find the shipped bundle. */
+const memoryToolsScriptPath = (runtime: { memoryToolsPath?: string | null }) =>
+  Object.hasOwn(runtime, "memoryToolsPath") ? runtime.memoryToolsPath : null;
 
 /*
   The server chooses this Agent's emoji from the message itself the moment it
@@ -710,7 +753,7 @@ const defaultChannelReplyRuntime = (): ChannelReplyRuntime => ({
   there and this publishes nothing. What is left here is the fallback for a
   server selection that failed: the placeholder, published from the claim
   itself rather than from anywhere downstream of routing, the worktree or the
-  memory brief.
+  rest of the setup.
 */
 function startChannelReplyAcknowledgement(
   config: Config,
@@ -855,7 +898,7 @@ async function foldChannelReplySteer(input: {
  */
 const channelReplySetupSteps = [
   "workspace",
-  "memory",
+  "memoryVault",
   "message",
   "organizationContext",
   "attachments",
@@ -893,9 +936,6 @@ function logChannelReplySetup(
       const elapsed = durations.get(step);
       return elapsed === undefined ? [] : [[step, elapsed] as const];
     })),
-    // A reply that answered without its stored preferences says so here, so a
-    // "it forgot what I told it" report has an answer in this one line.
-    ...(account.memoryBrief ? { memoryBrief: account.memoryBrief } : {}),
     total: Math.round(account.totalMs),
     parallel: true,
     steerFolded: account.steerFolded,
@@ -994,9 +1034,6 @@ async function runClaimedChannelReplyTurn(
   // with no checkout: the fetch and `git worktree add` used to sit on the
   // critical path of every "hi".
   const startsWithoutWorktree = channelReplyStartsWithoutWorktree(reply);
-  const memoryAbort = new AbortController();
-  const invocationSignal = AbortSignal.any([signal, memoryAbort.signal]);
-  let memoryInvocation: DmMemoryInvocation | null = null;
   let messageInvocation: DmMessageInvocation | null = null;
   let executionContext: DmExecutionContext | null = null;
   let publicationTerminal = false;
@@ -1032,48 +1069,30 @@ async function runClaimedChannelReplyTurn(
     return pending;
   };
   /*
-    The memory brief and the message relay need nothing but the claim: the
-    brief writes into a private temporary directory of its own and the relay
-    into a Unix socket beside it. Starting them here runs both against the
-    workspace decision below rather than after it, and their results are
-    collected with the workspace-bound steps in one settle.
+    The memory vault answers per turn, but whether this reply has one at all is
+    known from the first context, fetched here beside the workspace. `none`
+    (the run has no Agent) runs the reply without memory.
   */
-  const memoryDescriptor = reply.memory;
-  const memoryPending = memoryDescriptor
-    ? measureSetup("memory", async () => {
-      const invocation = await DmMemoryInvocation.create({
-        queue: workerQueueClient,
-        projectId: project.id,
-        workerId: registered.workerId,
-        work: reply,
-        memory: memoryDescriptor,
-        signal: invocationSignal,
-        // A survived failure leaves no other trace: the reply succeeds and the
-        // completion says nothing about the brief it answered without.
-        onTransportFailure: ({ phase, error }) =>
-          console.error(
-            `channel reply memory ${phase} unavailable for ${reply.workId}: ${
-              dmMemoryErrorDiagnostic(error)
-            }`,
-          ),
-      });
-      try {
-        /*
-          The turn loop used to open every round with this check, including the
-          first, where it re-asked for a descriptor the brief had just accepted.
-          It cannot move to a later round: M07 requires a scope revoked between
-          the brief and the first turn to stop the reply before the provider is
-          handed memory that was fetched while the claim still held. Here it
-          keeps that fence and stops paying for it serially, because it now runs
-          against the workspace-bound setup instead of after it.
-        */
-        return { invocation, changed: await invocation.check() };
-      } catch (error) {
-        await invocation.cleanup();
-        throw error;
-      }
-    })
+  const memoryVault = await openMemoryVaultInvocation({
+    queue: workerQueueClient,
+    projectId: project.id,
+    workerId: registered.workerId,
+    work: reply,
+    personFacing: true,
+    workspaceTools: true,
+    citations: true,
+    signal: signal,
+    scriptPath: memoryToolsScriptPath(runtime),
+  });
+  const memoryVaultPending = memoryVault
+    ? measureSetup("memoryVault", () => memoryVault.prefetch())
     : null;
+  /*
+    The message relay needs nothing but the claim: it listens on a Unix socket
+    in a private directory of its own. Starting it here runs it against the
+    workspace decision below rather than after it, and its result is collected
+    with the workspace-bound steps in one settle.
+  */
   const durablePublicMessages = reply.dmPublicMessageProtocol === 1 &&
     supportsDmMessagePublicationProvider(reply.provider);
   const messagePending = durablePublicMessages
@@ -1090,20 +1109,15 @@ async function runClaimedChannelReplyTurn(
         projectId: project.id,
         workerId: registered.workerId,
         work: reply,
-        signal: invocationSignal,
+        signal: signal,
       });
       return { invocation, serverPath };
     })
     : null;
-  /** A workspace failure must not strand a relay socket or a memory directory. */
+  /** A workspace failure must not strand a relay socket or a memory vault. */
   const discardStartedInvocations = async () => {
-    const [memory, message] = await Promise.allSettled([
-      memoryPending,
-      messagePending,
-    ]);
-    if (memory.status === "fulfilled" && memory.value) {
-      await memory.value.invocation.cleanup().catch(() => undefined);
-    }
+    const [message] = await Promise.allSettled([messagePending]);
+    await closeMemoryVault(memoryVault);
     if (message.status === "fulfilled" && message.value) {
       await message.value.invocation.cleanup().catch(() => undefined);
     }
@@ -1212,13 +1226,6 @@ async function runClaimedChannelReplyTurn(
   const activityPublisher = new ChannelActivityPublisher({
     credential: reply.activity,
     send: async (credential, activity) => {
-      try {
-        await memoryInvocation?.check(false);
-      } catch (error) {
-        memoryAbort.abort();
-        await memoryInvocation?.cleanup();
-        throw error;
-      }
       await replyActivity.publishReplyActivity({
         replyJobId: reply.workId,
         capability: credential.token,
@@ -1231,10 +1238,10 @@ async function runClaimedChannelReplyTurn(
       lastActivityErrorAt = now;
       console.error(
         `channel activity publish failed for ${reply.workId}: ${
-          reply.memory
-            ? dmMemoryExecutionError(error).message
+          dmReplyRedacted(reply, memoryVault?.scopeKind)
+            ? dmReplyRedactedError(error).message
             : error instanceof Error ? error.message : String(error)
-        } | ${dmMemoryErrorDiagnostic(error)}`,
+        } | ${replyErrorDiagnostic(error)}`,
       );
     },
   });
@@ -1242,8 +1249,8 @@ async function runClaimedChannelReplyTurn(
   const cleanupContext = () =>
     cleanupChannelReplyResources([
       {
-        label: "private DM memory",
-        run: async () => memoryInvocation?.cleanup(),
+        label: "memory vault",
+        run: async () => closeMemoryVault(memoryVault),
       },
       ...(reply.scope.kind === "workspace"
         ? [{
@@ -1309,7 +1316,6 @@ async function runClaimedChannelReplyTurn(
         totalMs: performance.now() - claimedAt,
         bootMs,
         steerFolded,
-        memoryBrief: memoryInvocation ? memoryInvocation.briefState : null,
         prewarm: prewarmOutcome,
       }),
     );
@@ -1341,7 +1347,7 @@ async function runClaimedChannelReplyTurn(
       fallbackName: "Briar Channel",
       scope: reply.scope,
     });
-    const providerEnvironment = providerExecutionEnvironment(
+    const baseProviderEnvironment = providerExecutionEnvironment(
       config,
       agent.provider,
       {
@@ -1358,11 +1364,17 @@ async function runClaimedChannelReplyTurn(
         BRIAR_CHANNEL_REPLY_WORK_ID: reply.workId,
       },
     );
+    // The pre-warmed process is spawned with this environment, so the private
+    // `tools` directory is on its PATH from the start. It stays empty, and
+    // `tools` does not exist, until a turn's context gives this reply a vault.
+    const providerEnvironment = memoryVault
+      ? memoryVault.environment(baseProviderEnvironment)
+      : baseProviderEnvironment;
     /*
       The provider process is the last thing on the critical path that needs
       nothing from the steps below: which binary, which workspace, which
       conversation and which sandbox are all settled. Starting it here lets its
-      boot run against the memory brief, the downloads and the Skill catalog
+      boot run against the message relay, the downloads and the Skill catalog
       instead of after them. Only Codex supports it; every other provider — and
       every later round — spawns when its turn starts.
     */
@@ -1379,7 +1391,7 @@ async function runClaimedChannelReplyTurn(
         conversationId: conversationIdAtClaim,
         toolInheritance: "briar",
         environment: providerEnvironment,
-        signal: invocationSignal,
+        signal: signal,
         diagnosticContext: {
           runId: reply.runId,
           workId: reply.workId,
@@ -1387,7 +1399,6 @@ async function runClaimedChannelReplyTurn(
         },
         onDiagnostic: (diagnostic) => {
           observeProviderDiagnostic(diagnostic);
-          if (reply.memory) return;
           logDetachedProviderTurnDiagnostic(diagnostic);
         },
       }).catch((error) => {
@@ -1395,7 +1406,7 @@ async function runClaimedChannelReplyTurn(
         // cold spawn, never a failed reply.
         console.error(
           `channel reply prewarm failed for ${reply.workId}: ${
-            dmMemoryErrorDiagnostic(error)
+            replyErrorDiagnostic(error)
           }`,
         );
         return null;
@@ -1403,7 +1414,7 @@ async function runClaimedChannelReplyTurn(
     /*
       Everything left needs the prepared workspace and nothing from the other
       steps, so the manifest download, the attachment downloads and the Skill
-      catalog start together and settle beside the two that started with the
+      catalog start together and settle beside the relay that started with the
       claim. Serialized, these were the 15–30 seconds a DM spent between its
       claim and the first provider turn.
     */
@@ -1419,7 +1430,7 @@ async function runClaimedChannelReplyTurn(
           claimToken: reply.claimToken,
           snapshotAt: reply.organizationContext!.snapshotAt,
           workspacePath,
-          signal: invocationSignal,
+          signal: signal,
         }),
       )
       : null;
@@ -1448,13 +1459,11 @@ async function runClaimedChannelReplyTurn(
       )
       : null;
     const [
-      memorySettled,
       messageSettled,
       organizationContextSettled,
       attachmentsSettled,
       skillCatalogSettled,
     ] = await Promise.allSettled([
-      memoryPending,
       messagePending,
       organizationContextPending,
       attachmentsPending,
@@ -1466,22 +1475,17 @@ async function runClaimedChannelReplyTurn(
     // reply used it, replaced it or never reached its first turn.
     preparedRunner = await prewarmPending;
     if (preparedRunner) prewarmOutcome = "ready";
-    if (memorySettled.status === "fulfilled" && memorySettled.value) {
-      memoryInvocation = memorySettled.value.invocation;
-    }
     if (messageSettled.status === "fulfilled" && messageSettled.value) {
       messageInvocation = messageSettled.value.invocation;
     }
     // Step order, so a reply reports the same failure the sequential setup did.
     const setupFailure = [
-      memorySettled,
       messageSettled,
       organizationContextSettled,
       attachmentsSettled,
       skillCatalogSettled,
     ].find((step) => step.status === "rejected");
     if (setupFailure?.status === "rejected") throw setupFailure.reason;
-    const memorySetup = settledSetupValue(memorySettled);
     const publication = settledSetupValue(messageSettled);
     const organizationContext = settledSetupValue(organizationContextSettled);
     let downloadedAttachments = settledSetupValue(attachmentsSettled);
@@ -1499,7 +1503,7 @@ async function runClaimedChannelReplyTurn(
       projectId: project.id,
       workerId: registered.workerId,
       reply,
-      signal: invocationSignal,
+      signal: signal,
     });
     steerFolded = folded !== null;
     if (folded) {
@@ -1547,7 +1551,7 @@ async function runClaimedChannelReplyTurn(
           projectId: project.id,
           workerId: registered.workerId,
           work: reply,
-          signal: invocationSignal,
+          signal: signal,
         });
       }
       console.log(
@@ -1557,6 +1561,8 @@ async function runClaimedChannelReplyTurn(
       );
     }
     const dmMessageMcpServerPath = publication ? publication.serverPath : null;
+    // Decided once, from the context fetched during setup.
+    const memoryVaultMode = Boolean(memoryVaultPending && await memoryVaultPending);
     const outputContract = providerStructuredOutputContract(
       agent.provider,
       ChannelAgentReplyProviderOutputSchema,
@@ -1577,7 +1583,7 @@ async function runClaimedChannelReplyTurn(
       repositoryRequestAvailable: repositoryRequestAvailable &&
         analysisWorktree === null,
       organizationContextAvailable: organizationContext !== null,
-      memoryLearningAvailable: reply.memoryLearningEnabled,
+      memoryVaultAvailable: memoryVaultMode,
       delegationTargets: reply.delegationTargets,
       delegation: reply.delegation,
       // An Agent-to-Agent hop only changes what this turn may say. Hop 1 stays
@@ -1643,7 +1649,7 @@ async function runClaimedChannelReplyTurn(
       !reply.routing && reply.session?.conversationId && reply.pendingTriggerMessageIds.length > 1
         ? "Continue the interrupted response in this same conversation with the updated user inputs below. Preserve completed work and tool results from the transcript; do not repeat completed actions unless the new input requires it."
         : null,
-      prompt, reply.routing ? null : memoryInvocation?.prompt(), reply.routing ? null : messageInvocation?.prompt()]
+      prompt, reply.routing ? null : messageInvocation?.prompt()]
       .filter(Boolean)
       .join("\n\n");
     let result: ParsedChannelReplyAgentResult["result"] | null = null;
@@ -1651,39 +1657,20 @@ async function runClaimedChannelReplyTurn(
     const generatedImages = new ReplyGeneratedImageCollector();
     startedChannelReplyTurns.add(reply.workId);
     while (!result) {
-      const currentMemoryInvocation = memoryInvocation;
       // Every continuation bumps one of the three round counters, so this is
-      // the claim's first provider turn — the round whose check already ran
-      // inside the parallel setup, with the same result and the same fence.
+      // the claim's first provider turn.
       const firstRound = lookupRounds === 0 && repairRounds === 0 &&
         repositoryRounds === 0;
-      const memoryChanged = currentMemoryInvocation
-        ? firstRound
-          ? Boolean(memorySetup?.changed)
-          : await currentMemoryInvocation.check()
-        : false;
-      if (currentMemoryInvocation && memoryChanged) {
-        conversationId = null;
-        turnPrompt = [
-          prompt,
-          reply.routing ? null : currentMemoryInvocation.prompt(),
-          reply.routing ? null : messageInvocation?.prompt(),
-          organizationContext
-            ? "Re-read the workspace context manifest for previously loaded context."
-            : null,
-        ].filter(Boolean).join("\n\n");
-      }
       /*
         Only the claim's first turn can use the pre-warmed process: a later
         round runs against a conversation the warm process was not prepared
-        with, and the memory-changed refresh above has already dropped the
-        conversation id it was prepared with.
+        with.
       */
       const roundPreparedRunner = firstRound ? preparedRunner : null;
       timeline.startTurn();
-      const turn = await runtime.runProviderTurn({
+      const turn = await runWithMemoryVault(memoryVault, {
         agent,
-        prompt: reply.routing ? [turnPrompt, executionContext?.prompt(), memoryInvocation?.prompt(), messageInvocation?.prompt()].filter(Boolean).join("\n\n") : turnPrompt,
+        prompt: reply.routing ? [turnPrompt, executionContext?.prompt(), messageInvocation?.prompt()].filter(Boolean).join("\n\n") : turnPrompt,
         workspacePath,
         /*
           A channel reply answers in a conversation with the tools Briar gave
@@ -1709,7 +1696,7 @@ async function runClaimedChannelReplyTurn(
           : undefined,
         skillCatalog: reply.session ? retainedSkillCatalog : undefined,
         environment: providerEnvironment,
-        signal: invocationSignal,
+        signal: signal,
         diagnosticContext: {
           runId: reply.runId,
           workId: reply.workId,
@@ -1717,20 +1704,7 @@ async function runClaimedChannelReplyTurn(
         },
         onDiagnostic: (diagnostic) => {
           observeProviderDiagnostic(diagnostic);
-          if (!reply.memory) {
-            logDetachedProviderTurnDiagnostic(diagnostic);
-            return;
-          }
-          if (
-            ["turn.started", "turn.completed", "turn.aborted_before_start"]
-              .includes(diagnostic.phase)
-          ) {
-            logDetachedProviderTurnDiagnostic({
-              at: diagnostic.at,
-              phase: diagnostic.phase,
-              context: { workId: reply.workId, workType: "channelReply" },
-            });
-          }
+          logDetachedProviderTurnDiagnostic(diagnostic);
         },
         onConversationId: async (nextConversationId) => {
           conversationId = reply.routing ? null : nextConversationId;
@@ -1772,7 +1746,7 @@ async function runClaimedChannelReplyTurn(
           activityPublisher.observePayload(payload);
           generatedImages.observePayload(payload);
         },
-      }, roundPreparedRunner);
+      }, (turnInput) => runtime.runProviderTurn(turnInput, roundPreparedRunner));
       logSetupOnce();
       assertDetachedProviderTurnSucceeded(turn);
       if (!turn.resultText) {
@@ -1796,16 +1770,13 @@ async function runClaimedChannelReplyTurn(
       if (decodedTurn.case === "reply") {
         timeline.endTurn("reply");
         result = decodedTurn.result;
-        if (result.memorySaveRequest && !reply.memoryLearningEnabled) {
-          throw new Error("memory_learning_unavailable");
-        }
         attachmentPaths = decodedTurn.attachmentPaths;
         break;
       }
       if (decodedTurn.case === "repository") {
         timeline.endTurn("repository");
         // The request is consumed here and never reported to the server: like
-        // a memory lookup, it is not a completion.
+        // a context lookup, it is not a completion.
         if (!repositoryRequestAvailable) {
           throw new Error("repository_unavailable");
         }
@@ -1832,23 +1803,8 @@ async function runClaimedChannelReplyTurn(
           : [
             prompt,
             continuation,
-            memoryInvocation?.prompt(),
             messageInvocation?.prompt(),
           ].filter(Boolean).join("\n\n");
-        continue;
-      }
-      if (decodedTurn.case === "memory") {
-        timeline.endTurn("memory");
-        if (!memoryInvocation) throw new Error("memory_unavailable");
-        if (lookupRounds >= 3) throw new Error("lookup_budget_exhausted");
-        const memoryPrompt = await memoryInvocation.lookup(decodedTurn.request);
-        lookupRounds += 1;
-        conversationId = reply.routing ? null : turn.conversationId;
-        const continuation =
-          `The memory lookup is complete. Use only supported evidence and return the next structured result.\n${memoryPrompt}`;
-        turnPrompt = conversationId
-          ? continuation
-          : `${prompt}\n\n${continuation}`;
         continue;
       }
       timeline.endTurn("context");
@@ -1877,7 +1833,7 @@ async function runClaimedChannelReplyTurn(
         ].filter(Boolean).join(" ");
         turnPrompt = conversationId
           ? refusal
-          : [prompt, refusal, memoryInvocation?.prompt(), messageInvocation?.prompt()]
+          : [prompt, refusal, messageInvocation?.prompt()]
             .filter(Boolean).join("\n\n");
         continue;
       }
@@ -1894,7 +1850,7 @@ async function runClaimedChannelReplyTurn(
         snapshotAt: reply.organizationContext!.snapshotAt,
         workspacePath,
         requests: decodedTurn.requests.contextRequests,
-        signal: invocationSignal,
+        signal: signal,
       });
       if (hydrated.loaded === 0) {
         throw new Error("Workspace Agent repeated a loaded context query");
@@ -1908,9 +1864,7 @@ async function runClaimedChannelReplyTurn(
       ].join("\n\n");
       turnPrompt = conversationId
         ? continuation
-        : `${prompt}\n\n${continuation}\n${memoryInvocation?.prompt() ?? ""}\n${
-            messageInvocation?.prompt() ?? ""
-          }`;
+        : `${prompt}\n\n${continuation}\n${messageInvocation?.prompt() ?? ""}`;
     }
     if (!result) throw new Error("Agent returned no channel reply");
     const skillExecutionProposalAllowed =
@@ -1933,12 +1887,11 @@ async function runClaimedChannelReplyTurn(
       ...generatedImages.files(),
     ], "Channel reply");
     await messageInvocation?.settle();
-    await memoryInvocation?.check(false);
     const finalReceipt = await publishPlainDmFinal(
       messageInvocation,
       result,
       replyAttachments,
-      invocationSignal,
+      signal,
     );
     await cleanupContext();
     const completion = await replyCompletion.completeChannelReply({
@@ -1966,14 +1919,18 @@ async function runClaimedChannelReplyTurn(
       await writeFile(join(workspacePath, ".briar-stop-unconfirmed"), "provider_stop_unconfirmed\n", { flag: "wx" })
         .catch(() => undefined);
     }
-    if (!reply.memory || error instanceof DetachedProviderBlockedError || error instanceof DetachedProviderStopUnconfirmedError) throw error;
-    throw dmMemoryExecutionError(error);
+    if (
+      !dmReplyRedacted(reply, memoryVault?.scopeKind) ||
+      error instanceof DetachedProviderBlockedError || error instanceof DetachedProviderStopUnconfirmedError
+    ) throw error;
+    throw dmReplyRedactedError(error);
   } finally {
     startedChannelReplyTurns.delete(reply.workId);
     // A pre-warmed process must never outlive the reply that started it, on
     // any path: used, replaced by a cold spawn, or never reached at all.
     await preparedRunner?.discard("reply_finished");
     logSetupOnce();
+    await closeMemoryVault(memoryVault);
     await messageInvocation?.cleanup({ terminal: publicationTerminal });
     activityPublisher.stop();
     if (activeReplyActivityPublishers.get(reply.workId) === activityPublisher) {
@@ -1993,10 +1950,10 @@ async function runClaimedChannelReplyTurn(
         } catch (error) {
           console.error(
             `channel session worktree retention update failed for ${reply.session.id}: ${
-              reply.memory
-                ? dmMemoryExecutionError(error).message
+              dmReplyRedacted(reply, memoryVault?.scopeKind)
+                ? dmReplyRedactedError(error).message
                 : error instanceof Error ? error.message : String(error)
-            } | ${dmMemoryErrorDiagnostic(error)}`,
+            } | ${replyErrorDiagnostic(error)}`,
           );
         } finally {
           releaseCachedAnalysisWorktree(sessionWorktreePath);
@@ -2012,21 +1969,26 @@ async function runClaimedChannelReplyTurn(
 }
 
 /**
- * What a failed reply tells Briar, and what this Worker logs beside it. A DM
- * reports only the redacted code — the message can echo the conversation — so
+ * What a failed reply tells Briar, and what this Worker logs beside it. A
+ * person's DM reports only a fixed code — the message can echo the
+ * conversation, recalled memory or the prompt (`dm-reply-redaction.ts`) — so
  * the diagnostic is the operator's only account of what actually broke; it
- * carries the failure's shape and never its text.
+ * carries the failure's shape and never its text. A provider block reports its
+ * own (headline-only in a DM) block instead of a message.
  */
 export function channelReplyFailureReport(
   error: unknown,
-  reply: Pick<ClaimedChannelReply, "memory">,
+  reply: Pick<ClaimedChannelReply, "directMessage">,
 ) {
   const message = error instanceof Error ? error.message : String(error);
+  const redacted = dmReplyRedacted(reply);
+  const block = detachedProviderBlockOf(error);
   return {
-    reported: reply.memory && !detachedProviderBlockOf(error)
-      ? dmMemoryExecutionError(error).message
-      : message,
-    diagnostic: dmMemoryErrorDiagnostic(error),
+    reported: redacted && !block ? dmReplyRedactedError(error).message : message,
+    // A block names the provider and its reason; in a DM its message is
+    // reduced to the headline, which cannot echo the conversation.
+    block: block && redacted ? dmSafeProviderBlock(block) : block,
+    diagnostic: replyErrorDiagnostic(error),
   };
 }
 
@@ -2039,8 +2001,7 @@ async function failClaimedChannelReply(
 ) {
   const workerId = project.executionWorker?.workerId;
   if (!workerId) throw error;
-  const block = detachedProviderBlockOf(error);
-  const { reported, diagnostic } = channelReplyFailureReport(error, reply);
+  const { reported, block, diagnostic } = channelReplyFailureReport(error, reply);
   console.error(
     `channel reply ${reply.workId} failed: ${reported} | ${diagnostic}`,
   );
@@ -2052,9 +2013,7 @@ async function failClaimedChannelReply(
       outcome: {
         case: "failure",
         error: reported,
-        // A block names the provider and its reason, never the DM content,
-        // so the memory privacy fence keeps it.
-        ...(block ? { block: reply.memory ? dmSafeProviderBlock(block) : block } : {}),
+        ...(block ? { block } : {}),
       },
     });
   // Whether this failure ends the job or hands it back to the queue is the
@@ -2063,14 +2022,6 @@ async function failClaimedChannelReply(
     reply.workId,
     completion.disposition === "requeued" ? "requeued" : "failed",
   );
-}
-
-/** Keep the reason and provider; drop provider text that could echo a prompt. */
-function dmSafeProviderBlock(block: ProviderBlock): ProviderBlock {
-  return {
-    ...block,
-    message: providerBlockHeadline(block),
-  };
 }
 
 export {

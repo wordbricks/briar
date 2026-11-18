@@ -388,6 +388,12 @@ extension DashboardRun {
             difficulty: message.hasDifficulty ? try coreDifficulty(message.difficulty) : nil,
             assigneeUserId: message.hasAssigneeUserID ? message.assigneeUserID : nil,
             createdByUserId: message.hasCreatedByUserID ? message.createdByUserID : nil,
+            createdByAgent: message.hasCreatedByAgent
+                ? IssueCreatorAgent(
+                    agentId: message.createdByAgent.hasAgentID ? message.createdByAgent.agentID : nil,
+                    name: message.createdByAgent.name
+                )
+                : nil,
             subscribers: try message.subscribers.map { subscriber in
                 guard subscriber.hasSubscribedAt else { throw MobileAPIError.invalidResponse }
                 return IssueSubscriber(

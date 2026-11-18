@@ -1256,8 +1256,17 @@ const channelReplyAgentMessageSchema = strict(Schema.Struct({
   body: channelMessageBodySchema,
 }));
 
-export const channelMemoryCitationSchema = strict(Schema.Struct({
-  documentId: Uuid,
+/**
+ * A reply citation names a memory vault record (its id,
+ * docs/plans/memory-vault-spec.md §5.1/§8) with the revision as `version`.
+ * The server keeps only records this claim read at their current revision.
+ * A UUID is still accepted on the wire (older Workers cited legacy D1
+ * documents); the server drops it like any record the claim did not read.
+ */
+export const channelReplyMemoryCitationSchema = strict(Schema.Struct({
+  documentId: Schema.String.check(Schema.isPattern(
+    /^(?:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[a-z0-9][a-z0-9-]{0,62})$/u,
+  )),
   version: Schema.Int.check(Schema.isGreaterThan(0)),
 }));
 
@@ -1273,20 +1282,11 @@ export const channelReplyCompletionFields = {
   agentMessage: Schema.NullOr(channelReplyAgentMessageSchema),
 } as const;
 
-export const channelMemorySaveRequestSchema = strict(Schema.Struct({
-    documents: Schema.Array(channelMemoryCitationSchema).check(
-      Schema.isMaxLength(10),
-    ),
-  }));
-
 export const channelReplyCompletionSchema = strict(Schema.Struct({
   acknowledgementReaction: Schema.optional(channelAcknowledgementReactionSchema),
-  memorySaveRequest: Schema.optional(
-    Schema.NullOr(channelMemorySaveRequestSchema),
-  ),
   memoryCitations: Schema.optional(
     Schema.NullOr(
-      Schema.Array(channelMemoryCitationSchema).check(Schema.isMaxLength(10)),
+      Schema.Array(channelReplyMemoryCitationSchema).check(Schema.isMaxLength(10)),
     ),
   ),
   body: channelMessageBodySchema,

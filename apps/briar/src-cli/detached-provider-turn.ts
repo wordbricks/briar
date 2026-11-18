@@ -121,6 +121,17 @@ export type DetachedProviderTurnInput = {
   computerUseMcpServerPath?: string | null;
   dmMessagePublicationBinding?: DmMessagePublicationBinding;
   dmMessageMcpServerPath?: string | null;
+  /**
+   * The memory vault section of this turn's trusted instructions (README and
+   * status line). Appended after Briar's own instructions and re-sent on every
+   * turn, including resumed conversations.
+   */
+  memoryVaultInstructions?: string | null;
+  /**
+   * The `tools issue` / `tools channel` section of this turn's trusted
+   * instructions (docs/plans/agent-workspace-tools.md); re-sent every turn.
+   */
+  workspaceToolsInstructions?: string | null;
   environment: NodeJS.ProcessEnv;
   signal: AbortSignal;
   diagnosticContext?: DetachedProviderTurnDiagnosticContext;
@@ -509,6 +520,8 @@ export async function executeDetachedProviderTurn(
     computerUseMcpServerPath: input.computerUseMcpServerPath,
     dmMessagePublicationBinding: input.dmMessagePublicationBinding,
     dmMessageMcpServerPath: input.dmMessageMcpServerPath,
+    memoryVaultInstructions: input.memoryVaultInstructions,
+    workspaceToolsInstructions: input.workspaceToolsInstructions,
     toolInheritance: input.toolInheritance,
     agentBinary,
   }).request;
@@ -766,8 +779,8 @@ export async function executeDetachedProviderTurn(
   Pre-warming. A Codex turn spends its first seconds on work that is decided
   the moment the workspace is: starting `codex app-server`, the initialize
   handshake, reading the config, listing models and installed apps. None of it
-  needs the prompt, so it can run beside the memory brief, the attachment
-  downloads and the Skill catalog instead of after them.
+  needs the prompt, so it can run beside the memory vault context, the
+  attachment downloads and the Skill catalog instead of after them.
 
   The prompt's developer instructions are what the thread request needs, so the
   prepared process stops exactly before `thread/start` and waits. Everything

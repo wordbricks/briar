@@ -30,6 +30,70 @@ const changelogCopyByLocale = {
     },
     entries: [
       {
+        version: "1.2.237",
+        date: "2026년 10월 16일",
+        title: "에이전트가 이슈와 채널을 직접 다룹니다",
+        summary:
+          "에이전트가 작업 중에 Briar 이슈를 만들고 기록을 남기며, 참여한 채널에 글을 올릴 수 있습니다.",
+        items: [
+          "에이전트가 이슈를 만들고 메모를 남기고 상태를 바꿀 수 있습니다. 실행 대기열에 올리는 것은 기존처럼 승인을 거칩니다.",
+          "에이전트가 자신이 참여한 채널에 글을 올릴 수 있습니다. 조직당 시간당 30개로 제한됩니다.",
+        ],
+      },
+      {
+        version: "1.2.236",
+        date: "2026년 10월 14일",
+        title: "기억 창에서 폴더와 내용을 나란히 봅니다",
+        summary:
+          "DM 기억 창이 넓어지고, 왼쪽 폴더 트리에서 고른 기억을 오른쪽에서 바로 미리 봅니다.",
+        items: [
+          "기억 창이 커지고 왼쪽에 폴더 트리, 오른쪽에 선택한 기억의 미리보기가 표시됩니다.",
+          "미리보기에서 바로 편집하고 변경 이력을 보거나 삭제할 수 있습니다.",
+          "좁은 화면에서는 폴더와 미리보기를 한 화면씩 오갑니다.",
+        ],
+      },
+      {
+        version: "1.2.235",
+        date: "2026년 10월 14일",
+        title: "기억을 폴더 구조로 봅니다",
+        summary:
+          "DM 기억 창이 에이전트 기억 저장소를 폴더 트리로 보여줍니다.",
+        items: [
+          "DM 기억 창에서 일지, 인물, 지식, 작업 흐름 등 기억 폴더를 접고 펼치며 볼 수 있습니다.",
+          "각 파일에 기억 종류와 버전이 표시되고, 누르면 내용과 이력을 보거나 수정·삭제할 수 있습니다.",
+          "에이전트에게 주는 기억 안내(README)를 읽기 전용으로 볼 수 있습니다.",
+        ],
+      },
+      {
+        version: "1.2.234",
+        date: "2026년 10월 14일",
+        title: "에이전트 기억이 새 저장소 하나로 정리되었습니다",
+        summary:
+          "이전 기억 시스템을 걷어내고, 에이전트가 새 기억 저장소만 쓰도록 정리했습니다. 데스크톱 앱에서도 에이전트가 기억 도구를 쓸 수 있습니다.",
+        items: [
+          "데스크톱 앱이 에이전트 기억 도구를 함께 설치해, 이 컴퓨터의 에이전트도 작업 중 기억을 조회하고 기록합니다.",
+          "이전 기억 시스템(자동 학습, 검색 인덱스)을 제거했습니다. 기존 기억은 새 저장소로 옮겨 그대로 유지됩니다.",
+          "기억 설정 화면에서 이전 시스템 전용 항목을 정리했습니다.",
+          "DM 답변이 실패하면 대화 내용이 담길 수 있는 오류 문구 대신 고정된 안내만 표시합니다.",
+        ],
+      },
+      {
+        version: "1.2.233",
+        date: "2026년 10월 14일",
+        title: "에이전트가 일하면서 스스로 기억을 관리합니다",
+        summary:
+          "에이전트가 대화와 작업 중에 기억을 직접 조회하고 기록하며, 새 실행에서도 이어서 씁니다. 새 도메인 briar.onequery.dev, 모바일 화면 개선과 의존성 보안 업데이트도 포함됩니다.",
+        items: [
+          "에이전트 기억이 Cloudflare Artifacts에 버전 이력과 함께 저장되고, 에이전트가 작업 중 기억을 조회·검색·기록합니다.",
+          "DM 기억은 사용자별로, 그룹 채널과 프로젝트 기억은 각각 분리되어 서로 섞이지 않습니다.",
+          "답변 문체와 지속 규칙, 실수에서 배운 교훈을 기억해 다음 답변과 작업에 반영합니다.",
+          "기억을 삭제하면 과거 이력까지 지워집니다.",
+          "Briar의 기본 주소가 briar.onequery.dev로 바뀌었습니다. 기존 주소도 계속 동작합니다.",
+          "휴대폰 화면에서 내비게이션이 닫을 수 있는 서랍으로 바뀌고, 받은함·이슈 화면이 좁은 폭에 맞게 정리되었습니다.",
+          "보안 경고가 있던 의존성을 업데이트했습니다.",
+        ],
+      },
+      {
         version: "1.2.232",
         date: "2026년 9월 26일",
         title: "이슈 관리와 알림이 더 선명해졌습니다",
@@ -2085,6 +2149,70 @@ const changelogCopyByLocale = {
       fixed: "Fixed",
     },
     entries: [
+      {
+        version: "1.2.237",
+        date: "October 16, 2026",
+        title: "Agents work with issues and channels",
+        summary:
+          "While working, agents can create Briar issues, leave notes on them and post in the channels they belong to.",
+        items: [
+          "Agents can create issues, add notes and change status. Queuing an issue for execution still goes through approval.",
+          "Agents can post in channels they are a member of, up to 30 posts per organization per hour.",
+        ],
+      },
+      {
+        version: "1.2.236",
+        date: "October 14, 2026",
+        title: "Folders and memory side by side",
+        summary:
+          "The DM memory window is larger, with the folder tree on the left and a preview of the selected memory on the right.",
+        items: [
+          "A larger memory window shows the folder tree on the left and the selected memory's preview on the right.",
+          "Edit, review history or delete straight from the preview.",
+          "On narrow screens, move between the folders and the preview one screen at a time.",
+        ],
+      },
+      {
+        version: "1.2.235",
+        date: "October 14, 2026",
+        title: "Browse memory as folders",
+        summary:
+          "The DM memory window shows the agent's memory store as a folder tree.",
+        items: [
+          "Expand and collapse memory folders such as the timeline, people, knowledge and workstreams in the DM memory window.",
+          "Each file shows its memory type and version; open it to read, review history, edit or delete.",
+          "The memory guide agents receive (README) is visible read-only.",
+        ],
+      },
+      {
+        version: "1.2.234",
+        date: "October 14, 2026",
+        title: "Agent memory now lives in one store",
+        summary:
+          "The previous memory system is gone and agents use only the new memory store. Agents on the desktop app can now use their memory tools too.",
+        items: [
+          "The desktop app installs the agent memory tools, so agents on this computer can look up and record memory while they work.",
+          "The previous memory system (automatic learning and its search index) was removed. Existing memories were moved to the new store and are kept.",
+          "Memory settings no longer show options that only the previous system used.",
+          "When a DM reply fails, Briar shows a fixed notice instead of error text that could repeat the conversation.",
+        ],
+      },
+      {
+        version: "1.2.233",
+        date: "October 14, 2026",
+        title: "Agents keep their own memory while they work",
+        summary:
+          "Agents now look up and record memory during conversations and tasks, and pick it up again in later runs. This release also moves Briar to briar.onequery.dev, improves phone layouts and updates dependencies with security advisories.",
+        items: [
+          "Agent memory is stored in Cloudflare Artifacts with full version history, and agents read, search and record it while they work.",
+          "DM memory is kept per person, and group channel and project memory are kept separately, so they never mix.",
+          "Agents remember reply style, standing reply rules and lessons from their own mistakes, and apply them to later replies and tasks.",
+          "Deleting a memory also removes it from the stored history.",
+          "Briar's primary address is now briar.onequery.dev; the previous address keeps working.",
+          "On phones, navigation moves into a dismissible drawer, and the inbox and issue views fit narrow screens.",
+          "Dependencies with security advisories were updated.",
+        ],
+      },
       {
         version: "1.2.232",
         date: "September 26, 2026",

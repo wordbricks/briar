@@ -12,6 +12,7 @@ import { useAgentDispatch } from "./hooks/useAgentDispatch";
 import { useAppShortcuts } from "./hooks/useAppShortcuts";
 import { useCommandPaletteItems } from "./hooks/useCommandPaletteItems";
 import { useDeepLinks } from "./hooks/useDeepLinks";
+import { useWebUrlSync } from "./hooks/useWebUrlSync";
 import { useInvitationFlow } from "./hooks/useInvitationFlow";
 import { useIssueAgents } from "./hooks/useIssueAgents";
 import { useLaunchIntro } from "./hooks/useLaunchIntro";
@@ -119,6 +120,7 @@ export function App({
   const isKeyboardShortcutsOpen = useAtomValue(isKeyboardShortcutsOpenAtom);
 
   useDeepLinks();
+  useWebUrlSync();
   const {
     beginTeamReconnect,
     clearTrigger: clearRepositorySetupTrigger,

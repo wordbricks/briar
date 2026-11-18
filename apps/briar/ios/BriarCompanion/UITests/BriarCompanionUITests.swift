@@ -228,21 +228,91 @@ final class BriarCompanionUITests: XCTestCase {
         let open = app.buttons["dm-memory-open"]
         XCTAssertTrue(open.waitForExistence(timeout: channelTransitionTimeout))
         open.tap()
+        // The vault as a folder tree: empty layout folders are listed, folders holding files are open.
+        // A folder that opens carries its identifier on the disclosure button and on its label; take the first.
+        let folder = { (key: String) in
+            app.descendants(matching: .any).matching(identifier: "dm-memory-folder-" + key).firstMatch
+        }
+        XCTAssertTrue(folder("memory").waitForExistence(timeout: 5))
+        XCTAssertTrue(folder("comms").exists)
+        XCTAssertFalse(folder("knowledge/facts").exists)
+        captureScreenshot(named: "companion-dm-memory-tree")
+        let knowledge = folder("knowledge")
+        reveal(knowledge, in: app)
+        knowledge.tap()
+        XCTAssertTrue(folder("knowledge/facts").waitForExistence(timeout: 5))
+        knowledge.tap()
+        XCTAssertTrue(folder("knowledge/facts").waitForNonExistence(timeout: 5))
+        // The record sits under entities/people with its real type and revision.
         let document = app.buttons["dm-memory-document-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]
-        XCTAssertTrue(document.waitForExistence(timeout: 5))
-        XCTAssertTrue(document.label.contains("색인 대기"))
+        reveal(document, in: app)
+        XCTAssertTrue(document.label.contains("synthetic-memory.md"))
+        XCTAssertTrue(document.label.contains("person · r1"))
         XCTAssertTrue(document.label.contains("사용자 보호"))
-        captureScreenshot(named: "companion-dm-memory-list")
+        XCTAssertFalse(document.label.contains("색인"))
+        // Closing a folder hides its files; opening it shows them again.
+        let people = folder("entities/people")
+        reveal(people, in: app)
+        people.tap()
+        XCTAssertTrue(document.waitForNonExistence(timeout: 5))
+        people.tap()
+        XCTAssertTrue(document.waitForExistence(timeout: 5))
+
+        // Swiping a file to forget asks first, like the preview's Forget; cancelling keeps it.
+        reveal(document, in: app)
+        document.swipeLeft()
+        let swipeForget = app.buttons["dm-memory-swipe-forget"]
+        XCTAssertTrue(swipeForget.waitForExistence(timeout: 5))
+        swipeForget.tap()
+        let swipeConfirm = app.buttons.matching(identifier: "dm-memory-forget-confirm").firstMatch
+        XCTAssertTrue(swipeConfirm.waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-dm-memory-swipe-confirm")
+        // iOS 26 anchors the dialog as a popover without a cancel button; tapping outside cancels it.
+        let dismissRegion = app.otherElements["PopoverDismissRegion"]
+        if dismissRegion.exists { dismissRegion.tap() } else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).tap() }
+        XCTAssertTrue(swipeConfirm.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(document.exists)
+
+        // README.md previews read only: no edit, history or forget.
+        let readme = app.buttons["dm-memory-document-cccccccc-cccc-4ccc-8ccc-cccccccccccc"]
+        reveal(readme, in: app)
+        XCTAssertTrue(readme.label.contains("README.md"))
+        XCTAssertTrue(readme.label.contains("읽기 전용"))
+        captureScreenshot(named: "companion-dm-memory-tree-files")
+        readme.tap()
+        let preview = app.descendants(matching: .any)["dm-memory-preview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(withLabel: "합성 안내 파일.", in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["dm-memory-preview-meta"].label.contains("읽기 전용"))
+        XCTAssertFalse(app.buttons["dm-memory-edit"].exists)
+        XCTAssertFalse(app.buttons["dm-memory-forget"].exists)
+        XCTAssertFalse(app.buttons["dm-memory-history"].exists)
+        captureScreenshot(named: "companion-dm-memory-readme")
+        app.navigationBars["README.md"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(preview.waitForNonExistence(timeout: 5))
+        reveal(document, in: app)
+
+        // A record previews its path, meta line and Markdown body.
         document.tap()
+        XCTAssertTrue(app.staticTexts["dm-memory-path"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["dm-memory-path"].label, "entities/people/synthetic-memory.md")
+        let meta = app.staticTexts["dm-memory-preview-meta"]
+        XCTAssertTrue(meta.label.contains("person · r1 · 사용자 보호"))
+        XCTAssertTrue(element(withLabel: "합성 데이터: 설명은 결론부터 제시한다.", in: app).waitForExistence(timeout: 5))
+        captureScreenshot(named: "companion-dm-memory-preview")
+        // Saving keeps the file previewed and shows the new revision.
+        app.buttons["dm-memory-edit"].tap()
         let save = app.buttons["dm-memory-save"]
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(document.label.contains("v2"))
-        XCTAssertTrue(document.label.contains("색인 대기"))
-        document.tap()
+        let revised = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "r2"),
+            object: meta
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [revised], timeout: 5), .completed)
+        XCTAssertTrue(preview.exists)
         let history = app.buttons["dm-memory-history"]
-        if !history.isHittable { app.swipeUp() }
         XCTAssertTrue(history.waitForExistence(timeout: 5))
         history.tap()
         let revision = app.buttons["dm-memory-revision-1"]
@@ -251,13 +321,81 @@ final class BriarCompanionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["dm-memory-revision-body"].waitForExistence(timeout: 5))
         captureScreenshot(named: "companion-dm-memory-history")
         app.navigationBars["변경 이력"].buttons.element(boundBy: 0).tap()
+        // Forgetting asks first, then returns to the tree.
         let forget = app.buttons["dm-memory-forget"]
-        if !forget.isHittable { app.swipeUp() }
         XCTAssertTrue(forget.waitForExistence(timeout: 5))
         forget.tap()
+        let confirm = app.buttons.matching(identifier: "dm-memory-forget-confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(preview.waitForNonExistence(timeout: 5))
         XCTAssertTrue(document.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["저장된 기억이 없습니다."].waitForExistence(timeout: 5))
+        reveal(app.staticTexts["저장된 기억이 없습니다."], in: app)
         captureScreenshot(named: "companion-dm-memory-forgotten")
+    }
+
+    /// On iPad the memory window shows the tree and the preview side by side,
+    /// with an empty detail column until a file is selected.
+    func testDirectMessageMemorySplitLayoutOnIPad() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "The split layout needs a regular-width iPad.")
+        let app = launchInsideCompanion()
+        // iPadOS shows the tab bar as a floating bar whose tabs are plain buttons.
+        let directMessages = app.buttons.matching(NSPredicate(format: "label == %@", "DMs")).firstMatch
+        XCTAssertTrue(directMessages.waitForExistence(timeout: transitionTimeout))
+        directMessages.tap()
+        let conversation = app.buttons["dm-row-12121212-1212-4212-8212-121212121212"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: channelTransitionTimeout))
+        conversation.tap()
+        let open = app.buttons["dm-memory-open"]
+        XCTAssertTrue(open.waitForExistence(timeout: channelTransitionTimeout))
+        open.tap()
+        let empty = app.descendants(matching: .any)["dm-memory-empty-detail"]
+        XCTAssertTrue(empty.waitForExistence(timeout: 5))
+        let preview = app.descendants(matching: .any)["dm-memory-preview"]
+        XCTAssertFalse(preview.exists)
+        let tree = app.collectionViews.firstMatch
+        let document = app.buttons["dm-memory-document-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]
+        reveal(document, in: app, scrolling: tree)
+        captureScreenshot(named: "companion-dm-memory-ipad-empty")
+        XCTAssertGreaterThan(empty.frame.minX, document.frame.maxX - 1, "The detail column sits right of the tree.")
+
+        document.tap()
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        XCTAssertFalse(empty.exists)
+        XCTAssertTrue(element(withLabel: "합성 데이터: 설명은 결론부터 제시한다.", in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(document.isHittable, "The tree stays visible beside the preview.")
+        XCTAssertGreaterThan(preview.frame.minX, document.frame.maxX - 1)
+        XCTAssertTrue(app.buttons["dm-memory-edit"].exists)
+        captureScreenshot(named: "companion-dm-memory-ipad-preview")
+
+        let readme = app.buttons["dm-memory-document-cccccccc-cccc-4ccc-8ccc-cccccccccccc"]
+        reveal(readme, in: app, scrolling: tree)
+        readme.tap()
+        XCTAssertTrue(element(withLabel: "합성 안내 파일.", in: app).waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["dm-memory-edit"].exists)
+        XCTAssertFalse(app.buttons["dm-memory-forget"].exists)
+        captureScreenshot(named: "companion-dm-memory-ipad-readme")
+
+        // Forgetting the previewed file empties the detail column again.
+        reveal(document, in: app, scrolling: tree)
+        document.tap()
+        let forget = app.buttons["dm-memory-forget"]
+        XCTAssertTrue(forget.waitForExistence(timeout: 5))
+        forget.tap()
+        let confirm = app.buttons.matching(identifier: "dm-memory-forget-confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(empty.waitForExistence(timeout: 5))
+        XCTAssertFalse(document.exists)
+    }
+
+    /// Scrolls the DM memory form until a lazily rendered row is on screen.
+    /// On iPad the screen's middle is the preview column, so swipe the tree itself.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, scrolling container: XCUIElement? = nil) {
+        let target = container ?? app
+        for _ in 0..<6 where !(element.exists && element.isHittable) { target.swipeUp() }
+        for _ in 0..<6 where !(element.exists && element.isHittable) { target.swipeDown() }
+        XCTAssertTrue(element.waitForExistence(timeout: 5))
     }
 
     func testChannelShowsLoadingSpinnerWhileMessagesLoad() {

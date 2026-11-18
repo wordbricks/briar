@@ -27,11 +27,6 @@ export type WorkerRuntimeInput = {
     readonly healthy: boolean;
     readonly detail: string | null;
   }>;
-  readonly dmMemoryLearning?: boolean | {
-    readonly protocol: 2;
-    readonly transports: ReadonlyArray<"agent" | "openrouter">;
-    readonly providers: ReadonlyArray<AgentProvider>;
-  };
   readonly dmReplyRouting?: {
     readonly protocol: 1;
     readonly providers: ReadonlyArray<AgentProvider>;
@@ -39,6 +34,10 @@ export type WorkerRuntimeInput = {
   readonly dmPublicMessages?: {
     readonly protocol: 1;
     readonly providers: ReadonlyArray<AgentProvider>;
+  };
+  /** `tools memory …` and per-turn vault context (docs/plans/memory-vault-spec.md). */
+  readonly memoryVault?: {
+    readonly protocol: 1;
   };
   readonly computerUse?: {
     readonly protocol: 1;
@@ -101,19 +100,6 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
       dmReplyRouting: input.dmReplyRouting ? {
         protocol: 1, providers: input.dmReplyRouting.providers.map((provider) => protoAgentProvider[provider]),
       } : undefined,
-      dmMemoryProtocol: 1,
-      dmMemoryLearningRequests: input.dmMemoryLearning ? 1 : undefined,
-      dmMemoryLearning: input.dmMemoryLearning
-        ? typeof input.dmMemoryLearning === "boolean"
-          ? { protocol: 1, transport: "openrouter" }
-          : {
-              protocol: input.dmMemoryLearning.protocol,
-              transports: [...input.dmMemoryLearning.transports],
-              providers: input.dmMemoryLearning.providers.map(
-                (provider) => protoAgentProvider[provider],
-              ),
-            }
-        : undefined,
       computerUse: input.computerUse
         ? {
             protocol: input.computerUse.protocol,
@@ -135,6 +121,7 @@ export const workerRuntimeToProto = (input: WorkerRuntimeInput) =>
             ),
           }
         : undefined,
+      memoryVaultProtocol: input.memoryVault?.protocol,
     },
     versions: { ...input.versions },
   });

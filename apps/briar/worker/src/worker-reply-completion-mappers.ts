@@ -523,9 +523,6 @@ export function completeChannelReplyInputFromProto(
       ? { acknowledgementReaction: success.acknowledgementReaction }
       : {}),
     memoryCitations: success.memoryCitations.map(memoryReference),
-    memorySaveRequest: success.memorySaveRequest
-      ? { documents: success.memorySaveRequest.documents.map(memoryReference) }
-      : null,
     body: success.body,
     document,
     issueProposal,

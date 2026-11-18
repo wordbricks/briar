@@ -148,7 +148,12 @@ per-database ceiling.
 ## Applying it
 
 `bun run worker:deploy` runs `apply-remote-d1-migrations` first, then
-`wrangler deploy`, which is the order a widening needs. The import is atomic —
+`wrangler deploy`, which is the order a widening needs. A narrowing change — a
+migration that drops a table, column or trigger the live code still reads —
+needs the opposite order, or the old code fails against the new schema until
+the deploy lands: run it as `BRIAR_WORKER_DEPLOY_ORDER=code-first bun run
+worker:deploy`, and make sure the new code also works on the old schema
+(`0222_remove_legacy_dm_memory.sql` was the first such release). The import is atomic —
 either the whole migration lands or none of it does, so a failure leaves the
 database intact rather than half-rebuilt. Take a restore point first;
 `wrangler d1 time-travel info briar-db` prints a bookmark and D1 keeps 30 days.

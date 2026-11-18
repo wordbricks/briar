@@ -13,9 +13,6 @@ import { create, fromJson, toJson } from "@bufbuild/protobuf";
 import * as Schema from "effect/Schema";
 import { timestampFromDate, ValueSchema } from "@bufbuild/protobuf/wkt";
 import {
-  DmMemoryBriefState,
-  DmMemoryDescriptorSchema} from "@briar/contracts/gen/briar/app/v1/dm_memory_pb";
-import {
   AcknowledgeChannelReplySteerResponseSchema,
   type AcknowledgeChannelReplySteerRequest,
   RefreshChannelReplyClaimResponseSchema,
@@ -25,11 +22,8 @@ import {
   CompleteChannelReplyResponseSchema,
   CompleteIssueReplyResponseSchema,
   CompleteMergeBatchPublicationResponseSchema,
-  CheckDmMemoryClaimResponseSchema,
-  GetDmMemoryBriefResponseSchema,
   HandoffWorkResponse_Outcome,
   HandoffWorkResponse_State,
-  LookupDmMemoryResponseSchema,
   MergeBatchState,
   MergeBatchValidationFailureCode,
   RecordMergeBatchAuthorityResponseSchema,
@@ -41,28 +35,18 @@ import {
   RenewWorkLeaseResponseSchema,
   WorkerQueueService,
   type BlockMergeBatchRequest,
-  type CheckDmMemoryClaimRequest,
   type CheckpointChannelReplySessionRequest,
   type CompleteChannelReplyRequest,
   type CompleteIssueReplyRequest,
   type CompleteMergeBatchPublicationRequest,
   type CompleteProjectAgentTaskRequest,
-  type DmMemoryClaimIdentity,
-  DmMemoryLearningFailure,
-  DmMemoryLearningStage,
-  type DmMemoryLearningRequestIdentity,
-  type FailDmMemoryLearningRequest,
-  type GetDmMemoryBriefRequest,
-  type LookupDmMemoryRequest,
   type PrepareReplyAttachmentUploadsRequest,
   type PublishDmMessageBatchRequest,
-  type ReserveDmMemoryLearningCallRequest,
   type RecordMergeBatchAuthorityRequest,
   type RecordMergeBatchCandidateEnqueuedRequest,
   type RecordMergeBatchValidationRequest,
   type WorkClaimIdentity,
-  type SubmitDmMemoryLearningProposalRequest,
-  type SubmitDmMemoryLearningVerificationRequest} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
+} from "@briar/contracts/gen/briar/worker/v1/worker_queue_pb";
 import type {
   ConnectRouter,
   HandlerContext,
@@ -110,24 +94,6 @@ import {
 } from "./team-request-contract";
 import { claimNextQueueWork } from "./queue-claim-routes";
 import {
-  claimDmLearningJob,
-  failDmLearningClaim,
-  renewDmLearningClaim,
-  type DmLearningClaimIdentity,
-} from "./dm-memory-learning-claims";
-import {
-  reserveDmLearningModelCall,
-  submitDmLearningProposal,
-  submitDmLearningVerification,
-} from "./dm-memory-learning-model-calls";
-import { DmLearningError } from "./dm-memory-learning-validation";
-import {
-  DmLearningProposal,
-  DmLearningUsage,
-  DmLearningVerification,
-} from "../../src/lib/dm-memory-learning-contract";
-import { dmMemoryCanonicalJson } from "../../src/lib/dm-memory-canonical-json";
-import {
   channelActivityCredential,
   issueActivityCredential,
 } from "./realtime-scheduling";
@@ -165,10 +131,26 @@ import {
 } from "./dm-public-message-application";
 import { publishDmPublicMessageBatchInputFromProto } from "./dm-public-message-mappers";
 import {
-  checkDmMemoryClaim,
-  getDmMemoryClaimBrief,
-  lookupDmMemoryClaim,
-} from "./dm-memory-claim-application";
+  agentChannelListRpc,
+  agentChannelPostRpc,
+  agentChannelReadRpc,
+  agentIssueCreateRpc,
+  agentIssueListRpc,
+  agentIssueNoteRpc,
+  agentIssueSetStatusRpc,
+  agentIssueShowRpc,
+  agentIssueUpdateRpc,
+} from "./worker-connect-agent-workspace";
+import {
+  getMemoryVaultContextRpc,
+  memoryVaultConnectServices,
+  memoryVaultJournalRpc,
+  memoryVaultListRpc,
+  memoryVaultReadRpc,
+  memoryVaultSaveRpc,
+  memoryVaultSearchRpc,
+} from "./worker-connect-memory-vault";
+import type { VaultGitStore } from "./memory-vault/git-store";
 
 export type WorkerConnectQueueInput = {
   readonly request: Request;
@@ -186,7 +168,6 @@ export type WorkerQueueServices = {
   readonly claimNextChannelReplyWork: typeof claimNextChannelReplyWork;
   readonly refreshChannelReplyClaim: typeof refreshChannelReplyClaim;
   readonly claimNextQueueWork: typeof claimNextQueueWork;
-  readonly claimDmLearningJob: typeof claimDmLearningJob;
   readonly sha256: typeof sha256;
   readonly renewHuntRunLease: typeof renewHuntRunLease;
   readonly renewTeamAgentTaskLease: typeof renewTeamAgentTaskLease;
@@ -218,14 +199,8 @@ export type WorkerQueueServices = {
   readonly completeChannelReplyApplication: typeof completeChannelReplyApplication;
   readonly publishDmPublicMessageBatchApplication:
     typeof publishDmPublicMessageBatchApplication;
-  readonly checkDmMemoryClaim: typeof checkDmMemoryClaim;
-  readonly getDmMemoryClaimBrief: typeof getDmMemoryClaimBrief;
-  readonly lookupDmMemoryClaim: typeof lookupDmMemoryClaim;
-  readonly reserveDmLearningModelCall: typeof reserveDmLearningModelCall;
-  readonly submitDmLearningProposal: typeof submitDmLearningProposal;
-  readonly submitDmLearningVerification: typeof submitDmLearningVerification;
-  readonly renewDmLearningClaim: typeof renewDmLearningClaim;
-  readonly failDmLearningClaim: typeof failDmLearningClaim;
+  /** The memory vault's Git store; tests inject an in-memory one. */
+  readonly memoryVaultStore: (env: Env) => VaultGitStore | null;
 };
 
 const workerQueueServices: WorkerQueueServices = {
@@ -237,7 +212,6 @@ const workerQueueServices: WorkerQueueServices = {
   claimNextChannelReplyWork,
   refreshChannelReplyClaim,
   claimNextQueueWork,
-  claimDmLearningJob,
   sha256,
   renewHuntRunLease,
   renewTeamAgentTaskLease,
@@ -265,14 +239,7 @@ const workerQueueServices: WorkerQueueServices = {
   completeIssueReplyApplication,
   completeChannelReplyApplication,
   publishDmPublicMessageBatchApplication,
-  checkDmMemoryClaim,
-  getDmMemoryClaimBrief,
-  lookupDmMemoryClaim,
-  reserveDmLearningModelCall,
-  submitDmLearningProposal,
-  submitDmLearningVerification,
-  renewDmLearningClaim,
-  failDmLearningClaim,
+  ...memoryVaultConnectServices,
 };
 
 const requiredWork = (value: WorkClaimIdentity | undefined) => {
@@ -330,23 +297,6 @@ const authenticatedWorker = (
   projectId,
   workerId,
 );
-
-const rethrowDmLearningError = (error: unknown): never => {
-  if (!(error instanceof DmLearningError)) throw error;
-  const status = error.code === "stale" || error.code === "scope_revoked"
-    ? 409
-    : error.code === "invalid_proposal" ||
-        error.code === "verification_rejected"
-    ? 422
-    : error.code === "budget_exhausted"
-    ? 429
-    : 503;
-  throw new HttpError(
-    status,
-    "Memory learning could not complete",
-    `memory_${error.code}`,
-  );
-};
 
 /**
  * The claim mutation commits before the protobuf mapping runs, so a mapping
@@ -478,15 +428,6 @@ async function claimWork(
       authenticatedWorker: worker,
     });
     if (issue) return { work: workerClaimMessage(issue) };
-
-    const learning = await services.claimDmLearningJob(input.db, {
-      workspaceId: worker.principal.workspaceId,
-      deviceId: worker.principal.deviceId,
-      workerId: claimInput.workerId,
-      projectId: claimInput.projectId,
-      now: new Date().toISOString(),
-    });
-    if (learning) return { work: workerClaimMessage(learning) };
   }
 
   // Nothing was claimable, so the Worker keeps its ordinary idle cadence.
@@ -645,33 +586,6 @@ async function renewWorkLease(
         },
       });
     }
-    case "dmMemory": {
-      if (
-        identity.work.value.workspaceId !==
-          worker.principal.workspaceId
-      ) {
-        throw new HttpError(403, "Worker is not enabled for this workspace");
-      }
-      try {
-        const renewed = await services.renewDmLearningClaim(input.db, {
-          identity: {
-            workspaceId: worker.principal.workspaceId,
-            deviceId: worker.principal.deviceId,
-            workerId: worker.binding.id,
-            jobId: identity.workId,
-            claimTokenHash,
-          },
-          inputHash: identity.work.value.inputHash,
-          now: observedAt,
-        });
-        return create(RenewWorkLeaseResponseSchema, {
-          leaseExpiresAt: timestamp(renewed, "lease expiry"),
-          work: { case: "dmMemory", value: {} },
-        });
-      } catch (error) {
-        return rethrowDmLearningError(error);
-      }
-    }
     case "mergeBatch": {
       const renewed = await services.renewMergeBatchLease(input.db, {
         batchId: identity.workId,
@@ -717,35 +631,6 @@ async function handoffWork(
   );
   const observedAt = new Date().toISOString();
   const claimTokenHash = await services.sha256(identity.claimToken);
-
-  if (identity.work.case === "dmMemory") {
-    if (
-      identity.work.value.workspaceId !== worker.principal.workspaceId
-    ) {
-      throw new HttpError(403, "Worker is not enabled for this workspace");
-    }
-    const released = await services.failDmLearningClaim(
-      input.db,
-      {
-        workspaceId: worker.principal.workspaceId,
-        deviceId: worker.principal.deviceId,
-        workerId: worker.binding.id,
-        jobId: identity.workId,
-        claimTokenHash,
-      },
-      "model_unavailable",
-      observedAt,
-    );
-    return {
-      outcome: released
-        ? HandoffWorkResponse_Outcome.RELEASED
-        : HandoffWorkResponse_Outcome.ALREADY_RELEASED,
-      requestId: request.requestId,
-      state: HandoffWorkResponse_State.DRAINING,
-      activeWorkCount: 0,
-      ready: false,
-    };
-  }
 
   if (identity.work.case === "mergeBatch") {
     if (await services.handoffAuxiliaryWorkerUpdate(input.db, {
@@ -1415,291 +1300,6 @@ async function publishDmMessageBatchRpc(
   }
 }
 
-const dmMemoryDescriptorMessage = (value: {
-  protocol: 1;
-  memorySpaceId: string;
-  memoryRevision: number;
-  revocationEpoch: number;
-  searchEnabled: boolean;
-  briefState: "available" | "disabled";
-}) => create(DmMemoryDescriptorSchema, {
-  protocol: value.protocol,
-  memorySpaceId: value.memorySpaceId,
-  memoryRevision: BigInt(value.memoryRevision),
-  revocationEpoch: BigInt(value.revocationEpoch),
-  searchEnabled: value.searchEnabled,
-  briefState: value.briefState === "available"
-    ? DmMemoryBriefState.AVAILABLE
-    : DmMemoryBriefState.DISABLED,
-});
-
-const dmMemoryScope = async (
-  input: WorkerConnectQueueInput,
-  claim: DmMemoryClaimIdentity | undefined,
-  services: WorkerQueueServices,
-) => {
-  if (!claim) throw new HttpError(400, "DM memory claim is required");
-  const work = requiredWork(claim.work);
-  if (work.work.case !== "channelReply") {
-    throw new HttpError(400, "DM memory requires a channel reply claim");
-  }
-  if (claim.revocationEpoch > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new HttpError(400, "DM memory revocation epoch is too large");
-  }
-  const worker = await authenticatedWorker(
-    input,
-    claim.projectId,
-    claim.workerId,
-    services,
-  );
-  return {
-    jobId: work.workId,
-    workerId: claim.workerId,
-    deviceId: worker.principal.deviceId,
-    claimToken: work.claimToken,
-    revocationEpoch: Number(claim.revocationEpoch),
-  };
-};
-
-async function checkDmMemoryClaimRpc(
-  input: WorkerConnectQueueInput,
-  request: CheckDmMemoryClaimRequest,
-  services: WorkerQueueServices,
-) {
-  const scope = await dmMemoryScope(input, request.claim, services);
-  const memory = await services.checkDmMemoryClaim(input.db, input.env, scope);
-  return create(CheckDmMemoryClaimResponseSchema, {
-    memory: dmMemoryDescriptorMessage(memory),
-  });
-}
-
-async function getDmMemoryBriefRpc(
-  input: WorkerConnectQueueInput,
-  request: GetDmMemoryBriefRequest,
-  services: WorkerQueueServices,
-) {
-  const scope = await dmMemoryScope(input, request.claim, services);
-  const result = await services.getDmMemoryClaimBrief(input.db, input.env, scope);
-  return create(GetDmMemoryBriefResponseSchema, {
-    memory: dmMemoryDescriptorMessage(result.memory),
-    brief: fromJson(ValueSchema, result.brief),
-  });
-}
-
-async function lookupDmMemoryRpc(
-  input: WorkerConnectQueueInput,
-  request: LookupDmMemoryRequest,
-  services: WorkerQueueServices,
-) {
-  const scope = await dmMemoryScope(input, request.claim, services);
-  if (!request.requestId || !request.request) {
-    throw new HttpError(400, "DM memory lookup request is incomplete");
-  }
-  const response = await services.lookupDmMemoryClaim(
-    input.db,
-    input.env,
-    scope,
-    request.requestId,
-    toJson(ValueSchema, request.request),
-  );
-  return create(LookupDmMemoryResponseSchema, {
-    response: fromJson(ValueSchema, response),
-  });
-}
-
-const learningJson = <S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
-  bytes: Uint8Array,
-): S["Type"] => {
-  try {
-    return Schema.decodeUnknownSync(schema)(
-      JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
-    );
-  } catch {
-    throw new HttpError(400, "Invalid memory learning payload");
-  }
-};
-
-const learningJsonBytes = (value: unknown) =>
-  new TextEncoder().encode(dmMemoryCanonicalJson(value));
-
-const learningNumber = (value: bigint, field: string) => {
-  const number = Number(value);
-  if (!Number.isSafeInteger(number)) {
-    throw new HttpError(400, `${field} exceeds JavaScript's safe integer range`);
-  }
-  return number;
-};
-
-const learningUsage = (
-  value: { inputTokens: bigint; outputTokens: bigint; costMicroUsd?: bigint } |
-    undefined,
-) => {
-  if (!value) throw new HttpError(400, "Memory learning usage is required");
-  return Schema.decodeSync(DmLearningUsage)({
-    inputTokens: learningNumber(value.inputTokens, "input_tokens"),
-    outputTokens: learningNumber(value.outputTokens, "output_tokens"),
-    costMicroUsd: value.costMicroUsd === undefined
-      ? null
-      : learningNumber(value.costMicroUsd, "cost_micro_usd"),
-  });
-};
-
-const learningStage = (value: DmMemoryLearningStage) => {
-  switch (value) {
-    case DmMemoryLearningStage.PROPOSING: return "proposing" as const;
-    case DmMemoryLearningStage.VERIFYING: return "verifying" as const;
-    default: throw new HttpError(400, "Memory learning stage is required");
-  }
-};
-
-const learningFailure = (value: DmMemoryLearningFailure) => {
-  switch (value) {
-    case DmMemoryLearningFailure.INVALID_PROPOSAL: return "invalid_proposal" as const;
-    case DmMemoryLearningFailure.VERIFICATION_REJECTED: return "verification_rejected" as const;
-    case DmMemoryLearningFailure.STALE: return "stale" as const;
-    case DmMemoryLearningFailure.SCOPE_REVOKED: return "scope_revoked" as const;
-    case DmMemoryLearningFailure.BUDGET_EXHAUSTED: return "budget_exhausted" as const;
-    case DmMemoryLearningFailure.MODEL_UNAVAILABLE: return "model_unavailable" as const;
-    case DmMemoryLearningFailure.MODEL_TIMEOUT: return "model_timeout" as const;
-    case DmMemoryLearningFailure.MODEL_CREDENTIALS: return "model_credentials" as const;
-    case DmMemoryLearningFailure.MODEL_CONFIGURATION: return "model_configuration" as const;
-    case DmMemoryLearningFailure.INPUT_CAPACITY: return "input_capacity" as const;
-    default: throw new HttpError(400, "Memory learning failure code is required");
-  }
-};
-
-async function dmLearningScope(
-  input: WorkerConnectQueueInput,
-  claim: DmMemoryLearningRequestIdentity | undefined,
-  services: WorkerQueueServices,
-) {
-  if (!claim) throw new HttpError(400, "Memory learning claim is required");
-  const work = requiredWork(claim.work);
-  const worker = await authenticatedWorker(
-    input,
-    claim.projectId,
-    claim.workerId,
-    services,
-  );
-  if (
-    work.work.case !== "dmMemory" || work.workId !== work.runId ||
-    work.work.value.workspaceId !== worker.principal.workspaceId ||
-    !work.work.value.inputHash
-  ) {
-    throw new HttpError(400, "Memory learning claim identity is invalid");
-  }
-  return {
-    identity: {
-      workspaceId: worker.principal.workspaceId,
-      deviceId: worker.principal.deviceId,
-      workerId: worker.binding.id,
-      jobId: work.workId,
-      claimTokenHash: await services.sha256(work.claimToken),
-    } satisfies DmLearningClaimIdentity,
-    inputHash: work.work.value.inputHash,
-    workspaceId: worker.principal.workspaceId,
-  };
-}
-
-async function reserveDmMemoryLearningCallRpc(
-  input: WorkerConnectQueueInput,
-  request: ReserveDmMemoryLearningCallRequest,
-  services: WorkerQueueServices,
-) {
-  try {
-    const scope = await dmLearningScope(input, request.claim, services);
-    const result = await services.reserveDmLearningModelCall(input.db, {
-      ...scope,
-      callId: request.callId,
-      stage: learningStage(request.stage),
-      now: new Date().toISOString(),
-    });
-    return create(WorkerQueueService.method.reserveDmMemoryLearningCall.output, {
-      json: learningJsonBytes(result),
-    });
-  } catch (error) {
-    return rethrowDmLearningError(error);
-  }
-}
-
-async function submitDmMemoryLearningProposalRpc(
-  input: WorkerConnectQueueInput,
-  request: SubmitDmMemoryLearningProposalRequest,
-  services: WorkerQueueServices,
-) {
-  try {
-    const scope = await dmLearningScope(input, request.claim, services);
-    const result = await services.submitDmLearningProposal(input.db, {
-      ...scope,
-      callId: request.callId,
-      proposal: learningJson(DmLearningProposal, request.proposalJson),
-      usage: learningUsage(request.usage),
-      now: new Date().toISOString(),
-    });
-    return create(WorkerQueueService.method.submitDmMemoryLearningProposal.output, {
-      json: learningJsonBytes(result),
-    });
-  } catch (error) {
-    return rethrowDmLearningError(error);
-  }
-}
-
-async function submitDmMemoryLearningVerificationRpc(
-  input: WorkerConnectQueueInput,
-  request: SubmitDmMemoryLearningVerificationRequest,
-  services: WorkerQueueServices,
-) {
-  try {
-    const scope = await dmLearningScope(input, request.claim, services);
-    const result = await services.submitDmLearningVerification(input.db, {
-      ...scope,
-      callId: request.callId,
-      proposalId: request.proposalId,
-      proposalHash: request.proposalHash,
-      verification: learningJson(
-        DmLearningVerification,
-        request.verificationJson,
-      ),
-      usage: learningUsage(request.usage),
-      now: new Date().toISOString(),
-    });
-    return create(
-      WorkerQueueService.method.submitDmMemoryLearningVerification.output,
-      { json: learningJsonBytes(result) },
-    );
-  } catch (error) {
-    return rethrowDmLearningError(error);
-  }
-}
-
-async function failDmMemoryLearningRpc(
-  input: WorkerConnectQueueInput,
-  request: FailDmMemoryLearningRequest,
-  services: WorkerQueueServices,
-) {
-  try {
-    const scope = await dmLearningScope(input, request.claim, services);
-    if ((request.callId === undefined) !== (request.usage === undefined)) {
-      throw new HttpError(400, "Memory learning accounting is incomplete");
-    }
-    const released = await services.failDmLearningClaim(
-      input.db,
-      scope.identity,
-      learningFailure(request.code),
-      new Date().toISOString(),
-      request.callId && request.usage
-        ? { callId: request.callId, usage: learningUsage(request.usage) }
-        : undefined,
-    );
-    return create(WorkerQueueService.method.failDmMemoryLearning.output, {
-      released,
-    });
-  } catch (error) {
-    return rethrowDmLearningError(error);
-  }
-}
-
 export function createWorkerQueueService(
   input: WorkerConnectQueueInput,
   overrides: Partial<WorkerQueueServices> = {},
@@ -1725,17 +1325,21 @@ export function createWorkerQueueService(
     completeChannelReply: (request) => completeChannelReplyRpc(input, request, services),
     publishDmMessageBatch: (request) =>
       publishDmMessageBatchRpc(input, request, services),
-    checkDmMemoryClaim: (request) => checkDmMemoryClaimRpc(input, request, services),
-    getDmMemoryBrief: (request) => getDmMemoryBriefRpc(input, request, services),
-    lookupDmMemory: (request) => lookupDmMemoryRpc(input, request, services),
-    reserveDmMemoryLearningCall: (request) =>
-      reserveDmMemoryLearningCallRpc(input, request, services),
-    submitDmMemoryLearningProposal: (request) =>
-      submitDmMemoryLearningProposalRpc(input, request, services),
-    submitDmMemoryLearningVerification: (request) =>
-      submitDmMemoryLearningVerificationRpc(input, request, services),
-    failDmMemoryLearning: (request) =>
-      failDmMemoryLearningRpc(input, request, services),
+    memoryVaultList: (request) => memoryVaultListRpc(input, request, services),
+    memoryVaultRead: (request) => memoryVaultReadRpc(input, request, services),
+    memoryVaultSearch: (request) => memoryVaultSearchRpc(input, request, services),
+    memoryVaultJournal: (request) => memoryVaultJournalRpc(input, request, services),
+    memoryVaultSave: (request) => memoryVaultSaveRpc(input, request, services),
+    getMemoryVaultContext: (request) => getMemoryVaultContextRpc(input, request, services),
+    agentIssueList: (request) => agentIssueListRpc(input, request, services),
+    agentIssueShow: (request) => agentIssueShowRpc(input, request, services),
+    agentIssueCreate: (request) => agentIssueCreateRpc(input, request, services),
+    agentIssueNote: (request) => agentIssueNoteRpc(input, request, services),
+    agentIssueSetStatus: (request) => agentIssueSetStatusRpc(input, request, services),
+    agentIssueUpdate: (request) => agentIssueUpdateRpc(input, request, services),
+    agentChannelList: (request) => agentChannelListRpc(input, request, services),
+    agentChannelRead: (request) => agentChannelReadRpc(input, request, services),
+    agentChannelPost: (request) => agentChannelPostRpc(input, request, services),
   };
 }
 

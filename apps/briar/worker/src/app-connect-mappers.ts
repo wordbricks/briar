@@ -593,6 +593,9 @@ export const appDashboardRun = (run: DashboardRunJson) =>
       : undefined,
     assigneeUserId: run.assigneeUserId ?? undefined,
     createdByUserId: run.createdByUserId ?? undefined,
+    createdByAgent: run.createdByAgent
+      ? { agentId: run.createdByAgent.agentId ?? undefined, name: run.createdByAgent.name }
+      : undefined,
     subscribers: run.subscribers.map((subscriber) =>
       create(IssueSubscriberSchema, {
         userId: subscriber.userId,

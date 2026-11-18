@@ -194,11 +194,26 @@ const buildDashboardRunListQuery = (
   }
   const query = filters.query?.trim();
   if (query) {
-    conditions.push(
-      `(lower(run.title) like lower(?) or lower(run.source_key) like lower(?) or lower(coalesce(run.detail, '')) like lower(?) or lower(coalesce(run.issue_description, '')) like lower(?))`,
-    );
-    const pattern = `%${query}%`;
-    bindings.push(pattern, pattern, pattern, pattern);
+    /*
+      A query that is an issue key ("BR-42") or a bare number ("42") also
+      matches the run number itself, so card-number links resolve even when
+      the run is outside the loaded page. Text matching is kept alongside it:
+      a team can title a run "42".
+    */
+    const issueKeyNumber = query.match(/^(?:[A-Za-z0-9]{1,3}-)?(\d+)$/u);
+    if (issueKeyNumber) {
+      conditions.push(
+        `(lower(run.title) like lower(?) or lower(run.source_key) like lower(?) or lower(coalesce(run.detail, '')) like lower(?) or lower(coalesce(run.issue_description, '')) like lower(?) or run.run_number = ?)`,
+      );
+      const pattern = `%${query}%`;
+      bindings.push(pattern, pattern, pattern, pattern, Number(issueKeyNumber[1]));
+    } else {
+      conditions.push(
+        `(lower(run.title) like lower(?) or lower(run.source_key) like lower(?) or lower(coalesce(run.detail, '')) like lower(?) or lower(coalesce(run.issue_description, '')) like lower(?))`,
+      );
+      const pattern = `%${query}%`;
+      bindings.push(pattern, pattern, pattern, pattern);
+    }
   }
   if (filters.planningProjectId) {
     conditions.push("run.planning_project_id = ?");

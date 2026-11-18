@@ -1,5 +1,5 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { AgentUsageStatusBar } from "../AgentUsageStatusBar";
 import { AppVersionStatus } from "../AppVersionStatus";
@@ -38,6 +38,7 @@ import {
   issueListRequestKeyAtom,
   lastDirectMessageChannelIdAtom,
   lastWorkLocationAtom,
+  navigationLocationAtom,
   requestedRunIdAtom,
   requestedSessionIdAtom,
   settingsTargetAtom,
@@ -88,6 +89,7 @@ export function DesktopShell({
   const activeWorkspaceId = useAtomValue(activeWorkspaceIdAtom);
   const lockedTeamId = useAtomValue(lockedTeamIdAtom);
   const setIsSidebarOpen = useAtomSet(isSidebarOpenAtom);
+  const isSidebarOpen = useAtomValue(isSidebarOpenAtom);
   const setSettingsTarget = useAtomSet(settingsTargetAtom);
   const setRequestedRunId = useAtomSet(requestedRunIdAtom);
   const setRequestedSessionId = useAtomSet(requestedSessionIdAtom);
@@ -217,7 +219,18 @@ export function DesktopShell({
         ref={appShellRef}
       >
         <WindowNavigationControlsWithHistory />
-        <SidebarWithSession
+        {isSidebarOpen && (
+          <button
+            aria-label="Close sidebar"
+            className="mobile-sidebar-backdrop"
+            onClick={() => setIsSidebarOpen(false)}
+            type="button"
+          />
+        )}
+        <div className="mobile-sidebar-layer">
+          <CloseMobileSidebarOnNavigation />
+          <MobileSidebarKeyboardBoundary />
+          <SidebarWithSession
           agents={agents.all}
           sidebarResizeProps={sidebarResizeProps}
           sidebarWidth={effectiveSidebarWidth}
@@ -336,6 +349,7 @@ export function DesktopShell({
           onLogout={() => void logout()}
           unreadInboxCount={unreadInboxCount}
         />
+        </div>
         <DesktopPages {...pages} />
       </div>
       <div className="app-status-bar">
@@ -379,4 +393,72 @@ export function DesktopShell({
       </div>
     </div>
   );
+}
+
+/** A narrow drawer closes after a destination changes, including channel and DM selections. */
+function CloseMobileSidebarOnNavigation() {
+  const location = useAtomValue(navigationLocationAtom);
+  const setIsSidebarOpen = useAtomSet(isSidebarOpenAtom);
+  useEffect(() => {
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 760px)").matches
+    ) {
+      setIsSidebarOpen(false);
+    }
+  }, [location, setIsSidebarOpen]);
+  return null;
+}
+
+/** Keep keyboard access inside the narrow drawer and let Escape dismiss it. */
+function MobileSidebarKeyboardBoundary() {
+  const isOpen = useAtomValue(isSidebarOpenAtom);
+  const setIsOpen = useAtomSet(isSidebarOpenAtom);
+  useEffect(() => {
+    if (
+      !isOpen ||
+      typeof window.matchMedia !== "function" ||
+      !window.matchMedia("(max-width: 760px)").matches
+    ) return;
+    const drawer = document.getElementById("app-sidebar");
+    if (!drawer) return;
+    const trigger = document.querySelector<HTMLElement>(
+      ".window-navigation-controls .sidebar-control",
+    );
+    const focusable = () => Array.from(
+      drawer.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((element) => element.getClientRects().length > 0);
+    const restoreFocus = document.activeElement === trigger ||
+      drawer.contains(document.activeElement);
+    focusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Portaled menus handle their own Escape and focus while open.
+      if (!drawer.contains(event.target as Node)) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsOpen(false);
+        trigger?.focus();
+      } else if (event.key === "Tab") {
+        const elements = focusable();
+        if (!elements.length) return;
+        const first = elements[0]!;
+        const last = elements[elements.length - 1]!;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      if (restoreFocus && drawer.contains(document.activeElement)) trigger?.focus();
+    };
+  }, [isOpen, setIsOpen]);
+  return null;
 }

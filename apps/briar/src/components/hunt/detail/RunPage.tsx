@@ -27,8 +27,9 @@ import { defaultIssueDetailTab, type IssueDetailTab } from "@/lib/issue-detail-t
 import { issueAttachmentReference, issueAttachmentReferences, removeIssueAttachmentMarkdown } from "@/lib/issue-markdown";
 import { clampConversationPaneWidth, conversationPaneWidthDefault, conversationPaneWidthMax, conversationPaneWidthMin, loadConversationPaneWidth, saveConversationPaneWidth } from "@/lib/conversation-pane-width";
 import { loadRunCostEstimate } from "@/lib/api";
-import { copyIssueId, copyIssueShareLink, shareIssueLink } from "@/lib/issue-links";
+import { copyIssueId, copyIssueShareLink, shareIssueLink, webAppIssueKeyUrl } from "@/lib/issue-links";
 import { formatIssueKey } from "@/lib/issue-key";
+import { webMode } from "@/state/platform";
 import type { AgentSkillExecutionApprovalInput, AgentSkillExecutionProposal, AgentExecutionCostEstimate, ExecutionWorker, HuntEvent, HuntRun, HuntRunPlacement, IssueAttachment, IssueMessage, IssueMessageSendResult, IssueProposedAction, IssueExecutionApprovalInput, IssueExecutionProposal, IssueExecutionPreferences, WorkspaceMember, PlanningProject, Project, ProjectAgent, ProjectExecutionWorkerPolicy, RelatedMessageReference, RunEvidence, RunEvidenceImage, UpdateIssueInput } from "@/types";
 import { agentEffortOptions, agentModelDisplayName, agentModelOptions, agentProviderLabels, type AgentProvider, type ModelEffort } from "@/lib/team-llm";
 import { useAgentProviderModels } from "@/hooks/useAgentProviderModels";
@@ -232,6 +233,8 @@ export function RunPage({
   const processNowDisabled = !onProcessNow || run.executionReadiness === "waiting" || run.status !== "queued" && !canReassign || isClaimed && !canReassign || isProcessing;
   const assignee = mentionMembers.find(member => member.userId === run.assigneeUserId) ?? null;
   const creator = mentionMembers.find(member => member.userId === run.createdByUserId) ?? null;
+  // An agent-created issue has no creating person; the two never coexist.
+  const creatorName = run.createdByAgent ? run.createdByAgent.name : creator?.name ?? t("run.creatorUnknown");
   const {
     toast
   } = useToast();
@@ -961,12 +964,16 @@ export function RunPage({
       setIsSubmittingRework(false);
     }
   };
+  const canonicalIssueUrl = webMode
+    ? webAppIssueKeyUrl(formatIssueKey(issueKeyPrefix, run.runNumber))
+    : null;
   const shareIssue = async () => {
     try {
       const result = await shareIssueLink({
         projectId,
         runId: run.id,
-        title: run.title
+        title: run.title,
+        urlOverride: canonicalIssueUrl ?? undefined
       });
       if (result === "copied") {
         toast(t("issue.linkCopied"), {
@@ -983,7 +990,8 @@ export function RunPage({
     try {
       await copyIssueShareLink({
         projectId,
-        runId: run.id
+        runId: run.id,
+        urlOverride: canonicalIssueUrl ?? undefined
       });
       toast(t("issue.linkCopied"), {
         tone: "success"
@@ -1568,9 +1576,9 @@ export function RunPage({
                       <SelectMenu align="end" className="run-assignee-select" disabled={isUpdatingIssue || !onUpdateIssue} label={t("issue.assignee")} onValueChange={updateIssueAssignee} options={assigneeOptions} searchEmptyMessage={t("workspace.noResults")} searchPlaceholder={t("workspace.search")} searchable={assigneeOptions.length > 8} size="small" value={run.assigneeUserId ?? ""} />
                     </span>
                   </label>
-                  <div aria-label={`${t("run.creator")}: ${creator?.name ?? t("run.creatorUnknown")}`} className="run-property" title={t("run.creator")}>
-                    <span className="run-property-icon assignee"><UserRound size={15} /></span>
-                    <span className="run-property-copy"><strong>{creator?.name ?? t("run.creatorUnknown")}</strong></span>
+                  <div aria-label={`${t("run.creator")}: ${creatorName}`} className="run-property" title={t("run.creator")}>
+                    <span className="run-property-icon assignee">{run.createdByAgent ? <Bot size={15} /> : <UserRound size={15} />}</span>
+                    <span className="run-property-copy"><strong>{creatorName}</strong></span>
                   </div>
                   {run.relatedMessage && onRelatedMessageOpen ? <button aria-label={t("run.openRelatedMessage")} className="run-property run-property-button run-related-message-property" onClick={() => onRelatedMessageOpen(run.relatedMessage!)} title={t("run.openRelatedMessage")} type="button">
                       <span className="run-property-icon related-message"><MessageSquare size={15} /></span>
@@ -1748,4 +1756,4 @@ export function RunPage({
         </DialogContent>
       </Dialog>
     </MainContent>;
-}
+    }

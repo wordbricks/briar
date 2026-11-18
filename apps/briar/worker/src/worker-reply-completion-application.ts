@@ -24,6 +24,7 @@ import {
   listChannelAgents,
 } from "./channels";
 import { sha256 } from "./crypto-digest";
+import { acceptMemoryVaultCitations } from "./memory-vault/citations";
 import { completeIssueAgentReplyOutput } from "./issue-agent-reply-completion-repository";
 import {
   failIssueAgentReply,
@@ -61,11 +62,7 @@ import type {
   PreparedReplyAttachmentUploadsInput,
 } from "./worker-reply-completion-mappers";
 import { requireDmMemoryReplyFence } from "./dm-memory-reply-fence";
-import {
-  channelReplyWorkerAvailability,
-  executionWorkerBindingById,
-  executionWorkerRuntime,
-} from "./workers";
+import { channelReplyWorkerAvailability } from "./workers";
 import { scheduleWhatsAppOutboxFlush } from "./whatsapp-outbox";
 import { wakeWorkspaceWorkers } from "./worker-wake-hub";
 import {
@@ -120,7 +117,6 @@ export type ReplyCompletionApplicationServices = {
   readonly scheduleIssueActivityClear: typeof scheduleIssueActivityClear;
   readonly scheduleChannelRealtimePublish: typeof scheduleChannelRealtimePublish;
   readonly scheduleChannelActivityClear: typeof scheduleChannelActivityClear;
-  readonly executionWorkerBindingById: typeof executionWorkerBindingById;
   readonly requireDmMemoryReplyFence: typeof requireDmMemoryReplyFence;
   readonly channelReplyWorkerAvailability: typeof channelReplyWorkerAvailability;
   readonly scheduleWhatsAppOutboxFlush: typeof scheduleWhatsAppOutboxFlush;
@@ -129,7 +125,9 @@ export type ReplyCompletionApplicationServices = {
     typeof findDmFinalPublicMessageForReply;
   readonly getDmFinalPublicMessageBatch: typeof getDmFinalPublicMessageBatch;
   readonly getDmPublicMessageClaim: typeof getDmPublicMessageClaim;
+  readonly acceptMemoryVaultCitations: typeof acceptMemoryVaultCitations;
 };
+
 
 const applicationServices: ReplyCompletionApplicationServices = {
   sha256,
@@ -155,7 +153,6 @@ const applicationServices: ReplyCompletionApplicationServices = {
   scheduleIssueActivityClear,
   scheduleChannelRealtimePublish,
   scheduleChannelActivityClear,
-  executionWorkerBindingById,
   requireDmMemoryReplyFence,
   channelReplyWorkerAvailability,
   scheduleWhatsAppOutboxFlush,
@@ -163,6 +160,7 @@ const applicationServices: ReplyCompletionApplicationServices = {
   findDmFinalPublicMessageForReply,
   getDmFinalPublicMessageBatch,
   getDmPublicMessageClaim,
+  acceptMemoryVaultCitations,
 };
 
 /**
@@ -883,7 +881,7 @@ export async function completeChannelReplyApplication(
     const result = input.request.outcome.completion;
     if (
       input.request.attachmentIds.length > 0 ||
-      result.memoryCitations?.length || result.memorySaveRequest ||
+      result.memoryCitations?.length ||
       result.document || result.issueProposal || result.issueBatchProposal ||
       result.executionProposal || result.skillExecutionProposal ||
       result.delegation || result.agentMessage
@@ -991,26 +989,6 @@ export async function completeChannelReplyApplication(
         );
       }
       const result = resolved.outcome.completion;
-      if (result.memorySaveRequest) {
-        const binding = await services.executionWorkerBindingById(
-          input.db,
-          scope.deviceId,
-          scope.workerId,
-        );
-        const capabilities = binding
-          ? executionWorkerRuntime(binding).proto.capabilities
-          : undefined;
-        if (capabilities?.dmMemoryLearningRequests !== 1) {
-          throw new ReplyCompletionApplicationError(
-            "claim_conflict",
-            "Memory learning is unavailable",
-          );
-        }
-        await services.requireDmMemoryReplyFence(
-          input.db,
-          scope.workId,
-        );
-      }
       const artifactRequested = Boolean(
         result.document || result.issueProposal || result.issueBatchProposal ||
           result.executionProposal || result.skillExecutionProposal,
@@ -1022,8 +1000,7 @@ export async function completeChannelReplyApplication(
       */
       if (
         claimed.agent_message_hop === 1 &&
-        (result.delegation || result.agentMessage || artifactRequested ||
-          result.memorySaveRequest)
+        (result.delegation || result.agentMessage || artifactRequested)
       ) {
         throw new ReplyCompletionApplicationError(
           "invalid_request",
@@ -1145,6 +1122,30 @@ export async function completeChannelReplyApplication(
           );
         }
       }
+      /*
+        A citation names a vault record id (memory-vault spec §8) and is kept
+        only if this claim read that revision and it is still current.
+        Anything else — including a legacy D1 document UUID from an older
+        Worker CLI — is dropped, not fatal.
+      */
+      const vaultCandidates = result.memoryCitations ?? [];
+      const vaultCitations = vaultCandidates.length > 0
+        ? await services.acceptMemoryVaultCitations(input.db, {
+            claimTokenHash: scope.claimTokenHash,
+            citations: vaultCandidates.map((citation) => ({
+              documentId: citation.documentId,
+              version: citation.version,
+            })),
+          })
+        : null;
+      if (vaultCitations?.rejected.length) {
+        // Only records this claim read at their current revision may be cited.
+        console.warn(JSON.stringify({
+          message: "memory vault citations rejected",
+          jobId: scope.workId,
+          rejected: vaultCitations.rejected.length,
+        }));
+      }
       completed = await services.completeChannelReply(input.db, claimed, {
         jobId: scope.workId,
         deviceId: scope.deviceId,
@@ -1152,8 +1153,7 @@ export async function completeChannelReplyApplication(
         claimTokenHash: scope.claimTokenHash,
         body: publishedFinal?.finalBody ?? result.body,
         acknowledgementReaction: result.acknowledgementReaction,
-        memoryCitations: result.memoryCitations,
-        memorySaveRequest: result.memorySaveRequest,
+        memoryVaultCitations: vaultCitations?.accepted ?? [],
         document,
         issueProposal,
         issueBatchProposal,

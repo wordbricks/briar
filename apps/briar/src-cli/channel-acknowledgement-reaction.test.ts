@@ -7,8 +7,7 @@ const reply = {
   body: "함께 이야기해요.", attachments: [], document: null,
   issueProposal: null, issueBatchProposal: null, executionProposal: null,
   skillExecutionProposal: null, delegation: null, agentMessage: null,
-  contextRequests: null, memoryRequests: null, memoryCitations: null,
-  memorySaveRequest: null,
+  contextRequests: null, memoryCitations: null,
 };
 
 describe.each(["codex", "claude"] as const)("%s DM reaction output", (provider) => {

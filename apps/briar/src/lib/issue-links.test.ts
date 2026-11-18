@@ -7,8 +7,11 @@ import {
   parseChannelLink,
   parseIssueLink,
   parseSessionLink,
+  parseWebAppIssueKeyPath,
   parseWebAppIssuePath,
+  parseWebAppPagePath,
   sessionShareUrl,
+  webAppIssueKeyUrl,
 } from "./issue-links";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
@@ -82,6 +85,26 @@ describe("issue links", () => {
     expect(
       parseWebAppIssuePath(`/open/issues/${projectId}/${runId}`),
     ).toBeNull();
+  });
+
+  it("builds and parses card-number web app urls", () => {
+    expect(
+      webAppIssueKeyUrl("br-7456", "https://briar.example/base"),
+    ).toBe("https://briar.example/app/issues/BR-7456");
+    expect(parseWebAppIssueKeyPath("/app/issues/BR-7456")).toBe("BR-7456");
+    expect(parseWebAppIssueKeyPath("/app/issues/br-7456/")).toBe("BR-7456");
+    expect(parseWebAppIssueKeyPath("/app/issues")).toBeNull();
+    expect(parseWebAppIssueKeyPath("/app/issues/not-a-key")).toBeNull();
+    expect(parseWebAppIssueKeyPath("/app/agents")).toBeNull();
+  });
+
+  it("parses page destinations from the web app path", () => {
+    expect(parseWebAppPagePath("/app/issues")).toBe("issues");
+    expect(parseWebAppPagePath("/app/dms/")).toBe("dms");
+    expect(parseWebAppPagePath("/app")).toBeNull();
+    expect(parseWebAppPagePath("/app/issues/BR-7456")).toBeNull();
+    expect(parseWebAppPagePath("/app/open/issues/x/y")).toBeNull();
+    expect(parseWebAppPagePath("/app/not-a-page")).toBeNull();
   });
 
   it("builds and parses session share and app deep links", () => {
