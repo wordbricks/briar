@@ -4,7 +4,7 @@ import { applyD1Migrations } from "./test-helpers/d1";
 import { executeD1Sql } from "./test-helpers/d1-sql";
 
 const beforeSearch = "0218_issue_attachment_sources.sql";
-const searchMigration = "0219_channel_message_search.sql";
+const searchMigration = "0224_channel_message_search.sql";
 
 describe("channel message search migration", () => {
   it("creates an empty index and leaves historical messages out by owner choice", async () => {

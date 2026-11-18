@@ -194,6 +194,58 @@ export function withSentinels(statements: readonly string[]) {
   return `${statements.map((statement) => `${STATEMENT_SENTINEL}\n${statement}`).join("\n")}\n`;
 }
 
+/** True for migration SQL that creates SQLite virtual tables (e.g. FTS5). */
+export function isVirtualTableSql(sql: string) {
+  return /create\s+virtual\s+table/i.test(sql);
+}
+
+/**
+ * Splits migrations into the ordinary ones Miniflare can replay and export
+ * and the virtual-table ones it cannot: Miniflare's D1 exporter fails on
+ * databases containing FTS5 tables, so virtual-table migrations never reach
+ * wrangler — their statements are appended to the exported snapshot instead.
+ *
+ * That append is only honest when virtual-table migrations form a suffix of
+ * the apply order. An ordinary migration after one of them would load ahead
+ * of tables and triggers it may expect, so it is rejected by name rather than
+ * silently misordered.
+ */
+export async function partitionVirtualTableMigrations(
+  names: readonly string[],
+  readMigration: (name: string) => Promise<string> = (name) =>
+    readFile(join(migrationsDir, name), "utf8"),
+) {
+  const ordinary: string[] = [];
+  const virtual: string[] = [];
+  for (const name of names) {
+    if (isVirtualTableSql(await readMigration(name))) {
+      virtual.push(name);
+      continue;
+    }
+    if (virtual.length > 0) {
+      throw new Error(
+        `Migration ${name} follows virtual-table migration(s) ${virtual.join(", ")}. ` +
+          "Miniflare cannot export databases containing virtual tables, so the " +
+          "snapshot appends virtual-table migrations last; an ordinary migration " +
+          "after them would load out of dependency order. Move it ahead of the " +
+          "virtual-table migrations, or teach scripts/d1-schema-dump.ts to splice.",
+      );
+    }
+    ordinary.push(name);
+  }
+  return { ordinary, virtual };
+}
+
+/** Statements of a migration file, split on its sentinels. */
+async function migrationStatements(name: string) {
+  const sql = await readFile(join(migrationsDir, name), "utf8");
+  return sql
+    .split(`${STATEMENT_SENTINEL}\n`)
+    .slice(1)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 /**
  * Applies `names` to a throwaway local database and returns the export's
  * statements, already regrouped into load order.
@@ -204,19 +256,8 @@ export async function dumpMigratedSchema(
 ) {
   const stateDir = await mkdtemp(join(tmpdir(), "briar-d1-dump-"));
   try {
-    // Miniflare's D1 exporter cannot export databases containing FTS5 virtual
-    // tables. Apply ordinary migrations, export them, then append the FTS
-    // migration verbatim to the snapshot in dependency order. Its statements
-    // create an empty index and triggers, never rewrite historical messages.
-    const virtualTableMigration = "0219_channel_message_search.sql";
-    const virtualTableIncluded = names.includes(virtualTableMigration);
-    if (virtualTableIncluded && names.at(-1) !== virtualTableMigration) {
-      throw new Error("FTS migration must be last for snapshot export");
-    }
-    await stageMigrations(
-      stateDir,
-      names.filter((name) => name !== virtualTableMigration),
-    );
+    const { ordinary, virtual } = await partitionVirtualTableMigrations(names);
+    await stageMigrations(stateDir, ordinary);
     const config = join(stateDir, "wrangler.jsonc");
     await run([
       "bunx",
@@ -242,13 +283,13 @@ export async function dumpMigratedSchema(
       "--output",
       output,
     ], stateDir);
-    console.log(`[${label}] applied ${names.length} migrations`);
+    console.log(`[${label}] applied ${ordinary.length} migrations`);
     const statements = dumpStatements(await Bun.file(output).text());
-    if (virtualTableIncluded) {
-      const sql = await readFile(join(migrationsDir, virtualTableMigration), "utf8");
-      statements.push(...sql.split(`${STATEMENT_SENTINEL}\n`).slice(1).map((part) =>
-        part.trim()
-      ).filter(Boolean));
+    // Virtual-table migrations never reached the exported database, so append
+    // them verbatim in apply order. Their statements create empty indexes and
+    // triggers; they never rewrite historical rows.
+    for (const name of virtual) {
+      statements.push(...await migrationStatements(name));
     }
     return statements;
   } finally {

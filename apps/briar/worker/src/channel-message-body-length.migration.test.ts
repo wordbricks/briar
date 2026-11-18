@@ -184,10 +184,11 @@ describe("channel message body length migration", () => {
       "briar_channel_messages_webhook_event_idx",
     ]);
     const triggers = await objects("trigger");
+    // 0222 dropped four legacy DM memory triggers on this table.
     expect(triggers.filter((name) =>
       !name.startsWith("briar_channel_message_search_") &&
       !name.startsWith("briar_channel_message_bigrams_")
-    )).toHaveLength(16);
+    )).toHaveLength(12);
     expect(triggers.filter((name) => name.startsWith("briar_channel_message_search_")))
       .toHaveLength(3);
     expect(triggers.filter((name) => name.startsWith("briar_channel_message_bigrams_")))

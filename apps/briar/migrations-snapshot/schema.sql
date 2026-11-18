@@ -4,8 +4,8 @@
 -- Whenever a migration changes the schema or seeds rows, run
 -- `bun run d1:snapshot` and commit the result; `bun run d1:snapshot:check`
 -- fails in CI otherwise.
--- migrations-digest: 22025eb924b62e445e56a18328ba595fab9aac41f9302efaed0028b8c556a607
--- snapshot-digest: 009b17aa1b89d1d1c5a0de2b2ba0a46bca0faa84db6e3c0e595f93da1d8eb724
+-- migrations-digest: 74413d2bc5714260f54ff9c782ba3032f1aaaffae57dcffc20c1da4969331f5c
+-- snapshot-digest: 396de8a6b8b02678cbdfd82f36daff8f9ab2be8fd059e6aa1bf5ae88fc17ff15
 -- @statement
 CREATE TABLE IF NOT EXISTS "d1_migrations"(
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -13651,4 +13651,71 @@ CREATE TRIGGER briar_dm_memory_reply_space_deleted before delete on briar_dm_mem
   delete from briar_channel_reply_lookups where job_id in (
     select job_id from briar_dm_memory_reply_fences where space_id = old.id
   );
+end;
+-- @statement
+create virtual table briar_channel_message_search using fts5(
+  body,
+  tokenize='trigram'
+);
+-- @statement
+create trigger briar_channel_message_search_insert
+  after insert on briar_channel_messages when new.deleted_at is null
+begin
+  insert into briar_channel_message_search(rowid, body)
+  values (new.rowid, new.body);
+end;
+-- @statement
+create trigger briar_channel_message_search_delete
+  after delete on briar_channel_messages when old.deleted_at is null
+begin
+  delete from briar_channel_message_search where rowid = old.rowid;
+end;
+-- @statement
+create trigger briar_channel_message_search_update
+  after update of body, deleted_at on briar_channel_messages
+begin
+  delete from briar_channel_message_search where rowid = old.rowid;
+  insert into briar_channel_message_search(rowid, body)
+  select new.rowid, new.body where new.deleted_at is null;
+end;
+-- @statement
+create table briar_channel_message_bigrams (
+  message_rowid integer not null,
+  gram text not null,
+  primary key (gram, message_rowid)
+) without rowid;
+-- @statement
+create trigger briar_channel_message_bigrams_insert
+  after insert on briar_channel_messages when new.deleted_at is null
+begin
+  insert or ignore into briar_channel_message_bigrams(message_rowid, gram)
+  select new.rowid, lower(substr(new.body, positions.value, 2))
+  from json_each('[' || (select group_concat(value) from (
+    with recursive positions(value) as (
+      select 1 union all select value + 1 from positions
+      where value < length(new.body) - 1 and value < 50000
+    ) select value from positions
+  )) || ']') positions
+  where length(lower(substr(new.body, positions.value, 2))) = 2;
+end;
+-- @statement
+create trigger briar_channel_message_bigrams_delete
+  after delete on briar_channel_messages
+begin
+  delete from briar_channel_message_bigrams where message_rowid = old.rowid;
+end;
+-- @statement
+create trigger briar_channel_message_bigrams_update
+  after update of body, deleted_at on briar_channel_messages
+begin
+  delete from briar_channel_message_bigrams where message_rowid = old.rowid;
+  insert or ignore into briar_channel_message_bigrams(message_rowid, gram)
+  select new.rowid, lower(substr(new.body, positions.value, 2))
+  from json_each('[' || (select group_concat(value) from (
+    with recursive positions(value) as (
+      select 1 union all select value + 1 from positions
+      where value < length(new.body) - 1 and value < 50000
+    ) select value from positions
+  )) || ']') positions
+  where new.deleted_at is null and length(lower(substr(new.body, positions.value, 2))) = 2;
 end;
